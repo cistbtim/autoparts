@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AutoParts Config Encryptor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d0f14; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: #141720; border: 1px solid #2d3347; border-radius: 14px; padding: 32px; width: 100%; max-width: 560px; }
+  h1 { color: #e85d04; font-size: 20px; margin-bottom: 6px; }
+  p { color: #64748b; font-size: 13px; margin-bottom: 24px; }
+  label { display: block; font-size: 12px; color: #64748b; margin-bottom: 5px; }
+  input, textarea { width: 100%; background: #0d0f14; border: 1px solid #2d3347; color: #e2e8f0; border-radius: 6px; padding: 9px 12px; font-family: monospace; font-size: 13px; margin-bottom: 14px; outline: none; }
+  input:focus, textarea:focus { border-color: #e85d04; }
+  textarea { min-height: 90px; resize: vertical; }
+  button { background: #e85d04; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 600; width: 100%; margin-bottom: 10px; transition: background .2s; }
+  button:hover { background: #f87337; }
+  button.sec { background: #1e2130; color: #94a3b8; border: 1px solid #2d3347; }
+  button.sec:hover { background: #252840; }
+  .result { background: #0d0f14; border: 1px solid #22c55e33; border-radius: 8px; padding: 14px; margin-top: 16px; display: none; }
+  .result label { color: #22c55e; margin-bottom: 6px; }
+  .result textarea { margin-bottom: 0; border-color: #22c55e33; font-size: 11px; }
+  .warning { background: #78350f33; border: 1px solid #f59e0b44; border-radius: 8px; padding: 12px 14px; margin-bottom: 20px; font-size: 12px; color: #fbbf24; }
+  .step { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 10px; }
+  .step-num { background: #e85d04; color: #fff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .step-text { font-size: 12px; color: #94a3b8; line-height: 1.6; }
+  hr { border: none; border-top: 1px solid #1e2130; margin: 20px 0; }
+  code { background: #1e2130; color: #94a3b8; border-radius: 4px; padding: 1px 7px; font-size: 11px; font-family: monospace; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>⚙ Config Encryptor</h1>
+  <p>Encrypt your Supabase credentials using AES-256-GCM</p>
+
+  <div class="warning">
+    ⚠️ Remember your <strong>passphrase</strong> — you'll need it to update the config. Never share it.
+  </div>
+
+  <label>Supabase Project URL</label>
+  <input type="text" id="sb_url" placeholder="https://xxxx.supabase.co" />
+
+  <label>Supabase Anon Key</label>
+  <input type="password" id="sb_key" placeholder="eyJhbGci..." />
+
+  <label>Secret Passphrase (you choose this)</label>
+  <input type="password" id="passphrase" placeholder="MySecret2024!" />
+
+  <button onclick="doEncrypt()">🔐 Encrypt</button>
+  <button class="sec" onclick="doDecrypt()">🔓 Verify Decryption</button>
+
+  <div class="result" id="enc_result">
+    <label>✅ Encrypted string — paste into <code>public/config.enc</code></label>
+    <textarea id="enc_output" readonly onclick="this.select()"></textarea>
+    <button class="sec" style="margin-top:10px" onclick="navigator.clipboard.writeText(document.getElementById('enc_output').value).then(()=>alert('Copied!'))">📋 Copy</button>
+  </div>
+
+  <div class="result" id="dec_result" style="border-color:#3b82f633">
+    <label style="color:#60a5fa">✅ Decryption successful</label>
+    <textarea id="dec_output" readonly></textarea>
+  </div>
+
+  <hr>
+  <p style="color:#475569;font-size:12px;margin-bottom:12px"><strong style="color:#94a3b8">Setup steps:</strong></p>
+  <div class="step"><span class="step-num">1</span><div class="step-text">Encrypt your credentials above and copy the result</div></div>
+  <div class="step"><span class="step-num">2</span><div class="step-text">Create file <code>public/config.enc</code> in your project and paste the string</div></div>
+  <div class="step"><span class="step-num">3</span><div class="step-text">In Vercel dashboard → Settings → Environment Variables, add:<br><code>VITE_CONFIG_PASS = your_passphrase</code></div></div>
+  <div class="step"><span class="step-num">4</span><div class="step-text">Deploy — the app auto-decrypts on load, users never see the raw key</div></div>
+  <div class="step"><span class="step-num">5</span><div class="step-text">To update credentials: re-encrypt here and replace <code>public/config.enc</code></div></div>
+</div>
+
+<script>
+const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+const ub64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+async function getKey(pass, salt) {
+  const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name:"PBKDF2", salt, iterations:100000, hash:"SHA-256" }, km, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]);
+}
+
+async function doEncrypt() {
+  const url = document.getElementById("sb_url").value.trim();
+  const key = document.getElementById("sb_key").value.trim();
+  const pass = document.getElementById("passphrase").value;
+  if (!url || !key || !pass) { alert("Please fill all 3 fields"); return; }
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ck = await getKey(pass, salt);
+  const ct = await crypto.subtle.encrypt({name:"AES-GCM",iv}, ck, new TextEncoder().encode(JSON.stringify({url,key})));
+  document.getElementById("enc_output").value = `${b64(salt)}:${b64(iv)}:${b64(ct)}`;
+  document.getElementById("enc_result").style.display = "block";
+}
+
+async function doDecrypt() {
+  const enc = document.getElementById("enc_output").value.trim();
+  const pass = document.getElementById("passphrase").value;
+  if (!enc || !pass) { alert("Encrypt first, then verify"); return; }
+  try {
+    const [s,iv,ct] = enc.split(":");
+    const ck = await getKey(pass, ub64(s));
+    const dec = await crypto.subtle.decrypt({name:"AES-GCM",iv:ub64(iv)}, ck, ub64(ct));
+    const r = JSON.parse(new TextDecoder().decode(dec));
+    document.getElementById("dec_output").value = `URL: ${r.url}\nKey: ${r.key.slice(0,40)}...`;
+    document.getElementById("dec_result").style.display = "block";
+  } catch { alert("Failed — wrong passphrase or corrupted data"); }
+}
+</script>
+</body>
+</html>

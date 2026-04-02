@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AutoParts License Generator</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0d0f14; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; min-height: 100vh; padding: 24px 16px; }
+.container { max-width: 720px; margin: 0 auto; }
+h1 { font-size: 22px; color: #e85d04; margin-bottom: 4px; }
+.sub { color: #64748b; font-size: 13px; margin-bottom: 28px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { background: #141720; border: 1px solid #2d3347; border-radius: 12px; padding: 24px; }
+.card h2 { font-size: 15px; font-weight: 600; margin-bottom: 18px; color: #94a3b8; }
+label { display: block; font-size: 12px; color: #64748b; margin-bottom: 5px; }
+input, select { width: 100%; background: #0d0f14; border: 1px solid #2d3347; color: #e2e8f0; border-radius: 6px; padding: 8px 12px; font-family: monospace; font-size: 13px; margin-bottom: 12px; outline: none; }
+input[type=password] { font-family: monospace; }
+input:focus, select:focus { border-color: #e85d04; }
+.btn { cursor: pointer; border: none; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 600; font-family: inherit; transition: all .2s; width: 100%; margin-top: 4px; }
+.btn-primary { background: #e85d04; color: #fff; }
+.btn-primary:hover { background: #f87337; }
+.btn-sec { background: #1e2130; color: #94a3b8; border: 1px solid #2d3347; }
+.btn-sec:hover { background: #252840; }
+.btn-danger { background: #7f1d1d; color: #fca5a5; }
+.result-box { background: #0d0f14; border: 1px solid #22c55e44; border-radius: 8px; padding: 16px; margin-top: 16px; display: none; }
+.result-box label { color: #22c55e; font-size: 12px; margin-bottom: 8px; }
+.key-display { font-family: monospace; font-size: 13px; color: #e2e8f0; word-break: break-all; background: #141720; border: 1px solid #2d3347; border-radius: 6px; padding: 12px; margin-bottom: 10px; cursor: pointer; user-select: all; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.log-entry { padding: 10px 0; border-bottom: 1px solid #1e2130; display: flex; justify-content: space-between; align-items: center; }
+.log-entry:last-child { border-bottom: none; }
+.warn { background: #78350f33; border: 1px solid #f59e0b44; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #fbbf24; margin-bottom: 16px; }
+.full { grid-column: 1 / -1; }
+hr { border: none; border-top: 1px solid #1e2130; margin: 20px 0; }
+.decode-result { background: #0d0f14; border: 1px solid #3b82f644; border-radius: 8px; padding: 14px; margin-top: 12px; display: none; }
+.field { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #1e2130; font-size: 13px; }
+.field:last-child { border-bottom: none; }
+.field span:first-child { color: #64748b; }
+.field span:last-child { color: #e2e8f0; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>⚙ AutoParts License Generator</h1>
+  <p class="sub">Admin tool — Generate and manage license keys for clients</p>
+
+  <div class="grid">
+    <!-- LEFT: Generate -->
+    <div class="card">
+      <h2>🔐 Generate License Key</h2>
+      <div class="warn">⚠️ Keep your Master Secret safe. All keys use the same secret.</div>
+
+      <label>Master Secret (your private password)</label>
+      <input type="password" id="master_secret" placeholder="MyMasterSecret2024!" />
+
+      <label>Supabase URL</label>
+      <input type="text" id="sb_url" placeholder="https://xxxx.supabase.co" />
+
+      <label>Supabase Anon Key</label>
+      <input type="password" id="sb_key" placeholder="eyJhbGci..." />
+
+      <hr>
+
+      <label>Client Name</label>
+      <input type="text" id="client_name" placeholder="王大明汽車零件行" />
+
+      <label>Client ID (short code)</label>
+      <input type="text" id="client_id" placeholder="client_001" />
+
+      <label>Plan</label>
+      <select id="plan">
+        <option value="trial">Trial (30 days)</option>
+        <option value="monthly">Monthly</option>
+        <option value="yearly">Yearly</option>
+        <option value="lifetime">Lifetime</option>
+      </select>
+
+      <label>Expiry Date</label>
+      <input type="date" id="expires" />
+
+      <button class="btn btn-primary" onclick="generateKey()">🔑 Generate License Key</button>
+
+      <div class="result-box" id="gen_result">
+        <label>✅ License Key — Send this to your client</label>
+        <div class="key-display" id="key_output" onclick="copyKey()" title="Click to copy"></div>
+        <button class="btn btn-sec" onclick="copyKey()">📋 Copy Key</button>
+        <button class="btn btn-sec" style="margin-top:6px" onclick="saveToLog()">💾 Save to Log</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Decode + Log -->
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <h2>🔍 Decode / Verify Key</h2>
+        <label>License Key</label>
+        <input type="text" id="decode_key" placeholder="AP-..." />
+        <label>Master Secret</label>
+        <input type="password" id="decode_secret" placeholder="MyMasterSecret2024!" />
+        <button class="btn btn-sec" onclick="decodeKey()">🔓 Decode</button>
+
+        <div class="decode-result" id="decode_result">
+          <div class="field"><span>Client</span><span id="d_client">—</span></div>
+          <div class="field"><span>Client ID</span><span id="d_clientid">—</span></div>
+          <div class="field"><span>Plan</span><span id="d_plan">—</span></div>
+          <div class="field"><span>Expires</span><span id="d_expires">—</span></div>
+          <div class="field"><span>Supabase URL</span><span id="d_url" style="font-size:11px;max-width:200px;word-break:break-all">—</span></div>
+          <div class="field"><span>Status</span><span id="d_status">—</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📋 Generated Keys Log</h2>
+        <div id="log_list" style="max-height:300px;overflow-y:auto">
+          <p style="color:#64748b;font-size:13px;text-align:center;padding:20px">No keys generated yet</p>
+        </div>
+        <button class="btn btn-danger" style="margin-top:12px;font-size:12px" onclick="clearLog()">🗑 Clear Log</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Set default expiry to 30 days from now
+const d = new Date(); d.setDate(d.getDate() + 30);
+document.getElementById("expires").value = d.toISOString().slice(0,10);
+
+const enc64 = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+const dec64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+async function getKey(secret, salt) {
+  const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name:"PBKDF2", salt, iterations:100000, hash:"SHA-256" },
+    km, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]
+  );
+}
+
+async function generateKey() {
+  const secret = document.getElementById("master_secret").value;
+  const url    = document.getElementById("sb_url").value.trim();
+  const key    = document.getElementById("sb_key").value.trim();
+  const client = document.getElementById("client_name").value.trim();
+  const cid    = document.getElementById("client_id").value.trim();
+  const plan   = document.getElementById("plan").value;
+  const exp    = document.getElementById("expires").value;
+
+  if (!secret || !url || !key || !client || !cid) {
+    alert("Please fill all required fields"); return;
+  }
+
+  const payload = JSON.stringify({ url, key, client, client_id: cid, plan, expires: exp, issued: new Date().toISOString() });
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const ck   = await getKey(secret, salt);
+  const ct   = await crypto.subtle.encrypt({name:"AES-GCM",iv}, ck, new TextEncoder().encode(payload));
+
+  const raw = `${enc64(salt)}:${enc64(iv)}:${enc64(ct)}`;
+  const licenseKey = "AP-" + btoa(raw).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+
+  document.getElementById("key_output").textContent = licenseKey;
+  document.getElementById("gen_result").style.display = "block";
+  window._lastGenerated = { licenseKey, client, cid, plan, exp, issued: new Date().toISOString() };
+}
+
+function copyKey() {
+  const key = document.getElementById("key_output").textContent;
+  navigator.clipboard.writeText(key).then(() => alert("✅ Copied to clipboard!"));
+}
+
+function saveToLog() {
+  if (!window._lastGenerated) return;
+  const log = JSON.parse(localStorage.getItem("ap_key_log") || "[]");
+  log.unshift(window._lastGenerated);
+  localStorage.setItem("ap_key_log", JSON.stringify(log));
+  renderLog();
+}
+
+function renderLog() {
+  const log = JSON.parse(localStorage.getItem("ap_key_log") || "[]");
+  const el = document.getElementById("log_list");
+  if (log.length === 0) { el.innerHTML = '<p style="color:#64748b;font-size:13px;text-align:center;padding:20px">No keys logged yet</p>'; return; }
+  el.innerHTML = log.map((e,i) => `
+    <div class="log-entry">
+      <div>
+        <div style="font-size:13px;font-weight:600">${e.client}</div>
+        <div style="font-size:11px;color:#64748b">${e.cid} · ${e.issued?.slice(0,10)}</div>
+      </div>
+      <div style="text-align:right">
+        <span class="badge" style="background:${e.plan==='trial'?'#1e3a5f':'#14532d'};color:${e.plan==='trial'?'#60a5fa':'#4ade80'}">${e.plan}</span>
+        <div style="font-size:11px;color:#64748b;margin-top:3px">exp: ${e.exp}</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function clearLog() {
+  if (confirm("Clear all log entries?")) { localStorage.removeItem("ap_key_log"); renderLog(); }
+}
+
+async function decodeKey() {
+  const raw    = document.getElementById("decode_key").value.trim();
+  const secret = document.getElementById("decode_secret").value;
+  if (!raw || !secret) { alert("Enter both key and secret"); return; }
+  try {
+    const b64 = raw.replace(/^AP-/,"").replace(/-/g,"+").replace(/_/g,"/");
+    const inner = atob(b64);
+    const [s,iv,ct] = inner.split(":");
+    const ck = await getKey(secret, dec64(s));
+    const dec = await crypto.subtle.decrypt({name:"AES-GCM",iv:dec64(iv)}, ck, dec64(ct));
+    const p = JSON.parse(new TextDecoder().decode(dec));
+
+    const expired = p.expires && new Date(p.expires) < new Date();
+    document.getElementById("d_client").textContent = p.client || "—";
+    document.getElementById("d_clientid").textContent = p.client_id || "—";
+    document.getElementById("d_plan").textContent = p.plan || "—";
+    document.getElementById("d_expires").textContent = p.expires || "—";
+    document.getElementById("d_url").textContent = p.url || "—";
+    document.getElementById("d_status").innerHTML = expired
+      ? '<span style="color:#ef4444;font-weight:600">⏰ EXPIRED</span>'
+      : '<span style="color:#22c55e;font-weight:600">✅ VALID</span>';
+    document.getElementById("decode_result").style.display = "block";
+  } catch(e) {
+    alert("❌ Failed — wrong secret or invalid key");
+  }
+}
+
+renderLog();
+</script>
+</body>
+</html>

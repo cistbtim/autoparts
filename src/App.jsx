@@ -220,7 +220,7 @@ const toSaveUrl = (url) => {
 
 // Convert Google Drive link → direct view URL (no white border — for logos)
 const toLogoUrl = (url) => {
-  if (!url) return null;
+  if (!url) return null;p
   const m = url.match(/\/file\/d\/([^/]+)/);
   if (m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
   const m2 = url.match(/[?&]id=([^&]+)/);
@@ -251,12 +251,13 @@ const makeId = (prefix) => {
 const makeToken = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
 
 // ── Dynamsoft Barcode Reader — PDF417 decoder ───────────────────
-const DYNAMSOFT_CDN = "https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/";
+// Using v7.4.0-v1 (same version as the working Google Apps Script scanner)
+const DYNAMSOFT_CDN = "https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@7.4.0-v1/dist/";
 let _dsReader = null;
 
 async function getDynamsoftReader() {
   if(_dsReader) return _dsReader;
-  if(!window.Dynamsoft?.DBR){
+  if(!window.Dynamsoft?.BarcodeReader){
     await new Promise((res,rej)=>{
       const s=document.createElement("script");
       s.src=DYNAMSOFT_CDN+"dbr.js";
@@ -265,12 +266,13 @@ async function getDynamsoftReader() {
       document.head.appendChild(s);
     });
   }
-  const DBR=window.Dynamsoft.DBR;
-  DBR.BarcodeReader.engineResourcePath=DYNAMSOFT_CDN;
-  DBR.BarcodeReader.license="DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9"; // public trial
-  _dsReader=await DBR.BarcodeReader.createInstance();
+  // v7 API: window.Dynamsoft.BarcodeReader (not Dynamsoft.DBR)
+  const BR=window.Dynamsoft.BarcodeReader;
+  BR.engineResourcePath=DYNAMSOFT_CDN;
+  // v7 uses productKeys (trial mode works without a key — shows watermark only)
+  _dsReader=await BR.createInstance();
   const settings=await _dsReader.getRuntimeSettings();
-  settings.barcodeFormatIds=DBR.EnumBarcodeFormat.BF_PDF417;
+  settings.barcodeFormatIds=Dynamsoft.EnumBarcodeFormat.BF_PDF417;
   settings.deblurLevel=9;
   settings.scaleDownThreshold=99999; // don't downscale — keep full resolution
   await _dsReader.updateRuntimeSettings(settings);
@@ -303,48 +305,53 @@ async function decodePDF417fromImage(dataUrl) {
 }
 
 // ── Parse SA eNaTIS licence disc PDF417 payload ─────────────────
-// The disc barcode uses pipe-delimited fields in this order:
-//  [0] disc serial  [1] cert no  [2] ID/org no  [3] licence no
-//  [4] reg/plate    [5] VIN      [6] engine no  [7] make
-//  [8] body type    [9] tare kg  [10] gvm kg    [11] expiry YYYY-MM-DD
-//  ... (additional fields vary by disc version)
+// Uses same logic as the working Google Apps Script scanner:
+//  - Find "***" end-of-data marker, slice from char 1 to that marker
+//  - Split by % to get fixed-position fields
+//  - safeGet(idx) takes value before "/" to handle bilingual entries like "White/Wit"
+// Field positions (default format):
+//  [5] plate  [7] body type  [8] make  [9] model  [10] color  [11] VIN  [12] engine no
+// RC format (starts with "RC"): [5] plate  [6] body  [7] make  [8] model  [9] VIN  [10] engine
 function parseLicenceDisc(rawText) {
-  // SA eNaTIS discs use % as delimiter (not |)
-  // Split and filter empty tokens (text starts and ends with %)
-  const parts = rawText.split("%").map(s=>s.trim()).filter(s=>s.length>0);
-  let reg=null, vin=null, engine_no=null, make=null, model=null, color=null,
-      body_type=null, expiry_date=null, licence_no=null;
+  // Strip Dynamsoft attention/warning prefix: "[Attention(exceptionCode:-20000)] "
+  const text = rawText.replace(/^\[Attention\([^)]*\)\]\s*/i, "").trim();
 
-  // Fixed-position mapping (verified against real disc):
-  // [0] disc serial  [1] ?  [2] ?  [3] ?  [4] licence no  [5] ?
-  // [6] plate  [7] body type  [8] make  [9] model  [10] color
-  // [11] VIN  [12] engine no  [13] expiry date
-  if(parts.length>=13){
-    licence_no  = parts[4]||null;
-    reg         = parts[5]||null;
-    body_type   = parts[7]||null;
-    make        = parts[8]||null;
-    model       = parts[9]||null;
-    color       = parts[10]||null;
-    vin         = parts[11]||null;
-    engine_no   = parts[12]||null;
-    expiry_date = parts[13]||null;
+  // Find the *** end-of-data marker (same technique as the working SA scanner)
+  const strPos = text.indexOf("***");
+  if(strPos === -1) return { reg:null, vin:null, engine_no:null, make:null, model:null, color:null, body_type:null, expiry_date:null, licence_no:null, raw:rawText };
+
+  // Slice from index 1 (skip leading %) up to *** marker, then split by %
+  const newresult = text.slice(1, strPos);
+  const arr = newresult.split("%");
+
+  // safeGet: return field value before any "/" (handles "White/Wit" bilingual), or ""
+  const safeGet = (idx) => arr[idx] ? arr[idx].split("/")[0].trim() : "";
+
+  const n = v => v?.trim() || null; // empty string → null
+
+  let reg, vin, engine_no, make, model, color, body_type;
+
+  if(arr[0]?.startsWith("RC")){
+    // RC format
+    reg       = n(safeGet(5));
+    body_type = n(safeGet(6));
+    make      = n(safeGet(7));
+    model     = n(safeGet(8));
+    color     = null;
+    vin       = n(safeGet(9));
+    engine_no = n(safeGet(10));
+  } else {
+    // Default eNaTIS format
+    reg       = n(safeGet(5));
+    body_type = n(safeGet(7));
+    make      = n(safeGet(8));
+    model     = n(safeGet(9));
+    color     = n(safeGet(10));
+    vin       = n(safeGet(11));
+    engine_no = n(safeGet(12));
   }
 
-
-  // Color may be bilingual "White / Wit" — take the English part before " / "
-  if(color&&color.includes(" / ")) color=color.split(" / ")[0].trim();
-
-  // Fallback: scan all tokens with known patterns (handles format variations)
-  for(const p of parts){
-    if(!vin && /^[A-HJ-NPR-Z0-9]{17}$/i.test(p))           vin = p.toUpperCase();
-    if(!expiry_date && /^\d{4}-\d{2}-\d{2}$/.test(p))      expiry_date = p;
-    if(!reg && /^[A-Z]{2,6}\s?\d{2,6}\s?[A-Z]{0,3}$/.test(p.trim())) reg = p.trim().replace(/\s+/g,"");
-  }
-
-  if(expiry_date) expiry_date = expiry_date.slice(0,10);
-
-  return { reg, vin, engine_no, make, model, color, body_type, expiry_date, licence_no, raw:rawText };
+  return { reg, vin, engine_no, make, model, color, body_type, expiry_date:null, licence_no:null, raw:rawText };
 }
 const waLink = (phone, msg) => `https://wa.me/${(phone||"").replace(/[^0-9+]/g,"")}?text=${encodeURIComponent(msg)}`;
 const mailLink = (to, subj, body) => `mailto:${to||""}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
@@ -901,6 +908,7 @@ function MainApp({user,onLogout,t,lang,setLang}) {
   const [workshopJobs,setWorkshopJobs]=useState([]);
   const [workshopJobItems,setWorkshopJobItems]=useState([]);
   const [workshopInvoices,setWorkshopInvoices]=useState([]);
+  const [workshopQuotes,setWorkshopQuotes]=useState([]);
   const [workshopCustomers,setWorkshopCustomers]=useState([]);
   const [workshopVehicles,setWorkshopVehicles]=useState([]); // null=no filter, Set=filtered part ids
   const [completedDays,setCompletedDays]=useState(7); // filter completed orders to last N days
@@ -1042,6 +1050,7 @@ function MainApp({user,onLogout,t,lang,setLang}) {
       api.get("workshop_jobs","select=*&order=created_at.desc").catch(()=>[]),
       api.get("workshop_job_items","select=*").catch(()=>[]),
       api.get("workshop_invoices","select=*&order=created_at.desc").catch(()=>[]),
+      api.get("workshop_quotes","select=*&order=created_at.desc").catch(()=>[]),
       api.get("workshop_customers","select=*&order=name.asc").catch(()=>[]),
       api.get("workshop_vehicles","select=*&order=reg.asc").catch(()=>[]),
     ]);
@@ -1066,8 +1075,27 @@ function MainApp({user,onLogout,t,lang,setLang}) {
     setWorkshopJobs(Array.isArray(rest[5])?rest[5]:[]);
     setWorkshopJobItems(Array.isArray(rest[6])?rest[6]:[]);
     setWorkshopInvoices(Array.isArray(rest[7])?rest[7]:[]);
-    setWorkshopCustomers(Array.isArray(rest[8])?rest[8]:[]);
-    setWorkshopVehicles(Array.isArray(rest[9])?rest[9]:[]);
+    setWorkshopQuotes(Array.isArray(rest[8])?rest[8]:[]);
+    setWorkshopCustomers(Array.isArray(rest[9])?rest[9]:[]);
+    setWorkshopVehicles(Array.isArray(rest[10])?rest[10]:[]);
+  },[]);
+
+  // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
+  const refreshWorkshopData=useCallback(async()=>{
+    const [jobs,items,invoices,quotes,wsCustomers,wsVehicles]=await Promise.all([
+      api.get("workshop_jobs","select=*&order=created_at.desc").catch(()=>[]),
+      api.get("workshop_job_items","select=*").catch(()=>[]),
+      api.get("workshop_invoices","select=*&order=created_at.desc").catch(()=>[]),
+      api.get("workshop_quotes","select=*&order=created_at.desc").catch(()=>[]),
+      api.get("workshop_customers","select=*&order=name.asc").catch(()=>[]),
+      api.get("workshop_vehicles","select=*&order=reg.asc").catch(()=>[]),
+    ]);
+    setWorkshopJobs(Array.isArray(jobs)?jobs:[]);
+    setWorkshopJobItems(Array.isArray(items)?items:[]);
+    setWorkshopInvoices(Array.isArray(invoices)?invoices:[]);
+    setWorkshopQuotes(Array.isArray(quotes)?quotes:[]);
+    setWorkshopCustomers(Array.isArray(wsCustomers)?wsCustomers:[]);
+    setWorkshopVehicles(Array.isArray(wsVehicles)?wsVehicles:[]);
   },[]);
 
   // Sync Apps Script URL to window whenever settings changes
@@ -1099,6 +1127,11 @@ function MainApp({user,onLogout,t,lang,setLang}) {
     tabRef.current === "vehicles" ||    // always pause when managing vehicles
     tabRef.current === "workshop" ||    // always pause on workshop
     tabRef.current === "wscustomers" ||
+    tabRef.current === "wsquotations" ||
+    tabRef.current === "wsinvoices" ||
+    tabRef.current === "wspayments" ||
+    tabRef.current === "wsstatement" ||
+    tabRef.current === "wsreport" ||
     (Date.now() - lastActivityRef.current) < 8000;
 
   useEffect(()=>{
@@ -1261,6 +1294,8 @@ function MainApp({user,onLogout,t,lang,setLang}) {
       const jobRow={
         workshop_customer_id:d.workshop_customer_id||null,
         workshop_vehicle_id:d.workshop_vehicle_id||null,
+        customer_name:str(d.customer_name),
+        customer_phone:str(d.customer_phone),
         vehicle_reg:str(d.vehicle_reg),
         vehicle_make:str(d.vehicle_make),
         vehicle_model:str(d.vehicle_model),
@@ -1278,48 +1313,94 @@ function MainApp({user,onLogout,t,lang,setLang}) {
         return_reason:str(d.return_reason),
         parent_job_id:d.parent_job_id||null,
       };
+      let savedId=d.id;
       if(d.id){ chk(await api.patch("workshop_jobs","id",d.id,jobRow),"Update job"); }
-      else { chk(await api.insert("workshop_jobs",{...jobRow, id:makeId("JOB")}),"Create job"); }
-      await loadAll(); showToast("Job saved");
+      else { savedId=makeId("JOB"); chk(await api.insert("workshop_jobs",{...jobRow, id:savedId}),"Create job"); }
+      await refreshWorkshopData(); showToast("Job saved");
+      return savedId;
     } catch(e){ alert("Save failed: "+e.message); }
   };
   const deleteWorkshopJob=async(id)=>{
     await api.delete("workshop_jobs","id",id);
-    await loadAll(); showToast("Deleted","err");
+    await refreshWorkshopData(); showToast("Deleted","err");
   };
   const saveJobItem=async(item)=>{
-    if(item.id) await api.patch("workshop_job_items","id",item.id,item);
-    else { const {id,...rest}=item; await api.insert("workshop_job_items",rest); }
-    await loadAll();
+    // Strip client-only fields not in the DB schema
+    const {part_id, id, ...dbItem} = item;
+    let res;
+    if(id){
+      res=await api.patch("workshop_job_items","id",id,dbItem);
+    } else {
+      res=await api.insert("workshop_job_items",dbItem);
+    }
+    if(res&&!Array.isArray(res)&&res.message) throw new Error(res.message);
+    await refreshWorkshopData();
   };
   const deleteJobItem=async(id)=>{
     await api.delete("workshop_job_items","id",id);
-    await loadAll();
+    await refreshWorkshopData();
   };
   const saveWorkshopInvoice=async(inv)=>{
-    await api.upsert("workshop_invoices",inv);
+    const {id,...rest}=inv;
+    const res=await api.insert("workshop_invoices",{...rest, id:id||makeId("WSI")});
+    if(res&&!Array.isArray(res)&&res.message) throw new Error(res.message);
     await api.patch("workshop_jobs","id",inv.job_id,{status:"Done"});
-    await loadAll(); showToast("Invoice created");
+    await refreshWorkshopData(); showToast("Invoice created");
+  };
+  const updateWorkshopInvoice=async(id,data)=>{
+    const res=await api.patch("workshop_invoices","id",id,data);
+    if(res&&!Array.isArray(res)&&res.message) throw new Error(res.message);
+    await refreshWorkshopData(); showToast("Invoice updated");
+  };
+  const deleteWorkshopInvoice=async(id,jobId)=>{
+    await api.delete("workshop_invoices","id",id);
+    if(jobId) await api.patch("workshop_jobs","id",jobId,{status:"In Progress"});
+    await refreshWorkshopData(); showToast("Invoice deleted","err");
+  };
+  const saveWorkshopQuote=async(q)=>{
+    const {id,...rest}=q;
+    if(id){ await api.patch("workshop_quotes","id",id,rest); showToast("Quote updated"); }
+    else { await api.insert("workshop_quotes",{...rest,id:makeId("WSQ")}); showToast("Quote created"); }
+    await refreshWorkshopData();
+  };
+  const deleteWorkshopQuote=async(id)=>{
+    await api.delete("workshop_quotes","id",id);
+    await refreshWorkshopData(); showToast("Quote deleted","err");
+  };
+  const convertQuoteToInvoice=async(quote,job,subtotal,tax,total)=>{
+    const invId=makeId("WSI");
+    await api.insert("workshop_invoices",{
+      id:invId, job_id:job.id,
+      invoice_customer:quote.quote_customer, inv_phone:quote.quote_phone, inv_email:quote.quote_email,
+      vehicle_reg:job.vehicle_reg||"",
+      invoice_date:new Date().toISOString().slice(0,10),
+      due_date:quote.valid_until||"",
+      subtotal, tax, total, status:"unpaid",
+      notes:`Converted from Quote ${quote.id}${quote.notes?"\n"+quote.notes:""}`,
+    });
+    await api.patch("workshop_quotes","id",quote.id,{status:"converted"});
+    await api.patch("workshop_jobs","id",job.id,{status:"Done"});
+    await refreshWorkshopData(); showToast("Invoice created from quote");
   };
   const saveWorkshopCustomer=async(data)=>{
     const {id,...rest}=data;
     if(id){ await api.patch("workshop_customers","id",id,rest); }
     else { await api.insert("workshop_customers",{...data, id:makeId("WSC")}); }
-    await loadAll(); showToast("Customer saved");
+    await refreshWorkshopData(); showToast("Customer saved");
   };
   const deleteWorkshopCustomer=async(id)=>{
     await api.delete("workshop_customers","id",id);
-    await loadAll(); showToast("Deleted","err");
+    await refreshWorkshopData(); showToast("Deleted","err");
   };
   const saveWorkshopVehicle=async(data)=>{
     const {id,...rest}=data;
     if(id){ await api.patch("workshop_vehicles","id",id,rest); }
     else { await api.insert("workshop_vehicles",{...data, id:makeId("WSV")}); }
-    await loadAll(); showToast("Vehicle saved");
+    await refreshWorkshopData(); showToast("Vehicle saved");
   };
   const deleteWorkshopVehicle=async(id)=>{
     await api.delete("workshop_vehicles","id",id);
-    await loadAll(); showToast("Deleted","err");
+    await refreshWorkshopData(); showToast("Deleted","err");
   };
   const saveFitment=async(partId,vehicleId,notes="")=>{
     await api.upsert("part_fitments",{part_id:partId,vehicle_id:vehicleId,notes});
@@ -1742,8 +1823,13 @@ function MainApp({user,onLogout,t,lang,setLang}) {
     {
       id:"grp_workshop", icon:"🔧", label:lang==="zh"?"維修工場":"Workshop", roles:["admin","manager"],
       children:[
-        {id:"workshop",icon:"🔧",label:t.workshop||"Workshop",roles:["admin","manager"]},
-        {id:"wscustomers",icon:"👤",label:lang==="zh"?"維修客戶":"WS Customers",roles:["admin","manager"]},
+        {id:"workshop",    icon:"🔧",label:"Jobs",         roles:["admin","manager"]},
+        {id:"wscustomers", icon:"👥",label:"WS Customers", roles:["admin","manager"]},
+        {id:"wsquotations",icon:"📝",label:"WS Quotations",roles:["admin","manager"]},
+        {id:"wsinvoices",  icon:"🧾",label:"WS Invoices",  roles:["admin","manager"]},
+        {id:"wspayments",  icon:"💳",label:"WS Payments",  roles:["admin","manager"]},
+        {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager"]},
+        {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager"]},
       ]
     },
     {
@@ -2809,13 +2895,18 @@ function MainApp({user,onLogout,t,lang,setLang}) {
 
         {/* ── SETTINGS ── */}
         {/* ── VEHICLES ── */}
-        {/* ── WORKSHOP ── */}
-        {tab==="workshop"&&(role==="admin"||role==="manager")&&(
+        {/* ── WORKSHOP (all sub-tabs) ── */}
+        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager")&&(
           <WorkshopPage
+            key={tab}
+            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstatement"?"statement":"report"}
             jobs={workshopJobs}
             jobItems={workshopJobItems}
             invoices={workshopInvoices}
+            quotes={workshopQuotes}
             parts={parts}
+            partFitments={partFitments}
+            vehicles={vehicles}
             customers={customers}
             wsCustomers={workshopCustomers}
             wsVehicles={workshopVehicles}
@@ -2825,21 +2916,15 @@ function MainApp({user,onLogout,t,lang,setLang}) {
             onSaveItem={saveJobItem}
             onDeleteItem={deleteJobItem}
             onSaveInvoice={saveWorkshopInvoice}
+            onUpdateInvoice={updateWorkshopInvoice}
+            onDeleteInvoice={deleteWorkshopInvoice}
+            onSaveQuote={saveWorkshopQuote}
+            onDeleteQuote={deleteWorkshopQuote}
+            onConvertQuoteToInvoice={convertQuoteToInvoice}
             onSaveWsCustomer={saveWorkshopCustomer}
             onDeleteWsCustomer={deleteWorkshopCustomer}
             onSaveWsVehicle={saveWorkshopVehicle}
             onDeleteWsVehicle={deleteWorkshopVehicle}
-            t={t} lang={lang}/>
-        )}
-        {tab==="wscustomers"&&(role==="admin"||role==="manager")&&(
-          <WsCustomersPage
-            wsCustomers={workshopCustomers}
-            wsVehicles={workshopVehicles}
-            jobs={workshopJobs}
-            onSaveCustomer={saveWorkshopCustomer}
-            onDeleteCustomer={deleteWorkshopCustomer}
-            onSaveVehicle={saveWorkshopVehicle}
-            onDeleteVehicle={deleteWorkshopVehicle}
             t={t} lang={lang}/>
         )}
 
@@ -7444,10 +7529,82 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
   const [reopenJobId,setReopenJobId]=useState(null);
   // job prefill for WorkshopJobModal
   const [jobPrefill,setJobPrefill]=useState(null);
+  // photo step
+  const [photoSession,setPhotoSession]=useState(null);   // {date,time} strings fixed at session start
+  const [photoList,setPhotoList]=useState([]);            // [{id,dataUrl,status,url,error}]
+  const [bookInJobId,setBookInJobId]=useState(null);      // job ID for linking photos to DB
+  const photoCounter=useRef(0);
+  const photoCamRef=useRef(null);
+  const photoGalRef=useRef(null);
 
   // Native file inputs — no getUserMedia, no HTTPS required
   const cameraRef=useRef(null);  // capture="environment" → opens native camera app
   const galleryRef=useRef(null); // no capture → opens file picker / gallery
+
+  // ── Upload one photo to Google Drive + save URL to DB ─────────
+  const uploadBookInPhoto=async(photoId,dataUrl,session,reg,jobId)=>{
+    const SCRIPT_URL=
+      (window._VEHICLE_SCRIPT_URL&&window._VEHICLE_SCRIPT_URL.trim())||
+      (window._APPS_SCRIPT_URL&&window._APPS_SCRIPT_URL.trim())||"";
+    if(!SCRIPT_URL){
+      setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"error",error:"No script URL — set Vehicle Script URL in Settings"}:x));
+      return;
+    }
+    const setStatus=(s)=>setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:s}:x));
+    setStatus("uploading");
+    try{
+      // resize to max 1600px
+      const base64=await new Promise((res,rej)=>{
+        const img=new Image();
+        img.onload=()=>{
+          const MAX=1600;
+          const canvas=document.createElement("canvas");
+          let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          canvas.width=w;canvas.height=h;
+          canvas.getContext("2d").drawImage(img,0,0,w,h);
+          res(canvas.toDataURL("image/jpeg",0.88));
+        };
+        img.onerror=rej;
+        img.src=dataUrl;
+      });
+      const folderPath=`Tim_Car_Phot/${reg}/${session.date}/${session.time}`;
+      const n=String(photoId).padStart(3,"0");
+      const filename=`photo_${n}.jpg`;
+      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType:"image/jpeg",folderPath})});
+      const result=await resp.json();
+      if(result.success){
+        // Save URL to DB linked to this job
+        if(jobId) await api.insert("workshop_job_photos",{id:makeId("PH"),job_id:jobId,url:result.url,folder_path:folderPath}).catch(()=>{});
+        setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"done",url:result.url}:x));
+      } else {
+        setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"error",error:result.error||"Upload failed"}:x));
+      }
+    }catch(e){
+      setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"error",error:e.message}:x));
+    }
+  };
+
+  const handlePhotoFile=(e)=>{
+    const files=Array.from(e.target.files||[]);
+    e.target.value="";
+    if(!files.length) return;
+    const session=photoSession;
+    const reg=plate.replace(/\s/g,"").toUpperCase();
+    const jid=bookInJobId;
+    files.forEach(file=>{
+      if(!file.type.startsWith("image/")) return;
+      photoCounter.current+=1;
+      const id=photoCounter.current;
+      const fr=new FileReader();
+      fr.onload=ev=>{
+        const dataUrl=ev.target.result;
+        setPhotoList(p=>[...p,{id,dataUrl,status:"pending",url:null,error:null}]);
+        uploadBookInPhoto(id,dataUrl,session,reg,jid);
+      };
+      fr.readAsDataURL(file);
+    });
+  };
 
   // ── Process an image file → decode PDF417 ──────────────────────
   const processImage=async(dataUrl)=>{
@@ -7533,9 +7690,112 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
       <WorkshopJobModal
         job={jobPrefill}
         wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs}
-        onSave={async(d)=>{ await onSaveJob(d); onClose(); }}
+        onSave={async(d)=>{
+          const jobId=await onSaveJob(d);
+          // After vehicle/job saved → go to photo capture
+          const now=new Date();
+          const pad2=n=>String(n).padStart(2,"0");
+          const dateStr=`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`;
+          const timeStr=`${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`;
+          setBookInJobId(jobId||null);
+          setPhotoSession({date:dateStr,time:timeStr});
+          setPhotoList([]);
+          photoCounter.current=0;
+          setStep("photos");
+        }}
         onReopenJob={async(d)=>{ await onReopenJob(d); onClose(); }}
         onClose={()=>setStep("lookup")} t={t}/>
+    );
+  }
+
+  // ── Photo capture step ───────────────────────────────────────
+  if(step==="photos"&&photoSession){
+    const reg=plate.replace(/\s/g,"").toUpperCase();
+    const folderDisplay=`Tim_Car_Phot/${reg}/${photoSession.date}/${photoSession.time}/`;
+    const done=photoList.filter(p=>p.status==="done").length;
+    const uploading=photoList.filter(p=>p.status==="uploading"||p.status==="pending").length;
+    const hasScript=!!(
+      (window._VEHICLE_SCRIPT_URL&&window._VEHICLE_SCRIPT_URL.trim())||
+      (window._APPS_SCRIPT_URL&&window._APPS_SCRIPT_URL.trim())
+    );
+    return (
+      <Overlay onClose={onClose} wide>
+        <MHead title={`📷 Vehicle Photos — ${reg}`} onClose={onClose}/>
+
+        {/* Job saved banner */}
+        <div style={{marginBottom:14,padding:10,background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.25)",borderRadius:10,fontSize:13}}>
+          <div style={{fontWeight:700,color:"var(--green)"}}>✅ Job card saved!</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Now take photos of the vehicle. Tap Done to skip.</div>
+        </div>
+
+        {/* Save path info */}
+        <div style={{marginBottom:12,padding:"8px 10px",background:"var(--surface2)",borderRadius:8,fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace",wordBreak:"break-all"}}>
+          📁 {folderDisplay}
+        </div>
+
+        {!hasScript&&(
+          <div style={{marginBottom:12,padding:10,background:"rgba(251,100,60,.08)",border:"1px solid rgba(251,100,60,.2)",borderRadius:8,fontSize:12,color:"var(--red)"}}>
+            ⚙️ No Apps Script URL configured — photos will not upload to Google Drive. Set <strong>Vehicle Script URL</strong> in Settings.
+          </div>
+        )}
+
+        {/* Camera / gallery buttons */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+          <button className="btn btn-primary" style={{padding:18,flexDirection:"column",display:"flex",alignItems:"center",gap:6,fontSize:13}}
+            onClick={()=>photoCamRef.current?.click()}>
+            <span style={{fontSize:26}}>📷</span>
+            Take Photo
+          </button>
+          <button className="btn btn-ghost" style={{padding:18,flexDirection:"column",display:"flex",alignItems:"center",gap:6,fontSize:13}}
+            onClick={()=>photoGalRef.current?.click()}>
+            <span style={{fontSize:26}}>🖼️</span>
+            Gallery
+          </button>
+          <input ref={photoCamRef} type="file" accept="image/*" capture="environment" multiple style={{display:"none"}} onChange={handlePhotoFile}/>
+          <input ref={photoGalRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={handlePhotoFile}/>
+        </div>
+
+        {/* Photo grid */}
+        {photoList.length>0&&(
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:600,color:"var(--text3)",marginBottom:8}}>
+              {photoList.length} photo{photoList.length!==1?"s":""} — {done} uploaded{uploading>0?`, ${uploading} in progress`:""}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(90px,1fr))",gap:8}}>
+              {photoList.map(p=>(
+                <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3"}}>
+                  <img src={p.dataUrl} alt={`photo ${p.id}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  {/* Status overlay */}
+                  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",
+                    background:p.status==="done"?"rgba(0,0,0,0)":p.status==="error"?"rgba(200,30,30,.5)":"rgba(0,0,0,.45)"}}>
+                    {(p.status==="pending"||p.status==="uploading")&&(
+                      <div style={{width:18,height:18,border:"2px solid rgba(255,255,255,.3)",borderTop:"2px solid #fff",
+                        borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+                    )}
+                    {p.status==="done"&&(
+                      <div style={{position:"absolute",top:3,right:5,fontSize:14}}>✅</div>
+                    )}
+                    {p.status==="error"&&(
+                      <div style={{fontSize:10,color:"#fff",textAlign:"center",padding:4}}>❌<br/>{(p.error||"").slice(0,30)}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {photoList.length===0&&(
+          <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:13}}>
+            No photos yet — tap <strong>Take Photo</strong> to start
+          </div>
+        )}
+
+        <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,fontWeight:700,marginTop:4}}
+          onClick={onClose} disabled={uploading>0}>
+          {uploading>0?`⏳ Uploading ${uploading} photo${uploading!==1?"s":""}...`:`✅ Done${done>0?` (${done} photo${done!==1?"s":""} saved)`:""}`}
+        </button>
+      </Overlay>
     );
   }
 
@@ -7776,6 +8036,14 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
                     <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={async()=>{if(window.confirm("Delete vehicle?")) await onDeleteVehicle(v.id);}}>✕</button>
                   </div>
                 </div>
+                {[v.photo_front,v.photo_rear,v.photo_side].some(Boolean)&&(
+                  <div style={{display:"flex",gap:5,marginTop:8}}>
+                    {[{url:v.photo_front,label:"Front"},{url:v.photo_rear,label:"Rear"},{url:v.photo_side,label:"Side"}].filter(p=>p.url).map(p=>(
+                      <img key={p.label} src={p.url} alt={p.label} style={{width:54,height:40,objectFit:"cover",borderRadius:5,border:"1px solid var(--border)"}}
+                        onError={e=>{e.target.style.display="none";}}/>
+                    ))}
+                  </div>
+                )}
                 {openJob&&<div style={{marginTop:8,fontSize:11,color:"var(--yellow)"}}> Open: {openJob.status} · {openJob.date_in}</div>}
                 <div style={{marginTop:6,fontSize:11,color:"var(--text3)"}}>{vJobs.length} job(s) total</div>
               </div>
@@ -7889,7 +8157,7 @@ function WsCustomerForm({data,onSave,onClose,t}) {
 }
 
 function WsVehicleForm({data,onSave,onClose,t}) {
-  const [f,setF]=useState({id:data.id||null,workshop_customer_id:data.workshop_customer_id,reg:data.reg||"",make:data.make||"",model:data.model||"",year:data.year||"",color:data.color||"",vin:data.vin||"",engine_no:data.engine_no||"",notes:data.notes||""});
+  const [f,setF]=useState({id:data.id||null,workshop_customer_id:data.workshop_customer_id,reg:data.reg||"",make:data.make||"",model:data.model||"",year:data.year||"",color:data.color||"",vin:data.vin||"",engine_no:data.engine_no||"",notes:data.notes||"",photo_front:data.photo_front||"",photo_rear:data.photo_rear||"",photo_side:data.photo_side||""});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   return (
     <div>
@@ -7907,6 +8175,26 @@ function WsVehicleForm({data,onSave,onClose,t}) {
         <div><FL label="Engine No."/><input className="inp" value={f.engine_no} onChange={e=>s("engine_no",e.target.value.toUpperCase())} style={{fontFamily:"DM Mono,monospace",fontSize:12}}/></div>
       </FG>
       <FD><FL label={t.notes||"Notes"}/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} style={{minHeight:50}}/></FD>
+
+      {/* Photos — only available after vehicle is saved */}
+      <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",margin:"14px 0 8px",paddingBottom:6,borderBottom:"1px solid var(--border)"}}>📸 Vehicle Photos</div>
+      {f.id
+        ? <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+            {[
+              {key:"photo_front", label:"Front"},
+              {key:"photo_rear",  label:"Rear"},
+              {key:"photo_side",  label:"Side"},
+            ].map(({key,label})=>(
+              <VehiclePhotoUploader key={key} label={label} url={f[key]}
+                vehicleId={f.id} make={f.make||"vehicle"} viewName={key.replace("photo_","")}
+                onChange={url=>s(key,url)}/>
+            ))}
+          </div>
+        : <div style={{textAlign:"center",padding:16,background:"var(--surface2)",borderRadius:10,color:"var(--text3)",fontSize:13}}>
+            💾 Save the vehicle first, then add photos
+          </div>
+      }
+
       <div style={{display:"flex",gap:10,marginTop:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.reg.trim()){alert("Plate required");return;}onSave(f);}}>💾 {t.save}</button>
@@ -7918,15 +8206,16 @@ function WsVehicleForm({data,onSave,onClose,t}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-function WorkshopPage({jobs,jobItems,invoices,parts,customers,wsCustomers=[],wsVehicles=[],settings,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,t,lang}) {
-  const [view,     setView]     = useState("list"); // list | job
-  const [activeJob,setActiveJob]= useState(null);
-  const [editJob,  setEditJob]  = useState(null);   // null=closed, {}=new, {...}=edit
-  const [filterSt, setFilterSt] = useState("__all__");
-  const [search,   setSearch]   = useState("");
-  const [bookIn,   setBookIn]   = useState(false);
+function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts,partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],settings,initialTab,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,t,lang}) {
+  const [view,      setView]      = useState("list");
+  const [activeJob, setActiveJob] = useState(null);
+  const [editJob,   setEditJob]   = useState(null);
+  const [filterSt,  setFilterSt]  = useState("__all__");
+  const [search,    setSearch]    = useState("");
+  const [bookIn,    setBookIn]    = useState(false);
+  const [wsTab,     setWsTab]     = useState(initialTab||"jobs");
+  const [stmtCust,  setStmtCust]  = useState("");  // statement: selected customer id
 
-  const JOB_STATUSES = ["Pending","In Progress","Done","Delivered"];
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
   const ST_BG    = {"Pending":"rgba(96,165,250,.12)","In Progress":"rgba(251,191,36,.12)","Done":"rgba(52,211,153,.12)","Delivered":"rgba(100,116,139,.12)"};
 
@@ -7938,124 +8227,496 @@ function WorkshopPage({jobs,jobItems,invoices,parts,customers,wsCustomers=[],wsV
   });
 
   const jobInvoice = (jobId) => invoices.find(i=>i.job_id===jobId);
+  const jobQuote   = (jobId) => quotes.find(q=>q.job_id===jobId);
 
-  // Open job detail
+  const C   = settings.currency||"ZAR";
+  const fmt = v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+  // ── Job detail view ──────────────────────────────────────────
   if(view==="job"&&activeJob){
     const items = jobItems.filter(i=>i.job_id===activeJob.id);
     const inv   = jobInvoice(activeJob.id);
+    const quote = jobQuote(activeJob.id);
     return (
       <WorkshopJobDetail
-        job={activeJob}
-        items={items}
-        invoice={inv}
-        parts={parts}
-        settings={settings}
+        job={activeJob} items={items} invoice={inv} quote={quote}
+        parts={parts} partFitments={partFitments} vehicles={vehicles} settings={settings}
         onBack={()=>{ setView("list"); setActiveJob(null); }}
         onSaveJob={async(d)=>{ await onSaveJob(d); setActiveJob({...activeJob,...d}); }}
-        onSaveItem={onSaveItem}
-        onDeleteItem={onDeleteItem}
-        onSaveInvoice={onSaveInvoice}
+        onSaveItem={onSaveItem} onDeleteItem={onDeleteItem}
+        onSaveInvoice={onSaveInvoice} onUpdateInvoice={onUpdateInvoice} onDeleteInvoice={onDeleteInvoice}
+        onSaveQuote={onSaveQuote} onDeleteQuote={onDeleteQuote} onConvertQuoteToInvoice={onConvertQuoteToInvoice}
         t={t} lang={lang}/>
     );
   }
 
+  // ── Sub-nav tabs ─────────────────────────────────────────────
+  const WS_TABS = [
+    ["jobs",       "🔧 Jobs",        jobs.length],
+    ["customers",  "👥 Customers",   wsCustomers.length],
+    ["quotations", "📝 Quotations",  quotes.length],
+    ["invoices",   "🧾 Invoices",    invoices.length],
+    ["payments",   "💳 Payments",    invoices.filter(i=>(+i.paid_amount||0)>0).length],
+    ["statement",  "📋 Statement",   null],
+    ["report",     "📊 Report",      null],
+  ];
+
+  // ── Report stats ─────────────────────────────────────────────
+  const totalInvoiced  = invoices.reduce((s,i)=>s+(+i.total||0),0);
+  const totalPaid      = invoices.reduce((s,i)=>s+(+i.paid_amount||0),0);
+  const totalOutstanding = totalInvoiced - totalPaid;
+  const totalQuoted    = quotes.filter(q=>q.status!=="converted").reduce((s,q)=>s+(+q.total||0),0);
+
   return (
     <div className="fu">
-      {/* Header */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
+      {/* ── Page header ── */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div>
           <h1 style={{fontSize:20,fontWeight:700}}>🔧 {t.workshop||"Workshop"}</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
-            {jobs.length} jobs · {jobs.filter(j=>j.status==="In Progress").length} in progress
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:2}}>
+            {jobs.length} jobs · {jobs.filter(j=>j.status==="In Progress").length} in progress · {invoices.filter(i=>i.status!=="paid").length} unpaid invoices
           </p>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <button className="btn btn-primary" style={{fontSize:15,padding:"10px 20px"}}
-            onClick={()=>setBookIn(true)}>
-            📷 Book In Car
+        {wsTab==="jobs"&&(
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-primary" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
+            <button className="btn btn-ghost" onClick={()=>setEditJob({
+              customer_name:"",customer_phone:"",vehicle_reg:"",vehicle_make:"",
+              vehicle_model:"",vehicle_year:"",vehicle_color:"",vin:"",engine_no:"",mileage:"",
+              complaint:"",diagnosis:"",mechanic:"",date_in:new Date().toISOString().slice(0,10),
+              date_out:"",notes:"",status:"Pending"
+            })}>+ Manual</button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Sub-navigation ── */}
+      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
+        {WS_TABS.map(([v,label,cnt])=>(
+          <button key={v} onClick={()=>setWsTab(v)} style={{
+            padding:"8px 14px",border:"none",background:"none",cursor:"pointer",
+            fontSize:13,fontWeight:wsTab===v?700:400,
+            color:wsTab===v?"var(--accent)":"var(--text2)",
+            borderBottom:wsTab===v?"2px solid var(--accent)":"2px solid transparent",
+            marginBottom:-1,whiteSpace:"nowrap",
+          }}>
+            {label}{cnt!==null&&<span style={{marginLeft:5,opacity:.55,fontSize:11,fontWeight:400}}>{cnt}</span>}
           </button>
-          <button className="btn btn-ghost" onClick={()=>setEditJob({
-            customer_name:"",customer_phone:"",vehicle_reg:"",vehicle_make:"",
-            vehicle_model:"",vehicle_year:"",vehicle_color:"",vin:"",engine_no:"",mileage:"",
-            complaint:"",diagnosis:"",mechanic:"",date_in:new Date().toISOString().slice(0,10),
-            date_out:"",notes:"",status:"Pending"
-          })}>+ Manual</button>
+        ))}
+      </div>
+
+      {/* ══════════════ JOBS TAB ══════════════ */}
+      {wsTab==="jobs"&&(<>
+        <div className="tabs" style={{marginBottom:14,width:"fit-content",maxWidth:"100%",flexWrap:"wrap"}}>
+          {[["__all__","All"],["Pending","🔵 Pending"],["In Progress","🟡 In Progress"],["Done","🟢 Done"],["Delivered","⚫ Delivered"]].map(([v,l])=>{
+            const cnt=v==="__all__"?jobs.length:jobs.filter(j=>j.status===v).length;
+            return <button key={v} className={`tab ${filterSt===v?"on":""}`} onClick={()=>setFilterSt(v)}>{l} <span style={{opacity:.6,fontSize:11}}>{cnt}</span></button>;
+          })}
         </div>
-      </div>
-
-      {/* Status filter tabs */}
-      <div className="tabs" style={{marginBottom:16,width:"fit-content",maxWidth:"100%"}}>
-        {[["__all__","All"],["Pending","🔵 Pending"],["In Progress","🟡 In Progress"],["Done","🟢 Done"],["Delivered","⚫ Delivered"]].map(([v,l])=>{
-          const cnt=v==="__all__"?jobs.length:jobs.filter(j=>j.status===v).length;
-          return <button key={v} className={`tab ${filterSt===v?"on":""}`} onClick={()=>setFilterSt(v)}>{l} <span style={{opacity:.6,fontSize:11}}>{cnt}</span></button>;
-        })}
-      </div>
-
-      {/* Search */}
-      <div style={{position:"relative",marginBottom:14,maxWidth:320}}>
-        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search job, customer, plate..."/>
-        {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16}}>✕</button>}
-      </div>
-
-      {/* Job cards grid */}
-      {filtered.length===0&&<div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No jobs found</div>}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
-        {filtered.map(j=>{
-          const items=jobItems.filter(i=>i.job_id===j.id);
-          const inv=jobInvoice(j.id);
-          const total=items.reduce((s,i)=>s+(+i.total||0),0);
-          return (
-            <div key={j.id} className="card card-hover" style={{padding:16,cursor:"pointer",
-              borderLeft:`3px solid ${ST_COLOR[j.status]||"var(--border)"}`}}
-              onClick={()=>{setActiveJob(j);setView("job");}}>
-              {/* Header */}
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                <div>
-                  <div style={{fontWeight:700,fontSize:15}}>{j.customer_name}</div>
-                  <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{j.customer_phone}</div>
+        <div style={{position:"relative",marginBottom:14,maxWidth:320}}>
+          <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search job, customer, plate..."/>
+          {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16}}>✕</button>}
+        </div>
+        {filtered.length===0&&<div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No jobs found</div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
+          {filtered.map(j=>{
+            const jItems=jobItems.filter(i=>i.job_id===j.id);
+            const inv=jobInvoice(j.id);
+            const jq=jobQuote(j.id);
+            const total=jItems.reduce((s,i)=>s+(+i.total||0),0);
+            return (
+              <div key={j.id} className="card card-hover" style={{padding:16,cursor:"pointer",borderLeft:`3px solid ${ST_COLOR[j.status]||"var(--border)"}`}}
+                onClick={()=>{setActiveJob(j);setView("job");}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:15}}>{j.customer_name||<span style={{color:"var(--text3)"}}>No name</span>}</div>
+                    <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{j.customer_phone}</div>
+                  </div>
+                  <span className="badge" style={{background:ST_BG[j.status],color:ST_COLOR[j.status],flexShrink:0}}>{j.status}</span>
                 </div>
-                <span className="badge" style={{background:ST_BG[j.status],color:ST_COLOR[j.status],flexShrink:0}}>{j.status}</span>
-              </div>
-              {/* Vehicle */}
-              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-                {j.vehicle_reg&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text)",fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700}}>🚗 {j.vehicle_reg}</span>}
-                {j.vehicle_make&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text2)",fontSize:11}}>{j.vehicle_make} {j.vehicle_model}</span>}
-                {j.vehicle_year&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text3)",fontSize:11}}>{j.vehicle_year}</span>}
-              </div>
-              {/* Return badge */}
-              {j.return_reason&&<div style={{fontSize:11,color:"var(--yellow)",marginBottom:6}}>🔄 Return: {j.return_reason.slice(0,50)}</div>}
-              {/* Complaint */}
-              {j.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:8,lineHeight:1.4,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>💬 {j.complaint}</div>}
-              {/* Footer */}
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid var(--border)",paddingTop:8}}>
-                <div style={{fontSize:11,color:"var(--text3)"}}>
-                  <code style={{fontFamily:"DM Mono,monospace"}}>{j.id}</code>
-                  {j.mechanic&&<span style={{marginLeft:8}}>👷 {j.mechanic}</span>}
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                  {j.vehicle_reg&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text)",fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700}}>🚗 {j.vehicle_reg}</span>}
+                  {j.vehicle_make&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text2)",fontSize:11}}>{j.vehicle_make} {j.vehicle_model}</span>}
+                  {j.vehicle_year&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text3)",fontSize:11}}>{j.vehicle_year}</span>}
                 </div>
-                <div style={{textAlign:"right"}}>
-                  {total>0&&<div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:15}}>{fmtAmt(total)}</div>}
-                  {inv&&<span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:10}}>🧾 Invoiced</span>}
+                {j.return_reason&&<div style={{fontSize:11,color:"var(--yellow)",marginBottom:6}}>🔄 {j.return_reason.slice(0,50)}</div>}
+                {j.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:8,lineHeight:1.4,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>💬 {j.complaint}</div>}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid var(--border)",paddingTop:8}}>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>
+                    <code style={{fontFamily:"DM Mono,monospace"}}>{j.id}</code>
+                    {j.mechanic&&<span style={{marginLeft:6}}>👷 {j.mechanic}</span>}
+                  </div>
+                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                    {jq&&!inv&&<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",fontSize:10}}>📝 Quoted</span>}
+                    {inv&&<span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:10}}>🧾 Invoiced</span>}
+                    {total>0&&<span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmt(total)}</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      </>)}
 
-      {/* Book-In Modal */}
-      {bookIn&&(
-        <BookInModal
+      {/* ══════════════ CUSTOMERS TAB ══════════════ */}
+      {wsTab==="customers"&&(
+        <WsCustomersPage
           wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs}
-          settings={settings}
+          onSaveCustomer={onSaveWsCustomer} onDeleteCustomer={onDeleteWsCustomer}
+          onSaveVehicle={onSaveWsVehicle} onDeleteVehicle={onDeleteWsVehicle}
+          settings={settings} embedded t={t}/>
+      )}
+
+      {/* ══════════════ QUOTATIONS TAB ══════════════ */}
+      {wsTab==="quotations"&&(<>
+        <div style={{marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+          <span style={{fontSize:13,color:"var(--text3)"}}>{quotes.length} quotation{quotes.length!==1?"s":""}</span>
+        </div>
+        {quotes.length===0
+          ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No quotations yet — create one from a job card</div>
+          : <div className="card" style={{overflow:"auto"}}>
+              <table className="tbl" style={{width:"100%",minWidth:700}}>
+                <thead><tr>
+                  <th>Quote ID</th><th>Customer</th><th>Vehicle</th><th>Date</th><th>Valid Until</th><th style={{textAlign:"right"}}>Total</th><th>Status</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {[...quotes].sort((a,b)=>new Date(b.quote_date)-new Date(a.quote_date)).map(q=>{
+                    const j=jobs.find(jb=>jb.id===q.job_id);
+                    const QST_COLOR={draft:"var(--text3)",sent:"var(--blue)",accepted:"var(--green)",declined:"var(--red)",converted:"var(--text3)"};
+                    const QST_BG={draft:"rgba(100,116,139,.12)",sent:"rgba(96,165,250,.12)",accepted:"rgba(52,211,153,.12)",declined:"rgba(248,113,113,.12)",converted:"rgba(100,116,139,.08)"};
+                    return (
+                      <tr key={q.id}>
+                        <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{q.id}</code></td>
+                        <td><div style={{fontWeight:600}}>{q.quote_customer||j?.customer_name||"—"}</div><div style={{fontSize:11,color:"var(--text3)"}}>{q.quote_phone||j?.customer_phone}</div></td>
+                        <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{q.vehicle_reg||j?.vehicle_reg||"—"}</code></td>
+                        <td style={{fontSize:12}}>{q.quote_date}</td>
+                        <td style={{fontSize:12,color:q.valid_until&&new Date(q.valid_until)<new Date()?"var(--red)":"var(--text2)"}}>{q.valid_until||"—"}</td>
+                        <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmt(q.total)}</td>
+                        <td><span className="badge" style={{background:QST_BG[q.status]||QST_BG.draft,color:QST_COLOR[q.status]||"var(--text3)",fontSize:11}}>{q.status}</span></td>
+                        <td>
+                          <div style={{display:"flex",gap:4}}>
+                            {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{setActiveJob(j);setView("job");}}>Open Job</button>}
+                            {j&&<button className="btn btn-ghost btn-xs" onClick={()=>printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings)}>🖨️</button>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+        }
+      </>)}
+
+      {/* ══════════════ INVOICES TAB ══════════════ */}
+      {wsTab==="invoices"&&(<>
+        <div style={{marginBottom:12,display:"flex",gap:16,flexWrap:"wrap"}}>
+          {[["Total Invoiced",totalInvoiced,"var(--accent)"],["Total Paid",totalPaid,"var(--green)"],["Outstanding",totalOutstanding,"var(--red)"]].map(([l,v,c])=>(
+            <div key={l} className="card" style={{padding:"10px 16px",minWidth:150}}>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{l}</div>
+              <div style={{fontWeight:700,fontSize:17,fontFamily:"Rajdhani,sans-serif",color:c}}>{fmt(v)}</div>
+            </div>
+          ))}
+        </div>
+        {invoices.length===0
+          ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No invoices yet</div>
+          : <div className="card" style={{overflow:"auto"}}>
+              <table className="tbl" style={{width:"100%",minWidth:750}}>
+                <thead><tr><th>Invoice ID</th><th>Customer</th><th>Vehicle</th><th>Date</th><th style={{textAlign:"right"}}>Total</th><th style={{textAlign:"right"}}>Paid</th><th style={{textAlign:"right"}}>Balance</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                  {[...invoices].sort((a,b)=>new Date(b.invoice_date)-new Date(a.invoice_date)).map(inv=>{
+                    const j=jobs.find(jb=>jb.id===inv.job_id);
+                    const paid=+inv.paid_amount||0;
+                    const bal=(+inv.total||0)-paid;
+                    const sc=inv.status==="paid"?"var(--green)":inv.status==="partial"?"var(--yellow)":"var(--red)";
+                    const sb=inv.status==="paid"?"rgba(52,211,153,.12)":inv.status==="partial"?"rgba(251,191,36,.12)":"rgba(248,113,113,.12)";
+                    return (
+                      <tr key={inv.id}>
+                        <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{inv.id}</code></td>
+                        <td><div style={{fontWeight:600}}>{inv.invoice_customer||j?.customer_name||"—"}</div><div style={{fontSize:11,color:"var(--text3)"}}>{inv.inv_phone||j?.customer_phone}</div></td>
+                        <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{inv.vehicle_reg||j?.vehicle_reg||"—"}</code></td>
+                        <td style={{fontSize:12}}>{inv.invoice_date}</td>
+                        <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.total)}</td>
+                        <td style={{textAlign:"right",color:"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{paid>0?fmt(paid):"—"}</td>
+                        <td style={{textAlign:"right",color:bal>0?"var(--red)":"var(--green)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{fmt(bal)}</td>
+                        <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ Paid":inv.status==="partial"?"💛 Partial":"⏳ Unpaid"}</span></td>
+                        <td>
+                          <div style={{display:"flex",gap:4}}>
+                            {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{setActiveJob(j);setView("job");}}>Open</button>}
+                            {j&&<button className="btn btn-ghost btn-xs" onClick={()=>printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings)}>🖨️</button>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+        }
+      </>)}
+
+      {/* ══════════════ PAYMENTS TAB ══════════════ */}
+      {wsTab==="payments"&&(()=>{
+        const paid=invoices.filter(i=>(+i.paid_amount||0)>0).sort((a,b)=>new Date(b.payment_date||b.invoice_date)-new Date(a.payment_date||a.invoice_date));
+        return (<>
+          <div style={{marginBottom:12,display:"flex",gap:16,flexWrap:"wrap"}}>
+            {[["Payments Received",paid.length+" transactions","var(--blue)"],["Total Collected",fmt(paid.reduce((s,i)=>s+(+i.paid_amount||0),0)),"var(--green)"]].map(([l,v,c])=>(
+              <div key={l} className="card" style={{padding:"10px 16px",minWidth:150}}>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{l}</div>
+                <div style={{fontWeight:700,fontSize:16,fontFamily:"Rajdhani,sans-serif",color:c}}>{v}</div>
+              </div>
+            ))}
+          </div>
+          {paid.length===0
+            ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No payments recorded yet</div>
+            : <div className="card" style={{overflow:"auto"}}>
+                <table className="tbl" style={{width:"100%",minWidth:700}}>
+                  <thead><tr><th>Invoice</th><th>Customer</th><th>Vehicle</th><th>Pay Date</th><th>Method</th><th>Reference</th><th style={{textAlign:"right"}}>Invoice Total</th><th style={{textAlign:"right"}}>Paid</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {paid.map(inv=>{
+                      const j=jobs.find(jb=>jb.id===inv.job_id);
+                      const sc=inv.status==="paid"?"var(--green)":"var(--yellow)";
+                      const sb=inv.status==="paid"?"rgba(52,211,153,.12)":"rgba(251,191,36,.12)";
+                      return (
+                        <tr key={inv.id}>
+                          <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{inv.id}</code></td>
+                          <td style={{fontWeight:600}}>{inv.invoice_customer||j?.customer_name||"—"}</td>
+                          <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{inv.vehicle_reg||j?.vehicle_reg||"—"}</code></td>
+                          <td style={{fontSize:12}}>{inv.payment_date||"—"}</td>
+                          <td><span className="badge" style={{background:"var(--surface2)",color:"var(--text2)",fontSize:11}}>{inv.payment_method||"—"}</span></td>
+                          <td style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{inv.payment_ref||"—"}</td>
+                          <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.total)}</td>
+                          <td style={{textAlign:"right",fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.paid_amount)}</td>
+                          <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ Paid":"💛 Partial"}</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+          }
+        </>);
+      })()}
+
+      {/* ══════════════ STATEMENT TAB ══════════════ */}
+      {wsTab==="statement"&&(()=>{
+        const sc=stmtCust?wsCustomers.find(c=>c.id===stmtCust):null;
+        const scJobs=sc?jobs.filter(j=>j.workshop_customer_id===sc.id||j.customer_name===sc.name):[];
+        const scJobIds=scJobs.map(j=>j.id);
+        const scInvoices=invoices.filter(i=>scJobIds.includes(i.job_id));
+        const scQuotes=quotes.filter(q=>scJobIds.includes(q.job_id));
+        const scVehicles=wsVehicles.filter(v=>v.workshop_customer_id===sc?.id);
+        const totalBilled=scInvoices.reduce((s,i)=>s+(+i.total||0),0);
+        const totalPaidC=scInvoices.reduce((s,i)=>s+(+i.paid_amount||0),0);
+        const outstanding=totalBilled-totalPaidC;
+        return (<>
+          <div style={{marginBottom:14,maxWidth:380}}>
+            <label style={{fontSize:12,color:"var(--text3)",display:"block",marginBottom:6}}>Select Customer</label>
+            <select className="inp" value={stmtCust} onChange={e=>setStmtCust(e.target.value)}>
+              <option value="">— Choose a customer —</option>
+              {wsCustomers.map(c=><option key={c.id} value={c.id}>{c.name}{c.phone?` · ${c.phone}`:""}</option>)}
+            </select>
+          </div>
+          {sc&&(<>
+            {/* Customer info */}
+            <div className="card" style={{padding:14,marginBottom:14,borderLeft:"3px solid var(--accent)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:16}}>👤 {sc.name}</div>
+                  {sc.phone&&<div style={{fontSize:13,color:"var(--text3)"}}>{sc.phone}</div>}
+                  {sc.email&&<div style={{fontSize:13,color:"var(--text3)"}}>{sc.email}</div>}
+                </div>
+                <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                  {[["Jobs",scJobs.length,"var(--blue)"],["Vehicles",scVehicles.length,"var(--text2)"],["Quotes",scQuotes.length,"var(--blue)"],["Invoices",scInvoices.length,"var(--accent)"]].map(([l,v,c])=>(
+                    <div key={l} style={{textAlign:"center",padding:"8px 14px",background:"var(--surface2)",borderRadius:8}}>
+                      <div style={{fontSize:18,fontWeight:700,color:c}}>{v}</div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>{l}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {scVehicles.length>0&&(
+                <div style={{marginTop:10,display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {scVehicles.map(v=>(
+                    <span key={v.id} className="badge" style={{background:"var(--surface2)",fontFamily:"DM Mono,monospace",fontSize:12}}>
+                      🚗 {v.reg} — {v.make} {v.model} {v.year}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Financial summary */}
+            <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+              {[["Total Billed",totalBilled,"var(--accent)"],["Total Paid",totalPaidC,"var(--green)"],["Outstanding",outstanding,outstanding>0?"var(--red)":"var(--green)"]].map(([l,v,c])=>(
+                <div key={l} className="card" style={{padding:"10px 16px",flex:1,minWidth:130}}>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{l}</div>
+                  <div style={{fontWeight:700,fontSize:17,fontFamily:"Rajdhani,sans-serif",color:c}}>{fmt(v)}</div>
+                </div>
+              ))}
+            </div>
+            {/* Jobs history */}
+            {scJobs.length>0&&(
+              <div className="card" style={{overflow:"auto",marginBottom:14}}>
+                <div style={{padding:"10px 14px",fontWeight:700,fontSize:13,borderBottom:"1px solid var(--border)"}}>🔧 Job History</div>
+                <table className="tbl" style={{width:"100%"}}>
+                  <thead><tr><th>Job ID</th><th>Vehicle</th><th>Date In</th><th>Complaint</th><th>Status</th><th>Invoice</th></tr></thead>
+                  <tbody>
+                    {scJobs.map(j=>{
+                      const inv=jobInvoice(j.id);
+                      return (
+                        <tr key={j.id} style={{cursor:"pointer"}} onClick={()=>{setActiveJob(j);setView("job");}}>
+                          <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{j.id}</code></td>
+                          <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{j.vehicle_reg||"—"}</code></td>
+                          <td style={{fontSize:12}}>{j.date_in}</td>
+                          <td style={{fontSize:12,color:"var(--text2)",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.complaint||"—"}</td>
+                          <td><span className="badge" style={{background:ST_BG[j.status],color:ST_COLOR[j.status],fontSize:11}}>{j.status}</span></td>
+                          <td>{inv?<span style={{fontWeight:700,color:inv.status==="paid"?"var(--green)":"var(--red)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.total)} {inv.status==="paid"?"✅":"⏳"}</span>:<span style={{color:"var(--text3)",fontSize:12}}>—</span>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {/* Invoices */}
+            {scInvoices.length>0&&(
+              <div className="card" style={{overflow:"auto",marginBottom:14}}>
+                <div style={{padding:"10px 14px",fontWeight:700,fontSize:13,borderBottom:"1px solid var(--border)"}}>🧾 Invoice History</div>
+                <table className="tbl" style={{width:"100%"}}>
+                  <thead><tr><th>Invoice ID</th><th>Date</th><th style={{textAlign:"right"}}>Total</th><th style={{textAlign:"right"}}>Paid</th><th style={{textAlign:"right"}}>Balance</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {scInvoices.map(inv=>{
+                      const bal=(+inv.total||0)-(+inv.paid_amount||0);
+                      const sc2=inv.status==="paid"?"var(--green)":inv.status==="partial"?"var(--yellow)":"var(--red)";
+                      const sb2=inv.status==="paid"?"rgba(52,211,153,.12)":inv.status==="partial"?"rgba(251,191,36,.12)":"rgba(248,113,113,.12)";
+                      return (
+                        <tr key={inv.id}>
+                          <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{inv.id}</code></td>
+                          <td style={{fontSize:12}}>{inv.invoice_date}</td>
+                          <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{fmt(inv.total)}</td>
+                          <td style={{textAlign:"right",color:"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{+inv.paid_amount>0?fmt(inv.paid_amount):"—"}</td>
+                          <td style={{textAlign:"right",fontWeight:700,color:bal>0?"var(--red)":"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(bal)}</td>
+                          <td><span className="badge" style={{background:sb2,color:sc2,fontSize:11}}>{inv.status==="paid"?"✅ Paid":inv.status==="partial"?"💛 Partial":"⏳ Unpaid"}</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>)}
+          {!sc&&<div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>Select a customer above to view their statement</div>}
+        </>);
+      })()}
+
+      {/* ══════════════ REPORT TAB ══════════════ */}
+      {wsTab==="report"&&(()=>{
+        const now=new Date();
+        const thisMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+        const lastMonth=new Date(now.getFullYear(),now.getMonth()-1,1);
+        const lastMonthStr=`${lastMonth.getFullYear()}-${String(lastMonth.getMonth()+1).padStart(2,"0")}`;
+        const jobsThisMonth=jobs.filter(j=>(j.date_in||"").startsWith(thisMonth));
+        const invThisMonth=invoices.filter(i=>(i.invoice_date||"").startsWith(thisMonth));
+        const revThisMonth=invThisMonth.reduce((s,i)=>s+(+i.total||0),0);
+        const paidThisMonth=invoices.filter(i=>(i.payment_date||"").startsWith(thisMonth)).reduce((s,i)=>s+(+i.paid_amount||0),0);
+        // Status breakdown
+        const byStatus=["Pending","In Progress","Done","Delivered"].map(s=>([s,jobs.filter(j=>j.status===s).length]));
+        // Top customers by revenue
+        const custRev={};
+        invoices.forEach(inv=>{ const k=inv.invoice_customer||"Unknown"; custRev[k]=(custRev[k]||0)+(+inv.total||0); });
+        const topCust=Object.entries(custRev).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        return (<>
+          {/* KPI cards */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:12,marginBottom:20}}>
+            {[
+              ["Total Jobs",jobs.length,"var(--blue)","🔧"],
+              ["This Month Jobs",jobsThisMonth.length,"var(--blue)","📅"],
+              ["Active Jobs",jobs.filter(j=>j.status==="In Progress").length,"var(--yellow)","⚙️"],
+              ["Pending Quotes",quotes.filter(q=>["draft","sent"].includes(q.status)).length,"var(--blue)","📝"],
+              ["Total Invoiced",fmt(totalInvoiced),"var(--accent)","🧾"],
+              ["This Month Rev",fmt(revThisMonth),"var(--accent)","📈"],
+              ["Collected",fmt(totalPaid),"var(--green)","💚"],
+              ["Outstanding",fmt(totalOutstanding),"var(--red)","⚠️"],
+            ].map(([l,v,c,ic])=>(
+              <div key={l} className="card" style={{padding:"12px 14px"}}>
+                <div style={{fontSize:18,marginBottom:4}}>{ic}</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{l}</div>
+                <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:c}}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,flexWrap:"wrap"}}>
+            {/* Job status breakdown */}
+            <div className="card" style={{padding:14}}>
+              <div style={{fontWeight:700,marginBottom:12,fontSize:13}}>📊 Jobs by Status</div>
+              {byStatus.map(([s,cnt])=>(
+                <div key={s} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <span className="badge" style={{background:ST_BG[s],color:ST_COLOR[s],fontSize:12}}>{s}</span>
+                  <div style={{flex:1,margin:"0 10px",height:6,background:"var(--surface2)",borderRadius:3,overflow:"hidden"}}>
+                    <div style={{width:`${jobs.length?cnt/jobs.length*100:0}%`,height:"100%",background:ST_COLOR[s],borderRadius:3}}/>
+                  </div>
+                  <span style={{fontWeight:700,minWidth:24,textAlign:"right"}}>{cnt}</span>
+                </div>
+              ))}
+            </div>
+            {/* Top customers */}
+            <div className="card" style={{padding:14}}>
+              <div style={{fontWeight:700,marginBottom:12,fontSize:13}}>🏆 Top Customers by Revenue</div>
+              {topCust.length===0&&<div style={{color:"var(--text3)",fontSize:13}}>No invoices yet</div>}
+              {topCust.map(([name,rev],i)=>(
+                <div key={name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,fontSize:13}}>
+                  <span style={{color:"var(--text3)",marginRight:8,minWidth:18}}>#{i+1}</span>
+                  <span style={{flex:1,fontWeight:i===0?700:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</span>
+                  <span style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",marginLeft:8}}>{fmt(rev)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Monthly table */}
+          {(()=>{
+            const monthMap={};
+            invoices.forEach(inv=>{
+              const m=(inv.invoice_date||"").slice(0,7);
+              if(!m) return;
+              if(!monthMap[m]) monthMap[m]={month:m,count:0,revenue:0,paid:0};
+              monthMap[m].count++;
+              monthMap[m].revenue+=(+inv.total||0);
+              monthMap[m].paid+=(+inv.paid_amount||0);
+            });
+            const months=Object.values(monthMap).sort((a,b)=>b.month.localeCompare(a.month)).slice(0,12);
+            if(!months.length) return null;
+            return (
+              <div className="card" style={{overflow:"auto",marginTop:14}}>
+                <div style={{padding:"10px 14px",fontWeight:700,fontSize:13,borderBottom:"1px solid var(--border)"}}>📅 Monthly Revenue</div>
+                <table className="tbl" style={{width:"100%"}}>
+                  <thead><tr><th>Month</th><th style={{textAlign:"right"}}>Invoices</th><th style={{textAlign:"right"}}>Revenue</th><th style={{textAlign:"right"}}>Collected</th><th style={{textAlign:"right"}}>Outstanding</th></tr></thead>
+                  <tbody>
+                    {months.map(m=>(
+                      <tr key={m.month}>
+                        <td style={{fontWeight:m.month===thisMonth?700:400,color:m.month===thisMonth?"var(--accent)":"inherit"}}>{m.month}{m.month===thisMonth?" ⬅ current":""}</td>
+                        <td style={{textAlign:"right"}}>{m.count}</td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{fmt(m.revenue)}</td>
+                        <td style={{textAlign:"right",color:"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(m.paid)}</td>
+                        <td style={{textAlign:"right",color:m.revenue-m.paid>0?"var(--red)":"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(m.revenue-m.paid)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </>);
+      })()}
+
+      {/* ── Modals ── */}
+      {bookIn&&(
+        <BookInModal wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs} settings={settings}
           onSaveJob={async(d)=>{ await onSaveJob(d); setBookIn(false); }}
           onReopenJob={async(d)=>{ await onSaveJob(d); setBookIn(false); }}
           onClose={()=>setBookIn(false)} t={t}/>
       )}
-
-      {/* New/Edit Job Modal */}
       {editJob&&(
-        <WorkshopJobModal job={editJob}
-          wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs}
+        <WorkshopJobModal job={editJob} wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs}
           onSave={async(d)=>{ await onSaveJob(d); setEditJob(null); }}
           onReopenJob={async(d)=>{ await onSaveJob(d); setEditJob(null); }}
           onClose={()=>setEditJob(null)} t={t}/>
@@ -8067,10 +8728,102 @@ function WorkshopPage({jobs,jobItems,invoices,parts,customers,wsCustomers=[],wsV
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,parts,settings,onBack,onSaveJob,onSaveItem,onDeleteItem,onSaveInvoice,t,lang}) {
-  const [editJob,   setEditJob]   = useState(false);
-  const [addingItem,setAddingItem]= useState(null); // null | 'part' | 'labour'
-  const [creatingInv,setCreatingInv]=useState(false);
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,onBack,onSaveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,t,lang}) {
+  const [editJob,      setEditJob]      = useState(false);
+  const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
+  const [creatingInv,  setCreatingInv]  = useState(false);
+  const [editingInv,   setEditingInv]   = useState(false);
+  const [deletingInv,  setDeletingInv]  = useState(false);
+  const [paymentModal, setPaymentModal] = useState(false);
+  const [statementModal,setStatementModal]=useState(false);
+  const [quoteModal,   setQuoteModal]   = useState(false);  // create/edit quote
+  const [deletingQuote,setDeletingQuote]= useState(false);
+
+  // ── Job photos ────────────────────────────────────────────────
+  const [savedPhotos,   setSavedPhotos]   = useState([]);      // from DB
+  const [loadingPhotos, setLoadingPhotos] = useState(true);
+  const [uploadPhotos,  setUploadPhotos]  = useState([]);      // in-progress uploads
+  const [viewPhoto,     setViewPhoto]     = useState(null);    // full-screen preview
+  const jobPhotoCamRef = useRef(null);
+  const jobPhotoGalRef = useRef(null);
+  const jobPhotoCounter = useRef(0);
+
+  // Load saved photos from DB when job changes
+  useEffect(()=>{
+    setLoadingPhotos(true);
+    api.get("workshop_job_photos",`job_id=eq.${job.id}&order=created_at.asc`)
+      .then(r=>{ setSavedPhotos(Array.isArray(r)?r:[]); })
+      .catch(()=>{ setSavedPhotos([]); })
+      .finally(()=>setLoadingPhotos(false));
+  },[job.id]);
+
+  const uploadJobPhoto=async(uploadId,dataUrl)=>{
+    const SCRIPT_URL=
+      (window._VEHICLE_SCRIPT_URL&&window._VEHICLE_SCRIPT_URL.trim())||
+      (window._APPS_SCRIPT_URL&&window._APPS_SCRIPT_URL.trim())||"";
+    const setUploadStatus=(s,extra={})=>setUploadPhotos(p=>p.map(x=>x.id===uploadId?{...x,status:s,...extra}:x));
+    if(!SCRIPT_URL){ setUploadStatus("error",{error:"No Script URL in Settings"}); return; }
+    setUploadStatus("uploading");
+    try{
+      // resize to max 1600px
+      const base64=await new Promise((res,rej)=>{
+        const img=new Image();
+        img.onload=()=>{
+          const MAX=1600; const canvas=document.createElement("canvas");
+          let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          canvas.width=w;canvas.height=h;
+          canvas.getContext("2d").drawImage(img,0,0,w,h);
+          res(canvas.toDataURL("image/jpeg",0.88));
+        };
+        img.onerror=rej; img.src=dataUrl;
+      });
+      const now=new Date();
+      const pad2=n=>String(n).padStart(2,"0");
+      const dateStr=`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`;
+      const timeStr=`${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`;
+      const reg=(job.vehicle_reg||"REG").replace(/\s/g,"").toUpperCase();
+      const folderPath=`Tim_Car_Phot/${reg}/${dateStr}/${timeStr}`;
+      const n=String(uploadId).padStart(3,"0");
+      const filename=`photo_${n}.jpg`;
+      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType:"image/jpeg",folderPath})});
+      const result=await resp.json();
+      if(result.success){
+        // Save URL to DB
+        const rec={id:makeId("PH"),job_id:job.id,url:result.url,folder_path:folderPath};
+        await api.insert("workshop_job_photos",rec);
+        setSavedPhotos(p=>[...p,rec]);
+        setUploadStatus("done",{url:result.url});
+      } else {
+        setUploadStatus("error",{error:result.error||"Upload failed"});
+      }
+    }catch(e){
+      setUploadStatus("error",{error:e.message});
+    }
+  };
+
+  const handleJobPhotoFile=(e)=>{
+    const files=Array.from(e.target.files||[]); e.target.value="";
+    if(!files.length) return;
+    files.forEach(file=>{
+      if(!file.type.startsWith("image/")) return;
+      jobPhotoCounter.current+=1;
+      const uid=jobPhotoCounter.current;
+      const fr=new FileReader();
+      fr.onload=ev=>{
+        const dataUrl=ev.target.result;
+        setUploadPhotos(p=>[...p,{id:uid,dataUrl,status:"pending",url:null,error:null}]);
+        uploadJobPhoto(uid,dataUrl);
+      };
+      fr.readAsDataURL(file);
+    });
+  };
+
+  const deleteJobPhoto=async(photoId)=>{
+    if(!confirm("Delete this photo?")) return;
+    await api.delete("workshop_job_photos","id",photoId);
+    setSavedPhotos(p=>p.filter(x=>x.id!==photoId));
+  };
 
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const tax      = subtotal*(settings.tax_rate||0)/100;
@@ -8139,6 +8892,83 @@ function WorkshopJobDetail({job,items,invoice,parts,settings,onBack,onSaveJob,on
         ))}
       </div>
 
+      {/* ── Vehicle Photos ── */}
+      <div className="card" style={{padding:14,marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontWeight:700,fontSize:14}}>
+            📷 Photos
+            {savedPhotos.length>0&&<span style={{marginLeft:8,fontSize:12,fontWeight:400,color:"var(--text3)"}}>{savedPhotos.length} saved</span>}
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoCamRef.current?.click()}>📷 Camera</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoGalRef.current?.click()}>🖼️ Gallery</button>
+          </div>
+          <input ref={jobPhotoCamRef} type="file" accept="image/*" capture="environment" multiple style={{display:"none"}} onChange={handleJobPhotoFile}/>
+          <input ref={jobPhotoGalRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={handleJobPhotoFile}/>
+        </div>
+
+        {loadingPhotos?(
+          <div style={{textAlign:"center",padding:"16px 0",color:"var(--text3)",fontSize:12}}>Loading photos...</div>
+        ):(savedPhotos.length===0&&uploadPhotos.length===0)?(
+          <div style={{textAlign:"center",padding:"16px 0",color:"var(--text3)",fontSize:12}}>No photos yet — tap Camera or Gallery to add</div>
+        ):(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
+            {/* Saved photos from DB */}
+            {savedPhotos.map(p=>{
+              const src=p.url?.includes("thumbnail?id=")||p.url?.includes("uc?export=")?p.url:toImgUrl(p.url);
+              return (
+                <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3",cursor:"pointer"}}
+                  onClick={()=>setViewPhoto(p.url)}>
+                  <img src={src} alt="vehicle photo"
+                    style={{width:"100%",height:"100%",objectFit:"cover"}}
+                    onError={e=>{
+                      const m=p.url?.match(/thumbnail[?]id=([^&]+)/)||p.url?.match(/[?&]id=([^&]+)/)||p.url?.match(/file\/d\/([^/?]+)/);
+                      if(m&&!e.target.src.includes("uc?export=view")) e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;
+                    }}
+                  />
+                  <button onClick={e=>{e.stopPropagation();deleteJobPhoto(p.id);}}
+                    style={{position:"absolute",top:3,right:3,background:"rgba(0,0,0,.55)",border:"none",borderRadius:"50%",
+                      width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",
+                      cursor:"pointer",color:"#fff",fontSize:10,lineHeight:1}}>✕</button>
+                </div>
+              );
+            })}
+            {/* In-progress uploads */}
+            {uploadPhotos.map(p=>(
+              <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3"}}>
+                <img src={p.dataUrl} alt="uploading" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",
+                  background:p.status==="done"?"rgba(0,0,0,0)":p.status==="error"?"rgba(180,0,0,.5)":"rgba(0,0,0,.45)"}}>
+                  {(p.status==="pending"||p.status==="uploading")&&(
+                    <div style={{width:20,height:20,border:"2px solid rgba(255,255,255,.3)",borderTop:"2px solid #fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+                  )}
+                  {p.status==="done"&&<div style={{position:"absolute",top:3,right:5,fontSize:14}}>✅</div>}
+                  {p.status==="error"&&<div style={{fontSize:9,color:"#fff",textAlign:"center",padding:3}}>❌ {(p.error||"").slice(0,25)}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Full-screen photo preview */}
+        {viewPhoto&&(
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}
+            onClick={()=>setViewPhoto(null)}>
+            <img src={toImgUrl(viewPhoto)} alt="preview"
+              style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8}}/>
+            <button style={{position:"absolute",top:16,right:20,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",
+              borderRadius:"50%",width:36,height:36,fontSize:18,cursor:"pointer"}}
+              onClick={()=>setViewPhoto(null)}>✕</button>
+            <a href={viewPhoto} target="_blank" rel="noreferrer"
+              style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",
+                background:"rgba(255,255,255,.15)",color:"#fff",padding:"8px 20px",borderRadius:20,fontSize:13,textDecoration:"none"}}
+              onClick={e=>e.stopPropagation()}>
+              Open in Drive ↗
+            </a>
+          </div>
+        )}
+      </div>
+
       {/* Line items */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <div style={{fontWeight:700,fontSize:14}}>🔧 Parts & Labour</div>
@@ -8177,32 +9007,174 @@ function WorkshopJobDetail({job,items,invoice,parts,settings,onBack,onSaveJob,on
         )}
       </div>
 
-      {/* Invoice section */}
-      {invoice
-        ? <div className="card" style={{padding:14,borderLeft:"3px solid var(--green)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div>
-                <div style={{fontWeight:700,color:"var(--green)"}}>🧾 Invoice Created</div>
-                <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{invoice.id} · {invoice.invoice_date} · {fmtAmt(invoice.total)}</div>
+      {/* ── Quote section ── */}
+      {quote ? (
+        <div className="card" style={{padding:14,marginBottom:14,borderLeft:`3px solid ${
+          quote.status==="accepted"?"var(--green)":quote.status==="declined"?"var(--red)":quote.status==="converted"?"var(--text3)":"var(--blue)"}`}}>
+          {/* Header */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:10}}>
+            <div>
+              <div style={{fontWeight:700,fontSize:14}}>📝 Quotation <code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{quote.id}</code></div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
+                {quote.quote_date}{quote.valid_until&&` · Valid until ${quote.valid_until}`}
               </div>
-              <span className="badge" style={{background:invoice.status==="paid"?"rgba(52,211,153,.12)":"rgba(248,113,113,.12)",color:invoice.status==="paid"?"var(--green)":"var(--red)"}}>
-                {invoice.status==="paid"?"✅ Paid":"⏳ Unpaid"}
+              <div style={{fontSize:13,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginTop:3}}>{fmtAmt(quote.total)}</div>
+            </div>
+            <span className="badge" style={{
+              background:quote.status==="accepted"?"rgba(52,211,153,.15)":quote.status==="declined"?"rgba(248,113,113,.15)":quote.status==="converted"?"rgba(100,116,139,.15)":"rgba(96,165,250,.15)",
+              color:quote.status==="accepted"?"var(--green)":quote.status==="declined"?"var(--red)":quote.status==="converted"?"var(--text3)":"var(--blue)",
+              fontSize:12,padding:"4px 10px"
+            }}>
+              {quote.status==="accepted"?"✅ Accepted":quote.status==="declined"?"❌ Declined":quote.status==="converted"?"📄 Converted":"📤 "+quote.status.charAt(0).toUpperCase()+quote.status.slice(1)}
+            </span>
+          </div>
+          {/* Actions */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopQuote(job,items,quote,settings)}>🖨️ Print PDF</button>
+            {(quote.quote_phone||job.customer_phone)&&(
+              <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
+                const phone=(quote.quote_phone||job.customer_phone||"").replace(/\D/g,"");
+                const name=quote.quote_customer||job.customer_name||"";
+                const C=settings.currency||"ZAR";
+                const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+                const lines=items.map(i=>`  • ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
+                const msg=`📝 *Workshop Quotation ${quote.id}*\n──────────────────\n`+
+                  `👤 ${name}\n🚗 ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n`+
+                  `📅 Date: ${quote.quote_date}${quote.valid_until?`\n⏳ Valid Until: ${quote.valid_until}`:""}\n\n`+
+                  `*Items:*\n${lines}\n\n💰 *Total: ${fmt(quote.total)}*\n\n`+
+                  `Please confirm to proceed.\n\n${settings.shop_name||"Workshop"}${settings.phone?`\n📞 ${settings.phone}`:""}`;
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,"_blank");
+              }}>💬 WA</button>
+            )}
+            {(quote.quote_email||job.customer_email)&&(
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)"}} onClick={()=>{
+                const email=quote.quote_email||job.customer_email||"";
+                const name=quote.quote_customer||job.customer_name||"";
+                const C=settings.currency||"ZAR";
+                const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+                const lines=items.map(i=>`  - ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
+                const subj=`Workshop Quotation ${quote.id} — ${name}`;
+                const body=`Dear ${name},\n\nPlease find your workshop quotation below.\n\n`+
+                  `Quotation: ${quote.id}\nDate: ${quote.quote_date}${quote.valid_until?`\nValid Until: ${quote.valid_until}`:""}\n`+
+                  `Vehicle: ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n\n`+
+                  `Items:\n${lines}\n\nTotal: ${fmt(quote.total)}\n\nPlease confirm to proceed.\n\n`+
+                  `${settings.shop_name||"Workshop"}${settings.phone?`\nPhone: ${settings.phone}`:""}`;
+                window.location.href=`mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+              }}>✉️ Email</button>
+            )}
+            {quote.status!=="converted"&&quote.status!=="declined"&&(
+              <button className={`btn btn-xs ${quote.status==="accepted"?"btn-ghost":"btn-success"}`}
+                onClick={()=>onSaveQuote({...quote,status:quote.status==="accepted"?"sent":"accepted"})}>
+                {quote.status==="accepted"?"↩ Unaccept":"✅ Mark Accepted"}
+              </button>
+            )}
+            {quote.status!=="converted"&&(
+              <button className="btn btn-ghost btn-xs" onClick={()=>setQuoteModal(true)}>✏️ Edit</button>
+            )}
+            {!invoice&&quote.status==="accepted"&&(
+              <button className="btn btn-primary btn-sm" onClick={async()=>{
+                if(window.confirm("Convert this quote to an invoice? This will create the invoice and mark the job as Done."))
+                  await onConvertQuoteToInvoice(quote,job,subtotal,tax,total);
+              }}>🧾 Convert to Invoice</button>
+            )}
+            <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",marginLeft:"auto"}}
+              onClick={()=>setDeletingQuote(true)}>🗑️</button>
+          </div>
+        </div>
+      ) : !invoice&&items.length>0&&(
+        <button className="btn btn-ghost" style={{width:"100%",padding:12,fontSize:14,fontWeight:600,marginBottom:14,border:"2px dashed var(--border)"}}
+          onClick={()=>setQuoteModal(true)}>
+          📝 Create Quotation for Customer
+        </button>
+      )}
+
+      {/* Invoice section */}
+      {invoice ? (
+        <div className="card" style={{padding:14,borderLeft:`3px solid ${invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)"}`}}>
+          {/* Header row */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:10}}>
+            <div>
+              <div style={{fontWeight:700,fontSize:14}}>🧾 Invoice <code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{invoice.id}</code></div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{invoice.invoice_date}{invoice.due_date&&` · Due ${invoice.due_date}`}</div>
+              <div style={{fontSize:13,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginTop:3}}>{fmtAmt(invoice.total)}</div>
+              {(+invoice.paid_amount||0)>0&&(
+                <div style={{fontSize:12,marginTop:2}}>
+                  <span style={{color:"var(--green)"}}>Paid: {fmtAmt(invoice.paid_amount)}</span>
+                  <span style={{color:"var(--text3)",marginLeft:8}}>Balance: {fmtAmt((+invoice.total||0)-(+invoice.paid_amount||0))}</span>
+                </div>
+              )}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+              <span className="badge" style={{
+                background:invoice.status==="paid"?"rgba(52,211,153,.15)":invoice.status==="partial"?"rgba(251,191,36,.15)":"rgba(248,113,113,.15)",
+                color:invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)",
+                fontSize:12,padding:"4px 10px"
+              }}>
+                {invoice.status==="paid"?"✅ Paid":invoice.status==="partial"?"💛 Partial":"⏳ Unpaid"}
               </span>
             </div>
           </div>
-        : items.length>0&&(
-            <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,fontWeight:700}}
-              onClick={()=>setCreatingInv(true)}>
-              🧾 Create Workshop Invoice
-            </button>
-          )
-      }
+
+          {/* Action buttons */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setStatementModal(true)}>📋 Statement</button>
+            {invoice.status!=="paid"&&(
+              <button className="btn btn-success btn-sm" onClick={()=>setPaymentModal(true)}>💳 Payment</button>
+            )}
+            <button className="btn btn-ghost btn-sm" onClick={()=>setEditingInv(true)}>✏️ Edit</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopInvoice(job,items,invoice,settings)}>🖨️ Print</button>
+            {(invoice.inv_phone||job.customer_phone)&&(
+              <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
+                const phone=(invoice.inv_phone||job.customer_phone||"").replace(/\D/g,"");
+                const name=invoice.invoice_customer||job.customer_name||"";
+                const C=settings.currency||"ZAR";
+                const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+                const itemLines=items.map(i=>`  • ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
+                const balance=(+invoice.total||0)-(+invoice.paid_amount||0);
+                const msg=`🔧 *Workshop Invoice ${invoice.id}*\n──────────────────\n`+
+                  `👤 ${name}\n🚗 ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n`+
+                  `📅 Date: ${invoice.invoice_date}\n\n*Items:*\n${itemLines}\n\n`+
+                  `💰 *Total: ${fmt(invoice.total)}*\n`+
+                  ((+invoice.paid_amount||0)>0?`✅ Paid: ${fmt(invoice.paid_amount)}\n⚠️ Balance: ${fmt(balance)}\n`:"")+
+                  `Status: ${invoice.status==="paid"?"✅ PAID":invoice.status==="partial"?"💛 PARTIAL":"⏳ UNPAID"}\n\n`+
+                  `${settings.shop_name||"Workshop"}${settings.phone?`\n📞 ${settings.phone}`:""}`;
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,"_blank");
+              }}>💬 WA</button>
+            )}
+            {(invoice.inv_email||job.customer_email)&&(
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)"}} onClick={()=>{
+                const email=invoice.inv_email||job.customer_email||"";
+                const name=invoice.invoice_customer||job.customer_name||"";
+                const C=settings.currency||"ZAR";
+                const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+                const itemLines=items.map(i=>`  - ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
+                const subject=`Workshop Invoice ${invoice.id} — ${name}`;
+                const body=`Dear ${name},\n\nPlease find your workshop invoice details below.\n\n`+
+                  `Invoice: ${invoice.id}\nDate: ${invoice.invoice_date}\n`+
+                  `Vehicle: ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n\n`+
+                  `Items:\n${itemLines}\n\nTotal: ${fmt(invoice.total)}\nStatus: ${invoice.status==="paid"?"PAID":"UNPAID"}\n\n`+
+                  `${settings.shop_name||"Workshop"}${settings.phone?`\nPhone: ${settings.phone}`:""}${settings.email?`\nEmail: ${settings.email}`:""}`;
+                window.location.href=`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+              }}>✉️ Email</button>
+            )}
+            <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",marginLeft:"auto"}}
+              onClick={()=>setDeletingInv(true)}>🗑️ Delete</button>
+          </div>
+        </div>
+      ) : items.length>0&&(
+        <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,fontWeight:700}}
+          onClick={()=>setCreatingInv(true)}>
+          🧾 Create Workshop Invoice
+        </button>
+      )}
 
       {/* Add item modal */}
       {addingItem&&(
         <WorkshopItemModal
           type={addingItem}
           parts={parts}
+          partFitments={partFitments}
+          vehicles={vehicles}
           onSave={async(item)=>{ await onSaveItem({...item,job_id:job.id}); setAddingItem(null); }}
           onClose={()=>setAddingItem(null)}
           t={t}/>
@@ -8223,6 +9195,72 @@ function WorkshopJobDetail({job,items,invoice,parts,settings,onBack,onSaveJob,on
           settings={settings}
           onSave={async(inv)=>{ await onSaveInvoice(inv); setCreatingInv(false); }}
           onClose={()=>setCreatingInv(false)} t={t}/>
+      )}
+
+      {/* Edit invoice modal */}
+      {editingInv&&invoice&&(
+        <WsInvoiceEditModal
+          invoice={invoice}
+          onSave={async(data)=>{ await onUpdateInvoice(invoice.id,data); setEditingInv(false); }}
+          onClose={()=>setEditingInv(false)}/>
+      )}
+
+      {/* Record payment modal */}
+      {paymentModal&&invoice&&(
+        <WsPaymentModal
+          invoice={invoice}
+          settings={settings}
+          onSave={async(data)=>{ await onUpdateInvoice(invoice.id,data); setPaymentModal(false); }}
+          onClose={()=>setPaymentModal(false)}/>
+      )}
+
+      {/* Statement modal */}
+      {statementModal&&invoice&&(
+        <WsStatementModal
+          invoice={invoice} job={job} items={items} settings={settings}
+          onClose={()=>setStatementModal(false)}
+          onPrint={()=>printWorkshopInvoice(job,items,invoice,settings)}/>
+      )}
+
+      {/* Create/Edit quote modal */}
+      {quoteModal&&(
+        <WsQuoteModal
+          job={job} items={items} subtotal={subtotal} tax={tax} total={total}
+          existing={quote} settings={settings}
+          onSave={async(q)=>{ await onSaveQuote(q); setQuoteModal(false); }}
+          onClose={()=>setQuoteModal(false)}/>
+      )}
+
+      {/* Delete quote confirm */}
+      {deletingQuote&&quote&&(
+        <Overlay onClose={()=>setDeletingQuote(false)}>
+          <MHead title="🗑️ Delete Quotation" onClose={()=>setDeletingQuote(false)}/>
+          <p style={{color:"var(--text2)",marginBottom:18}}>
+            Delete quotation <code style={{fontFamily:"DM Mono,monospace"}}>{quote.id}</code>?
+          </p>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setDeletingQuote(false)}>Cancel</button>
+            <button className="btn btn-danger" style={{flex:1}} onClick={async()=>{ await onDeleteQuote(quote.id); setDeletingQuote(false); }}>Delete</button>
+          </div>
+        </Overlay>
+      )}
+
+      {/* Delete invoice confirm */}
+      {deletingInv&&invoice&&(
+        <Overlay onClose={()=>setDeletingInv(false)}>
+          <MHead title="🗑️ Delete Invoice" onClose={()=>setDeletingInv(false)}/>
+          <p style={{color:"var(--text2)",marginBottom:18}}>
+            Delete invoice <code style={{fontFamily:"DM Mono,monospace"}}>{invoice.id}</code>?
+            The job will revert to <strong>In Progress</strong>.
+          </p>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setDeletingInv(false)}>Cancel</button>
+            <button className="btn btn-danger" style={{flex:1}} onClick={async()=>{
+              await onDeleteInvoice(invoice.id,job.id);
+              setDeletingInv(false);
+            }}>Delete</button>
+          </div>
+        </Overlay>
       )}
     </div>
   );
@@ -8496,26 +9534,58 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP ITEM MODAL — Add Part or Labour
 // ═══════════════════════════════════════════════════════════════
-function WorkshopItemModal({type, parts, onSave, onClose, t}) {
-  const [desc,     setDesc]     = useState("");
-  const [qty,      setQty]      = useState(1);
-  const [price,    setPrice]    = useState("");
-  const [selPart,  setSelPart]  = useState(null);
-  const [search,   setSearch]   = useState("");
+function WorkshopItemModal({type, parts, partFitments=[], vehicles=[], onSave, onClose, t}) {
+  const [desc,      setDesc]      = useState("");
+  const [qty,       setQty]       = useState(1);
+  const [price,     setPrice]     = useState("");
+  const [selPart,   setSelPart]   = useState(null);
+  const [search,    setSearch]    = useState("");
+  const [saving,    setSaving]    = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
+
+  // Build a lookup: part_id → "make model year" string from fitments
+  const partVehicleText = {};
+  partFitments.forEach(f=>{
+    const v=vehicles.find(vv=>String(vv.id)===String(f.vehicle_id));
+    if(!v) return;
+    const txt=`${v.make||""} ${v.model||""} ${v.year_from||""} ${v.year_to||""}`.toLowerCase();
+    partVehicleText[String(f.part_id)]=(partVehicleText[String(f.part_id)]||"")+" "+txt;
+  });
 
   const fp = parts.filter(p=>{
     if(!search.trim()) return true;
-    const s=search.toLowerCase();
-    return `${p.name} ${p.sku} ${p.chinese_desc||""} ${p.oe_number||""}`.toLowerCase().includes(s);
+    const haystack=`${p.name} ${p.sku} ${p.chinese_desc||""} ${p.oe_number||""} ${partVehicleText[String(p.id)]||""}`.toLowerCase();
+    return search.trim().toLowerCase().split(/\s+/).every(w=>haystack.includes(w));
   }).slice(0,20);
 
   const total = (+qty||0)*(+price||0);
+
+  const resetForm=()=>{ setDesc(""); setQty(1); setPrice(""); setSelPart(null); setSearch(""); };
 
   const selectPart=(p)=>{
     setSelPart(p);
     setDesc(p.name);
     setPrice(p.price||"");
     setSearch("");
+  };
+
+  const handleSave=async()=>{
+    if(!desc.trim()||!price){alert("Fill description and price");return;}
+    setSaving(true);
+    try{
+      await onSave({
+        type,
+        description:desc,
+        part_sku:selPart?selPart.sku:"",
+        qty:+qty,
+        unit_price:+price,
+        total:(+qty)*(+price),
+      });
+      resetForm();
+      setJustAdded(true);
+      setTimeout(()=>setJustAdded(false),2000);
+    }catch(e){ alert("Save failed: "+e.message); }
+    finally{ setSaving(false); }
   };
 
   return (
@@ -8527,36 +9597,75 @@ function WorkshopItemModal({type, parts, onSave, onClose, t}) {
           <FL label="Search Part from Inventory"/>
           <div style={{position:"relative",marginBottom:8}}>
             <input className="inp" value={search} onChange={e=>{setSearch(e.target.value);setSelPart(null);}}
-              placeholder="Search SKU, name, OE..."/>
+              placeholder="Search name, SKU, OE, make, model, year..."/>
           </div>
           {search&&!selPart&&(
-            <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:200,overflowY:"auto",marginBottom:8}}>
+            <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:320,overflowY:"auto",marginBottom:8}}>
               {fp.length===0
                 ? <div style={{padding:12,color:"var(--text3)",fontSize:13,textAlign:"center"}}>No parts found</div>
-                : fp.map(p=>(
-                    <div key={p.id} onClick={()=>selectPart(p)}
-                      style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}
-                      onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
-                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <div>
-                        <span style={{fontWeight:600,fontSize:13}}>{p.name}</span>
-                        <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{p.sku}</code>
+                : fp.map(p=>{
+                    const img=p.image_url?toImgUrl(p.image_url):null;
+                    const fitVehicles=partFitments
+                      .filter(f=>String(f.part_id)===String(p.id))
+                      .map(f=>vehicles.find(v=>String(v.id)===String(f.vehicle_id)))
+                      .filter(Boolean);
+                    const vehicleStr=[...new Set(fitVehicles.map(v=>`${v.make} ${v.model} ${v.year_from||""}${v.year_to?"-"+v.year_to:""}`.trim()))].join(" · ");
+                    return (
+                      <div key={p.id} onClick={()=>selectPart(p)}
+                        style={{padding:"10px 12px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",gap:10,alignItems:"center"}}
+                        onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
+                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        {/* Image */}
+                        <div style={{width:48,height:48,flexShrink:0,borderRadius:6,overflow:"hidden",background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
+                          {img
+                            ? <img src={img} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
+                            : (p.image||"🔩")}
+                        </div>
+                        {/* Info */}
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                            <span style={{fontWeight:600,fontSize:13}}>{p.name}</span>
+                            <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{p.sku}</code>
+                          </div>
+                          {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{p.chinese_desc}</div>}
+                          {p.oe_number&&<div style={{fontSize:11,color:"var(--text3)"}}>OE: {p.oe_number}</div>}
+                          {vehicleStr&&<div style={{fontSize:11,color:"var(--green)",marginTop:2}}>🚗 {vehicleStr}</div>}
+                        </div>
+                        {/* Price */}
+                        <span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",flexShrink:0}}>{fmtAmt(p.price)}</span>
                       </div>
-                      <span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(p.price)}</span>
-                    </div>
-                  ))
+                    );
+                  })
               }
             </div>
           )}
-          {selPart&&(
-            <div style={{padding:"8px 12px",background:"rgba(96,165,250,.08)",borderRadius:8,border:"1px solid rgba(96,165,250,.2)",marginBottom:8,display:"flex",justifyContent:"space-between"}}>
-              <div>
-                <span style={{fontWeight:600}}>{selPart.name}</span>
-                <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{selPart.sku}</code>
+          {selPart&&(()=>{
+            const img=selPart.image_url?toImgUrl(selPart.image_url):null;
+            const fitVehicles=partFitments
+              .filter(f=>String(f.part_id)===String(selPart.id))
+              .map(f=>vehicles.find(v=>String(v.id)===String(f.vehicle_id)))
+              .filter(Boolean);
+            const vehicleStr=[...new Set(fitVehicles.map(v=>`${v.make} ${v.model} ${v.year_from||""}${v.year_to?"-"+v.year_to:""}`.trim()))].join(" · ");
+            return (
+              <div style={{padding:"10px 12px",background:"rgba(96,165,250,.08)",borderRadius:8,border:"1px solid rgba(96,165,250,.2)",marginBottom:8,display:"flex",gap:10,alignItems:"center"}}>
+                <div style={{width:48,height:48,flexShrink:0,borderRadius:6,overflow:"hidden",background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
+                  {img
+                    ? <img src={img} alt={selPart.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
+                    : (selPart.image||"🔩")}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontWeight:600}}>{selPart.name}</span>
+                    <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{selPart.sku}</code>
+                  </div>
+                  {selPart.chinese_desc&&<div style={{fontSize:12,color:"var(--text3)"}}>{selPart.chinese_desc}</div>}
+                  {selPart.oe_number&&<div style={{fontSize:11,color:"var(--text3)"}}>OE: {selPart.oe_number}</div>}
+                  {vehicleStr&&<div style={{fontSize:11,color:"var(--green)"}}>🚗 {vehicleStr}</div>}
+                </div>
+                <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}} onClick={()=>{ setSelPart(null); setDesc(""); setPrice(""); }}>✕</button>
               </div>
-              <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{ setSelPart(null); setDesc(""); setPrice(""); }}>✕</button>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
@@ -8568,21 +9677,10 @@ function WorkshopItemModal({type, parts, onSave, onClose, t}) {
       </FG>
 
       <div style={{display:"flex",gap:10,marginTop:18}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
-        <button className="btn btn-primary" style={{flex:2}}
-          onClick={()=>{
-            if(!desc.trim()||!price){alert("Fill description and price");return;}
-            onSave({
-              type,
-              description:desc,
-              part_id:selPart?selPart.id:null,
-              part_sku:selPart?selPart.sku:"",
-              qty:+qty,
-              unit_price:+price,
-              total:(+qty)*(+price),
-            });
-          }}>
-          ✅ Add {type==="part"?"Part":"Labour"}
+        {justAdded&&<div style={{flex:"0 0 100%",textAlign:"center",fontSize:13,color:"var(--green)",fontWeight:600,padding:"4px 0"}}>✅ Added! You can add another.</div>}
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Done</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>
+          {saving?"Saving...":("✅ Add "+(type==="part"?"Part":"Labour"))}
         </button>
       </div>
     </Overlay>
@@ -8590,24 +9688,666 @@ function WorkshopItemModal({type, parts, onSave, onClose, t}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// WORKSHOP INVOICE PRINT
+// ═══════════════════════════════════════════════════════════════
+function printWorkshopInvoice(job, items, invoice, settings) {
+  const C = settings.currency||"NT$";
+  const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
+  const taxAmt   = subtotal*(settings.tax_rate||0)/100;
+  const total    = subtotal+taxAmt;
+  const parts    = items.filter(i=>i.type==="part");
+  const labour   = items.filter(i=>i.type==="labour");
+  const shopName = settings.shop_name||"Auto Workshop";
+  const invId    = invoice?.id||"—";
+  const invDate  = invoice?.invoice_date||new Date().toISOString().slice(0,10);
+  const status   = invoice?.status||"unpaid";
+
+  const rowsHtml = items.map((i,idx)=>`
+    <tr style="background:${idx%2===0?"#fff":"#f9f9f9"}">
+      <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5">
+        <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${i.type==="part"?"#dbeafe":"#dcfce7"};color:${i.type==="part"?"#1d4ed8":"#166534"};margin-right:6px">${i.type==="part"?"PART":"LABOUR"}</span>
+        ${i.description}${i.part_sku?`<br/><span style="font-size:11px;color:#888;font-family:monospace">${i.part_sku}</span>`:""}
+      </td>
+      <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${i.qty}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${fmt(i.unit_price)}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:700">${fmt(i.total)}</td>
+    </tr>`).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Workshop Invoice ${invId}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:36px;max-width:820px;margin:0 auto}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;border-bottom:3px solid #111;margin-bottom:24px}
+  .shop-name{font-size:26px;font-weight:900;color:#f97316;letter-spacing:1px}
+  .shop-info{font-size:11px;color:#555;margin-top:5px;line-height:1.7}
+  .inv-block{text-align:right}
+  .inv-title{font-size:20px;font-weight:700}
+  .inv-no{font-size:15px;font-weight:700;color:#f97316;margin-top:4px}
+  .inv-meta{font-size:12px;color:#555;margin-top:4px;line-height:1.8}
+  .status{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+  .card{background:#f9f9f9;border:1px solid #e5e5e5;border-radius:8px;padding:14px}
+  .card-label{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+  .card-name{font-size:15px;font-weight:700;margin-bottom:3px}
+  .card-info{font-size:12px;color:#555;line-height:1.7}
+  table{width:100%;border-collapse:collapse;margin-bottom:20px}
+  thead tr{background:#111;color:#fff}
+  thead th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  thead th:nth-child(n+2){text-align:right}
+  .totals{margin-left:auto;width:260px;margin-bottom:24px}
+  .t-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #eee}
+  .t-total{display:flex;justify-content:space-between;padding:10px 0;font-size:17px;font-weight:800;color:#f97316;border-top:2px solid #111;margin-top:4px}
+  .notes{background:#fff8ed;border:1px solid #fcd34d;border-radius:8px;padding:12px;font-size:12px;margin-bottom:20px}
+  .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
+  @media print{body{padding:18px}}
+</style></head><body>
+
+  <div class="header">
+    <div>
+      <div class="shop-name">${shopName}</div>
+      <div class="shop-info">
+        ${settings.phone?`📞 ${settings.phone}<br/>`:""}
+        ${settings.email?`✉️ ${settings.email}<br/>`:""}
+        ${settings.address?`📍 ${settings.address}`:""}
+      </div>
+    </div>
+    <div class="inv-block">
+      <div class="inv-title">WORKSHOP INVOICE</div>
+      <div class="inv-no">${invId}</div>
+      <div class="inv-meta">
+        Date: ${invDate}<br/>
+        ${invoice?.due_date?`Due: ${invoice.due_date}<br/>`:""}
+        <span class="status" style="background:${status==="paid"?"#d1e7dd":"#fff3cd"};color:${status==="paid"?"#0a3622":"#856404"}">${status==="paid"?"✅ PAID":"⏳ UNPAID"}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-label">👤 Customer</div>
+      <div class="card-name">${invoice?.invoice_customer||job.customer_name||"—"}</div>
+      <div class="card-info">
+        ${(invoice?.inv_phone||job.customer_phone)?`📞 ${invoice?.inv_phone||job.customer_phone}<br/>`:""}
+        ${(invoice?.inv_email||job.customer_email)?`✉️ ${invoice?.inv_email||job.customer_email}`:""}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">🚗 Vehicle</div>
+      <div class="card-name">${job.vehicle_reg||"—"}</div>
+      <div class="card-info">
+        ${[job.vehicle_make,job.vehicle_model,job.vehicle_year].filter(Boolean).join(" ")}<br/>
+        ${job.vehicle_color?`Color: ${job.vehicle_color}<br/>`:""}
+        ${job.mileage?`Mileage: ${Number(job.mileage).toLocaleString()} km<br/>`:""}
+        ${job.vin?`VIN: ${job.vin}`:""}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-label">🔧 Job Info</div>
+      <div class="card-info">
+        ${job.mechanic?`Mechanic: <strong>${job.mechanic}</strong><br/>`:""}
+        ${job.date_in?`Date In: ${job.date_in}<br/>`:""}
+        ${job.date_out?`Date Out: ${job.date_out}`:""}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">💬 Complaint / Diagnosis</div>
+      <div class="card-info">
+        ${job.complaint?`<em>${job.complaint}</em><br/>`:""}
+        ${job.diagnosis?`<span style="color:#1d4ed8">${job.diagnosis}</span>`:""}
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr>
+      <th>Description</th>
+      <th style="text-align:right;width:60px">Qty</th>
+      <th style="text-align:right;width:120px">Unit Price</th>
+      <th style="text-align:right;width:120px">Total</th>
+    </tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+
+  <div class="totals">
+    <div class="t-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+    ${(settings.tax_rate||0)>0?`<div class="t-row"><span>Tax (${settings.tax_rate}%)</span><span>${fmt(taxAmt)}</span></div>`:""}
+    <div class="t-total"><span>TOTAL</span><span>${fmt(total)}</span></div>
+  </div>
+
+  ${invoice?.notes?`<div class="notes"><strong>Notes:</strong> ${invoice.notes}</div>`:""}
+
+  <div class="footer">
+    ${shopName}${settings.phone?" · "+settings.phone:""}${settings.email?" · "+settings.email:""}<br/>
+    Thank you for your business!
+  </div>
+
+</body></html>`;
+
+  const w = window.open("","_blank","width=860,height=1100");
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),400);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORKSHOP QUOTE — PRINT PDF
+// ═══════════════════════════════════════════════════════════════
+function printWorkshopQuote(job, items, quote, settings) {
+  const C = settings.currency||"ZAR";
+  const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
+  const taxAmt   = subtotal*(settings.tax_rate||0)/100;
+  const total    = subtotal+taxAmt;
+  const shopName = settings.shop_name||"Auto Workshop";
+
+  const rowsHtml = items.map((i,idx)=>`
+    <tr style="background:${idx%2===0?"#fff":"#f9f9f9"}">
+      <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5">
+        <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${i.type==="part"?"#dbeafe":"#dcfce7"};color:${i.type==="part"?"#1d4ed8":"#166534"};margin-right:6px">${i.type==="part"?"PART":"LABOUR"}</span>
+        ${i.description}${i.part_sku?`<br/><span style="font-size:11px;color:#888;font-family:monospace">${i.part_sku}</span>`:""}
+      </td>
+      <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${i.qty}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${fmt(i.unit_price)}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:700">${fmt(i.total)}</td>
+    </tr>`).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Quotation ${quote.id}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:36px;max-width:820px;margin:0 auto}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;border-bottom:3px solid #2563eb;margin-bottom:24px}
+  .shop-name{font-size:26px;font-weight:900;color:#f97316;letter-spacing:1px}
+  .shop-info{font-size:11px;color:#555;margin-top:5px;line-height:1.7}
+  .inv-block{text-align:right}
+  .inv-title{font-size:20px;font-weight:700;color:#2563eb}
+  .inv-no{font-size:15px;font-weight:700;color:#f97316;margin-top:4px}
+  .inv-meta{font-size:12px;color:#555;margin-top:4px;line-height:1.8}
+  .watermark{display:inline-block;padding:3px 14px;border-radius:20px;font-size:11px;font-weight:700;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+  .card{background:#f9f9f9;border:1px solid #e5e5e5;border-radius:8px;padding:14px}
+  .card-label{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+  .card-name{font-size:15px;font-weight:700;margin-bottom:3px}
+  .card-info{font-size:12px;color:#555;line-height:1.7}
+  table{width:100%;border-collapse:collapse;margin-bottom:20px}
+  thead tr{background:#2563eb;color:#fff}
+  thead th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  thead th:nth-child(n+2){text-align:right}
+  .totals{margin-left:auto;width:260px;margin-bottom:24px}
+  .t-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #eee}
+  .t-total{display:flex;justify-content:space-between;padding:10px 0;font-size:17px;font-weight:800;color:#2563eb;border-top:2px solid #2563eb;margin-top:4px}
+  .notice{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;font-size:12px;margin-bottom:20px;color:#1e40af}
+  .notes{background:#fff8ed;border:1px solid #fcd34d;border-radius:8px;padding:12px;font-size:12px;margin-bottom:20px}
+  .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
+  .sig-box{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+  .sig-line{border-top:1px solid #aaa;padding-top:6px;font-size:11px;color:#888;text-align:center}
+  @media print{body{padding:18px}}
+</style></head><body>
+
+  <div class="header">
+    <div>
+      <div class="shop-name">${shopName}</div>
+      <div class="shop-info">
+        ${settings.phone?`📞 ${settings.phone}<br/>`:""}
+        ${settings.email?`✉️ ${settings.email}<br/>`:""}
+        ${settings.address?`📍 ${settings.address}`:""}
+      </div>
+    </div>
+    <div class="inv-block">
+      <div class="inv-title">QUOTATION / ESTIMATE</div>
+      <div class="inv-no">${quote.id}</div>
+      <div class="inv-meta">
+        Date: ${quote.quote_date}<br/>
+        ${quote.valid_until?`Valid Until: ${quote.valid_until}<br/>`:""}
+        <span class="watermark">⏳ AWAITING CONFIRMATION</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-label">👤 Customer</div>
+      <div class="card-name">${quote.quote_customer||job.customer_name||"—"}</div>
+      <div class="card-info">
+        ${(quote.quote_phone||job.customer_phone)?`📞 ${quote.quote_phone||job.customer_phone}<br/>`:""}
+        ${(quote.quote_email||job.customer_email)?`✉️ ${quote.quote_email||job.customer_email}`:""}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">🚗 Vehicle</div>
+      <div class="card-name">${job.vehicle_reg||"—"}</div>
+      <div class="card-info">
+        ${[job.vehicle_make,job.vehicle_model,job.vehicle_year].filter(Boolean).join(" ")}<br/>
+        ${job.vehicle_color?`Color: ${job.vehicle_color}<br/>`:""}
+        ${job.mileage?`Mileage: ${Number(job.mileage).toLocaleString()} km`:""}
+      </div>
+    </div>
+  </div>
+
+  ${job.complaint||job.diagnosis?`
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-label">💬 Complaint / Diagnosis</div>
+    <div class="card-info">
+      ${job.complaint?`<em>${job.complaint}</em><br/>`:""}
+      ${job.diagnosis?`<span style="color:#1d4ed8">${job.diagnosis}</span>`:""}
+    </div>
+  </div>`:""}
+
+  <table>
+    <thead><tr>
+      <th>Description</th>
+      <th style="text-align:right;width:60px">Qty</th>
+      <th style="text-align:right;width:120px">Unit Price</th>
+      <th style="text-align:right;width:120px">Amount</th>
+    </tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+
+  <div class="totals">
+    <div class="t-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+    ${(settings.tax_rate||0)>0?`<div class="t-row"><span>Tax (${settings.tax_rate}%)</span><span>${fmt(taxAmt)}</span></div>`:""}
+    <div class="t-total"><span>QUOTED TOTAL</span><span>${fmt(total)}</span></div>
+  </div>
+
+  ${quote.notes?`<div class="notes"><strong>Notes:</strong> ${quote.notes}</div>`:""}
+
+  <div class="notice">
+    ℹ️ This is a <strong>quotation only</strong> — not a tax invoice. Prices are valid${quote.valid_until?` until <strong>${quote.valid_until}</strong>`:" as indicated"}.
+    Work will commence upon written or verbal acceptance.
+  </div>
+
+  <div class="sig-box">
+    <div class="sig-line">Customer Signature &amp; Date</div>
+    <div class="sig-line">Authorised by &amp; Date</div>
+  </div>
+
+  <div class="footer">
+    ${shopName}${settings.phone?" · "+settings.phone:""}${settings.email?" · "+settings.email:""}<br/>
+    Thank you for considering us!
+  </div>
+
+</body></html>`;
+
+  const w = window.open("","_blank","width=860,height=1100");
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),400);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORKSHOP QUOTE — CREATE/EDIT MODAL
+// ═══════════════════════════════════════════════════════════════
+function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,onSave,onClose}) {
+  const C=settings.currency||"ZAR";
+  const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const [f,setF]=useState({
+    id:existing?.id||null,
+    job_id:job.id,
+    quote_customer:existing?.quote_customer||job.customer_name||"",
+    quote_phone:existing?.quote_phone||job.customer_phone||"",
+    quote_email:existing?.quote_email||job.customer_email||"",
+    quote_date:existing?.quote_date||new Date().toISOString().slice(0,10),
+    valid_until:existing?.valid_until||"",
+    notes:existing?.notes||"",
+    subtotal,tax,total,
+    status:existing?.status||"draft",
+  });
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const [saving,setSaving]=useState(false);
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title={existing?"✏️ Edit Quotation":"📝 Create Quotation"} onClose={onClose}/>
+
+      {/* Customer */}
+      <div className="card" style={{padding:14,marginBottom:14,background:"var(--surface2)"}}>
+        <div style={{fontSize:11,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",marginBottom:10}}>
+          👤 Quote For
+        </div>
+        <FG>
+          <div><FL label="Customer Name"/><input className="inp" value={f.quote_customer} onChange={e=>s("quote_customer",e.target.value)}/></div>
+          <div><FL label="Phone"/><input className="inp" value={f.quote_phone} onChange={e=>s("quote_phone",e.target.value)}/></div>
+        </FG>
+        <FD><FL label="Email"/><input className="inp" value={f.quote_email} onChange={e=>s("quote_email",e.target.value)}/></FD>
+      </div>
+
+      {/* Items summary */}
+      <div className="card" style={{padding:14,marginBottom:14,background:"var(--surface2)"}}>
+        <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>🔧 {job.vehicle_reg} · {items.length} item{items.length!==1?"s":""}</div>
+        <table className="tbl" style={{width:"100%"}}>
+          <thead><tr>{["Type","Description","Qty","Price","Total"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>
+            {items.map(i=>(
+              <tr key={i.id}>
+                <td><span className="badge" style={{background:i.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:i.type==="part"?"var(--blue)":"var(--green)",fontSize:10}}>{i.type==="part"?"🔩":"👷"}</span></td>
+                <td>{i.description}</td>
+                <td style={{textAlign:"right"}}>{i.qty}</td>
+                <td style={{textAlign:"right"}}>{fmt(i.unit_price)}</td>
+                <td style={{textAlign:"right",fontWeight:700}}>{fmt(i.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+          <div style={{fontSize:13,color:"var(--text3)"}}>Subtotal: <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(subtotal)}</strong></div>
+          {(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>Tax ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(tax)}</strong></div>}
+          <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>Total: {fmt(total)}</div>
+        </div>
+      </div>
+
+      <FG>
+        <div><FL label="Quote Date"/><input className="inp" type="date" value={f.quote_date} onChange={e=>s("quote_date",e.target.value)}/></div>
+        <div><FL label="Valid Until"/><input className="inp" type="date" value={f.valid_until} onChange={e=>s("valid_until",e.target.value)}/></div>
+      </FG>
+      <FD><FL label="Notes / Terms"/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Payment terms, warranty, conditions..." style={{minHeight:60}}/></FD>
+
+      <div style={{display:"flex",gap:10,marginTop:18}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-ghost" style={{flex:1}} disabled={saving||items.length===0} onClick={async()=>{
+          setSaving(true);
+          try{ await onSave({...f}); printWorkshopQuote(job,items,{...f},settings); }catch(e){alert(e.message);}
+          finally{setSaving(false);}
+        }}>💾 Save &amp; Print</button>
+        <button className="btn btn-primary" style={{flex:1}} disabled={saving||items.length===0} onClick={async()=>{
+          setSaving(true);
+          try{ await onSave({...f}); }catch(e){alert(e.message);}
+          finally{setSaving(false);}
+        }}>{saving?"Saving...":(existing?"💾 Save":"📝 Create Quote")}</button>
+      </div>
+      {items.length===0&&<p style={{color:"var(--red)",fontSize:12,marginTop:8,textAlign:"center"}}>Add parts or labour items before creating a quote.</p>}
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORKSHOP INVOICE — EDIT MODAL
+// ═══════════════════════════════════════════════════════════════
+function WsInvoiceEditModal({invoice,onSave,onClose}) {
+  const [f,setF]=useState({
+    invoice_customer:invoice.invoice_customer||"",
+    inv_phone:invoice.inv_phone||"",
+    inv_email:invoice.inv_email||"",
+    invoice_date:invoice.invoice_date||"",
+    due_date:invoice.due_date||"",
+    notes:invoice.notes||"",
+  });
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const [saving,setSaving]=useState(false);
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="✏️ Edit Invoice" onClose={onClose}/>
+      <FG>
+        <div><FL label="Customer Name"/><input className="inp" value={f.invoice_customer} onChange={e=>s("invoice_customer",e.target.value)}/></div>
+        <div><FL label="Phone"/><input className="inp" value={f.inv_phone} onChange={e=>s("inv_phone",e.target.value)}/></div>
+      </FG>
+      <FD><FL label="Email"/><input className="inp" value={f.inv_email} onChange={e=>s("inv_email",e.target.value)}/></FD>
+      <FG>
+        <div><FL label="Invoice Date"/><input className="inp" type="date" value={f.invoice_date} onChange={e=>s("invoice_date",e.target.value)}/></div>
+        <div><FL label="Due Date"/><input className="inp" type="date" value={f.due_date} onChange={e=>s("due_date",e.target.value)}/></div>
+      </FG>
+      <FD><FL label="Notes"/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} style={{minHeight:60}}/></FD>
+      <div style={{display:"flex",gap:10,marginTop:16}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={saving} onClick={async()=>{
+          setSaving(true);
+          try{ await onSave(f); }catch(e){ alert(e.message); }
+          finally{ setSaving(false); }
+        }}>{saving?"Saving...":"💾 Save Changes"}</button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORKSHOP INVOICE — PAYMENT MODAL
+// ═══════════════════════════════════════════════════════════════
+function WsPaymentModal({invoice,settings,onSave,onClose}) {
+  const balance=(+invoice.total||0)-(+invoice.paid_amount||0);
+  const [amount,setAmount]=useState(balance.toFixed(2));
+  const [method,setMethod]=useState("Cash");
+  const [date,setDate]=useState(new Date().toISOString().slice(0,10));
+  const [ref,setRef]=useState("");
+  const [saving,setSaving]=useState(false);
+  const C=settings.currency||"ZAR";
+
+  const handleSave=async()=>{
+    const paid=parseFloat(amount)||0;
+    if(paid<=0){alert("Enter a valid amount");return;}
+    const newPaid=Math.min((+invoice.paid_amount||0)+paid,+invoice.total||0);
+    const newStatus=newPaid>=(+invoice.total||0)?"paid":newPaid>0?"partial":"unpaid";
+    setSaving(true);
+    try{
+      await onSave({
+        paid_amount:newPaid,
+        payment_method:method,
+        payment_date:date,
+        payment_ref:ref,
+        status:newStatus,
+      });
+    }catch(e){ alert(e.message); }
+    finally{ setSaving(false); }
+  };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="💳 Record Payment" onClose={onClose}/>
+      <div className="card" style={{padding:12,marginBottom:14,background:"var(--surface2)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
+          <span style={{color:"var(--text3)"}}>Invoice Total</span>
+          <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{C} {(+invoice.total||0).toFixed(2)}</strong>
+        </div>
+        {(+invoice.paid_amount||0)>0&&(
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginTop:4}}>
+            <span style={{color:"var(--text3)"}}>Already Paid</span>
+            <strong style={{fontFamily:"Rajdhani,sans-serif",color:"var(--green)"}}>{C} {(+invoice.paid_amount||0).toFixed(2)}</strong>
+          </div>
+        )}
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:14,marginTop:6,paddingTop:6,borderTop:"1px solid var(--border)"}}>
+          <span style={{fontWeight:700}}>Balance Due</span>
+          <strong style={{fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",fontSize:16}}>{C} {balance.toFixed(2)}</strong>
+        </div>
+      </div>
+      <FG>
+        <div>
+          <FL label={`Amount Received (${C})`}/>
+          <input className="inp" type="number" min="0" step="0.01" value={amount} onChange={e=>setAmount(e.target.value)}/>
+        </div>
+        <div>
+          <FL label="Payment Method"/>
+          <select className="inp" value={method} onChange={e=>setMethod(e.target.value)}>
+            {["Cash","Card","EFT / Bank Transfer","Cheque","Other"].map(m=><option key={m}>{m}</option>)}
+          </select>
+        </div>
+      </FG>
+      <FG>
+        <div><FL label="Payment Date"/><input className="inp" type="date" value={date} onChange={e=>setDate(e.target.value)}/></div>
+        <div><FL label="Reference / Receipt No"/><input className="inp" value={ref} onChange={e=>setRef(e.target.value)} placeholder="Optional"/></div>
+      </FG>
+      <div style={{display:"flex",gap:10,marginTop:16}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-success" style={{flex:2}} disabled={saving} onClick={handleSave}>
+          {saving?"Saving...":"💳 Confirm Payment"}
+        </button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORKSHOP INVOICE — STATEMENT MODAL
+// ═══════════════════════════════════════════════════════════════
+function WsStatementModal({invoice,job,items,settings,onClose,onPrint}) {
+  const C=settings.currency||"ZAR";
+  const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const paid=+invoice.paid_amount||0;
+  const balance=(+invoice.total||0)-paid;
+  const statusColor=invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)";
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="📋 Invoice Statement" onClose={onClose}/>
+
+      {/* Invoice header */}
+      <div className="card" style={{padding:14,marginBottom:12,background:"var(--surface2)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:15}}>{settings.shop_name||"Workshop"}</div>
+            {settings.phone&&<div style={{fontSize:12,color:"var(--text3)"}}>📞 {settings.phone}</div>}
+            {settings.address&&<div style={{fontSize:12,color:"var(--text3)"}}>{settings.address}</div>}
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)"}}>{invoice.id}</div>
+            <div style={{fontSize:12,color:"var(--text3)"}}>Date: {invoice.invoice_date}</div>
+            {invoice.due_date&&<div style={{fontSize:12,color:"var(--text3)"}}>Due: {invoice.due_date}</div>}
+          </div>
+        </div>
+        <div style={{borderTop:"1px solid var(--border)",marginTop:10,paddingTop:10,display:"flex",gap:24,flexWrap:"wrap"}}>
+          <div>
+            <div style={{fontSize:11,color:"var(--text3)"}}>Customer</div>
+            <div style={{fontWeight:600}}>{invoice.invoice_customer||job.customer_name||"—"}</div>
+            {(invoice.inv_phone||job.customer_phone)&&<div style={{fontSize:12,color:"var(--text3)"}}>{invoice.inv_phone||job.customer_phone}</div>}
+          </div>
+          <div>
+            <div style={{fontSize:11,color:"var(--text3)"}}>Vehicle</div>
+            <div style={{fontWeight:600,fontFamily:"DM Mono,monospace"}}>{job.vehicle_reg||"—"}</div>
+            <div style={{fontSize:12,color:"var(--text3)"}}>{job.vehicle_make} {job.vehicle_model} {job.vehicle_year}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Line items */}
+      <div className="card" style={{overflow:"hidden",marginBottom:12}}>
+        <table className="tbl" style={{width:"100%"}}>
+          <thead><tr>{["Description","Qty","Unit Price","Total"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>
+            {items.map(i=>(
+              <tr key={i.id}>
+                <td>
+                  <span className="badge" style={{background:i.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:i.type==="part"?"var(--blue)":"var(--green)",fontSize:10,marginRight:6}}>
+                    {i.type==="part"?"🔩":"👷"}
+                  </span>
+                  {i.description}
+                </td>
+                <td style={{textAlign:"right"}}>{i.qty}</td>
+                <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmt(i.unit_price)}</td>
+                <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif"}}>{fmt(i.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+          <div style={{fontSize:13,color:"var(--text3)"}}>Subtotal: <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(invoice.subtotal)}</strong></div>
+          {(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>Tax ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(invoice.tax)}</strong></div>}
+          <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>Total: {fmt(invoice.total)}</div>
+        </div>
+      </div>
+
+      {/* Payment summary */}
+      <div className="card" style={{padding:14,marginBottom:14,borderLeft:`3px solid ${statusColor}`}}>
+        <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>💳 Payment Summary</div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
+          <span style={{color:"var(--text3)"}}>Invoice Total</span><strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(invoice.total)}</strong>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
+          <span style={{color:"var(--text3)"}}>Amount Paid</span>
+          <strong style={{fontFamily:"Rajdhani,sans-serif",color:"var(--green)"}}>{fmt(paid)}</strong>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:15,paddingTop:8,borderTop:"1px solid var(--border)"}}>
+          <strong>Balance Due</strong>
+          <strong style={{fontFamily:"Rajdhani,sans-serif",color:statusColor,fontSize:17}}>{fmt(balance)}</strong>
+        </div>
+        {paid>0&&(
+          <div style={{marginTop:10,padding:"8px 10px",background:"var(--surface2)",borderRadius:8,fontSize:12}}>
+            {invoice.payment_method&&<div>Method: <strong>{invoice.payment_method}</strong></div>}
+            {invoice.payment_date&&<div>Date: <strong>{invoice.payment_date}</strong></div>}
+            {invoice.payment_ref&&<div>Reference: <code style={{fontFamily:"DM Mono,monospace"}}>{invoice.payment_ref}</code></div>}
+          </div>
+        )}
+        <div style={{marginTop:10,display:"flex",justifyContent:"center"}}>
+          <span className="badge" style={{background:invoice.status==="paid"?"rgba(52,211,153,.15)":invoice.status==="partial"?"rgba(251,191,36,.15)":"rgba(248,113,113,.15)",color:statusColor,fontSize:13,padding:"5px 14px"}}>
+            {invoice.status==="paid"?"✅ FULLY PAID":invoice.status==="partial"?"💛 PARTIALLY PAID":"⏳ UNPAID"}
+          </span>
+        </div>
+      </div>
+
+      {invoice.notes&&<div style={{marginBottom:14,padding:10,background:"var(--surface2)",borderRadius:8,fontSize:13,color:"var(--text2)"}}>{invoice.notes}</div>}
+
+      <div style={{display:"flex",gap:10}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Close</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onPrint}>🖨️ Print PDF</button>
+      </div>
+    </Overlay>
+  );
+}
+
 // WORKSHOP INVOICE MODAL
 // ═══════════════════════════════════════════════════════════════
 function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSave,onClose,t}) {
-  const [invDate, setInvDate] = useState(new Date().toISOString().slice(0,10));
-  const [dueDate, setDueDate] = useState("");
-  const [notes,   setNotes]   = useState("");
+  const [invDate,  setInvDate]  = useState(new Date().toISOString().slice(0,10));
+  const [dueDate,  setDueDate]  = useState("");
+  const [notes,    setNotes]    = useState("");
+  const [saving,   setSaving]   = useState(false);
+  // Invoice-specific customer details — pre-filled from job profile, editable before saving
+  const [invCust,  setInvCust]  = useState(job.customer_name||"");
+  const [invPhone, setInvPhone] = useState(job.customer_phone||"");
+  const [invEmail, setInvEmail] = useState(job.customer_email||"");
+
+  const handleCreate=async()=>{
+    setSaving(true);
+    try{
+      await onSave({
+        job_id:job.id,
+        invoice_customer:invCust, inv_phone:invPhone, inv_email:invEmail,
+        vehicle_reg:job.vehicle_reg||"",
+        invoice_date:invDate, due_date:dueDate,
+        subtotal, tax, total, status:"unpaid", notes,
+      });
+    }catch(e){ alert("Failed to create invoice: "+e.message); }
+    finally{ setSaving(false); }
+  };
 
   return (
     <Overlay onClose={onClose} wide>
       <MHead title="🧾 Create Workshop Invoice" onClose={onClose}/>
+
+      {/* Editable invoice customer details — pre-filled from job profile */}
       <div className="card" style={{padding:14,marginBottom:14,background:"var(--surface2)"}}>
-        <div style={{fontWeight:700,marginBottom:8}}>{job.customer_name} — {job.vehicle_reg}</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:".06em"}}>
+            👤 Invoice Customer
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button type="button" className="btn btn-ghost btn-xs"
+              onClick={()=>{ setInvCust(job.customer_name||""); setInvPhone(job.customer_phone||""); setInvEmail(job.customer_email||""); }}>
+              ↩ Use Profile
+            </button>
+            <button type="button" className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
+              onClick={()=>{ setInvCust(""); setInvPhone(""); setInvEmail(""); }}>
+              ✕ Clear
+            </button>
+          </div>
+        </div>
+        <FG>
+          <div><FL label="Invoice Name"/><input className="inp" value={invCust} onChange={e=>setInvCust(e.target.value)} placeholder="Customer name on invoice"/></div>
+          <div><FL label="Invoice Phone"/><input className="inp" value={invPhone} onChange={e=>setInvPhone(e.target.value)} placeholder="Phone"/></div>
+        </FG>
+        <FD><FL label="Invoice Email"/><input className="inp" value={invEmail} onChange={e=>setInvEmail(e.target.value)} placeholder="Email"/></FD>
+      </div>
+
+      {/* Line items summary */}
+      <div className="card" style={{padding:14,marginBottom:14,background:"var(--surface2)"}}>
+        <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>{job.vehicle_reg} · {items.length} item{items.length!==1?"s":""}</div>
         <table className="tbl" style={{width:"100%"}}>
-          <thead><tr>{["Description","Qty","Price","Total"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <thead><tr>{["Type","Description","Qty","Price","Total"].map(h=><th key={h}>{h}</th>)}</tr></thead>
           <tbody>
             {items.map(i=>(
               <tr key={i.id}>
-                <td>{i.description}</td>
+                <td><span className="badge" style={{background:i.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:i.type==="part"?"var(--blue)":"var(--green)",fontSize:11}}>{i.type==="part"?"🔩":"👷"}</span></td>
+                <td>{i.description}{i.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:6}}>{i.part_sku}</code>}</td>
                 <td style={{textAlign:"right"}}>{i.qty}</td>
                 <td style={{textAlign:"right"}}>{fmtAmt(i.unit_price)}</td>
                 <td style={{textAlign:"right",fontWeight:700}}>{fmtAmt(i.total)}</td>
@@ -8621,6 +10361,7 @@ function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSave,onCl
           <div style={{fontSize:16,fontWeight:700,color:"var(--accent)"}}>Total: {fmtAmt(total)}</div>
         </div>
       </div>
+
       <FG>
         <div><FL label={t.invoiceDate}/><input className="inp" type="date" value={invDate} onChange={e=>setInvDate(e.target.value)}/></div>
         <div><FL label={t.dueDate}/><input className="inp" type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></div>
@@ -8628,16 +10369,9 @@ function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSave,onCl
       <FD><FL label={t.notes}/><textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Payment instructions, warranty..." style={{minHeight:60}}/></FD>
       <div style={{display:"flex",gap:10,marginTop:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={()=>{
-          const id = makeId(settings.invoice_prefix||"INV");
-          onSave({
-            id, job_id:job.id, customer_name:job.customer_name,
-            customer_phone:job.customer_phone||"", customer_email:job.customer_email||"",
-            vehicle_reg:job.vehicle_reg||"",
-            invoice_date:invDate, due_date:dueDate,
-            subtotal, tax, total, status:"unpaid", notes,
-          });
-        }}>💾 Create Invoice</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handleCreate} disabled={saving}>
+          {saving?"Saving...":"💾 Create Invoice"}
+        </button>
       </div>
     </Overlay>
   );

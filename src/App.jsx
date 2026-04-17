@@ -7967,26 +7967,40 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
         )}
       </div>
 
-      {/* Label + buttons */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:5,gap:4,flexWrap:"wrap"}}>
-        <div style={{fontSize:11,fontWeight:600,color:"var(--text3)"}}>{label}</div>
-        <div style={{display:"flex",gap:4}}>
-          <button className="btn btn-ghost btn-xs" style={{fontSize:10,padding:"2px 7px"}}
-            title="Take photo with camera" onClick={e=>{ e.stopPropagation(); camRef.current?.click(); }}>
-            📷
+      {/* Label + 3 source buttons */}
+      <div style={{marginTop:6}}>
+        <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:5,textAlign:"center",textTransform:"uppercase",letterSpacing:".06em"}}>{label}</div>
+        <div style={{display:"flex",gap:5,justifyContent:"center"}}>
+          {/* Option 1 — Camera */}
+          <button className="btn btn-ghost btn-xs"
+            style={{flex:1,padding:"5px 4px",fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}
+            title="Take a new photo with camera"
+            onClick={e=>{ e.stopPropagation(); camRef.current?.click(); }}>
+            <span style={{fontSize:15}}>📷</span>
+            <span>Camera</span>
           </button>
-          <button className="btn btn-ghost btn-xs" style={{fontSize:10,padding:"2px 7px"}}
-            title="Choose from gallery, Google Drive or files" onClick={e=>{ e.stopPropagation(); fileRef.current?.click(); }}>
-            🖼️ Drive
+          {/* Option 2 — Local file / gallery */}
+          <button className="btn btn-ghost btn-xs"
+            style={{flex:1,padding:"5px 4px",fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}
+            title="Browse local files or phone gallery"
+            onClick={e=>{ e.stopPropagation(); fileRef.current?.click(); }}>
+            <span style={{fontSize:15}}>🖼️</span>
+            <span>Files</span>
           </button>
-          {(reg||vehicleId) && (
-            <button className="btn btn-ghost btn-xs" style={{fontSize:10,padding:"2px 7px"}}
-              onClick={e=>{ e.stopPropagation(); openBrowse(); }} title="Browse saved Drive photos for this vehicle">
-              🗂️
-            </button>
-          )}
+          {/* Option 3 — Google Drive plate folder */}
+          <button className="btn btn-ghost btn-xs"
+            style={{flex:1,padding:"5px 4px",fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+              color:"var(--blue)",opacity:(reg||vehicleId)?1:0.4}}
+            title={(reg||vehicleId)?`Browse Drive folder: ${(reg||vehicleId||"").toUpperCase()}`:"Save vehicle plate first to browse Drive"}
+            onClick={e=>{ e.stopPropagation(); openBrowse(); }}>
+            <span style={{fontSize:15}}>☁️</span>
+            <span>Drive</span>
+          </button>
+          {/* Remove */}
           {url && (
-            <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",fontSize:10,padding:"2px 7px"}}
+            <button className="btn btn-ghost btn-xs"
+              style={{padding:"5px 6px",fontSize:11,color:"var(--red)"}}
+              title="Remove photo"
               onClick={e=>{ e.stopPropagation(); onChange(""); }}>✕</button>
           )}
         </div>
@@ -8002,7 +8016,9 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
           <div style={{background:"var(--surface)",borderRadius:"12px 12px 0 0",padding:16,width:"100%",maxWidth:600,maxHeight:"75vh",overflowY:"auto"}}
             onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontWeight:700,fontSize:14}}>🗂 Drive Photos — {(reg||vehicleId||"").replace(/\s/g,"").toUpperCase()}</div>
+              <div style={{fontWeight:700,fontSize:14}}>
+                ☁️ Google Drive — <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)"}}>Tim_Car_Phot / {(reg||vehicleId||"").replace(/\s/g,"").toUpperCase()}</code>
+              </div>
               <button className="btn btn-ghost btn-xs" onClick={()=>setBrowsing(false)}>✕ Close</button>
             </div>
             {browseLoading && (

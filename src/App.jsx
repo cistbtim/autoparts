@@ -1316,8 +1316,10 @@ function MainApp({user,onLogout,t,lang,setLang}) {
       if(!keepOpen) await releaseLock("part",ep.id);
       await loadAll();
       if(keepOpen){
-        // Refresh modal data so form shows saved values if it re-renders
-        openM("editPart", {...ep, ...d2});
+        // Close and reopen so form reinitialises with fresh saved data
+        const fresh = {...ep, ...d2};
+        closeM("editPart");
+        setTimeout(()=>openM("editPart", fresh), 0);
       } else {
         closeM("editPart");
         setTimeout(()=>{
@@ -4322,14 +4324,6 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
-  const savedPartRef = useRef(part?.id);
-
-  // When modal data refreshes after keepOpen save, sync form to new values
-  useEffect(()=>{
-    if(part && saved && part.id === savedPartRef.current){
-      setF(makeF(part));
-    }
-  },[part]);
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
 
   const buildPayload=(fv)=>({

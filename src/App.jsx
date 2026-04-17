@@ -4305,7 +4305,7 @@ function ImgPreview({src}) {
 function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles}) {
   const initF = part?{
     sku:part.sku||"", name:part.name||"", category:part.category||"Engine",
-    brand:part.brand||"", price:part.price||"", stock:part.stock||"", minStock:part.min_stock||"",
+    brand:part.brand||"", price:part.price??"", stock:part.stock??0, minStock:part.min_stock??0,
     image_url:part.image_url||"", chinese_desc:part.chinese_desc||"",
     make:part.make||"", model:part.model||"", year_range:part.year_range||"", oe_number:part.oe_number||"",
     bin_location:part.bin_location||"",

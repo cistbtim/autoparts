@@ -951,6 +951,7 @@ function MainApp({user,onLogout,t,lang,setLang}) {
   const [searchDebounced,setSearchDebounced]=useState("");
   const [filterCat,setFilterCat]=useState("__all__");
   const [filterLow,setFilterLow]=useState(false);
+  const [filterFits,setFilterFits]=useState("__all__"); // __all__ | none | has
   const [invPage,setInvPage]=useState(0);   // inventory page
   const [shopPage,setShopPage]=useState(0); // shop page
   const PAGE_SIZE=20;
@@ -976,7 +977,7 @@ function MainApp({user,onLogout,t,lang,setLang}) {
   },[searchPart]);
 
   // Reset page when filters change
-  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow]);
+  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits]);
   useEffect(()=>{ setShopPage(0); },[searchPart]);
   // Modals
   const [M,setM]=useState({});
@@ -1992,6 +1993,11 @@ function MainApp({user,onLogout,t,lang,setLang}) {
   const fp=parts.filter(p=>{
     if(filterLow&&p.stock>p.min_stock)return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
+    if(filterFits!=="__all__"){
+      const hasFit=partFitments.some(f=>String(f.part_id)===String(p.id));
+      if(filterFits==="none"&&hasFit)return false;
+      if(filterFits==="has"&&!hasFit)return false;
+    }
     if(!searchDebounced.trim())return true;
     const words=searchDebounced.trim().toLowerCase().split(" ").filter(Boolean);
     const fields=[
@@ -2400,10 +2406,22 @@ function MainApp({user,onLogout,t,lang,setLang}) {
                 <option value="__all__">All Categories</option>
                 {getCategories().map(c=><option key={c} value={c}>{c}</option>)}
               </select>
-              {(searchPart||filterCat!=="__all__"||filterLow)&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
+              <select className="inp" value={filterFits} onChange={e=>setFilterFits(e.target.value)} style={{width:150,
+                borderColor:filterFits!=="__all__"?"var(--accent)":undefined,
+                color:filterFits==="none"?"var(--red)":filterFits==="has"?"var(--blue)":undefined}}>
+                <option value="__all__">🚗 All Fits</option>
+                <option value="none">❌ No fitment</option>
+                <option value="has">✅ Has fitment</option>
+              </select>
+              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__")&&(
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
             </div>
+            {filterFits==="none"&&(
+              <div style={{fontSize:12,color:"var(--red)",marginBottom:10,background:"rgba(248,113,113,.08)",borderRadius:8,padding:"6px 10px"}}>
+                ❌ {fp.length} part{fp.length!==1?"s":""} with no vehicle fitment — open each and add fits in the <strong>Fits</strong> tab
+              </div>
+            )}
             {searchDebounced&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>
               🔍 {fp.length} result{fp.length!==1?"s":""} for <span style={{color:"var(--accent)",fontWeight:600}}>"{searchDebounced}"</span>
               {fp.length===0&&<span style={{color:"var(--red)",marginLeft:8}}>— try fewer words</span>}

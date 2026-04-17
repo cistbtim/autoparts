@@ -1306,26 +1306,28 @@ function MainApp({user,onLogout,t,lang,setLang}) {
   };
 
   // Parts
-  const savePart=async(data)=>{
+  const savePart=async(data, keepOpen=false)=>{
     const ep=mData("editPart");
     if(ep){
       const d2={...data,image_url:toSaveUrl(data.image_url)};
       await api.patch("parts","id",ep.id,d2);
       if(ep.stock!==d2.stock)await logInv({...ep,...d2},ep.stock,d2.stock,"Edit Part","Admin edit");
       showToast("Part updated");
-      await releaseLock("part",ep.id); // release lock on save
-      await loadAll();closeM("editPart");
-      // Stay on same page and scroll back to the edited row
-      setTimeout(()=>{
-        const el=document.getElementById(`part-row-${ep.id}`);
-        if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); el.style.transition="background .5s"; el.style.background="rgba(251,146,60,.15)"; setTimeout(()=>el.style.background="",1500); }
-      },300);
+      if(!keepOpen) await releaseLock("part",ep.id);
+      await loadAll();
+      if(!keepOpen){ closeM("editPart");
+        setTimeout(()=>{
+          const el=document.getElementById(`part-row-${ep.id}`);
+          if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); el.style.transition="background .5s"; el.style.background="rgba(251,146,60,.15)"; setTimeout(()=>el.style.background="",1500); }
+        },300);
+      }
     } else {
       const d2={...data,image_url:toSaveUrl(data.image_url)};
       const r=await api.upsert("parts",d2);
       await logInv(Array.isArray(r)?r[0]:d2,0,d2.stock,"New Part","Added");
       showToast("Part added");
-      await loadAll();closeM("editPart");
+      await loadAll();
+      if(!keepOpen) closeM("editPart");
     }
   };
   // ── Workshop ──
@@ -4315,7 +4317,8 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
   const [ptab, setPtab] = useState("info");
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
-  const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); };
+  const [saved, setSaved] = useState(false);
+  const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
 
   const buildPayload=(fv)=>({
     sku:fv.sku.trim(), name:fv.name.trim(), category:fv.category, brand:fv.brand,
@@ -4329,8 +4332,7 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
   const handlePhotoChange = (url) => {
     const updated = {...f, image_url: url};
     setF(updated);
-    setDirty(false);
-    if (part) onSave(buildPayload(updated));
+    if (part) { onSave(buildPayload(updated), true); setDirty(false); setSaved(true); }
     else setDirty(true);
   };
 
@@ -4501,26 +4503,43 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
         </div>
       )}
 
-      {/* Save / Cancel */}
-      {dirty&&(
-        <div style={{fontSize:12,color:"var(--accent)",background:"rgba(251,146,60,.08)",borderRadius:8,padding:"6px 10px",marginTop:14,textAlign:"center"}}>
-          ⚠️ Unsaved changes
+      {/* Saved banner */}
+      {saved&&(
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,
+          background:"rgba(34,197,94,.1)",border:"1px solid rgba(34,197,94,.3)",
+          borderRadius:10,padding:"10px 14px",marginTop:14}}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--green)"}}>✅ Saved!</div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setSaved(false)}>✏️ Continue editing</button>
+            <button className="btn btn-primary btn-sm" onClick={onClose}>Exit →</button>
+          </div>
         </div>
       )}
-      <div style={{display:"flex",gap:10,marginTop:10}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{t.cancel}</button>
-        <button className="btn btn-primary" style={{flex:2,position:"relative",
-          boxShadow:dirty?"0 0 0 3px rgba(251,146,60,.4)":undefined,
-          animation:dirty?"pulse-ring 1.5s ease infinite":undefined}}
-          onClick={()=>{
-            if(!validate()) return;
-            onSave(buildPayload(f));
-            setDirty(false);
-          }}>
-          {dirty&&<span style={{position:"absolute",top:-4,right:-4,width:10,height:10,background:"var(--accent)",borderRadius:"50%",border:"2px solid var(--surface)"}}/>}
-          {t.save}
-        </button>
-      </div>
+
+      {/* Unsaved warning + Save/Cancel */}
+      {!saved&&(
+        <>
+          {dirty&&(
+            <div style={{fontSize:12,color:"var(--accent)",background:"rgba(251,146,60,.08)",borderRadius:8,padding:"6px 10px",marginTop:14,textAlign:"center"}}>
+              ⚠️ Unsaved changes
+            </div>
+          )}
+          <div style={{display:"flex",gap:10,marginTop:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{t.cancel}</button>
+            <button className="btn btn-primary" style={{flex:2,position:"relative",
+              boxShadow:dirty?"0 0 0 3px rgba(251,146,60,.4)":undefined,
+              animation:dirty?"pulse-ring 1.5s ease infinite":undefined}}
+              onClick={()=>{
+                if(!validate()) return;
+                onSave(buildPayload(f), true);
+                setDirty(false); setSaved(true);
+              }}>
+              {dirty&&<span style={{position:"absolute",top:-4,right:-4,width:10,height:10,background:"var(--accent)",borderRadius:"50%",border:"2px solid var(--surface)"}}/>}
+              {t.save}
+            </button>
+          </div>
+        </>
+      )}
     </Overlay>
   );
 }

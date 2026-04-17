@@ -10247,9 +10247,9 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
             Capture condition photos before work starts. Photos will be saved to the vehicle record after the job is saved.
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
-            <JobPhotoSlot label="Front"  value={f.photo_front} onChange={v=>s("photo_front",v)}/>
-            <JobPhotoSlot label="Side"   value={f.photo_side}  onChange={v=>s("photo_side",v)}/>
-            <JobPhotoSlot label="Rear"   value={f.photo_rear}  onChange={v=>s("photo_rear",v)}/>
+            <JobPhotoSlot label="Front"  value={f.photo_front} onChange={v=>s("photo_front",v)} reg={f.vehicle_reg}/>
+            <JobPhotoSlot label="Side"   value={f.photo_side}  onChange={v=>s("photo_side",v)}  reg={f.vehicle_reg}/>
+            <JobPhotoSlot label="Rear"   value={f.photo_rear}  onChange={v=>s("photo_rear",v)}  reg={f.vehicle_reg}/>
           </div>
           {photoCount>0&&(
             <div style={{marginTop:10,fontSize:12,color:"var(--green)"}}>
@@ -10277,9 +10277,20 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
 // ═══════════════════════════════════════════════════════════════
 // JOB PHOTO SLOT — capture front/side/rear on job card creation
 // ═══════════════════════════════════════════════════════════════
-function JobPhotoSlot({label, value, onChange}) {
-  const camRef  = useRef(null);  // camera only
-  const fileRef = useRef(null);  // full picker (gallery, Drive, files)
+function JobPhotoSlot({label, value, onChange, reg}) {
+  const camRef  = useRef(null);
+  const fileRef = useRef(null);
+  const [browsing,      setBrowsing]      = useState(false);
+  const [drivePhotos,   setDrivePhotos]   = useState(null);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [error,         setError]         = useState(null);
+
+  const plate = (reg||"").replace(/\s/g,"").toUpperCase();
+
+  const getScriptUrl = () =>
+    (window._VEHICLE_SCRIPT_URL && window._VEHICLE_SCRIPT_URL.trim()) ||
+    (window._APPS_SCRIPT_URL    && window._APPS_SCRIPT_URL.trim())    || "";
+
   const handleFile = (e) => {
     const file = e.target.files?.[0]; if(!file) return;
     const fr = new FileReader();
@@ -10287,6 +10298,24 @@ function JobPhotoSlot({label, value, onChange}) {
     fr.readAsDataURL(file);
     e.target.value = "";
   };
+
+  const openBrowse = async () => {
+    const SCRIPT_URL = getScriptUrl();
+    if (!SCRIPT_URL) { setError("⚙️ Set Vehicle Script URL in Settings first"); return; }
+    if (!plate) { setError("Enter vehicle reg first"); return; }
+    setBrowsing(true);
+    if (drivePhotos === null) {
+      setBrowseLoading(true);
+      try {
+        const resp = await fetch(SCRIPT_URL, { method:"POST", body:JSON.stringify({action:"listPhotos", plate}) });
+        const result = await resp.json();
+        if (result.success) setDrivePhotos(result.photos || []);
+        else throw new Error(result.error || "Could not list photos");
+      } catch(e) { setError("❌ " + e.message); setBrowsing(false); }
+      setBrowseLoading(false);
+    }
+  };
+
   return (
     <div>
       <div onClick={()=>fileRef.current?.click()} style={{
@@ -10321,12 +10350,47 @@ function JobPhotoSlot({label, value, onChange}) {
           onClick={e=>{e.stopPropagation();fileRef.current?.click();}}>
           <span style={{fontSize:13}}>🖼️</span><span>Files</span>
         </button>
+        <button className="btn btn-ghost btn-xs"
+          style={{flex:1,padding:"4px 2px",fontSize:10,display:"flex",flexDirection:"column",alignItems:"center",gap:1,
+            color:"var(--blue)",opacity:plate?1:0.4}}
+          title={plate?`Browse Drive: ${plate}`:"Enter vehicle reg first"}
+          onClick={e=>{e.stopPropagation();openBrowse();}}>
+          <span style={{fontSize:13}}>☁️</span><span>Drive</span>
+        </button>
         {value&&(
           <button className="btn btn-ghost btn-xs"
             style={{padding:"4px 6px",fontSize:10,color:"var(--red)"}}
             onClick={e=>{e.stopPropagation();onChange("");}}>✕</button>
         )}
       </div>
+      {error && <div style={{fontSize:10,color:"var(--red)",marginTop:3}}>{error}</div>}
+
+      {/* Drive photo picker */}
+      {browsing && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+          onClick={()=>setBrowsing(false)}>
+          <div style={{background:"var(--surface)",borderRadius:"12px 12px 0 0",padding:16,width:"100%",maxWidth:600,maxHeight:"75vh",overflowY:"auto"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontWeight:700,fontSize:14}}>☁️ Drive — {plate}</div>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setBrowsing(false)}>✕</button>
+            </div>
+            {browseLoading
+              ? <div style={{textAlign:"center",padding:20,color:"var(--text3)"}}>Loading photos...</div>
+              : drivePhotos && drivePhotos.length===0
+                ? <div style={{textAlign:"center",padding:20,color:"var(--text3)"}}>No photos found for {plate}</div>
+                : <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                    {(drivePhotos||[]).map(p=>(
+                      <div key={p.id} style={{aspectRatio:"1",borderRadius:8,overflow:"hidden",cursor:"pointer",border:"2px solid transparent"}}
+                        onClick={()=>{ onChange(p.url); setBrowsing(false); }}>
+                        <DriveImg url={p.url} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                      </div>
+                    ))}
+                  </div>
+            }
+          </div>
+        </div>
+      )}
     </div>
   );
 }

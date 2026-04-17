@@ -33,7 +33,7 @@ const api = {
 };
 
 // ── Settings cache ────────────────────────────────────────────
-let _settings = { shop_name:"AutoParts", logo_url:"", logo_data:"", logo_h_login:140, logo_h_sidebar:36, logo_h_pdf:70, logo_blend:"normal", currency:"NT$", whatsapp:"", email:"", phone:"", address:"", tax_rate:0, vat_number:"", invoice_prefix:"INV", credit_note_prefix:"CN", apps_script_url:"", vehicle_script_url:"" };
+let _settings = { shop_name:"AutoParts", logo_url:"", logo_data:"", logo_h_login:140, logo_h_sidebar:36, logo_h_pdf:70, logo_blend:"normal", currency:"TWD NT$", whatsapp:"", email:"", phone:"", address:"", tax_rate:0, vat_number:"", invoice_prefix:"INV", credit_note_prefix:"CN", apps_script_url:"", vehicle_script_url:"" };
 const getSettings = () => _settings;
 const loadSettings = async () => {
   try {
@@ -45,7 +45,7 @@ const loadSettings = async () => {
   return _settings;
 };
 const curSym = (c) => { const s = (c||"").trim(); const i = s.lastIndexOf(" "); return i>=0 ? s.slice(i+1) : s; };
-const C = () => curSym(getSettings().currency || "NT$");
+const C = () => curSym(getSettings().currency || "TWD NT$");
 
 // ── i18n ─────────────────────────────────────────────────────
 const T = {
@@ -3657,8 +3657,8 @@ function SettingsPage({settings,onSave,t}) {
         </div>
         <div className="card" style={{padding:22}}>
           <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>💰 Billing Settings</h3>
-          <FD><FL label={t.currency}/><select className="inp" value={f.currency||"NT$"} onChange={e=>s("currency",e.target.value)}>
-            {["NT$","USD $","MYR RM","SGD $","HKD $","JPY ¥","EUR €","GBP £","CNY ¥","THB ฿","IDR Rp","PHP ₱","ZAR R","AUD $","CAD $","KRW ₩"].map(c=><option key={c}>{c}</option>)}
+          <FD><FL label={t.currency}/><select className="inp" value={f.currency||"TWD NT$"} onChange={e=>s("currency",e.target.value)}>
+            {["TWD NT$","USD $","MYR RM","SGD $","HKD $","JPY ¥","EUR €","GBP £","CNY ¥","THB ฿","IDR Rp","PHP ₱","ZAR R","AUD $","CAD $","KRW ₩"].map(c=><option key={c}>{c}</option>)}
           </select></FD>
           <FG cols="1fr 1fr">
             <div><FL label={t.taxRate}/><input className="inp" type="number" value={f.tax_rate||0} onChange={e=>s("tax_rate",+e.target.value)} placeholder="0 (no VAT)"/></div>
@@ -4925,7 +4925,7 @@ function PdfInvoiceModal({inv,settings,onClose}) {
     api.get(tbl,`invoice_id=eq.${inv.id}&select=*`).then(r=>setItems(Array.isArray(r)?r:[]));
   },[inv.id]);
 
-  const cur=curSym(settings.currency||"NT$");
+  const cur=curSym(settings.currency||"TWD NT$");
   const fmt=(n)=>`${cur}${(n||0).toLocaleString()}`;
   const isSupplier=inv.type==="supplier";
 
@@ -5103,7 +5103,7 @@ function AddPaymentModal({data,customerInvoices,supplierInvoices,onSave,onClose,
     notes:""
   });
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
-  const cur=curSym(settings.currency||"NT$");
+  const cur=curSym(settings.currency||"TWD NT$");
 
   // Auto-fill party name when reference selected
   const fillFromRef=(refId,type)=>{
@@ -5167,7 +5167,7 @@ function AddPaymentModal({data,customerInvoices,supplierInvoices,onSave,onClose,
 function ReportsPage({orders,parts,customers,supplierInvoices,payments,settings,t,lang}) {
   const [period,setPeriod]=useState("monthly");
   const [reportTab,setReportTab]=useState("sales");
-  const cur=curSym(settings.currency||"NT$");
+  const cur=curSym(settings.currency||"TWD NT$");
   const fmt=(n)=>`${cur}${(n||0).toLocaleString()}`;
 
   // ── Sales data ──
@@ -10469,7 +10469,7 @@ function WsTransferPage({parts=[],wsStock=[],settings,onSave}) {
   const [saving,setSaving]=useState(false);
   const [done,setDone]=useState(false);
 
-  const C=curSym(settings?.currency||"NT$");
+  const C=curSym(settings?.currency||"TWD NT$");
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
   const filteredParts=parts.filter(p=>{
@@ -10598,7 +10598,7 @@ function WsTransferPage({parts=[],wsStock=[],settings,onSave}) {
 // WORKSHOP INVOICE PRINT
 // ═══════════════════════════════════════════════════════════════
 function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
-  const C = curSym(settings.currency||"NT$");
+  const C = curSym(settings.currency||"TWD NT$");
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;

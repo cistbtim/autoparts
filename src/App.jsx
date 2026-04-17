@@ -1315,7 +1315,11 @@ function MainApp({user,onLogout,t,lang,setLang}) {
       showToast("Part updated");
       if(!keepOpen) await releaseLock("part",ep.id);
       await loadAll();
-      if(!keepOpen){ closeM("editPart");
+      if(keepOpen){
+        // Refresh modal data so form shows saved values if it re-renders
+        openM("editPart", {...ep, ...d2});
+      } else {
+        closeM("editPart");
         setTimeout(()=>{
           const el=document.getElementById(`part-row-${ep.id}`);
           if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); el.style.transition="background .5s"; el.style.background="rgba(251,146,60,.15)"; setTimeout(()=>el.style.background="",1500); }
@@ -4303,21 +4307,29 @@ function ImgPreview({src}) {
 }
 
 function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles}) {
-  const initF = part?{
-    sku:part.sku||"", name:part.name||"", category:part.category||"Engine",
-    brand:part.brand||"", price:part.price??"", stock:part.stock??0, minStock:part.min_stock??0,
-    image_url:part.image_url||"", chinese_desc:part.chinese_desc||"",
-    make:part.make||"", model:part.model||"", year_range:part.year_range||"", oe_number:part.oe_number||"",
-    bin_location:part.bin_location||"",
+  const makeF = (p) => p?{
+    sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
+    brand:p.brand||"", price:p.price??"", stock:p.stock??0, minStock:p.min_stock??0,
+    image_url:p.image_url||"", chinese_desc:p.chinese_desc||"",
+    make:p.make||"", model:p.model||"", year_range:p.year_range||"", oe_number:p.oe_number||"",
+    bin_location:p.bin_location||"",
   }:{
     sku:"", name:"", category:"Engine", brand:"", price:"", stock:"", minStock:"",
     image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", bin_location:"",
   };
-  const [f,setF]=useState(initF);
+  const [f,setF]=useState(()=>makeF(part));
   const [ptab, setPtab] = useState("info");
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
+  const savedPartRef = useRef(part?.id);
+
+  // When modal data refreshes after keepOpen save, sync form to new values
+  useEffect(()=>{
+    if(part && saved && part.id === savedPartRef.current){
+      setF(makeF(part));
+    }
+  },[part]);
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
 
   const buildPayload=(fv)=>({

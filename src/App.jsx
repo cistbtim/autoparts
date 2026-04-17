@@ -10278,7 +10278,8 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
 // JOB PHOTO SLOT — capture front/side/rear on job card creation
 // ═══════════════════════════════════════════════════════════════
 function JobPhotoSlot({label, value, onChange}) {
-  const ref = useRef(null);
+  const camRef  = useRef(null);  // camera only
+  const fileRef = useRef(null);  // full picker (gallery, Drive, files)
   const handleFile = (e) => {
     const file = e.target.files?.[0]; if(!file) return;
     const fr = new FileReader();
@@ -10288,30 +10289,44 @@ function JobPhotoSlot({label, value, onChange}) {
   };
   return (
     <div>
-      <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:5,textAlign:"center",textTransform:"uppercase",letterSpacing:".05em"}}>{label}</div>
-      <div onClick={()=>ref.current?.click()} style={{
+      <div onClick={()=>fileRef.current?.click()} style={{
         border:`2px dashed ${value?"var(--green)":"var(--border)"}`,
         borderRadius:10, cursor:"pointer",
         background:value?"var(--surface)":"var(--surface2)",
-        aspectRatio:"4/3", overflow:"hidden",
+        aspectRatio:"4/3", overflow:"hidden", position:"relative",
         display:"flex", alignItems:"center", justifyContent:"center",
         transition:"border-color .15s",
       }}>
-        <input ref={ref} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFile}/>
+        <input ref={camRef}  type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFile}/>
+        <input ref={fileRef} type="file" style={{display:"none"}} onChange={handleFile}/>
         {value
           ? (value.startsWith("data:")
               ? <img src={value} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
               : <DriveImg url={value} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>)
           : <div style={{textAlign:"center",color:"var(--text3)",padding:8}}>
-              <div style={{fontSize:22,marginBottom:4}}>📷</div>
-              <div style={{fontSize:11}}>Tap to capture</div>
+              <div style={{fontSize:22,marginBottom:4}}>🖼️</div>
+              <div style={{fontSize:11,fontWeight:600,marginBottom:2}}>{label}</div>
+              <div style={{fontSize:10}}>Tap to choose</div>
             </div>
         }
       </div>
-      {value&&(
-        <button className="btn btn-ghost btn-xs" style={{width:"100%",marginTop:4,color:"var(--red)",fontSize:11}}
-          onClick={e=>{e.stopPropagation();onChange("");}}>✕ Remove</button>
-      )}
+      <div style={{display:"flex",gap:4,marginTop:5}}>
+        <button className="btn btn-ghost btn-xs"
+          style={{flex:1,padding:"4px 2px",fontSize:10,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}
+          onClick={e=>{e.stopPropagation();camRef.current?.click();}}>
+          <span style={{fontSize:13}}>📷</span><span>Camera</span>
+        </button>
+        <button className="btn btn-ghost btn-xs"
+          style={{flex:1,padding:"4px 2px",fontSize:10,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}
+          onClick={e=>{e.stopPropagation();fileRef.current?.click();}}>
+          <span style={{fontSize:13}}>🖼️</span><span>Files</span>
+        </button>
+        {value&&(
+          <button className="btn btn-ghost btn-xs"
+            style={{padding:"4px 6px",fontSize:10,color:"var(--red)"}}
+            onClick={e=>{e.stopPropagation();onChange("");}}>✕</button>
+        )}
+      </div>
     </div>
   );
 }

@@ -2046,6 +2046,9 @@ function MainApp({user,onLogout,t,lang,setLang}) {
         {id:"wsquotations",icon:"📝",label:"WS Quotations",roles:["admin","manager"]},
         {id:"wsinvoices",  icon:"🧾",label:"WS Invoices",  roles:["admin","manager"]},
         {id:"wspayments",  icon:"💳",label:"WS Payments",  roles:["admin","manager"]},
+        {id:"wsstock",     icon:"📦",label:"WS Stock",     roles:["admin","manager"]},
+        {id:"wsservices",  icon:"🔧",label:"WS Services",  roles:["admin","manager"]},
+        {id:"wstransfer",  icon:"🔄",label:"WS Transfer",  roles:["admin","manager"]},
         {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager"]},
         {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager"]},
       ]
@@ -3140,10 +3143,10 @@ function MainApp({user,onLogout,t,lang,setLang}) {
         {/* ── SETTINGS ── */}
         {/* ── VEHICLES ── */}
         {/* ── WORKSHOP (all sub-tabs) ── */}
-        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager")&&(
+        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager")&&(
           <WorkshopPage
             key={tab}
-            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstatement"?"statement":"report"}
+            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":"report"}
             jobs={workshopJobs}
             jobItems={workshopJobItems}
             invoices={workshopInvoices}

@@ -4301,7 +4301,7 @@ function ImgPreview({src}) {
 }
 
 function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles}) {
-  const [f,setF]=useState(part?{
+  const initF = part?{
     sku:part.sku||"", name:part.name||"", category:part.category||"Engine",
     brand:part.brand||"", price:part.price||"", stock:part.stock||"", minStock:part.min_stock||"",
     image_url:part.image_url||"", chinese_desc:part.chinese_desc||"",
@@ -4310,10 +4310,34 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
   }:{
     sku:"", name:"", category:"Engine", brand:"", price:"", stock:"", minStock:"",
     image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", bin_location:"",
-  });
-  const [ptab, setPtab] = useState("info"); // info | photo | stock | vehicle
+  };
+  const [f,setF]=useState(initF);
+  const [ptab, setPtab] = useState("info");
   const [errors, setErrors] = useState({});
-  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const [dirty, setDirty] = useState(false);
+  const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); };
+
+  const buildPayload=(fv)=>({
+    sku:fv.sku.trim(), name:fv.name.trim(), category:fv.category, brand:fv.brand,
+    price:+fv.price, stock:+fv.stock, min_stock:+fv.minStock,
+    image_url:fv.image_url, chinese_desc:fv.chinese_desc,
+    make:fv.make, model:fv.model, year_range:fv.year_range, oe_number:fv.oe_number,
+    bin_location:fv.bin_location||"",
+  });
+
+  // Auto-save immediately when photo is uploaded (existing part only)
+  const handlePhotoChange = (url) => {
+    const updated = {...f, image_url: url};
+    setF(updated);
+    setDirty(false);
+    if (part) onSave(buildPayload(updated));
+    else setDirty(true);
+  };
+
+  const handleClose = () => {
+    if (dirty && !window.confirm("You have unsaved changes. Close without saving?")) return;
+    onClose();
+  };
 
   const validate = () => {
     const e = {};
@@ -4343,8 +4367,8 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
     : null;
 
   return (
-    <Overlay onClose={onClose} wide>
-      <MHead title={part?"✏️ Edit Part":"+ New Part"} onClose={onClose}/>
+    <Overlay onClose={handleClose} wide>
+      <MHead title={part?"✏️ Edit Part":"+ New Part"} onClose={handleClose}/>
 
       {/* Tab bar */}
       <div className="tabs" style={{marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
@@ -4404,7 +4428,8 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
       {/* ── TAB: PHOTO ── */}
       {ptab==="photo"&&(
         <div>
-          <PartPhotoUploader imageUrl={f.image_url} onChange={v=>s("image_url",v)} sku={f.sku} t={t}/>
+          {part&&<div style={{fontSize:12,color:"var(--green)",marginBottom:10,background:"rgba(34,197,94,.08)",borderRadius:8,padding:"6px 10px"}}>✅ Photo saves automatically when uploaded</div>}
+          <PartPhotoUploader imageUrl={f.image_url} onChange={handlePhotoChange} sku={f.sku} t={t}/>
         </div>
       )}
 
@@ -4477,18 +4502,24 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
       )}
 
       {/* Save / Cancel */}
-      <div style={{display:"flex",gap:10,marginTop:18}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={()=>{
-          if(!validate()) return;
-          onSave({
-            sku:f.sku.trim(), name:f.name.trim(), category:f.category, brand:f.brand,
-            price:+f.price, stock:+f.stock, min_stock:+f.minStock,
-            image_url:f.image_url, chinese_desc:f.chinese_desc,
-            make:f.make, model:f.model, year_range:f.year_range, oe_number:f.oe_number,
-            bin_location:f.bin_location||"",
-          });
-        }}>{t.save}</button>
+      {dirty&&(
+        <div style={{fontSize:12,color:"var(--accent)",background:"rgba(251,146,60,.08)",borderRadius:8,padding:"6px 10px",marginTop:14,textAlign:"center"}}>
+          ⚠️ Unsaved changes
+        </div>
+      )}
+      <div style={{display:"flex",gap:10,marginTop:10}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{t.cancel}</button>
+        <button className="btn btn-primary" style={{flex:2,position:"relative",
+          boxShadow:dirty?"0 0 0 3px rgba(251,146,60,.4)":undefined,
+          animation:dirty?"pulse-ring 1.5s ease infinite":undefined}}
+          onClick={()=>{
+            if(!validate()) return;
+            onSave(buildPayload(f));
+            setDirty(false);
+          }}>
+          {dirty&&<span style={{position:"absolute",top:-4,right:-4,width:10,height:10,background:"var(--accent)",borderRadius:"50%",border:"2px solid var(--surface)"}}/>}
+          {t.save}
+        </button>
       </div>
     </Overlay>
   );

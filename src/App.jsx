@@ -958,7 +958,9 @@ function MainApp({user,onLogout,t,lang,setLang}) {
   const [workshopInvoices,setWorkshopInvoices]=useState([]);
   const [workshopQuotes,setWorkshopQuotes]=useState([]);
   const [workshopCustomers,setWorkshopCustomers]=useState([]);
-  const [workshopVehicles,setWorkshopVehicles]=useState([]); // null=no filter, Set=filtered part ids
+  const [workshopVehicles,setWorkshopVehicles]=useState([]);
+  const [workshopStock,setWorkshopStock]=useState([]);
+  const [workshopServices,setWorkshopServices]=useState([]); // null=no filter, Set=filtered part ids
   const [completedDays,setCompletedDays]=useState(7); // filter completed orders to last N days
   const [searchCust,setSearchCust]=useState("");
   const [toast,setToast]=useState(null);
@@ -1130,13 +1132,15 @@ function MainApp({user,onLogout,t,lang,setLang}) {
 
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
   const refreshWorkshopData=useCallback(async()=>{
-    const [jobs,items,invoices,quotes,wsCustomers,wsVehicles]=await Promise.all([
+    const [jobs,items,invoices,quotes,wsCustomers,wsVehicles,wsStock,wsServices]=await Promise.all([
       api.get("workshop_jobs","select=*&order=date_in.desc").catch(()=>[]),
       api.get("workshop_job_items","select=*").catch(()=>[]),
       api.get("workshop_invoices","select=*&order=invoice_date.desc").catch(()=>[]),
       api.get("workshop_quotes","select=*&order=quote_date.desc").catch(()=>[]),
       api.get("workshop_customers","select=*&order=name.asc").catch(()=>[]),
       api.get("workshop_vehicles","select=*&order=reg.asc").catch(()=>[]),
+      api.get("workshop_stock","select=*&order=name.asc").catch(()=>[]),
+      api.get("workshop_services","select=*&order=name.asc").catch(()=>[]),
     ]);
     setWorkshopJobs(Array.isArray(jobs)?jobs:[]);
     setWorkshopJobItems(Array.isArray(items)?items:[]);
@@ -1144,6 +1148,8 @@ function MainApp({user,onLogout,t,lang,setLang}) {
     setWorkshopQuotes(Array.isArray(quotes)?quotes:[]);
     setWorkshopCustomers(Array.isArray(wsCustomers)?wsCustomers:[]);
     setWorkshopVehicles(Array.isArray(wsVehicles)?wsVehicles:[]);
+    setWorkshopStock(Array.isArray(wsStock)?wsStock:[]);
+    setWorkshopServices(Array.isArray(wsServices)?wsServices:[]);
   },[]);
 
   // Sync Apps Script URL to window whenever settings changes
@@ -1417,12 +1423,26 @@ function MainApp({user,onLogout,t,lang,setLang}) {
   };
   const saveJobItem=async(item)=>{
     // Strip client-only fields not in the DB schema
-    const {part_id, id, ...dbItem} = item;
+    const {part_id, ws_stock_id, id, ...dbItem} = item;
     let res;
     if(id){
       res=await api.patch("workshop_job_items","id",id,dbItem);
     } else {
       res=await api.insert("workshop_job_items",dbItem);
+      // Deduct from workshop stock when adding a part to a job
+      if(ws_stock_id && item.type==="part"){
+        const wsi=workshopStock.find(w=>w.id===ws_stock_id);
+        if(wsi){
+          const nq=Math.max(0,(+wsi.qty||0)-(+item.qty||1));
+          await api.patch("workshop_stock","id",ws_stock_id,{qty:nq});
+          await api.insert("workshop_stock_moves",{
+            id:makeId("WSM"),stock_id:ws_stock_id,stock_name:wsi.name,
+            move_type:"job_use",qty_change:-(+item.qty||1),qty_after:nq,
+            reference:item.job_id,notes:`Used in job ${item.job_id}`,
+            moved_at:new Date().toISOString(),
+          });
+        }
+      }
     }
     if(res&&!Array.isArray(res)&&res.message) throw new Error(res.message);
     await refreshWorkshopData();
@@ -1515,6 +1535,91 @@ function MainApp({user,onLogout,t,lang,setLang}) {
     await api.delete("workshop_vehicles","id",id);
     await refreshWorkshopData(); showToast("Deleted","err");
   };
+
+  // ── Workshop Stock ────────────────────────────────────────────
+  const saveWsStockItem=async(item)=>{
+    const {id,...rest}=item;
+    if(id){ await api.patch("workshop_stock","id",id,rest); showToast("Stock item updated"); }
+    else { await api.insert("workshop_stock",{...rest,id:makeId("WSK")}); showToast("Stock item added"); }
+    await refreshWorkshopData();
+  };
+  const deleteWsStockItem=async(id)=>{
+    await api.delete("workshop_stock","id",id);
+    await refreshWorkshopData(); showToast("Deleted","err");
+  };
+  const adjustWsStock=async(item,newQty,reason)=>{
+    const change=newQty-(item.qty||0);
+    await api.patch("workshop_stock","id",item.id,{qty:newQty});
+    await api.insert("workshop_stock_moves",{
+      id:makeId("WSM"),stock_id:item.id,stock_name:item.name,
+      move_type:"adjustment",qty_change:change,qty_after:newQty,
+      notes:reason||"Manual adjustment",moved_at:new Date().toISOString(),
+    });
+    await refreshWorkshopData(); showToast(`Stock → ${newQty}`);
+  };
+
+  // ── Workshop Services ─────────────────────────────────────────
+  const saveWsService=async(svc)=>{
+    const {id,...rest}=svc;
+    if(id){ await api.patch("workshop_services","id",id,rest); showToast("Service updated"); }
+    else { await api.insert("workshop_services",{...rest,id:makeId("WSS")}); showToast("Service added"); }
+    await refreshWorkshopData();
+  };
+  const deleteWsService=async(id)=>{
+    await api.delete("workshop_services","id",id);
+    await refreshWorkshopData(); showToast("Deleted","err");
+  };
+
+  // ── Workshop Transfer (Shop → Workshop Stock) ─────────────────
+  const saveWsTransfer=async(transfer,lines)=>{
+    const txId=makeId("WST");
+    await api.insert("workshop_transfers",{
+      id:txId,transfer_date:transfer.date,status:"completed",
+      notes:transfer.notes||"",created_by:user?.name||user?.username||"",
+    });
+    for(const ln of lines){
+      await api.insert("workshop_transfer_items",{
+        id:makeId("WSTI"),transfer_id:txId,
+        part_id:ln.part_id,part_name:ln.part_name,part_sku:ln.part_sku||"",
+        workshop_stock_id:ln.ws_stock_id||"",workshop_stock_name:ln.ws_stock_name||"",
+        qty:ln.qty,unit_cost:ln.unit_cost,total:(ln.qty||0)*(ln.unit_cost||0),
+      });
+      // Deduct from main shop stock
+      const shopPart=parts.find(p=>p.id===ln.part_id);
+      if(shopPart){
+        const nq=Math.max(0,(+shopPart.stock||0)-(+ln.qty||0));
+        await api.patch("parts","id",shopPart.id,{stock:nq});
+      }
+      // Credit workshop stock
+      if(ln.ws_stock_id){
+        const wsi=workshopStock.find(w=>w.id===ln.ws_stock_id);
+        const nq=(+(wsi?.qty||0))+(+ln.qty||0);
+        await api.patch("workshop_stock","id",ln.ws_stock_id,{qty:nq});
+        await api.insert("workshop_stock_moves",{
+          id:makeId("WSM"),stock_id:ln.ws_stock_id,stock_name:ln.ws_stock_name||"",
+          move_type:"transfer_in",qty_change:+ln.qty,qty_after:nq,
+          reference:txId,notes:`Transfer from shop: ${ln.part_name}`,
+          moved_at:new Date().toISOString(),
+        });
+      } else {
+        // Auto-create new workshop stock item
+        const newId=makeId("WSK");
+        await api.insert("workshop_stock",{
+          id:newId,sku:ln.part_sku||"",name:ln.part_name||"",
+          qty:+ln.qty,min_qty:0,unit_cost:+ln.unit_cost,unit_price:+ln.unit_cost,
+        });
+        await api.insert("workshop_stock_moves",{
+          id:makeId("WSM"),stock_id:newId,stock_name:ln.part_name||"",
+          move_type:"transfer_in",qty_change:+ln.qty,qty_after:+ln.qty,
+          reference:txId,notes:`Transfer from shop: ${ln.part_name}`,
+          moved_at:new Date().toISOString(),
+        });
+      }
+    }
+    await refreshWorkshopData(); await loadAll();
+    showToast("Transfer completed ✅");
+  };
+
   const saveFitment=async(partId,vehicleId,notes="")=>{
     await api.upsert("part_fitments",{part_id:partId,vehicle_id:vehicleId,notes});
     await loadAll(); showToast("Vehicle linked");
@@ -3060,10 +3165,19 @@ function MainApp({user,onLogout,t,lang,setLang}) {
             onSaveQuote={saveWorkshopQuote}
             onDeleteQuote={deleteWorkshopQuote}
             onConvertQuoteToInvoice={convertQuoteToInvoice}
+            wsStock={workshopStock}
+            wsServices={workshopServices}
             onSaveWsCustomer={saveWorkshopCustomer}
             onDeleteWsCustomer={deleteWorkshopCustomer}
             onSaveWsVehicle={saveWorkshopVehicle}
             onDeleteWsVehicle={deleteWorkshopVehicle}
+            onSaveWsStock={saveWsStockItem}
+            onDeleteWsStock={deleteWsStockItem}
+            onAdjustWsStock={adjustWsStock}
+            onSaveWsService={saveWsService}
+            onDeleteWsService={deleteWsService}
+            onSaveWsTransfer={saveWsTransfer}
+            parts={parts}
             t={t} lang={lang}/>
         )}
 
@@ -8437,7 +8551,7 @@ function WsVehicleForm({data,onSave,onClose,t}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts,partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],settings,initialTab,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,t,lang}) {
+function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],settings,initialTab,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,t,lang}) {
   const [view,      setView]      = useState("list");
   const [activeJob, setActiveJob] = useState(null);
   const [editJob,   setEditJob]   = useState(null);
@@ -8473,7 +8587,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts,partFitments=[],ve
       <WorkshopJobDetail
         job={activeJob} items={items} invoice={inv} quote={quote}
         parts={parts} partFitments={partFitments} vehicles={vehicles} settings={settings}
-        wsVehicles={wsVehicles} wsCustomers={wsCustomers}
+        wsVehicles={wsVehicles} wsCustomers={wsCustomers} wsStock={wsStock} wsServices={wsServices}
         onBack={()=>{ setView("list"); setActiveJob(null); }}
         onSaveJob={async(d)=>{ await onSaveJob(d); setActiveJob({...activeJob,...d}); }}
         onSaveItem={onSaveItem} onDeleteItem={onDeleteItem}
@@ -8490,6 +8604,9 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts,partFitments=[],ve
     ["quotations", "📝 Quotations",  quotes.length],
     ["invoices",   "🧾 Invoices",    invoices.length],
     ["payments",   "💳 Payments",    invoices.filter(i=>(+i.paid_amount||0)>0).length],
+    ["wsstock",    "📦 WS Stock",    wsStock.length],
+    ["wsservices", "🔧 Services",    wsServices.length],
+    ["wstransfer", "🔄 Transfer",    null],
     ["statement",  "📋 Statement",   null],
     ["report",     "📊 Report",      null],
   ];
@@ -8762,6 +8879,24 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts,partFitments=[],ve
         </>);
       })()}
 
+      {/* ══════════════ WS STOCK TAB ══════════════ */}
+      {wsTab==="wsstock"&&(
+        <WsStockPage wsStock={wsStock} settings={settings}
+          onSave={onSaveWsStock} onDelete={onDeleteWsStock} onAdjust={onAdjustWsStock}/>
+      )}
+
+      {/* ══════════════ WS SERVICES TAB ══════════════ */}
+      {wsTab==="wsservices"&&(
+        <WsServicesPage wsServices={wsServices} settings={settings}
+          onSave={onSaveWsService} onDelete={onDeleteWsService}/>
+      )}
+
+      {/* ══════════════ WS TRANSFER TAB ══════════════ */}
+      {wsTab==="wstransfer"&&(
+        <WsTransferPage parts={parts} wsStock={wsStock} settings={settings}
+          onSave={onSaveWsTransfer}/>
+      )}
+
       {/* ══════════════ STATEMENT TAB ══════════════ */}
       {wsTab==="statement"&&(()=>{
         const sc=stmtCust?wsCustomers.find(c=>c.id===stmtCust):null;
@@ -8992,7 +9127,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts,partFitments=[],ve
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],onBack,onSaveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,t,lang}) {
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);
@@ -9452,9 +9587,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       {addingItem&&(
         <WorkshopItemModal
           type={addingItem}
-          parts={parts}
-          partFitments={partFitments}
-          vehicles={vehicles}
+          wsStock={wsStock}
+          wsServices={wsServices}
           onSave={async(item)=>{ await onSaveItem({...item,job_id:job.id}); setAddingItem(null); }}
           onClose={()=>setAddingItem(null)}
           t={t}/>
@@ -9900,40 +10034,33 @@ function JobPhotoSlot({label, value, onChange}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// WORKSHOP ITEM MODAL — Add Part or Labour
+// WORKSHOP ITEM MODAL — Add Part or Labour (uses workshop stock)
 // ═══════════════════════════════════════════════════════════════
-function WorkshopItemModal({type, parts, partFitments=[], vehicles=[], onSave, onClose, t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], onSave, onClose, t}) {
   const [desc,      setDesc]      = useState("");
   const [qty,       setQty]       = useState(1);
   const [price,     setPrice]     = useState("");
-  const [selPart,   setSelPart]   = useState(null);
+  const [selItem,   setSelItem]   = useState(null);
   const [search,    setSearch]    = useState("");
   const [saving,    setSaving]    = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
-  // Build a lookup: part_id → "make model year" string from fitments
-  const partVehicleText = {};
-  partFitments.forEach(f=>{
-    const v=vehicles.find(vv=>String(vv.id)===String(f.vehicle_id));
-    if(!v) return;
-    const txt=`${v.make||""} ${v.model||""} ${v.year_from||""} ${v.year_to||""}`.toLowerCase();
-    partVehicleText[String(f.part_id)]=(partVehicleText[String(f.part_id)]||"")+" "+txt;
-  });
+  const list = type==="part" ? wsStock : wsServices;
 
-  const fp = parts.filter(p=>{
+  const filtered = list.filter(p=>{
     if(!search.trim()) return true;
-    const haystack=`${p.name} ${p.sku} ${p.chinese_desc||""} ${p.oe_number||""} ${partVehicleText[String(p.id)]||""}`.toLowerCase();
-    return search.trim().toLowerCase().split(/\s+/).every(w=>haystack.includes(w));
-  }).slice(0,20);
+    const hay=`${p.name||""} ${p.sku||""} ${p.description||""}`.toLowerCase();
+    return search.trim().toLowerCase().split(/\s+/).every(w=>hay.includes(w));
+  }).slice(0,30);
 
   const total = (+qty||0)*(+price||0);
 
-  const resetForm=()=>{ setDesc(""); setQty(1); setPrice(""); setSelPart(null); setSearch(""); };
+  const resetForm=()=>{ setDesc(""); setQty(1); setPrice(""); setSelItem(null); setSearch(""); };
 
-  const selectPart=(p)=>{
-    setSelPart(p);
+  const selectItem=(p)=>{
+    setSelItem(p);
     setDesc(p.name);
-    setPrice(p.price||"");
+    setPrice(p.price||p.rate||"");
     setSearch("");
   };
 
@@ -9944,7 +10071,8 @@ function WorkshopItemModal({type, parts, partFitments=[], vehicles=[], onSave, o
       await onSave({
         type,
         description:desc,
-        part_sku:selPart?selPart.sku:"",
+        part_sku:selItem?selItem.sku||"":"",
+        ws_stock_id:type==="part"&&selItem?selItem.id:null,
         qty:+qty,
         unit_price:+price,
         total:(+qty)*(+price),
@@ -9956,88 +10084,72 @@ function WorkshopItemModal({type, parts, partFitments=[], vehicles=[], onSave, o
     finally{ setSaving(false); }
   };
 
+  const stockBadge=(p)=>{
+    if(type!=="part") return null;
+    const q=+p.qty_on_hand||0;
+    const low=+p.low_stock_qty||0;
+    const color=q<=0?"var(--red)":q<=low?"var(--yellow)":"var(--green)";
+    return <span style={{fontSize:11,fontWeight:700,color,fontFamily:"Rajdhani,sans-serif",flexShrink:0}}>
+      {q<=0?"⛔ Out":q<=low?`⚠️ ${q}`:q} {type==="part"&&p.unit?p.unit:""}
+    </span>;
+  };
+
   return (
     <Overlay onClose={onClose} wide>
-      <MHead title={type==="part"?"🔩 Add Part":"👷 Add Labour"} onClose={onClose}/>
+      <MHead title={type==="part"?"🔩 Add WS Part":"👷 Add Labour"} onClose={onClose}/>
 
-      {type==="part"&&(
-        <div style={{marginBottom:14}}>
-          <FL label="Search Part from Inventory"/>
-          <div style={{position:"relative",marginBottom:8}}>
-            <input className="inp" value={search} onChange={e=>{setSearch(e.target.value);setSelPart(null);}}
-              placeholder="Search name, SKU, OE, make, model, year..."/>
-          </div>
-          {search&&!selPart&&(
-            <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:320,overflowY:"auto",marginBottom:8}}>
-              {fp.length===0
-                ? <div style={{padding:12,color:"var(--text3)",fontSize:13,textAlign:"center"}}>No parts found</div>
-                : fp.map(p=>{
-                    const img=p.image_url?toImgUrl(p.image_url):null;
-                    const fitVehicles=partFitments
-                      .filter(f=>String(f.part_id)===String(p.id))
-                      .map(f=>vehicles.find(v=>String(v.id)===String(f.vehicle_id)))
-                      .filter(Boolean);
-                    const vehicleStr=[...new Set(fitVehicles.map(v=>`${v.make} ${v.model} ${v.year_from||""}${v.year_to?"-"+v.year_to:""}`.trim()))].join(" · ");
-                    return (
-                      <div key={p.id} onClick={()=>selectPart(p)}
-                        style={{padding:"10px 12px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",gap:10,alignItems:"center"}}
-                        onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
-                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        {/* Image */}
-                        <div style={{width:48,height:48,flexShrink:0,borderRadius:6,overflow:"hidden",background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
-                          {img
-                            ? <img src={img} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
-                            : (p.image||"🔩")}
-                        </div>
-                        {/* Info */}
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                            <span style={{fontWeight:600,fontSize:13}}>{p.name}</span>
-                            <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{p.sku}</code>
-                          </div>
-                          {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{p.chinese_desc}</div>}
-                          {p.oe_number&&<div style={{fontSize:11,color:"var(--text3)"}}>OE: {p.oe_number}</div>}
-                          {vehicleStr&&<div style={{fontSize:11,color:"var(--green)",marginTop:2}}>🚗 {vehicleStr}</div>}
-                        </div>
-                        {/* Price */}
-                        <span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",flexShrink:0}}>{fmtAmt(p.price)}</span>
-                      </div>
-                    );
-                  })
-              }
-            </div>
-          )}
-          {selPart&&(()=>{
-            const img=selPart.image_url?toImgUrl(selPart.image_url):null;
-            const fitVehicles=partFitments
-              .filter(f=>String(f.part_id)===String(selPart.id))
-              .map(f=>vehicles.find(v=>String(v.id)===String(f.vehicle_id)))
-              .filter(Boolean);
-            const vehicleStr=[...new Set(fitVehicles.map(v=>`${v.make} ${v.model} ${v.year_from||""}${v.year_to?"-"+v.year_to:""}`.trim()))].join(" · ");
-            return (
-              <div style={{padding:"10px 12px",background:"rgba(96,165,250,.08)",borderRadius:8,border:"1px solid rgba(96,165,250,.2)",marginBottom:8,display:"flex",gap:10,alignItems:"center"}}>
-                <div style={{width:48,height:48,flexShrink:0,borderRadius:6,overflow:"hidden",background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
-                  {img
-                    ? <img src={img} alt={selPart.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
-                    : (selPart.image||"🔩")}
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                    <span style={{fontWeight:600}}>{selPart.name}</span>
-                    <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{selPart.sku}</code>
-                  </div>
-                  {selPart.chinese_desc&&<div style={{fontSize:12,color:"var(--text3)"}}>{selPart.chinese_desc}</div>}
-                  {selPart.oe_number&&<div style={{fontSize:11,color:"var(--text3)"}}>OE: {selPart.oe_number}</div>}
-                  {vehicleStr&&<div style={{fontSize:11,color:"var(--green)"}}>🚗 {vehicleStr}</div>}
-                </div>
-                <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}} onClick={()=>{ setSelPart(null); setDesc(""); setPrice(""); }}>✕</button>
-              </div>
-            );
-          })()}
+      <div style={{marginBottom:14}}>
+        <FL label={type==="part"?"Search Workshop Stock":"Search Service Preset"}/>
+        <div style={{marginBottom:8}}>
+          <input className="inp" value={search} onChange={e=>{setSearch(e.target.value);setSelItem(null);}}
+            placeholder={type==="part"?"Search part name, SKU...":"Search service name..."}/>
         </div>
-      )}
 
-      <FD><FL label="Description *"/><input className="inp" value={desc} onChange={e=>setDesc(e.target.value)} placeholder={type==="part"?"Part name...":"Labour description e.g. Oil change, brake pad replacement..."}/></FD>
+        {(search||list.length<=10)&&!selItem&&(
+          <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:300,overflowY:"auto",marginBottom:8}}>
+            {(search?filtered:list.slice(0,20)).length===0
+              ? <div style={{padding:12,color:"var(--text3)",fontSize:13,textAlign:"center"}}>
+                  {type==="part"?"No workshop stock — add items in WS Stock tab":"No services — add presets in Services tab"}
+                </div>
+              : (search?filtered:list.slice(0,20)).map(p=>(
+                  <div key={p.id} onClick={()=>selectItem(p)}
+                    style={{padding:"10px 12px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",gap:10,alignItems:"center"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
+                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    <div style={{fontSize:22,flexShrink:0}}>{type==="part"?"🔩":"🔧"}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
+                      {p.sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{p.sku}</code>}
+                      {p.description&&<div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{p.description}</div>}
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>{fmtAmt(p.price||p.rate||0)}</div>
+                      {type==="part"&&stockBadge(p)}
+                    </div>
+                  </div>
+                ))
+            }
+          </div>
+        )}
+
+        {selItem&&(
+          <div style={{padding:"10px 12px",background:"rgba(96,165,250,.08)",borderRadius:8,border:"1px solid rgba(96,165,250,.2)",marginBottom:8,display:"flex",gap:10,alignItems:"center"}}>
+            <div style={{fontSize:22,flexShrink:0}}>{type==="part"?"🔩":"🔧"}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:600}}>{selItem.name}</div>
+              {selItem.sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{selItem.sku}</code>}
+              {type==="part"&&stockBadge(selItem)}
+            </div>
+            <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}}
+              onClick={()=>{ setSelItem(null); setDesc(""); setPrice(""); }}>✕</button>
+          </div>
+        )}
+      </div>
+
+      <FD><FL label="Description *"/>
+        <input className="inp" value={desc} onChange={e=>setDesc(e.target.value)}
+          placeholder={type==="part"?"Part name...":"Labour e.g. Oil change, brake pad replacement..."}/>
+      </FD>
       <FG>
         <div><FL label="Qty"/><input className="inp" type="number" value={qty} onChange={e=>setQty(e.target.value)} min="0.5" step="0.5"/></div>
         <div><FL label={`Unit ${type==="part"?"Price":"Rate"}`}/><input className="inp" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0.00"/></div>
@@ -10052,6 +10164,429 @@ function WorkshopItemModal({type, parts, partFitments=[], vehicles=[], onSave, o
         </button>
       </div>
     </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WS STOCK PAGE
+// ═══════════════════════════════════════════════════════════════
+function WsStockPage({wsStock=[],settings,onSave,onDelete,onAdjust}) {
+  const [search,setSearch]=useState("");
+  const [modal,setModal]=useState(null); // null | {mode:"add"|"edit"|"adjust", item?}
+
+  const filtered=wsStock.filter(p=>{
+    if(!search.trim()) return true;
+    const h=`${p.name||""} ${p.sku||""} ${p.description||""}`.toLowerCase();
+    return search.trim().toLowerCase().split(/\s+/).every(w=>h.includes(w));
+  });
+
+  const lowStock=wsStock.filter(p=>+p.qty_on_hand<=+p.low_stock_qty&&+p.low_stock_qty>0);
+
+  return (
+    <div>
+      {lowStock.length>0&&(
+        <div style={{marginBottom:12,padding:"10px 14px",background:"rgba(251,191,36,.12)",border:"1px solid rgba(251,191,36,.3)",borderRadius:10}}>
+          <div style={{fontWeight:700,fontSize:13,color:"var(--yellow)",marginBottom:6}}>⚠️ Low Stock Alert ({lowStock.length} items)</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {lowStock.map(p=>(
+              <span key={p.id} className="badge" style={{background:"rgba(251,191,36,.15)",color:"var(--yellow)",fontSize:12}}>
+                {p.name} — {+p.qty_on_hand} {p.unit||""}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
+        <input className="inp" style={{flex:1,minWidth:200}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search workshop stock..."/>
+        <button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Stock Item</button>
+      </div>
+
+      {filtered.length===0
+        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
+            <div style={{fontSize:32,marginBottom:8}}>📦</div>
+            <div style={{fontWeight:600}}>No workshop stock yet</div>
+            <div style={{fontSize:13,marginTop:4}}>Add items or transfer from the spare shop</div>
+          </div>
+        : (
+          <div style={{overflowX:"auto"}}>
+            <table className="tbl" style={{width:"100%"}}>
+              <thead><tr><th>Name</th><th>SKU</th><th style={{textAlign:"right"}}>Qty</th><th>Unit</th><th style={{textAlign:"right"}}>Cost</th><th style={{textAlign:"right"}}>Price</th><th>Low Stock</th><th>Actions</th></tr></thead>
+              <tbody>
+                {filtered.map(p=>{
+                  const qty=+p.qty_on_hand||0;
+                  const low=+p.low_stock_qty||0;
+                  const qColor=qty<=0?"var(--red)":qty<=low?"var(--yellow)":"var(--green)";
+                  return (
+                    <tr key={p.id}>
+                      <td style={{fontWeight:600}}>{p.name}</td>
+                      <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{p.sku||"—"}</code></td>
+                      <td style={{textAlign:"right",fontWeight:700,color:qColor,fontFamily:"Rajdhani,sans-serif"}}>{qty}</td>
+                      <td style={{fontSize:12,color:"var(--text3)"}}>{p.unit||"—"}</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(p.cost_price||0)}</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",fontWeight:700}}>{fmtAmt(p.price||0)}</td>
+                      <td style={{fontSize:12,color:"var(--text3)"}}>{low>0?low:"—"}</td>
+                      <td>
+                        <div style={{display:"flex",gap:4}}>
+                          <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"adjust",item:p})}>±</button>
+                          <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:p})}>✏️</button>
+                          <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete this stock item?"))onDelete(p.id);}}>🗑</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+
+      {modal?.mode==="adjust"&&(
+        <WsStockAdjustModal item={modal.item}
+          onSave={async(d)=>{ await onAdjust(d); setModal(null); }}
+          onClose={()=>setModal(null)}/>
+      )}
+      {(modal?.mode==="add"||modal?.mode==="edit")&&(
+        <WsStockModal item={modal.item}
+          onSave={async(d)=>{ await onSave(d); setModal(null); }}
+          onClose={()=>setModal(null)}/>
+      )}
+    </div>
+  );
+}
+
+function WsStockModal({item,onSave,onClose}) {
+  const [name,setName]=useState(item?.name||"");
+  const [sku,setSku]=useState(item?.sku||"");
+  const [desc,setDesc]=useState(item?.description||"");
+  const [unit,setUnit]=useState(item?.unit||"");
+  const [qty,setQty]=useState(item?.qty_on_hand??0);
+  const [cost,setCost]=useState(item?.cost_price||"");
+  const [price,setPrice]=useState(item?.price||"");
+  const [lowStock,setLowStock]=useState(item?.low_stock_qty||"");
+  const [saving,setSaving]=useState(false);
+  const isEdit=!!item;
+
+  const handleSave=async()=>{
+    if(!name.trim()){alert("Name is required");return;}
+    setSaving(true);
+    try{
+      await onSave({
+        ...(isEdit?{id:item.id}:{}),
+        name:name.trim(),
+        sku:sku.trim()||null,
+        description:desc.trim()||null,
+        unit:unit.trim()||null,
+        qty_on_hand:+qty||0,
+        cost_price:+cost||0,
+        price:+price||0,
+        low_stock_qty:+lowStock||0,
+      });
+    }catch(e){alert("Save failed: "+e.message);}
+    finally{setSaving(false);}
+  };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title={isEdit?"✏️ Edit Stock Item":"+ New Stock Item"} onClose={onClose}/>
+      <FG>
+        <FD style={{gridColumn:"1/-1"}}><FL label="Name *"/><input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Oil Filter — Toyota"/></FD>
+        <FD><FL label="SKU"/><input className="inp" value={sku} onChange={e=>setSku(e.target.value)} placeholder="WS-001"/></FD>
+        <FD><FL label="Unit"/><input className="inp" value={unit} onChange={e=>setUnit(e.target.value)} placeholder="pcs / L / set"/></FD>
+        <FD><FL label="Qty on Hand"/><input className="inp" type="number" value={qty} onChange={e=>setQty(e.target.value)} min="0" step="1"/></FD>
+        <FD><FL label="Low Stock Alert"/><input className="inp" type="number" value={lowStock} onChange={e=>setLowStock(e.target.value)} min="0"/></FD>
+        <FD><FL label="Cost Price"/><input className="inp" type="number" value={cost} onChange={e=>setCost(e.target.value)} placeholder="0.00"/></FD>
+        <FD><FL label="Selling Price"/><input className="inp" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0.00"/></FD>
+      </FG>
+      <FD style={{marginTop:8}}><FL label="Description"/><textarea className="inp" rows={2} value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Optional notes..."/></FD>
+      <div style={{display:"flex",gap:10,marginTop:18}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>{saving?"Saving...":"✅ Save"}</button>
+      </div>
+    </Overlay>
+  );
+}
+
+function WsStockAdjustModal({item,onSave,onClose}) {
+  const [adjType,setAdjType]=useState("add");
+  const [qty,setQty]=useState("");
+  const [reason,setReason]=useState("");
+  const [saving,setSaving]=useState(false);
+
+  const handleSave=async()=>{
+    if(!qty||+qty<=0){alert("Enter a valid quantity");return;}
+    setSaving(true);
+    try{
+      const delta=adjType==="add"?+qty:-+qty;
+      await onSave({id:item.id, delta, reason:reason.trim()||adjType, new_qty:(+item.qty_on_hand||0)+delta});
+    }catch(e){alert("Adjust failed: "+e.message);}
+    finally{setSaving(false);}
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title={`±  Adjust: ${item.name}`} onClose={onClose}/>
+      <div style={{marginBottom:12,padding:"8px 12px",background:"var(--surface2)",borderRadius:8,display:"flex",gap:16}}>
+        <span style={{fontSize:13,color:"var(--text3)"}}>Current stock:</span>
+        <span style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"var(--accent)"}}>{+item.qty_on_hand||0} {item.unit||""}</span>
+      </div>
+      <FD><FL label="Adjustment Type"/>
+        <div style={{display:"flex",gap:8}}>
+          {[["add","➕ Add Stock"],["remove","➖ Remove"]].map(([v,l])=>(
+            <button key={v} className={"btn btn-sm "+(adjType===v?"btn-primary":"btn-ghost")} style={{flex:1}} onClick={()=>setAdjType(v)}>{l}</button>
+          ))}
+        </div>
+      </FD>
+      <FG>
+        <FD><FL label="Quantity"/><input className="inp" type="number" value={qty} onChange={e=>setQty(e.target.value)} min="1" step="1" placeholder="0"/></FD>
+        <FD><FL label="Reason"/><input className="inp" value={reason} onChange={e=>setReason(e.target.value)} placeholder="Manual count, damaged, etc."/></FD>
+      </FG>
+      {qty&&+qty>0&&(
+        <div style={{marginTop:8,padding:"8px 12px",background:adjType==="add"?"rgba(52,211,153,.1)":"rgba(248,113,113,.1)",borderRadius:8,textAlign:"center",fontSize:13,fontWeight:600,color:adjType==="add"?"var(--green)":"var(--red)"}}>
+          New stock: {(+item.qty_on_hand||0)+(adjType==="add"?+qty:-+qty)} {item.unit||""}
+        </div>
+      )}
+      <div style={{display:"flex",gap:10,marginTop:18}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>{saving?"Saving...":"✅ Apply Adjustment"}</button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WS SERVICES PAGE
+// ═══════════════════════════════════════════════════════════════
+function WsServicesPage({wsServices=[],settings,onSave,onDelete}) {
+  const [modal,setModal]=useState(null);
+  const [search,setSearch]=useState("");
+
+  const filtered=wsServices.filter(s=>{
+    if(!search.trim()) return true;
+    const h=`${s.name||""} ${s.description||""}`.toLowerCase();
+    return search.trim().toLowerCase().split(/\s+/).every(w=>h.includes(w));
+  });
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
+        <input className="inp" style={{flex:1,minWidth:200}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search services..."/>
+        <button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Service</button>
+      </div>
+
+      {filtered.length===0
+        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
+            <div style={{fontSize:32,marginBottom:8}}>🔧</div>
+            <div style={{fontWeight:600}}>No service presets yet</div>
+            <div style={{fontSize:13,marginTop:4}}>Add standard labour services with preset rates</div>
+          </div>
+        : (
+          <div style={{overflowX:"auto"}}>
+            <table className="tbl" style={{width:"100%"}}>
+              <thead><tr><th>Service Name</th><th>Description</th><th style={{textAlign:"right"}}>Rate</th><th>Unit</th><th>Actions</th></tr></thead>
+              <tbody>
+                {filtered.map(s=>(
+                  <tr key={s.id}>
+                    <td style={{fontWeight:600}}>{s.name}</td>
+                    <td style={{fontSize:12,color:"var(--text3)",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.description||"—"}</td>
+                    <td style={{textAlign:"right",fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(s.rate||0)}</td>
+                    <td style={{fontSize:12,color:"var(--text3)"}}>{s.unit||"job"}</td>
+                    <td>
+                      <div style={{display:"flex",gap:4}}>
+                        <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:s})}>✏️</button>
+                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete service preset?"))onDelete(s.id);}}>🗑</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+
+      {(modal?.mode==="add"||modal?.mode==="edit")&&(
+        <WsServiceModal item={modal.item}
+          onSave={async(d)=>{ await onSave(d); setModal(null); }}
+          onClose={()=>setModal(null)}/>
+      )}
+    </div>
+  );
+}
+
+function WsServiceModal({item,onSave,onClose}) {
+  const [name,setName]=useState(item?.name||"");
+  const [desc,setDesc]=useState(item?.description||"");
+  const [rate,setRate]=useState(item?.rate||"");
+  const [unit,setUnit]=useState(item?.unit||"job");
+  const [saving,setSaving]=useState(false);
+  const isEdit=!!item;
+
+  const handleSave=async()=>{
+    if(!name.trim()){alert("Name is required");return;}
+    setSaving(true);
+    try{
+      await onSave({
+        ...(isEdit?{id:item.id}:{}),
+        name:name.trim(),
+        description:desc.trim()||null,
+        rate:+rate||0,
+        unit:unit.trim()||"job",
+      });
+    }catch(e){alert("Save failed: "+e.message);}
+    finally{setSaving(false);}
+  };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title={isEdit?"✏️ Edit Service":"+ New Service Preset"} onClose={onClose}/>
+      <FD><FL label="Service Name *"/><input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Oil Change, Brake Pad Replacement"/></FD>
+      <FD><FL label="Description"/><textarea className="inp" rows={2} value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Optional details..."/></FD>
+      <FG>
+        <FD><FL label="Default Rate"/><input className="inp" type="number" value={rate} onChange={e=>setRate(e.target.value)} placeholder="0.00"/></FD>
+        <FD><FL label="Unit"/><input className="inp" value={unit} onChange={e=>setUnit(e.target.value)} placeholder="job / hr / set"/></FD>
+      </FG>
+      <div style={{display:"flex",gap:10,marginTop:18}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>{saving?"Saving...":"✅ Save"}</button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WS TRANSFER PAGE — Transfer from spare shop → workshop stock
+// ═══════════════════════════════════════════════════════════════
+function WsTransferPage({parts=[],wsStock=[],settings,onSave}) {
+  const [items,setItems]=useState([]); // [{part_id,ws_stock_id,name,sku,qty,cost_price}]
+  const [notes,setNotes]=useState("");
+  const [search,setSearch]=useState("");
+  const [saving,setSaving]=useState(false);
+  const [done,setDone]=useState(false);
+
+  const C=settings?.currency||"NT$";
+  const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+  const filteredParts=parts.filter(p=>{
+    if(!search.trim()) return true;
+    const h=`${p.name||""} ${p.sku||""} ${p.chinese_desc||""}`.toLowerCase();
+    return search.trim().toLowerCase().split(/\s+/).every(w=>h.includes(w));
+  }).slice(0,20);
+
+  const addPart=(p)=>{
+    if(items.find(i=>i.part_id===p.id)) return;
+    const wsMatch=wsStock.find(w=>w.sku&&w.sku===p.sku);
+    setItems(prev=>[...prev,{part_id:p.id,ws_stock_id:wsMatch?.id||null,name:p.name,sku:p.sku||"",qty:1,cost_price:p.price||0,shop_qty:+p.qty||0}]);
+    setSearch("");
+  };
+
+  const updateItem=(idx,field,val)=>setItems(prev=>prev.map((it,i)=>i===idx?{...it,[field]:val}:it));
+  const removeItem=(idx)=>setItems(prev=>prev.filter((_,i)=>i!==idx));
+
+  const totalCost=items.reduce((s,i)=>s+(+i.qty||0)*(+i.cost_price||0),0);
+
+  const handleSave=async()=>{
+    if(items.length===0){alert("Add at least one item to transfer");return;}
+    const overQty=items.filter(i=>(+i.qty||0)>i.shop_qty);
+    if(overQty.length>0){
+      if(!window.confirm(`Some items exceed current shop stock:\n${overQty.map(i=>`${i.name}: transfer ${i.qty}, shop has ${i.shop_qty}`).join("\n")}\n\nContinue?`)) return;
+    }
+    setSaving(true);
+    try{
+      await onSave({items,notes:notes.trim()});
+      setItems([]);
+      setNotes("");
+      setDone(true);
+      setTimeout(()=>setDone(false),3000);
+    }catch(e){alert("Transfer failed: "+e.message);}
+    finally{setSaving(false);}
+  };
+
+  return (
+    <div>
+      <div className="card" style={{padding:14,marginBottom:14,borderLeft:"3px solid var(--blue)"}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>🔄 Transfer Spare Parts → Workshop Stock</div>
+        <div style={{fontSize:13,color:"var(--text3)"}}>Move parts from the main spare shop inventory into the workshop stock system. Shop stock will be deducted.</div>
+      </div>
+
+      {done&&<div style={{marginBottom:12,padding:"10px 14px",background:"rgba(52,211,153,.15)",border:"1px solid rgba(52,211,153,.3)",borderRadius:10,fontWeight:600,color:"var(--green)"}}>✅ Transfer completed successfully!</div>}
+
+      <div style={{marginBottom:14}}>
+        <FL label="Search Spare Shop Parts"/>
+        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name, SKU..."/>
+        {search&&filteredParts.length>0&&(
+          <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:260,overflowY:"auto",marginTop:4}}>
+            {filteredParts.map(p=>(
+              <div key={p.id} onClick={()=>addPart(p)}
+                style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",gap:10,alignItems:"center"}}
+                onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
+                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
+                  {p.sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{p.sku}</code>}
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontSize:12,color:"var(--text3)"}}>Stock: {+p.qty||0}</div>
+                  <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>{fmtAmt(p.price||0)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {items.length>0&&(
+        <div style={{marginBottom:14}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>📋 Transfer Items ({items.length})</div>
+          <div style={{overflowX:"auto"}}>
+            <table className="tbl" style={{width:"100%"}}>
+              <thead><tr><th>Part</th><th>SKU</th><th>Shop Stock</th><th style={{textAlign:"right"}}>Qty</th><th style={{textAlign:"right"}}>Cost</th><th style={{textAlign:"right"}}>Subtotal</th><th></th></tr></thead>
+              <tbody>
+                {items.map((it,idx)=>{
+                  const over=(+it.qty||0)>it.shop_qty;
+                  return (
+                    <tr key={idx} style={over?{background:"rgba(248,113,113,.06)"}:{}}>
+                      <td style={{fontWeight:600,fontSize:13}}>{it.name}{over&&<span style={{color:"var(--red)",fontSize:11,marginLeft:6}}>⚠️ Over stock</span>}</td>
+                      <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{it.sku||"—"}</code></td>
+                      <td style={{fontSize:12,color:"var(--text3)"}}>{it.shop_qty}</td>
+                      <td style={{textAlign:"right"}}>
+                        <input className="inp" type="number" value={it.qty} min="1" step="1"
+                          style={{width:70,textAlign:"right"}}
+                          onChange={e=>updateItem(idx,"qty",e.target.value)}/>
+                      </td>
+                      <td style={{textAlign:"right"}}>
+                        <input className="inp" type="number" value={it.cost_price} min="0" step="0.01"
+                          style={{width:90,textAlign:"right"}}
+                          onChange={e=>updateItem(idx,"cost_price",e.target.value)}/>
+                      </td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)"}}>{fmt((+it.qty||0)*(+it.cost_price||0))}</td>
+                      <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>removeItem(idx)}>✕</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={5} style={{textAlign:"right",fontWeight:700,fontSize:13,padding:"10px 12px"}}>Total Transfer Value:</td>
+                  <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)",fontSize:15,padding:"10px 12px"}}>{fmt(totalCost)}</td>
+                  <td/>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <FD><FL label="Transfer Notes"/><textarea className="inp" rows={2} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Reason for transfer, job reference, etc."/></FD>
+
+      <div style={{display:"flex",gap:10,marginTop:18}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setItems([]);setNotes("");}}>🗑 Clear</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving||items.length===0}>
+          {saving?"Processing...":"🔄 Execute Transfer"}
+        </button>
+      </div>
+    </div>
   );
 }
 

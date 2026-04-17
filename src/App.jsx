@@ -7815,7 +7815,8 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
   const [browsing,  setBrowsing]  = useState(false);  // picker open
   const [drivePhotos, setDrivePhotos] = useState(null); // null=not loaded, []=[loaded]
   const [browseLoading, setBrowseLoading] = useState(false);
-  const fileRef = useRef(null);
+  const fileRef = useRef(null);  // gallery / drive / files — no accept, full picker
+  const camRef  = useRef(null);  // direct camera capture
 
   const openBrowse = async () => {
     const SCRIPT_URL = getScriptUrl();
@@ -7846,7 +7847,10 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
     (window._APPS_SCRIPT_URL    && window._APPS_SCRIPT_URL.trim())    || "";
 
   const upload = async (file) => {
-    if (!file || !file.type.startsWith("image/")) { setError("Image files only"); return; }
+    if (!file) return;
+    const isImg = file.type.startsWith("image/") || file.type==="" ||
+      /\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(file.name);
+    if (!isImg) { setError("Image files only"); return; }
     const SCRIPT_URL = getScriptUrl();
     if (!SCRIPT_URL) { setError("⚙️ Set Vehicle Photos Apps Script URL in Settings first"); return; }
 
@@ -7919,7 +7923,7 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
         onClick={() => !uploading && fileRef.current?.click()}
         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={e => { e.preventDefault(); setDragOver(false); upload(e.dataTransfer.files[0]); }}
+        onDrop={e => { e.preventDefault(); setDragOver(false); upload(e.dataTransfer.files[0]); e.dataTransfer.clearData(); }}
         style={{
           border: `2px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`,
           borderRadius: 10, cursor: uploading ? "wait" : "pointer",
@@ -7928,8 +7932,12 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
           display: "flex", alignItems: "center", justifyContent: "center",
           transition: "all .15s",
         }}>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment"
-          style={{display:"none"}} onChange={e => upload(e.target.files[0])}/>
+        {/* No accept + no capture = full file picker (gallery, Drive, files) */}
+        <input ref={fileRef} type="file" style={{display:"none"}}
+          onChange={e => { upload(e.target.files[0]); e.target.value=""; }}/>
+        {/* Camera only */}
+        <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
+          onChange={e => { upload(e.target.files[0]); e.target.value=""; }}/>
 
         {uploading ? (
           <div style={{textAlign:"center",color:"var(--accent)",padding:8}}>
@@ -7946,15 +7954,15 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
               onMouseEnter={e=>e.currentTarget.style.opacity=1}
               onMouseLeave={e=>e.currentTarget.style.opacity=0}>
               <div style={{background:"rgba(0,0,0,.6)",color:"#fff",borderRadius:8,padding:"6px 12px",fontSize:12}}>
-                🔄 Replace
+                🔄 Tap to replace
               </div>
             </div>
           </>
         ) : (
           <div style={{textAlign:"center",color:"var(--text3)",padding:8}}>
-            <div style={{fontSize:22,marginBottom:4}}>📷</div>
-            <div style={{fontSize:12,fontWeight:600}}>{label}</div>
-            <div style={{fontSize:10,marginTop:2}}>Drop or tap</div>
+            <div style={{fontSize:22,marginBottom:4}}>🖼️</div>
+            <div style={{fontSize:11,fontWeight:600,marginBottom:2}}>{label}</div>
+            <div style={{fontSize:10}}>Tap to choose photo</div>
           </div>
         )}
       </div>
@@ -7963,15 +7971,23 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:5,gap:4,flexWrap:"wrap"}}>
         <div style={{fontSize:11,fontWeight:600,color:"var(--text3)"}}>{label}</div>
         <div style={{display:"flex",gap:4}}>
+          <button className="btn btn-ghost btn-xs" style={{fontSize:10,padding:"2px 7px"}}
+            title="Take photo with camera" onClick={e=>{ e.stopPropagation(); camRef.current?.click(); }}>
+            📷
+          </button>
+          <button className="btn btn-ghost btn-xs" style={{fontSize:10,padding:"2px 7px"}}
+            title="Choose from gallery, Google Drive or files" onClick={e=>{ e.stopPropagation(); fileRef.current?.click(); }}>
+            🖼️ Drive
+          </button>
           {(reg||vehicleId) && (
             <button className="btn btn-ghost btn-xs" style={{fontSize:10,padding:"2px 7px"}}
-              onClick={openBrowse} title="Pick from saved Drive photos">
-              🗂 Browse
+              onClick={e=>{ e.stopPropagation(); openBrowse(); }} title="Browse saved Drive photos for this vehicle">
+              🗂️
             </button>
           )}
           {url && (
             <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",fontSize:10,padding:"2px 7px"}}
-              onClick={()=>onChange("")}>✕</button>
+              onClick={e=>{ e.stopPropagation(); onChange(""); }}>✕</button>
           )}
         </div>
       </div>

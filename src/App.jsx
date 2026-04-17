@@ -1374,17 +1374,25 @@ function MainApp({user,onLogout,t,lang,setLang}) {
       if(d.id){ chk(await api.patch("workshop_jobs","id",d.id,jobRow),"Update job"); }
       else { savedId=makeId("JOB"); chk(await api.insert("workshop_jobs",{...jobRow, id:savedId}),"Create job"); }
 
-      // Upload condition photos captured during job creation (fire-and-forget)
-      const photoEntries=[
+      // Save/upload condition photos captured during job creation (fire-and-forget)
+      const allPhotoEntries=[
         {field:"photo_front",viewName:"front",data:d.photo_front},
         {field:"photo_rear", viewName:"rear", data:d.photo_rear},
         {field:"photo_side", viewName:"side", data:d.photo_side},
-      ].filter(p=>p.data&&p.data.startsWith("data:"));
-      if(photoEntries.length&&d.workshop_vehicle_id){
+      ].filter(p=>p.data);
+      const driveUrlEntries = allPhotoEntries.filter(p=>!p.data.startsWith("data:"));
+      const uploadEntries   = allPhotoEntries.filter(p=>p.data.startsWith("data:"));
+      if(allPhotoEntries.length&&d.workshop_vehicle_id){
         const vehId=d.workshop_vehicle_id;
-        const vehMake=(d.vehicle_make||"vehicle").replace(/[^a-zA-Z0-9_-]/g,"_");
+        // Drive URLs selected from picker — save directly to vehicle record
+        if(driveUrlEntries.length){
+          const patch={};
+          driveUrlEntries.forEach(p=>{ patch[p.field]=p.data; });
+          try{ await api.patch("workshop_vehicles","id",vehId,patch); }catch{}
+        }
+        // data: URLs — resize + upload to Drive, then save URL
         const SCRIPT_URL=(window._VEHICLE_SCRIPT_URL?.trim())||(window._APPS_SCRIPT_URL?.trim())||"";
-        if(SCRIPT_URL){
+        if(uploadEntries.length&&SCRIPT_URL){
           (async()=>{
             const _n=new Date(),_p=n=>String(n).padStart(2,"0");
             const _date=`${_n.getFullYear()}-${_p(_n.getMonth()+1)}-${_p(_n.getDate())}`;
@@ -1392,7 +1400,7 @@ function MainApp({user,onLogout,t,lang,setLang}) {
             const _plate=(d.vehicle_reg||vehId).replace(/\s/g,"").toUpperCase();
             const folderPath="Tim_Car_Phot/"+_plate+"/"+_date;
             try{ await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"createFolder",folderPath})}); }catch{}
-            for(const p of photoEntries){
+            for(const p of uploadEntries){
               try{
                 const resized=await new Promise((res,rej)=>{
                   const img=new Image();

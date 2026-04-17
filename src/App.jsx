@@ -44,7 +44,8 @@ const loadSettings = async () => {
   } catch(e){ console.warn("loadSettings error:",e); }
   return _settings;
 };
-const C = () => getSettings().currency || "NT$";
+const curSym = (c) => { const s = (c||"").trim(); const i = s.lastIndexOf(" "); return i>=0 ? s.slice(i+1) : s; };
+const C = () => curSym(getSettings().currency || "NT$");
 
 // ── i18n ─────────────────────────────────────────────────────
 const T = {
@@ -4924,7 +4925,7 @@ function PdfInvoiceModal({inv,settings,onClose}) {
     api.get(tbl,`invoice_id=eq.${inv.id}&select=*`).then(r=>setItems(Array.isArray(r)?r:[]));
   },[inv.id]);
 
-  const cur=settings.currency||"NT$";
+  const cur=curSym(settings.currency||"NT$");
   const fmt=(n)=>`${cur}${(n||0).toLocaleString()}`;
   const isSupplier=inv.type==="supplier";
 
@@ -5102,7 +5103,7 @@ function AddPaymentModal({data,customerInvoices,supplierInvoices,onSave,onClose,
     notes:""
   });
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
-  const cur=settings.currency||"NT$";
+  const cur=curSym(settings.currency||"NT$");
 
   // Auto-fill party name when reference selected
   const fillFromRef=(refId,type)=>{
@@ -5166,7 +5167,7 @@ function AddPaymentModal({data,customerInvoices,supplierInvoices,onSave,onClose,
 function ReportsPage({orders,parts,customers,supplierInvoices,payments,settings,t,lang}) {
   const [period,setPeriod]=useState("monthly");
   const [reportTab,setReportTab]=useState("sales");
-  const cur=settings.currency||"NT$";
+  const cur=curSym(settings.currency||"NT$");
   const fmt=(n)=>`${cur}${(n||0).toLocaleString()}`;
 
   // ── Sales data ──
@@ -6428,7 +6429,7 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
     }));
     const quotedCount=sessionQuotes.filter(q=>q.status==="quoted").length;
     const totalQuotes=sessionQuotes.length;
-    const cur=settings.currency||"R";
+    const cur=curSym(settings.currency||"R");
 
     return (
       <div className="fu">
@@ -9447,7 +9448,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
                 const phone=(quote.quote_phone||job.customer_phone||"").replace(/\D/g,"");
                 const name=quote.quote_customer||job.customer_name||"";
-                const C=settings.currency||"ZAR";
+                const C=curSym(settings.currency||"R");
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
                 const lines=items.map(i=>`  • ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                 const msg=`📝 *Workshop Quotation ${quote.id}*\n──────────────────\n`+
@@ -9462,7 +9463,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)"}} onClick={()=>{
                 const email=quote.quote_email||job.customer_email||"";
                 const name=quote.quote_customer||job.customer_name||"";
-                const C=settings.currency||"ZAR";
+                const C=curSym(settings.currency||"R");
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
                 const lines=items.map(i=>`  - ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                 const subj=`Workshop Quotation ${quote.id} — ${name}`;
@@ -9536,7 +9537,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
                 const phone=(invoice.inv_phone||job.customer_phone||"").replace(/\D/g,"");
                 const name=invoice.invoice_customer||job.customer_name||"";
-                const C=settings.currency||"ZAR";
+                const C=curSym(settings.currency||"R");
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
                 const itemLines=items.map(i=>`  • ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                 const balance=(+invoice.total||0)-(+invoice.paid_amount||0);
@@ -9554,7 +9555,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)"}} onClick={()=>{
                 const email=invoice.inv_email||job.customer_email||"";
                 const name=invoice.invoice_customer||job.customer_name||"";
-                const C=settings.currency||"ZAR";
+                const C=curSym(settings.currency||"R");
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
                 const itemLines=items.map(i=>`  - ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                 const subject=`Workshop Invoice ${invoice.id} — ${name}`;
@@ -10468,7 +10469,7 @@ function WsTransferPage({parts=[],wsStock=[],settings,onSave}) {
   const [saving,setSaving]=useState(false);
   const [done,setDone]=useState(false);
 
-  const C=settings?.currency||"NT$";
+  const C=curSym(settings?.currency||"NT$");
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
   const filteredParts=parts.filter(p=>{
@@ -10597,7 +10598,7 @@ function WsTransferPage({parts=[],wsStock=[],settings,onSave}) {
 // WORKSHOP INVOICE PRINT
 // ═══════════════════════════════════════════════════════════════
 function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
-  const C = settings.currency||"NT$";
+  const C = curSym(settings.currency||"NT$");
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
@@ -10758,7 +10759,7 @@ function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
 // WORKSHOP QUOTE — PRINT PDF
 // ═══════════════════════════════════════════════════════════════
 function printWorkshopQuote(job, items, quote, settings, photos={}) {
-  const C = settings.currency||"ZAR";
+  const C = curSym(settings.currency||"R");
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
@@ -10917,7 +10918,7 @@ function printWorkshopQuote(job, items, quote, settings, photos={}) {
 // WORKSHOP QUOTE — CREATE/EDIT MODAL
 // ═══════════════════════════════════════════════════════════════
 function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,onSave,onClose}) {
-  const C=settings.currency||"ZAR";
+  const C=curSym(settings.currency||"R");
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [f,setF]=useState({
     id:existing?.id||null,
@@ -11047,7 +11048,7 @@ function WsPaymentModal({invoice,settings,onSave,onClose}) {
   const [date,setDate]=useState(new Date().toISOString().slice(0,10));
   const [ref,setRef]=useState("");
   const [saving,setSaving]=useState(false);
-  const C=settings.currency||"ZAR";
+  const C=curSym(settings.currency||"R");
 
   const handleSave=async()=>{
     const paid=parseFloat(amount)||0;
@@ -11116,7 +11117,7 @@ function WsPaymentModal({invoice,settings,onSave,onClose}) {
 // WORKSHOP INVOICE — STATEMENT MODAL
 // ═══════════════════════════════════════════════════════════════
 function WsStatementModal({invoice,job,items,settings,onClose,onPrint}) {
-  const C=settings.currency||"ZAR";
+  const C=curSym(settings.currency||"R");
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const paid=+invoice.paid_amount||0;
   const balance=(+invoice.total||0)-paid;

@@ -902,6 +902,8 @@ export default function App() {
   if(rfqToken) return <RfqReplyPage token={rfqToken} lang={lang}/>;
   const rfqQuoteToken = new URLSearchParams(window.location.search).get("rfq_quote");
   if(rfqQuoteToken) return <RfqQuoteReplyPage token={rfqQuoteToken}/>;
+  const wsqToken = new URLSearchParams(window.location.search).get("wsq");
+  if(wsqToken) return <QuoteConfirmPage token={wsqToken}/>;
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
   if(!user) return <LoginPage onLogin={setUser} t={t} lang={lang} setLang={changeLang} loadedSettings={_settings}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={()=>setUser(null)} lang={lang}/>;
@@ -1496,6 +1498,12 @@ function MainApp({user,onLogout,t,lang,setLang}) {
     if(id){ await api.patch("workshop_quotes","id",id,rest); showToast("Quote updated"); }
     else { await api.insert("workshop_quotes",{...rest,id:makeId("WSQ")}); showToast("Quote created"); }
     await refreshWorkshopData();
+  };
+  const sendQuoteForApproval=async(quoteId)=>{
+    const token=makeToken();
+    await api.patch("workshop_quotes","id",quoteId,{confirm_token:token,confirm_status:"pending"});
+    await refreshWorkshopData();
+    return token;
   };
   const deleteWorkshopQuote=async(id)=>{
     await api.delete("workshop_quotes","id",id);
@@ -3169,6 +3177,7 @@ function MainApp({user,onLogout,t,lang,setLang}) {
             onSaveQuote={saveWorkshopQuote}
             onDeleteQuote={deleteWorkshopQuote}
             onConvertQuoteToInvoice={convertQuoteToInvoice}
+            onSendQuoteForApproval={sendQuoteForApproval}
             wsStock={workshopStock}
             wsServices={workshopServices}
             onSaveWsCustomer={saveWorkshopCustomer}
@@ -6240,6 +6249,186 @@ function RfqQuoteReplyPage({token}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// QUOTE CONFIRM PAGE — public page for customer approval
+// ═══════════════════════════════════════════════════════════════
+function QuoteConfirmPage({token}) {
+  const [quote,setQuote]=useState(null);
+  const [job,setJob]=useState(null);
+  const [items,setItems]=useState([]);
+  const [shopSettings,setShopSettings]=useState({});
+  const [loading,setLoading]=useState(true);
+  const [note,setNote]=useState("");
+  const [done,setDone]=useState(null); // null | "confirmed" | "declined"
+  const [saving,setSaving]=useState(false);
+
+  useEffect(()=>{
+    (async()=>{
+      const [qs,ss]=await Promise.all([
+        api.get("workshop_quotes",`confirm_token=eq.${token}&select=*`).catch(()=>[]),
+        api.get("settings","id=eq.1&select=*").catch(()=>[]),
+      ]);
+      const q=Array.isArray(qs)&&qs[0]?qs[0]:null;
+      if(q){
+        setQuote(q);
+        if(q.confirm_status==="confirmed"||q.confirm_status==="declined") setDone(q.confirm_status);
+        const [ji,jj]=await Promise.all([
+          api.get("workshop_job_items",`job_id=eq.${q.job_id}&select=*`).catch(()=>[]),
+          api.get("workshop_jobs",`id=eq.${q.job_id}&select=*`).catch(()=>[]),
+        ]);
+        setItems(Array.isArray(ji)?ji:[]);
+        if(Array.isArray(jj)&&jj[0]) setJob(jj[0]);
+      }
+      if(Array.isArray(ss)&&ss[0]) setShopSettings(ss[0]);
+      setLoading(false);
+    })();
+  },[token]);
+
+  const respond=async(status)=>{
+    setSaving(true);
+    try{
+      await api.patch("workshop_quotes","confirm_token",token,{
+        confirm_status:status,
+        confirmed_at:new Date().toISOString(),
+        customer_note:note.trim()||null,
+      });
+      setDone(status);
+    }catch(e){ alert("Failed to submit: "+e.message); }
+    finally{ setSaving(false); }
+  };
+
+  const sym=curSym(shopSettings.currency||"R");
+  const fmt=v=>`${sym} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const shopName=shopSettings.shop_name||"Auto Workshop";
+
+  if(loading) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
+      <style>{CSS}</style>
+      <div style={{color:"#f97316",fontSize:15}}>⏳ Loading quotation...</div>
+    </div>
+  );
+
+  if(!quote) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
+      <style>{CSS}</style>
+      <div style={{textAlign:"center",color:"#fff",padding:40}}>
+        <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+        <div style={{fontSize:16,fontWeight:600}}>Quotation not found</div>
+        <div style={{fontSize:13,color:"#888",marginTop:8}}>This link may be invalid or expired.</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{background:"#0a0e1a",minHeight:"100vh",padding:"20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"center"}}>
+      <style>{CSS}</style>
+      <div style={{width:"100%",maxWidth:520,paddingTop:16}}>
+        {/* Header */}
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{fontSize:28,marginBottom:6}}>🔧</div>
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:24,fontWeight:700,color:"var(--accent)"}}>{shopName}</div>
+          <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>Workshop Quotation Approval</div>
+        </div>
+
+        {done?(
+          <div className="card" style={{padding:32,textAlign:"center"}}>
+            <div style={{fontSize:56,marginBottom:12}}>{done==="confirmed"?"✅":"❌"}</div>
+            <div style={{fontSize:20,fontWeight:700,marginBottom:8,color:done==="confirmed"?"var(--green)":"var(--red)"}}>
+              {done==="confirmed"?"Quotation Approved!":"Quotation Declined"}
+            </div>
+            <div style={{color:"var(--text3)",fontSize:14,lineHeight:1.6}}>
+              {done==="confirmed"
+                ?"Thank you! We will proceed with the work as quoted. We will contact you shortly."
+                :"Thank you for your response. We will get in touch to discuss alternatives."}
+            </div>
+            <div style={{marginTop:16,fontSize:13,color:"var(--text3)"}}>
+              {shopSettings.phone&&<div>📞 {shopSettings.phone}</div>}
+              {shopSettings.email&&<div>✉️ {shopSettings.email}</div>}
+            </div>
+          </div>
+        ):(
+          <>
+            {/* Quote info */}
+            <div className="card" style={{padding:16,marginBottom:14,borderLeft:"3px solid var(--blue)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:12}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:15}}>📝 Quotation <code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{quote.id}</code></div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>Date: {quote.quote_date}{quote.valid_until&&` · Valid until: ${quote.valid_until}`}</div>
+                </div>
+                <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:22,color:"var(--accent)"}}>{fmt(quote.total)}</div>
+              </div>
+              {/* Vehicle / Customer */}
+              <div style={{display:"flex",gap:10,flexWrap:"wrap",fontSize:13}}>
+                {job?.vehicle_reg&&<span className="badge" style={{background:"var(--surface2)",fontFamily:"DM Mono,monospace"}}>🚗 {job.vehicle_reg}</span>}
+                {(job?.vehicle_make||job?.vehicle_model)&&<span className="badge" style={{background:"var(--surface2)"}}>{job.vehicle_make} {job.vehicle_model} {job.vehicle_year||""}</span>}
+                {quote.quote_customer&&<span className="badge" style={{background:"var(--surface2)"}}>👤 {quote.quote_customer}</span>}
+              </div>
+            </div>
+
+            {/* Line items */}
+            <div className="card" style={{padding:0,marginBottom:14,overflow:"hidden"}}>
+              <div style={{padding:"10px 16px",fontWeight:700,fontSize:13,borderBottom:"1px solid var(--border)",background:"var(--surface2)"}}>📋 Work Items</div>
+              {items.length===0
+                ? <div style={{padding:16,color:"var(--text3)",fontSize:13,textAlign:"center"}}>No items found</div>
+                : items.map((it,i)=>(
+                  <div key={it.id||i} style={{padding:"10px 16px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",gap:8,alignItems:"center"}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:600,fontSize:13}}>{it.description}</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
+                        {it.type==="part"?"🔩 Part":"👷 Labour"} · Qty: {it.qty} × {fmt(it.unit_price)}
+                      </div>
+                    </div>
+                    <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)",flexShrink:0}}>{fmt(it.total)}</div>
+                  </div>
+                ))
+              }
+              <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",background:"var(--surface2)"}}>
+                <span style={{fontWeight:700,fontSize:13}}>Total</span>
+                <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:18,color:"var(--accent)"}}>{fmt(quote.total)}</span>
+              </div>
+            </div>
+
+            {/* Notes from workshop */}
+            {quote.notes&&(
+              <div className="card" style={{padding:"10px 16px",marginBottom:14,background:"rgba(96,165,250,.06)",borderLeft:"3px solid var(--blue)"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>Workshop Notes</div>
+                <div style={{fontSize:13}}>{quote.notes}</div>
+              </div>
+            )}
+
+            {/* Customer note */}
+            <div style={{marginBottom:14}}>
+              <FL label="Your message (optional)"/>
+              <textarea className="inp" rows={3} value={note} onChange={e=>setNote(e.target.value)}
+                placeholder="Any questions or comments for the workshop..."/>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{display:"flex",gap:12,marginBottom:24}}>
+              <button className="btn" style={{flex:1,padding:16,fontSize:15,fontWeight:700,background:"rgba(248,113,113,.15)",color:"var(--red)",border:"2px solid rgba(248,113,113,.4)",borderRadius:12}}
+                onClick={()=>respond("declined")} disabled={saving}>
+                ❌ Decline
+              </button>
+              <button className="btn btn-primary" style={{flex:2,padding:16,fontSize:15,fontWeight:700,borderRadius:12}}
+                onClick={()=>respond("confirmed")} disabled={saving}>
+                {saving?"Submitting...":"✅ Approve & Confirm"}
+              </button>
+            </div>
+
+            {/* Workshop contact */}
+            <div style={{textAlign:"center",color:"var(--text3)",fontSize:12}}>
+              <div style={{marginBottom:4}}>Questions? Contact us:</div>
+              {shopSettings.phone&&<div>📞 {shopSettings.phone}</div>}
+              {shopSettings.email&&<div>✉️ {shopSettings.email}</div>}
+              {shopSettings.address&&<div>📍 {shopSettings.address}</div>}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // RFQ PAGE — main management page
 // ═══════════════════════════════════════════════════════════════
 function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpdateStatus,onSelectQuote,onCreatePO,t,user,settings}) {
@@ -8555,7 +8744,7 @@ function WsVehicleForm({data,onSave,onClose,t}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],settings,initialTab,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,t,lang}) {
+function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],settings,initialTab,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,t,lang}) {
   const [view,      setView]      = useState("list");
   const [activeJob, setActiveJob] = useState(null);
   const [editJob,   setEditJob]   = useState(null);
@@ -8597,15 +8786,17 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
         onSaveItem={onSaveItem} onDeleteItem={onDeleteItem}
         onSaveInvoice={onSaveInvoice} onUpdateInvoice={onUpdateInvoice} onDeleteInvoice={onDeleteInvoice}
         onSaveQuote={onSaveQuote} onDeleteQuote={onDeleteQuote} onConvertQuoteToInvoice={onConvertQuoteToInvoice}
+        onSendQuoteForApproval={onSendQuoteForApproval}
         t={t} lang={lang}/>
     );
   }
 
   // ── Sub-nav tabs ─────────────────────────────────────────────
+  const quoteResponses = quotes.filter(q=>q.confirm_status==="confirmed"||q.confirm_status==="declined").length;
   const WS_TABS = [
     ["jobs",       "🔧 Jobs",        jobs.length],
     ["customers",  "👥 Customers",   wsCustomers.length],
-    ["quotations", "📝 Quotations",  quotes.length],
+    ["quotations", quoteResponses>0?`📝 Quotations 🔔`:"📝 Quotations",  quotes.length],
     ["invoices",   "🧾 Invoices",    invoices.length],
     ["payments",   "💳 Payments",    invoices.filter(i=>(+i.paid_amount||0)>0).length],
     ["wsstock",    "📦 WS Stock",    wsStock.length],
@@ -9131,7 +9322,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,t,lang}) {
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);
@@ -9142,6 +9333,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [quoteModal,   setQuoteModal]   = useState(false);  // create/edit quote
   const [deletingQuote,setDeletingQuote]= useState(false);
   const [quoteSrcForInv,setQuoteSrcForInv]= useState(null); // quote being converted to invoice
+  const [approvalModal, setApprovalModal] = useState(false);
+  const [deliveryModal, setDeliveryModal] = useState(false);
 
   const vehiclePhotos = wsVehicles.reduce((acc,v)=>v.id===job.workshop_vehicle_id?{front:v.photo_front||"",rear:v.photo_rear||"",side:v.photo_side||""}:acc,{front:"",rear:"",side:""});
 
@@ -9212,7 +9405,9 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
     const files=Array.from(e.target.files||[]); e.target.value="";
     if(!files.length) return;
     files.forEach(file=>{
-      if(!file.type.startsWith("image/")) return;
+      const isImage = file.type.startsWith("image/") || file.type==="" ||
+        /\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(file.name);
+      if(!isImage) return;
       jobPhotoCounter.current+=1;
       const uid=jobPhotoCounter.current;
       const fr=new FileReader();
@@ -9251,6 +9446,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           {job.status}
         </span>
         <button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ Edit</button>
+        <button className="btn btn-ghost btn-sm" title="Print Job Card Label" onClick={()=>printJobCardLabel(job,settings)}>🏷️ Label</button>
+        <button className="btn btn-ghost btn-sm" title="Collection / Delivery Label" onClick={()=>setDeliveryModal(true)}>🚗 Collect/Deliver</button>
       </div>
 
       {/* Job info card */}
@@ -9300,17 +9497,22 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
 
       {/* ── Vehicle Photos ── */}
       <div className="card" style={{padding:14,marginBottom:14}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:4}}>
           <div style={{fontWeight:700,fontSize:14}}>
             📷 Photos
             {savedPhotos.length>0&&<span style={{marginLeft:8,fontSize:12,fontWeight:400,color:"var(--text3)"}}>{savedPhotos.length} saved</span>}
           </div>
           <div style={{display:"flex",gap:6}}>
-            <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoCamRef.current?.click()}>📷 Camera</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoGalRef.current?.click()}>🖼️ Gallery</button>
+            <button className="btn btn-ghost btn-sm" title="Take new photo with camera" onClick={()=>jobPhotoCamRef.current?.click()}>📷 Camera</button>
+            <button className="btn btn-ghost btn-sm" title="Browse phone gallery, Google Drive, or Files" onClick={()=>jobPhotoGalRef.current?.click()}>🖼️ Gallery / Drive</button>
           </div>
-          <input ref={jobPhotoCamRef} type="file" accept="image/*" capture="environment" multiple style={{display:"none"}} onChange={handleJobPhotoFile}/>
-          <input ref={jobPhotoGalRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={handleJobPhotoFile}/>
+          {/* Camera: direct capture only */}
+          <input ref={jobPhotoCamRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleJobPhotoFile}/>
+          {/* Browse: NO accept + NO capture → Android shows full picker (Gallery, Google Drive, Files) */}
+          <input ref={jobPhotoGalRef} type="file" multiple style={{display:"none"}} onChange={handleJobPhotoFile}/>
+        </div>
+        <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>
+          📷 Camera = take new photo · 🖼️ Gallery/Drive = browse phone, Google Drive, or files
         </div>
 
         {loadingPhotos?(
@@ -9434,6 +9636,27 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               {quote.status==="accepted"?"✅ Accepted":quote.status==="declined"?"❌ Declined":quote.status==="converted"?"📄 Converted":"📤 "+quote.status.charAt(0).toUpperCase()+quote.status.slice(1)}
             </span>
           </div>
+          {/* Customer confirm status */}
+          {quote.confirm_status&&quote.confirm_status!=="pending"&&(
+            <div style={{marginBottom:10,padding:"8px 12px",borderRadius:8,
+              background:quote.confirm_status==="confirmed"?"rgba(52,211,153,.12)":"rgba(248,113,113,.12)",
+              border:`1px solid ${quote.confirm_status==="confirmed"?"rgba(52,211,153,.3)":"rgba(248,113,113,.3)"}`,
+              display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>{quote.confirm_status==="confirmed"?"✅":"❌"}</span>
+              <div>
+                <div style={{fontWeight:700,fontSize:13,color:quote.confirm_status==="confirmed"?"var(--green)":"var(--red)"}}>
+                  Customer {quote.confirm_status==="confirmed"?"Approved":"Declined"} this quotation
+                </div>
+                {quote.confirmed_at&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{new Date(quote.confirmed_at).toLocaleString()}</div>}
+                {quote.customer_note&&<div style={{fontSize:12,color:"var(--text2)",marginTop:3}}>💬 "{quote.customer_note}"</div>}
+              </div>
+            </div>
+          )}
+          {quote.confirm_status==="pending"&&(
+            <div style={{marginBottom:10,padding:"8px 12px",borderRadius:8,background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.3)",fontSize:12,color:"var(--yellow)"}}>
+              ⏳ Awaiting customer response...
+            </div>
+          )}
           {/* Invoice exists warning */}
           {invoice&&(
             <div style={{background:"rgba(251,191,36,.15)",border:"1px solid rgba(251,191,36,.5)",borderRadius:6,padding:"7px 12px",marginBottom:10,fontSize:12,display:"flex",alignItems:"center",gap:6}}>
@@ -9444,6 +9667,12 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           {/* Actions */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
             <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos)}>🖨️ Print PDF</button>
+            {quote.status!=="converted"&&onSendQuoteForApproval&&(
+              <button className="btn btn-sm" style={{background:"rgba(37,211,102,.12)",color:"#25D366",border:"1px solid rgba(37,211,102,.3)"}}
+                onClick={()=>setApprovalModal(true)}>
+                🔗 Send for Approval
+              </button>
+            )}
             {(quote.quote_phone||job.customer_phone)&&(
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
                 const phone=(quote.quote_phone||job.customer_phone||"").replace(/\D/g,"");
@@ -9691,6 +9920,24 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             }}>Delete</button>
           </div>
         </Overlay>
+      )}
+
+      {/* Send for Approval modal */}
+      {approvalModal&&quote&&(
+        <QuoteApprovalModal
+          quote={quote} job={job} items={items} settings={settings}
+          onSend={async()=>{
+            const token = await onSendQuoteForApproval(quote.id);
+            return `${window.location.origin}${window.location.pathname}?wsq=${token}`;
+          }}
+          onClose={()=>setApprovalModal(false)}/>
+      )}
+
+      {/* Collection/Delivery label modal */}
+      {deliveryModal&&(
+        <DeliveryLabelModal
+          job={job} settings={settings}
+          onClose={()=>setDeliveryModal(false)}/>
       )}
     </div>
   );
@@ -10591,6 +10838,310 @@ function WsTransferPage({parts=[],wsStock=[],settings,onSave}) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRINT LABEL FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+function printStockLabel(p, settings, labelType="shop") {
+  const sym = curSym(settings?.currency||"R");
+  const shopName = settings?.shop_name||"AutoParts";
+  const isWs = labelType==="ws";
+  const w = window.open("","_blank","width=380,height=300");
+  if(!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><title>Label</title>
+  <style>
+    @page{size:58mm 40mm;margin:0}
+    @media print{body{margin:0}}
+    *{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;margin:0;padding:0;background:#fff;color:#000}
+    .label{width:58mm;height:40mm;padding:2mm 3mm;display:flex;flex-direction:column;justify-content:space-between;border:0.5pt solid #ccc}
+    .hdr{font-size:6pt;font-weight:bold;text-transform:uppercase;letter-spacing:.1em;color:${isWs?"#e65100":"#1565c0"};border-bottom:0.5pt solid ${isWs?"#e65100":"#1565c0"};padding-bottom:0.5mm;margin-bottom:1mm}
+    .name{font-size:8.5pt;font-weight:bold;line-height:1.2;overflow:hidden;max-height:12mm}
+    .sku{font-family:"Courier New",monospace;font-size:7pt;color:#444;margin-top:0.5mm;letter-spacing:.04em}
+    .footer{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto}
+    .price{font-size:12pt;font-weight:bold}
+    .info{text-align:right;font-size:6.5pt;color:#555}
+  </style></head>
+  <body onload="window.print();window.close()">
+  <div class="label">
+    <div class="hdr">${isWs?"🔧 WORKSHOP":"📦 SPARE SHOP"} · ${shopName}</div>
+    <div class="name">${(p.name||"").replace(/</g,"&lt;")}</div>
+    <div class="sku">SKU: ${p.sku||"—"}${p.oe_number?" | OE: "+p.oe_number:""}</div>
+    <div class="footer">
+      <div>
+        <div class="price">${sym} ${(+(p.price)||0).toFixed(2)}</div>
+        ${p.bin_location?`<div style="font-size:6pt;color:#888;margin-top:0.5mm">📍 ${p.bin_location}</div>`:""}
+      </div>
+      <div class="info">
+        Qty: ${isWs?(+p.qty_on_hand||0):(+p.stock||0)}${p.unit?" "+p.unit:""}
+      </div>
+    </div>
+  </div>
+  </body></html>`);
+  w.document.close();
+}
+
+function printJobCardLabel(job, settings) {
+  const shopName = settings?.shop_name||"AutoParts";
+  const w = window.open("","_blank","width=480,height=360");
+  if(!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><title>Job Card Label</title>
+  <style>
+    @page{size:90mm 55mm;margin:0}
+    @media print{body{margin:0}}
+    *{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;margin:0;padding:0;background:#fff;color:#000}
+    .label{width:90mm;height:55mm;padding:3mm 4mm;display:flex;flex-direction:column;border:2pt solid #000}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1pt solid #000;padding-bottom:1.5mm;margin-bottom:1.5mm}
+    .job-id{font-family:"Courier New",monospace;font-size:13pt;font-weight:bold}
+    .shop{font-size:5.5pt;color:#666;text-transform:uppercase;letter-spacing:.1em;margin-top:1mm}
+    .reg{font-size:15pt;font-weight:bold;font-family:"Courier New",monospace;border:1pt solid #000;padding:0.5mm 2mm;text-align:center;margin-bottom:1.5mm;align-self:flex-start}
+    .row{font-size:7pt;margin-bottom:0.8mm;display:flex;gap:2mm}
+    .lbl{color:#666;width:14mm;flex-shrink:0}
+    .val{font-weight:bold;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+    .complaint{font-size:6.5pt;color:#333;margin-top:1mm;border-top:0.5pt dashed #bbb;padding-top:1mm;overflow:hidden;max-height:7mm}
+    .meta{font-size:5.5pt;color:#888;margin-top:auto;display:flex;justify-content:space-between}
+  </style></head>
+  <body onload="window.print();window.close()">
+  <div class="label">
+    <div class="hdr">
+      <div>
+        <div class="job-id">${job.id||""}</div>
+        <div class="shop">🔧 ${shopName}</div>
+      </div>
+      <div style="text-align:right;font-size:6pt;color:#555">
+        ${job.date_in||""}<br/>
+        <strong>${job.status||""}</strong>
+      </div>
+    </div>
+    <div class="reg">🚗 ${job.vehicle_reg||"—"}</div>
+    <div class="row"><span class="lbl">Customer:</span><span class="val">${(job.customer_name||"—").replace(/</g,"&lt;")}</span></div>
+    <div class="row"><span class="lbl">Phone:</span><span class="val">${job.customer_phone||"—"}</span></div>
+    ${job.vehicle_make?`<div class="row"><span class="lbl">Vehicle:</span><span class="val">${job.vehicle_make||""} ${job.vehicle_model||""} ${job.vehicle_year||""}</span></div>`:""}
+    ${job.complaint?`<div class="complaint">Complaint: ${(job.complaint||"").slice(0,120).replace(/</g,"&lt;")}${(job.complaint||"").length>120?"...":""}</div>`:""}
+    ${job.mechanic?`<div class="meta"><span>Mechanic: ${job.mechanic}</span><span>${shopName}</span></div>`:`<div class="meta"><span></span><span>${shopName}</span></div>`}
+  </div>
+  </body></html>`);
+  w.document.close();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// QUOTE APPROVAL MODAL — send confirmation link via WA/email
+// ═══════════════════════════════════════════════════════════════
+function QuoteApprovalModal({quote, job, items, settings, onSend, onClose}) {
+  const [link, setLink] = useState(quote.confirm_token
+    ? `${window.location.origin}${window.location.pathname}?wsq=${quote.confirm_token}`
+    : null);
+  const [sending, setSending] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const generateLink = async() => {
+    setSending(true);
+    try {
+      const url = await onSend();
+      setLink(url);
+    } catch(e) { alert("Failed: "+e.message); }
+    finally { setSending(false); }
+  };
+
+  const copyLink = () => {
+    if(!link) return;
+    navigator.clipboard.writeText(link).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
+  };
+
+  const sym = curSym(settings?.currency||"R");
+  const fmt = v => `${sym} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+  const sendWA = () => {
+    if(!link) return;
+    const phone = (quote.quote_phone||job.customer_phone||"").replace(/\D/g,"");
+    const name = quote.quote_customer||job.customer_name||"Customer";
+    const msg = `📝 *Workshop Quotation ${quote.id}*\n\nHi ${name},\n\nYour quotation is ready for review.\n\n`+
+      `🚗 Vehicle: ${job.vehicle_reg||""}${job.vehicle_make?" — "+job.vehicle_make+" "+(job.vehicle_model||""):""}\n`+
+      `💰 Total: *${fmt(quote.total)}*\n\n`+
+      `Please click the link below to view details and approve or decline:\n${link}\n\n`+
+      `${settings?.shop_name||"Workshop"}${settings?.phone?"\n📞 "+settings.phone:""}`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,"_blank");
+  };
+
+  const sendEmail = () => {
+    if(!link) return;
+    const email = quote.quote_email||job.customer_email||"";
+    const name = quote.quote_customer||job.customer_name||"Customer";
+    const subj = `Workshop Quotation ${quote.id} — Please Approve`;
+    const body = `Dear ${name},\n\nYour workshop quotation is ready for review.\n\n`+
+      `Quotation: ${quote.id}\nVehicle: ${job.vehicle_reg||""}${job.vehicle_make?" — "+job.vehicle_make+" "+(job.vehicle_model||""):""}\nTotal: ${fmt(quote.total)}\n\n`+
+      `Click the link below to view all items and approve or decline:\n${link}\n\n`+
+      `${settings?.shop_name||"Workshop"}${settings?.phone?"\nPhone: "+settings.phone:""}`;
+    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+  };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="🔗 Send Quotation for Approval" onClose={onClose}/>
+      <div style={{marginBottom:14,padding:"10px 14px",background:"var(--surface2)",borderRadius:8,fontSize:13}}>
+        <div style={{fontWeight:600,marginBottom:4}}>How it works:</div>
+        <div style={{color:"var(--text2)",lineHeight:1.7}}>
+          1. Click <strong>Generate Link</strong> to create a unique approval page<br/>
+          2. Send it via WhatsApp or Email — customer clicks the link<br/>
+          3. Customer views the quote and clicks <strong>Approve</strong> or <strong>Decline</strong><br/>
+          4. You'll see the response on this job card automatically
+        </div>
+      </div>
+
+      {!link ? (
+        <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:14}} onClick={generateLink} disabled={sending}>
+          {sending?"Generating...":"🔗 Generate Approval Link"}
+        </button>
+      ) : (
+        <>
+          <div style={{marginBottom:14}}>
+            <FL label="Customer Approval Link"/>
+            <div style={{display:"flex",gap:6}}>
+              <input className="inp" value={link} readOnly style={{flex:1,fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--blue)"}}/>
+              <button className="btn btn-ghost btn-sm" style={{flexShrink:0,color:copied?"var(--green)":"var(--text)"}} onClick={copyLink}>
+                {copied?"✅ Copied!":"📋 Copy"}
+              </button>
+            </div>
+          </div>
+
+          <div style={{marginBottom:8,fontWeight:600,fontSize:13,color:"var(--text2)"}}>Send via:</div>
+          <div style={{display:"flex",gap:10,marginBottom:14}}>
+            {(quote.quote_phone||job.customer_phone)&&(
+              <button className="btn btn-sm" style={{flex:1,background:"rgba(37,211,102,.12)",color:"#25D366",border:"1px solid rgba(37,211,102,.3)",padding:12,fontWeight:600}}
+                onClick={sendWA}>
+                💬 WhatsApp
+              </button>
+            )}
+            {(quote.quote_email||job.customer_email)&&(
+              <button className="btn btn-sm" style={{flex:1,background:"rgba(96,165,250,.1)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.3)",padding:12,fontWeight:600}}
+                onClick={sendEmail}>
+                ✉️ Email
+              </button>
+            )}
+            {!(quote.quote_phone||job.customer_phone)&&!(quote.quote_email||job.customer_email)&&(
+              <div style={{fontSize:13,color:"var(--text3)",padding:"10px 0"}}>No phone/email on file — copy the link and send manually.</div>
+            )}
+          </div>
+
+          {(quote.confirm_status==="confirmed"||quote.confirm_status==="declined")&&(
+            <div style={{padding:"10px 14px",borderRadius:8,marginBottom:12,
+              background:quote.confirm_status==="confirmed"?"rgba(52,211,153,.1)":"rgba(248,113,113,.1)",
+              border:`1px solid ${quote.confirm_status==="confirmed"?"rgba(52,211,153,.3)":"rgba(248,113,113,.3)"}`,
+              fontWeight:600,color:quote.confirm_status==="confirmed"?"var(--green)":"var(--red)"}}>
+              {quote.confirm_status==="confirmed"?"✅ Customer has already approved this quotation":"❌ Customer has declined this quotation"}
+            </div>
+          )}
+        </>
+      )}
+
+      <button className="btn btn-ghost" style={{width:"100%",marginTop:8}} onClick={onClose}>Close</button>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DELIVERY LABEL MODAL — Collection / Driver / Uber
+// ═══════════════════════════════════════════════════════════════
+function DeliveryLabelModal({job, settings, onClose}) {
+  const [method, setMethod] = useState("collection");
+  const [address, setAddress] = useState(job.customer_address||"");
+  const [timeSlot, setTimeSlot] = useState("");
+  const [notes, setNotes] = useState("");
+  const shopName = settings?.shop_name||"AutoParts";
+  const sym = curSym(settings?.currency||"R");
+
+  const METHODS = [
+    {id:"collection", icon:"🚶", label:"Self Collection", color:"#1565c0"},
+    {id:"driver",     icon:"🚗", label:"Driver Delivery", color:"#e65100"},
+    {id:"uber",       icon:"🛵", label:"Uber Delivery",   color:"#000"},
+  ];
+
+  const doPrint = () => {
+    const m = METHODS.find(x=>x.id===method)||METHODS[0];
+    const w = window.open("","_blank","width=480,height=400");
+    if(!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>Delivery Label</title>
+    <style>
+      @page{size:100mm 65mm;margin:0}
+      @media print{body{margin:0}}
+      *{box-sizing:border-box}
+      body{font-family:Arial,sans-serif;margin:0;padding:0;background:#fff;color:#000}
+      .label{width:100mm;height:65mm;padding:3mm 4mm;display:flex;flex-direction:column;border:2pt solid #000}
+      .banner{font-size:9pt;font-weight:bold;color:#fff;background:${m.color};text-align:center;padding:1.5mm;margin-bottom:2mm;border-radius:1mm;letter-spacing:.04em}
+      .customer{font-size:13pt;font-weight:bold;margin-bottom:1.5mm;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+      .phone{font-size:10pt;font-weight:bold;font-family:"Courier New",monospace;margin-bottom:1.5mm}
+      .reg{font-family:"Courier New",monospace;font-size:10pt;border:1pt solid #000;display:inline-block;padding:0.5mm 2mm;margin-bottom:1.5mm}
+      .info{font-size:7.5pt;color:#333;margin-bottom:0.8mm}
+      .footer{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;font-size:6pt;color:#888}
+    </style></head>
+    <body onload="window.print();window.close()">
+    <div class="label">
+      <div class="banner">${m.icon} ${m.label.toUpperCase()}</div>
+      <div class="customer">👤 ${(job.customer_name||"—").replace(/</g,"&lt;")}</div>
+      <div class="phone">📞 ${job.customer_phone||"—"}</div>
+      <div>
+        <span class="reg">🚗 ${job.vehicle_reg||"—"}</span>
+        <span style="font-size:7.5pt;margin-left:3mm;color:#555">${job.vehicle_make||""} ${job.vehicle_model||""}</span>
+      </div>
+      ${address?`<div class="info" style="margin-top:1.5mm">📍 ${address.replace(/</g,"&lt;")}</div>`:""}
+      ${timeSlot?`<div class="info">🕐 ${timeSlot.replace(/</g,"&lt;")}</div>`:""}
+      ${notes?`<div class="info">📝 ${notes.replace(/</g,"&lt;")}</div>`:""}
+      <div class="footer">
+        <span>Job: ${job.id||""} · ${job.date_in||""}</span>
+        <span>🔧 ${shopName}</span>
+      </div>
+    </div>
+    </body></html>`);
+    w.document.close();
+    onClose();
+  };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="🚗 Collection / Delivery Label" onClose={onClose}/>
+
+      <div style={{marginBottom:14}}>
+        <FL label="Method"/>
+        <div style={{display:"flex",gap:8}}>
+          {METHODS.map(m=>(
+            <button key={m.id} onClick={()=>setMethod(m.id)}
+              className={"btn btn-sm "+(method===m.id?"btn-primary":"btn-ghost")}
+              style={{flex:1,padding:10}}>
+              {m.icon} {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{padding:"10px 14px",background:"var(--surface2)",borderRadius:8,marginBottom:14,fontSize:13}}>
+        <div style={{fontWeight:600,marginBottom:4}}>Customer:</div>
+        <div>{job.customer_name||"—"} · {job.customer_phone||"—"}</div>
+        <div style={{marginTop:4}}>Vehicle: <strong>{job.vehicle_reg}</strong> {job.vehicle_make} {job.vehicle_model}</div>
+      </div>
+
+      {method!=="collection"&&(
+        <FD><FL label="Delivery Address"/>
+          <textarea className="inp" rows={2} value={address} onChange={e=>setAddress(e.target.value)}
+            placeholder="Street, suburb, city..."/>
+        </FD>
+      )}
+      <FG>
+        <FD><FL label="Time Slot (optional)"/>
+          <input className="inp" value={timeSlot} onChange={e=>setTimeSlot(e.target.value)} placeholder="e.g. 14:00 – 16:00"/>
+        </FD>
+        <FD><FL label="Notes (optional)"/>
+          <input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Gate code, driver name..."/>
+        </FD>
+      </FG>
+
+      <div style={{display:"flex",gap:10,marginTop:18}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={doPrint}>🖨️ Print Label</button>
+      </div>
+    </Overlay>
   );
 }
 

@@ -8269,7 +8269,7 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
             Gallery
           </button>
           <input ref={photoCamRef} type="file" accept="image/*" capture="environment" multiple style={{display:"none"}} onChange={handlePhotoFile}/>
-          <input ref={photoGalRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={handlePhotoFile}/>
+          <input ref={photoGalRef} type="file" multiple style={{display:"none"}} onChange={handlePhotoFile}/>
         </div>
 
         {/* Photo grid */}
@@ -8337,7 +8337,7 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
             </button>
             {/* capture="environment" opens rear camera directly on mobile */}
             <input ref={cameraRef}  type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFile}/>
-            <input ref={galleryRef} type="file" accept="image/*"                        style={{display:"none"}} onChange={handleFile}/>
+            <input ref={galleryRef} type="file" style={{display:"none"}} onChange={handleFile}/>
           </div>
         )}
 

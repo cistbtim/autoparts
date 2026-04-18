@@ -10012,6 +10012,10 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                   style={{fontSize:11,padding:"2px 8px",background:"rgba(251,191,36,.12)",color:"var(--yellow)",border:"1px solid rgba(251,191,36,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                   VinDecoderz
                 </a>
+                <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.wolfoil.com/en-us/oil-finder","_blank");}}
+                  style={{fontSize:11,padding:"2px 8px",background:"rgba(249,115,22,.12)",color:"#f97316",border:"1px solid rgba(249,115,22,.3)",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap"}}>
+                  WolfOil 📋
+                </button>
               </div>
             </div>
           )}
@@ -10740,6 +10744,10 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(251,191,36,.12)",color:"var(--yellow)",border:"1px solid rgba(251,191,36,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                     VinDecoderz
                   </a>
+                  <button onClick={()=>{navigator.clipboard.writeText(f.vin);window.open("https://www.wolfoil.com/en-us/oil-finder","_blank");}}
+                    style={{fontSize:11,padding:"2px 8px",background:"rgba(249,115,22,.12)",color:"#f97316",border:"1px solid rgba(249,115,22,.3)",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap"}}>
+                    WolfOil 📋
+                  </button>
                 </div>
               )}
             </div>

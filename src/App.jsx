@@ -9909,14 +9909,12 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
     const current=checklist[key]||{status:"pending",note:"",photo_url:""};
     const updated={...current,...patch};
     setChecklist(p=>({...p,[key]:updated}));
-    if(updated.id){
-      await api.update("workshop_job_checklist",updated.id,{status:updated.status,note:updated.note,photo_url:updated.photo_url});
-    } else {
-      const newId=makeId("CL");
-      const rec={id:newId,job_id:job.id,item_key:key,status:updated.status,note:updated.note||"",photo_url:updated.photo_url||""};
-      await api.insert("workshop_job_checklist",rec);
-      setChecklist(p=>({...p,[key]:{...updated,id:newId}}));
-    }
+    try{
+      const id=updated.id||makeId("CL");
+      const rec={id,job_id:job.id,item_key:key,status:updated.status,note:updated.note||"",photo_url:updated.photo_url||""};
+      await api.upsert("workshop_job_checklist",rec);
+      if(!updated.id) setChecklist(p=>({...p,[key]:{...updated,id}}));
+    }catch(e){ console.error("Checklist save error:",e); alert("Save failed — make sure the workshop_job_checklist table exists in Supabase."); }
   };
 
   const uploadChecklistPhoto=async(key,dataUrl)=>{

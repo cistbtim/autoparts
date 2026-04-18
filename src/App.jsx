@@ -551,6 +551,10 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .mob-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;border-radius:8px;transition:all .18s;position:relative}
 .mob-nav-btn.on{color:var(--accent)}.mob-nav-btn .mi{font-size:18px;line-height:1}
 .mob-badge{position:absolute;top:3px;right:calc(50% - 16px);background:var(--accent);color:#fff;border-radius:99px;min-width:15px;height:15px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;padding:0 3px}
+.drawer-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;backdrop-filter:blur(2px)}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:82vw;max-width:300px;background:var(--surface);z-index:201;display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1);overflow-y:auto;box-shadow:6px 0 32px rgba(0,0,0,.35)}
+.drawer.open{transform:translateX(0)}
+.drawer-backdrop.open{display:block}
 .stat-card{position:relative;overflow:hidden;padding:20px 22px;border-radius:var(--radius)}
 .stat-card::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at top right,var(--gc,transparent) 0%,transparent 70%);pointer-events:none}
 .chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
@@ -1004,6 +1008,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [searchCust,setSearchCust]=useState("");
   const [toast,setToast]=useState(null);
   const [lightbox,setLightbox]=useState(null);
+  const [drawerOpen,setDrawerOpen]=useState(false);
 
   // Debounce search input — only filter after 250ms of no typing
   useEffect(()=>{
@@ -2306,8 +2311,65 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         </div>
       </aside>
 
+      {/* SLIDE-IN DRAWER (mobile full nav) */}
+      <div className={`drawer-backdrop${drawerOpen?" open":""}`} onClick={()=>setDrawerOpen(false)}/>
+      <div className={`drawer${drawerOpen?" open":""}`}>
+        {/* Drawer header */}
+        <div style={{padding:"16px 16px 10px",borderBottom:"1px solid var(--border)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+            <ShopLogo settings={settings} size="md"/>
+            <button onClick={()=>setDrawerOpen(false)} style={{background:"none",border:"none",color:"var(--text3)",fontSize:20,cursor:"pointer",padding:4}}>✕</button>
+          </div>
+          <div style={{background:"var(--surface2)",borderRadius:9,padding:"8px 10px",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:30,height:30,borderRadius:"50%",background:ROLES[role]?.bg,border:`1.5px solid ${ROLES[role]?.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{ROLES[role]?.icon}</div>
+              <div><div style={{fontSize:13,fontWeight:600}}>{user.name||user.username}</div><span className="badge" style={{background:ROLES[role]?.bg,color:ROLES[role]?.color,fontSize:10,padding:"1px 7px"}}>{t[role]||role}</span></div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:5,justifyContent:"center"}}>
+            <button className={`lang ${lang==="en"?"on":""}`} onClick={()=>setLang("en")}>EN</button>
+            <button className={`lang ${lang==="zh"?"on":""}`} onClick={()=>setLang("zh")}>中文</button>
+          </div>
+        </div>
+        {/* Drawer nav groups */}
+        <nav style={{flex:1,padding:"8px 6px",overflowY:"auto"}}>
+          {navGroups.map(g=>{
+            const hasActive=g.children.find(c=>c.id===tab);
+            return (
+              <div key={g.id} style={{marginBottom:2}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",padding:"8px 10px 4px"}}>{g.icon} {g.label}</div>
+                {g.children.map(n=>(
+                  <button key={n.id} onClick={()=>{setTab(n.id);setDrawerOpen(false);}}
+                    style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"10px 12px",background:tab===n.id?"var(--surface3)":"none",border:"none",borderRadius:9,color:tab===n.id?"var(--accent)":"var(--text2)",cursor:"pointer",fontSize:14,fontFamily:"inherit",fontWeight:tab===n.id?700:400,marginBottom:2,textAlign:"left",position:"relative"}}>
+                    <span style={{fontSize:16}}>{n.icon}</span>
+                    <span style={{flex:1}}>{n.label}</span>
+                    {(n.badge||0)>0&&<span style={{background:"var(--accent)",color:"#fff",borderRadius:99,minWidth:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,padding:"0 5px"}}>{n.badge}</span>}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </nav>
+        {/* Drawer footer */}
+        <div style={{padding:"10px 10px 16px",borderTop:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:6}}>
+          {(role==="admin"||role==="customer")&&(
+            <button className="btn btn-primary btn-sm" style={{width:"100%"}} onClick={()=>{openM("checkout");setDrawerOpen(false);}}>
+              🛒 {t.cart} {cartCount>0&&<span style={{background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 7px",fontSize:11}}>{cartCount}</span>}
+            </button>
+          )}
+          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light Mode":"🌙 Dark Mode"}</button>
+          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 {t.logout}</button>
+        </div>
+      </div>
+
       {/* MOBILE NAV — role-based flat nav */}
       <nav className="mobile-nav">
+        {/* Hamburger — always first */}
+        <button className="mob-nav-btn" onClick={()=>setDrawerOpen(true)} style={{position:"relative"}}>
+          {pendingCQ+pendingInq+pendingCnt>0&&<span className="mob-badge">{pendingCQ+pendingInq+pendingCnt}</span>}
+          <span className="mi">☰</span>
+          <span style={{fontSize:9,marginTop:2}}>Menu</span>
+        </button>
         {mobileNav.map(n=>(
           <button key={n.id}
             className={`mob-nav-btn ${tab===n.id?"on":""}`}

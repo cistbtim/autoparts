@@ -7680,6 +7680,7 @@ function VehiclesPage({vehicles, partFitments, onSave, onDelete, t}) {
   const fitCount = (vid) => partFitments.filter(f=>String(f.vehicle_id)===String(vid)).length;
 
   return (
+  <>
     <div className="fu">
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
@@ -7784,12 +7785,13 @@ function VehiclesPage({vehicles, partFitments, onSave, onDelete, t}) {
         })}
       </div>
 
-      {/* Add/Edit Modal */}
-      {editV&&(
-        <VehicleModal vehicle={editV} onSave={async(data)=>{ await onSave(data); setEditV(null); }}
-          onClose={()=>setEditV(null)} t={t}/>
-      )}
     </div>
+    {/* Modal outside .fu so position:fixed isn't trapped by the animation stacking context */}
+    {editV&&(
+      <VehicleModal vehicle={editV} onSave={async(data)=>{ await onSave(data); setEditV(null); }}
+        onClose={()=>setEditV(null)} t={t}/>
+    )}
+  </>
   );
 }
 

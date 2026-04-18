@@ -133,6 +133,14 @@ const T = {
     paid:"Paid", reconcile:"Reconcile", printInvoice:"Print / PDF", download:"Download PDF",
     sendWa:"Send via WhatsApp", sendEmail:"Send via Email",
     daily:"Daily", monthly:"Monthly", yearly:"Yearly",
+    queryPriceQty:"Query Price & Qty", submitQuery:"Submit Query",
+    myQueries:"My Queries", customerQueries:"Customer Queries",
+    queryReply:"Reply to Query", depositRequest:"Request Deposit",
+    depositAmount:"Deposit Amount", depositNote:"Payment Instructions",
+    confirmedPrice:"Confirmed Price (per unit)", confirmedQty:"Available Qty",
+    sendReply:"Send Reply", depositPaid:"Mark Deposit Paid",
+    depositRequested:"Awaiting Deposit", noQueries:"No queries yet",
+    queryNotes:"Notes / Query Details", partQuery:"Part Query",
   },
   zh:{
     appSub:"零件管理銷售系統", dashboard:"儀表板", inventory:"庫存管理",
@@ -204,6 +212,14 @@ const T = {
     paid:"已付款", reconcile:"對帳", printInvoice:"列印/PDF", download:"下載 PDF",
     sendWa:"WhatsApp 傳送", sendEmail:"Email 傳送",
     daily:"每日", monthly:"每月", yearly:"每年",
+    queryPriceQty:"詢問價格及庫存", submitQuery:"提交詢問",
+    myQueries:"我的詢問", customerQueries:"客戶詢問",
+    queryReply:"回覆詢問", depositRequest:"要求訂金",
+    depositAmount:"訂金金額", depositNote:"付款說明",
+    confirmedPrice:"確認單價", confirmedQty:"可供數量",
+    sendReply:"發送回覆", depositPaid:"標記訂金已付",
+    depositRequested:"等待訂金", noQueries:"暫無詢問記錄",
+    queryNotes:"備註 / 詢問內容", partQuery:"零件詢問",
   }
 };
 
@@ -947,6 +963,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [suppliers,setSuppliers]=useState([]);
   const [partSuppliers,setPartSuppliers]=useState([]);
   const [inquiries,setInquiries]=useState([]);
+  const [customerQueries,setCustomerQueries]=useState([]);
   const [supplierInvoices,setSupplierInvoices]=useState([]);
   const [customerInvoices,setCustomerInvoices]=useState([]);
   const [supplierReturns,setSupplierReturns]=useState([]);
@@ -1125,6 +1142,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("workshop_quotes","select=*&order=quote_date.desc").catch(()=>[]),
       api.get("workshop_customers","select=*&order=name.asc").catch(()=>[]),
       api.get("workshop_vehicles","select=*&order=reg.asc").catch(()=>[]),
+      api.get("customer_queries","select=*&order=created_at.desc").catch(()=>[]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -1150,6 +1168,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWorkshopQuotes(Array.isArray(rest[8])?rest[8]:[]);
     setWorkshopCustomers(Array.isArray(rest[9])?rest[9]:[]);
     setWorkshopVehicles(Array.isArray(rest[10])?rest[10]:[]);
+    setCustomerQueries(Array.isArray(rest[11])?rest[11]:[]);
   },[]);
 
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
@@ -1747,6 +1766,25 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   };
   const updateInquiry=async(id,data)=>{await api.patch("inquiries","id",id,data);await loadAll();showToast("Updated");};
 
+  // Customer Queries
+  const submitCustomerQuery=async(data)=>{
+    await api.insert("customer_queries",data);
+    const q=await api.get("customer_queries","select=*&order=created_at.desc").catch(()=>[]);
+    setCustomerQueries(Array.isArray(q)?q:[]);
+    showToast("✅ Query submitted! We'll reply soon.");
+  };
+  const replyToQuery=async(id,data)=>{
+    await api.patch("customer_queries","id",id,data);
+    setCustomerQueries(p=>p.map(q=>q.id===id?{...q,...data}:q));
+    showToast("✅ Reply sent to customer!");
+  };
+  const markDepositPaid=async(id)=>{
+    const d={status:"deposit_paid",deposit_paid_at:new Date().toISOString()};
+    await api.patch("customer_queries","id",id,d);
+    setCustomerQueries(p=>p.map(q=>q.id===id?{...q,...d}:q));
+    showToast("✅ Deposit marked as paid!");
+  };
+
   // Supplier Invoices
   const saveSupplierInvoice=async(data,items)=>{
     const {inv,isNew}=data;
@@ -2040,6 +2078,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const totalRev=orders.filter(o=>o.status==="Completed").reduce((s,o)=>s+(o.total||0),0);
   const pendingCnt=orders.filter(o=>o.status==="Processing"||o.status==="Ready to Ship").length;
   const pendingInq=inquiries.filter(i=>i.status==="pending").length;
+  const pendingCQ=customerQueries.filter(q=>q.status==="pending").length;
   const getPartSupps=(pid)=>partSuppliers.filter(ps=>ps.part_id===pid).map(ps=>({...ps,supplier:suppliers.find(s=>s.id===ps.supplier_id)}));
   const OS = role==="shipper"
     ? [
@@ -2113,6 +2152,8 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {id:"salesInvoices",icon:"🧾",label:t.salesInvoices,roles:["admin","manager"]},
         {id:"customerReturns",icon:"↩️",label:t.customerReturns,roles:["admin","manager"]},
         {id:"customers",icon:"👥",label:t.customers,roles:["admin"]},
+        {id:"customerqueries",icon:"💬",label:t.customerQueries,roles:["admin"],badge:pendingCQ},
+        {id:"myqueries",icon:"💬",label:t.myQueries,roles:["customer"]},
       ]
     },
     {
@@ -2140,6 +2181,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     if(role==="customer") return [
       {id:"shop",    icon:"🛒",label:t.shop},
       {id:"myorders",icon:"📦",label:t.myOrders},
+      {id:"myqueries",icon:"💬",label:t.myQueries},
     ];
     if(role==="stockman") return [
       {id:"inventory",icon:"📦",label:t.inventory,badge:lowStock.length},
@@ -2209,10 +2251,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       <aside className="sidebar" style={{width:240,background:"var(--surface)",borderRight:"1px solid var(--border)",position:"fixed",height:"100vh",zIndex:50,display:"flex",flexDirection:"column"}}>
         <div style={{padding:"18px 18px 12px"}}>
           <div style={{maxWidth:210,overflow:"hidden"}}>
-            <ShopLogo settings={settings} size="sm"/>
+            <ShopLogo settings={settings} size="md"/>
           </div>
-          <div style={{fontSize:10,color:"var(--green)",marginTop:2}}>{`🟢 ${t.connected}`}</div>
-          <div style={{display:"flex",gap:5,marginTop:9}}>
+          <div style={{fontSize:10,color:"var(--green)",marginTop:4}}>{`🟢 ${t.connected}`}</div>
+          <div style={{display:"flex",gap:5,marginTop:9,justifyContent:"center"}}>
             <button className={`lang ${lang==="en"?"on":""}`} onClick={()=>setLang("en")}>EN</button>
             <button className={`lang ${lang==="zh"?"on":""}`} onClick={()=>setLang("zh")}>中文</button>
           </div>
@@ -2764,6 +2806,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
                       {inCart
                         ? <div style={{display:"flex",alignItems:"center",gap:7}}><button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty-1)}>−</button><span style={{flex:1,textAlign:"center",fontWeight:700,fontSize:16}}>{inCart.qty}</span><button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty+1)}>+</button><button className="btn btn-danger btn-xs" onClick={()=>removeFromCart(p.id)}>✕</button></div>
                         : <button className="btn btn-primary" style={{width:"100%"}} disabled={p.stock===0} onClick={()=>addToCart(p)}>{t.addToCart}</button>}
+                      <button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:6,fontSize:12,borderColor:"var(--blue)",color:"var(--blue)"}} onClick={()=>openM("customerQuery",p)}>
+                        🔍 {t.queryPriceQty}
+                      </button>
                     </div>
                   </div>
                 );
@@ -3317,6 +3362,126 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
           </div>
         )}
 
+        {/* ── CUSTOMER QUERIES (admin) ── */}
+        {tab==="customerqueries"&&(
+          <div className="fu">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
+              <div>
+                <h1 style={{fontSize:20,fontWeight:700}}>{t.customerQueries}</h1>
+                <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{pendingCQ} pending · {customerQueries.length} total</p>
+              </div>
+            </div>
+            {customerQueries.length===0
+              ? <div style={{textAlign:"center",padding:60,color:"var(--text3)"}}>{t.noQueries}</div>
+              : (
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  {customerQueries.map(q=>{
+                    const statusColor=q.status==="pending"?"var(--yellow)":q.status==="replied"?"var(--blue)":q.status==="deposit_requested"?"var(--accent)":q.status==="deposit_paid"?"var(--green)":"var(--text3)";
+                    const statusLabel=q.status==="pending"?"⏳ Pending":q.status==="replied"?"✅ Replied":q.status==="deposit_requested"?"💰 Deposit Requested":q.status==="deposit_paid"?"✅ Deposit Paid":"—";
+                    return (
+                      <div key={q.id} className="card" style={{padding:16,borderLeft:`3px solid ${statusColor}`}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
+                          <div style={{flex:1}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                              <span style={{fontWeight:700,fontSize:15}}>{q.part_name}</span>
+                              {q.part_sku&&<span style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{q.part_sku}</span>}
+                              <span style={{fontSize:11,fontWeight:600,color:statusColor,background:statusColor+"18",padding:"2px 8px",borderRadius:99}}>{statusLabel}</span>
+                            </div>
+                            <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13,color:"var(--text2)",marginBottom:4}}>
+                              <span>👤 {q.customer_name}</span>
+                              <span>📞 {q.customer_phone}</span>
+                              {q.customer_email&&<span>✉ {q.customer_email}</span>}
+                              <span>🔢 Qty: <strong>{q.qty_requested}</strong></span>
+                            </div>
+                            {q.notes&&<div style={{fontSize:12,color:"var(--text3)",fontStyle:"italic",marginBottom:4}}>"{q.notes}"</div>}
+                            <div style={{fontSize:11,color:"var(--text3)"}}>{q.created_at?.slice(0,16)?.replace("T"," ")}</div>
+                            {(q.confirmed_price||q.confirmed_qty||q.reply_notes)&&(
+                              <div style={{marginTop:8,background:"var(--surface2)",borderRadius:8,padding:"8px 12px",fontSize:13}}>
+                                <div style={{fontWeight:600,marginBottom:4,color:"var(--blue)"}}>📩 Reply:</div>
+                                {q.confirmed_price&&<div>Price: <strong style={{color:"var(--accent)"}}>{fmtAmt(q.confirmed_price)}</strong> / unit</div>}
+                                {q.confirmed_qty&&<div>Available: <strong>{q.confirmed_qty}</strong> units</div>}
+                                {q.reply_notes&&<div style={{color:"var(--text2)",marginTop:4}}>{q.reply_notes}</div>}
+                              </div>
+                            )}
+                            {q.deposit_amount&&(
+                              <div style={{marginTop:8,background:"rgba(249,115,22,.08)",borderRadius:8,padding:"8px 12px",fontSize:13,border:"1px solid var(--accent)"}}>
+                                <div style={{fontWeight:600,marginBottom:4,color:"var(--accent)"}}>💰 Deposit Required: <strong>{fmtAmt(q.deposit_amount)}</strong></div>
+                                {q.deposit_note&&<div style={{color:"var(--text2)",fontSize:12}}>{q.deposit_note}</div>}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+                            <button className="btn btn-primary btn-sm" onClick={()=>openM("queryReply",q)}>
+                              {q.status==="pending"?"📝 Reply":"✏️ Edit Reply"}
+                            </button>
+                            {q.status==="deposit_requested"&&(
+                              <button className="btn btn-ghost btn-sm" style={{color:"var(--green)",borderColor:"var(--green)"}} onClick={()=>markDepositPaid(q.id)}>
+                                ✅ {t.depositPaid}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            }
+          </div>
+        )}
+
+        {/* ── MY QUERIES (customer) ── */}
+        {tab==="myqueries"&&(()=>{
+          const myQ=customerQueries.filter(q=>q.customer_phone===user.phone||q.customer_name===user.name||q.customer_email===user.email);
+          return (
+            <div className="fu">
+              <div style={{marginBottom:18}}>
+                <h1 style={{fontSize:20,fontWeight:700}}>{t.myQueries}</h1>
+                <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{myQ.length} {lang==="zh"?"筆詢問":"queries"}</p>
+              </div>
+              {myQ.length===0
+                ? <div style={{textAlign:"center",padding:60,color:"var(--text3)"}}>{t.noQueries}<br/><span style={{fontSize:13,marginTop:8,display:"block"}}>Use the 🔍 button in the shop to ask about price and availability.</span></div>
+                : (
+                  <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                    {myQ.map(q=>{
+                      const statusColor=q.status==="pending"?"var(--yellow)":q.status==="replied"?"var(--blue)":q.status==="deposit_requested"?"var(--accent)":q.status==="deposit_paid"?"var(--green)":"var(--text3)";
+                      const statusLabel=q.status==="pending"?(lang==="zh"?"⏳ 等待回覆":"⏳ Awaiting Reply"):q.status==="replied"?(lang==="zh"?"✅ 已回覆":"✅ Replied"):q.status==="deposit_requested"?(lang==="zh"?"💰 需付訂金":"💰 Deposit Required"):q.status==="deposit_paid"?(lang==="zh"?"✅ 訂金已付":"✅ Deposit Paid"):"—";
+                      return (
+                        <div key={q.id} className="card" style={{padding:16,borderLeft:`3px solid ${statusColor}`}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                            <span style={{fontWeight:700,fontSize:15}}>{q.part_name}</span>
+                            {q.part_sku&&<span style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{q.part_sku}</span>}
+                            <span style={{fontSize:11,fontWeight:600,color:statusColor,background:statusColor+"18",padding:"2px 8px",borderRadius:99}}>{statusLabel}</span>
+                          </div>
+                          <div style={{fontSize:13,color:"var(--text2)",marginBottom:4}}>
+                            Qty requested: <strong>{q.qty_requested}</strong> · {q.created_at?.slice(0,10)}
+                          </div>
+                          {q.notes&&<div style={{fontSize:12,color:"var(--text3)",fontStyle:"italic",marginBottom:8}}>"{q.notes}"</div>}
+                          {(q.confirmed_price||q.confirmed_qty||q.reply_notes)&&(
+                            <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 14px",fontSize:13,marginTop:8}}>
+                              <div style={{fontWeight:600,marginBottom:6,color:"var(--blue)"}}>📩 {lang==="zh"?"商家回覆":"Shop Reply"}</div>
+                              {q.confirmed_price&&<div style={{marginBottom:4}}>{lang==="zh"?"確認單價":"Confirmed Price"}: <strong style={{color:"var(--accent)",fontSize:16}}>{fmtAmt(q.confirmed_price)}</strong></div>}
+                              {q.confirmed_qty&&<div style={{marginBottom:4}}>{lang==="zh"?"可供數量":"Available Qty"}: <strong>{q.confirmed_qty}</strong></div>}
+                              {q.reply_notes&&<div style={{color:"var(--text2)",marginTop:6,lineHeight:1.5}}>{q.reply_notes}</div>}
+                            </div>
+                          )}
+                          {q.deposit_amount&&(
+                            <div style={{marginTop:8,background:"rgba(249,115,22,.1)",borderRadius:8,padding:"12px 14px",border:"1px solid var(--accent)"}}>
+                              <div style={{fontWeight:700,color:"var(--accent)",marginBottom:4}}>💰 {lang==="zh"?"訂金要求":"Deposit Required"}: {fmtAmt(q.deposit_amount)}</div>
+                              {q.deposit_note&&<div style={{fontSize:13,color:"var(--text2)",lineHeight:1.6}}>{q.deposit_note}</div>}
+                              {q.status==="deposit_paid"&&<div style={{marginTop:6,color:"var(--green)",fontWeight:600}}>✅ {lang==="zh"?"訂金已收到":"Deposit received — order confirmed!"}</div>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              }
+            </div>
+          );
+        })()}
+
       </main>
 
       {/* ════ MODALS ════ */}
@@ -3339,6 +3504,19 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       {isOpen("viewCustomerInvoice")&&<ViewCustomerInvoiceModal inv={mData("viewCustomerInvoice")} onClose={()=>closeM("viewCustomerInvoice")} settings={settings}/>}
       {isOpen("customerReturn")&&<CustomerReturnModal data={mData("customerReturn")} customers={customers} parts={parts} customerInvoices={customerInvoices} onSave={saveCustomerReturn} onClose={()=>closeM("customerReturn")} t={t} settings={settings}/>}
       {isOpen("checkout")&&<CheckoutModal cart={cart} customers={customers} cartTotal={cartTotal} role={role} currentUser={user} onPlace={placeOrder} onClose={()=>closeM("checkout")} onRemove={removeFromCart} onQty={qtyCart} t={t} lang={lang}/>}
+      {isOpen("customerQuery")&&<CustomerQueryModal part={mData("customerQuery")} currentUser={user} onSubmit={submitCustomerQuery} onClose={()=>closeM("customerQuery")} t={t}/>}
+      {isOpen("queryReply")&&<CustomerQueryReplyModal query={mData("queryReply")} onReply={replyToQuery} onClose={()=>closeM("queryReply")} t={t} settings={settings}
+        onGoInventory={()=>{
+          const q=mData("queryReply"); closeM("queryReply"); setTab("inventory");
+          if(q?.part_id){const p=parts.find(pt=>pt.id===q.part_id||pt.id===+q.part_id); if(p) openM("editPart",p);}
+        }}
+        onGoRFQ={()=>{
+          const q=mData("queryReply");
+          const p=parts.find(pt=>pt.id===q?.part_id||pt.id===+q?.part_id);
+          closeM("queryReply");
+          if(p) openM("inquiry",p); else setTab("inquiries");
+        }}
+      />}
 
       {/* ORDER CONFIRM */}
       {isOpen("orderConfirm")&&(()=>{
@@ -4784,6 +4962,137 @@ function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,onUpdat
         </div>
       )}
       {avail.length===0&&partSuppliers.length===0&&<p style={{color:"var(--text3)",textAlign:"center",padding:20}}>No suppliers yet — add them in the Suppliers section first.</p>}
+    </Overlay>
+  );
+}
+
+// ── Customer Query Modal (customer submits query from shop) ───────────
+function CustomerQueryModal({part,currentUser,onSubmit,onClose,t}) {
+  const isCustomer=currentUser?._isCustomer||currentUser?.role==="customer";
+  const [form,setForm]=useState({
+    name:isCustomer?(currentUser?.name||""):"",
+    phone:isCustomer?(currentUser?.phone||""):"",
+    email:isCustomer?(currentUser?.email||""):"",
+    qty:1,
+    notes:"",
+  });
+  const [saving,setSaving]=useState(false);
+  const set=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const handle=async()=>{
+    if(!form.name||!form.phone){alert(t.name+" & "+t.phone+" required");return;}
+    setSaving(true);
+    await onSubmit({
+      part_id:part.id,part_name:part.name,part_sku:part.sku||"",
+      part_price:part.price||0,part_image:part.image_url||"",
+      customer_name:form.name,customer_phone:form.phone,customer_email:form.email,
+      qty_requested:+form.qty||1,notes:form.notes,
+      status:"pending",created_at:new Date().toISOString(),
+    });
+    setSaving(false);
+    onClose();
+  };
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title={t.queryPriceQty} sub={part.name} onClose={onClose}/>
+      <div style={{background:"var(--surface2)",borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:13}}>
+        <div style={{fontWeight:700,marginBottom:2}}>{part.name}</div>
+        {part.sku&&<div style={{color:"var(--text3)",fontSize:12}}>SKU: {part.sku}</div>}
+        {part.oe_number&&<div style={{color:"var(--text3)",fontSize:12}}>OE: {part.oe_number}</div>}
+      </div>
+      <FG cols="1fr 1fr">
+        <div><FL label={t.name} req/><input className="inp" value={form.name} onChange={e=>set("name",e.target.value)} disabled={isCustomer&&!!form.name}/></div>
+        <div><FL label={t.phone} req/><input className="inp" value={form.phone} onChange={e=>set("phone",e.target.value)} disabled={isCustomer&&!!form.phone}/></div>
+      </FG>
+      <FD><FL label={t.email}/><input className="inp" type="email" value={form.email} onChange={e=>set("email",e.target.value)}/></FD>
+      <FD><FL label={t.qty} req/><input className="inp" type="number" min="1" value={form.qty} onChange={e=>set("qty",e.target.value)}/></FD>
+      <FD><FL label={t.queryNotes}/><textarea className="inp" rows={3} value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Any special requirements, vehicle info, etc."/></FD>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16}}>
+        <button className="btn btn-ghost" onClick={onClose}>{t.cancel}</button>
+        <button className="btn btn-primary" onClick={handle} disabled={saving}>{saving?"...":t.submitQuery}</button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ── Customer Query Reply Modal (admin replies + requests deposit) ─────
+function CustomerQueryReplyModal({query,onReply,onClose,t,settings,onGoInventory,onGoRFQ}) {
+  const [price,setPrice]=useState(query?.confirmed_price||"");
+  const [qty,setQty]=useState(query?.confirmed_qty||"");
+  const [notes,setNotes]=useState(query?.reply_notes||"");
+  const [reqDeposit,setReqDeposit]=useState(!!(query?.deposit_amount));
+  const [deposit,setDeposit]=useState(query?.deposit_amount||"");
+  const [depositNote,setDepositNote]=useState(query?.deposit_note||`Please pay a deposit of ${settings?.currency||""} to confirm your order. Contact us for payment details.`);
+  const [saving,setSaving]=useState(false);
+  const handle=async()=>{
+    setSaving(true);
+    await onReply(query.id,{
+      confirmed_price:price?+price:null,
+      confirmed_qty:qty?+qty:null,
+      reply_notes:notes,
+      deposit_amount:reqDeposit&&deposit?+deposit:null,
+      deposit_note:reqDeposit?depositNote:null,
+      status:reqDeposit?"deposit_requested":"replied",
+      replied_at:new Date().toISOString(),
+    });
+    setSaving(false);
+    onClose();
+  };
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title={t.queryReply} sub={`${query.customer_name} — ${query.part_name}`} onClose={onClose}/>
+
+      {/* Part info + quick-action buttons */}
+      <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:3}}>{query.part_name}</div>
+            {query.part_sku&&(
+              <div style={{fontSize:13,color:"var(--blue)",fontFamily:"DM Mono,monospace",fontWeight:600,marginBottom:6}}>
+                SKU: {query.part_sku}
+              </div>
+            )}
+            <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:13,color:"var(--text2)"}}>
+              <span>👤 {query.customer_name}</span>
+              <span>📞 {query.customer_phone}</span>
+              <span>🔢 Qty: <strong>{query.qty_requested}</strong></span>
+            </div>
+            {query.notes&&<div style={{marginTop:5,fontSize:12,color:"var(--text3)",fontStyle:"italic"}}>"{query.notes}"</div>}
+          </div>
+          {/* Quick-action buttons */}
+          <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+            <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"var(--blue)",fontSize:12,whiteSpace:"nowrap"}}
+              onClick={onGoInventory}>
+              📦 View in Inventory
+            </button>
+            <button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)",borderColor:"var(--yellow)",fontSize:12,whiteSpace:"nowrap"}}
+              onClick={onGoRFQ}>
+              📩 Send RFQ to Suppliers
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <FG cols="1fr 1fr">
+        <div><FL label={t.confirmedPrice}/><input className="inp" type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} placeholder="Unit price"/></div>
+        <div><FL label={t.confirmedQty}/><input className="inp" type="number" min="0" value={qty} onChange={e=>setQty(e.target.value)} placeholder="Available qty"/></div>
+      </FG>
+      <FD><FL label={t.notes}/><textarea className="inp" rows={3} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Reply message to customer..."/></FD>
+      <div style={{margin:"14px 0",padding:"12px 14px",background:"var(--surface2)",borderRadius:10,border:`1px solid ${reqDeposit?"var(--yellow)":"var(--border)"}`}}>
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontWeight:600,fontSize:13,marginBottom:reqDeposit?12:0}}>
+          <input type="checkbox" checked={reqDeposit} onChange={e=>setReqDeposit(e.target.checked)} style={{width:16,height:16}}/>
+          {t.depositRequest}
+        </label>
+        {reqDeposit&&(
+          <>
+            <FD><FL label={t.depositAmount} req/><input className="inp" type="number" min="0" step="0.01" value={deposit} onChange={e=>setDeposit(e.target.value)} placeholder="Deposit amount"/></FD>
+            <FD><FL label={t.depositNote}/><textarea className="inp" rows={3} value={depositNote} onChange={e=>setDepositNote(e.target.value)}/></FD>
+          </>
+        )}
+      </div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16}}>
+        <button className="btn btn-ghost" onClick={onClose}>{t.cancel}</button>
+        <button className="btn btn-primary" onClick={handle} disabled={saving}>{saving?"...":t.sendReply}</button>
+      </div>
     </Overlay>
   );
 }
@@ -7198,6 +7507,7 @@ function PartPhotoUploader({imageUrl, onChange, sku, t}) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver]   = useState(false);
   const [error, setError]         = useState(null);
+  const [zoomed, setZoomed]       = useState(false);
   const fileRef = useRef(null);
 
   // ⚙️ Paste your Apps Script Web App URL here after deploying
@@ -7297,10 +7607,15 @@ function PartPhotoUploader({imageUrl, onChange, sku, t}) {
           </div>
         ) : preview ? (
           <div style={{display:"flex",alignItems:"center",gap:12,justifyContent:"center"}}>
-            <img src={preview} alt="part" style={{width:64,height:64,objectFit:"contain",borderRadius:8,background:"var(--surface3)"}}/>
+            <div style={{position:"relative",flexShrink:0}} onClick={e=>e.stopPropagation()}>
+              <img src={preview} alt="part"
+                style={{width:80,height:80,objectFit:"contain",borderRadius:8,background:"var(--surface3)",cursor:"zoom-in",display:"block"}}
+                onClick={e=>{e.stopPropagation();setZoomed(true);}}/>
+              <div style={{position:"absolute",bottom:2,right:2,background:"rgba(0,0,0,.55)",borderRadius:4,padding:"1px 4px",fontSize:9,color:"#fff",pointerEvents:"none"}}>🔍</div>
+            </div>
             <div style={{textAlign:"left"}}>
               <div style={{fontSize:13,fontWeight:600,color:"var(--green)"}}>✅ Photo uploaded</div>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Click or drop to replace</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Click photo to enlarge · drop here to replace</div>
             </div>
           </div>
         ) : (
@@ -7364,6 +7679,19 @@ function PartPhotoUploader({imageUrl, onChange, sku, t}) {
 
       {imageUrl && (
         <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>{t.gdrive_hint}</div>
+      )}
+
+      {/* Fullscreen lightbox */}
+      {zoomed&&preview&&(
+        <div onClick={()=>setZoomed(false)}
+          style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
+          <img src={toFullUrl(imageUrl)||preview} alt="part"
+            style={{maxWidth:"92vw",maxHeight:"88vh",objectFit:"contain",borderRadius:10,boxShadow:"0 8px 48px rgba(0,0,0,.6)"}}
+            onError={e=>{e.target.src=preview;}}
+            onClick={e=>e.stopPropagation()}/>
+          <button onClick={()=>setZoomed(false)}
+            style={{position:"absolute",top:18,right:22,background:"rgba(255,255,255,.12)",border:"none",borderRadius:"50%",width:38,height:38,fontSize:20,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
       )}
     </div>
   );

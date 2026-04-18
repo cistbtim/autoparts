@@ -10016,7 +10016,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                   style={{fontSize:11,padding:"2px 8px",background:"rgba(249,115,22,.12)",color:"#f97316",border:"1px solid rgba(249,115,22,.3)",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap"}}>
                   WolfOil 📋
                 </button>
-                <a href="https://www.willard.co.za" target="_blank" rel="noopener noreferrer"
+                <a href="https://willard.co.za/battery-selection-tool/" target="_blank" rel="noopener noreferrer"
                   style={{fontSize:11,padding:"2px 8px",background:"rgba(220,38,38,.12)",color:"#ef4444",border:"1px solid rgba(220,38,38,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                   Willard 🔋
                 </a>
@@ -10756,7 +10756,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(249,115,22,.12)",color:"#f97316",border:"1px solid rgba(249,115,22,.3)",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap"}}>
                     WolfOil 📋
                   </button>
-                  <a href="https://www.willard.co.za" target="_blank" rel="noopener noreferrer"
+                  <a href="https://willard.co.za/battery-selection-tool/" target="_blank" rel="noopener noreferrer"
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(220,38,38,.12)",color:"#ef4444",border:"1px solid rgba(220,38,38,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                     Willard 🔋
                   </a>

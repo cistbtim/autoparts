@@ -10020,7 +10020,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                   style={{fontSize:11,padding:"2px 8px",background:"rgba(220,38,38,.12)",color:"#ef4444",border:"1px solid rgba(220,38,38,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                   Willard 🔋
                 </a>
-                <a href="https://www.varta-automotive.com" target="_blank" rel="noopener noreferrer"
+                <a href="https://www.varta-automotive.com/battery-finder" target="_blank" rel="noopener noreferrer"
                   style={{fontSize:11,padding:"2px 8px",background:"rgba(99,102,241,.12)",color:"#6366f1",border:"1px solid rgba(99,102,241,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                   VARTA 🔋
                 </a>
@@ -10760,7 +10760,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(220,38,38,.12)",color:"#ef4444",border:"1px solid rgba(220,38,38,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                     Willard 🔋
                   </a>
-                  <a href="https://www.varta-automotive.com" target="_blank" rel="noopener noreferrer"
+                  <a href="https://www.varta-automotive.com/battery-finder" target="_blank" rel="noopener noreferrer"
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(99,102,241,.12)",color:"#6366f1",border:"1px solid rgba(99,102,241,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                     VARTA 🔋
                   </a>

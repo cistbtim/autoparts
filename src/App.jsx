@@ -9995,6 +9995,32 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <div style={{fontWeight:600,fontSize:13}}>{v||"—"}</div>
             </div>
           ))}
+          {job.vin&&(
+            <div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>VIN</div>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                <code style={{fontWeight:600,fontSize:12,fontFamily:"DM Mono,monospace",letterSpacing:"0.5px"}}>{job.vin}</code>
+                <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent(job.vin)}`} target="_blank" rel="noopener noreferrer"
+                  style={{fontSize:11,padding:"2px 8px",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
+                  PartsOuq
+                </a>
+                <a href={`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`} target="_blank" rel="noopener noreferrer"
+                  style={{fontSize:11,padding:"2px 8px",background:"rgba(52,211,153,.12)",color:"var(--green)",border:"1px solid rgba(52,211,153,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
+                  RealOEM
+                </a>
+                <a href={`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`} target="_blank" rel="noopener noreferrer"
+                  style={{fontSize:11,padding:"2px 8px",background:"rgba(251,191,36,.12)",color:"var(--yellow)",border:"1px solid rgba(251,191,36,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
+                  VinDecoderz
+                </a>
+              </div>
+            </div>
+          )}
+          {job.engine_no&&(
+            <div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>Engine No</div>
+              <code style={{fontWeight:600,fontSize:12,fontFamily:"DM Mono,monospace",letterSpacing:"0.5px"}}>{job.engine_no}</code>
+            </div>
+          )}
         </div>
         {job.complaint&&<div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
           <div style={{fontSize:11,color:"var(--text3)",marginBottom:3}}>💬 Complaint</div>

@@ -10723,7 +10723,26 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
             <div><FL label="Year"/><input className="inp" type="number" value={f.vehicle_year} onChange={e=>s("vehicle_year",e.target.value)} placeholder="2022"/></div>
           </FG>
           <FG>
-            <div><FL label="VIN"/><input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value.toUpperCase())} placeholder="17-char VIN..." style={{fontFamily:"DM Mono,monospace",fontSize:12}}/></div>
+            <div>
+              <FL label="VIN"/>
+              <input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value.toUpperCase())} placeholder="17-char VIN..." style={{fontFamily:"DM Mono,monospace",fontSize:12}}/>
+              {f.vin&&(
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:5}}>
+                  <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent(f.vin)}`} target="_blank" rel="noopener noreferrer"
+                    style={{fontSize:11,padding:"2px 8px",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
+                    PartsOuq
+                  </a>
+                  <a href={`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(f.vin)}`} target="_blank" rel="noopener noreferrer"
+                    style={{fontSize:11,padding:"2px 8px",background:"rgba(52,211,153,.12)",color:"var(--green)",border:"1px solid rgba(52,211,153,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
+                    RealOEM
+                  </a>
+                  <a href={`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(f.vin)}`} target="_blank" rel="noopener noreferrer"
+                    style={{fontSize:11,padding:"2px 8px",background:"rgba(251,191,36,.12)",color:"var(--yellow)",border:"1px solid rgba(251,191,36,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
+                    VinDecoderz
+                  </a>
+                </div>
+              )}
+            </div>
             <div><FL label="Engine No."/><input className="inp" value={f.engine_no} onChange={e=>s("engine_no",e.target.value.toUpperCase())} placeholder="Engine number..." style={{fontFamily:"DM Mono,monospace",fontSize:12}}/></div>
           </FG>
         </div>

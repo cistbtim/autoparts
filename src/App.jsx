@@ -9975,6 +9975,30 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         <button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ Edit</button>
         <button className="btn btn-ghost btn-sm" title="Print Job Card Label" onClick={()=>printJobCardLabel(job,settings)}>🏷️ Label</button>
         <button className="btn btn-ghost btn-sm" title="Collection / Delivery Label" onClick={()=>setDeliveryModal(true)}>🚗 Collect/Deliver</button>
+        <button className="btn btn-ghost btn-sm" title="Float vehicle info window" onClick={()=>{
+          const w=window.open("","_blank","width=340,height=420,top=60,left=60,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no");
+          w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vehicle Info</title><style>
+            *{margin:0;padding:0;box-sizing:border-box}
+            body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;padding:16px;font-size:13px}
+            h2{font-size:15px;font-weight:700;margin-bottom:14px;color:#60a5fa;border-bottom:1px solid #1e3a5f;padding-bottom:8px}
+            .row{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid #1e293b}
+            .row:last-child{border-bottom:none}
+            .lbl{color:#94a3b8;font-size:11px;min-width:90px}
+            .val{font-weight:600;text-align:right;word-break:break-all}
+            code{font-family:"DM Mono",monospace;font-size:11px;letter-spacing:.5px;background:#1e293b;padding:2px 5px;border-radius:4px}
+          </style></head><body>
+            <h2>🚗 Vehicle Info</h2>
+            <div class="row"><span class="lbl">Plate</span><span class="val">${job.vehicle_reg||"—"}</span></div>
+            <div class="row"><span class="lbl">Make</span><span class="val">${job.vehicle_make||"—"}</span></div>
+            <div class="row"><span class="lbl">Model</span><span class="val">${job.vehicle_model||"—"}</span></div>
+            <div class="row"><span class="lbl">Year</span><span class="val">${job.vehicle_year||"—"}</span></div>
+            <div class="row"><span class="lbl">Color</span><span class="val">${job.vehicle_color||"—"}</span></div>
+            <div class="row"><span class="lbl">Mileage</span><span class="val">${job.mileage?job.mileage.toLocaleString()+" km":"—"}</span></div>
+            ${job.vin?`<div class="row"><span class="lbl">VIN</span><span class="val"><code>${job.vin}</code></span></div>`:""}
+            ${job.engine_no?`<div class="row"><span class="lbl">Engine No</span><span class="val"><code>${job.engine_no}</code></span></div>`:""}
+          </body></html>`);
+          w.document.close();
+        }}>🪟 Float Info</button>
       </div>
 
       {/* Job info card */}

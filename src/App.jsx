@@ -9847,6 +9847,27 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
 }
 
 // ═══════════════════════════════════════════════════════════════
+// VEHICLE CHECK-IN CHECKLIST ITEMS
+// ═══════════════════════════════════════════════════════════════
+const CHECKLIST_ITEMS=[
+  {key:"body_front",    label:"Front Bumper / Body",   icon:"🚗"},
+  {key:"body_rear",     label:"Rear Bumper / Body",    icon:"🚙"},
+  {key:"body_left",     label:"Left Side Body",        icon:"◀️"},
+  {key:"body_right",   label:"Right Side Body",       icon:"▶️"},
+  {key:"windscreen",   label:"Windscreen",            icon:"🔲"},
+  {key:"wipers",       label:"Wipers",                icon:"🌧️"},
+  {key:"lights_front", label:"Front Lights",          icon:"💡"},
+  {key:"lights_rear",  label:"Rear Lights",           icon:"🔴"},
+  {key:"tyres",        label:"Tyres Condition",       icon:"⚫"},
+  {key:"spare_wheel",  label:"Spare Wheel",           icon:"🛞"},
+  {key:"fuel_level",   label:"Fuel Level",            icon:"⛽"},
+  {key:"interior",     label:"Interior Condition",    icon:"💺"},
+  {key:"dash_lights",  label:"Dashboard Warning Lights",icon:"⚠️"},
+  {key:"boot",         label:"Boot / Trunk",          icon:"📦"},
+  {key:"radio",        label:"Radio / Electronics",   icon:"📻"},
+];
+
+// ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
 function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,t,lang}) {
@@ -9864,6 +9885,70 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [deliveryModal, setDeliveryModal] = useState(false);
 
   const vehiclePhotos = wsVehicles.reduce((acc,v)=>v.id===job.workshop_vehicle_id?{front:v.photo_front||"",rear:v.photo_rear||"",side:v.photo_side||""}:acc,{front:"",rear:"",side:""});
+
+  // ── Check-in Checklist ────────────────────────────────────────
+  const [checklist,       setChecklist]       = useState({}); // { item_key: {status,note,photo_url} }
+  const [checklistOpen,   setChecklistOpen]   = useState(false);
+  const [checklistLoaded, setChecklistLoaded] = useState(false);
+  const [clUploading,     setClUploading]     = useState({}); // { item_key: bool }
+  const clCamRefs = useRef({});
+
+  useEffect(()=>{
+    if(!checklistOpen||checklistLoaded) return;
+    api.get("workshop_job_checklist",`job_id=eq.${job.id}`)
+      .then(rows=>{
+        const map={};
+        (Array.isArray(rows)?rows:[]).forEach(r=>{ map[r.item_key]={status:r.status||"pending",note:r.note||"",photo_url:r.photo_url||"",id:r.id}; });
+        setChecklist(map);
+        setChecklistLoaded(true);
+      })
+      .catch(()=>setChecklistLoaded(true));
+  },[checklistOpen,checklistLoaded,job.id]);
+
+  const saveChecklistItem=async(key,patch)=>{
+    const current=checklist[key]||{status:"pending",note:"",photo_url:""};
+    const updated={...current,...patch};
+    setChecklist(p=>({...p,[key]:updated}));
+    if(updated.id){
+      await api.update("workshop_job_checklist",updated.id,{status:updated.status,note:updated.note,photo_url:updated.photo_url});
+    } else {
+      const newId=makeId("CL");
+      const rec={id:newId,job_id:job.id,item_key:key,status:updated.status,note:updated.note||"",photo_url:updated.photo_url||""};
+      await api.insert("workshop_job_checklist",rec);
+      setChecklist(p=>({...p,[key]:{...updated,id:newId}}));
+    }
+  };
+
+  const uploadChecklistPhoto=async(key,dataUrl)=>{
+    const SCRIPT_URL=(window._VEHICLE_SCRIPT_URL&&window._VEHICLE_SCRIPT_URL.trim())||(window._APPS_SCRIPT_URL&&window._APPS_SCRIPT_URL.trim())||"";
+    if(!SCRIPT_URL){ alert("No Script URL configured in Settings."); return; }
+    setClUploading(p=>({...p,[key]:true}));
+    try{
+      const base64=await new Promise((res,rej)=>{
+        const img=new Image();
+        img.onload=()=>{
+          const MAX=1200; const canvas=document.createElement("canvas");
+          let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          canvas.width=w;canvas.height=h;
+          canvas.getContext("2d").drawImage(img,0,0,w,h);
+          res(canvas.toDataURL("image/jpeg",0.85));
+        };
+        img.onerror=rej; img.src=dataUrl;
+      });
+      const now=new Date(); const pad2=n=>String(n).padStart(2,"0");
+      const dateStr=`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`;
+      const timeStr=`${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`;
+      const reg=(job.vehicle_reg||"REG").replace(/\s/g,"").toUpperCase();
+      const folderPath=`Tim_Car_Phot/${reg}/Checklist`;
+      const filename=`CL_${key}_${dateStr.replace(/-/g,"")}_${timeStr.replace(/-/g,"")}.jpg`;
+      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType:"image/jpeg",folderPath})});
+      const result=await resp.json();
+      if(result.success){ await saveChecklistItem(key,{photo_url:result.url}); }
+      else { alert("Photo upload failed: "+(result.error||"Unknown error")); }
+    }catch(e){ alert("Upload error: "+e.message); }
+    finally{ setClUploading(p=>({...p,[key]:false})); }
+  };
 
   // ── Job photos ────────────────────────────────────────────────
   const [savedPhotos,   setSavedPhotos]   = useState([]);      // from DB
@@ -10078,6 +10163,88 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             {s}
           </button>
         ))}
+      </div>
+
+      {/* ── Check-in Checklist ── */}
+      <div className="card" style={{marginBottom:14,overflow:"hidden"}}>
+        <div style={{padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",userSelect:"none"}}
+          onClick={()=>setChecklistOpen(o=>!o)}>
+          <div style={{fontWeight:700,fontSize:14,display:"flex",alignItems:"center",gap:8}}>
+            ✅ Check-in Inspection
+            {checklistLoaded&&(()=>{
+              const done=CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length;
+              return <span style={{fontSize:11,fontWeight:400,color:"var(--text3)"}}>{done}/{CHECKLIST_ITEMS.length} checked</span>;
+            })()}
+          </div>
+          <span style={{fontSize:12,color:"var(--text3)"}}>{checklistOpen?"▲":"▼"}</span>
+        </div>
+        {checklistOpen&&(
+          <div style={{borderTop:"1px solid var(--border)"}}>
+            {!checklistLoaded?(
+              <div style={{padding:16,textAlign:"center",color:"var(--text3)",fontSize:13}}>Loading...</div>
+            ):(
+              CHECKLIST_ITEMS.map(item=>{
+                const cl=checklist[item.key]||{status:"pending",note:"",photo_url:""};
+                const statusColor={ok:"#22c55e",issue:"#ef4444",na:"#94a3b8",pending:"#475569"};
+                return(
+                  <div key={item.key} style={{padding:"10px 14px",borderBottom:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:6}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                      <span style={{fontSize:16,width:22}}>{item.icon}</span>
+                      <span style={{fontSize:13,fontWeight:600,flex:1,minWidth:120}}>{item.label}</span>
+                      {/* Status buttons */}
+                      <div style={{display:"flex",gap:4}}>
+                        {[{v:"ok",label:"✓ OK",bg:"rgba(34,197,94,.15)",col:"#22c55e",bdr:"rgba(34,197,94,.4)"},
+                          {v:"issue",label:"✗ Issue",bg:"rgba(239,68,68,.15)",col:"#ef4444",bdr:"rgba(239,68,68,.4)"},
+                          {v:"na",label:"N/A",bg:"rgba(148,163,184,.1)",col:"#94a3b8",bdr:"rgba(148,163,184,.3)"}
+                        ].map(s=>(
+                          <button key={s.v} onClick={()=>saveChecklistItem(item.key,{status:s.v})}
+                            style={{fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",fontWeight:cl.status===s.v?700:400,
+                              background:cl.status===s.v?s.bg:"transparent",
+                              color:cl.status===s.v?s.col:"var(--text3)",
+                              border:`1px solid ${cl.status===s.v?s.bdr:"var(--border)"}`}}>
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Photo button */}
+                      <button onClick={()=>clCamRefs.current[item.key]?.click()}
+                        style={{fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",
+                          background:cl.photo_url?"rgba(96,165,250,.15)":"transparent",
+                          color:cl.photo_url?"var(--blue)":"var(--text3)",
+                          border:`1px solid ${cl.photo_url?"rgba(96,165,250,.3)":"var(--border)"}`}}>
+                        {clUploading[item.key]?"⏳":cl.photo_url?"📷 Photo ✓":"📷 Photo"}
+                      </button>
+                      <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+                        ref={el=>clCamRefs.current[item.key]=el}
+                        onChange={e=>{
+                          const file=e.target.files?.[0]; e.target.value="";
+                          if(!file) return;
+                          const fr=new FileReader();
+                          fr.onload=ev=>uploadChecklistPhoto(item.key,ev.target.result);
+                          fr.readAsDataURL(file);
+                        }}/>
+                      {/* View photo thumbnail */}
+                      {cl.photo_url&&(
+                        <img src={toImgUrl(cl.photo_url)} alt="check" onClick={()=>setViewPhoto(cl.photo_url)}
+                          style={{width:36,height:36,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)"}}/>
+                      )}
+                    </div>
+                    {/* Note input */}
+                    <input className="inp" placeholder="Note (optional)..." value={cl.note}
+                      onChange={e=>setChecklist(p=>({...p,[item.key]:{...cl,note:e.target.value}}))}
+                      onBlur={e=>{ if(e.target.value!==( checklist[item.key]?.note||"")) saveChecklistItem(item.key,{note:e.target.value}); else if(cl.status!=="pending"||cl.note) saveChecklistItem(item.key,{note:e.target.value}); }}
+                      style={{fontSize:12,padding:"4px 8px"}}/>
+                  </div>
+                );
+              })
+            )}
+            {checklistLoaded&&(
+              <div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"var(--text3)"}}>
+                <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="na").length} N/A</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Vehicle Photos ── */}

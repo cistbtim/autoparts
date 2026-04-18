@@ -10237,8 +10237,9 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               })
             )}
             {checklistLoaded&&(
-              <div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"var(--text3)"}}>
+              <div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"var(--text3)",flexWrap:"wrap",gap:8}}>
                 <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="na").length} N/A</span>
+                <button className="btn btn-ghost btn-sm" onClick={()=>printChecklistReport(job,checklist,settings)}>🖨️ Print Report</button>
               </div>
             )}
           </div>
@@ -11739,6 +11740,89 @@ function printStockLabel(p, settings, labelType="shop") {
       </div>
     </div>
   </div>
+  </body></html>`);
+  w.document.close();
+}
+
+function printChecklistReport(job, checklist, settings) {
+  const shopName = settings?.shop_name||"AutoParts";
+  const now = new Date().toLocaleString();
+  const statusIcon = s => s==="ok"?"✓":s==="issue"?"✗":s==="na"?"—":"·";
+  const statusColor = s => s==="ok"?"#16a34a":s==="issue"?"#dc2626":s==="na"?"#6b7280":"#9ca3af";
+  const rows = CHECKLIST_ITEMS.map(item=>{
+    const cl=checklist[item.key]||{};
+    const st=cl.status||"pending";
+    const note=cl.note||"";
+    const photo=cl.photo_url||"";
+    const thumbUrl=photo?photo.replace(/\/file\/d\/([^/]+)\/.*/,"https://drive.google.com/thumbnail?id=$1&sz=w120").replace(/[?&]id=([^&]+).*/,"https://drive.google.com/thumbnail?id=$1&sz=w120"):"";
+    return `<tr>
+      <td style="padding:6px 8px;font-size:12px">${item.icon} ${item.label}</td>
+      <td style="padding:6px 8px;text-align:center;font-weight:700;font-size:14px;color:${statusColor(st)}">${statusIcon(st)}</td>
+      <td style="padding:6px 8px;font-size:11px;color:#374151">${note||""}</td>
+      <td style="padding:6px 8px;text-align:center">${thumbUrl?`<img src="${thumbUrl}" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb"/>`:""}</td>
+    </tr>`;
+  }).join("");
+  const okCount   = CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length;
+  const issCount  = CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length;
+  const naCount   = CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="na").length;
+  const w=window.open("","_blank","width=800,height=900");
+  if(!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Check-in Report</title>
+  <style>
+    @page{size:A4;margin:15mm}
+    @media print{body{margin:0}.no-print{display:none}}
+    *{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;color:#111;background:#fff;padding:20px}
+    h1{font-size:18px;margin:0 0 4px}
+    .sub{font-size:12px;color:#6b7280;margin-bottom:16px}
+    .veh{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:16px}
+    .vf{font-size:10px;color:#6b7280;margin-bottom:2px}
+    .vv{font-size:13px;font-weight:700}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:#f3f4f6;padding:7px 8px;text-align:left;font-size:11px;color:#374151;border-bottom:2px solid #d1d5db}
+    tr:nth-child(even){background:#f9fafb}
+    td{border-bottom:1px solid #e5e7eb;vertical-align:middle}
+    .summary{display:flex;gap:16px;margin-top:16px;font-size:12px}
+    .badge{padding:4px 12px;border-radius:20px;font-weight:700}
+    .sig{margin-top:32px;display:flex;gap:40px}
+    .sig-box{flex:1;border-top:1px solid #111;padding-top:6px;font-size:11px;color:#6b7280}
+    .print-btn{display:inline-block;margin-bottom:16px;padding:8px 20px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
+  </style></head>
+  <body>
+    <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+    <h1>🔧 ${shopName}</h1>
+    <div class="sub">Vehicle Check-in Inspection Report · Printed: ${now}</div>
+    <div class="veh">
+      <div><div class="vf">Plate / Reg</div><div class="vv">${job.vehicle_reg||"—"}</div></div>
+      <div><div class="vf">Make / Model</div><div class="vv">${(job.vehicle_make||"")} ${(job.vehicle_model||"")||"—"}</div></div>
+      <div><div class="vf">Year</div><div class="vv">${job.vehicle_year||"—"}</div></div>
+      <div><div class="vf">Color</div><div class="vv">${job.vehicle_color||"—"}</div></div>
+      <div><div class="vf">Mileage</div><div class="vv">${job.mileage?Number(job.mileage).toLocaleString()+" km":"—"}</div></div>
+      <div><div class="vf">Job ID</div><div class="vv" style="font-family:monospace;font-size:11px">${job.id||"—"}</div></div>
+      <div><div class="vf">Customer</div><div class="vv">${job.customer_name||"—"}</div></div>
+      <div><div class="vf">Date In</div><div class="vv">${job.date_in||"—"}</div></div>
+      <div><div class="vf">Mechanic</div><div class="vv">${job.mechanic||"—"}</div></div>
+      ${job.vin?`<div style="grid-column:1/-1"><div class="vf">VIN</div><div class="vv" style="font-family:monospace;font-size:12px">${job.vin}</div></div>`:""}
+    </div>
+    <table>
+      <thead><tr>
+        <th style="width:36%">Item</th>
+        <th style="width:10%;text-align:center">Status</th>
+        <th style="width:40%">Note</th>
+        <th style="width:14%;text-align:center">Photo</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="summary">
+      <span class="badge" style="background:#dcfce7;color:#16a34a">✓ OK: ${okCount}</span>
+      <span class="badge" style="background:#fee2e2;color:#dc2626">✗ Issues: ${issCount}</span>
+      <span class="badge" style="background:#f3f4f6;color:#6b7280">— N/A: ${naCount}</span>
+    </div>
+    <div class="sig">
+      <div class="sig-box">Customer Signature</div>
+      <div class="sig-box">Staff Signature</div>
+      <div class="sig-box">Date</div>
+    </div>
   </body></html>`);
   w.document.close();
 }

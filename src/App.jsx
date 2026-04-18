@@ -1,4 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Component } from "react";
+
+class ErrorBoundary extends Component {
+  constructor(props){ super(props); this.state={err:null}; }
+  static getDerivedStateFromError(e){ return {err:e}; }
+  render(){
+    if(this.state.err) return (
+      <div style={{padding:20,background:"#fee2e2",border:"2px solid #ef4444",borderRadius:10,margin:10}}>
+        <strong style={{color:"#dc2626"}}>⚠ Error in {this.props.name||"component"}:</strong>
+        <pre style={{fontSize:12,marginTop:8,whiteSpace:"pre-wrap",color:"#991b1b"}}>{this.state.err?.message}{"\n"}{this.state.err?.stack}</pre>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 // ============================================================
 // 🔧 CONFIG — reads from Vite env variables (.env file)
@@ -7788,8 +7802,10 @@ function VehiclesPage({vehicles, partFitments, onSave, onDelete, t}) {
     </div>
     {/* Modal outside .fu so position:fixed isn't trapped by the animation stacking context */}
     {editV&&(
-      <VehicleModal vehicle={editV} onSave={async(data)=>{ await onSave(data); setEditV(null); }}
-        onClose={()=>setEditV(null)} t={t}/>
+      <ErrorBoundary name="VehicleModal">
+        <VehicleModal vehicle={editV} onSave={async(data)=>{ await onSave(data); setEditV(null); }}
+          onClose={()=>setEditV(null)} t={t}/>
+      </ErrorBoundary>
     )}
   </>
   );
@@ -7910,7 +7926,7 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
   const openBrowse = async () => {
     const SCRIPT_URL = getScriptUrl();
     if (!SCRIPT_URL) { setError("⚙️ Set Vehicle Script URL in Settings first"); return; }
-    const plate = (reg||vehicleId||"").replace(/\s/g,"").toUpperCase();
+    const plate = String(reg||vehicleId||"").replace(/\s/g,"").toUpperCase();
     if (!plate) { setError("No plate number — save the vehicle first"); return; }
     setBrowsing(true);
     if (drivePhotos === null) {
@@ -7971,7 +7987,7 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
       const _now=new Date(), _p=n=>String(n).padStart(2,"0");
       const _date=`${_now.getFullYear()}-${_p(_now.getMonth()+1)}-${_p(_now.getDate())}`;
       const _dt=`${_date.replace(/-/g,"")}_${_p(_now.getHours())}${_p(_now.getMinutes())}${_p(_now.getSeconds())}`;
-      const _plate=(reg||vehicleId||"vehicle").replace(/\s/g,"").toUpperCase();
+      const _plate=String(reg||vehicleId||"vehicle").replace(/\s/g,"").toUpperCase();
       const folderPath = "Tim_Car_Phot/" + _plate + "/" + _date;
       setStatus("Creating folder " + folderPath + "...");
       const folderResp = await fetch(SCRIPT_URL, {
@@ -8080,7 +8096,7 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
           <button className="btn btn-ghost btn-xs"
             style={{flex:1,padding:"5px 4px",fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2,
               color:"var(--blue)",opacity:(reg||vehicleId)?1:0.4}}
-            title={(reg||vehicleId)?`Browse Drive folder: ${(reg||vehicleId||"").toUpperCase()}`:"Save vehicle plate first to browse Drive"}
+            title={(reg||vehicleId)?`Browse Drive folder: ${String(reg||vehicleId||"").toUpperCase()}`:"Save vehicle plate first to browse Drive"}
             onClick={e=>{ e.stopPropagation(); openBrowse(); }}>
             <span style={{fontSize:15}}>☁️</span>
             <span>Drive</span>
@@ -8106,7 +8122,7 @@ function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onCha
             onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
               <div style={{fontWeight:700,fontSize:14}}>
-                ☁️ Google Drive — <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)"}}>Tim_Car_Phot / {(reg||vehicleId||"").replace(/\s/g,"").toUpperCase()}</code>
+                ☁️ Google Drive — <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)"}}>Tim_Car_Phot / {String(reg||vehicleId||"").replace(/\s/g,"").toUpperCase()}</code>
               </div>
               <button className="btn btn-ghost btn-xs" onClick={()=>setBrowsing(false)}>✕ Close</button>
             </div>

@@ -456,6 +456,7 @@ const canAccess = (u) => {
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Rajdhani:wght@600;700&family=DM+Mono:wght@400;500&display=swap');
 :root{--bg:#080b12;--surface:#0f1420;--surface2:#161c2d;--surface3:#1d2540;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--accent:#f97316;--accent2:#fb923c;--text:#f1f5f9;--text2:#94a3b8;--text3:#475569;--green:#34d399;--red:#f87171;--blue:#60a5fa;--yellow:#fbbf24;--purple:#a78bfa;--radius:14px;--radius-sm:8px;--shadow:0 4px 24px rgba(0,0,0,0.4);--shadow-lg:0 8px 48px rgba(0,0,0,0.6);--glow:0 0 20px rgba(249,115,22,0.15)}
+[data-theme="light"]{--bg:#f0f4f8;--surface:#ffffff;--surface2:#e8edf3;--surface3:#d1dae6;--border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.18);--text:#0f172a;--text2:#334155;--text3:#64748b;--green:#059669;--red:#dc2626;--blue:#1d4ed8;--yellow:#b45309;--purple:#6d28d9;--shadow:0 4px 24px rgba(0,0,0,0.1);--shadow-lg:0 8px 48px rgba(0,0,0,0.15);--glow:0 0 20px rgba(249,115,22,0.1)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:99px}
@@ -893,6 +894,9 @@ export default function App() {
   const [lang,setLang] = useState(localStorage.getItem("ap_lang")||"en");
   const [user,setUser] = useState(null);
   const [settingsLoaded,setSettingsLoaded] = useState(false);
+  const [theme,setTheme] = useState(localStorage.getItem("ap_theme")||"dark");
+  useEffect(()=>{ document.documentElement.setAttribute("data-theme",theme); },[theme]);
+  const toggleTheme = ()=>{ const n=theme==="dark"?"light":"dark"; setTheme(n); localStorage.setItem("ap_theme",n); };
   const changeLang = (l)=>{setLang(l);localStorage.setItem("ap_lang",l);};
   const t = T[lang];
 
@@ -907,13 +911,13 @@ export default function App() {
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
   if(!user) return <LoginPage onLogin={setUser} t={t} lang={lang} setLang={changeLang} loadedSettings={_settings}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={()=>setUser(null)} lang={lang}/>;
-  return <MainApp user={user} onLogout={()=>setUser(null)} t={t} lang={lang} setLang={changeLang}/>;
+  return <MainApp user={user} onLogout={()=>setUser(null)} t={t} lang={lang} setLang={changeLang} theme={theme} toggleTheme={toggleTheme}/>;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════
-function MainApp({user,onLogout,t,lang,setLang}) {
+function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   _currentLang = lang; // sync for tSt
   const role = user.role;
   const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":"dashboard";
@@ -2241,6 +2245,7 @@ function MainApp({user,onLogout,t,lang,setLang}) {
               🛒 {t.cart} {cartCount>0&&<span style={{background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 7px",fontSize:11}}>{cartCount}</span>}
             </button>
           )}
+          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light Mode":"🌙 Dark Mode"}</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={onLogout}>🚪 {t.logout}</button>
         </div>
       </aside>

@@ -479,6 +479,7 @@ const getSubInfo = (u) => {
 const canAccess = (u) => {
   if(!u) return false;
   if(u.role==="admin") return true;
+  if(u.role==="demo") return true; // demo always gets in
   // Customers who log in via customers table (_isCustomer flag) always get access
   if(u._isCustomer) return true;
   // Staff (shipper etc) — check subscription
@@ -2112,6 +2113,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const allCat="__all__",allOS="__all__";
   // Multi-word search using DEBOUNCED value — fast typing won't lag UI
   const fp=parts.filter(p=>{
+    if(isDemo&&!(p.image_url||p.image_data))return false; // demo: only parts with photos
     if(filterLow&&p.stock>p.min_stock)return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
     if(filterFits!=="__all__"){
@@ -2287,6 +2289,17 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   useEffect(()=>{
     navGroups.forEach(g=>{if(g.children.find(c=>c.id===tab))setExpandedGroups(p=>({...p,[g.id]:true}));});
   },[tab]);
+
+  // Demo: override nav to only inventory + shop
+  if(isDemo){
+    navGroups.length=0;
+    navGroups.push(
+      {id:"grp_demo",icon:"🛍️",label:"Demo",roles:["demo"],children:[
+        {id:"inventory",icon:"📦",label:t.inventory,roles:["demo"]},
+        {id:"shop",icon:"🛒",label:t.shop,roles:["demo"]},
+      ]}
+    );
+  }
 
   const navItems=navGroups.flatMap(g=>g.children); // for compatibility
 
@@ -2884,10 +2897,13 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
                 {(searchPart||filterCat!=="__all__")&&(
                   <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");}} style={{color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear</button>
                 )}
-                <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}}
-                  onClick={()=>openM("checkout")}>
-                  🛒 {cartCount>0?`(${cartCount}) `:""}Checkout{cartTotal>0?` · ${fmtAmt(cartTotal)}`:""}
-                </button>
+                {isDemo
+                  ? <span style={{marginLeft:"auto",flexShrink:0,fontSize:12,color:"var(--text3)",padding:"6px 12px",border:"1px solid var(--border)",borderRadius:8}}>🔒 Demo — orders disabled</span>
+                  : <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}}
+                      onClick={()=>openM("checkout")}>
+                      🛒 {cartCount>0?`(${cartCount}) `:""}Checkout{cartTotal>0?` · ${fmtAmt(cartTotal)}`:""}
+                    </button>
+                }
               </div>
             </div>
             {/* 🚗 Vehicle Search Bar */}
@@ -2929,9 +2945,11 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
                     <div style={{marginTop:8}}>
                       <div style={{fontSize:20,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginBottom:4}}>{fmtAmt(p.price)}</div>
                       <div style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)",marginBottom:10}}>{p.stock>0?`${p.stock} in stock`:t.outOfStock}</div>
-                      {inCart
-                        ? <div style={{display:"flex",alignItems:"center",gap:7}}><button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty-1)}>−</button><span style={{flex:1,textAlign:"center",fontWeight:700,fontSize:16}}>{inCart.qty}</span><button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty+1)}>+</button><button className="btn btn-danger btn-xs" onClick={()=>removeFromCart(p.id)}>✕</button></div>
-                        : <button className="btn btn-primary" style={{width:"100%"}} disabled={p.stock===0} onClick={()=>addToCart(p)}>{t.addToCart}</button>}
+                      {isDemo
+                        ? <button className="btn btn-ghost" style={{width:"100%",fontSize:12,color:"var(--text3)"}} disabled>🔒 Demo</button>
+                        : inCart
+                          ? <div style={{display:"flex",alignItems:"center",gap:7}}><button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty-1)}>−</button><span style={{flex:1,textAlign:"center",fontWeight:700,fontSize:16}}>{inCart.qty}</span><button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty+1)}>+</button><button className="btn btn-danger btn-xs" onClick={()=>removeFromCart(p.id)}>✕</button></div>
+                          : <button className="btn btn-primary" style={{width:"100%"}} disabled={p.stock===0} onClick={()=>addToCart(p)}>{t.addToCart}</button>}
                       <button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:6,fontSize:12,borderColor:"var(--blue)",color:"var(--blue)"}} onClick={()=>openM("customerQuery",p)}>
                         🔍 {t.queryPriceQty}
                       </button>

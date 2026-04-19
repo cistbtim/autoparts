@@ -7683,6 +7683,10 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
     const totalQuotes=sessionQuotes.length;
     const hasSelected=sessionQuotes.some(q=>q.status==="selected");
     const cur=curSym(settings.currency||"R");
+    const sortedSessions=[...rfqSessions].sort((a,b)=>a.created_at>b.created_at?-1:1);
+    const curIdx=sortedSessions.findIndex(s=>s.id===activeSession.id);
+    const prevSession=curIdx<sortedSessions.length-1?sortedSessions[curIdx+1]:null;
+    const nextSession=curIdx>0?sortedSessions[curIdx-1]:null;
 
     return (
       <div className="fu">
@@ -7692,9 +7696,12 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
             <h1 style={{fontSize:20,fontWeight:700}}>{activeSession.name}</h1>
             <div style={{fontSize:13,color:"var(--text3)",marginTop:2}}>
               {quotedCount}/{totalQuotes} quotes received · {sessionItems.length} parts · {allSuppliers.length} suppliers
+              <span style={{marginLeft:10,color:"var(--text3)"}}>({curIdx+1}/{sortedSessions.length})</span>
             </div>
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {prevSession&&<button className="btn btn-ghost btn-sm" onClick={()=>openSession(prevSession)}>← Prev</button>}
+            {nextSession&&<button className="btn btn-ghost btn-sm" onClick={()=>openSession(nextSession)}>Next →</button>}
             <button className="btn btn-ghost btn-sm" onClick={handleRefresh}>🔄 Refresh</button>
             {hasSelected&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={handleUnselectAll}>✕ Unselect All</button>}
             {activeSession.status==="ordered"

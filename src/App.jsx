@@ -599,7 +599,7 @@ const ShopLogo = ({settings, size="md", style={}}) => {
       style={{maxHeight:h, maxWidth:h*5, width:"auto", height:"auto", objectFit:"contain", display:"block", ...style}}
       onError={e=>e.target.style.display="none"}/>
   );
-  return <LogoSVG height={h} style={style}/>;
+  return null;
 };
 
 // ── Shared UI ─────────────────────────────────────────────────
@@ -868,7 +868,10 @@ function RfqReplyPage({token,lang}) {
     <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <style>{CSS}</style>
       <div style={{width:"100%",maxWidth:480}}>
-        <div style={{textAlign:"center",marginBottom:24}}><ShopLogo settings={_settings} size="md"/><div style={{color:"var(--text3)",fontSize:12,marginTop:3}}>Supplier Quotation Portal</div></div>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <ShopLogo settings={_settings} size="md" style={{width:"100%",maxWidth:"100%",maxHeight:100,objectFit:"contain",height:"auto",margin:"0 auto"}}/>
+          <div style={{color:"var(--text3)",fontSize:12,marginTop:6}}>Supplier Quotation Portal</div>
+        </div>
         <div className="card" style={{padding:26}}>
           {!loaded&&<p style={{color:"var(--text3)",textAlign:"center",padding:30}}>Loading...</p>}
           {err&&<div style={{color:"var(--red)",textAlign:"center",padding:30}}>⚠ {err}</div>}
@@ -1929,13 +1932,22 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   };
 
   const selectRfqQuote=async(quoteId,rfqItemId)=>{
-    // Mark this quote as selected, others for same item as not
     const itemQuotes=rfqQuotes.filter(q=>q.rfq_item_id===rfqItemId);
     for(const q of itemQuotes){
       await api.patch("rfq_quotes","id",q.id,{status:q.id===quoteId?"selected":"pending"});
     }
-    await loadAll();
-    showToast("✅ Quote selected");
+    // no loadAll — RfqPage uses optimistic lq state; user clicks Refresh to sync
+  };
+
+  const unselectRfqQuote=async(quoteId)=>{
+    await api.patch("rfq_quotes","id",quoteId,{status:"quoted"});
+    // no loadAll
+  };
+
+  const unselectAllRfq=async(sid)=>{
+    const toUnselect=rfqQuotes.filter(q=>q.rfq_id===sid&&q.status==="selected");
+    for(const q of toUnselect) await api.patch("rfq_quotes","id",q.id,{status:"quoted"});
+    // no loadAll
   };
 
   const createPOFromRfq=async(sid)=>{
@@ -2772,7 +2784,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             parts={parts} suppliers={suppliers}
             rfqSessions={rfqSessions} rfqItems={rfqItems} rfqQuotes={rfqQuotes}
             onCreate={createRfqSession} onUpdateStatus={updateRfqStatus}
-            onSelectQuote={selectRfqQuote} onCreatePO={createPOFromRfq}
+            onSelectQuote={selectRfqQuote} onUnselectQuote={unselectRfqQuote}
+            onUnselectAll={unselectAllRfq} onRefresh={loadAll}
+            onCreatePO={createPOFromRfq}
+            onEditPart={(p)=>{if(p)openM("editPart",p);}}
             t={t} user={user} settings={settings}/>
         )}
 
@@ -3215,7 +3230,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
                         <td>
                           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                             <button className="btn btn-ghost btn-xs" onClick={()=>openM("inquiryDetail",inq)}>View</button>
-                            {inq.status==="pending"&&<button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} onClick={()=>{navigator.clipboard.writeText(replyUrl);showToast("Link copied!");}}>🔗 Link</button>}
+                            {inq.status==="pending"&&<><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} onClick={()=>{navigator.clipboard.writeText(replyUrl);showToast("Link copied!");}}>🔗 Copy</button><a href={replyUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}>↗ Open</button></a></>}
                             {inq.status==="replied"&&<button className="btn btn-success btn-xs" onClick={()=>acceptInquiry(inq)}>✅ Accept</button>}
                             {inq.status!=="closed"&&inq.status!=="ordered"&&<button className="btn btn-danger btn-xs" onClick={()=>updateInquiry(inq.id,{status:"closed"})}>✕</button>}
                           </div>
@@ -3619,7 +3634,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       </main>
 
       {/* ════ MODALS ════ */}
-      {isOpen("editPart")&&<PartModal part={mData("editPart")} vehicles={vehicles} partFitments={partFitments} onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart} onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}} inquiries={inquiries} onClose={()=>{
+      {isOpen("editPart")&&<PartModal part={mData("editPart")} vehicles={vehicles} partFitments={partFitments} onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart} onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}} inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions} onClose={()=>{
   const ep=mData("editPart"); if(ep?.id) releaseLock("part",ep.id);
   closeM("editPart");
 }} t={t}/>}
@@ -3688,7 +3703,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
               <div style={{background:"var(--surface2)",borderRadius:10,padding:13,marginBottom:15,border:"1px solid var(--border)"}}>
                 <FL label="Supplier Reply Link (no login needed)"/>
                 <div style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--accent)",wordBreak:"break-all",lineHeight:1.6}}>{replyUrl}</div>
-                <button className="btn btn-ghost btn-xs" style={{marginTop:7}} onClick={()=>{navigator.clipboard.writeText(replyUrl);showToast("Link copied!");}}>📋 Copy Link</button>
+                <div style={{display:"flex",gap:6,marginTop:7}}>
+                  <button className="btn btn-ghost btn-xs" onClick={()=>{navigator.clipboard.writeText(replyUrl);showToast("Link copied!");}}>📋 Copy Link</button>
+                  <a href={replyUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}>↗ Open</button></a>
+                </div>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:9}}>
                 {supplier_phone?<a href={waLink(supplier_phone,waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-primary" style={{width:"100%",background:"#25D366",padding:13,fontSize:15}}>📲 Send via WhatsApp</button></a>:<p style={{fontSize:12,color:"var(--text3)",textAlign:"center"}}>💡 Add supplier phone to enable WhatsApp</p>}
@@ -4685,7 +4703,7 @@ function ImgPreview({src}) {
   );
 }
 
-function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,inquiries=[]}) {
+function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[]}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -4740,13 +4758,17 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
   };
 
   const partRfqs = part ? inquiries.filter(i=>String(i.part_id)===String(part.id)) : [];
+  // rfq_quotes for this part (via rfq_items)
+  const partItemIds = part ? rfqItems.filter(i=>String(i.part_id)===String(part.id)).map(i=>i.id) : [];
+  const partSessionQuotes = rfqQuotes.filter(q=>partItemIds.includes(q.rfq_item_id));
+  const rfqTotal = partRfqs.length + partSessionQuotes.length;
   const TABS = [
     {id:"info",    label:"📋 Info"},
     {id:"photo",   label:"📸 Photo"},
     {id:"stock",   label:"💰 Stock"},
     {id:"vehicle", label:"🚗 Vehicle"},
     {id:"fitment", label:"🔗 Fits"},
-    {id:"rfq",     label:`📩 RFQ${partRfqs.length>0?" ("+partRfqs.length+")":""}`},
+    {id:"rfq",     label:`📩 RFQ${rfqTotal>0?" ("+rfqTotal+")":""}`},
   ];
 
   const Err = ({k}) => errors[k]
@@ -4898,7 +4920,7 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
       {/* ── TAB: RFQ ── */}
       {ptab==="rfq"&&(
         <div>
-          {partRfqs.length===0?(
+          {rfqTotal===0?(
             <div style={{textAlign:"center",padding:32,color:"var(--text3)"}}>
               <div style={{fontSize:32,marginBottom:8}}>📩</div>
               <div style={{fontWeight:600,marginBottom:4}}>No RFQ records yet</div>
@@ -4906,36 +4928,82 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+              {/* ── Single-part inquiries ── */}
+              {partRfqs.length>0&&(
+                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>📩 Direct Inquiries</div>
+              )}
               {partRfqs.map(inq=>{
                 const replyUrl=`${window.location.origin}${window.location.pathname}?rfq=${inq.rfq_token}`;
                 const statusColor=inq.status==="replied"?"var(--green)":inq.status==="ordered"?"var(--blue)":inq.status==="pending"?"var(--yellow)":"var(--text3)";
                 return (
-                <div key={inq.id} style={{background:"var(--surface2)",borderRadius:10,padding:13,border:`1px solid ${inq.status==="replied"?"rgba(52,211,153,.3)":inq.status==="ordered"?"rgba(96,165,250,.3)":"var(--border)"}`}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-                    <div>
-                      <div style={{fontWeight:700,fontSize:14}}>{inq.supplier_name}</div>
-                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{inq.created_at?.slice(0,10)} · Qty: {inq.qty_requested}</div>
-                    </div>
-                    <span className="badge" style={{background:`rgba(0,0,0,.07)`,color:statusColor,fontSize:11,fontWeight:700}}>{inq.status||"pending"}</span>
-                  </div>
-                  {inq.status==="replied"&&(
-                    <div style={{background:"rgba(52,211,153,.07)",borderRadius:8,padding:"8px 10px",marginBottom:8}}>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"4px 12px",fontSize:12}}>
-                        {inq.reply_price&&<div><span style={{color:"var(--text3)"}}>Price: </span><span style={{fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmtAmt(inq.reply_price)}</span></div>}
-                        {inq.reply_stock!=null&&<div><span style={{color:"var(--text3)"}}>Stock: </span><span style={{fontWeight:600}}>{inq.reply_stock}</span></div>}
-                        {inq.supplier_part_no&&<div><span style={{color:"var(--text3)"}}>Part#: </span><span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--green)"}}>{inq.supplier_part_no}</span></div>}
-                        {inq.reply_notes&&<div style={{gridColumn:"1/-1",color:"var(--text2)",fontSize:11,marginTop:2}}>{inq.reply_notes}</div>}
+                  <div key={inq.id} style={{background:"var(--surface2)",borderRadius:10,padding:13,border:`1px solid ${inq.status==="replied"?"rgba(52,211,153,.3)":inq.status==="ordered"?"rgba(96,165,250,.3)":"var(--border)"}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:14}}>{inq.supplier_name}</div>
+                        <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{inq.created_at?.slice(0,10)} · Qty: {inq.qty_requested}</div>
                       </div>
+                      <span className="badge" style={{background:"rgba(0,0,0,.07)",color:statusColor,fontSize:11,fontWeight:700}}>{inq.status||"pending"}</span>
                     </div>
-                  )}
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {inq.status==="pending"&&<button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} onClick={()=>{navigator.clipboard.writeText(replyUrl);}}>📋 Copy Link</button>}
-                    {inq.supplier_phone&&inq.status==="pending"&&<a href={`https://wa.me/${(inq.supplier_phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(inq.message||"")}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none",fontSize:11,padding:"3px 8px"}}>📲 WA</button></a>}
-                    {inq.status==="replied"&&inq.reply_price&&inquiries&&<button className="btn btn-success btn-xs" onClick={()=>{if(onClose)onClose();}}>✅ Accept → Go to Inquiries</button>}
+                    {(inq.status==="replied"||inq.reply_price)&&(
+                      <div style={{background:"rgba(52,211,153,.07)",borderRadius:8,padding:"7px 10px",marginBottom:6}}>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"4px 12px",fontSize:12}}>
+                          {inq.reply_price&&<div><span style={{color:"var(--text3)"}}>Price: </span><span style={{fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmtAmt(inq.reply_price)}</span></div>}
+                          {inq.reply_stock!=null&&<div><span style={{color:"var(--text3)"}}>Stock: </span><span style={{fontWeight:600}}>{inq.reply_stock}</span></div>}
+                          {inq.supplier_part_no&&<div><span style={{color:"var(--text3)"}}>Part#: </span><span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--green)"}}>{inq.supplier_part_no}</span></div>}
+                          {inq.reply_notes&&<div style={{gridColumn:"1/-1",color:"var(--text2)",fontSize:11,marginTop:2}}>{inq.reply_notes}</div>}
+                        </div>
+                      </div>
+                    )}
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {inq.status==="pending"&&<><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} onClick={()=>navigator.clipboard.writeText(replyUrl)}>📋 Copy Link</button><a href={replyUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}>↗ Open</button></a></>}
+                      {inq.supplier_phone&&inq.status==="pending"&&<a href={`https://wa.me/${(inq.supplier_phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(inq.message||"")}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none",fontSize:11,padding:"3px 8px"}}>📲 WA</button></a>}
+                      {inq.status==="replied"&&inq.reply_price&&<button className="btn btn-success btn-xs" onClick={onClose}>✅ Accept → Go to Inquiries</button>}
+                    </div>
                   </div>
-                </div>
                 );
               })}
+
+              {/* ── RFQ Session quotes ── */}
+              {partSessionQuotes.length>0&&(
+                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginTop:4,marginBottom:2}}>📋 Session Quotes</div>
+              )}
+              {partSessionQuotes.map(q=>{
+                const item=rfqItems.find(i=>i.id===q.rfq_item_id)||{};
+                const session=rfqSessions.find(s=>s.id===q.rfq_id);
+                const statusColor=q.status==="quoted"||q.status==="selected"?"var(--green)":q.status==="pending"?"var(--yellow)":"var(--text3)";
+                const batchUrl=`${window.location.origin}${window.location.pathname}?rfq_batch=${q.token}`;
+                return (
+                  <div key={q.id} style={{background:"var(--surface2)",borderRadius:10,padding:13,border:`1px solid ${q.status==="selected"?"rgba(249,115,22,.35)":q.status==="quoted"?"rgba(52,211,153,.3)":"var(--border)"}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:14}}>{q.supplier_name}</div>
+                        <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>
+                          {session?.name&&<span style={{color:"var(--blue)"}}>{session.name} · </span>}
+                          {q.created_at?.slice(0,10)} · Qty: {item.qty_needed||"—"}
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                        {q.status==="selected"&&<span style={{fontSize:10,color:"var(--accent)",fontWeight:700}}>★ Selected</span>}
+                        <span className="badge" style={{background:"rgba(0,0,0,.07)",color:statusColor,fontSize:11,fontWeight:700}}>{q.status}</span>
+                      </div>
+                    </div>
+                    {(q.status==="quoted"||q.status==="selected")&&(
+                      <div style={{background:"rgba(52,211,153,.07)",borderRadius:8,padding:"7px 10px",marginBottom:6}}>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"4px 12px",fontSize:12}}>
+                          {q.unit_price!=null&&<div><span style={{color:"var(--text3)"}}>Price: </span><span style={{fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmtAmt(q.unit_price)}</span></div>}
+                          {q.stock_qty!=null&&<div><span style={{color:"var(--text3)"}}>Stock: </span><span style={{fontWeight:600}}>{q.stock_qty}</span></div>}
+                          {q.supplier_part_no&&<div><span style={{color:"var(--text3)"}}>Part#: </span><span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--green)"}}>{q.supplier_part_no}</span></div>}
+                          {q.lead_days!=null&&<div><span style={{color:"var(--text3)"}}>Lead: </span><span>{q.lead_days}d</span></div>}
+                          {q.notes&&<div style={{gridColumn:"1/-1",color:"var(--text2)",fontSize:11,marginTop:2}}>{q.notes}</div>}
+                        </div>
+                      </div>
+                    )}
+                    {q.status==="pending"&&<><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} onClick={()=>navigator.clipboard.writeText(batchUrl)}>📋 Copy Batch Link</button><a href={batchUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}>↗ Open</button></a></>}
+                  </div>
+                );
+              })}
+
             </div>
           )}
         </div>
@@ -5521,7 +5589,8 @@ function InquiryDetailModal({inquiry,onUpdate,onAccept,onClose,t,settings}) {
           <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Supplier Reply Link</div>
           <div style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--accent)",wordBreak:"break-all",lineHeight:1.6,marginBottom:8}}>{replyUrl}</div>
           <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-            <button className="btn btn-ghost btn-xs" onClick={()=>{navigator.clipboard.writeText(replyUrl);}}> 📋 Copy Link</button>
+            <button className="btn btn-ghost btn-xs" onClick={()=>{navigator.clipboard.writeText(replyUrl);}}>📋 Copy Link</button>
+            <a href={replyUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}>↗ Open</button></a>
             {inquiry.supplier_phone&&<a href={`https://wa.me/${(inquiry.supplier_phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none"}}>📲 WhatsApp</button></a>}
             {inquiry.supplier_email&&<a href={`mailto:${inquiry.supplier_email}?subject=RFQ - ${inquiry.part_name}&body=${encodeURIComponent(waMsg)}`} style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs">✉ Email</button></a>}
           </div>
@@ -6910,7 +6979,8 @@ function RfqQuoteReplyPage({token}) {
       <div style={{width:"100%",maxWidth:480,paddingTop:20}}>
         {/* Header */}
         <div style={{textAlign:"center",marginBottom:24}}>
-          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:26,fontWeight:700,color:"var(--accent)"}}>📋 RFQ Quote Request</div>
+          <ShopLogo settings={_settings} size="md" style={{width:"100%",maxWidth:"100%",maxHeight:100,objectFit:"contain",height:"auto",margin:"0 auto"}}/>
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:26,fontWeight:700,color:"var(--accent)",marginTop:10}}>📋 RFQ Quote Request</div>
           <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>From: {quote.supplier_name||"Supplier"}</div>
         </div>
 
@@ -7082,8 +7152,8 @@ function RfqBatchReplyPage({token}) {
       <div style={{maxWidth:900,margin:"0 auto"}}>
         {/* Header */}
         <div style={{textAlign:"center",marginBottom:24}}>
-          <ShopLogo settings={_settings} size="md"/>
-          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:22,fontWeight:700,color:"var(--accent)",marginTop:8}}>📋 Request for Quotation</div>
+          <ShopLogo settings={_settings} size="md" style={{width:"100%",maxWidth:"100%",maxHeight:100,objectFit:"contain",height:"auto",margin:"0 auto"}}/>
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:22,fontWeight:700,color:"var(--accent)",marginTop:10}}>📋 Request for Quotation</div>
           <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>
             {session?.name&&<span style={{fontWeight:600,color:"var(--text)"}}>{session.name} · </span>}
             {supplierName} · {rows.length} item{rows.length!==1?"s":""}
@@ -7388,9 +7458,45 @@ function QuoteConfirmPage({token}) {
 // ═══════════════════════════════════════════════════════════════
 // RFQ PAGE — main management page
 // ═══════════════════════════════════════════════════════════════
-function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpdateStatus,onSelectQuote,onCreatePO,t,user,settings}) {
+function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpdateStatus,onSelectQuote,onUnselectQuote,onUnselectAll,onRefresh,onCreatePO,onEditPart,t,user,settings}) {
   const [view,setView]=useState("list"); // list | create | detail
   const [activeSession,setActiveSession]=useState(null);
+  const [lq,setLq]=useState([]); // local quote state for detail view (no auto-refresh)
+  const needSync=useRef(false);
+
+  // Sync lq when opening a session
+  useEffect(()=>{
+    if(activeSession) setLq(rfqQuotes.filter(q=>q.rfq_id===activeSession.id));
+  },[activeSession?.id]); // eslint-disable-line
+
+  // Sync lq only when user clicks Refresh
+  useEffect(()=>{
+    if(needSync.current&&activeSession){
+      setLq(rfqQuotes.filter(q=>q.rfq_id===activeSession.id));
+      needSync.current=false;
+    }
+  },[rfqQuotes]); // eslint-disable-line
+
+  const handleRefresh=async()=>{needSync.current=true;await onRefresh();};
+
+  const handleSelect=async(quoteId,rfqItemId)=>{
+    setLq(prev=>prev.map(q=>{
+      if(q.rfq_item_id!==rfqItemId) return q;
+      if(q.id===quoteId) return {...q,status:"selected"};
+      return {...q,status:q.unit_price!=null?"quoted":"pending"};
+    }));
+    onSelectQuote(quoteId,rfqItemId);
+  };
+
+  const handleUnselect=async(quoteId)=>{
+    setLq(prev=>prev.map(q=>q.id===quoteId?{...q,status:"quoted"}:q));
+    onUnselectQuote(quoteId);
+  };
+
+  const handleUnselectAll=async()=>{
+    setLq(prev=>prev.map(q=>q.status==="selected"?{...q,status:"quoted"}:q));
+    onUnselectAll(activeSession.id);
+  };
 
   // ── Create wizard state ──
   const [wName,setWName]=useState(`RFQ ${new Date().toISOString().slice(0,10)}`);
@@ -7569,12 +7675,13 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
   // ── Detail view ──
   if(view==="detail"&&activeSession) {
     const sessionItems=rfqItems.filter(i=>i.rfq_id===activeSession.id);
-    const sessionQuotes=rfqQuotes.filter(q=>q.rfq_id===activeSession.id);
+    const sessionQuotes=lq;
     const allSuppliers=[...new Set(sessionQuotes.map(q=>q.supplier_id))].map(sid=>({
       id:sid, name:sessionQuotes.find(q=>q.supplier_id===sid)?.supplier_name
     }));
-    const quotedCount=sessionQuotes.filter(q=>q.status==="quoted").length;
+    const quotedCount=sessionQuotes.filter(q=>q.status==="quoted"||q.status==="selected").length;
     const totalQuotes=sessionQuotes.length;
+    const hasSelected=sessionQuotes.some(q=>q.status==="selected");
     const cur=curSym(settings.currency||"R");
 
     return (
@@ -7588,6 +7695,8 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
             </div>
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button className="btn btn-ghost btn-sm" onClick={handleRefresh}>🔄 Refresh</button>
+            {hasSelected&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={handleUnselectAll}>✕ Unselect All</button>}
             {activeSession.status==="ordered"
               ? <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",padding:"6px 14px"}}>✅ Ordered</span>
               : <button className="btn btn-primary" onClick={()=>onCreatePO(activeSession.id)}>🛒 Create PO from Selected</button>
@@ -7619,6 +7728,7 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
                 <div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--accent)",wordBreak:"break-all",marginBottom:8,lineHeight:1.5}}>{batchUrl}</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   <button className="btn btn-ghost btn-xs" onClick={()=>{navigator.clipboard.writeText(batchUrl);}}>📋 Copy</button>
+                  <a href={batchUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}>↗ Open</button></a>
                   {suppData?.phone&&<a href={`https://wa.me/${(suppData.phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none",fontSize:11,padding:"3px 10px"}}>📲 WhatsApp</button></a>}
                   {suppData?.email&&<a href={`mailto:${suppData.email}?subject=RFQ: ${activeSession.name}&body=${encodeURIComponent(waMsg)}`} style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs">✉ Email</button></a>}
                 </div>
@@ -7650,7 +7760,8 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
                   return (
                     <tr key={item.id}>
                       <td>
-                        <div style={{fontWeight:600,fontSize:13}}>{item.part_name}</div>
+                        <div style={{fontWeight:600,fontSize:13,cursor:"pointer",color:"var(--accent)",textDecoration:"underline dotted"}}
+                          onClick={()=>onEditPart&&onEditPart(parts.find(p=>String(p.id)===String(item.part_id)))}>{item.part_name}</div>
                         <div style={{fontSize:11,color:"var(--text3)"}}>{item.part_sku}{item.oe_number&&" · "+item.oe_number}</div>
                       </td>
                       <td style={{textAlign:"center",fontWeight:700,color:"var(--accent)"}}>{item.qty_needed}</td>
@@ -7672,7 +7783,8 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
                                     <button className="cp-btn" style={{fontSize:10,padding:"2px 8px"}}>✉</button>
                                   </a>}
                                   <button className="cp-btn" style={{fontSize:10,padding:"2px 8px"}}
-                                    onClick={()=>navigator.clipboard.writeText(replyUrl).then(()=>alert("Link copied!"))}>🔗</button>
+                                    onClick={()=>navigator.clipboard.writeText(replyUrl)}>🔗</button>
+                                  <a href={replyUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="cp-btn" style={{fontSize:10,padding:"2px 8px",color:"var(--blue)"}}>↗</button></a>
                                 </div>
                               </div>
                             ):(
@@ -7687,8 +7799,12 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
                                 {q.notes&&<div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic",maxWidth:140,margin:"2px auto"}}>{q.notes}</div>}
                                 {q.status!=="selected"
                                   ? <button className="cp-btn" style={{fontSize:11,marginTop:6,color:"var(--accent)",borderColor:"rgba(251,146,60,.3)"}}
-                                      onClick={()=>onSelectQuote(q.id,item.id)}>Select</button>
-                                  : <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:11,display:"inline-block",marginTop:4}}>✓ Selected</span>
+                                      onClick={()=>handleSelect(q.id,item.id)}>Select</button>
+                                  : <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,marginTop:4}}>
+                                      <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:11}}>✓ Selected</span>
+                                      <button className="cp-btn" style={{fontSize:10,padding:"2px 8px",color:"var(--red)",borderColor:"rgba(239,68,68,.3)"}}
+                                        onClick={()=>handleUnselect(q.id)}>Unselect</button>
+                                    </div>
                                 }
                               </div>
                             )}

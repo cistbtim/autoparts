@@ -965,7 +965,7 @@ export default function App() {
 function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   _currentLang = lang; // sync for tSt
   const role = user.role;
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":"dashboard";
+  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="demo"?"inventory":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [parts,setParts]=useState([]);

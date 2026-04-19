@@ -2413,6 +2413,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             </button>
           )}
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light Mode":"🌙 Dark Mode"}</button>
+          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>openM("changePassword")}>🔑 Change Password</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={onLogout}>🚪 {t.logout}</button>
         </div>
       </aside>
@@ -2464,6 +2465,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             </button>
           )}
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light Mode":"🌙 Dark Mode"}</button>
+          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>{openM("changePassword");setDrawerOpen(false);}}>🔑 Change Password</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 {t.logout}</button>
         </div>
       </div>
@@ -3796,6 +3798,8 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       {isOpen("pdfInvoice")&&<PdfInvoiceModal
         inv={mData("pdfInvoice")} settings={settings} onClose={()=>closeM("pdfInvoice")}/>}
 
+      {isOpen("changePassword")&&<ChangePasswordModal user={user} onClose={()=>closeM("changePassword")} showToast={showToast}/>}
+
       {toast&&<div className="toast" style={{borderColor:toast.type==="err"?"rgba(248,113,113,.3)":"var(--border2)",color:toast.type==="err"?"var(--red)":"var(--green)"}}>
         {toast.type==="err"?"⚠":"✓"} {toast.msg}
       </div>}
@@ -3803,6 +3807,52 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       {isDemo&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9999,background:"linear-gradient(90deg,#f59e0b,#f97316)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
         🔒 Demo Mode — all data is read-only. Contact us to get your own account.
       </div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHANGE PASSWORD MODAL
+// ═══════════════════════════════════════════════════════════════
+function ChangePasswordModal({user,onClose,showToast}) {
+  const [cur,setCur]=useState("");
+  const [nw,setNw]=useState("");
+  const [nw2,setNw2]=useState("");
+  const [err,setErr]=useState("");
+  const [loading,setLoading]=useState(false);
+
+  const save=async()=>{
+    if(!cur||!nw||!nw2){setErr("All fields required");return;}
+    if(nw!==nw2){setErr("New passwords don't match");return;}
+    if(nw.length<4){setErr("Password too short (min 4 chars)");return;}
+    setLoading(true);setErr("");
+    // Verify current password
+    const table=user._isCustomer?"customers":"users";
+    const field=user._isCustomer?"phone":"username";
+    const val=user._isCustomer?user.phone:user.username;
+    const check=await api.get(table,`${field}=eq.${encodeURIComponent(val)}&password=eq.${encodeURIComponent(cur)}&select=id`);
+    if(!Array.isArray(check)||check.length===0){setErr("Current password is incorrect");setLoading(false);return;}
+    await api.patch(table,"id",user.id,{password:nw});
+    setLoading(false);
+    showToast("✅ Password changed");
+    onClose();
+  };
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:380}}>
+        <MHead title="🔑 Change Password" onClose={onClose}/>
+        <div style={{display:"flex",flexDirection:"column",gap:13}}>
+          <div><FL label="Current Password"/><input className="inp" type="password" value={cur} onChange={e=>setCur(e.target.value)} autoFocus/></div>
+          <div><FL label="New Password"/><input className="inp" type="password" value={nw} onChange={e=>setNw(e.target.value)}/></div>
+          <div><FL label="Confirm New Password"/><input className="inp" type="password" value={nw2} onChange={e=>setNw2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&save()}/></div>
+          {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={loading}>{loading?"Saving...":"Save Password"}</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

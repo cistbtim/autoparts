@@ -940,6 +940,8 @@ export default function App() {
   if(rfqToken) return <RfqReplyPage token={rfqToken} lang={lang}/>;
   const rfqQuoteToken = new URLSearchParams(window.location.search).get("rfq_quote");
   if(rfqQuoteToken) return <RfqQuoteReplyPage token={rfqQuoteToken}/>;
+  const rfqBatchToken = new URLSearchParams(window.location.search).get("rfq_batch");
+  if(rfqBatchToken) return <RfqBatchReplyPage token={rfqBatchToken}/>;
   const wsqToken = new URLSearchParams(window.location.search).get("wsq");
   if(wsqToken) return <QuoteConfirmPage token={wsqToken}/>;
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
@@ -1006,6 +1008,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [workshopServices,setWorkshopServices]=useState([]); // null=no filter, Set=filtered part ids
   const [completedDays,setCompletedDays]=useState(7); // filter completed orders to last N days
   const [searchCust,setSearchCust]=useState("");
+  const [inqFilter,setInqFilter]=useState("all");
   const [toast,setToast]=useState(null);
   const [lightbox,setLightbox]=useState(null);
   const [drawerOpen,setDrawerOpen]=useState(false);
@@ -1771,6 +1774,36 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   };
   const updateInquiry=async(id,data)=>{await api.patch("inquiries","id",id,data);await loadAll();showToast("Updated");};
 
+  const acceptInquiry=async(inq)=>{
+    if(!inq.reply_price) return;
+    const invId=makeId(settings.invoice_prefix||"INV");
+    const lineItem={
+      id:makeId("LI"), invoice_id:invId,
+      part_id:inq.part_id||"", part_name:inq.part_name||"",
+      part_sku:inq.part_sku||"", supplier_part_id:inq.supplier_part_no||"",
+      qty:inq.qty_requested||1, unit_cost:+inq.reply_price||0,
+      total:(inq.qty_requested||1)*(+inq.reply_price||0)
+    };
+    const inv={
+      id:invId, supplier_id:+inq.supplier_id||null, supplier_name:inq.supplier_name,
+      invoice_date:today(), status:"unpaid",
+      total:lineItem.total, notes:`From RFQ ${inq.id}`
+    };
+    await api.insert("supplier_invoices",inv);
+    await api.insert("supplier_invoice_items",lineItem);
+    // Update stock
+    const part=parts.find(p=>String(p.id)===String(inq.part_id));
+    if(part){
+      const ns=part.stock+(inq.qty_requested||1);
+      await api.patch("parts","id",part.id,{stock:ns});
+      await logInv(part,part.stock,ns,"Stock In",`RFQ Accept ${inq.id}`);
+    }
+    await api.patch("inquiries","id",inq.id,{status:"ordered"});
+    await loadAll();
+    showToast(`✅ PO ${invId} created`);
+    setTab("purchaseInvoices");
+  };
+
   // Customer Queries
   const submitCustomerQuery=async(data)=>{
     await api.insert("customer_queries",data);
@@ -1802,6 +1835,12 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       }
     }
     await loadAll();closeM("supplierInvoice");showToast(isNew?"Invoice saved & stock updated":"Invoice updated");
+  };
+  const deleteSupplierInvoice=async(id)=>{
+    if(!window.confirm("Delete this empty invoice?")) return;
+    await api.delete("supplier_invoice_items","invoice_id",id);
+    await api.delete("supplier_invoices","id",id);
+    await loadAll();showToast("Invoice deleted","err");
   };
 
   // Supplier Returns
@@ -2611,7 +2650,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
               <div className="tbl-wrap">
                 <table className="tbl">
                   <thead><tr>
-                    {["",t.sku,`${t.name} / ${t.chineseDesc}`,"Bin",t.make,t.model,t.yearRange,t.oeNumber,t.category,t.price,"St"].map(h=><th key={h}>{h}</th>)}
+                    {["",t.sku,`${t.name} / ${t.chineseDesc}`,"Bin",t.make,t.model,t.yearRange,t.oeNumber,t.category,t.price,"Cost","St"].map(h=><th key={h}>{h}</th>)}
                     <th style={{textAlign:"center",whiteSpace:"nowrap"}}>🚗</th>
                     {role==="admin"&&<th style={{position:"sticky",right:0,background:"var(--surface2)",zIndex:2,boxShadow:"-2px 0 8px rgba(0,0,0,.3)"}}>Actions</th>}
                   </tr></thead>
@@ -2669,6 +2708,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
                           </td>
                           <td><span className="badge" style={{background:"var(--surface3)",color:"var(--text2)"}}>{p.category}</span></td>
                           <td style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:15,color:"var(--accent)"}}>{fmtAmt(p.price)}</td>
+                          <td style={{fontFamily:"Rajdhani,sans-serif",fontSize:13,color:"var(--text3)"}}>{p.cost_price>0?fmtAmt(p.cost_price):"—"}</td>
                           <td style={{textAlign:"center",fontSize:16}} title={p.stock===0?"Out of Stock":p.stock<=p.min_stock?"Low Stock":"In Stock"}>{p.stock===0?"🔴":p.stock<=p.min_stock?"🟡":"🟢"}</td>
                           <td style={{textAlign:"center"}}>
                             {(()=>{const cnt=partFitments.filter(f=>String(f.part_id)===String(p.id)).length;return cnt>0?<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{cnt} 🚗</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>;})()}
@@ -2989,6 +3029,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
                               ? <button className="btn btn-success btn-xs" onClick={()=>openM("addPayment",{prefill:{type:"payment",reference_id:inv.id,party_name:inv.supplier_name,amount:inv.total,payment_date:today()}})}>💳 Record Payment</button>
                               : <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:11}}>✅ Paid</span>
                             }
+                            {(inv.total===0||!inv.total)&&inv.status!=="paid"&&<button className="btn btn-danger btn-xs" onClick={()=>deleteSupplierInvoice(inv.id)}>🗑 Delete</button>}
                           </div>
                         </td>
                       </tr>
@@ -3126,39 +3167,70 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         )}
 
         {/* ── INQUIRIES ── */}
-        {tab==="inquiries"&&role==="admin"&&(
+        {tab==="inquiries"&&role==="admin"&&(()=>{
+          const inqReplied=inquiries.filter(i=>i.status==="replied").length;
+          const inqOrdered=inquiries.filter(i=>i.status==="ordered").length;
+          const filteredInq=inqFilter==="all"?inquiries:inquiries.filter(i=>i.status===inqFilter);
+          return (
           <div className="fu">
-            <PH title={`📩 ${t.inquiries}`} subtitle={`${inquiries.length} total · ${pendingInq} pending`}/>
+            <PH title={`📩 ${t.inquiries}`} subtitle={`${inquiries.length} total`}/>
+            {/* Pipeline summary */}
+            <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+              {[
+                {label:"Pending",val:pendingInq,color:"var(--yellow)",icon:"⏳",key:"pending"},
+                {label:"Replied",val:inqReplied,color:"var(--blue)",icon:"💬",key:"replied"},
+                {label:"Ordered",val:inqOrdered,color:"var(--green)",icon:"✅",key:"ordered"},
+                {label:"All",val:inquiries.length,color:"var(--text2)",icon:"📋",key:"all"},
+              ].map(s=>(
+                <div key={s.key} onClick={()=>setInqFilter(s.key)} style={{cursor:"pointer",background:inqFilter===s.key?"var(--surface3)":"var(--surface2)",borderRadius:10,padding:"10px 18px",border:`1px solid ${inqFilter===s.key?"var(--accent)":"var(--border)"}`,display:"flex",alignItems:"center",gap:8,minWidth:100}}>
+                  <span style={{fontSize:18}}>{s.icon}</span>
+                  <div><div style={{fontWeight:800,fontSize:18,fontFamily:"Rajdhani,sans-serif",color:s.color}}>{s.val}</div><div style={{fontSize:11,color:"var(--text3)"}}>{s.label}</div></div>
+                </div>
+              ))}
+            </div>
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
-                  <thead><tr>{["Part","Supplier","Qty",t.status,"Reply Price","Stock","Supplier Part#","Date","Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{["Part","Supplier","Qty",t.status,"Reply Price","Stock","Supp Part#","Date","Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {inquiries.map(inq=>(
-                      <tr key={inq.id}>
-                        <td style={{fontWeight:600}}>{inq.part_name}</td>
-                        <td style={{color:"var(--text2)"}}>{inq.supplier_name}</td>
+                    {filteredInq.map(inq=>{
+                      const replyUrl=`${window.location.origin}${window.location.pathname}?rfq=${inq.rfq_token}`;
+                      const waMsg=`${inq.message||`RFQ for ${inq.part_name} (${inq.part_sku||""}) - Qty: ${inq.qty_requested}`}\n\n📎 Submit quote here (no login needed):\n${replyUrl}`;
+                      return (
+                      <tr key={inq.id} style={{opacity:inq.status==="closed"?0.5:1}}>
+                        <td><div style={{fontWeight:600}}>{inq.part_name}</div><div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{inq.part_sku||""}</div></td>
+                        <td>
+                          <div style={{fontWeight:600,fontSize:13}}>{inq.supplier_name}</div>
+                          <div style={{display:"flex",gap:4,marginTop:2,flexWrap:"wrap"}}>
+                            {inq.supplier_phone&&<a href={`https://wa.me/${(inq.supplier_phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer"><span style={{fontSize:10,color:"#25D366",background:"rgba(37,211,102,.1)",borderRadius:4,padding:"1px 5px"}}>📲 WA</span></a>}
+                            {inq.supplier_email&&<a href={`mailto:${inq.supplier_email}?subject=RFQ - ${inq.part_name}&body=${encodeURIComponent(waMsg)}`}><span style={{fontSize:10,color:"var(--blue)",background:"rgba(96,165,250,.1)",borderRadius:4,padding:"1px 5px"}}>✉ Email</span></a>}
+                          </div>
+                        </td>
                         <td style={{textAlign:"center",fontWeight:700}}>{inq.qty_requested}</td>
                         <td><StatusBadge status={inq.status}/></td>
-                        <td style={{color:inq.reply_price?"var(--green)":"var(--text3)"}}>{inq.reply_price?fmtAmt(inq.reply_price):"—"}</td>
-                        <td style={{color:inq.reply_stock?"var(--green)":"var(--text3)"}}>{inq.reply_stock ?? "—"}</td>
+                        <td style={{fontWeight:700,color:inq.reply_price?"var(--green)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontSize:15}}>{inq.reply_price?fmtAmt(inq.reply_price):"—"}</td>
+                        <td style={{color:inq.reply_stock?"var(--text)":"var(--text3)"}}>{inq.reply_stock??("—")}</td>
                         <td style={{fontFamily:"DM Mono,monospace",fontSize:12,color:inq.supplier_part_no?"var(--green)":"var(--text3)"}}>{inq.supplier_part_no||"—"}</td>
-                        <td style={{color:"var(--text3)",fontSize:12}}>{inq.created_at?.slice(0,10)}</td>
+                        <td style={{color:"var(--text3)",fontSize:12,whiteSpace:"nowrap"}}>{inq.created_at?.slice(0,10)}</td>
                         <td>
-                          <div style={{display:"flex",gap:5}}>
+                          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                             <button className="btn btn-ghost btn-xs" onClick={()=>openM("inquiryDetail",inq)}>View</button>
-                            {inq.status!=="closed"&&<button className="btn btn-danger btn-xs" onClick={()=>updateInquiry(inq.id,{status:"closed"})}>Close</button>}
+                            {inq.status==="pending"&&<button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} onClick={()=>{navigator.clipboard.writeText(replyUrl);showToast("Link copied!");}}>🔗 Link</button>}
+                            {inq.status==="replied"&&<button className="btn btn-success btn-xs" onClick={()=>acceptInquiry(inq)}>✅ Accept</button>}
+                            {inq.status!=="closed"&&inq.status!=="ordered"&&<button className="btn btn-danger btn-xs" onClick={()=>updateInquiry(inq.id,{status:"closed"})}>✕</button>}
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
-                {inquiries.length===0&&<div style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No inquiries</div>}
+                {filteredInq.length===0&&<div style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No {inqFilter==="all"?"":""+inqFilter+" "}inquiries</div>}
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ── CUSTOMERS ── */}
         {tab==="customers"&&role==="admin"&&(
@@ -3547,7 +3619,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       </main>
 
       {/* ════ MODALS ════ */}
-      {isOpen("editPart")&&<PartModal part={mData("editPart")} vehicles={vehicles} partFitments={partFitments} onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart} onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}} onClose={()=>{
+      {isOpen("editPart")&&<PartModal part={mData("editPart")} vehicles={vehicles} partFitments={partFitments} onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart} onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}} inquiries={inquiries} onClose={()=>{
   const ep=mData("editPart"); if(ep?.id) releaseLock("part",ep.id);
   closeM("editPart");
 }} t={t}/>}
@@ -3555,7 +3627,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}
       {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} t={t}/>}
       {isOpen("inquiry")&&<InquiryModal part={mData("inquiry")} suppliers={suppliers} partSuppliers={getPartSupps(mData("inquiry")?.id)} onSend={sendInquiry} onClose={()=>closeM("inquiry")} t={t}/>}
-      {isOpen("inquiryDetail")&&<InquiryDetailModal inquiry={mData("inquiryDetail")} onUpdate={updateInquiry} onClose={()=>closeM("inquiryDetail")} t={t}/>}
+      {isOpen("inquiryDetail")&&<InquiryDetailModal inquiry={mData("inquiryDetail")} onUpdate={updateInquiry} onAccept={async(inq)=>{closeM("inquiryDetail");await acceptInquiry(inq);}} onClose={()=>closeM("inquiryDetail")} settings={settings} t={t}/>}
       {isOpen("editCustomer")&&<CustomerModal customer={mData("editCustomer")} onSave={saveCustomer} onClose={()=>closeM("editCustomer")} t={t}/>}
       {isOpen("editUser")&&<UserModal user={mData("editUser")} onSave={saveUser} onClose={()=>closeM("editUser")} t={t}/>}
       {isOpen("custHistory")&&<CustHistoryModal customer={mData("custHistory")} orders={orders.filter(o=>o.customer_phone===mData("custHistory")?.phone)} onClose={()=>closeM("custHistory")}/>}
@@ -4002,6 +4074,34 @@ function SettingsPage({settings,onSave,t}) {
           <button className="btn btn-primary btn-sm" onClick={addCat} disabled={!newCat.trim()}>+ Add</button>
         </div>
         <div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>Categories are saved locally on this device.</div>
+      </div>
+
+      {/* Label Size Settings */}
+      <div className="card" style={{padding:22,marginTop:20}}>
+        <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:16}}>🏷️ Stock Label Size</h3>
+        <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Set the print size for stock labels (used when printing part labels)</div>
+        <FG cols="1fr 1fr">
+          <div>
+            <FL label="Label Width (mm)"/>
+            <input className="inp" type="number" min="20" max="200" value={f.label_w||50} onChange={e=>s("label_w",+e.target.value)} placeholder="50"/>
+          </div>
+          <div>
+            <FL label="Label Height (mm)"/>
+            <input className="inp" type="number" min="15" max="200" value={f.label_h||50} onChange={e=>s("label_h",+e.target.value)} placeholder="50"/>
+          </div>
+        </FG>
+        <div style={{background:"var(--surface2)",borderRadius:8,padding:12,border:"1px solid var(--border)",marginTop:10,display:"inline-flex",alignItems:"center",gap:12}}>
+          <div style={{
+            width: Math.min(+(f.label_w||50)*2, 160),
+            height: Math.min(+(f.label_h||50)*2, 100),
+            border:"1px dashed var(--border2)",borderRadius:4,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            background:"var(--surface3)",flexShrink:0
+          }}>
+            <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.label_w||50}×{f.label_h||50}mm</span>
+          </div>
+          <div style={{fontSize:12,color:"var(--text3)"}}>Preview (2× scale)<br/>Default: 50mm × 50mm</div>
+        </div>
       </div>
     </div>
   );
@@ -4585,15 +4685,15 @@ function ImgPreview({src}) {
   );
 }
 
-function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles}) {
+function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,inquiries=[]}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
-    brand:p.brand||"", price:p.price??"", stock:p.stock??0, minStock:p.min_stock??0,
+    brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
     image_url:p.image_url||"", chinese_desc:p.chinese_desc||"",
     make:p.make||"", model:p.model||"", year_range:p.year_range||"", oe_number:p.oe_number||"",
     bin_location:p.bin_location||"",
   }:{
-    sku:"", name:"", category:"Engine", brand:"", price:"", stock:"", minStock:"",
+    sku:"", name:"", category:"Engine", brand:"", price:"", cost_price:"", stock:"", minStock:"",
     image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", bin_location:"",
   };
   const [f,setF]=useState(()=>makeF(part));
@@ -4605,7 +4705,7 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
 
   const buildPayload=(fv)=>({
     sku:fv.sku.trim(), name:fv.name.trim(), category:fv.category, brand:fv.brand,
-    price:+fv.price, stock:+fv.stock, min_stock:+fv.minStock,
+    price:+fv.price, cost_price:+fv.cost_price||0, stock:+fv.stock, min_stock:+fv.minStock,
     image_url:fv.image_url, chinese_desc:fv.chinese_desc,
     make:fv.make, model:fv.model, year_range:fv.year_range, oe_number:fv.oe_number,
     bin_location:fv.bin_location||"",
@@ -4639,12 +4739,14 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
     return true;
   };
 
+  const partRfqs = part ? inquiries.filter(i=>String(i.part_id)===String(part.id)) : [];
   const TABS = [
     {id:"info",    label:"📋 Info"},
     {id:"photo",   label:"📸 Photo"},
     {id:"stock",   label:"💰 Stock"},
     {id:"vehicle", label:"🚗 Vehicle"},
     {id:"fitment", label:"🔗 Fits"},
+    {id:"rfq",     label:`📩 RFQ${partRfqs.length>0?" ("+partRfqs.length+")":""}`},
   ];
 
   const Err = ({k}) => errors[k]
@@ -4721,13 +4823,20 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
       {/* ── TAB: STOCK ── */}
       {ptab==="stock"&&(
         <div>
-          <FG cols="1fr 1fr 1fr">
+          <FG cols="1fr 1fr">
             <div>
-              <FL label={`${t.price} *`}/>
+              <FL label={`${t.price} * (Selling)`}/>
               <input className="inp" type="number" value={f.price} onChange={e=>{s("price",e.target.value);setErrors(p=>({...p,price:""}));}}
                 placeholder="0.00" style={{borderColor:errors.price?"var(--red)":undefined}}/>
               <Err k="price"/>
             </div>
+            <div>
+              <FL label="💰 Cost Price"/>
+              <input className="inp" type="number" value={f.cost_price} onChange={e=>s("cost_price",e.target.value)} placeholder="0.00"/>
+              {f.cost_price>0&&f.price>0&&<div style={{fontSize:11,color:"var(--green)",marginTop:3}}>Margin: {(((+f.price-(+f.cost_price))/(+f.price))*100).toFixed(1)}%</div>}
+            </div>
+          </FG>
+          <FG cols="1fr 1fr">
             <div><FL label={t.stock}/><input className="inp" type="number" value={f.stock} onChange={e=>s("stock",e.target.value)} placeholder="0"/></div>
             <div><FL label={t.minStock}/><input className="inp" type="number" value={f.minStock} onChange={e=>s("minStock",e.target.value)} placeholder="1"/></div>
           </FG>
@@ -4783,6 +4892,52 @@ function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitm
         <div style={{textAlign:"center",padding:32,color:"var(--text3)"}}>
           <div style={{fontSize:24,marginBottom:8}}>💾</div>
           Save the part first, then link vehicles
+        </div>
+      )}
+
+      {/* ── TAB: RFQ ── */}
+      {ptab==="rfq"&&(
+        <div>
+          {partRfqs.length===0?(
+            <div style={{textAlign:"center",padding:32,color:"var(--text3)"}}>
+              <div style={{fontSize:32,marginBottom:8}}>📩</div>
+              <div style={{fontWeight:600,marginBottom:4}}>No RFQ records yet</div>
+              <div style={{fontSize:12}}>Use the RFQ button in inventory to send a quote request to suppliers</div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {partRfqs.map(inq=>{
+                const replyUrl=`${window.location.origin}${window.location.pathname}?rfq=${inq.rfq_token}`;
+                const statusColor=inq.status==="replied"?"var(--green)":inq.status==="ordered"?"var(--blue)":inq.status==="pending"?"var(--yellow)":"var(--text3)";
+                return (
+                <div key={inq.id} style={{background:"var(--surface2)",borderRadius:10,padding:13,border:`1px solid ${inq.status==="replied"?"rgba(52,211,153,.3)":inq.status==="ordered"?"rgba(96,165,250,.3)":"var(--border)"}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:14}}>{inq.supplier_name}</div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{inq.created_at?.slice(0,10)} · Qty: {inq.qty_requested}</div>
+                    </div>
+                    <span className="badge" style={{background:`rgba(0,0,0,.07)`,color:statusColor,fontSize:11,fontWeight:700}}>{inq.status||"pending"}</span>
+                  </div>
+                  {inq.status==="replied"&&(
+                    <div style={{background:"rgba(52,211,153,.07)",borderRadius:8,padding:"8px 10px",marginBottom:8}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"4px 12px",fontSize:12}}>
+                        {inq.reply_price&&<div><span style={{color:"var(--text3)"}}>Price: </span><span style={{fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmtAmt(inq.reply_price)}</span></div>}
+                        {inq.reply_stock!=null&&<div><span style={{color:"var(--text3)"}}>Stock: </span><span style={{fontWeight:600}}>{inq.reply_stock}</span></div>}
+                        {inq.supplier_part_no&&<div><span style={{color:"var(--text3)"}}>Part#: </span><span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--green)"}}>{inq.supplier_part_no}</span></div>}
+                        {inq.reply_notes&&<div style={{gridColumn:"1/-1",color:"var(--text2)",fontSize:11,marginTop:2}}>{inq.reply_notes}</div>}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {inq.status==="pending"&&<button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} onClick={()=>{navigator.clipboard.writeText(replyUrl);}}>📋 Copy Link</button>}
+                    {inq.supplier_phone&&inq.status==="pending"&&<a href={`https://wa.me/${(inq.supplier_phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(inq.message||"")}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none",fontSize:11,padding:"3px 8px"}}>📲 WA</button></a>}
+                    {inq.status==="replied"&&inq.reply_price&&inquiries&&<button className="btn btn-success btn-xs" onClick={()=>{if(onClose)onClose();}}>✅ Accept → Go to Inquiries</button>}
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -5300,40 +5455,130 @@ function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t}) {
   );
 }
 
-function InquiryDetailModal({inquiry,onUpdate,onClose,t}) {
+function InquiryDetailModal({inquiry,onUpdate,onAccept,onClose,t,settings}) {
   const [rp,setRp]=useState(inquiry?.reply_price||"");
   const [rs,setRs]=useState(inquiry?.reply_stock||"");
   const [rn,setRn]=useState(inquiry?.reply_notes||"");
   const [spn,setSpn]=useState(inquiry?.supplier_part_no||"");
   if(!inquiry)return null;
+  const replyUrl=`${window.location.origin}${window.location.pathname}?rfq=${inquiry.rfq_token}`;
+  const waMsg=`${inquiry.message||`RFQ for ${inquiry.part_name} (${inquiry.part_sku||""}) - Qty: ${inquiry.qty_requested}`}\n\n📎 Submit quote here:\n${replyUrl}`;
+  const hasReply=inquiry.reply_price||rp;
+  const isOrdered=inquiry.status==="ordered";
   return (
-    <Overlay onClose={onClose}>
-      <MHead title="📩 Inquiry Detail" sub={inquiry.id} onClose={onClose}/>
-      <div style={{background:"var(--surface2)",borderRadius:11,padding:14,marginBottom:16,border:"1px solid var(--border)"}}>
+    <Overlay onClose={onClose} wide>
+      <MHead title="📩 RFQ Detail" sub={inquiry.id} onClose={onClose}/>
+
+      {/* Status pipeline */}
+      <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:18,background:"var(--surface2)",borderRadius:10,padding:"10px 14px",border:"1px solid var(--border)"}}>
+        {[
+          {key:"pending",label:"Sent",icon:"📤"},
+          {key:"replied",label:"Replied",icon:"💬"},
+          {key:"ordered",label:"Ordered",icon:"✅"},
+        ].map((st,i)=>{
+          const steps=["pending","replied","ordered"];
+          const curIdx=steps.indexOf(inquiry.status);
+          const stIdx=steps.indexOf(st.key);
+          const done=curIdx>=stIdx;
+          return (
+            <div key={st.key} style={{display:"contents"}}>
+              {i>0&&<div style={{flex:1,height:2,background:done?"var(--accent)":"var(--border)",transition:"background .3s"}}/>}
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:64}}>
+                <div style={{width:32,height:32,borderRadius:"50%",background:done?"var(--accent)":"var(--surface3)",border:`2px solid ${done?"var(--accent)":"var(--border)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,transition:"background .3s"}}>{st.icon}</div>
+                <div style={{fontSize:10,fontWeight:600,color:done?"var(--accent)":"var(--text3)",textTransform:"uppercase",letterSpacing:".05em"}}>{st.label}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Part + Supplier info */}
+      <div style={{background:"var(--surface2)",borderRadius:11,padding:14,marginBottom:14,border:"1px solid var(--border)"}}>
         <FG>
-          <div><FL label="Part"/><div style={{fontWeight:600}}>{inquiry.part_name}{inquiry.part_oe_number&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>OE: {inquiry.part_oe_number}</span>}</div></div>
-          <div><FL label="Supplier"/><div style={{fontWeight:600}}>{inquiry.supplier_name}</div></div>
+          <div>
+            <FL label="Part"/>
+            <div style={{fontWeight:600}}>{inquiry.part_name}{inquiry.part_oe_number&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>OE: {inquiry.part_oe_number}</span>}</div>
+            <div style={{fontSize:12,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginTop:2}}>{inquiry.part_sku}</div>
+          </div>
+          <div>
+            <FL label="Supplier"/>
+            <div style={{fontWeight:600}}>{inquiry.supplier_name}</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:2,display:"flex",gap:8}}>
+              {inquiry.supplier_phone&&<span>📞 {inquiry.supplier_phone}</span>}
+              {inquiry.supplier_email&&<span>✉ {inquiry.supplier_email}</span>}
+            </div>
+          </div>
         </FG>
         <FG>
-          <div><FL label="Qty Requested"/><div style={{fontWeight:700,color:"var(--accent)",fontSize:16,fontFamily:"Rajdhani,sans-serif"}}>{inquiry.qty_requested}</div></div>
-          <div><FL label="Supplier Part No."/><div style={{fontWeight:600,fontFamily:"DM Mono,monospace",color:inquiry.supplier_part_no?"var(--green)":"var(--text3)"}}>{inquiry.supplier_part_no||"— not yet provided"}</div></div>
+          <div><FL label="Qty Requested"/><div style={{fontWeight:700,color:"var(--accent)",fontSize:18,fontFamily:"Rajdhani,sans-serif"}}>{inquiry.qty_requested}</div></div>
+          <div><FL label="Sent On"/><div style={{color:"var(--text2)",fontSize:13}}>{inquiry.created_at?.slice(0,10)}</div></div>
         </FG>
-        {inquiry.message&&<div><FL label="Message"/><div style={{fontSize:12,color:"var(--text2)",whiteSpace:"pre-line",lineHeight:1.7,maxHeight:120,overflowY:"auto",background:"var(--surface2)",borderRadius:8,padding:10}}>{inquiry.message}</div></div>}
       </div>
-      <FL label="Record Reply (manual entry)"/>
-      <FD>
-        <FL label="Supplier Part No. / Reference"/>
-        <input className="inp" value={spn} onChange={e=>setSpn(e.target.value)} placeholder="Supplier internal part number"/>
-      </FD>
-      <FG>
-        <div><FL label="Reply Price"/><input className="inp" type="number" value={rp} onChange={e=>setRp(e.target.value)} placeholder="0"/></div>
-        <div><FL label="Reply Stock"/><input className="inp" type="number" value={rs} onChange={e=>setRs(e.target.value)}/></div>
-      </FG>
-      <FD><FL label="Notes"/><textarea className="inp" value={rn} onChange={e=>setRn(e.target.value)}/></FD>
-      <div style={{display:"flex",gap:8}}>
-        <button className="btn btn-primary" style={{flex:2}} onClick={()=>onUpdate(inquiry.id,{reply_price:rp?+rp:null,reply_stock:rs?+rs:null,reply_notes:rn,supplier_part_no:spn,status:"replied",replied_at:new Date().toISOString()})}>Save & Mark Replied</button>
-        <button className="btn btn-danger" style={{flex:1}} onClick={()=>onUpdate(inquiry.id,{status:"closed"})}>Close</button>
-      </div>
+
+      {/* Reply link + re-send */}
+      {!isOrdered&&(
+        <div style={{background:"var(--surface2)",borderRadius:10,padding:13,marginBottom:14,border:"1px solid var(--border)"}}>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Supplier Reply Link</div>
+          <div style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--accent)",wordBreak:"break-all",lineHeight:1.6,marginBottom:8}}>{replyUrl}</div>
+          <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+            <button className="btn btn-ghost btn-xs" onClick={()=>{navigator.clipboard.writeText(replyUrl);}}> 📋 Copy Link</button>
+            {inquiry.supplier_phone&&<a href={`https://wa.me/${(inquiry.supplier_phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none"}}>📲 WhatsApp</button></a>}
+            {inquiry.supplier_email&&<a href={`mailto:${inquiry.supplier_email}?subject=RFQ - ${inquiry.part_name}&body=${encodeURIComponent(waMsg)}`} style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs">✉ Email</button></a>}
+          </div>
+        </div>
+      )}
+
+      {/* Reply received banner */}
+      {(inquiry.status==="replied"||inquiry.reply_price)&&(
+        <div style={{background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.25)",borderRadius:10,padding:13,marginBottom:14}}>
+          <div style={{fontSize:11,color:"var(--green)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>💬 Supplier Reply Received</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"6px 12px",fontSize:13}}>
+            <div><span style={{color:"var(--text3)"}}>Price: </span><span style={{fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif",fontSize:16}}>{inquiry.reply_price?fmtAmt(inquiry.reply_price):"—"}</span></div>
+            <div><span style={{color:"var(--text3)"}}>Stock: </span><span style={{fontWeight:600}}>{inquiry.reply_stock??("—")}</span></div>
+            <div><span style={{color:"var(--text3)"}}>Part#: </span><span style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--green)"}}>{inquiry.supplier_part_no||"—"}</span></div>
+            {inquiry.reply_notes&&<div style={{gridColumn:"1/-1",color:"var(--text2)",fontSize:12,marginTop:2}}>Notes: {inquiry.reply_notes}</div>}
+            {inquiry.replied_at&&<div style={{gridColumn:"1/-1",fontSize:11,color:"var(--text3)"}}>Replied: {inquiry.replied_at?.slice(0,16).replace("T"," ")}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Accept quote → Create PO */}
+      {(inquiry.status==="replied"||(rp&&+rp>0))&&!isOrdered&&(
+        <div style={{background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)",borderRadius:10,padding:13,marginBottom:14}}>
+          <div style={{fontSize:12,color:"var(--accent)",fontWeight:700,marginBottom:6}}>✅ Accept This Quote</div>
+          <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>Creates a Purchase Invoice for <strong>{inquiry.qty_requested} × {inquiry.part_name}</strong> @ <strong>{fmtAmt(inquiry.reply_price||rp)}</strong> from <strong>{inquiry.supplier_name}</strong> and updates stock.</div>
+          <button className="btn btn-primary" style={{width:"100%"}} onClick={()=>onAccept({...inquiry,reply_price:rp||inquiry.reply_price,supplier_part_no:spn||inquiry.supplier_part_no})}>
+            ✅ Accept & Create Purchase Invoice
+          </button>
+        </div>
+      )}
+      {isOrdered&&(
+        <div style={{background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.25)",borderRadius:10,padding:13,marginBottom:14,textAlign:"center"}}>
+          <div style={{fontSize:16}}>✅</div>
+          <div style={{fontWeight:700,color:"var(--green)"}}>Purchase Order Created</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>This inquiry has been converted to a purchase invoice.</div>
+        </div>
+      )}
+
+      {/* Manual reply entry */}
+      {!isOrdered&&(
+        <>
+          <div style={{fontSize:12,fontWeight:700,color:"var(--text2)",marginBottom:10,paddingTop:4,borderTop:"1px solid var(--border)"}}>✏️ Record Reply Manually</div>
+          <FD>
+            <FL label="Supplier Part No. / Reference"/>
+            <input className="inp" value={spn} onChange={e=>setSpn(e.target.value)} placeholder="Supplier internal part number" style={{fontFamily:"DM Mono,monospace"}}/>
+          </FD>
+          <FG>
+            <div><FL label="Reply Price"/><input className="inp" type="number" value={rp} onChange={e=>setRp(e.target.value)} placeholder="0.00"/></div>
+            <div><FL label="Available Stock"/><input className="inp" type="number" value={rs} onChange={e=>setRs(e.target.value)} placeholder="qty"/></div>
+          </FG>
+          <FD><FL label="Notes (lead time, MOQ, conditions...)"/><textarea className="inp" value={rn} onChange={e=>setRn(e.target.value)} placeholder="e.g. 7 days lead time, min order 10 pcs" style={{minHeight:60}}/></FD>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-primary" style={{flex:2}} onClick={()=>onUpdate(inquiry.id,{reply_price:rp?+rp:null,reply_stock:rs?+rs:null,reply_notes:rn,supplier_part_no:spn,status:"replied",replied_at:new Date().toISOString()})}>💾 Save & Mark Replied</button>
+            {inquiry.status!=="closed"&&<button className="btn btn-danger" style={{flex:1}} onClick={()=>{onUpdate(inquiry.id,{status:"closed"});onClose();}}>✕ Close</button>}
+          </div>
+        </>
+      )}
     </Overlay>
   );
 }
@@ -6721,6 +6966,246 @@ function RfqQuoteReplyPage({token}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// RFQ BATCH REPLY PAGE — supplier quotes ALL items at once
+// ═══════════════════════════════════════════════════════════════
+function RfqBatchReplyPage({token}) {
+  const [session,setSession]=useState(null);
+  const [supplierName,setSupplierName]=useState("");
+  const [rows,setRows]=useState([]); // [{quote, item, form:{...}}]
+  const [loading,setLoading]=useState(true);
+  const [submitting,setSubmitting]=useState(false);
+  const [submitted,setSubmitted]=useState(false);
+  const [err,setErr]=useState("");
+
+  useEffect(()=>{
+    (async()=>{
+      // 1. Load the anchor quote by token
+      const quotes=await api.get("rfq_quotes",`token=eq.${token}&select=*`);
+      if(!Array.isArray(quotes)||!quotes[0]){setErr("Invalid or expired RFQ link.");setLoading(false);return;}
+      const anchor=quotes[0];
+      setSupplierName(anchor.supplier_name||"Supplier");
+
+      // 2. Load ALL quotes for this session + supplier
+      const allQuotes=await api.get("rfq_quotes",`rfq_id=eq.${anchor.rfq_id}&supplier_id=eq.${anchor.supplier_id}&select=*`);
+      const qs=Array.isArray(allQuotes)?allQuotes:[];
+
+      // 3. Load items + session + part_suppliers in parallel
+      const [items,sess,partSupps]=await Promise.all([
+        api.get("rfq_items",`rfq_id=eq.${anchor.rfq_id}&select=*`),
+        api.get("rfq_sessions",`id=eq.${anchor.rfq_id}&select=*`),
+        api.get("part_suppliers",`supplier_id=eq.${anchor.supplier_id}&select=*`).catch(()=>[]),
+      ]);
+      if(Array.isArray(sess)&&sess[0]) setSession(sess[0]);
+
+      const itemMap=Object.fromEntries((Array.isArray(items)?items:[]).map(i=>[i.id,i]));
+      // Build lookup: part_id → supplier_part_no from part_suppliers table
+      const psMap=Object.fromEntries((Array.isArray(partSupps)?partSupps:[]).map(ps=>[String(ps.part_id),ps.supplier_part_no||""]));
+
+      // 4. Build rows — auto-fill supplier_part_no from part_suppliers if not already in quote
+      const built=qs.map(q=>{
+        const item=itemMap[q.rfq_item_id]||{};
+        const knownPartNo=q.supplier_part_no||psMap[String(item.part_id)]||"";
+        return {
+          quote:q,
+          item,
+          prefilled:!q.supplier_part_no&&!!psMap[String(item.part_id)],
+          form:{
+            supplier_part_no:knownPartNo,
+            unit_price:q.unit_price||"",
+            stock_qty:q.stock_qty||"",
+            lead_days:q.lead_days||"",
+            notes:q.notes||"",
+          }
+        };
+      });
+      setRows(built);
+      setLoading(false);
+    })();
+  },[token]);
+
+  const upd=(qi,k,v)=>setRows(prev=>prev.map((r,i)=>i===qi?{...r,form:{...r.form,[k]:v}}:r));
+
+  const submitAll=async()=>{
+    const missing=rows.filter(r=>!r.form.unit_price);
+    if(missing.length>0){setErr(`Please enter price for: ${missing.map(r=>r.item.part_name).join(", ")}`);return;}
+    setErr("");setSubmitting(true);
+    for(const r of rows){
+      await api.patch("rfq_quotes","token",r.quote.token,{
+        supplier_part_no:r.form.supplier_part_no,
+        unit_price:+r.form.unit_price,
+        stock_qty:r.form.stock_qty?+r.form.stock_qty:null,
+        lead_days:r.form.lead_days?+r.form.lead_days:null,
+        notes:r.form.notes,
+        status:"quoted",
+        quoted_at:new Date().toISOString(),
+      });
+    }
+    setSubmitting(false);setSubmitted(true);
+  };
+
+  const downloadCsv=()=>{
+    const hdr=["Part Name","SKU","OE#","Qty Needed","Your Part#","Unit Price *","Stock Available","Lead Days","Notes"];
+    const dataRows=rows.map(r=>[
+      r.item.part_name||"",
+      r.item.part_sku||"",
+      r.item.oe_number||"",
+      r.item.qty_needed||1,
+      r.form.supplier_part_no,
+      r.form.unit_price,
+      r.form.stock_qty,
+      r.form.lead_days,
+      r.form.notes,
+    ]);
+    const csv=[hdr,...dataRows].map(row=>row.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a=document.createElement("a");
+    a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);
+    a.download=`RFQ_${session?.name||"batch"}.csv`;
+    a.click();
+  };
+
+  if(loading) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
+      <style>{CSS}</style>
+      <div style={{color:"#f97316",fontSize:15}}>⏳ Loading RFQ...</div>
+    </div>
+  );
+  if(err&&!rows.length) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
+      <style>{CSS}</style>
+      <div style={{textAlign:"center",color:"#fff",padding:40}}><div style={{fontSize:40,marginBottom:12}}>⚠️</div><div style={{fontSize:16}}>{err}</div></div>
+    </div>
+  );
+
+  return (
+    <div style={{background:"#0a0e1a",minHeight:"100vh",padding:"20px 12px"}}>
+      <style>{CSS}</style>
+      <div style={{maxWidth:900,margin:"0 auto"}}>
+        {/* Header */}
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <ShopLogo settings={_settings} size="md"/>
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:22,fontWeight:700,color:"var(--accent)",marginTop:8}}>📋 Request for Quotation</div>
+          <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>
+            {session?.name&&<span style={{fontWeight:600,color:"var(--text)"}}>{session.name} · </span>}
+            {supplierName} · {rows.length} item{rows.length!==1?"s":""}
+            {session?.deadline&&<span style={{color:"var(--yellow)",marginLeft:8}}>⏰ Deadline: {session.deadline}</span>}
+          </div>
+        </div>
+
+        {submitted?(
+          <div className="card" style={{padding:32,textAlign:"center"}}>
+            <div style={{fontSize:56,marginBottom:12}}>✅</div>
+            <div style={{fontSize:20,fontWeight:700,marginBottom:8}}>All Quotes Submitted!</div>
+            <div style={{color:"var(--text3)",fontSize:14,marginBottom:20}}>Thank you, {supplierName}. We will review and get back to you.</div>
+            <div className="card" style={{padding:16,background:"var(--surface2)",display:"inline-block",textAlign:"left"}}>
+              {rows.map((r,i)=>(
+                <div key={i} style={{display:"flex",gap:16,padding:"6px 0",borderBottom:"1px solid var(--border)",fontSize:13}}>
+                  <span style={{flex:1,fontWeight:500}}>{r.item.part_name}</span>
+                  <span style={{color:"var(--accent)",fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:15}}>{r.form.unit_price}</span>
+                  {r.form.stock_qty&&<span style={{color:"var(--text3)"}}>Qty: {r.form.stock_qty}</span>}
+                </div>
+              ))}
+            </div>
+            <button className="btn btn-ghost" style={{marginTop:20,display:"block",margin:"20px auto 0"}} onClick={()=>setSubmitted(false)}>✏️ Edit Quotes</button>
+          </div>
+        ):(
+          <>
+            {/* Download CSV */}
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10,gap:8}}>
+              <button className="btn btn-ghost btn-sm" onClick={downloadCsv}>📥 Download as CSV Template</button>
+            </div>
+
+            {/* Spreadsheet table */}
+            <div className="card" style={{padding:0,overflow:"hidden",marginBottom:16}}>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                  <thead>
+                    <tr style={{background:"var(--surface3)"}}>
+                      <th style={{padding:"10px 14px",textAlign:"left",fontWeight:700,fontSize:11,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text3)",borderBottom:"2px solid var(--border)",minWidth:180}}>#  Part</th>
+                      <th style={{padding:"10px 8px",textAlign:"center",fontWeight:700,fontSize:11,textTransform:"uppercase",color:"var(--text3)",borderBottom:"2px solid var(--border)",whiteSpace:"nowrap"}}>Qty Needed</th>
+                      <th style={{padding:"10px 8px",textAlign:"left",fontWeight:700,fontSize:11,textTransform:"uppercase",color:"var(--text3)",borderBottom:"2px solid var(--border)",minWidth:130}}>Your Part# </th>
+                      <th style={{padding:"10px 8px",textAlign:"left",fontWeight:700,fontSize:11,textTransform:"uppercase",color:"var(--accent)",borderBottom:"2px solid var(--border)",minWidth:110}}>Unit Price *</th>
+                      <th style={{padding:"10px 8px",textAlign:"left",fontWeight:700,fontSize:11,textTransform:"uppercase",color:"var(--text3)",borderBottom:"2px solid var(--border)",minWidth:90}}>Stock</th>
+                      <th style={{padding:"10px 8px",textAlign:"left",fontWeight:700,fontSize:11,textTransform:"uppercase",color:"var(--text3)",borderBottom:"2px solid var(--border)",minWidth:90}}>Lead (days)</th>
+                      <th style={{padding:"10px 8px",textAlign:"left",fontWeight:700,fontSize:11,textTransform:"uppercase",color:"var(--text3)",borderBottom:"2px solid var(--border)",minWidth:160}}>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r,i)=>(
+                      <tr key={r.quote.id} style={{borderBottom:"1px solid var(--border)",background:i%2===0?"transparent":"rgba(255,255,255,.02)"}}>
+                        <td style={{padding:"10px 14px",verticalAlign:"middle"}}>
+                          <div style={{fontWeight:600,fontSize:13}}>{i+1}. {r.item.part_name||"—"}</div>
+                          <div style={{fontSize:11,color:"var(--text3)",marginTop:2,fontFamily:"DM Mono,monospace"}}>
+                            {r.item.part_sku&&<span>{r.item.part_sku}</span>}
+                            {r.item.oe_number&&<span style={{marginLeft:8}}>OE: {r.item.oe_number}</span>}
+                          </div>
+                          {(r.item.make||r.item.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{[r.item.make,r.item.model,r.item.part_chinese_desc].filter(Boolean).join(" · ")}</div>}
+                        </td>
+                        <td style={{padding:"10px 8px",textAlign:"center",verticalAlign:"middle"}}>
+                          <span style={{fontWeight:800,fontSize:18,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{r.item.qty_needed||1}</span>
+                        </td>
+                        <td style={{padding:"6px 8px",verticalAlign:"middle"}}>
+                          <input className="inp" value={r.form.supplier_part_no} onChange={e=>upd(i,"supplier_part_no",e.target.value)}
+                            placeholder="your ref#"
+                            style={{fontSize:12,fontFamily:"DM Mono,monospace",padding:"6px 8px",
+                              borderColor:r.form.supplier_part_no?"rgba(52,211,153,.4)":"var(--border)",
+                              background:r.form.supplier_part_no?"rgba(52,211,153,.04)":"transparent"}}/>
+                          {r.prefilled&&<div style={{fontSize:10,color:"var(--green)",marginTop:2}}>✓ from records</div>}
+                        </td>
+                        <td style={{padding:"6px 8px",verticalAlign:"middle"}}>
+                          <input className="inp" type="number" value={r.form.unit_price} onChange={e=>upd(i,"unit_price",e.target.value)}
+                            placeholder="0.00" step="0.01"
+                            style={{fontSize:13,fontWeight:700,padding:"6px 8px",borderColor:!r.form.unit_price?"rgba(248,113,113,.5)":"var(--border)",color:"var(--accent)"}}/>
+                        </td>
+                        <td style={{padding:"6px 8px",verticalAlign:"middle"}}>
+                          <input className="inp" type="number" value={r.form.stock_qty} onChange={e=>upd(i,"stock_qty",e.target.value)}
+                            placeholder="qty" style={{fontSize:12,padding:"6px 8px"}}/>
+                        </td>
+                        <td style={{padding:"6px 8px",verticalAlign:"middle"}}>
+                          <input className="inp" type="number" value={r.form.lead_days} onChange={e=>upd(i,"lead_days",e.target.value)}
+                            placeholder="7" style={{fontSize:12,padding:"6px 8px"}}/>
+                        </td>
+                        <td style={{padding:"6px 8px",verticalAlign:"middle"}}>
+                          <input className="inp" value={r.form.notes} onChange={e=>upd(i,"notes",e.target.value)}
+                            placeholder="MOQ, conditions..." style={{fontSize:12,padding:"6px 8px"}}/>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Fill-all shortcuts */}
+            <div style={{background:"var(--surface2)",borderRadius:10,padding:12,marginBottom:16,border:"1px solid var(--border)"}}>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>⚡ Quick fill — apply same lead time or notes to all rows:</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>Lead days:</span>
+                  <input className="inp" type="number" placeholder="e.g. 7" style={{width:70,fontSize:12,padding:"4px 8px"}}
+                    onChange={e=>{if(e.target.value)setRows(prev=>prev.map(r=>({...r,form:{...r.form,lead_days:e.target.value}})));}}/>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>Notes:</span>
+                  <input className="inp" placeholder="apply to all rows" style={{width:180,fontSize:12,padding:"4px 8px"}}
+                    onChange={e=>{if(e.target.value)setRows(prev=>prev.map(r=>({...r,form:{...r.form,notes:e.target.value}})));}}/>
+                </div>
+              </div>
+            </div>
+
+            {err&&<div style={{color:"var(--red)",fontSize:13,marginBottom:12,padding:"8px 12px",background:"rgba(248,113,113,.08)",borderRadius:8}}>⚠ {err}</div>}
+
+            <button className="btn btn-primary" style={{width:"100%",padding:16,fontSize:16,fontWeight:700,borderRadius:12,marginBottom:20}}
+              onClick={submitAll} disabled={submitting}>
+              {submitting?"⏳ Submitting...":"📤 Submit All Quotes"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // QUOTE CONFIRM PAGE — public page for customer approval
 // ═══════════════════════════════════════════════════════════════
 function QuoteConfirmPage({token}) {
@@ -7113,6 +7598,33 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
         {/* Progress */}
         <div style={{background:"var(--surface2)",borderRadius:99,height:6,marginBottom:16,overflow:"hidden"}}>
           <div style={{background:"var(--green)",height:"100%",borderRadius:99,width:`${totalQuotes?quotedCount/totalQuotes*100:0}%`,transition:"width .3s"}}/>
+        </div>
+
+        {/* Per-supplier batch send cards */}
+        <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+          {allSuppliers.map(s=>{
+            const suppQuotes=sessionQuotes.filter(q=>q.supplier_id===s.id);
+            const batchToken=suppQuotes[0]?.token;
+            const batchUrl=`${window.location.origin}${window.location.pathname}?rfq_batch=${batchToken}`;
+            const quotedCount=suppQuotes.filter(q=>q.status==="quoted"||q.status==="selected").length;
+            const suppData=suppliers.find(x=>String(x.id)===String(s.id));
+            const itemsList=sessionItems.map((item,i)=>`${i+1}. ${item.part_name} (${item.part_sku||"—"}) × ${item.qty_needed}`).join("\n");
+            const waMsg=`Hi ${s.name},\n\nWe have an RFQ for ${sessionItems.length} parts. Please click the link below to view the list and submit all quotes at once:\n\n${batchUrl}\n\nParts:\n${itemsList}\n\nDeadline: ${activeSession.deadline||"ASAP"}\nThank you,\n${settings?.shop_name||"AutoParts"}`;
+            return (
+              <div key={s.id} style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",border:`1px solid ${quotedCount===suppQuotes.length&&suppQuotes.length>0?"rgba(52,211,153,.35)":"var(--border)"}`,flex:"1 1 240px",minWidth:220}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{s.name}</div>
+                  <span style={{fontSize:11,color:quotedCount===suppQuotes.length&&suppQuotes.length>0?"var(--green)":"var(--text3)",fontWeight:600}}>{quotedCount}/{suppQuotes.length} quoted</span>
+                </div>
+                <div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--accent)",wordBreak:"break-all",marginBottom:8,lineHeight:1.5}}>{batchUrl}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <button className="btn btn-ghost btn-xs" onClick={()=>{navigator.clipboard.writeText(batchUrl);}}>📋 Copy</button>
+                  {suppData?.phone&&<a href={`https://wa.me/${(suppData.phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none",fontSize:11,padding:"3px 10px"}}>📲 WhatsApp</button></a>}
+                  {suppData?.email&&<a href={`mailto:${suppData.email}?subject=RFQ: ${activeSession.name}&body=${encodeURIComponent(waMsg)}`} style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs">✉ Email</button></a>}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Comparison table */}
@@ -11709,15 +12221,17 @@ function printStockLabel(p, settings, labelType="shop") {
   const sym = curSym(settings?.currency||"R");
   const shopName = settings?.shop_name||"AutoParts";
   const isWs = labelType==="ws";
+  const lw = (settings?.label_w||50)+"mm";
+  const lh = (settings?.label_h||50)+"mm";
   const w = window.open("","_blank","width=380,height=300");
   if(!w) return;
   w.document.write(`<!DOCTYPE html><html><head><title>Label</title>
   <style>
-    @page{size:58mm 40mm;margin:0}
+    @page{size:${lw} ${lh};margin:0}
     @media print{body{margin:0}}
     *{box-sizing:border-box}
     body{font-family:Arial,sans-serif;margin:0;padding:0;background:#fff;color:#000}
-    .label{width:58mm;height:40mm;padding:2mm 3mm;display:flex;flex-direction:column;justify-content:space-between;border:0.5pt solid #ccc}
+    .label{width:${lw};height:${lh};padding:2mm 3mm;display:flex;flex-direction:column;justify-content:space-between;border:0.5pt solid #ccc}
     .hdr{font-size:6pt;font-weight:bold;text-transform:uppercase;letter-spacing:.1em;color:${isWs?"#e65100":"#1565c0"};border-bottom:0.5pt solid ${isWs?"#e65100":"#1565c0"};padding-bottom:0.5mm;margin-bottom:1mm}
     .name{font-size:8.5pt;font-weight:bold;line-height:1.2;overflow:hidden;max-height:12mm}
     .sku{font-family:"Courier New",monospace;font-size:7pt;color:#444;margin-top:0.5mm;letter-spacing:.04em}

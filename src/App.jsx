@@ -671,8 +671,9 @@ const StatusBadge = ({status}) => {
 
 // ── Login Page ────────────────────────────────────────────────
 function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
-  const [authTab,setAuthTab] = useState("customer"); // default to customer
+  const [authTab,setAuthTab] = useState("customer"); // customer | workshop | staff
   const [user,setUser] = useState(""); const [pass,setPass] = useState("");
+  const [wsUser,setWsUser] = useState(""); const [wsPass,setWsPass] = useState("");
   const [custTab,setCustTab] = useState("login");
   const [cName,setCName] = useState(""); const [cPhone,setCPhone] = useState("");
   const [cEmail,setCEmail] = useState(""); const [cPass,setCPass] = useState(""); const [cPass2,setCPass2] = useState("");
@@ -686,6 +687,15 @@ function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
     const res = await api.get("users",`username=eq.${encodeURIComponent(user)}&password=eq.${encodeURIComponent(pass)}&select=*`);
     if(Array.isArray(res)&&res.length>0){await logLogin(res[0]);onLogin(res[0]);}
     else setErr(t.wrongPass);
+    setLoading(false);
+  };
+
+  const doWorkshopLogin = async () => {
+    if(!wsUser||!wsPass){setErr("Fill username & password");return;}
+    setLoading(true);setErr("");
+    const res = await api.get("users",`username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&role=eq.workshop&select=*`);
+    if(Array.isArray(res)&&res.length>0){await logLogin(res[0]);onLogin(res[0]);}
+    else setErr("Invalid workshop username or password");
     setLoading(false);
   };
 
@@ -729,14 +739,17 @@ function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
             <button className={`lang ${lang==="zh"?"on":""}`} onClick={()=>setLang("zh")}>中文</button>
           </div>
         </div>
-        {/* Staff login link — small, subtle, at the top */}
-        <div style={{textAlign:"right",marginBottom:12}}>
-          <button onClick={()=>{setAuthTab(authTab==="customer"?"staff":"customer");setErr("");}}
-            style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"var(--text3)",fontFamily:"DM Sans,sans-serif",textDecoration:"underline",textDecorationStyle:"dotted"}}>
-            {authTab==="customer"
-              ? (lang==="zh"?"🏢 員工登入":"🏢 Staff Login")
-              : (lang==="zh"?"👤 返回客戶":"👤 Back to Customer")}
-          </button>
+        {/* Login type tabs */}
+        <div style={{display:"flex",borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",marginBottom:16}}>
+          {[["customer","👤 "+(lang==="zh"?"客戶":"Customer")],["workshop","🔧 Workshop"],["staff","🏢 "+(lang==="zh"?"員工":"Staff")]].map(([id,lb])=>(
+            <button key={id} onClick={()=>{setAuthTab(id);setErr("");}}
+              style={{flex:1,padding:"9px 4px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",fontFamily:"DM Sans,sans-serif",
+                background:authTab===id?"var(--accent)":"var(--surface2)",
+                color:authTab===id?"#fff":"var(--text3)",
+                borderRight:id!=="staff"?"1px solid var(--border)":"none",transition:"all .15s"}}>
+              {lb}
+            </button>
+          ))}
         </div>
         <div className="card" style={{padding:26,boxShadow:"var(--shadow-lg)"}}>
           {authTab==="staff"&&(
@@ -745,6 +758,18 @@ function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
               <div><FL label={t.password}/><input className="inp" type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doStaffLogin()}/></div>
               {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
               <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doStaffLogin} disabled={loading}>{loading?t.connecting:t.login}</button>
+            </div>
+          )}
+          {authTab==="workshop"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:13}}>
+              <div style={{textAlign:"center",marginBottom:4}}>
+                <span style={{fontSize:28}}>🔧</span>
+                <div style={{fontSize:13,color:"var(--text3)",marginTop:4}}>Workshop Portal</div>
+              </div>
+              <div><FL label={t.username}/><input className="inp" type="text" value={wsUser} onChange={e=>setWsUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()} autoCapitalize="none" placeholder="Workshop username"/></div>
+              <div><FL label={t.password}/><input className="inp" type="password" value={wsPass} onChange={e=>setWsPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()}/></div>
+              {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
+              <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doWorkshopLogin} disabled={loading}>{loading?t.connecting:t.login}</button>
             </div>
           )}
           {authTab==="customer"&&(

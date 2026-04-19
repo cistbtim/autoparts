@@ -1952,7 +1952,21 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   };
 
   const saveWorkshopProfile=async(data)=>{
-    await api.upsert("workshop_profiles",{...data, id:wsId});
+    const payload={...data, id:wsId};
+    // Check if row already exists
+    const existing=await api.get("workshop_profiles",`id=eq.${wsId}&select=id`).catch(()=>[]);
+    let res;
+    if(Array.isArray(existing)&&existing.length>0){
+      res=await api.patch("workshop_profiles","id",wsId,payload);
+    } else {
+      res=await api.insert("workshop_profiles",payload);
+    }
+    // Show actual Supabase error if save failed
+    if(res&&!Array.isArray(res)&&res.message){
+      showToast(`❌ Save failed: ${res.message}`,"err");
+      console.error("workshop_profiles save error:",res);
+      return;
+    }
     setWorkshopProfile(p=>({...p,...data}));
     showToast("✅ Workshop profile saved");
   };

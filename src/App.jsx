@@ -741,7 +741,7 @@ function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
         </div>
         {/* Login type tabs */}
         <div style={{display:"flex",borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",marginBottom:16}}>
-          {[["customer","👤 "+(lang==="zh"?"客戶":"Customer")],["workshop","🔧 Workshop"],["staff","🏢 "+(lang==="zh"?"員工":"Staff")]].map(([id,lb])=>(
+          {[["customer","🛒 "+(lang==="zh"?"零件店客戶":"Parts Shop")],["workshop","🔧 Workshop"],["staff","🏢 "+(lang==="zh"?"員工":"Staff")]].map(([id,lb])=>(
             <button key={id} onClick={()=>{setAuthTab(id);setErr("");}}
               style={{flex:1,padding:"9px 4px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",fontFamily:"DM Sans,sans-serif",
                 background:authTab===id?"var(--accent)":"var(--surface2)",

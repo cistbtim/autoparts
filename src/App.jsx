@@ -693,9 +693,23 @@ function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
   const doWorkshopLogin = async () => {
     if(!wsUser||!wsPass){setErr("Fill username & password");return;}
     setLoading(true);setErr("");
+    // Check main workshop account first — main always takes priority
     const res = await api.get("users",`username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&role=eq.workshop&select=*`);
-    if(Array.isArray(res)&&res.length>0){await logLogin(res[0]);onLogin(res[0]);}
-    else setErr("Invalid workshop username or password");
+    if(Array.isArray(res)&&res.length>0){await logLogin(res[0]);onLogin(res[0]);setLoading(false);return;}
+    // Check workshop sub-users (mechanics, managers)
+    const suRes = await api.get("workshop_users",`username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&is_active=eq.true&select=*`);
+    if(Array.isArray(suRes)&&suRes.length>0){
+      const wu=suRes[0];
+      const mainRes=await api.get("users",`id=eq.${wu.workshop_id}&select=*`);
+      if(Array.isArray(mainRes)&&mainRes.length>0){
+        const userObj={...mainRes[0],wsRole:wu.ws_role,wsUsername:wu.username,name:wu.name||mainRes[0].name};
+        await logLogin({...userObj,username:wu.username});
+        onLogin(userObj);
+        setLoading(false);
+        return;
+      }
+    }
+    setErr("Invalid workshop username or password");
     setLoading(false);
   };
 
@@ -990,6 +1004,7 @@ export default function App() {
 function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   _currentLang = lang; // sync for tSt
   const role = user.role;
+  const wsRole = user.wsRole || "main"; // workshop sub-role: "main" | "manager" | "mechanic"
   // workshop_id scopes all workshop data to this user's own records
   const wsId = role==="workshop" ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
@@ -2270,16 +2285,16 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       id:"grp_workshop", icon:"🔧", label:lang==="zh"?"維修工場":"Workshop", roles:["admin","manager","workshop"],
       children:[
         {id:"workshop",    icon:"🔧",label:"Jobs",         roles:["admin","manager","workshop"]},
-        {id:"wscustomers", icon:"👥",label:"WS Customers", roles:["admin","manager","workshop"]},
-        {id:"wsquotations",icon:"📝",label:"WS Quotations",roles:["admin","manager","workshop"]},
-        {id:"wsinvoices",  icon:"🧾",label:"WS Invoices",  roles:["admin","manager","workshop"]},
-        {id:"wspayments",  icon:"💳",label:"WS Payments",  roles:["admin","manager","workshop"]},
-        {id:"wsstock",     icon:"📦",label:"WS Stock",     roles:["admin","manager","workshop"]},
-        {id:"wsservices",  icon:"🔧",label:"WS Services",  roles:["admin","manager","workshop"]},
-        {id:"wstransfer",  icon:"🔄",label:"WS Transfer",  roles:["admin","manager","workshop"]},
-        {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager","workshop"]},
-        {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager","workshop"]},
-        {id:"wsprofile",   icon:"⚙️",label:"WS Settings",  roles:["workshop"]},
+        {id:"wscustomers", icon:"👥",label:"WS Customers", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsquotations",icon:"📝",label:"WS Quotations",roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsinvoices",  icon:"🧾",label:"WS Invoices",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wspayments",  icon:"💳",label:"WS Payments",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsstock",     icon:"📦",label:"WS Stock",     roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsservices",  icon:"🔧",label:"WS Services",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wstransfer",  icon:"🔄",label:"WS Transfer",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsprofile",   icon:"⚙️",label:"WS Settings",  roles:["workshop"], wsRoles:["main"]},
       ]
     },
     {
@@ -2314,7 +2329,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     },
   ].filter(g=>g.roles.includes(role)).map(g=>({
     ...g,
-    children:g.children.filter(c=>c.roles.includes(role))
+    children:g.children.filter(c=>c.roles.includes(role)&&(!c.wsRoles||role!=="workshop"||c.wsRoles.includes(wsRole)))
   })).filter(g=>g.children.length>0);
 
   // Flat list for mobile nav — role-based
@@ -2339,6 +2354,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       {id:"inventory", icon:"📦",label:t.inventory},
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"reports",   icon:"📊",label:t.reports},
+    ];
+    if(role==="workshop"&&wsRole==="mechanic") return [
+      {id:"workshop",    icon:"🔧",label:"Jobs"},
     ];
     if(role==="workshop") return [
       {id:"workshop",    icon:"🔧",label:"Jobs"},
@@ -3510,7 +3528,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {/* ── VEHICLES ── */}
         {/* ── WORKSHOP (all sub-tabs) ── */}
         {tab==="wsprofile"&&role==="workshop"&&(
-          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile}/>
+          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId}/>
         )}
 
         {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
@@ -3552,6 +3570,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             onDeleteWsService={deleteWsService}
             onSaveWsTransfer={saveWsTransfer}
             parts={parts}
+            wsRole={wsRole}
             t={t} lang={lang}/>
         )}
 
@@ -3866,7 +3885,8 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PROFILE / SETTINGS PAGE
 // ═══════════════════════════════════════════════════════════════
-function WorkshopProfilePage({profile,onSave}) {
+function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
+  const [pTab,setPTab]=useState("profile"); // "profile" | "users"
   const [f,setF]=useState({
     name:"", vat_number:"", phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", ...profile
@@ -3874,8 +3894,47 @@ function WorkshopProfilePage({profile,onSave}) {
   const [saving,setSaving]=useState(false);
   const [dragOver,setDragOver]=useState(false);
   const fileRef=useRef(null);
+  // Workshop users state
+  const [wsUsers,setWsUsers]=useState([]);
+  const [loadingUsers,setLoadingUsers]=useState(false);
+  const [userForm,setUserForm]=useState(null); // null | {id,username,password,name,ws_role,is_active}
+  const [savingUser,setSavingUser]=useState(false);
+  const [userErr,setUserErr]=useState("");
 
   useEffect(()=>{ setF(p=>({...p,...profile})); },[profile]);
+
+  const loadWsUsers=async()=>{
+    if(!wsId) return;
+    setLoadingUsers(true);
+    const res=await api.get("workshop_users",`workshop_id=eq.${wsId}&order=id.asc&select=*`);
+    setWsUsers(Array.isArray(res)?res:[]);
+    setLoadingUsers(false);
+  };
+  useEffect(()=>{ if(pTab==="users"&&wsRole==="main") loadWsUsers(); },[pTab]);
+
+  const saveWsUser=async()=>{
+    if(!userForm?.username||!userForm?.ws_role){setUserErr("Username and role required");return;}
+    if(!userForm.id&&!userForm.password){setUserErr("Password required for new user");return;}
+    setSavingUser(true);setUserErr("");
+    try{
+      if(userForm.id){
+        const upd={username:userForm.username,name:userForm.name||"",ws_role:userForm.ws_role,is_active:userForm.is_active};
+        if(userForm.password) upd.password=userForm.password;
+        await api.patch("workshop_users","id",userForm.id,upd);
+      } else {
+        await api.insert("workshop_users",{workshop_id:wsId,username:userForm.username,password:userForm.password,name:userForm.name||"",ws_role:userForm.ws_role,is_active:true});
+      }
+      await loadWsUsers();
+      setUserForm(null);
+    }catch(e){setUserErr("Save failed: "+e.message);}
+    setSavingUser(false);
+  };
+
+  const deleteWsUser=async(id)=>{
+    if(!window.confirm("Delete this user?")) return;
+    await api.delete("workshop_users","id",id);
+    setWsUsers(p=>p.filter(u=>u.id!==id));
+  };
 
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
 
@@ -3909,9 +3968,84 @@ function WorkshopProfilePage({profile,onSave}) {
 
   return (
     <div className="fu" style={{maxWidth:560}}>
-      <h1 style={{fontSize:20,fontWeight:700,marginBottom:20}}>⚙️ Workshop Settings</h1>
+      <h1 style={{fontSize:20,fontWeight:700,marginBottom:16}}>⚙️ Workshop Settings</h1>
 
-      <div className="card" style={{padding:20,display:"flex",flexDirection:"column",gap:14}}>
+      {wsRole==="main"&&(
+        <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:20,gap:0}}>
+          {[["profile","⚙️ Profile"],["users","👥 Workshop Users"]].map(([id,lb])=>(
+            <button key={id} onClick={()=>setPTab(id)}
+              style={{padding:"9px 18px",border:"none",background:"none",cursor:"pointer",fontSize:13,fontWeight:pTab===id?700:400,
+                color:pTab===id?"var(--accent)":"var(--text2)",borderBottom:pTab===id?"2px solid var(--accent)":"2px solid transparent",marginBottom:-1}}>
+              {lb}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pTab==="users"&&wsRole==="main"&&(
+        <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div style={{fontSize:14,fontWeight:600}}>Manage who can log in to your workshop</div>
+            <button className="btn btn-primary btn-sm" onClick={()=>setUserForm({username:"",password:"",name:"",ws_role:"mechanic",is_active:true})}>+ Add User</button>
+          </div>
+          {loadingUsers&&<div style={{textAlign:"center",padding:20,color:"var(--text3)"}}>Loading...</div>}
+          {!loadingUsers&&wsUsers.length===0&&<div className="card" style={{textAlign:"center",padding:24,color:"var(--text3)"}}>No sub-users yet. Add mechanics or managers.</div>}
+          {wsUsers.map(u=>(
+            <div key={u.id} className="card" style={{padding:"12px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:120}}>
+                <div style={{fontWeight:600,fontSize:14}}>{u.name||u.username}</div>
+                <div style={{fontSize:12,color:"var(--text3)"}}>@{u.username}</div>
+              </div>
+              <span className="badge" style={{
+                background:u.ws_role==="manager"?"rgba(139,92,246,.12)":u.ws_role==="mechanic"?"rgba(96,165,250,.12)":"rgba(249,115,22,.12)",
+                color:u.ws_role==="manager"?"#8b5cf6":u.ws_role==="mechanic"?"var(--blue)":"#f97316",
+                fontSize:12
+              }}>
+                {u.ws_role==="manager"?"👔 Manager":u.ws_role==="mechanic"?"🔧 Mechanic":"👑 Main"}
+              </span>
+              <span style={{fontSize:11,padding:"2px 8px",borderRadius:5,
+                background:u.is_active?"rgba(52,211,153,.12)":"rgba(248,113,113,.12)",
+                color:u.is_active?"var(--green)":"var(--red)"}}>
+                {u.is_active?"Active":"Inactive"}
+              </span>
+              <div style={{display:"flex",gap:6}}>
+                <button className="btn btn-ghost btn-xs" onClick={()=>setUserForm({...u,password:""})}>✏️ Edit</button>
+                <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deleteWsUser(u.id)}>🗑️</button>
+              </div>
+            </div>
+          ))}
+          {userForm&&(
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+              <div className="card" style={{width:"100%",maxWidth:400,padding:24,display:"flex",flexDirection:"column",gap:14}}>
+                <h2 style={{fontSize:16,fontWeight:700,marginBottom:4}}>{userForm.id?"Edit User":"Add Workshop User"}</h2>
+                <div><FL label="Display Name"/><input className="inp" value={userForm.name} onChange={e=>setUserForm(p=>({...p,name:e.target.value}))} placeholder="e.g. John Smith"/></div>
+                <div><FL label="Username *"/><input className="inp" value={userForm.username} onChange={e=>setUserForm(p=>({...p,username:e.target.value}))} placeholder="e.g. john_mech" autoCapitalize="none"/></div>
+                <div><FL label={userForm.id?"New Password (leave blank to keep)":"Password *"}/><input className="inp" type="password" value={userForm.password} onChange={e=>setUserForm(p=>({...p,password:e.target.value}))}/></div>
+                <div>
+                  <FL label="Role *"/>
+                  <select className="inp" value={userForm.ws_role} onChange={e=>setUserForm(p=>({...p,ws_role:e.target.value}))}>
+                    <option value="mechanic">🔧 Mechanic (jobs + checklist only)</option>
+                    <option value="manager">👔 Manager (full workshop access)</option>
+                  </select>
+                </div>
+                {userForm.id&&(
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <input type="checkbox" id="ua" checked={userForm.is_active} onChange={e=>setUserForm(p=>({...p,is_active:e.target.checked}))}/>
+                    <label htmlFor="ua" style={{fontSize:13}}>Active (can login)</label>
+                  </div>
+                )}
+                {userErr&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {userErr}</div>}
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn btn-primary" style={{flex:1}} onClick={saveWsUser} disabled={savingUser}>{savingUser?"Saving...":"✅ Save"}</button>
+                  <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setUserForm(null);setUserErr("");}}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {pTab==="profile"&&<div className="card" style={{padding:20,display:"flex",flexDirection:"column",gap:14}}>
         {/* Logo */}
         <div>
           <FL label="Workshop Logo"/>
@@ -3946,7 +4080,7 @@ function WorkshopProfilePage({profile,onSave}) {
         <button className="btn btn-primary" style={{padding:13,fontSize:15}} onClick={save} disabled={saving}>
           {saving?"Saving...":"✅ Save Settings"}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -10161,7 +10295,7 @@ function WsVehicleForm({data,onSave,onClose,t}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],settings,initialTab,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,t,lang}) {
+function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],settings,initialTab,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,wsRole="main",t,lang}) {
   const [view,      setView]      = useState("list");
   const [activeJob, setActiveJob] = useState(null);
   const [editJob,   setEditJob]   = useState(null);
@@ -10204,13 +10338,16 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
         onSaveInvoice={onSaveInvoice} onUpdateInvoice={onUpdateInvoice} onDeleteInvoice={onDeleteInvoice}
         onSaveQuote={onSaveQuote} onDeleteQuote={onDeleteQuote} onConvertQuoteToInvoice={onConvertQuoteToInvoice}
         onSendQuoteForApproval={onSendQuoteForApproval}
+        wsRole={wsRole}
         t={t} lang={lang}/>
     );
   }
 
   // ── Sub-nav tabs ─────────────────────────────────────────────
   const quoteResponses = quotes.filter(q=>q.confirm_status==="confirmed"||q.confirm_status==="declined").length;
-  const WS_TABS = [
+  const WS_TABS = wsRole==="mechanic" ? [
+    ["jobs",       "🔧 Jobs",        jobs.length],
+  ] : [
     ["jobs",       "🔧 Jobs",        jobs.length],
     ["customers",  "👥 Customers",   wsCustomers.length],
     ["quotations", quoteResponses>0?`📝 Quotations 🔔`:"📝 Quotations",  quotes.length],
@@ -10311,7 +10448,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
                   <div style={{display:"flex",gap:4,alignItems:"center"}}>
                     {jq&&!inv&&<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",fontSize:10}}>📝 Quoted</span>}
                     {inv&&<span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:10}}>🧾 Invoiced</span>}
-                    {total>0&&<span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmt(total)}</span>}
+                    {total>0&&wsRole!=="mechanic"&&<span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmt(total)}</span>}
                   </div>
                 </div>
               </div>
@@ -10760,7 +10897,7 @@ const CHECKLIST_ITEMS=[
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,wsRole="main",t,lang}) {
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);
@@ -10945,7 +11082,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         <span className="badge" style={{background:"rgba(96,165,250,.12)",color:ST_COLOR[job.status]||"var(--blue)",fontSize:13,padding:"5px 12px"}}>
           {job.status}
         </span>
-        <button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ Edit</button>
+        {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ Edit</button>}
         <button className="btn btn-ghost btn-sm" title="Print Job Card Label" onClick={()=>printJobCardLabel(job,settings)}>🏷️ Label</button>
         <button className="btn btn-ghost btn-sm" title="Collection / Delivery Label" onClick={()=>setDeliveryModal(true)}>🚗 Collect/Deliver</button>
         <button className="btn btn-ghost btn-sm" title="Download vehicle info as .txt" onClick={()=>{
@@ -11043,15 +11180,27 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       </div>
 
       {/* Status update bar */}
-      <div className="card" style={{padding:12,marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontSize:12,color:"var(--text3)",marginRight:4}}>Update status:</span>
-        {JOB_STATUSES.map(s=>(
-          <button key={s} className={`btn btn-xs ${job.status===s?"btn-primary":"btn-ghost"}`}
-            onClick={()=>onSaveJob({...job,status:s})}>
-            {s}
-          </button>
-        ))}
-      </div>
+      {wsRole==="mechanic" ? (
+        <div className="card" style={{padding:12,marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{fontSize:12,color:"var(--text3)",marginRight:4}}>Update status:</span>
+          {["Pending","In Progress"].map(s=>(
+            <button key={s} className={`btn btn-xs ${job.status===s?"btn-primary":"btn-ghost"}`}
+              onClick={()=>onSaveJob({...job,status:s})}>
+              {s}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="card" style={{padding:12,marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{fontSize:12,color:"var(--text3)",marginRight:4}}>Update status:</span>
+          {JOB_STATUSES.map(s=>(
+            <button key={s} className={`btn btn-xs ${job.status===s?"btn-primary":"btn-ghost"}`}
+              onClick={()=>onSaveJob({...job,status:s})}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Check-in Checklist ── */}
       <div className="card" style={{marginBottom:14,overflow:"hidden"}}>
@@ -11221,33 +11370,37 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       {/* Line items */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <div style={{fontWeight:700,fontSize:14}}>🔧 Parts & Labour</div>
-        <div style={{display:"flex",gap:6}}>
-          <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ Part</button>
-          <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ Labour</button>
-        </div>
+        {wsRole!=="mechanic"&&(
+          <div style={{display:"flex",gap:6}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ Part</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ Labour</button>
+          </div>
+        )}
       </div>
 
       <div className="card" style={{overflow:"hidden",marginBottom:14}}>
         {items.length===0
           ? <div style={{textAlign:"center",padding:24,color:"var(--text3)"}}>No items yet — add parts or labour</div>
           : <table className="tbl" style={{width:"100%"}}>
-              <thead><tr>{["Type","Description","Qty","Unit Price","Total",""].map(h=><th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>
+                {["Type","Description","Qty",...(wsRole!=="mechanic"?["Unit Price","Total"]:[]),""].map(h=><th key={h}>{h}</th>)}
+              </tr></thead>
               <tbody>
                 {items.map(item=>(
                   <tr key={item.id}>
                     <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?"🔩 Part":"👷 Labour"}</span></td>
                     <td style={{fontWeight:500}}>{item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}</td>
                     <td style={{textAlign:"right"}}>{item.qty}</td>
-                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(item.unit_price)}</td>
-                    <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(item.total)}</td>
-                    <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button></td>
+                    {wsRole!=="mechanic"&&<td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(item.unit_price)}</td>}
+                    {wsRole!=="mechanic"&&<td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(item.total)}</td>}
+                    <td>{wsRole!=="mechanic"&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button>}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
         }
         {/* Totals */}
-        {items.length>0&&(
+        {items.length>0&&wsRole!=="mechanic"&&(
           <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
             <div style={{fontSize:13,color:"var(--text3)"}}>Subtotal: <strong style={{color:"var(--text)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(subtotal)}</strong></div>
             {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(tax)}</strong></div>}
@@ -11257,7 +11410,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       </div>
 
       {/* ── Quote section ── */}
-      {quote ? (
+      {wsRole!=="mechanic"&&quote ? (
         <div className="card" style={{padding:14,marginBottom:14,borderLeft:`3px solid ${
           quote.status==="accepted"?"var(--green)":quote.status==="declined"?"var(--red)":quote.status==="converted"?"var(--text3)":"var(--blue)"}`}}>
           {/* Header */}
@@ -11361,7 +11514,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               onClick={()=>setDeletingQuote(true)}>🗑️</button>
           </div>
         </div>
-      ) : !invoice&&items.length>0&&(
+      ) : !invoice&&items.length>0&&wsRole!=="mechanic"&&(
         <button className="btn btn-ghost" style={{width:"100%",padding:12,fontSize:14,fontWeight:600,marginBottom:14,border:"2px dashed var(--border)"}}
           onClick={()=>setQuoteModal(true)}>
           📝 Create Quotation for Customer
@@ -11369,7 +11522,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       )}
 
       {/* Invoice section */}
-      {invoice ? (
+      {wsRole!=="mechanic"&&invoice ? (
         <div className="card" style={{padding:14,borderLeft:`3px solid ${invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)"}`}}>
           {/* Header row */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:10}}>
@@ -11441,7 +11594,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               onClick={()=>setDeletingInv(true)}>🗑️ Delete</button>
           </div>
         </div>
-      ) : items.length>0&&(
+      ) : items.length>0&&wsRole!=="mechanic"&&(
         quote?.status==="converted"
           ? <div style={{background:"rgba(251,191,36,.12)",border:"1px solid rgba(251,191,36,.4)",borderRadius:8,padding:"12px 14px",marginBottom:4}}>
               <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>⚠️ This quote was already converted to an invoice.</div>

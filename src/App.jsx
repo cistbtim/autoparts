@@ -479,7 +479,8 @@ const getSubInfo = (u) => {
 const canAccess = (u) => {
   if(!u) return false;
   if(u.role==="admin") return true;
-  if(u.role==="demo") return true; // demo always gets in
+  if(u.role==="demo") return true;
+  if(u.role==="workshop") return true;
   // Customers who log in via customers table (_isCustomer flag) always get access
   if(u._isCustomer) return true;
   // Staff (shipper etc) — check subscription
@@ -2174,9 +2175,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       ]
     },
     {
-      id:"grp_inventory", icon:"📦", label:lang==="zh"?"庫存管理":"Inventory", roles:["admin","manager","shipper","stockman"],
+      id:"grp_inventory", icon:"📦", label:lang==="zh"?"庫存管理":"Inventory", roles:["admin","manager","shipper","stockman","workshop"],
       children:[
-        {id:"inventory",icon:"📦",label:t.inventory,roles:["admin","manager","shipper","stockman"],badge:lowStock.length},
+        {id:"inventory",icon:"📦",label:t.inventory,roles:["admin","manager","shipper","stockman","workshop"],badge:lowStock.length},
         {id:"stocktake",icon:"🔢",label:t.stockTake,roles:["admin","manager","shipper","stockman"]},
         {id:"stockmove",icon:"🔀",label:t.stockMove,roles:["admin","manager","shipper","stockman"]},
         {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager"]},
@@ -2194,25 +2195,25 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       ]
     },
     {
-      id:"grp_workshop", icon:"🔧", label:lang==="zh"?"維修工場":"Workshop", roles:["admin","manager"],
+      id:"grp_workshop", icon:"🔧", label:lang==="zh"?"維修工場":"Workshop", roles:["admin","manager","workshop"],
       children:[
-        {id:"workshop",    icon:"🔧",label:"Jobs",         roles:["admin","manager"]},
-        {id:"wscustomers", icon:"👥",label:"WS Customers", roles:["admin","manager"]},
-        {id:"wsquotations",icon:"📝",label:"WS Quotations",roles:["admin","manager"]},
-        {id:"wsinvoices",  icon:"🧾",label:"WS Invoices",  roles:["admin","manager"]},
-        {id:"wspayments",  icon:"💳",label:"WS Payments",  roles:["admin","manager"]},
-        {id:"wsstock",     icon:"📦",label:"WS Stock",     roles:["admin","manager"]},
-        {id:"wsservices",  icon:"🔧",label:"WS Services",  roles:["admin","manager"]},
-        {id:"wstransfer",  icon:"🔄",label:"WS Transfer",  roles:["admin","manager"]},
-        {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager"]},
-        {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager"]},
+        {id:"workshop",    icon:"🔧",label:"Jobs",         roles:["admin","manager","workshop"]},
+        {id:"wscustomers", icon:"👥",label:"WS Customers", roles:["admin","manager","workshop"]},
+        {id:"wsquotations",icon:"📝",label:"WS Quotations",roles:["admin","manager","workshop"]},
+        {id:"wsinvoices",  icon:"🧾",label:"WS Invoices",  roles:["admin","manager","workshop"]},
+        {id:"wspayments",  icon:"💳",label:"WS Payments",  roles:["admin","manager","workshop"]},
+        {id:"wsstock",     icon:"📦",label:"WS Stock",     roles:["admin","manager","workshop"]},
+        {id:"wsservices",  icon:"🔧",label:"WS Services",  roles:["admin","manager","workshop"]},
+        {id:"wstransfer",  icon:"🔄",label:"WS Transfer",  roles:["admin","manager","workshop"]},
+        {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager","workshop"]},
+        {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager","workshop"]},
       ]
     },
     {
-      id:"grp_sales", icon:"🛒", label:lang==="zh"?"銷售與客戶":"Sales", roles:["admin","manager","shipper","customer"],
+      id:"grp_sales", icon:"🛒", label:lang==="zh"?"銷售與客戶":"Sales", roles:["admin","manager","shipper","customer","workshop"],
       badge: pendingCnt,
       children:[
-        {id:"shop",icon:"🛒",label:t.shop,roles:["admin","customer"]},
+        {id:"shop",icon:"🛒",label:t.shop,roles:["admin","customer","workshop"]},
         {id:"picking",icon:"🔍",label:t.picking,roles:["admin","shipper"],badge:pendingCnt},
         {id:"orders",icon:"📋",label:t.orders,roles:["admin","shipper"]},
         {id:"myorders",icon:"📦",label:t.myOrders,roles:["customer"]},
@@ -2265,6 +2266,13 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       {id:"inventory", icon:"📦",label:t.inventory},
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"reports",   icon:"📊",label:t.reports},
+    ];
+    if(role==="workshop") return [
+      {id:"workshop",    icon:"🔧",label:"Jobs"},
+      {id:"wscustomers", icon:"👥",label:"WS Customers"},
+      {id:"wsquotations",icon:"📝",label:"Quotations"},
+      {id:"wsinvoices",  icon:"🧾",label:"Invoices"},
+      {id:"shop",        icon:"🛒",label:t.shop},
     ];
     // admin — show most used
     return [
@@ -5704,7 +5712,7 @@ function UserModal({user,onSave,onClose,t}) {
     <Overlay onClose={onClose}>
       <MHead title={user?"Edit User":"Add User"} onClose={onClose}/>
       <FG><div><FL label="Username *"/><input className="inp" value={f.username} onChange={e=>s("username",e.target.value)} disabled={!!user}/></div><div><FL label={user?"New password (blank=keep)":"Password *"}/><input className="inp" type="password" value={f.password} onChange={e=>s("password",e.target.value)} placeholder="••••••"/></div></FG>
-      <FD><FL label={t.role}/><select className="inp" value={f.role} onChange={e=>s("role",e.target.value)}><option value="admin">👑 Admin</option><option value="manager">👔 Manager</option><option value="shipper">🚚 Shipper</option><option value="stockman">📦 Stockman</option><option value="customer">👤 Customer</option><option value="demo">🔒 Demo</option></select></FD>
+      <FD><FL label={t.role}/><select className="inp" value={f.role} onChange={e=>s("role",e.target.value)}><option value="admin">👑 Admin</option><option value="manager">👔 Manager</option><option value="workshop">🔧 Workshop</option><option value="shipper">🚚 Shipper</option><option value="stockman">📦 Stockman</option><option value="customer">👤 Customer</option><option value="demo">🔒 Demo</option></select></FD>
       <FG><div><FL label={t.name}/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)}/></div><div><FL label={t.phone}/><input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div></FG>
       <FD><FL label={t.email}/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></FD>
       <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.username||(!user&&!f.password))return;const d={username:f.username,role:f.role,name:f.name,phone:f.phone,email:f.email};if(f.password)d.password=f.password;onSave(d);}}>{t.save}</button></div>

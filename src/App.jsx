@@ -1945,7 +1945,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   // Customers / Users
   const saveCustomer=async(data)=>{const ec=mData("editCustomer");if(ec)await api.patch("customers","id",ec.id,data);else await api.upsert("customers",{...data,orders:0,total_spent:0});await loadAll();closeM("editCustomer");showToast(ec?"Updated":"Added");};
   const deleteCustomer=async(id)=>{await api.delete("customers","id",id);await loadAll();showToast("Deleted","err");};
-  const saveUser=async(data)=>{const eu=mData("editUser");if(eu)await api.patch("users","id",eu.id,data);else await api.upsert("users",data);await loadAll();closeM("editUser");showToast(eu?"Updated":"Added");};
+  const saveUser=async(data)=>{const eu=mData("editUser");if(eu?.id)await api.patch("users","id",eu.id,data);else await api.upsert("users",data);await loadAll();closeM("editUser");showToast(eu?.id?"Updated":"Added");};
   const deleteUser=async(id)=>{if(id===user.id){showToast("Cannot delete yourself","err");return;}await api.delete("users","id",id);await loadAll();showToast("Deleted","err");};
   const saveSettings=async(data)=>{
     // Include id:1 so upsert creates row if missing
@@ -3444,7 +3444,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {tab==="users"&&role==="admin"&&(
           <div className="fu">
             <PH title={t.users} subtitle={`${users.length} users`}
-              action={<button className="btn btn-primary" onClick={()=>openM("editUser")}>+ Add User</button>}/>
+              action={<div style={{display:"flex",gap:8}}><button className="btn btn-ghost" onClick={()=>openM("editUser",{role:"workshop",username:"",password:"",name:"",phone:"",email:""})}>🔧 Add Workshop</button><button className="btn btn-primary" onClick={()=>openM("editUser")}>+ Add User</button></div>}/>
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
@@ -3881,8 +3881,21 @@ function WorkshopProfilePage({profile,onSave}) {
 
   const handleFile=(file)=>{
     if(!file||!file.type.startsWith("image/")) return;
+    const MAX=800;
     const reader=new FileReader();
-    reader.onload=e=>{ s("logo_data",e.target.result); s("logo_url",""); };
+    reader.onload=ev=>{
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement("canvas");
+        let w=img.width,h=img.height;
+        if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+        canvas.width=w;canvas.height=h;
+        canvas.getContext("2d").drawImage(img,0,0,w,h);
+        s("logo_data",canvas.toDataURL("image/png",0.85));
+        s("logo_url","");
+      };
+      img.src=ev.target.result;
+    };
     reader.readAsDataURL(file);
   };
 
@@ -5908,16 +5921,17 @@ function CustomerModal({customer,onSave,onClose,t}) {
 }
 
 function UserModal({user,onSave,onClose,t}) {
-  const [f,setF]=useState(user?{username:user.username,password:"",role:user.role,name:user.name||"",phone:user.phone||"",email:user.email||""}:{username:"",password:"",role:"customer",name:"",phone:"",email:""});
+  const isEdit=!!user?.id;
+  const [f,setF]=useState(isEdit?{username:user.username,password:"",role:user.role,name:user.name||"",phone:user.phone||"",email:user.email||""}:{username:"",password:"",role:user?.role||"customer",name:"",phone:"",email:""});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   return (
     <Overlay onClose={onClose}>
-      <MHead title={user?"Edit User":"Add User"} onClose={onClose}/>
-      <FG><div><FL label="Username *"/><input className="inp" value={f.username} onChange={e=>s("username",e.target.value)} disabled={!!user}/></div><div><FL label={user?"New password (blank=keep)":"Password *"}/><input className="inp" type="password" value={f.password} onChange={e=>s("password",e.target.value)} placeholder="••••••"/></div></FG>
+      <MHead title={isEdit?"Edit User":f.role==="workshop"?"🔧 Add Workshop":"Add User"} onClose={onClose}/>
+      <FG><div><FL label="Username *"/><input className="inp" value={f.username} onChange={e=>s("username",e.target.value)} disabled={isEdit}/></div><div><FL label={isEdit?"New password (blank=keep)":"Password *"}/><input className="inp" type="password" value={f.password} onChange={e=>s("password",e.target.value)} placeholder="••••••"/></div></FG>
       <FD><FL label={t.role}/><select className="inp" value={f.role} onChange={e=>s("role",e.target.value)}><option value="admin">👑 Admin</option><option value="manager">👔 Manager</option><option value="workshop">🔧 Workshop</option><option value="shipper">🚚 Shipper</option><option value="stockman">📦 Stockman</option><option value="customer">👤 Customer</option><option value="demo">🔒 Demo</option></select></FD>
       <FG><div><FL label={t.name}/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)}/></div><div><FL label={t.phone}/><input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div></FG>
       <FD><FL label={t.email}/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></FD>
-      <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.username||(!user&&!f.password))return;const d={username:f.username,role:f.role,name:f.name,phone:f.phone,email:f.email};if(f.password)d.password=f.password;onSave(d);}}>{t.save}</button></div>
+      <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.username||(!isEdit&&!f.password))return;const d={username:f.username,role:f.role,name:f.name,phone:f.phone,email:f.email};if(f.password)d.password=f.password;onSave(d);}}>{t.save}</button></div>
     </Overlay>
   );
 }
@@ -12979,6 +12993,8 @@ function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
   const parts    = items.filter(i=>i.type==="part");
   const labour   = items.filter(i=>i.type==="labour");
   const shopName = settings.shop_name||"Auto Workshop";
+  const logoSrc = settings.logo_data || settings.logo_url || "";
+  const logoHtml = logoSrc ? `<img src="${logoSrc}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
   const photoList = [{url:photos.front,label:"Front"},{url:photos.rear,label:"Rear"},{url:photos.side,label:"Side"}].filter(p=>p.url);
   const photosBlock = photoList.length ? `
     <div style="width:190px;flex-shrink:0">
@@ -13035,6 +13051,7 @@ function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
 
   <div class="header">
     <div>
+      ${logoHtml}
       <div class="shop-name">${shopName}</div>
       <div class="shop-info">
         ${settings.phone?`📞 ${settings.phone}<br/>`:""}
@@ -13138,6 +13155,8 @@ function printWorkshopQuote(job, items, quote, settings, photos={}) {
   const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
   const total    = subtotal+taxAmt;
   const shopName = settings.shop_name||"Auto Workshop";
+  const logoSrc = settings.logo_data || settings.logo_url || "";
+  const logoHtml = logoSrc ? `<img src="${logoSrc}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
   const photoList = [{url:photos.front,label:"Front"},{url:photos.rear,label:"Rear"},{url:photos.side,label:"Side"}].filter(p=>p.url);
   const photosBlock = photoList.length ? `
     <div style="width:190px;flex-shrink:0">
@@ -13194,6 +13213,7 @@ function printWorkshopQuote(job, items, quote, settings, photos={}) {
 
   <div class="header">
     <div>
+      ${logoHtml}
       <div class="shop-name">${shopName}</div>
       <div class="shop-info">
         ${settings.phone?`📞 ${settings.phone}<br/>`:""}

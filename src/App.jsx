@@ -1233,6 +1233,11 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWorkshopCustomers(Array.isArray(rest[9])?rest[9]:[]);
     setWorkshopVehicles(Array.isArray(rest[10])?rest[10]:[]);
     setCustomerQueries(Array.isArray(rest[11])?rest[11]:[]);
+    // Load workshop profile for workshop role
+    if(wsId){
+      const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
+      setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
+    }
   },[]);
 
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted

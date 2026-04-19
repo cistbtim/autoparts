@@ -38,12 +38,16 @@ const fetchAll = async (table, query="") => {
   return all;
 };
 
+let _demoMode = false;
+let _onDemoBlock = null;
+const _demoBlock = () => { _onDemoBlock?.(); return {}; };
+
 const api = {
   get:    async (t, q="") => fetchAll(t, q),
-  upsert: async (t, d)    => (await fetch(`${SUPABASE_URL}/rest/v1/${t}`, {method:"POST", headers:H({Prefer:"return=representation,resolution=merge-duplicates"}), body:JSON.stringify(d)})).json(),
-  patch:  async (t, c, v, d) => (await fetch(`${SUPABASE_URL}/rest/v1/${t}?${c}=eq.${v}`, {method:"PATCH", headers:H({Prefer:"return=representation"}), body:JSON.stringify(d)})).json(),
-  delete: async (t, c, v) => fetch(`${SUPABASE_URL}/rest/v1/${t}?${c}=eq.${v}`, {method:"DELETE", headers:H()}),
-  insert: async (t, d)    => (await fetch(`${SUPABASE_URL}/rest/v1/${t}`, {method:"POST", headers:H({Prefer:"return=representation"}), body:JSON.stringify(d)})).json(),
+  upsert: async (t, d)    => { if(_demoMode) return _demoBlock(); return (await fetch(`${SUPABASE_URL}/rest/v1/${t}`, {method:"POST", headers:H({Prefer:"return=representation,resolution=merge-duplicates"}), body:JSON.stringify(d)})).json(); },
+  patch:  async (t, c, v, d) => { if(_demoMode) return _demoBlock(); return (await fetch(`${SUPABASE_URL}/rest/v1/${t}?${c}=eq.${v}`, {method:"PATCH", headers:H({Prefer:"return=representation"}), body:JSON.stringify(d)})).json(); },
+  delete: async (t, c, v) => { if(_demoMode) return _demoBlock(); return fetch(`${SUPABASE_URL}/rest/v1/${t}?${c}=eq.${v}`, {method:"DELETE", headers:H()}); },
+  insert: async (t, d)    => { if(_demoMode) return _demoBlock(); return (await fetch(`${SUPABASE_URL}/rest/v1/${t}`, {method:"POST", headers:H({Prefer:"return=representation"}), body:JSON.stringify(d)})).json(); },
 };
 
 // ── Settings cache ────────────────────────────────────────────
@@ -1100,6 +1104,11 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   },[]);
 
   const showToast=(msg,type="ok")=>{setToast({msg,type});setTimeout(()=>setToast(null),2800);};
+
+  // Demo mode — block all writes, show toast
+  const isDemo = user?.role==="demo";
+  _demoMode = isDemo;
+  _onDemoBlock = ()=>showToast("🔒 Demo mode — sign up to save changes","err");
 
   const logInv=async(part,before,after,action,reason="")=>{
     await api.upsert("inventory_logs",{part_id:part.id,part_name:part.name,part_sku:part.sku,action,qty_before:before,qty_after:after,changed_by:user.name||user.username,reason});
@@ -3739,6 +3748,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       {toast&&<div className="toast" style={{borderColor:toast.type==="err"?"rgba(248,113,113,.3)":"var(--border2)",color:toast.type==="err"?"var(--red)":"var(--green)"}}>
         {toast.type==="err"?"⚠":"✓"} {toast.msg}
       </div>}
+
+      {isDemo&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9999,background:"linear-gradient(90deg,#f59e0b,#f97316)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
+        🔒 Demo Mode — all data is read-only. Contact us to get your own account.
+      </div>}
     </div>
   );
 }
@@ -5673,7 +5686,7 @@ function UserModal({user,onSave,onClose,t}) {
     <Overlay onClose={onClose}>
       <MHead title={user?"Edit User":"Add User"} onClose={onClose}/>
       <FG><div><FL label="Username *"/><input className="inp" value={f.username} onChange={e=>s("username",e.target.value)} disabled={!!user}/></div><div><FL label={user?"New password (blank=keep)":"Password *"}/><input className="inp" type="password" value={f.password} onChange={e=>s("password",e.target.value)} placeholder="••••••"/></div></FG>
-      <FD><FL label={t.role}/><select className="inp" value={f.role} onChange={e=>s("role",e.target.value)}><option value="admin">👑 Admin</option><option value="manager">👔 Manager</option><option value="shipper">🚚 Shipper</option><option value="stockman">📦 Stockman</option><option value="customer">👤 Customer</option></select></FD>
+      <FD><FL label={t.role}/><select className="inp" value={f.role} onChange={e=>s("role",e.target.value)}><option value="admin">👑 Admin</option><option value="manager">👔 Manager</option><option value="shipper">🚚 Shipper</option><option value="stockman">📦 Stockman</option><option value="customer">👤 Customer</option><option value="demo">🔒 Demo</option></select></FD>
       <FG><div><FL label={t.name}/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)}/></div><div><FL label={t.phone}/><input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div></FG>
       <FD><FL label={t.email}/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></FD>
       <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.username||(!user&&!f.password))return;const d={username:f.username,role:f.role,name:f.name,phone:f.phone,email:f.email};if(f.password)d.password=f.password;onSave(d);}}>{t.save}</button></div>

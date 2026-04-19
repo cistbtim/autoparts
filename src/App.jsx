@@ -1042,7 +1042,8 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [workshopCustomers,setWorkshopCustomers]=useState([]);
   const [workshopVehicles,setWorkshopVehicles]=useState([]);
   const [workshopStock,setWorkshopStock]=useState([]);
-  const [workshopServices,setWorkshopServices]=useState([]); // null=no filter, Set=filtered part ids
+  const [workshopServices,setWorkshopServices]=useState([]);
+  const [workshopProfile,setWorkshopProfile]=useState({}); // null=no filter, Set=filtered part ids
   const [completedDays,setCompletedDays]=useState(7); // filter completed orders to last N days
   const [searchCust,setSearchCust]=useState("");
   const [inqFilter,setInqFilter]=useState("all");
@@ -1241,6 +1242,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWorkshopVehicles(Array.isArray(wsVehicles)?wsVehicles:[]);
     setWorkshopStock(Array.isArray(wsStock)?wsStock:[]);
     setWorkshopServices(Array.isArray(wsServices)?wsServices:[]);
+    if(wsId){
+      const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
+      setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
+    }
   },[]);
 
   // Sync Apps Script URL to window whenever settings changes
@@ -1932,6 +1937,12 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setSettings(s=>({...s,...data}));
     showToast("✅ Settings saved");
   };
+
+  const saveWorkshopProfile=async(data)=>{
+    await api.upsert("workshop_profiles",{...data, id:wsId});
+    setWorkshopProfile(p=>({...p,...data}));
+    showToast("✅ Workshop profile saved");
+  };
   // ── RFQ functions ──────────────────────────────────────────
   const createRfqSession=async(name,deadline,selectedParts,selectedSuppliers)=>{
     const sid=makeId("RFQ");
@@ -2236,6 +2247,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {id:"wstransfer",  icon:"🔄",label:"WS Transfer",  roles:["admin","manager","workshop"]},
         {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager","workshop"]},
         {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager","workshop"]},
+        {id:"wsprofile",   icon:"⚙️",label:"WS Settings",  roles:["workshop"]},
       ]
     },
     {
@@ -3465,6 +3477,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {/* ── SETTINGS ── */}
         {/* ── VEHICLES ── */}
         {/* ── WORKSHOP (all sub-tabs) ── */}
+        {tab==="wsprofile"&&role==="workshop"&&(
+          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile}/>
+        )}
+
         {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
           <WorkshopPage
             key={tab}
@@ -3811,6 +3827,81 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       {isDemo&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9999,background:"linear-gradient(90deg,#f59e0b,#f97316)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
         🔒 Demo Mode — all data is read-only. Contact us to get your own account.
       </div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORKSHOP PROFILE / SETTINGS PAGE
+// ═══════════════════════════════════════════════════════════════
+function WorkshopProfilePage({profile,onSave}) {
+  const [f,setF]=useState({
+    name:"", vat_number:"", phone:"", whatsapp:"", email:"",
+    address:"", website:"", logo_url:"", logo_data:"", ...profile
+  });
+  const [saving,setSaving]=useState(false);
+  const [dragOver,setDragOver]=useState(false);
+  const fileRef=useRef(null);
+
+  useEffect(()=>{ setF(p=>({...p,...profile})); },[profile]);
+
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const handleFile=(file)=>{
+    if(!file||!file.type.startsWith("image/")) return;
+    const reader=new FileReader();
+    reader.onload=e=>{ s("logo_data",e.target.result); s("logo_url",""); };
+    reader.readAsDataURL(file);
+  };
+
+  const save=async()=>{
+    setSaving(true);
+    await onSave(f);
+    setSaving(false);
+  };
+
+  const logoSrc=f.logo_url||f.logo_data;
+
+  return (
+    <div className="fu" style={{maxWidth:560}}>
+      <h1 style={{fontSize:20,fontWeight:700,marginBottom:20}}>⚙️ Workshop Settings</h1>
+
+      <div className="card" style={{padding:20,display:"flex",flexDirection:"column",gap:14}}>
+        {/* Logo */}
+        <div>
+          <FL label="Workshop Logo"/>
+          <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+          <div style={{border:`2px dashed ${dragOver?"var(--accent)":"var(--border)"}`,borderRadius:10,padding:16,textAlign:"center",
+            cursor:"pointer",transition:"all .15s",background:dragOver?"rgba(251,146,60,.06)":"var(--surface2)",marginBottom:8}}
+            onClick={()=>fileRef.current?.click()}
+            onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+            onDragLeave={()=>setDragOver(false)}
+            onDrop={e=>{e.preventDefault();setDragOver(false);handleFile(e.dataTransfer.files[0]);}}>
+            {logoSrc
+              ? <img src={logoSrc} alt="logo" style={{maxHeight:70,maxWidth:220,objectFit:"contain"}}/>
+              : <div style={{color:"var(--text3)",fontSize:13}}>📁 Click or drag image to upload logo</div>}
+          </div>
+          {logoSrc&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{s("logo_data","");s("logo_url","");}}>✕ Remove logo</button>}
+          <div style={{marginTop:8}}>
+            <FL label="Or paste Google Drive / URL"/>
+            <input className="inp" value={f.logo_url} onChange={e=>{s("logo_url",e.target.value);s("logo_data","");}} placeholder="https://..."/>
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={{gridColumn:"1/-1"}}><FL label="Workshop Name *"/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
+          <div><FL label="VAT / Tax Number"/><input className="inp" value={f.vat_number} onChange={e=>s("vat_number",e.target.value)}/></div>
+          <div><FL label="Website"/><input className="inp" value={f.website} onChange={e=>s("website",e.target.value)} placeholder="https://..."/></div>
+          <div><FL label="Phone"/><input className="inp" value={f.phone} onChange={e=>s("phone",e.target.value)} placeholder="+27..."/></div>
+          <div><FL label="WhatsApp"/><input className="inp" value={f.whatsapp} onChange={e=>s("whatsapp",e.target.value)} placeholder="+27..."/></div>
+          <div style={{gridColumn:"1/-1"}}><FL label="Email"/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div>
+          <div style={{gridColumn:"1/-1"}}><FL label="Address"/><textarea className="inp" rows={3} value={f.address} onChange={e=>s("address",e.target.value)} style={{resize:"vertical"}}/></div>
+        </div>
+
+        <button className="btn btn-primary" style={{padding:13,fontSize:15}} onClick={save} disabled={saving}>
+          {saving?"Saving...":"✅ Save Settings"}
+        </button>
+      </div>
     </div>
   );
 }

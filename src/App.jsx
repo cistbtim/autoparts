@@ -1141,6 +1141,19 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   _demoMode = isDemo;
   _onDemoBlock = ()=>showToast("🔒 Demo mode — sign up to save changes","err");
 
+  // For workshop role: merge workshop profile over shop settings so logo/name/contacts show correctly
+  const wsDisplaySettings = wsId ? {
+    ...settings,
+    shop_name:  workshopProfile.name      || settings.shop_name,
+    logo_url:   workshopProfile.logo_url  || "",
+    logo_data:  workshopProfile.logo_data || "",
+    phone:      workshopProfile.phone     || settings.phone,
+    whatsapp:   workshopProfile.whatsapp  || settings.whatsapp,
+    email:      workshopProfile.email     || settings.email,
+    address:    workshopProfile.address   || settings.address,
+    vat_number: workshopProfile.vat_number|| settings.vat_number,
+  } : settings;
+
   const logInv=async(part,before,after,action,reason="")=>{
     await api.upsert("inventory_logs",{part_id:part.id,part_name:part.name,part_sku:part.sku,action,qty_before:before,qty_after:after,changed_by:user.name||user.username,reason});
   };
@@ -2378,7 +2391,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       <aside className="sidebar" style={{width:240,background:"var(--surface)",borderRight:"1px solid var(--border)",position:"fixed",height:"100vh",zIndex:50,display:"flex",flexDirection:"column"}}>
         <div style={{padding:"18px 18px 12px"}}>
           <div style={{maxWidth:210,overflow:"hidden"}}>
-            <ShopLogo settings={settings} size="md"/>
+            <ShopLogo settings={wsDisplaySettings} size="md"/>
           </div>
           <div style={{fontSize:10,color:"var(--green)",marginTop:4}}>{`🟢 ${t.connected}`}</div>
           <div style={{display:"flex",gap:5,marginTop:9,justifyContent:"center"}}>
@@ -2440,7 +2453,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {/* Drawer header */}
         <div style={{padding:"16px 16px 10px",borderBottom:"1px solid var(--border)"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-            <ShopLogo settings={settings} size="md"/>
+            <ShopLogo settings={wsDisplaySettings} size="md"/>
             <button onClick={()=>setDrawerOpen(false)} style={{background:"none",border:"none",color:"var(--text3)",fontSize:20,cursor:"pointer",padding:4}}>✕</button>
           </div>
           <div style={{background:"var(--surface2)",borderRadius:9,padding:"8px 10px",marginBottom:8}}>
@@ -3495,7 +3508,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             customers={customers}
             wsCustomers={workshopCustomers}
             wsVehicles={workshopVehicles}
-            settings={settings}
+            settings={wsDisplaySettings}
             onSaveJob={saveWorkshopJob}
             onDeleteJob={deleteWorkshopJob}
             onSaveItem={saveJobItem}

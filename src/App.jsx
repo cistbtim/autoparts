@@ -990,6 +990,9 @@ export default function App() {
 function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   _currentLang = lang; // sync for tSt
   const role = user.role;
+  // workshop_id scopes all workshop data to this user's own records
+  const wsId = role==="workshop" ? String(user.id) : null;
+  const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="demo"?"inventory":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
@@ -1183,12 +1186,12 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("rfq_quotes","select=*&order=created_at.desc").catch(()=>[]),
       api.get("stock_moves","select=*&order=moved_at.desc&limit=200").catch(()=>[]),
       api.get("stock_takes","select=*&order=created_at.desc").catch(()=>[]),
-      api.get("workshop_jobs","select=*&order=date_in.desc").catch(()=>[]),
-      api.get("workshop_job_items","select=*").catch(()=>[]),
-      api.get("workshop_invoices","select=*&order=invoice_date.desc").catch(()=>[]),
-      api.get("workshop_quotes","select=*&order=quote_date.desc").catch(()=>[]),
-      api.get("workshop_customers","select=*&order=name.asc").catch(()=>[]),
-      api.get("workshop_vehicles","select=*&order=reg.asc").catch(()=>[]),
+      api.get("workshop_jobs",`select=*&order=date_in.desc${wsF}`).catch(()=>[]),
+      api.get("workshop_job_items",`select=*${wsF}`).catch(()=>[]),
+      api.get("workshop_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]),
+      api.get("workshop_quotes",`select=*&order=quote_date.desc${wsF}`).catch(()=>[]),
+      api.get("workshop_customers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.get("workshop_vehicles",`select=*&order=reg.asc${wsF}`).catch(()=>[]),
       api.get("customer_queries","select=*&order=created_at.desc").catch(()=>[]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
@@ -1221,14 +1224,14 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
   const refreshWorkshopData=useCallback(async()=>{
     const [jobs,items,invoices,quotes,wsCustomers,wsVehicles,wsStock,wsServices]=await Promise.all([
-      api.get("workshop_jobs","select=*&order=date_in.desc").catch(()=>[]),
-      api.get("workshop_job_items","select=*").catch(()=>[]),
-      api.get("workshop_invoices","select=*&order=invoice_date.desc").catch(()=>[]),
-      api.get("workshop_quotes","select=*&order=quote_date.desc").catch(()=>[]),
-      api.get("workshop_customers","select=*&order=name.asc").catch(()=>[]),
-      api.get("workshop_vehicles","select=*&order=reg.asc").catch(()=>[]),
-      api.get("workshop_stock","select=*&order=name.asc").catch(()=>[]),
-      api.get("workshop_services","select=*&order=name.asc").catch(()=>[]),
+      api.get("workshop_jobs",`select=*&order=date_in.desc${wsF}`).catch(()=>[]),
+      api.get("workshop_job_items",`select=*${wsF}`).catch(()=>[]),
+      api.get("workshop_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]),
+      api.get("workshop_quotes",`select=*&order=quote_date.desc${wsF}`).catch(()=>[]),
+      api.get("workshop_customers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.get("workshop_vehicles",`select=*&order=reg.asc${wsF}`).catch(()=>[]),
+      api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]),
     ]);
     setWorkshopJobs(Array.isArray(jobs)?jobs:[]);
     setWorkshopJobItems(Array.isArray(items)?items:[]);
@@ -1429,19 +1432,20 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       // Auto-create workshop_customer if not linked yet
       if(!d.workshop_customer_id && d.customer_name?.trim()){
         const custId=makeId("WSC");
-        chk(await api.insert("workshop_customers",{id:custId,name:d.customer_name.trim(),phone:d.customer_phone||"",email:d.customer_email||""}),"Save customer");
+        chk(await api.insert("workshop_customers",{id:custId,name:d.customer_name.trim(),phone:d.customer_phone||"",email:d.customer_email||"",workshop_id:wsId||null}),"Save customer");
         d.workshop_customer_id=custId;
       }
       // Auto-create workshop_vehicle if not linked yet
       if(!d.workshop_vehicle_id && d.vehicle_reg?.trim()){
         const vehId=makeId("WSV");
-        chk(await api.insert("workshop_vehicles",{id:vehId,workshop_customer_id:d.workshop_customer_id||null,reg:d.vehicle_reg.trim(),make:d.vehicle_make||"",model:d.vehicle_model||"",year:d.vehicle_year||"",color:d.vehicle_color||"",vin:d.vin||"",engine_no:d.engine_no||""}),"Save vehicle");
+        chk(await api.insert("workshop_vehicles",{id:vehId,workshop_customer_id:d.workshop_customer_id||null,reg:d.vehicle_reg.trim(),make:d.vehicle_make||"",model:d.vehicle_model||"",year:d.vehicle_year||"",color:d.vehicle_color||"",vin:d.vin||"",engine_no:d.engine_no||"",workshop_id:wsId||null}),"Save vehicle");
         d.workshop_vehicle_id=vehId;
       }
       // Build job record — empty strings → null so Supabase doesn't choke on typed columns
       const str=v=>v?.toString().trim()||null;
       const int=v=>v?parseInt(v,10)||null:null;
       const jobRow={
+        workshop_id:wsId||null,
         workshop_customer_id:d.workshop_customer_id||null,
         workshop_vehicle_id:d.workshop_vehicle_id||null,
         customer_name:str(d.customer_name),
@@ -1532,7 +1536,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     if(id){
       res=await api.patch("workshop_job_items","id",id,dbItem);
     } else {
-      res=await api.insert("workshop_job_items",dbItem);
+      res=await api.insert("workshop_job_items",{...dbItem,workshop_id:wsId||null});
       // Deduct from workshop stock when adding a part to a job
       if(ws_stock_id && item.type==="part"){
         const wsi=workshopStock.find(w=>w.id===ws_stock_id);
@@ -1557,7 +1561,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   };
   const saveWorkshopInvoice=async(inv)=>{
     const {id,...rest}=inv;
-    const payload={...rest, id:id||makeId("WSI")};
+    const payload={...rest, id:id||makeId("WSI"), workshop_id:wsId||null};
     console.log("[saveWorkshopInvoice] inserting:", payload);
     let res;
     try{
@@ -1597,7 +1601,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const saveWorkshopQuote=async(q)=>{
     const {id,...rest}=q;
     if(id){ await api.patch("workshop_quotes","id",id,rest); showToast("Quote updated"); }
-    else { await api.insert("workshop_quotes",{...rest,id:makeId("WSQ")}); showToast("Quote created"); }
+    else { await api.insert("workshop_quotes",{...rest,id:makeId("WSQ"),workshop_id:wsId||null}); showToast("Quote created"); }
     await refreshWorkshopData();
   };
   const sendQuoteForApproval=async(quoteId)=>{
@@ -1613,7 +1617,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const convertQuoteToInvoice=async(quote,job,subtotal,tax,total)=>{
     const invId=makeId("WSI");
     await api.insert("workshop_invoices",{
-      id:invId, job_id:job.id,
+      id:invId, job_id:job.id, workshop_id:wsId||null,
       invoice_customer:quote.quote_customer, inv_phone:quote.quote_phone, inv_email:quote.quote_email,
       vehicle_reg:job.vehicle_reg||"",
       invoice_date:new Date().toISOString().slice(0,10),
@@ -1628,7 +1632,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const saveWorkshopCustomer=async(data)=>{
     const {id,...rest}=data;
     if(id){ await api.patch("workshop_customers","id",id,rest); }
-    else { await api.insert("workshop_customers",{...data, id:makeId("WSC")}); }
+    else { await api.insert("workshop_customers",{...data, id:makeId("WSC"), workshop_id:wsId||null}); }
     await refreshWorkshopData(); showToast("Customer saved");
   };
   const deleteWorkshopCustomer=async(id)=>{
@@ -1638,7 +1642,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const saveWorkshopVehicle=async(data)=>{
     const {id,...rest}=data;
     if(id){ await api.patch("workshop_vehicles","id",id,rest); }
-    else { await api.insert("workshop_vehicles",{...data, id:makeId("WSV")}); }
+    else { await api.insert("workshop_vehicles",{...data, id:makeId("WSV"), workshop_id:wsId||null}); }
     await refreshWorkshopData(); showToast("Vehicle saved");
   };
   const deleteWorkshopVehicle=async(id)=>{
@@ -1650,7 +1654,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const saveWsStockItem=async(item)=>{
     const {id,...rest}=item;
     if(id){ await api.patch("workshop_stock","id",id,rest); showToast("Stock item updated"); }
-    else { await api.insert("workshop_stock",{...rest,id:makeId("WSK")}); showToast("Stock item added"); }
+    else { await api.insert("workshop_stock",{...rest,id:makeId("WSK"),workshop_id:wsId||null}); showToast("Stock item added"); }
     await refreshWorkshopData();
   };
   const deleteWsStockItem=async(id)=>{
@@ -1672,7 +1676,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const saveWsService=async(svc)=>{
     const {id,...rest}=svc;
     if(id){ await api.patch("workshop_services","id",id,rest); showToast("Service updated"); }
-    else { await api.insert("workshop_services",{...rest,id:makeId("WSS")}); showToast("Service added"); }
+    else { await api.insert("workshop_services",{...rest,id:makeId("WSS"),workshop_id:wsId||null}); showToast("Service added"); }
     await refreshWorkshopData();
   };
   const deleteWsService=async(id)=>{

@@ -3459,7 +3459,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {/* ── SETTINGS ── */}
         {/* ── VEHICLES ── */}
         {/* ── WORKSHOP (all sub-tabs) ── */}
-        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager")&&(
+        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
           <WorkshopPage
             key={tab}
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":"report"}

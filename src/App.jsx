@@ -13294,6 +13294,13 @@ function printWorkshopQuote(job, items, quote, settings, photos={}) {
     <div class="sig-line">Authorised by &amp; Date</div>
   </div>
 
+  ${quote.confirm_token?`
+  <div style="margin-bottom:20px;padding:14px 18px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;text-align:center">
+    <div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🔗 Online Approval Link</div>
+    <div style="font-size:12px;color:#555;margin-bottom:8px">Click the link below to view this quotation and approve or decline:</div>
+    <a href="${window.location.origin}${window.location.pathname}?wsq=${quote.confirm_token}" style="display:inline-block;padding:8px 20px;background:#2563eb;color:#fff;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;word-break:break-all">${window.location.origin}${window.location.pathname}?wsq=${quote.confirm_token}</a>
+  </div>`:""}
+
   <div class="footer">
     ${shopName}${settings.phone?" · "+settings.phone:""}${settings.email?" · "+settings.email:""}<br/>
     Thank you for considering us!

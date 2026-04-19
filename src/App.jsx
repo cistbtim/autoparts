@@ -2200,9 +2200,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       ]
     },
     {
-      id:"grp_inventory", icon:"📦", label:lang==="zh"?"庫存管理":"Inventory", roles:["admin","manager","shipper","stockman","workshop"],
+      id:"grp_inventory", icon:"📦", label:lang==="zh"?"庫存管理":"Inventory", roles:["admin","manager","shipper","stockman"],
       children:[
-        {id:"inventory",icon:"📦",label:t.inventory,roles:["admin","manager","shipper","stockman","workshop"],badge:lowStock.length},
+        {id:"inventory",icon:"📦",label:t.inventory,roles:["admin","manager","shipper","stockman"],badge:lowStock.length},
         {id:"stocktake",icon:"🔢",label:t.stockTake,roles:["admin","manager","shipper","stockman"]},
         {id:"stockmove",icon:"🔀",label:t.stockMove,roles:["admin","manager","shipper","stockman"]},
         {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager"]},
@@ -2297,7 +2297,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       {id:"wscustomers", icon:"👥",label:"WS Customers"},
       {id:"wsquotations",icon:"📝",label:"Quotations"},
       {id:"wsinvoices",  icon:"🧾",label:"Invoices"},
-      {id:"shop",        icon:"🛒",label:t.shop},
+      {id:"wspayments",  icon:"💳",label:"Payments"},
     ];
     // admin — show most used
     return [

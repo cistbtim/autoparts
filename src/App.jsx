@@ -1576,6 +1576,25 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     await api.delete("workshop_jobs","id",id);
     await refreshWorkshopData(); showToast("Deleted","err");
   };
+  const moveWorkshopJob=async(jobId,targetWsId)=>{
+    const tid=targetWsId.trim();
+    if(!tid) throw new Error("Target workshop ID is required");
+    // Check target workshop exists
+    const check=await api.get("workshop_profiles",`id=eq.${tid}&select=id`).catch(()=>[]);
+    if(!Array.isArray(check)||check.length===0) throw new Error(`Workshop "${tid}" not found`);
+    // Move job and all related records
+    await api.patch("workshop_jobs","id",jobId,{workshop_id:tid});
+    await api.patch("workshop_job_items","job_id",jobId,{workshop_id:tid});
+    const job=workshopJobs.find(j=>j.id===jobId);
+    // Move invoice(s) for this job
+    const jobInvoices=workshopInvoices.filter(i=>i.job_id===jobId);
+    for(const inv of jobInvoices) await api.patch("workshop_invoices","id",inv.id,{workshop_id:tid});
+    // Move quote(s) for this job
+    const jobQuotes=workshopQuotes.filter(q=>q.job_id===jobId);
+    for(const q of jobQuotes) await api.patch("workshop_quotes","id",q.id,{workshop_id:tid});
+    await refreshWorkshopData();
+    showToast(`Job moved to workshop ${tid}`);
+  };
   const saveJobItem=async(item)=>{
     // Strip client-only fields not in the DB schema
     const {part_id, ws_stock_id, id, ...dbItem} = item;
@@ -3570,6 +3589,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             settings={wsDisplaySettings}
             onSaveJob={saveWorkshopJob}
             onDeleteJob={deleteWorkshopJob}
+            onMoveJob={moveWorkshopJob}
             onSaveItem={saveJobItem}
             onDeleteItem={deleteJobItem}
             onSaveInvoice={saveWorkshopInvoice}
@@ -10320,7 +10340,7 @@ function WsVehicleForm({data,onSave,onClose,t}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",t,lang}) {
+function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",t,lang}) {
   const [view,      setView]      = useState("list");
   const [activeJob, setActiveJob] = useState(null);
   const [editJob,   setEditJob]   = useState(null);
@@ -10359,6 +10379,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
         wsVehicles={wsVehicles} wsCustomers={wsCustomers} wsStock={wsStock} wsServices={wsServices}
         onBack={()=>{ setView("list"); setActiveJob(null); }}
         onSaveJob={async(d)=>{ await onSaveJob(d); setActiveJob({...activeJob,...d}); }}
+        onMoveJob={async(targetWsId)=>{ await onMoveJob(activeJob.id,targetWsId); setView("list"); setActiveJob(null); }}
         onSaveItem={onSaveItem} onDeleteItem={onDeleteItem}
         onSaveInvoice={onSaveInvoice} onUpdateInvoice={onUpdateInvoice} onDeleteInvoice={onDeleteInvoice}
         onSaveQuote={onSaveQuote} onDeleteQuote={onDeleteQuote} onConvertQuoteToInvoice={onConvertQuoteToInvoice}
@@ -10929,7 +10950,7 @@ const CHECKLIST_ITEMS=[
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,wsRole="main",t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,wsRole="main",t,lang}) {
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);
@@ -10942,6 +10963,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [quoteSrcForInv,setQuoteSrcForInv]= useState(null); // quote being converted to invoice
   const [approvalModal, setApprovalModal] = useState(false);
   const [deliveryModal, setDeliveryModal] = useState(false);
+  const [moveModal,     setMoveModal]     = useState(false);
 
   const vehiclePhotos = wsVehicles.reduce((acc,v)=>v.id===job.workshop_vehicle_id?{front:v.photo_front||"",rear:v.photo_rear||"",side:v.photo_side||""}:acc,{front:"",rear:"",side:""});
 
@@ -11137,6 +11159,9 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`;
           a.click();
         }}>⬇️ Info .txt</button>
+        {wsRole==="main"&&onMoveJob&&(
+          <button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>setMoveModal(true)}>🔀 Move Job</button>
+        )}
       </div>
 
       {/* Job info card */}
@@ -11765,7 +11790,58 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           job={job} settings={settings}
           onClose={()=>setDeliveryModal(false)}/>
       )}
+
+      {moveModal&&(
+        <MoveJobModal
+          job={job}
+          onMove={onMoveJob}
+          onClose={()=>setMoveModal(false)}/>
+      )}
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOVE JOB MODAL
+// ═══════════════════════════════════════════════════════════════
+function MoveJobModal({job,onMove,onClose}) {
+  const [targetId,setTargetId]=useState("");
+  const [saving,setSaving]=useState(false);
+
+  const handleMove=async()=>{
+    if(!targetId.trim()){alert("Enter the target Workshop ID");return;}
+    if(!window.confirm(
+      `Move job ${job.id} (${job.customer_name}) to workshop "${targetId.trim()}"?\n\nThis will also move all related quotes and invoices.`
+    )) return;
+    setSaving(true);
+    try{
+      await onMove(targetId.trim());
+    }catch(e){ alert("Move failed: "+e.message); setSaving(false); }
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="🔀 Move Job to Another Workshop" onClose={onClose}/>
+      <div style={{marginBottom:14,padding:"10px 14px",background:"var(--surface2)",borderRadius:8,fontSize:13}}>
+        <div style={{fontWeight:700,marginBottom:4}}>{job.customer_name} · <code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{job.id}</code></div>
+        <div style={{color:"var(--text3)"}}>🚗 {job.vehicle_reg||"—"} · {job.date_in}</div>
+      </div>
+      <div style={{marginBottom:16}}>
+        <FL label="Target Workshop ID"/>
+        <input className="inp" value={targetId} onChange={e=>setTargetId(e.target.value)}
+          placeholder="e.g. WS-00123"
+          style={{fontFamily:"DM Mono,monospace"}}/>
+        <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>
+          The job, all job items, quotes and invoices will be reassigned to this workshop.
+        </div>
+      </div>
+      <div style={{display:"flex",gap:10}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose} disabled={saving}>Cancel</button>
+        <button className="btn" style={{flex:2,background:"var(--yellow)",color:"#000",fontWeight:700}} onClick={handleMove} disabled={saving||!targetId.trim()}>
+          {saving?"Moving...":"🔀 Confirm Move"}
+        </button>
+      </div>
+    </Overlay>
   );
 }
 

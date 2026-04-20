@@ -10507,6 +10507,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
   const [stmtCust,  setStmtCust]  = useState("");  // statement: selected customer id
   const [qInvModal, setQInvModal] = useState(null); // {job, items, quote} for convert-from-list
   const [sortBy,    setSortBy]    = useState("date_desc");
+  const [filterWs,  setFilterWs]  = useState("__all__");
 
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
   const ST_BG    = {"Pending":"rgba(96,165,250,.12)","In Progress":"rgba(251,191,36,.12)","Done":"rgba(52,211,153,.12)","Delivered":"rgba(100,116,139,.12)"};
@@ -10515,6 +10516,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
 
   const filtered = jobs.filter(j=>{
     if(filterSt!=="__all__"&&j.status!==filterSt) return false;
+    if(filterWs!=="__all__"&&j.workshop_id!==filterWs) return false;
     if(!search.trim()) return true;
     const s=search.toLowerCase();
     const wsName=wsProfileMap[j.workshop_id]||j.workshop_id||"";
@@ -10639,6 +10641,14 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
             <option value="job_id">Job #</option>
             <option value="make">Make / Model</option>
           </select>
+          {!wsId&&wsProfiles.length>0&&(
+            <select className="inp" value={filterWs} onChange={e=>setFilterWs(e.target.value)} style={{flex:"0 0 auto",width:"auto",minWidth:180}}>
+              <option value="__all__">🏪 All Workshops</option>
+              {wsProfiles.map(p=>(
+                <option key={p.id} value={p.id}>{p.name||p.id}</option>
+              ))}
+            </select>
+          )}
         </div>
         {filtered.length===0&&<div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No jobs found</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>

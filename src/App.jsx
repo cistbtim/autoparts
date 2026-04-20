@@ -10506,7 +10506,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
   const jobInvoice = (jobId) => invoices.find(i=>i.job_id===jobId);
   const jobQuote   = (jobId) => quotes.find(q=>q.job_id===jobId);
 
-  const C   = settings.currency||"ZAR";
+  const C   = curSym(settings.currency||"NT$");
   const fmt = v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
   // ── Job detail view ──────────────────────────────────────────

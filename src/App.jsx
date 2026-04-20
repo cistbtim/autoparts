@@ -1058,6 +1058,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [workshopVehicles,setWorkshopVehicles]=useState([]);
   const [workshopStock,setWorkshopStock]=useState([]);
   const [workshopServices,setWorkshopServices]=useState([]);
+  const [workshopDocuments,setWorkshopDocuments]=useState([]);
   const [workshopProfile,setWorkshopProfile]=useState({}); // null=no filter, Set=filtered part ids
   const [completedDays,setCompletedDays]=useState(7); // filter completed orders to last N days
   const [searchCust,setSearchCust]=useState("");
@@ -1257,7 +1258,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
 
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
   const refreshWorkshopData=useCallback(async()=>{
-    const [jobs,items,invoices,quotes,wsCustomers,wsVehicles,wsStock,wsServices]=await Promise.all([
+    const [jobs,items,invoices,quotes,wsCustomers,wsVehicles,wsStock,wsServices,wsDocs]=await Promise.all([
       api.get("workshop_jobs",`select=*&order=date_in.desc${wsF}`).catch(()=>[]),
       api.get("workshop_job_items",`select=*${wsF}`).catch(()=>[]),
       api.get("workshop_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]),
@@ -1266,6 +1267,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("workshop_vehicles",`select=*&order=reg.asc${wsF}`).catch(()=>[]),
       api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]),
       api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]),
     ]);
     setWorkshopJobs(Array.isArray(jobs)?jobs:[]);
     setWorkshopJobItems(Array.isArray(items)?items:[]);
@@ -1275,6 +1277,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWorkshopVehicles(Array.isArray(wsVehicles)?wsVehicles:[]);
     setWorkshopStock(Array.isArray(wsStock)?wsStock:[]);
     setWorkshopServices(Array.isArray(wsServices)?wsServices:[]);
+    setWorkshopDocuments(Array.isArray(wsDocs)?wsDocs:[]);
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
@@ -1691,34 +1694,47 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   // ── Workshop Stock ────────────────────────────────────────────
   const saveWsStockItem=async(item)=>{
     const {id,...rest}=item;
-    if(id){ await api.patch("workshop_stock","id",id,rest); showToast("Stock item updated"); }
-    else { await api.insert("workshop_stock",{...rest,id:makeId("WSK"),workshop_id:wsId||null}); showToast("Stock item added"); }
+    const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
+    if(id){ chkR(await api.patch("workshop_stock","id",id,rest),"Update stock"); showToast("Stock item updated"); }
+    else { chkR(await api.insert("workshop_stock",{...rest,id:makeId("WSK"),workshop_id:wsId||null}),"Add stock"); showToast("Stock item added"); }
     await refreshWorkshopData();
   };
   const deleteWsStockItem=async(id)=>{
     await api.delete("workshop_stock","id",id);
     await refreshWorkshopData(); showToast("Deleted","err");
   };
-  const adjustWsStock=async(item,newQty,reason)=>{
-    const change=newQty-(item.qty||0);
-    await api.patch("workshop_stock","id",item.id,{qty:newQty});
+  const adjustWsStock=async({id,delta,reason,new_qty})=>{
+    const stockItem=workshopStock.find(s=>s.id===id);
+    await api.patch("workshop_stock","id",id,{qty:new_qty});
     await api.insert("workshop_stock_moves",{
-      id:makeId("WSM"),stock_id:item.id,stock_name:item.name,
-      move_type:"adjustment",qty_change:change,qty_after:newQty,
+      id:makeId("WSM"),stock_id:id,stock_name:stockItem?.name||"",
+      move_type:"adjustment",qty_change:delta,qty_after:new_qty,
       notes:reason||"Manual adjustment",moved_at:new Date().toISOString(),
     });
-    await refreshWorkshopData(); showToast(`Stock → ${newQty}`);
+    await refreshWorkshopData(); showToast(`Stock → ${new_qty}`);
   };
 
   // ── Workshop Services ─────────────────────────────────────────
   const saveWsService=async(svc)=>{
     const {id,...rest}=svc;
-    if(id){ await api.patch("workshop_services","id",id,rest); showToast("Service updated"); }
-    else { await api.insert("workshop_services",{...rest,id:makeId("WSS"),workshop_id:wsId||null}); showToast("Service added"); }
+    const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
+    if(id){ chkR(await api.patch("workshop_services","id",id,rest),"Update service"); showToast("Service updated"); }
+    else { chkR(await api.insert("workshop_services",{...rest,id:makeId("WSS"),workshop_id:wsId||null}),"Add service"); showToast("Service added"); }
     await refreshWorkshopData();
   };
   const deleteWsService=async(id)=>{
     await api.delete("workshop_services","id",id);
+    await refreshWorkshopData(); showToast("Deleted","err");
+  };
+
+  // ── Workshop Documents ────────────────────────────────────────
+  const saveWsDocument=async(doc)=>{
+    const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
+    chkR(await api.insert("workshop_documents",{...doc,id:makeId("WSD"),workshop_id:wsId||null,uploaded_at:new Date().toISOString()}),"Save document");
+    await refreshWorkshopData(); showToast("Document saved");
+  };
+  const deleteWsDocument=async(id)=>{
+    await api.delete("workshop_documents","id",id);
     await refreshWorkshopData(); showToast("Deleted","err");
   };
 
@@ -3569,6 +3585,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             onSaveWsService={saveWsService}
             onDeleteWsService={deleteWsService}
             onSaveWsTransfer={saveWsTransfer}
+            wsDocs={workshopDocuments}
+            onSaveWsDoc={saveWsDocument}
+            onDeleteWsDoc={deleteWsDocument}
             parts={parts}
             wsRole={wsRole}
             t={t} lang={lang}/>
@@ -10295,7 +10314,7 @@ function WsVehicleForm({data,onSave,onClose,t}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],settings,initialTab,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,wsRole="main",t,lang}) {
+function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",t,lang}) {
   const [view,      setView]      = useState("list");
   const [activeJob, setActiveJob] = useState(null);
   const [editJob,   setEditJob]   = useState(null);
@@ -10356,6 +10375,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
     ["wsstock",    "📦 WS Stock",    wsStock.length],
     ["wsservices", "🔧 Services",    wsServices.length],
     ["wstransfer", "🔄 Transfer",    null],
+    ["wsdocs",     "📎 Documents",   wsDocs.length],
     ["statement",  "📋 Statement",   null],
     ["report",     "📊 Report",      null],
   ];
@@ -10644,6 +10664,12 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
       {wsTab==="wstransfer"&&(
         <WsTransferPage parts={parts} wsStock={wsStock} settings={settings}
           onSave={onSaveWsTransfer}/>
+      )}
+
+      {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
+      {wsTab==="wsdocs"&&(
+        <WsDocumentsPage docs={wsDocs} settings={settings}
+          onSave={onSaveWsDoc} onDelete={onDeleteWsDoc}/>
       )}
 
       {/* ══════════════ STATEMENT TAB ══════════════ */}
@@ -12215,7 +12241,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], onSave, onClose, t}
   const selectItem=(p)=>{
     setSelItem(p);
     setDesc(p.name);
-    setPrice(p.price||p.rate||"");
+    setPrice(p.default_price||p.price||p.rate||"");
     setSearch("");
   };
 
@@ -12241,8 +12267,8 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], onSave, onClose, t}
 
   const stockBadge=(p)=>{
     if(type!=="part") return null;
-    const q=+p.qty_on_hand||0;
-    const low=+p.low_stock_qty||0;
+    const q=+p.qty||0;
+    const low=+p.min_qty||0;
     const color=q<=0?"var(--red)":q<=low?"var(--yellow)":"var(--green)";
     return <span style={{fontSize:11,fontWeight:700,color,fontFamily:"Rajdhani,sans-serif",flexShrink:0}}>
       {q<=0?"⛔ Out":q<=low?`⚠️ ${q}`:q} {type==="part"&&p.unit?p.unit:""}
@@ -12278,7 +12304,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], onSave, onClose, t}
                       {p.description&&<div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{p.description}</div>}
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>{fmtAmt(p.price||p.rate||0)}</div>
+                      <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>{fmtAmt(p.default_price||p.price||p.rate||0)}</div>
                       {type==="part"&&stockBadge(p)}
                     </div>
                   </div>
@@ -12335,7 +12361,7 @@ function WsStockPage({wsStock=[],settings,onSave,onDelete,onAdjust}) {
     return search.trim().toLowerCase().split(/\s+/).every(w=>h.includes(w));
   });
 
-  const lowStock=wsStock.filter(p=>+p.qty_on_hand<=+p.low_stock_qty&&+p.low_stock_qty>0);
+  const lowStock=wsStock.filter(p=>+p.qty<=+p.min_qty&&+p.min_qty>0);
 
   return (
     <div>
@@ -12345,7 +12371,7 @@ function WsStockPage({wsStock=[],settings,onSave,onDelete,onAdjust}) {
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {lowStock.map(p=>(
               <span key={p.id} className="badge" style={{background:"rgba(251,191,36,.15)",color:"var(--yellow)",fontSize:12}}>
-                {p.name} — {+p.qty_on_hand} {p.unit||""}
+                {p.name} — {+p.qty} {p.unit||""}
               </span>
             ))}
           </div>
@@ -12369,8 +12395,8 @@ function WsStockPage({wsStock=[],settings,onSave,onDelete,onAdjust}) {
               <thead><tr><th>Name</th><th>SKU</th><th style={{textAlign:"right"}}>Qty</th><th>Unit</th><th style={{textAlign:"right"}}>Cost</th><th style={{textAlign:"right"}}>Price</th><th>Low Stock</th><th>Actions</th></tr></thead>
               <tbody>
                 {filtered.map(p=>{
-                  const qty=+p.qty_on_hand||0;
-                  const low=+p.low_stock_qty||0;
+                  const qty=+p.qty||0;
+                  const low=+p.min_qty||0;
                   const qColor=qty<=0?"var(--red)":qty<=low?"var(--yellow)":"var(--green)";
                   return (
                     <tr key={p.id}>
@@ -12378,8 +12404,8 @@ function WsStockPage({wsStock=[],settings,onSave,onDelete,onAdjust}) {
                       <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{p.sku||"—"}</code></td>
                       <td style={{textAlign:"right",fontWeight:700,color:qColor,fontFamily:"Rajdhani,sans-serif"}}>{qty}</td>
                       <td style={{fontSize:12,color:"var(--text3)"}}>{p.unit||"—"}</td>
-                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(p.cost_price||0)}</td>
-                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",fontWeight:700}}>{fmtAmt(p.price||0)}</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(p.unit_cost||0)}</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",fontWeight:700}}>{fmtAmt(p.unit_price||0)}</td>
                       <td style={{fontSize:12,color:"var(--text3)"}}>{low>0?low:"—"}</td>
                       <td>
                         <div style={{display:"flex",gap:4}}>
@@ -12416,10 +12442,10 @@ function WsStockModal({item,onSave,onClose}) {
   const [sku,setSku]=useState(item?.sku||"");
   const [desc,setDesc]=useState(item?.description||"");
   const [unit,setUnit]=useState(item?.unit||"");
-  const [qty,setQty]=useState(item?.qty_on_hand??0);
-  const [cost,setCost]=useState(item?.cost_price||"");
-  const [price,setPrice]=useState(item?.price||"");
-  const [lowStock,setLowStock]=useState(item?.low_stock_qty||"");
+  const [qty,setQty]=useState(item?.qty??0);
+  const [cost,setCost]=useState(item?.unit_cost||"");
+  const [price,setPrice]=useState(item?.unit_price||"");
+  const [lowStock,setLowStock]=useState(item?.min_qty||"");
   const [saving,setSaving]=useState(false);
   const isEdit=!!item;
 
@@ -12433,10 +12459,10 @@ function WsStockModal({item,onSave,onClose}) {
         sku:sku.trim()||null,
         description:desc.trim()||null,
         unit:unit.trim()||null,
-        qty_on_hand:+qty||0,
-        cost_price:+cost||0,
-        price:+price||0,
-        low_stock_qty:+lowStock||0,
+        qty:+qty||0,
+        unit_cost:+cost||0,
+        unit_price:+price||0,
+        min_qty:+lowStock||0,
       });
     }catch(e){alert("Save failed: "+e.message);}
     finally{setSaving(false);}
@@ -12474,7 +12500,7 @@ function WsStockAdjustModal({item,onSave,onClose}) {
     setSaving(true);
     try{
       const delta=adjType==="add"?+qty:-+qty;
-      await onSave({id:item.id, delta, reason:reason.trim()||adjType, new_qty:(+item.qty_on_hand||0)+delta});
+      await onSave({id:item.id, delta, reason:reason.trim()||adjType, new_qty:(+item.qty||0)+delta});
     }catch(e){alert("Adjust failed: "+e.message);}
     finally{setSaving(false);}
   };
@@ -12484,7 +12510,7 @@ function WsStockAdjustModal({item,onSave,onClose}) {
       <MHead title={`±  Adjust: ${item.name}`} onClose={onClose}/>
       <div style={{marginBottom:12,padding:"8px 12px",background:"var(--surface2)",borderRadius:8,display:"flex",gap:16}}>
         <span style={{fontSize:13,color:"var(--text3)"}}>Current stock:</span>
-        <span style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"var(--accent)"}}>{+item.qty_on_hand||0} {item.unit||""}</span>
+        <span style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"var(--accent)"}}>{+item.qty||0} {item.unit||""}</span>
       </div>
       <FD><FL label="Adjustment Type"/>
         <div style={{display:"flex",gap:8}}>
@@ -12499,7 +12525,7 @@ function WsStockAdjustModal({item,onSave,onClose}) {
       </FG>
       {qty&&+qty>0&&(
         <div style={{marginTop:8,padding:"8px 12px",background:adjType==="add"?"rgba(52,211,153,.1)":"rgba(248,113,113,.1)",borderRadius:8,textAlign:"center",fontSize:13,fontWeight:600,color:adjType==="add"?"var(--green)":"var(--red)"}}>
-          New stock: {(+item.qty_on_hand||0)+(adjType==="add"?+qty:-+qty)} {item.unit||""}
+          New stock: {(+item.qty||0)+(adjType==="add"?+qty:-+qty)} {item.unit||""}
         </div>
       )}
       <div style={{display:"flex",gap:10,marginTop:18}}>
@@ -12545,7 +12571,7 @@ function WsServicesPage({wsServices=[],settings,onSave,onDelete}) {
                   <tr key={s.id}>
                     <td style={{fontWeight:600}}>{s.name}</td>
                     <td style={{fontSize:12,color:"var(--text3)",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.description||"—"}</td>
-                    <td style={{textAlign:"right",fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(s.rate||0)}</td>
+                    <td style={{textAlign:"right",fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(s.default_price||s.price||s.rate||0)}</td>
                     <td style={{fontSize:12,color:"var(--text3)"}}>{s.unit||"job"}</td>
                     <td>
                       <div style={{display:"flex",gap:4}}>
@@ -12573,7 +12599,7 @@ function WsServicesPage({wsServices=[],settings,onSave,onDelete}) {
 function WsServiceModal({item,onSave,onClose}) {
   const [name,setName]=useState(item?.name||"");
   const [desc,setDesc]=useState(item?.description||"");
-  const [rate,setRate]=useState(item?.rate||"");
+  const [rate,setRate]=useState(item?.default_price||item?.price||item?.rate||"");
   const [unit,setUnit]=useState(item?.unit||"job");
   const [saving,setSaving]=useState(false);
   const isEdit=!!item;
@@ -12586,7 +12612,7 @@ function WsServiceModal({item,onSave,onClose}) {
         ...(isEdit?{id:item.id}:{}),
         name:name.trim(),
         description:desc.trim()||null,
-        rate:+rate||0,
+        default_price:+rate||0,
         unit:unit.trim()||"job",
       });
     }catch(e){alert("Save failed: "+e.message);}
@@ -12781,7 +12807,7 @@ function printStockLabel(p, settings, labelType="shop") {
         ${p.bin_location?`<div style="font-size:6pt;color:#888;margin-top:0.5mm">📍 ${p.bin_location}</div>`:""}
       </div>
       <div class="info">
-        Qty: ${isWs?(+p.qty_on_hand||0):(+p.stock||0)}${p.unit?" "+p.unit:""}
+        Qty: ${isWs?(+p.qty||0):(+p.stock||0)}${p.unit?" "+p.unit:""}
       </div>
     </div>
   </div>
@@ -13465,6 +13491,185 @@ function printWorkshopQuote(job, items, quote, settings, photos={}) {
   w.document.write(html);
   w.document.close();
   setTimeout(()=>w.print(),400);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WS DOCUMENTS PAGE
+// ═══════════════════════════════════════════════════════════════
+function WsDocumentsPage({docs=[],settings,onSave,onDelete}) {
+  const [modal,setModal]=useState(false);
+  const [search,setSearch]=useState("");
+  const [viewDoc,setViewDoc]=useState(null);
+
+  const filtered=docs.filter(d=>{
+    if(!search.trim()) return true;
+    const h=`${d.name||""} ${d.notes||""} ${d.file_type||""}`.toLowerCase();
+    return search.trim().toLowerCase().split(/\s+/).every(w=>h.includes(w));
+  });
+
+  const fmtDate=s=>{ if(!s) return "—"; const d=new Date(s); return d.toLocaleDateString()+' '+d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}); };
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
+        <input className="inp" style={{flex:1,minWidth:200}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search documents..."/>
+        <button className="btn btn-primary btn-sm" onClick={()=>setModal(true)}>+ Upload Document</button>
+      </div>
+
+      {filtered.length===0
+        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
+            <div style={{fontSize:32,marginBottom:8}}>📎</div>
+            <div style={{fontWeight:600}}>No documents yet</div>
+            <div style={{fontSize:13,marginTop:4}}>Upload PDFs or photos to keep on file</div>
+          </div>
+        : (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+            {filtered.map(d=>{
+              const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
+              return (
+                <div key={d.id} className="card" style={{padding:14,display:"flex",flexDirection:"column",gap:8}}>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                    <div style={{fontSize:32,lineHeight:1,flexShrink:0}}>{isPdf?"📄":"🖼️"}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name||"Unnamed"}</div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{fmtDate(d.uploaded_at)}</div>
+                    </div>
+                  </div>
+                  {d.notes&&<div style={{fontSize:12,color:"var(--text2)",lineHeight:1.4,padding:"6px 8px",background:"var(--surface2)",borderRadius:6}}>{d.notes}</div>}
+                  <div style={{display:"flex",gap:6,marginTop:"auto"}}>
+                    <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{flex:1,textAlign:"center",textDecoration:"none"}}>
+                      {isPdf?"📄 Open PDF":"🔍 View"}
+                    </a>
+                    {!isPdf&&<button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setViewDoc(d)}>🔍 Preview</button>}
+                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete this document?"))onDelete(d.id);}}>🗑</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      }
+
+      {modal&&(
+        <WsDocUploadModal
+          onSave={async(d)=>{ await onSave(d); setModal(false); }}
+          onClose={()=>setModal(false)}/>
+      )}
+
+      {viewDoc&&(
+        <div onClick={()=>setViewDoc(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+          <img src={viewDoc.file_url} alt={viewDoc.name} style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WsDocUploadModal({onSave,onClose}) {
+  const [name,setName]=useState("");
+  const [notes,setNotes]=useState("");
+  const [file,setFile]=useState(null);
+  const [preview,setPreview]=useState(null);
+  const [uploading,setUploading]=useState(false);
+  const fileRef=useRef(null);
+
+  const handleFile=e=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    setFile(f);
+    setName(prev=>prev||f.name.replace(/\.[^.]+$/,""));
+    if(f.type.startsWith("image/")){
+      const r=new FileReader(); r.onload=ev=>setPreview(ev.target.result); r.readAsDataURL(f);
+    } else { setPreview(null); }
+  };
+
+  const handleSave=async()=>{
+    if(!file){alert("Please choose a file");return;}
+    if(!name.trim()){alert("Please enter a document name");return;}
+    const SCRIPT_URL=(window._VEHICLE_SCRIPT_URL?.trim())||(window._APPS_SCRIPT_URL?.trim())||"";
+    if(!SCRIPT_URL){alert("No Google Drive Script URL configured in Settings → Apps Script URL.");return;}
+    setUploading(true);
+    try{
+      const isPdf=file.type==="application/pdf";
+      let base64,mimeType,filename;
+      if(isPdf){
+        // Read PDF as base64
+        base64=await new Promise((res,rej)=>{
+          const r=new FileReader();
+          r.onload=ev=>{
+            const ab=ev.target.result;
+            const bytes=new Uint8Array(ab);
+            let bin=""; bytes.forEach(b=>{bin+=String.fromCharCode(b);});
+            res("data:application/pdf;base64,"+btoa(bin));
+          };
+          r.onerror=rej; r.readAsArrayBuffer(file);
+        });
+        mimeType="application/pdf";
+        filename=`${name.trim().replace(/\s+/g,"_")}_${Date.now()}.pdf`;
+      } else {
+        // Resize image
+        base64=await new Promise((res,rej)=>{
+          const img=new Image();
+          img.onload=()=>{
+            const MAX=1600; const canvas=document.createElement("canvas");
+            let w=img.width,h=img.height;
+            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+            canvas.width=w;canvas.height=h;
+            canvas.getContext("2d").drawImage(img,0,0,w,h);
+            res(canvas.toDataURL("image/jpeg",0.88));
+          };
+          img.onerror=rej; img.src=preview;
+        });
+        mimeType="image/jpeg";
+        filename=`${name.trim().replace(/\s+/g,"_")}_${Date.now()}.jpg`;
+      }
+      const folderPath="Tim_Car_Phot/Workshop_Documents";
+      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType,folderPath})});
+      const result=await resp.json();
+      if(!result.success) throw new Error(result.error||"Upload failed");
+      await onSave({
+        name:name.trim(),
+        notes:notes.trim()||null,
+        file_url:result.url,
+        file_type:isPdf?"pdf":"image",
+        mime_type:mimeType,
+        filename,
+      });
+    }catch(e){alert("Upload failed: "+e.message);}
+    finally{setUploading(false);}
+  };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="📎 Upload Document" onClose={onClose}/>
+      <FD style={{marginBottom:12}}>
+        <FL label="Document Name *"/>
+        <input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Warranty Card, Supplier Invoice"/>
+      </FD>
+      <FD style={{marginBottom:12}}>
+        <FL label="Notes"/>
+        <textarea className="inp" rows={2} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional description..."/>
+      </FD>
+      <FD style={{marginBottom:12}}>
+        <FL label="File (PDF or Photo)"/>
+        <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleFile}/>
+        <button className="btn btn-ghost" style={{width:"100%",justifyContent:"center"}} onClick={()=>fileRef.current?.click()}>
+          {file?`✅ ${file.name}`:"📂 Choose File (PDF or Image)"}
+        </button>
+      </FD>
+      {preview&&(
+        <div style={{marginBottom:12,textAlign:"center"}}>
+          <img src={preview} alt="preview" style={{maxHeight:180,maxWidth:"100%",borderRadius:8,border:"1px solid var(--border)"}}/>
+        </div>
+      )}
+      {file&&!preview&&<div style={{marginBottom:12,padding:"8px 12px",background:"var(--surface2)",borderRadius:8,fontSize:13,color:"var(--text2)"}}>📄 {file.name}</div>}
+      <div style={{display:"flex",gap:10,marginTop:8}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose} disabled={uploading}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={uploading}>
+          {uploading?"⏳ Uploading...":"⬆️ Upload & Save"}
+        </button>
+      </div>
+    </Overlay>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════

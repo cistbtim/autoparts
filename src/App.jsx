@@ -296,6 +296,10 @@ const makeId = (prefix) => {
   return `${prefix}-${Date.now()}-${_idCounter}`;
 };
 const makeToken = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
+const detectGeoLocation = async () => {
+  const g = await (await fetch("https://ipapi.co/json/")).json();
+  return { city: g.city||"", country: g.country_name||"" };
+};
 
 // ── Dynamsoft Barcode Reader — PDF417 decoder ───────────────────
 // Using v7.4.0-v1 (same version as the working Google Apps Script scanner)
@@ -683,6 +687,7 @@ function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
   const [wsRegEmail,setWsRegEmail] = useState(""); const [wsRegPhone,setWsRegPhone] = useState("");
   const [wsRegCity,setWsRegCity] = useState(""); const [wsRegCountry,setWsRegCountry] = useState("");
   const [err,setErr] = useState(""); const [loading,setLoading] = useState(false);
+  const [detectingLoc,setDetectingLoc] = useState(false);
 
   const logLogin = async (u) => { try { const g=await(await fetch("https://ipapi.co/json/")).json(); await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:`${g.country_name||"?"} ${g.country_flag_emoji||""}`.trim(),city:g.city||"",device:navigator.userAgent.slice(0,100),status:"success"}); } catch{} };
 
@@ -825,9 +830,21 @@ function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
                 <div><FL label="Confirm Password *"/><input className="inp" type="password" value={wsRegPass2} onChange={e=>setWsRegPass2(e.target.value)}/></div>
                 <div><FL label="Email"/><input className="inp" type="email" value={wsRegEmail} onChange={e=>setWsRegEmail(e.target.value)} placeholder="workshop@email.com"/></div>
                 <div><FL label="Phone"/><input className="inp" type="tel" value={wsRegPhone} onChange={e=>setWsRegPhone(e.target.value)} placeholder="+27..."/></div>
-                <div style={{display:"flex",gap:10}}>
-                  <div style={{flex:1}}><FL label="City *"/><input className="inp" value={wsRegCity} onChange={e=>setWsRegCity(e.target.value)} placeholder="Cape Town"/></div>
-                  <div style={{flex:1}}><FL label="Country *"/><input className="inp" value={wsRegCountry} onChange={e=>setWsRegCountry(e.target.value)} placeholder="South Africa"/></div>
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <FL label="City & Country *"/>
+                    <button type="button" className="btn btn-ghost btn-xs" disabled={detectingLoc} onClick={async()=>{
+                      setDetectingLoc(true);
+                      try{const loc=await detectGeoLocation();setWsRegCity(loc.city);setWsRegCountry(loc.country);}catch{}
+                      setDetectingLoc(false);
+                    }} style={{fontSize:11,padding:"3px 9px"}}>
+                      {detectingLoc?"Detecting...":"📍 Auto-detect"}
+                    </button>
+                  </div>
+                  <div style={{display:"flex",gap:10}}>
+                    <input className="inp" value={wsRegCity} onChange={e=>setWsRegCity(e.target.value)} placeholder="City" style={{flex:1}}/>
+                    <input className="inp" value={wsRegCountry} onChange={e=>setWsRegCountry(e.target.value)} placeholder="Country" style={{flex:1}}/>
+                  </div>
                 </div>
                 {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
                 <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doWsSignup} disabled={loading}>{loading?"Creating account...":"🚀 Start Free Trial"}</button>
@@ -4029,6 +4046,7 @@ function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"", ...profile
   });
   const [saving,setSaving]=useState(false);
+  const [detectingLoc,setDetectingLoc]=useState(false);
   const [dragOver,setDragOver]=useState(false);
   const fileRef=useRef(null);
   // Workshop users state
@@ -4212,8 +4230,22 @@ function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
           <div><FL label="WhatsApp"/><input className="inp" value={f.whatsapp} onChange={e=>s("whatsapp",e.target.value)} placeholder="+27..."/></div>
           <div style={{gridColumn:"1/-1"}}><FL label="Email"/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div>
           <div style={{gridColumn:"1/-1"}}><FL label="Address"/><textarea className="inp" rows={3} value={f.address} onChange={e=>s("address",e.target.value)} style={{resize:"vertical"}}/></div>
-          <div><FL label="City"/><input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)} placeholder="e.g. Cape Town"/></div>
-          <div><FL label="Country"/><input className="inp" value={f.country||""} onChange={e=>s("country",e.target.value)} placeholder="e.g. South Africa"/></div>
+          <div style={{gridColumn:"1/-1"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <FL label="City & Country"/>
+              <button type="button" className="btn btn-ghost btn-xs" disabled={detectingLoc} onClick={async()=>{
+                setDetectingLoc(true);
+                try{const loc=await detectGeoLocation();s("city",loc.city);s("country",loc.country);}catch{}
+                setDetectingLoc(false);
+              }} style={{fontSize:11,padding:"3px 9px"}}>
+                {detectingLoc?"Detecting...":"📍 Auto-detect"}
+              </button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)} placeholder="City"/>
+              <input className="inp" value={f.country||""} onChange={e=>s("country",e.target.value)} placeholder="Country"/>
+            </div>
+          </div>
           <div style={{gridColumn:"1/-1"}}>
             <FL label="Currency"/>
             <select className="inp" value={f.currency||"ZAR R"} onChange={e=>s("currency",e.target.value)}>
@@ -4311,6 +4343,7 @@ function WsLocationSetupModal({profile,onSave,onClose}) {
   const [city,setCity]=useState(profile?.city||"");
   const [country,setCountry]=useState(profile?.country||"");
   const [saving,setSaving]=useState(false);
+  const [detecting,setDetecting]=useState(false);
   const [err,setErr]=useState("");
 
   const save=async()=>{
@@ -4332,13 +4365,16 @@ function WsLocationSetupModal({profile,onSave,onClose}) {
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:13}}>
-          <div>
-            <FL label="City *"/>
-            <input className="inp" value={city} onChange={e=>setCity(e.target.value)} placeholder="e.g. Cape Town" autoFocus/>
-          </div>
-          <div>
-            <FL label="Country *"/>
-            <input className="inp" value={country} onChange={e=>setCountry(e.target.value)} placeholder="e.g. South Africa" onKeyDown={e=>e.key==="Enter"&&save()}/>
+          <button type="button" className="btn btn-ghost" disabled={detecting} onClick={async()=>{
+            setDetecting(true);
+            try{const loc=await detectGeoLocation();setCity(loc.city);setCountry(loc.country);}catch{}
+            setDetecting(false);
+          }} style={{width:"100%",fontSize:13}}>
+            {detecting?"📡 Detecting your location...":"📍 Auto-detect my City & Country"}
+          </button>
+          <div style={{display:"flex",gap:10}}>
+            <div style={{flex:1}}><FL label="City *"/><input className="inp" value={city} onChange={e=>setCity(e.target.value)} placeholder="e.g. Cape Town"/></div>
+            <div style={{flex:1}}><FL label="Country *"/><input className="inp" value={country} onChange={e=>setCountry(e.target.value)} placeholder="e.g. South Africa" onKeyDown={e=>e.key==="Enter"&&save()}/></div>
           </div>
           {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
           <div style={{display:"flex",gap:10,marginTop:4}}>

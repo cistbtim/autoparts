@@ -675,8 +675,13 @@ function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
   const [user,setUser] = useState(""); const [pass,setPass] = useState("");
   const [wsUser,setWsUser] = useState(""); const [wsPass,setWsPass] = useState("");
   const [custTab,setCustTab] = useState("login");
+  const [wsTab,setWsTab] = useState("login"); // login | signup
   const [cName,setCName] = useState(""); const [cPhone,setCPhone] = useState("");
   const [cEmail,setCEmail] = useState(""); const [cPass,setCPass] = useState(""); const [cPass2,setCPass2] = useState("");
+  const [wsRegName,setWsRegName] = useState(""); const [wsRegUser,setWsRegUser] = useState("");
+  const [wsRegPass,setWsRegPass] = useState(""); const [wsRegPass2,setWsRegPass2] = useState("");
+  const [wsRegEmail,setWsRegEmail] = useState(""); const [wsRegPhone,setWsRegPhone] = useState("");
+  const [wsRegCity,setWsRegCity] = useState(""); const [wsRegCountry,setWsRegCountry] = useState("");
   const [err,setErr] = useState(""); const [loading,setLoading] = useState(false);
 
   const logLogin = async (u) => { try { const g=await(await fetch("https://ipapi.co/json/")).json(); await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:`${g.country_name||"?"} ${g.country_flag_emoji||""}`.trim(),city:g.city||"",device:navigator.userAgent.slice(0,100),status:"success"}); } catch{} };
@@ -710,6 +715,29 @@ function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
       }
     }
     setErr("Invalid workshop username or password");
+    setLoading(false);
+  };
+
+  const doWsSignup = async () => {
+    if(!wsRegName||!wsRegUser||!wsRegPass||!wsRegCity||!wsRegCountry){setErr("Workshop name, username, password, city and country are required");return;}
+    if(wsRegPass!==wsRegPass2){setErr("Passwords don't match");return;}
+    if(wsRegPass.length<4){setErr("Password must be at least 4 characters");return;}
+    setLoading(true);setErr("");
+    // Check username uniqueness
+    const ex=await api.get("users",`username=eq.${encodeURIComponent(wsRegUser)}&select=id`).catch(()=>[]);
+    if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
+    // Create workshop user account
+    const wsId=makeId("WS");
+    const today=new Date().toISOString().slice(0,10);
+    const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
+    const newUser=await api.insert("users",{id:wsId,username:wsRegUser,password:wsRegPass,name:wsRegName,role:"workshop",phone:wsRegPhone||"",email:wsRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
+    if(!newUser){setLoading(false);return;}
+    // Create workshop profile with trial
+    await api.upsert("workshop_profiles",{id:wsId,name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>{});
+    // Auto-login
+    const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
+    if(loginUser){await logLogin({...loginUser});onLogin({...loginUser});}
+    else setErr("Account created — please log in");
     setLoading(false);
   };
 
@@ -776,14 +804,35 @@ function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
           )}
           {authTab==="workshop"&&(
             <div style={{display:"flex",flexDirection:"column",gap:13}}>
-              <div style={{textAlign:"center",marginBottom:4}}>
-                <span style={{fontSize:28}}>🔧</span>
-                <div style={{fontSize:13,color:"var(--text3)",marginTop:4}}>Workshop Portal</div>
+              <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:4}}>
+                {[["login","Sign In"],["signup","Register Workshop"]].map(([id,lb])=>(
+                  <button key={id} className={`auth-tab ${wsTab===id?"on":""}`} onClick={()=>{setWsTab(id);setErr("");}}>{lb}</button>
+                ))}
               </div>
-              <div><FL label={t.username}/><input className="inp" type="text" value={wsUser} onChange={e=>setWsUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()} autoCapitalize="none" placeholder="Workshop username"/></div>
-              <div><FL label={t.password}/><input className="inp" type="password" value={wsPass} onChange={e=>setWsPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()}/></div>
-              {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
-              <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doWorkshopLogin} disabled={loading}>{loading?t.connecting:t.login}</button>
+              {wsTab==="login"&&(<>
+                <div><FL label={t.username}/><input className="inp" type="text" value={wsUser} onChange={e=>setWsUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()} autoCapitalize="none" placeholder="Workshop username"/></div>
+                <div><FL label={t.password}/><input className="inp" type="password" value={wsPass} onChange={e=>setWsPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()}/></div>
+                {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
+                <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doWorkshopLogin} disabled={loading}>{loading?t.connecting:t.login}</button>
+              </>)}
+              {wsTab==="signup"&&(<>
+                <div style={{background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.2)",borderRadius:8,padding:"10px 13px",fontSize:12,color:"var(--green)",lineHeight:1.5}}>
+                  ✅ <strong>30-day free trial</strong> — no credit card needed. After trial, a monthly fee applies.
+                </div>
+                <div><FL label="Workshop Name *"/><input className="inp" value={wsRegName} onChange={e=>setWsRegName(e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
+                <div><FL label="Username *"/><input className="inp" value={wsRegUser} onChange={e=>setWsRegUser(e.target.value)} autoCapitalize="none" placeholder="Choose a login username"/></div>
+                <div><FL label="Password *"/><input className="inp" type="password" value={wsRegPass} onChange={e=>setWsRegPass(e.target.value)}/></div>
+                <div><FL label="Confirm Password *"/><input className="inp" type="password" value={wsRegPass2} onChange={e=>setWsRegPass2(e.target.value)}/></div>
+                <div><FL label="Email"/><input className="inp" type="email" value={wsRegEmail} onChange={e=>setWsRegEmail(e.target.value)} placeholder="workshop@email.com"/></div>
+                <div><FL label="Phone"/><input className="inp" type="tel" value={wsRegPhone} onChange={e=>setWsRegPhone(e.target.value)} placeholder="+27..."/></div>
+                <div style={{display:"flex",gap:10}}>
+                  <div style={{flex:1}}><FL label="City *"/><input className="inp" value={wsRegCity} onChange={e=>setWsRegCity(e.target.value)} placeholder="Cape Town"/></div>
+                  <div style={{flex:1}}><FL label="Country *"/><input className="inp" value={wsRegCountry} onChange={e=>setWsRegCountry(e.target.value)} placeholder="South Africa"/></div>
+                </div>
+                {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
+                <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doWsSignup} disabled={loading}>{loading?"Creating account...":"🚀 Start Free Trial"}</button>
+                <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",marginTop:-4}}>Already have an account? <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setWsTab("login");setErr("");}}>Sign in</span></p>
+              </>)}
             </div>
           )}
           {authTab==="customer"&&(
@@ -1062,6 +1111,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [workshopProfile,setWorkshopProfile]=useState({});
   const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
   const [showLocationSetup,setShowLocationSetup]=useState(false);
+  const [subStatus,setSubStatus]=useState(null); // null | {status,daysLeft,expiresAt}
   const [completedDays,setCompletedDays]=useState(7); // filter completed orders to last N days
   const [searchCust,setSearchCust]=useState("");
   const [inqFilter,setInqFilter]=useState("all");
@@ -1267,6 +1317,14 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       const p=Array.isArray(prof)&&prof[0]?prof[0]:{};
       setWorkshopProfile(p);
+      // Check subscription
+      if(p.subscription_expires_at){
+        const today=new Date(); today.setHours(0,0,0,0);
+        const exp=new Date(p.subscription_expires_at); exp.setHours(0,0,0,0);
+        const daysLeft=Math.ceil((exp-today)/(1000*60*60*24));
+        const status=p.subscription_status||"trial";
+        setSubStatus({status, daysLeft, expiresAt:p.subscription_expires_at, expired:daysLeft<0||(status==="expired")});
+      }
       // Prompt for city/country if missing (main role only)
       if(wsRole==="main"&&(!p.city||!p.country)) setShowLocationSetup(true);
     }
@@ -2346,6 +2404,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsprofile",   icon:"⚙️",label:"WS Settings",  roles:["workshop"], wsRoles:["main"]},
+        {id:"wssubscriptions",icon:"💳",label:"WS Subscriptions",roles:["admin"]},
       ]
     },
     {
@@ -3578,11 +3637,18 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {/* ── SETTINGS ── */}
         {/* ── VEHICLES ── */}
         {/* ── WORKSHOP (all sub-tabs) ── */}
-        {tab==="wsprofile"&&role==="workshop"&&(
+        {/* Subscription expired block */}
+        {role==="workshop"&&subStatus?.expired&&(
+          <WsSubscriptionExpiredPage expiresAt={subStatus.expiresAt} onLogout={()=>{setUser(null);setTab("workshop");setSubStatus(null);}} settings={wsDisplaySettings}/>
+        )}
+        {tab==="wsprofile"&&role==="workshop"&&!subStatus?.expired&&(
           <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId}/>
         )}
+        {tab==="wssubscriptions"&&role==="admin"&&(
+          <WsSubscriptionsPage settings={settings}/>
+        )}
 
-        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
+        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager"||(role==="workshop"&&!subStatus?.expired))&&(
           <WorkshopPage
             key={tab}
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":"report"}
@@ -3944,6 +4010,11 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       {isDemo&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9999,background:"linear-gradient(90deg,#f59e0b,#f97316)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
         🔒 Demo Mode — all data is read-only. Contact us to get your own account.
       </div>}
+      {role==="workshop"&&subStatus&&!subStatus.expired&&subStatus.daysLeft<=7&&(
+        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9998,background:"linear-gradient(90deg,#f97316,#ef4444)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
+          ⚠️ {subStatus.status==="trial"?"Free trial":"Subscription"} expires in <strong>{subStatus.daysLeft<=0?"today":subStatus.daysLeft===1?"1 day":`${subStatus.daysLeft} days`}</strong> ({subStatus.expiresAt}) — Contact admin to renew
+        </div>
+      )}
     </div>
   );
 }
@@ -4252,6 +4323,149 @@ function WsLocationSetupModal({profile,onSave,onClose}) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORKSHOP SUBSCRIPTION EXPIRED PAGE
+// ═══════════════════════════════════════════════════════════════
+function WsSubscriptionExpiredPage({expiresAt,onLogout,settings}) {
+  return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"60vh",padding:24}}>
+      <div style={{maxWidth:480,width:"100%",textAlign:"center"}}>
+        <div style={{fontSize:56,marginBottom:16}}>🔒</div>
+        <h2 style={{fontSize:22,fontWeight:700,marginBottom:8,color:"var(--red)"}}>Subscription Expired</h2>
+        <p style={{color:"var(--text3)",fontSize:14,lineHeight:1.6,marginBottom:20}}>
+          Your workshop subscription expired on <strong>{expiresAt}</strong>.<br/>
+          Please contact the administrator to renew your subscription and regain access.
+        </p>
+        <div className="card" style={{padding:20,marginBottom:20,textAlign:"left"}}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>📞 Contact to Renew</div>
+          {settings?.phone&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:6}}>📱 {settings.phone}</div>}
+          {settings?.whatsapp&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:6}}>💬 WhatsApp: {settings.whatsapp}</div>}
+          {settings?.email&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:6}}>✉️ {settings.email}</div>}
+          {!settings?.phone&&!settings?.email&&<div style={{fontSize:13,color:"var(--text3)"}}>Please contact your system administrator.</div>}
+        </div>
+        <button className="btn btn-ghost" style={{width:"100%"}} onClick={onLogout}>← Sign Out</button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN WORKSHOP SUBSCRIPTIONS PAGE
+// ═══════════════════════════════════════════════════════════════
+function WsSubscriptionsPage({settings}) {
+  const [workshops,setWorkshops]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [editing,setEditing]=useState(null); // {id,subscription_status,subscription_expires_at}
+  const [saving,setSaving]=useState(false);
+
+  const load=async()=>{
+    setLoading(true);
+    const res=await api.get("workshop_profiles","select=id,name,city,country,phone,email,trial_start,subscription_status,subscription_expires_at&order=name.asc").catch(()=>[]);
+    setWorkshops(Array.isArray(res)?res:[]);
+    setLoading(false);
+  };
+  useEffect(()=>{load();},[]);
+
+  const save=async()=>{
+    if(!editing) return;
+    setSaving(true);
+    await api.patch("workshop_profiles","id",editing.id,{subscription_status:editing.subscription_status,subscription_expires_at:editing.subscription_expires_at});
+    setSaving(false);
+    setEditing(null);
+    load();
+  };
+
+  const today=new Date(); today.setHours(0,0,0,0);
+  const daysLeft=(exp)=>{ if(!exp) return null; const d=new Date(exp); d.setHours(0,0,0,0); return Math.ceil((d-today)/(1000*60*60*24)); };
+  const statusColor=(s,dl)=>{
+    if(s==="active") return dl!==null&&dl>0?"var(--green)":"var(--red)";
+    if(s==="trial")  return dl!==null&&dl>0?(dl<=7?"var(--yellow)":"var(--blue)"):"var(--red)";
+    return "var(--red)";
+  };
+
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>💳 Workshop Subscriptions</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:2}}>{workshops.length} workshops registered</p>
+        </div>
+        <button className="btn btn-ghost" onClick={load} disabled={loading}>🔄 Refresh</button>
+      </div>
+      {loading&&<div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>Loading...</div>}
+      {!loading&&workshops.length===0&&<div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No workshops found</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {workshops.map(w=>{
+          const dl=daysLeft(w.subscription_expires_at);
+          const sc=statusColor(w.subscription_status,dl);
+          const expired=w.subscription_expires_at&&dl!==null&&dl<0;
+          return (
+            <div key={w.id} className="card" style={{padding:"14px 18px",borderLeft:`3px solid ${sc}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:15}}>{w.name||w.id}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
+                    {[w.city,w.country].filter(Boolean).join(", ")}
+                    {w.phone&&<span style={{marginLeft:8}}>📞 {w.phone}</span>}
+                  </div>
+                  <div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--text3)",marginTop:2}}>ID: {w.id}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <span style={{fontWeight:700,fontSize:13,color:sc,background:`${sc}18`,borderRadius:6,padding:"3px 10px"}}>
+                    {w.subscription_status?.toUpperCase()||"NO PLAN"}
+                  </span>
+                  <div style={{fontSize:12,color:expired?"var(--red)":"var(--text3)",marginTop:4}}>
+                    {w.subscription_expires_at
+                      ? expired?`⚠️ Expired ${w.subscription_expires_at}`:dl===0?"Expires today":`${dl} days left · ${w.subscription_expires_at}`
+                      : "No expiry set"}
+                  </div>
+                  <div style={{marginTop:6}}>
+                    <button className="btn btn-ghost btn-sm" onClick={()=>setEditing({...w})}>✏️ Manage</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {editing&&(
+        <Overlay onClose={()=>setEditing(null)} wide>
+          <MHead title={`💳 Manage: ${editing.name}`} onClose={()=>setEditing(null)}/>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div>
+              <FL label="Subscription Status"/>
+              <select className="inp" value={editing.subscription_status||"trial"} onChange={e=>setEditing(p=>({...p,subscription_status:e.target.value}))}>
+                <option value="trial">Trial</option>
+                <option value="active">Active (Paid)</option>
+                <option value="expired">Expired</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </div>
+            <div>
+              <FL label="Subscription Expires At"/>
+              <input className="inp" type="date" value={editing.subscription_expires_at||""} onChange={e=>setEditing(p=>({...p,subscription_expires_at:e.target.value}))}/>
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {[["+ 1 Month",30],["+ 3 Months",90],["+ 6 Months",180],["+ 1 Year",365]].map(([lb,days])=>(
+                <button key={lb} className="btn btn-ghost btn-sm" onClick={()=>{
+                  const base=editing.subscription_expires_at&&new Date(editing.subscription_expires_at)>new Date()?new Date(editing.subscription_expires_at):new Date();
+                  const d=new Date(base.getTime()+days*24*60*60*1000);
+                  setEditing(p=>({...p,subscription_expires_at:d.toISOString().slice(0,10),subscription_status:"active"}));
+                }}>{lb}</button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setEditing(null)}>Cancel</button>
+              <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>{saving?"Saving...":"💾 Save"}</button>
+            </div>
+          </div>
+        </Overlay>
+      )}
     </div>
   );
 }

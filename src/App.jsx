@@ -1059,7 +1059,8 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [workshopStock,setWorkshopStock]=useState([]);
   const [workshopServices,setWorkshopServices]=useState([]);
   const [workshopDocuments,setWorkshopDocuments]=useState([]);
-  const [workshopProfile,setWorkshopProfile]=useState({}); // null=no filter, Set=filtered part ids
+  const [workshopProfile,setWorkshopProfile]=useState({});
+  const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
   const [completedDays,setCompletedDays]=useState(7); // filter completed orders to last N days
   const [searchCust,setSearchCust]=useState("");
   const [inqFilter,setInqFilter]=useState("all");
@@ -1227,6 +1228,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]),
       api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]),
       api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]),
+      api.get("workshop_profiles","select=id,name&order=name.asc").catch(()=>[]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -1256,6 +1258,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWorkshopStock(Array.isArray(rest[12])?rest[12]:[]);
     setWorkshopServices(Array.isArray(rest[13])?rest[13]:[]);
     setWorkshopDocuments(Array.isArray(rest[14])?rest[14]:[]);
+    setAllWsProfiles(Array.isArray(rest[15])?rest[15]:[]);
     // Load workshop profile for workshop role
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
@@ -3617,6 +3620,8 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             onDeleteWsDoc={deleteWsDocument}
             parts={parts}
             wsRole={wsRole}
+            wsId={wsId}
+            wsProfiles={allWsProfiles}
             t={t} lang={lang}/>
         )}
 
@@ -10491,7 +10496,7 @@ function WsVehicleForm({data,onSave,onClose,t}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",t,lang}) {
+function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],t,lang}) {
   const [view,      setView]      = useState("list");
   const [activeJob, setActiveJob] = useState(null);
   const [editJob,   setEditJob]   = useState(null);
@@ -10501,15 +10506,25 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
   const [wsTab,     setWsTab]     = useState(initialTab||"jobs");
   const [stmtCust,  setStmtCust]  = useState("");  // statement: selected customer id
   const [qInvModal, setQInvModal] = useState(null); // {job, items, quote} for convert-from-list
+  const [sortBy,    setSortBy]    = useState("date_desc");
 
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
   const ST_BG    = {"Pending":"rgba(96,165,250,.12)","In Progress":"rgba(251,191,36,.12)","Done":"rgba(52,211,153,.12)","Delivered":"rgba(100,116,139,.12)"};
+
+  const wsProfileMap = Object.fromEntries(wsProfiles.map(p=>[p.id, p.name||p.id]));
 
   const filtered = jobs.filter(j=>{
     if(filterSt!=="__all__"&&j.status!==filterSt) return false;
     if(!search.trim()) return true;
     const s=search.toLowerCase();
     return `${j.customer_name} ${j.vehicle_reg} ${j.vehicle_make} ${j.vehicle_model} ${j.id}`.toLowerCase().includes(s);
+  }).sort((a,b)=>{
+    if(sortBy==="date_asc")  return (a.date_in||"").localeCompare(b.date_in||"");
+    if(sortBy==="date_desc") return (b.date_in||"").localeCompare(a.date_in||"");
+    if(sortBy==="customer")  return (a.customer_name||"").localeCompare(b.customer_name||"");
+    if(sortBy==="job_id")    return a.id.localeCompare(b.id);
+    if(sortBy==="make")      return `${a.vehicle_make||""} ${a.vehicle_model||""}`.localeCompare(`${b.vehicle_make||""} ${b.vehicle_model||""}`);
+    return 0;
   });
 
   const jobInvoice = (jobId) => invoices.find(i=>i.job_id===jobId);
@@ -10611,9 +10626,18 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
             return <button key={v} className={`tab ${filterSt===v?"on":""}`} onClick={()=>setFilterSt(v)}>{l} <span style={{opacity:.6,fontSize:11}}>{cnt}</span></button>;
           })}
         </div>
-        <div style={{position:"relative",marginBottom:14,maxWidth:320}}>
-          <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search job, customer, plate..."/>
-          {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16}}>✕</button>}
+        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+          <div style={{position:"relative",flex:"1 1 220px",maxWidth:320}}>
+            <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search job, customer, plate..."/>
+            {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16}}>✕</button>}
+          </div>
+          <select className="inp" value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{flex:"0 0 auto",width:"auto",minWidth:160}}>
+            <option value="date_desc">↓ Newest first</option>
+            <option value="date_asc">↑ Oldest first</option>
+            <option value="customer">A–Z Customer</option>
+            <option value="job_id">Job #</option>
+            <option value="make">Make / Model</option>
+          </select>
         </div>
         {filtered.length===0&&<div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No jobs found</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
@@ -10639,6 +10663,14 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
                 </div>
                 {j.return_reason&&<div style={{fontSize:11,color:"var(--yellow)",marginBottom:6}}>🔄 {j.return_reason.slice(0,50)}</div>}
                 {j.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:8,lineHeight:1.4,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>💬 {j.complaint}</div>}
+                {!wsId&&j.workshop_id&&(
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:6,display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{background:"rgba(251,146,60,.12)",color:"#f97316",borderRadius:6,padding:"2px 7px",fontWeight:600,fontSize:11}}>
+                      🏪 {wsProfileMap[j.workshop_id]||j.workshop_id}
+                    </span>
+                    <span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)"}}>{j.workshop_id}</span>
+                  </div>
+                )}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid var(--border)",paddingTop:8}}>
                   <div style={{fontSize:11,color:"var(--text3)"}}>
                     <code style={{fontFamily:"DM Mono,monospace"}}>{j.id}</code>

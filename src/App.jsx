@@ -10956,6 +10956,8 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
   const [filterWs,      setFilterWs]      = useState("__all__");
   const [filterCity,    setFilterCity]    = useState("__all__");
   const [filterCountry, setFilterCountry] = useState("__all__");
+  const [jobPage,   setJobPage]   = useState(0);
+  const JOB_PAGE_SIZE = typeof window!=="undefined"&&window.innerWidth<=767 ? 5 : 20;
 
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
   const ST_BG    = {"Pending":"rgba(96,165,250,.12)","In Progress":"rgba(251,191,36,.12)","Done":"rgba(52,211,153,.12)","Delivered":"rgba(100,116,139,.12)"};
@@ -10982,6 +10984,8 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
     if(sortBy==="make")      return `${a.vehicle_make||""} ${a.vehicle_model||""}`.localeCompare(`${b.vehicle_make||""} ${b.vehicle_model||""}`);
     return 0;
   });
+
+  useEffect(()=>{ setJobPage(0); },[filterSt,search,sortBy,filterWs,filterCity,filterCountry]);
 
   const jobInvoice = (jobId) => invoices.find(i=>i.job_id===jobId);
   const jobQuote   = (jobId) => quotes.find(q=>q.job_id===jobId);
@@ -11117,7 +11121,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
         </div>
         {filtered.length===0&&<div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No jobs found</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
-          {filtered.map(j=>{
+          {filtered.slice(jobPage*JOB_PAGE_SIZE,(jobPage+1)*JOB_PAGE_SIZE).map(j=>{
             const jItems=jobItems.filter(i=>i.job_id===j.id);
             const inv=jobInvoice(j.id);
             const jq=jobQuote(j.id);
@@ -11162,6 +11166,15 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
             );
           })}
         </div>
+        {filtered.length>JOB_PAGE_SIZE&&(
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginTop:16,flexWrap:"wrap"}}>
+            <button className="btn btn-ghost btn-sm" disabled={jobPage===0} onClick={()=>setJobPage(p=>p-1)}>← Prev</button>
+            <span style={{fontSize:12,color:"var(--text3)"}}>
+              {jobPage*JOB_PAGE_SIZE+1}–{Math.min((jobPage+1)*JOB_PAGE_SIZE,filtered.length)} of {filtered.length}
+            </span>
+            <button className="btn btn-ghost btn-sm" disabled={(jobPage+1)*JOB_PAGE_SIZE>=filtered.length} onClick={()=>setJobPage(p=>p+1)}>Next →</button>
+          </div>
+        )}
       </>)}
 
       {/* ══════════════ CUSTOMERS TAB ══════════════ */}

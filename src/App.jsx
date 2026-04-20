@@ -4497,6 +4497,10 @@ function SettingsPage({settings,onSave,t}) {
             </div>
           </FD>
           <FD><FL label={t.shopAddress}/><textarea className="inp" value={f.address||""} onChange={e=>s("address",e.target.value)} placeholder="Full shop address" style={{minHeight:70}}/></FD>
+          <FG cols="1fr 1fr">
+            <div><FL label="City"/><input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)} placeholder="e.g. Cape Town"/></div>
+            <div><FL label="Country"/><input className="inp" value={f.country||""} onChange={e=>s("country",e.target.value)} placeholder="e.g. South Africa"/></div>
+          </FG>
         </div>
         <div className="card" style={{padding:22}}>
           <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>💰 Billing Settings</h3>
@@ -6259,6 +6263,7 @@ function PdfInvoiceModal({inv,settings,onClose}) {
                 {settings.phone&&<div>📞 {settings.phone}</div>}
                 {settings.email&&<div>✉ {settings.email}</div>}
                 {settings.address&&<div>📍 {settings.address}</div>}
+                {(settings.city||settings.country)&&<div>🌍 {[settings.city,settings.country].filter(Boolean).join(", ")}</div>}
                 {settings.vat_number
                   ? <div>VAT Reg No: <strong>{settings.vat_number}</strong></div>
                   : <div style={{color:"#aaa",fontStyle:"italic"}}>Not VAT Registered</div>}
@@ -14322,6 +14327,7 @@ function WsStatementModal({invoice,job,items,settings,onClose,onPrint}) {
             <div style={{fontWeight:700,fontSize:15}}>{settings.shop_name||"Workshop"}</div>
             {settings.phone&&<div style={{fontSize:12,color:"var(--text3)"}}>📞 {settings.phone}</div>}
             {settings.address&&<div style={{fontSize:12,color:"var(--text3)"}}>{settings.address}</div>}
+            {(settings.city||settings.country)&&<div style={{fontSize:12,color:"var(--text3)"}}>🌍 {[settings.city,settings.country].filter(Boolean).join(", ")}</div>}
           </div>
           <div style={{textAlign:"right"}}>
             <div style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)"}}>{invoice.id}</div>

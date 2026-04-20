@@ -11030,6 +11030,86 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
     finally{ setClUploading(p=>({...p,[key]:false})); }
   };
 
+  // ── Job documents ─────────────────────────────────────────────
+  const [jobDocs,       setJobDocs]       = useState([]);
+  const [docName,       setDocName]       = useState("");
+  const [docNotes,      setDocNotes]      = useState("");
+  const [docFile,       setDocFile]       = useState(null);
+  const [docPreview,    setDocPreview]    = useState(null);
+  const [docUploading,  setDocUploading]  = useState(false);
+  const [viewDocImg,    setViewDocImg]    = useState(null);
+  const docFileRef = useRef(null);
+
+  useEffect(()=>{
+    api.get("workshop_documents",`job_id=eq.${job.id}&order=uploaded_at.desc`)
+      .then(r=>setJobDocs(Array.isArray(r)?r:[]))
+      .catch(()=>setJobDocs([]));
+  },[job.id]);
+
+  const handleDocFile=e=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    setDocFile(f);
+    setDocName(prev=>prev||f.name.replace(/\.[^.]+$/,""));
+    if(f.type.startsWith("image/")){
+      const r=new FileReader(); r.onload=ev=>setDocPreview(ev.target.result); r.readAsDataURL(f);
+    } else { setDocPreview(null); }
+  };
+
+  const uploadJobDoc=async()=>{
+    if(!docFile){alert("Choose a file first");return;}
+    if(!docName.trim()){alert("Enter a document name");return;}
+    const SCRIPT_URL=(window._VEHICLE_SCRIPT_URL?.trim())||(window._APPS_SCRIPT_URL?.trim())||"";
+    if(!SCRIPT_URL){alert("No Google Drive Script URL in Settings");return;}
+    setDocUploading(true);
+    try{
+      const isPdf=docFile.type==="application/pdf";
+      let base64,mimeType,filename;
+      if(isPdf){
+        base64=await new Promise((res,rej)=>{
+          const r=new FileReader();
+          r.onload=ev=>{const b=new Uint8Array(ev.target.result);let s="";b.forEach(x=>{s+=String.fromCharCode(x);});res("data:application/pdf;base64,"+btoa(s));};
+          r.onerror=rej; r.readAsArrayBuffer(docFile);
+        });
+        mimeType="application/pdf"; filename=`${docName.trim().replace(/\s+/g,"_")}_${Date.now()}.pdf`;
+      } else {
+        base64=await new Promise((res,rej)=>{
+          const img=new Image();
+          img.onload=()=>{
+            const MAX=1600; const canvas=document.createElement("canvas");
+            let w=img.width,h=img.height;
+            if(w>MAX||h>MAX){const ratio=Math.min(MAX/w,MAX/h);w=Math.round(w*ratio);h=Math.round(h*ratio);}
+            canvas.width=w;canvas.height=h;
+            canvas.getContext("2d").drawImage(img,0,0,w,h);
+            res(canvas.toDataURL("image/jpeg",0.88));
+          };
+          img.onerror=rej; img.src=docPreview;
+        });
+        mimeType="image/jpeg"; filename=`${docName.trim().replace(/\s+/g,"_")}_${Date.now()}.jpg`;
+      }
+      const folderPath=`Tim_Car_Phot/${(job.vehicle_reg||"REG").replace(/\s/g,"").toUpperCase()}/Documents`;
+      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType,folderPath})});
+      const result=await resp.json();
+      if(!result.success) throw new Error(result.error||"Upload failed");
+      const rec={
+        id:makeId("WSD"),job_id:job.id,workshop_id:job.workshop_id||null,
+        name:docName.trim(),notes:docNotes.trim()||null,
+        file_url:result.url,file_type:isPdf?"pdf":"image",mime_type:mimeType,filename,
+        uploaded_at:new Date().toISOString(),
+      };
+      const saved=await api.insert("workshop_documents",rec);
+      if(saved&&!Array.isArray(saved)&&saved.message) throw new Error(saved.message);
+      setJobDocs(p=>[rec,...p]);
+      setDocName(""); setDocNotes(""); setDocFile(null); setDocPreview(null);
+      if(docFileRef.current) docFileRef.current.value="";
+    }catch(e){alert("Upload failed: "+e.message);}
+    finally{setDocUploading(false);}
+  };
+
+  const deleteJobDoc=async(id)=>{
+    await api.delete("workshop_documents","id",id);
+    setJobDocs(p=>p.filter(d=>d.id!==id));
+  };
+
   // ── Job photos ────────────────────────────────────────────────
   const [savedPhotos,   setSavedPhotos]   = useState([]);      // from DB
   const [loadingPhotos, setLoadingPhotos] = useState(true);
@@ -11430,6 +11510,55 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           </div>
         )}
       </div>
+
+      {/* ── Job Documents ── */}
+      <div className="card" style={{padding:14,marginBottom:14}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📎 Documents ({jobDocs.length})</div>
+        {/* Upload row */}
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:jobDocs.length>0?12:0}}>
+          <input ref={docFileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleDocFile}/>
+          <button className="btn btn-ghost btn-sm" onClick={()=>docFileRef.current?.click()}>
+            📂 {docFile?docFile.name:"Choose File"}
+          </button>
+          <input className="inp" style={{flex:1,minWidth:120,height:34,fontSize:13}} value={docName} onChange={e=>setDocName(e.target.value)} placeholder="Document name"/>
+          <input className="inp" style={{flex:1,minWidth:100,height:34,fontSize:13}} value={docNotes} onChange={e=>setDocNotes(e.target.value)} placeholder="Notes (optional)"/>
+          <button className="btn btn-primary btn-sm" onClick={uploadJobDoc} disabled={docUploading||!docFile}>
+            {docUploading?"⏳ Uploading...":"⬆️ Upload"}
+          </button>
+        </div>
+        {/* Image preview */}
+        {docPreview&&<div style={{marginBottom:8}}><img src={docPreview} alt="preview" style={{maxHeight:100,borderRadius:6,border:"1px solid var(--border)"}}/></div>}
+        {/* Saved docs list */}
+        {jobDocs.length>0&&(
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {jobDocs.map(d=>{
+              const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
+              return (
+                <div key={d.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",background:"var(--surface2)",borderRadius:8}}>
+                  <span style={{fontSize:20,flexShrink:0}}>{isPdf?"📄":"🖼️"}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                    {d.notes&&<div style={{fontSize:11,color:"var(--text3)"}}>{d.notes}</div>}
+                  </div>
+                  <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{textDecoration:"none"}}>
+                    {isPdf?"📄 Open":"🔍 View"}
+                  </a>
+                  {!isPdf&&<button className="btn btn-ghost btn-xs" onClick={()=>setViewDocImg(d.file_url)}>🖼️</button>}
+                  <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
+                    onClick={()=>{if(window.confirm("Delete this document?"))deleteJobDoc(d.id);}}>🗑</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Image lightbox for job doc */}
+      {viewDocImg&&(
+        <div onClick={()=>setViewDocImg(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+          <img src={viewDocImg} alt="doc" style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:10}}/>
+        </div>
+      )}
 
       {/* Line items */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>

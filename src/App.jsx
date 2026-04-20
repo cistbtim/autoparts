@@ -565,6 +565,16 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .drawer{position:fixed;top:0;left:0;bottom:0;width:82vw;max-width:300px;background:var(--surface);z-index:201;display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1);overflow-y:auto;box-shadow:6px 0 32px rgba(0,0,0,.35)}
 .drawer.open{transform:translateX(0)}
 .drawer-backdrop.open{display:block}
+.ws-more-sheet{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-radius:20px 20px 0 0;z-index:202;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);max-height:82vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,.28)}
+.ws-more-sheet.open{transform:translateY(0)}
+.ws-more-handle{display:flex;justify-content:center;padding:12px 0 6px}
+.ws-more-handle span{width:38px;height:4px;background:var(--border2);border-radius:99px;display:block}
+.ws-more-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:10px 16px 16px}
+.ws-more-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:13px 4px;background:var(--surface2);border:1.5px solid var(--border);border-radius:14px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text2);font-family:'DM Sans',sans-serif;transition:all .15s;line-height:1.3;text-align:center;min-height:68px;width:100%}
+.ws-more-item.on{background:var(--accent-soft,rgba(99,102,241,.12));border-color:var(--accent);color:var(--accent)}
+.ws-more-item:active{transform:scale(.93)}
+.ws-more-actions{display:flex;gap:8px;padding:4px 16px 24px}
+.ws-more-sep{height:1px;background:var(--border);margin:0 16px 2px}
 .stat-card{position:relative;overflow:hidden;padding:20px 22px;border-radius:var(--radius)}
 .stat-card::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at top right,var(--gc,transparent) 0%,transparent 70%);pointer-events:none}
 .chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
@@ -1135,6 +1145,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [toast,setToast]=useState(null);
   const [lightbox,setLightbox]=useState(null);
   const [drawerOpen,setDrawerOpen]=useState(false);
+  const [wsMoreOpen,setWsMoreOpen]=useState(false);
 
   // Debounce search input — only filter after 250ms of no typing
   useEffect(()=>{
@@ -2663,32 +2674,112 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         </div>
       </div>
 
+      {/* WS MORE SHEET — workshop mobile app style bottom sheet */}
+      {role==="workshop"&&(()=>{
+        const moreItems=[
+          {id:"shop", icon:"🛒", label:"Shop"},
+          ...(wsRole!=="mechanic"?[
+            {id:"wspayments", icon:"💳",label:"Payments"},
+            {id:"wsstock",    icon:"📦",label:"Stock"},
+            {id:"wsservices", icon:"🔧",label:"Services"},
+            {id:"wstransfer", icon:"🔄",label:"Transfer"},
+            {id:"wsstatement",icon:"📋",label:"Statement"},
+            {id:"wsreport",   icon:"📊",label:"Report"},
+            ...(wsRole==="main"?[{id:"wsprofile",icon:"⚙️",label:"Settings"}]:[]),
+          ]:[]),
+        ];
+        return (
+          <>
+            <div className={`drawer-backdrop${wsMoreOpen?" open":""}`} style={{zIndex:205}} onClick={()=>setWsMoreOpen(false)}/>
+            <div className={`ws-more-sheet${wsMoreOpen?" open":""}`} style={{zIndex:206}}>
+              <div className="ws-more-handle"><span/></div>
+              {/* User info row */}
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"6px 16px 12px",borderBottom:"1px solid var(--border)"}}>
+                <div style={{width:38,height:38,borderRadius:"50%",background:ROLES[role]?.bg,border:`2px solid ${ROLES[role]?.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{ROLES[role]?.icon}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"var(--text)"}}>{user.name||user.username}</div>
+                  <span className="badge" style={{background:ROLES[role]?.bg,color:ROLES[role]?.color,fontSize:10,padding:"1px 8px"}}>{wsRole}</span>
+                </div>
+                <div style={{display:"flex",gap:4}}>
+                  <button className={`lang ${lang==="en"?"on":""}`} onClick={()=>setLang("en")}>EN</button>
+                  <button className={`lang ${lang==="zh"?"on":""}`} onClick={()=>setLang("zh")}>中文</button>
+                </div>
+              </div>
+              {/* Grid of nav items */}
+              {moreItems.length>0&&(
+                <div className="ws-more-grid">
+                  {moreItems.map(n=>(
+                    <button key={n.id} className={`ws-more-item${tab===n.id?" on":""}`} onClick={()=>{setTab(n.id);setWsMoreOpen(false);}}>
+                      <span style={{fontSize:24,lineHeight:1}}>{n.icon}</span>
+                      <span>{n.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="ws-more-sep"/>
+              {/* Action buttons */}
+              <div className="ws-more-actions">
+                <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light":"🌙 Dark"}</button>
+                <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12}} onClick={()=>{openM("changePassword");setWsMoreOpen(false);}}>🔑 Password</button>
+                <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 Logout</button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
+
       {/* MOBILE NAV — role-based flat nav */}
       <nav className="mobile-nav">
-        {/* Hamburger — always first */}
-        <button className="mob-nav-btn" onClick={()=>setDrawerOpen(true)} style={{position:"relative"}}>
-          {pendingCQ+pendingInq+pendingCnt>0&&<span className="mob-badge">{pendingCQ+pendingInq+pendingCnt}</span>}
-          <span className="mi">☰</span>
-          <span style={{fontSize:9,marginTop:2}}>Menu</span>
-        </button>
-        {mobileNav.map(n=>(
-          <button key={n.id}
-            className={`mob-nav-btn ${tab===n.id?"on":""}`}
-            onClick={()=>setTab(n.id)}
-            style={{position:"relative"}}>
-            {(n.badge||0)>0&&<span className="mob-badge">{n.badge}</span>}
-            <span className="mi">{n.icon}</span>
-            <span style={{fontSize:9,marginTop:2,lineHeight:1.2,textAlign:"center"}}>
-              {n.label.length>8?n.label.slice(0,7)+"…":n.label}
-            </span>
-          </button>
-        ))}
-        {(role==="admin"||role==="customer")&&(
-          <button className="mob-nav-btn" onClick={()=>openM("checkout")} style={{position:"relative"}}>
-            {cartCount>0&&<span className="mob-badge">{cartCount}</span>}
-            <span className="mi">🛒</span>
-            <span style={{fontSize:9,marginTop:2}}>Cart</span>
-          </button>
+        {role==="workshop" ? (
+          <>
+            {/* Workshop: app-style bottom tabs — no hamburger */}
+            {wsRole==="mechanic" ? (
+              <button className={`mob-nav-btn ${tab==="workshop"?"on":""}`} onClick={()=>setTab("workshop")} style={{position:"relative"}}>
+                <span className="mi">🔧</span>
+                <span style={{fontSize:9,marginTop:2}}>Jobs</span>
+              </button>
+            ) : (
+              [{id:"workshop",icon:"🔧",label:"Jobs"},{id:"wscustomers",icon:"👥",label:"Customers"},{id:"wsquotations",icon:"📝",label:"Quotes"},{id:"wsinvoices",icon:"🧾",label:"Invoices"}].map(n=>(
+                <button key={n.id} className={`mob-nav-btn ${tab===n.id?"on":""}`} onClick={()=>setTab(n.id)} style={{position:"relative"}}>
+                  <span className="mi">{n.icon}</span>
+                  <span style={{fontSize:9,marginTop:2}}>{n.label}</span>
+                </button>
+              ))
+            )}
+            {/* More button — opens bottom sheet */}
+            <button className={`mob-nav-btn ${wsMoreOpen?"on":""}`} onClick={()=>setWsMoreOpen(true)} style={{position:"relative"}}>
+              <span className="mi" style={{fontWeight:700,letterSpacing:1}}>···</span>
+              <span style={{fontSize:9,marginTop:2}}>More</span>
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Non-workshop: hamburger + flat tabs */}
+            <button className="mob-nav-btn" onClick={()=>setDrawerOpen(true)} style={{position:"relative"}}>
+              {pendingCQ+pendingInq+pendingCnt>0&&<span className="mob-badge">{pendingCQ+pendingInq+pendingCnt}</span>}
+              <span className="mi">☰</span>
+              <span style={{fontSize:9,marginTop:2}}>Menu</span>
+            </button>
+            {mobileNav.map(n=>(
+              <button key={n.id}
+                className={`mob-nav-btn ${tab===n.id?"on":""}`}
+                onClick={()=>setTab(n.id)}
+                style={{position:"relative"}}>
+                {(n.badge||0)>0&&<span className="mob-badge">{n.badge}</span>}
+                <span className="mi">{n.icon}</span>
+                <span style={{fontSize:9,marginTop:2,lineHeight:1.2,textAlign:"center"}}>
+                  {n.label.length>8?n.label.slice(0,7)+"…":n.label}
+                </span>
+              </button>
+            ))}
+            {(role==="admin"||role==="customer")&&(
+              <button className="mob-nav-btn" onClick={()=>openM("checkout")} style={{position:"relative"}}>
+                {cartCount>0&&<span className="mob-badge">{cartCount}</span>}
+                <span className="mi">🛒</span>
+                <span style={{fontSize:9,marginTop:2}}>Cart</span>
+              </button>
+            )}
+          </>
         )}
       </nav>
 
@@ -10969,7 +11060,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
       </div>
 
       {/* ── Sub-navigation ── */}
-      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
+      <div className="hide-mobile" style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
         {WS_TABS.map(([v,label,cnt])=>(
           <button key={v} onClick={()=>setWsTab(v)} style={{
             padding:"8px 14px",border:"none",background:"none",cursor:"pointer",

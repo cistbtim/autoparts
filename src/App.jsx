@@ -10379,6 +10379,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
         wsVehicles={wsVehicles} wsCustomers={wsCustomers} wsStock={wsStock} wsServices={wsServices}
         onBack={()=>{ setView("list"); setActiveJob(null); }}
         onSaveJob={async(d)=>{ await onSaveJob(d); setActiveJob({...activeJob,...d}); }}
+        onDeleteJob={async()=>{ await onDeleteJob(activeJob.id); setView("list"); setActiveJob(null); }}
         onMoveJob={async(targetWsId)=>{ await onMoveJob(activeJob.id,targetWsId); setView("list"); setActiveJob(null); }}
         onSaveItem={onSaveItem} onDeleteItem={onDeleteItem}
         onSaveInvoice={onSaveInvoice} onUpdateInvoice={onUpdateInvoice} onDeleteInvoice={onDeleteInvoice}
@@ -10950,7 +10951,7 @@ const CHECKLIST_ITEMS=[
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,wsRole="main",t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,wsRole="main",t,lang}) {
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);
@@ -11161,6 +11162,12 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         }}>⬇️ Info .txt</button>
         {wsRole==="main"&&onMoveJob&&(
           <button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>setMoveModal(true)}>🔀 Move Job</button>
+        )}
+        {wsRole==="main"&&onDeleteJob&&(
+          <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{
+            if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))
+              onDeleteJob();
+          }}>🗑 Delete Job</button>
         )}
       </div>
 

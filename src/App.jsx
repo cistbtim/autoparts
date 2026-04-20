@@ -10179,6 +10179,14 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
     await api.delete("workshop_documents","id",id);
     setCustDocs(p=>p.filter(d=>d.id!==id));
   };
+  const [editCdId,setEditCdId]=useState(null);
+  const [editCdVal,setEditCdVal]=useState({name:"",notes:""});
+  const saveCdEdit=async()=>{
+    if(!editCdVal.name.trim()){alert("Name required");return;}
+    await api.patch("workshop_documents","id",editCdId,{name:editCdVal.name.trim(),notes:editCdVal.notes.trim()||null});
+    setCustDocs(p=>p.map(d=>d.id===editCdId?{...d,name:editCdVal.name.trim(),notes:editCdVal.notes.trim()||null}:d));
+    setEditCdId(null);
+  };
 
   const filtered=wsCustomers.filter(c=>{
     if(!search.trim()) return true;
@@ -10280,17 +10288,30 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {custDocs.map(d=>{
                 const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
+                const isEditing=editCdId===d.id;
                 return (
-                  <div key={d.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",background:"var(--surface2)",borderRadius:8}}>
-                    <span style={{fontSize:20,flexShrink:0}}>{isPdf?"📄":"🖼️"}</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
-                      {d.notes&&<div style={{fontSize:11,color:"var(--text3)"}}>{d.notes}</div>}
-                      {d.job_id&&<div style={{fontSize:10,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>📋 {d.job_id}</div>}
-                    </div>
-                    <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{textDecoration:"none"}}>{isPdf?"📄 Open":"🔍 View"}</a>
-                    {!isPdf&&<button className="btn btn-ghost btn-xs" onClick={()=>setCdViewImg(d.file_url)}>🖼️</button>}
-                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete document?"))deleteCustDoc(d.id);}}>🗑</button>
+                  <div key={d.id} style={{padding:"7px 10px",background:"var(--surface2)",borderRadius:8}}>
+                    {isEditing?(
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                        <input className="inp" style={{flex:2,minWidth:120,height:30,fontSize:13}} value={editCdVal.name} onChange={e=>setEditCdVal(v=>({...v,name:e.target.value}))} placeholder="Name"/>
+                        <input className="inp" style={{flex:2,minWidth:100,height:30,fontSize:13}} value={editCdVal.notes} onChange={e=>setEditCdVal(v=>({...v,notes:e.target.value}))} placeholder="Notes"/>
+                        <button className="btn btn-primary btn-xs" onClick={saveCdEdit}>✅</button>
+                        <button className="btn btn-ghost btn-xs" onClick={()=>setEditCdId(null)}>✕</button>
+                      </div>
+                    ):(
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <span style={{fontSize:20,flexShrink:0}}>{isPdf?"📄":"🖼️"}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                          {d.notes&&<div style={{fontSize:11,color:"var(--text3)"}}>{d.notes}</div>}
+                          {d.job_id&&<div style={{fontSize:10,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>📋 {d.job_id}</div>}
+                        </div>
+                        <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{textDecoration:"none"}}>{isPdf?"📄 Open":"🔍 View"}</a>
+                        {!isPdf&&<button className="btn btn-ghost btn-xs" onClick={()=>setCdViewImg(d.file_url)}>🖼️</button>}
+                        <button className="btn btn-ghost btn-xs" onClick={()=>{setEditCdId(d.id);setEditCdVal({name:d.name||"",notes:d.notes||""});}}>✏️</button>
+                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete document?"))deleteCustDoc(d.id);}}>🗑</button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -11230,6 +11251,14 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
     await api.delete("workshop_documents","id",id);
     setJobDocs(p=>p.filter(d=>d.id!==id));
   };
+  const [editDocId,setEditDocId]=useState(null);
+  const [editDocVal,setEditDocVal]=useState({name:"",notes:""});
+  const saveDocEdit=async()=>{
+    if(!editDocVal.name.trim()){alert("Name required");return;}
+    await api.patch("workshop_documents","id",editDocId,{name:editDocVal.name.trim(),notes:editDocVal.notes.trim()||null});
+    setJobDocs(p=>p.map(d=>d.id===editDocId?{...d,name:editDocVal.name.trim(),notes:editDocVal.notes.trim()||null}:d));
+    setEditDocId(null);
+  };
 
   // ── Job photos ────────────────────────────────────────────────
   const [savedPhotos,   setSavedPhotos]   = useState([]);      // from DB
@@ -11654,19 +11683,29 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {jobDocs.map(d=>{
               const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
+              const isEditing=editDocId===d.id;
               return (
-                <div key={d.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",background:"var(--surface2)",borderRadius:8}}>
-                  <span style={{fontSize:20,flexShrink:0}}>{isPdf?"📄":"🖼️"}</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
-                    {d.notes&&<div style={{fontSize:11,color:"var(--text3)"}}>{d.notes}</div>}
-                  </div>
-                  <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{textDecoration:"none"}}>
-                    {isPdf?"📄 Open":"🔍 View"}
-                  </a>
-                  {!isPdf&&<button className="btn btn-ghost btn-xs" onClick={()=>setViewDocImg(d.file_url)}>🖼️</button>}
-                  <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
-                    onClick={()=>{if(window.confirm("Delete this document?"))deleteJobDoc(d.id);}}>🗑</button>
+                <div key={d.id} style={{padding:"7px 10px",background:"var(--surface2)",borderRadius:8}}>
+                  {isEditing?(
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                      <input className="inp" style={{flex:2,minWidth:120,height:30,fontSize:13}} value={editDocVal.name} onChange={e=>setEditDocVal(v=>({...v,name:e.target.value}))} placeholder="Name"/>
+                      <input className="inp" style={{flex:2,minWidth:100,height:30,fontSize:13}} value={editDocVal.notes} onChange={e=>setEditDocVal(v=>({...v,notes:e.target.value}))} placeholder="Notes"/>
+                      <button className="btn btn-primary btn-xs" onClick={saveDocEdit}>✅</button>
+                      <button className="btn btn-ghost btn-xs" onClick={()=>setEditDocId(null)}>✕</button>
+                    </div>
+                  ):(
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:20,flexShrink:0}}>{isPdf?"📄":"🖼️"}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                        {d.notes&&<div style={{fontSize:11,color:"var(--text3)"}}>{d.notes}</div>}
+                      </div>
+                      <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{textDecoration:"none"}}>{isPdf?"📄 Open":"🔍 View"}</a>
+                      {!isPdf&&<button className="btn btn-ghost btn-xs" onClick={()=>setViewDocImg(d.file_url)}>🖼️</button>}
+                      <button className="btn btn-ghost btn-xs" onClick={()=>{setEditDocId(d.id);setEditDocVal({name:d.name||"",notes:d.notes||""});}}>✏️</button>
+                      <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete this document?"))deleteJobDoc(d.id);}}>🗑</button>
+                    </div>
+                  )}
                 </div>
               );
             })}

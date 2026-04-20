@@ -1223,6 +1223,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("workshop_customers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
       api.get("workshop_vehicles",`select=*&order=reg.asc${wsF}`).catch(()=>[]),
       api.get("customer_queries","select=*&order=created_at.desc").catch(()=>[]),
+      api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -1249,6 +1252,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWorkshopCustomers(Array.isArray(rest[9])?rest[9]:[]);
     setWorkshopVehicles(Array.isArray(rest[10])?rest[10]:[]);
     setCustomerQueries(Array.isArray(rest[11])?rest[11]:[]);
+    setWorkshopStock(Array.isArray(rest[12])?rest[12]:[]);
+    setWorkshopServices(Array.isArray(rest[13])?rest[13]:[]);
+    setWorkshopDocuments(Array.isArray(rest[14])?rest[14]:[]);
     // Load workshop profile for workshop role
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
@@ -13494,10 +13500,17 @@ function printWorkshopQuote(job, items, quote, settings, photos={}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// WS DOCUMENTS PAGE
+// WS DOCUMENTS PAGE  (inline upload + display, no modal)
 // ═══════════════════════════════════════════════════════════════
 function WsDocumentsPage({docs=[],settings,onSave,onDelete}) {
-  const [modal,setModal]=useState(false);
+  // ── Upload section state ──────────────────────────────────────
+  const [name,setName]=useState("");
+  const [notes,setNotes]=useState("");
+  const [file,setFile]=useState(null);
+  const [preview,setPreview]=useState(null);
+  const [uploading,setUploading]=useState(false);
+  const fileRef=useRef(null);
+  // ── Display section state ─────────────────────────────────────
   const [search,setSearch]=useState("");
   const [viewDoc,setViewDoc]=useState(null);
 
@@ -13509,70 +13522,6 @@ function WsDocumentsPage({docs=[],settings,onSave,onDelete}) {
 
   const fmtDate=s=>{ if(!s) return "—"; const d=new Date(s); return d.toLocaleDateString()+' '+d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}); };
 
-  return (
-    <div>
-      <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
-        <input className="inp" style={{flex:1,minWidth:200}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search documents..."/>
-        <button className="btn btn-primary btn-sm" onClick={()=>setModal(true)}>+ Upload Document</button>
-      </div>
-
-      {filtered.length===0
-        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
-            <div style={{fontSize:32,marginBottom:8}}>📎</div>
-            <div style={{fontWeight:600}}>No documents yet</div>
-            <div style={{fontSize:13,marginTop:4}}>Upload PDFs or photos to keep on file</div>
-          </div>
-        : (
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
-            {filtered.map(d=>{
-              const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
-              return (
-                <div key={d.id} className="card" style={{padding:14,display:"flex",flexDirection:"column",gap:8}}>
-                  <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                    <div style={{fontSize:32,lineHeight:1,flexShrink:0}}>{isPdf?"📄":"🖼️"}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name||"Unnamed"}</div>
-                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{fmtDate(d.uploaded_at)}</div>
-                    </div>
-                  </div>
-                  {d.notes&&<div style={{fontSize:12,color:"var(--text2)",lineHeight:1.4,padding:"6px 8px",background:"var(--surface2)",borderRadius:6}}>{d.notes}</div>}
-                  <div style={{display:"flex",gap:6,marginTop:"auto"}}>
-                    <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{flex:1,textAlign:"center",textDecoration:"none"}}>
-                      {isPdf?"📄 Open PDF":"🔍 View"}
-                    </a>
-                    {!isPdf&&<button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setViewDoc(d)}>🔍 Preview</button>}
-                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete this document?"))onDelete(d.id);}}>🗑</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )
-      }
-
-      {modal&&(
-        <WsDocUploadModal
-          onSave={async(d)=>{ await onSave(d); setModal(false); }}
-          onClose={()=>setModal(false)}/>
-      )}
-
-      {viewDoc&&(
-        <div onClick={()=>setViewDoc(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-          <img src={viewDoc.file_url} alt={viewDoc.name} style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function WsDocUploadModal({onSave,onClose}) {
-  const [name,setName]=useState("");
-  const [notes,setNotes]=useState("");
-  const [file,setFile]=useState(null);
-  const [preview,setPreview]=useState(null);
-  const [uploading,setUploading]=useState(false);
-  const fileRef=useRef(null);
-
   const handleFile=e=>{
     const f=e.target.files?.[0]; if(!f) return;
     setFile(f);
@@ -13582,7 +13531,7 @@ function WsDocUploadModal({onSave,onClose}) {
     } else { setPreview(null); }
   };
 
-  const handleSave=async()=>{
+  const handleUpload=async()=>{
     if(!file){alert("Please choose a file");return;}
     if(!name.trim()){alert("Please enter a document name");return;}
     const SCRIPT_URL=(window._VEHICLE_SCRIPT_URL?.trim())||(window._APPS_SCRIPT_URL?.trim())||"";
@@ -13592,7 +13541,6 @@ function WsDocUploadModal({onSave,onClose}) {
       const isPdf=file.type==="application/pdf";
       let base64,mimeType,filename;
       if(isPdf){
-        // Read PDF as base64
         base64=await new Promise((res,rej)=>{
           const r=new FileReader();
           r.onload=ev=>{
@@ -13606,7 +13554,6 @@ function WsDocUploadModal({onSave,onClose}) {
         mimeType="application/pdf";
         filename=`${name.trim().replace(/\s+/g,"_")}_${Date.now()}.pdf`;
       } else {
-        // Resize image
         base64=await new Promise((res,rej)=>{
           const img=new Image();
           img.onload=()=>{
@@ -13626,49 +13573,103 @@ function WsDocUploadModal({onSave,onClose}) {
       const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType,folderPath})});
       const result=await resp.json();
       if(!result.success) throw new Error(result.error||"Upload failed");
-      await onSave({
-        name:name.trim(),
-        notes:notes.trim()||null,
-        file_url:result.url,
-        file_type:isPdf?"pdf":"image",
-        mime_type:mimeType,
-        filename,
-      });
+      await onSave({name:name.trim(),notes:notes.trim()||null,file_url:result.url,file_type:isPdf?"pdf":"image",mime_type:mimeType,filename});
+      // Reset upload form
+      setName(""); setNotes(""); setFile(null); setPreview(null);
+      if(fileRef.current) fileRef.current.value="";
     }catch(e){alert("Upload failed: "+e.message);}
     finally{setUploading(false);}
   };
 
   return (
-    <Overlay onClose={onClose} wide>
-      <MHead title="📎 Upload Document" onClose={onClose}/>
-      <FD style={{marginBottom:12}}>
-        <FL label="Document Name *"/>
-        <input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Warranty Card, Supplier Invoice"/>
-      </FD>
-      <FD style={{marginBottom:12}}>
-        <FL label="Notes"/>
-        <textarea className="inp" rows={2} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional description..."/>
-      </FD>
-      <FD style={{marginBottom:12}}>
-        <FL label="File (PDF or Photo)"/>
+    <div>
+      {/* ── UPLOAD SECTION ── */}
+      <div className="card" style={{padding:16,marginBottom:20,borderLeft:"3px solid var(--accent)"}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>⬆️ Upload New Document</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div>
+            <FL label="Document Name *"/>
+            <input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Warranty Card, Supplier Invoice"/>
+          </div>
+          <div>
+            <FL label="Notes (optional)"/>
+            <input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Brief description..."/>
+          </div>
+        </div>
+        {/* File selector */}
         <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleFile}/>
-        <button className="btn btn-ghost" style={{width:"100%",justifyContent:"center"}} onClick={()=>fileRef.current?.click()}>
-          {file?`✅ ${file.name}`:"📂 Choose File (PDF or Image)"}
-        </button>
-      </FD>
-      {preview&&(
-        <div style={{marginBottom:12,textAlign:"center"}}>
-          <img src={preview} alt="preview" style={{maxHeight:180,maxWidth:"100%",borderRadius:8,border:"1px solid var(--border)"}}/>
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <button className="btn btn-ghost" style={{flex:"0 0 auto"}} onClick={()=>fileRef.current?.click()}>
+            📂 Choose File
+          </button>
+          {file
+            ? <span style={{fontSize:13,color:"var(--text2)",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {file.type==="application/pdf"?"📄":"🖼️"} {file.name}
+              </span>
+            : <span style={{fontSize:12,color:"var(--text3)"}}>PDF or photo (JPG, PNG...)</span>
+          }
+          <button className="btn btn-primary" style={{flex:"0 0 auto"}} onClick={handleUpload} disabled={uploading||!file}>
+            {uploading?"⏳ Uploading...":"⬆️ Upload & Save"}
+          </button>
+        </div>
+        {/* Image preview */}
+        {preview&&(
+          <div style={{marginTop:10}}>
+            <img src={preview} alt="preview" style={{maxHeight:140,maxWidth:"100%",borderRadius:8,border:"1px solid var(--border)"}}/>
+          </div>
+        )}
+      </div>
+
+      {/* ── DISPLAY SECTION ── */}
+      <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center"}}>
+        <div style={{fontWeight:700,fontSize:14,flex:1}}>📎 Saved Documents ({docs.length})</div>
+        <input className="inp" style={{width:220}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..."/>
+      </div>
+
+      {filtered.length===0
+        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
+            <div style={{fontSize:32,marginBottom:8}}>📭</div>
+            <div style={{fontWeight:600}}>{docs.length===0?"No documents yet":"No results"}</div>
+          </div>
+        : (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+            {filtered.map(d=>{
+              const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
+              return (
+                <div key={d.id} className="card" style={{padding:14,display:"flex",flexDirection:"column",gap:8}}>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                    <div style={{fontSize:30,lineHeight:1,flexShrink:0}}>{isPdf?"📄":"🖼️"}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name||"Unnamed"}</div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{fmtDate(d.uploaded_at)}</div>
+                    </div>
+                  </div>
+                  {d.notes&&<div style={{fontSize:12,color:"var(--text2)",lineHeight:1.4,padding:"5px 8px",background:"var(--surface2)",borderRadius:6}}>{d.notes}</div>}
+                  <div style={{display:"flex",gap:6,marginTop:"auto"}}>
+                    <a href={d.file_url} target="_blank" rel="noopener noreferrer"
+                      className="btn btn-ghost btn-xs" style={{flex:1,textAlign:"center",textDecoration:"none"}}>
+                      {isPdf?"📄 Open PDF":"🔍 View"}
+                    </a>
+                    {!isPdf&&(
+                      <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setViewDoc(d)}>🖼️ Preview</button>
+                    )}
+                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
+                      onClick={()=>{if(window.confirm("Delete this document?"))onDelete(d.id);}}>🗑</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      }
+
+      {/* Image lightbox */}
+      {viewDoc&&(
+        <div onClick={()=>setViewDoc(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+          <img src={viewDoc.file_url} alt={viewDoc.name} style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
         </div>
       )}
-      {file&&!preview&&<div style={{marginBottom:12,padding:"8px 12px",background:"var(--surface2)",borderRadius:8,fontSize:13,color:"var(--text2)"}}>📄 {file.name}</div>}
-      <div style={{display:"flex",gap:10,marginTop:8}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose} disabled={uploading}>Cancel</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={uploading}>
-          {uploading?"⏳ Uploading...":"⬆️ Upload & Save"}
-        </button>
-      </div>
-    </Overlay>
+    </div>
   );
 }
 

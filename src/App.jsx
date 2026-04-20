@@ -1170,6 +1170,8 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     address:    workshopProfile.address   || settings.address,
     vat_number: workshopProfile.vat_number|| settings.vat_number,
     currency:   workshopProfile.currency  || settings.currency || "ZAR R",
+    city:       workshopProfile.city      || "",
+    country:    workshopProfile.country   || "",
   } : settings;
 
   const logInv=async(part,before,after,action,reason="")=>{
@@ -3940,7 +3942,7 @@ function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
   const [pTab,setPTab]=useState("profile"); // "profile" | "users"
   const [f,setF]=useState({
     name:"", vat_number:"", phone:"", whatsapp:"", email:"",
-    address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", ...profile
+    address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"", ...profile
   });
   const [saving,setSaving]=useState(false);
   const [dragOver,setDragOver]=useState(false);
@@ -4126,6 +4128,8 @@ function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
           <div><FL label="WhatsApp"/><input className="inp" value={f.whatsapp} onChange={e=>s("whatsapp",e.target.value)} placeholder="+27..."/></div>
           <div style={{gridColumn:"1/-1"}}><FL label="Email"/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div>
           <div style={{gridColumn:"1/-1"}}><FL label="Address"/><textarea className="inp" rows={3} value={f.address} onChange={e=>s("address",e.target.value)} style={{resize:"vertical"}}/></div>
+          <div><FL label="City"/><input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)} placeholder="e.g. Cape Town"/></div>
+          <div><FL label="Country"/><input className="inp" value={f.country||""} onChange={e=>s("country",e.target.value)} placeholder="e.g. South Africa"/></div>
           <div style={{gridColumn:"1/-1"}}>
             <FL label="Currency"/>
             <select className="inp" value={f.currency||"ZAR R"} onChange={e=>s("currency",e.target.value)}>
@@ -13666,6 +13670,7 @@ function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
         ${settings.phone?`📞 ${settings.phone}<br/>`:""}
         ${settings.email?`✉️ ${settings.email}<br/>`:""}
         ${settings.address?`📍 ${settings.address}<br/>`:""}
+        ${(settings.city||settings.country)?`🌍 ${[settings.city,settings.country].filter(Boolean).join(", ")}<br/>`:""}
         ${settings.vat_number?`VAT Reg No: <strong>${settings.vat_number}</strong>`:`<em style="color:#aaa">Not VAT Registered</em>`}
       </div>
     </div>
@@ -13828,6 +13833,7 @@ function printWorkshopQuote(job, items, quote, settings, photos={}) {
         ${settings.phone?`📞 ${settings.phone}<br/>`:""}
         ${settings.email?`✉️ ${settings.email}<br/>`:""}
         ${settings.address?`📍 ${settings.address}<br/>`:""}
+        ${(settings.city||settings.country)?`🌍 ${[settings.city,settings.country].filter(Boolean).join(", ")}<br/>`:""}
         ${settings.vat_number?`VAT Reg No: <strong>${settings.vat_number}</strong>`:`<em style="color:#aaa">Not VAT Registered</em>`}
       </div>
     </div>

@@ -4224,6 +4224,32 @@ function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
           </div>
         </div>
 
+        {/* Subscription info card */}
+        {(profile?.trial_start||profile?.subscription_status||profile?.subscription_expires_at)&&(()=>{
+          const today=new Date(); today.setHours(0,0,0,0);
+          const exp=profile.subscription_expires_at?new Date(profile.subscription_expires_at):null;
+          if(exp) exp.setHours(0,0,0,0);
+          const daysLeft=exp?Math.ceil((exp-today)/(1000*60*60*24)):null;
+          const expired=daysLeft!==null&&daysLeft<0;
+          const statusColors={trial:"var(--blue)",active:"var(--green)",expired:"var(--red)",suspended:"var(--red)"};
+          const sc=statusColors[profile.subscription_status]||"var(--text3)";
+          return (
+            <div style={{border:`1px solid ${sc}40`,borderRadius:10,padding:16,background:`${sc}08`,marginBottom:4}}>
+              <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:sc}}>📋 Account & Subscription</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:13}}>
+                <div><span style={{color:"var(--text3)"}}>Status:</span><br/><strong style={{color:sc}}>{(profile.subscription_status||"—").toUpperCase()}</strong></div>
+                <div><span style={{color:"var(--text3)"}}>Registered:</span><br/><strong>{profile.trial_start||"—"}</strong></div>
+                <div><span style={{color:"var(--text3)"}}>Expires:</span><br/><strong style={{color:expired?"var(--red)":undefined}}>{profile.subscription_expires_at||"—"}</strong></div>
+                <div><span style={{color:"var(--text3)"}}>Days Left:</span><br/><strong style={{color:expired?"var(--red)":daysLeft!==null&&daysLeft<=7?"var(--yellow)":"var(--green)"}}>
+                  {daysLeft===null?"—":expired?`Expired ${Math.abs(daysLeft)}d ago`:daysLeft===0?"Today":daysLeft===1?"1 day":`${daysLeft} days`}
+                </strong></div>
+                <div><span style={{color:"var(--text3)"}}>City:</span><br/><strong>{profile.city||"—"}</strong></div>
+                <div><span style={{color:"var(--text3)"}}>Country:</span><br/><strong>{profile.country||"—"}</strong></div>
+              </div>
+            </div>
+          );
+        })()}
+
         <button className="btn btn-primary" style={{padding:13,fontSize:15}} onClick={save} disabled={saving}>
           {saving?"Saving...":"✅ Save Settings"}
         </button>
@@ -4437,6 +4463,14 @@ function WsSubscriptionsPage({settings}) {
         <Overlay onClose={()=>setEditing(null)} wide>
           <MHead title={`💳 Manage: ${editing.name}`} onClose={()=>setEditing(null)}/>
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {/* Workshop info summary */}
+            <div style={{background:"var(--surface2)",borderRadius:10,padding:14,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:13}}>
+              <div><span style={{color:"var(--text3)"}}>City:</span><br/><strong>{editing.city||"—"}</strong></div>
+              <div><span style={{color:"var(--text3)"}}>Country:</span><br/><strong>{editing.country||"—"}</strong></div>
+              <div><span style={{color:"var(--text3)"}}>Registered:</span><br/><strong>{editing.trial_start||"—"}</strong></div>
+              <div><span style={{color:"var(--text3)"}}>Phone:</span><br/><strong>{editing.phone||"—"}</strong></div>
+              {editing.email&&<div style={{gridColumn:"1/-1"}}><span style={{color:"var(--text3)"}}>Email:</span><br/><strong>{editing.email}</strong></div>}
+            </div>
             <div>
               <FL label="Subscription Status"/>
               <select className="inp" value={editing.subscription_status||"trial"} onChange={e=>setEditing(p=>({...p,subscription_status:e.target.value}))}>

@@ -1061,6 +1061,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [workshopDocuments,setWorkshopDocuments]=useState([]);
   const [workshopProfile,setWorkshopProfile]=useState({});
   const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
+  const [showLocationSetup,setShowLocationSetup]=useState(false);
   const [completedDays,setCompletedDays]=useState(7); // filter completed orders to last N days
   const [searchCust,setSearchCust]=useState("");
   const [inqFilter,setInqFilter]=useState("all");
@@ -1264,7 +1265,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     // Load workshop profile for workshop role
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
-      setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
+      const p=Array.isArray(prof)&&prof[0]?prof[0]:{};
+      setWorkshopProfile(p);
+      // Prompt for city/country if missing (main role only)
+      if(wsRole==="main"&&(!p.city||!p.country)) setShowLocationSetup(true);
     }
   },[]);
 
@@ -3924,6 +3928,15 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
 
       {isOpen("changePassword")&&<ChangePasswordModal user={user} onClose={()=>closeM("changePassword")} showToast={showToast}/>}
 
+      {showLocationSetup&&<WsLocationSetupModal
+        profile={workshopProfile}
+        onSave={async(city,country)=>{
+          await saveWorkshopProfile({...workshopProfile,city,country});
+          setShowLocationSetup(false);
+          showToast("✅ Location saved");
+        }}
+        onClose={()=>setShowLocationSetup(false)}/>}
+
       {toast&&<div className="toast" style={{borderColor:toast.type==="err"?"rgba(248,113,113,.3)":"var(--border2)",color:toast.type==="err"?"var(--red)":"var(--green)"}}>
         {toast.type==="err"?"⚠":"✓"} {toast.msg}
       </div>}
@@ -4187,6 +4200,55 @@ function ChangePasswordModal({user,onClose,showToast}) {
           <div style={{display:"flex",gap:10}}>
             <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
             <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={loading}>{loading?"Saving...":"Save Password"}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORKSHOP LOCATION SETUP MODAL
+// ═══════════════════════════════════════════════════════════════
+function WsLocationSetupModal({profile,onSave,onClose}) {
+  const [city,setCity]=useState(profile?.city||"");
+  const [country,setCountry]=useState(profile?.country||"");
+  const [saving,setSaving]=useState(false);
+  const [err,setErr]=useState("");
+
+  const save=async()=>{
+    if(!city.trim()||!country.trim()){setErr("Both City and Country are required");return;}
+    setSaving(true);
+    await onSave(city.trim(),country.trim());
+    setSaving(false);
+  };
+
+  return (
+    <div className="overlay" style={{zIndex:9000}} onClick={e=>e.stopPropagation()}>
+      <div className="modal" style={{maxWidth:420}}>
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <div style={{fontSize:36,marginBottom:10}}>🌍</div>
+          <div style={{fontSize:18,fontWeight:700,marginBottom:6}}>Set Your Workshop Location</div>
+          <div style={{fontSize:13,color:"var(--text3)",lineHeight:1.5}}>
+            Please set your <strong>City</strong> and <strong>Country</strong> to continue.<br/>
+            This helps with filtering and reporting across workshops.
+          </div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:13}}>
+          <div>
+            <FL label="City *"/>
+            <input className="inp" value={city} onChange={e=>setCity(e.target.value)} placeholder="e.g. Cape Town" autoFocus/>
+          </div>
+          <div>
+            <FL label="Country *"/>
+            <input className="inp" value={country} onChange={e=>setCountry(e.target.value)} placeholder="e.g. South Africa" onKeyDown={e=>e.key==="Enter"&&save()}/>
+          </div>
+          {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
+          <div style={{display:"flex",gap:10,marginTop:4}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Skip for now</button>
+            <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>
+              {saving?"Saving...":"✅ Save Location"}
+            </button>
           </div>
         </div>
       </div>

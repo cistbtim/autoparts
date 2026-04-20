@@ -10104,6 +10104,81 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
   const [editCust,setEditCust]=useState(null);
   const [editVehicle,setEditVehicle]=useState(null);
   const [search,setSearch]=useState("");
+  // Customer documents
+  const [custDocs,setCustDocs]=useState([]);
+  const [cdName,setCdName]=useState("");
+  const [cdNotes,setCdNotes]=useState("");
+  const [cdFile,setCdFile]=useState(null);
+  const [cdPreview,setCdPreview]=useState(null);
+  const [cdUploading,setCdUploading]=useState(false);
+  const [cdViewImg,setCdViewImg]=useState(null);
+  const cdFileRef=useRef(null);
+
+  useEffect(()=>{
+    if(!activeCust) return;
+    api.get("workshop_documents",`customer_id=eq.${activeCust.id}&order=uploaded_at.desc`)
+      .then(r=>setCustDocs(Array.isArray(r)?r:[]))
+      .catch(()=>setCustDocs([]));
+  },[activeCust?.id]);
+
+  const handleCdFile=e=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    setCdFile(f);
+    setCdName(prev=>prev||f.name.replace(/\.[^.]+$/,""));
+    if(f.type.startsWith("image/")){const r=new FileReader();r.onload=ev=>setCdPreview(ev.target.result);r.readAsDataURL(f);}
+    else setCdPreview(null);
+  };
+
+  const uploadCustDoc=async()=>{
+    if(!cdFile){alert("Choose a file first");return;}
+    if(!cdName.trim()){alert("Enter a document name");return;}
+    const SCRIPT_URL=(window._VEHICLE_SCRIPT_URL?.trim())||(window._APPS_SCRIPT_URL?.trim())||"";
+    if(!SCRIPT_URL){alert("No Google Drive Script URL in Settings");return;}
+    setCdUploading(true);
+    try{
+      const isPdf=cdFile.type==="application/pdf";
+      let base64,mimeType,filename;
+      if(isPdf){
+        base64=await new Promise((res,rej)=>{
+          const r=new FileReader();
+          r.onload=ev=>{const b=new Uint8Array(ev.target.result);let s="";b.forEach(x=>{s+=String.fromCharCode(x);});res("data:application/pdf;base64,"+btoa(s));};
+          r.onerror=rej;r.readAsArrayBuffer(cdFile);
+        });
+        mimeType="application/pdf";filename=`${cdName.trim().replace(/\s+/g,"_")}_${Date.now()}.pdf`;
+      } else {
+        base64=await new Promise((res,rej)=>{
+          const img=new Image();
+          img.onload=()=>{
+            const MAX=1600;const canvas=document.createElement("canvas");
+            let w=img.width,h=img.height;
+            if(w>MAX||h>MAX){const ratio=Math.min(MAX/w,MAX/h);w=Math.round(w*ratio);h=Math.round(h*ratio);}
+            canvas.width=w;canvas.height=h;canvas.getContext("2d").drawImage(img,0,0,w,h);
+            res(canvas.toDataURL("image/jpeg",0.88));
+          };
+          img.onerror=rej;img.src=cdPreview;
+        });
+        mimeType="image/jpeg";filename=`${cdName.trim().replace(/\s+/g,"_")}_${Date.now()}.jpg`;
+      }
+      const folderPath=`Tim_Car_Phot/Customers/${activeCust.name.replace(/\s+/g,"_")}`;
+      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType,folderPath})});
+      const result=await resp.json();
+      if(!result.success) throw new Error(result.error||"Upload failed");
+      const rec={id:makeId("WSD"),customer_id:activeCust.id,workshop_id:null,job_id:null,
+        name:cdName.trim(),notes:cdNotes.trim()||null,file_url:result.url,
+        file_type:isPdf?"pdf":"image",mime_type:mimeType,filename,uploaded_at:new Date().toISOString()};
+      const saved=await api.insert("workshop_documents",rec);
+      if(saved&&!Array.isArray(saved)&&saved.message) throw new Error(saved.message);
+      setCustDocs(p=>[rec,...p]);
+      setCdName("");setCdNotes("");setCdFile(null);setCdPreview(null);
+      if(cdFileRef.current) cdFileRef.current.value="";
+    }catch(e){alert("Upload failed: "+e.message);}
+    finally{setCdUploading(false);}
+  };
+
+  const deleteCustDoc=async(id)=>{
+    await api.delete("workshop_documents","id",id);
+    setCustDocs(p=>p.filter(d=>d.id!==id));
+  };
 
   const filtered=wsCustomers.filter(c=>{
     if(!search.trim()) return true;
@@ -10184,7 +10259,53 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
           </div>
         ))}
 
+        {/* Customer Documents */}
+        <div style={{fontWeight:700,fontSize:14,marginBottom:12,marginTop:10}}>📎 Documents ({custDocs.length})</div>
+        <div className="card" style={{padding:14,marginBottom:14}}>
+          {/* Upload row */}
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:custDocs.length>0?12:0}}>
+            <input ref={cdFileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleCdFile}/>
+            <button className="btn btn-ghost btn-sm" onClick={()=>cdFileRef.current?.click()}>
+              📂 {cdFile?cdFile.name:"Choose File"}
+            </button>
+            <input className="inp" style={{flex:1,minWidth:120,height:34,fontSize:13}} value={cdName} onChange={e=>setCdName(e.target.value)} placeholder="Document name"/>
+            <input className="inp" style={{flex:1,minWidth:100,height:34,fontSize:13}} value={cdNotes} onChange={e=>setCdNotes(e.target.value)} placeholder="Notes (optional)"/>
+            <button className="btn btn-primary btn-sm" onClick={uploadCustDoc} disabled={cdUploading||!cdFile}>
+              {cdUploading?"⏳ Uploading...":"⬆️ Upload"}
+            </button>
+          </div>
+          {cdPreview&&<div style={{marginBottom:8}}><img src={cdPreview} alt="preview" style={{maxHeight:90,borderRadius:6,border:"1px solid var(--border)"}}/></div>}
+          {/* Docs list */}
+          {custDocs.length>0&&(
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {custDocs.map(d=>{
+                const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
+                return (
+                  <div key={d.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",background:"var(--surface2)",borderRadius:8}}>
+                    <span style={{fontSize:20,flexShrink:0}}>{isPdf?"📄":"🖼️"}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                      {d.notes&&<div style={{fontSize:11,color:"var(--text3)"}}>{d.notes}</div>}
+                      {d.job_id&&<div style={{fontSize:10,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>📋 {d.job_id}</div>}
+                    </div>
+                    <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{textDecoration:"none"}}>{isPdf?"📄 Open":"🔍 View"}</a>
+                    {!isPdf&&<button className="btn btn-ghost btn-xs" onClick={()=>setCdViewImg(d.file_url)}>🖼️</button>}
+                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete document?"))deleteCustDoc(d.id);}}>🗑</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {custDocs.length===0&&!cdFile&&<div style={{textAlign:"center",padding:16,color:"var(--text3)",fontSize:13}}>No documents yet — upload ID, insurance, warranty, etc.</div>}
+        </div>
+
       </div>
+      {/* Image lightbox */}
+      {cdViewImg&&(
+        <div onClick={()=>setCdViewImg(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+          <img src={cdViewImg} alt="doc" style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:10}}/>
+        </div>
+      )}
       {/* Modals outside .fu so position:fixed isn't trapped by the animation stacking context */}
       {editCust&&(
         <Overlay onClose={()=>setEditCust(null)} wide>
@@ -11091,7 +11212,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       const result=await resp.json();
       if(!result.success) throw new Error(result.error||"Upload failed");
       const rec={
-        id:makeId("WSD"),job_id:job.id,workshop_id:job.workshop_id||null,
+        id:makeId("WSD"),job_id:job.id,workshop_id:job.workshop_id||null,customer_id:job.workshop_customer_id||null,
         name:docName.trim(),notes:docNotes.trim()||null,
         file_url:result.url,file_type:isPdf?"pdf":"image",mime_type:mimeType,filename,
         uploaded_at:new Date().toISOString(),

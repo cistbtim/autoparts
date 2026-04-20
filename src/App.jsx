@@ -1230,7 +1230,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]),
       api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]),
       api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_profiles","select=id,name&order=name.asc").catch(()=>[]),
+      api.get("workshop_profiles","select=id,name,city,country&order=name.asc").catch(()=>[]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -10516,16 +10516,23 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
   const [stmtCust,  setStmtCust]  = useState("");  // statement: selected customer id
   const [qInvModal, setQInvModal] = useState(null); // {job, items, quote} for convert-from-list
   const [sortBy,    setSortBy]    = useState("date_desc");
-  const [filterWs,  setFilterWs]  = useState("__all__");
+  const [filterWs,      setFilterWs]      = useState("__all__");
+  const [filterCity,    setFilterCity]    = useState("__all__");
+  const [filterCountry, setFilterCountry] = useState("__all__");
 
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
   const ST_BG    = {"Pending":"rgba(96,165,250,.12)","In Progress":"rgba(251,191,36,.12)","Done":"rgba(52,211,153,.12)","Delivered":"rgba(100,116,139,.12)"};
 
-  const wsProfileMap = Object.fromEntries(wsProfiles.map(p=>[p.id, p.name||p.id]));
+  const wsProfileMap  = Object.fromEntries(wsProfiles.map(p=>[p.id, p.name||p.id]));
+  const wsProfileMap2 = Object.fromEntries(wsProfiles.map(p=>[p.id, p]));
+  const wsCities      = [...new Set(wsProfiles.map(p=>p.city).filter(Boolean))].sort();
+  const wsCountries   = [...new Set(wsProfiles.map(p=>p.country).filter(Boolean))].sort();
 
   const filtered = jobs.filter(j=>{
     if(filterSt!=="__all__"&&j.status!==filterSt) return false;
     if(filterWs!=="__all__"&&j.workshop_id!==filterWs) return false;
+    if(filterCity!=="__all__"){const p=wsProfileMap2[j.workshop_id];if(!p||p.city!==filterCity) return false;}
+    if(filterCountry!=="__all__"){const p=wsProfileMap2[j.workshop_id];if(!p||p.country!==filterCountry) return false;}
     if(!search.trim()) return true;
     const s=search.toLowerCase();
     const wsName=wsProfileMap[j.workshop_id]||j.workshop_id||"";
@@ -10650,14 +10657,26 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
             <option value="job_id">Job #</option>
             <option value="make">Make / Model</option>
           </select>
-          {!wsId&&wsProfiles.length>0&&(
-            <select className="inp" value={filterWs} onChange={e=>setFilterWs(e.target.value)} style={{flex:"0 0 auto",width:"auto",minWidth:180}}>
+          {!wsId&&wsProfiles.length>0&&(<>
+            <select className="inp" value={filterWs} onChange={e=>{setFilterWs(e.target.value);setFilterCity("__all__");setFilterCountry("__all__");}} style={{flex:"0 0 auto",width:"auto",minWidth:180}}>
               <option value="__all__">🏪 All Workshops</option>
               {wsProfiles.map(p=>(
                 <option key={p.id} value={p.id}>{p.name||p.id}</option>
               ))}
             </select>
-          )}
+            {wsCities.length>0&&(
+              <select className="inp" value={filterCity} onChange={e=>{setFilterCity(e.target.value);setFilterWs("__all__");}} style={{flex:"0 0 auto",width:"auto",minWidth:140}}>
+                <option value="__all__">🏙️ All Cities</option>
+                {wsCities.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+            {wsCountries.length>0&&(
+              <select className="inp" value={filterCountry} onChange={e=>{setFilterCountry(e.target.value);setFilterWs("__all__");}} style={{flex:"0 0 auto",width:"auto",minWidth:150}}>
+                <option value="__all__">🌍 All Countries</option>
+                {wsCountries.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+          </>)}
         </div>
         {filtered.length===0&&<div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No jobs found</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>

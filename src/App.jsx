@@ -10517,7 +10517,8 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
     if(filterSt!=="__all__"&&j.status!==filterSt) return false;
     if(!search.trim()) return true;
     const s=search.toLowerCase();
-    return `${j.customer_name} ${j.vehicle_reg} ${j.vehicle_make} ${j.vehicle_model} ${j.id}`.toLowerCase().includes(s);
+    const wsName=wsProfileMap[j.workshop_id]||j.workshop_id||"";
+    return `${j.customer_name} ${j.vehicle_reg} ${j.vehicle_make} ${j.vehicle_model} ${j.id} ${wsName}`.toLowerCase().includes(s);
   }).sort((a,b)=>{
     if(sortBy==="date_asc")  return (a.date_in||"").localeCompare(b.date_in||"");
     if(sortBy==="date_desc") return (b.date_in||"").localeCompare(a.date_in||"");

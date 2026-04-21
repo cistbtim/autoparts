@@ -11131,7 +11131,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
               <div key={j.id} className="card card-hover" style={{padding:0,cursor:"pointer",borderLeft:`3px solid ${ST_COLOR[j.status]||"var(--border)"}`,overflow:"hidden",display:"flex",minHeight:110}}
                 onClick={()=>{setActiveJob(j);setView("job");}}>
                 {/* Front photo */}
-                <div style={{width:84,flexShrink:0,background:"var(--surface2)",position:"relative",overflow:"hidden"}}>
+                <div style={{width:64,flexShrink:0,background:"var(--surface2)",position:"relative",overflow:"hidden"}}>
                   {frontPhoto?(
                     <img src={toImgUrl(frontPhoto)} alt="car"
                       style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}

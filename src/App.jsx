@@ -12497,11 +12497,17 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
                 <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🔎 OE Number Search</div>
                 <div style={{display:"flex",gap:6}}>
-                  <input
-                    value={oeSearch} onChange={e=>setOeSearch(e.target.value)}
-                    onKeyDown={e=>{ if(e.key==="Enter"&&oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
-                    placeholder="Enter OE / part number…"
-                    style={{flex:1,fontFamily:"DM Mono,monospace",fontSize:13,padding:"6px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)",outline:"none"}}/>
+                  <div style={{flex:1,position:"relative",display:"flex",alignItems:"center"}}>
+                    <input
+                      value={oeSearch} onChange={e=>setOeSearch(e.target.value)}
+                      onKeyDown={e=>{ if(e.key==="Enter"&&oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
+                      placeholder="Enter OE / part number…"
+                      style={{width:"100%",fontFamily:"DM Mono,monospace",fontSize:13,padding:"6px 30px 6px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)",outline:"none",boxSizing:"border-box"}}/>
+                    {oeSearch&&(
+                      <button onClick={()=>setOeSearch("")}
+                        style={{position:"absolute",right:6,background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,lineHeight:1,padding:0}}>✕</button>
+                    )}
+                  </div>
                   <button
                     onClick={()=>{ if(oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
                     disabled={!oeSearch.trim()}

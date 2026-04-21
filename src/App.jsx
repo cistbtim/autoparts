@@ -12355,7 +12355,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},
     {label:"Willard 🔋",icon:"🔋", color:"#ef4444",       bg:"rgba(220,38,38,.11)",   href:"https://willard.co.za/battery-selection-tool/"},
     {label:"VARTA 🔋",  icon:"⚡", color:"#6366f1",       bg:"rgba(99,102,241,.11)",  href:"https://www.varta-automotive.com/battery-finder"},
-    {label:"Amayma",    icon:"🔧", color:"#0ea5e9",       bg:"rgba(14,165,233,.11)",  href:`https://amayma.com/search?q=${encodeURIComponent(job.vin)}`},
+    {label:"Amayama",   icon:"🔧", color:"#0ea5e9",       bg:"rgba(14,165,233,.11)",  href:`https://www.amayama.com/en/genuine-catalogs/epc/toyota-japan/search_frame?frame_no=${encodeURIComponent(job.vin)}`},
     {label:"Safeline",  icon:"🛑", color:"#dc2626",       bg:"rgba(220,38,38,.09)",   href:"https://safelinebrakes.co.za/"},
   ] : [];
 

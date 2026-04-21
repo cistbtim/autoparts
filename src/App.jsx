@@ -11637,6 +11637,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [approvalModal, setApprovalModal] = useState(false);
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [moveModal,     setMoveModal]     = useState(false);
+  const [jobTab,        setJobTab]        = useState("car");
 
   const vehiclePhotos = wsVehicles.reduce((acc,v)=>v.id===job.workshop_vehicle_id?{front:v.photo_front||"",rear:v.photo_rear||"",side:v.photo_side||""}:acc,{front:"",rear:"",side:""});
 
@@ -11648,7 +11649,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const clCamRefs = useRef({});
 
   useEffect(()=>{
-    if(!checklistOpen||checklistLoaded) return;
+    if(jobTab!=="inspect"||checklistLoaded) return;
     api.get("workshop_job_checklist",`job_id=eq.${job.id}`)
       .then(rows=>{
         const map={};
@@ -11657,7 +11658,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         setChecklistLoaded(true);
       })
       .catch(()=>setChecklistLoaded(true));
-  },[checklistOpen,checklistLoaded,job.id]);
+  },[jobTab,checklistLoaded,job.id]);
 
   const saveChecklistItem=async(key,patch)=>{
     const current=checklist[key]||{status:"pending",note:"",photo_url:""};
@@ -11885,174 +11886,188 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const JOB_STATUSES = ["Pending","In Progress","Done","Delivered"];
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
 
+  // VIN search lookup helper
+  const vinSearchLinks = job.vin ? [
+    {label:"PartsOuq",  icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:`https://partsouq.com/en/search/all?q=${encodeURIComponent(job.vin)}`},
+    {label:"RealOEM",   icon:"🚗", color:"var(--green)",  bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`},
+    {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},
+    {label:"Willard 🔋",icon:"🔋", color:"#ef4444",       bg:"rgba(220,38,38,.11)",   href:"https://willard.co.za/battery-selection-tool/"},
+    {label:"VARTA 🔋",  icon:"⚡", color:"#6366f1",       bg:"rgba(99,102,241,.11)",  href:"https://www.varta-automotive.com/battery-finder"},
+  ] : [];
+
   return (
     <div className="fu">
-      {/* Back + header */}
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+      {/* ── Header ── */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}>
         <button className="btn btn-ghost btn-sm" onClick={onBack}>← Back</button>
-        <div style={{flex:1}}>
-          <h1 style={{fontSize:18,fontWeight:700}}>{job.customer_name}</h1>
-          <div style={{fontSize:12,color:"var(--text3)"}}><code style={{fontFamily:"DM Mono,monospace"}}>{job.id}</code> · {job.date_in}</div>
+        <div style={{flex:1,minWidth:0}}>
+          <h1 style={{fontSize:18,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name}</h1>
+          <div style={{fontSize:12,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap",marginTop:2}}>
+            <code style={{fontFamily:"DM Mono,monospace"}}>{job.id}</code>
+            <span>·</span><span>{job.date_in}</span>
+            {job.vehicle_reg&&<><span>·</span><strong>🚗 {job.vehicle_reg}</strong></>}
+          </div>
         </div>
-        <span className="badge" style={{background:"rgba(96,165,250,.12)",color:ST_COLOR[job.status]||"var(--blue)",fontSize:13,padding:"5px 12px"}}>
+        <span className="badge" style={{background:"rgba(96,165,250,.12)",color:ST_COLOR[job.status]||"var(--blue)",fontSize:13,padding:"5px 12px",flexShrink:0}}>
           {job.status}
         </span>
-        {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ Edit</button>}
-        <button className="btn btn-ghost btn-sm" title="Print Job Card Label" onClick={()=>printJobCardLabel(job,settings)}>🏷️ Label</button>
-        <button className="btn btn-ghost btn-sm" title="Collection / Delivery Label" onClick={()=>setDeliveryModal(true)}>🚗 Collect/Deliver</button>
-        <button className="btn btn-ghost btn-sm" title="Download vehicle info as .txt" onClick={()=>{
-          const lines=[
-            "============================",
-            "  VEHICLE INFO",
-            "============================",
-            `Plate    : ${job.vehicle_reg||"—"}`,
-            `Make     : ${job.vehicle_make||"—"}`,
-            `Model    : ${job.vehicle_model||"—"}`,
-            `Year     : ${job.vehicle_year||"—"}`,
-            `Color    : ${job.vehicle_color||"—"}`,
-            `Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,
-            job.vin?`VIN      : ${job.vin}`:"",
-            job.engine_no?`Engine No: ${job.engine_no}`:"",
-            "============================",
-          ].filter(Boolean).join("\r\n");
-          const a=document.createElement("a");
-          a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));
-          a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`;
-          a.click();
-        }}>⬇️ Info .txt</button>
-        {wsRole==="main"&&onMoveJob&&(
-          <button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>setMoveModal(true)}>🔀 Move Job</button>
-        )}
-        {wsRole==="main"&&onDeleteJob&&(
-          <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{
-            if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))
-              onDeleteJob();
-          }}>🗑 Delete Job</button>
-        )}
       </div>
 
-      {/* Job info card */}
-      <div className="card" style={{padding:16,marginBottom:14}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:12}}>
-          {[
-            ["🚗 Plate",job.vehicle_reg],
-            ["Make/Model",`${job.vehicle_make||""} ${job.vehicle_model||""}`.trim()||"—"],
-            ["Year",job.vehicle_year||"—"],
-            ["Color",job.vehicle_color||"—"],
-            ["Mileage",job.mileage?`${job.mileage.toLocaleString()} km`:"—"],
-            ["👷 Mechanic",job.mechanic||"—"],
-            ["📅 Date In",job.date_in||"—"],
-            ["📅 Date Out",job.date_out||"—"],
-          ].map(([l,v])=>(
-            <div key={l}>
-              <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{l}</div>
-              <div style={{fontWeight:600,fontSize:13}}>{v||"—"}</div>
-            </div>
-          ))}
+      {/* Action buttons row */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+        {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ Edit</button>}
+        <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardLabel(job,settings)}>🏷️ Label</button>
+        <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 Collect</button>
+        <button className="btn btn-ghost btn-sm" onClick={()=>{
+          const lines=["============================","  VEHICLE INFO","============================",
+            `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,
+            `Model    : ${job.vehicle_model||"—"}`,`Year     : ${job.vehicle_year||"—"}`,
+            `Color    : ${job.vehicle_color||"—"}`,`Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,
+            job.vin?`VIN      : ${job.vin}`:"",job.engine_no?`Engine No: ${job.engine_no}`:"",
+            "============================",].filter(Boolean).join("\r\n");
+          const a=document.createElement("a");
+          a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));
+          a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`; a.click();
+        }}>⬇️ Info</button>
+        {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>setMoveModal(true)}>🔀 Move</button>}
+        {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 Delete</button>}
+      </div>
+
+      {/* ── Status bar ── */}
+      <div className="card" style={{padding:"10px 14px",marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:12,color:"var(--text3)",marginRight:2}}>Status:</span>
+        {(wsRole==="mechanic"?["Pending","In Progress"]:JOB_STATUSES).map(s=>(
+          <button key={s} className={`btn btn-xs ${job.status===s?"btn-primary":"btn-ghost"}`}
+            onClick={()=>onSaveJob({...job,status:s})}>{s}</button>
+        ))}
+      </div>
+
+      {/* ── Tab bar ── */}
+      <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:14,overflowX:"auto",gap:0,scrollbarWidth:"none"}}>
+        {[
+          {id:"car",     label:"🚗 Car"},
+          {id:"inspect", label:"✅ Inspect", badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
+          {id:"photos",  label:"📷 Photos",  badge:savedPhotos.length>0?savedPhotos.length:null},
+          {id:"docs",    label:"📎 Docs",     badge:jobDocs.length>0?jobDocs.length:null},
+          ...(wsRole!=="mechanic"?[
+            {id:"quote",   label:"📝 Quote",   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
+            {id:"invoice", label:"🧾 Invoice", badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
+          ]:[]),
+        ].map(t=>(
+          <button key={t.id} onClick={()=>setJobTab(t.id)} style={{
+            padding:"9px 13px",border:"none",background:"none",cursor:"pointer",flexShrink:0,
+            fontSize:13,fontWeight:jobTab===t.id?700:400,
+            color:jobTab===t.id?"var(--accent)":"var(--text2)",
+            borderBottom:jobTab===t.id?"2px solid var(--accent)":"2px solid transparent",
+            marginBottom:-1,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,
+          }}>
+            {t.label}
+            {t.badge!=null&&<span style={{fontSize:10,fontWeight:600,opacity:.7,background:"var(--surface2)",borderRadius:99,padding:"1px 5px"}}>{t.badge}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* ══ CAR INFO tab ══ */}
+      {jobTab==="car"&&(
+        <div className="card" style={{padding:16,marginBottom:14}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:12}}>
+            {[
+              ["🚗 Plate",job.vehicle_reg],
+              ["Make / Model",`${job.vehicle_make||""} ${job.vehicle_model||""}`.trim()||"—"],
+              ["Year",job.vehicle_year||"—"],
+              ["Color",job.vehicle_color||"—"],
+              ["Mileage",job.mileage?`${job.mileage.toLocaleString()} km`:"—"],
+              ["👷 Mechanic",job.mechanic||"—"],
+              ["📅 Date In",job.date_in||"—"],
+              ["📅 Date Out",job.date_out||"—"],
+            ].map(([l,v])=>(
+              <div key={l}>
+                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>{l}</div>
+                <div style={{fontWeight:600,fontSize:13}}>{v||"—"}</div>
+              </div>
+            ))}
+            {job.engine_no&&(
+              <div>
+                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>Engine No</div>
+                <code style={{fontWeight:600,fontSize:12,fontFamily:"DM Mono,monospace"}}>{job.engine_no}</code>
+              </div>
+            )}
+          </div>
+
+          {/* VIN + Search tools */}
           {job.vin&&(
-            <div>
-              <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>VIN</div>
-              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                <code style={{fontWeight:600,fontSize:12,fontFamily:"DM Mono,monospace",letterSpacing:"0.5px"}}>{job.vin}</code>
-                <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent(job.vin)}`} target="_blank" rel="noopener noreferrer"
-                  style={{fontSize:11,padding:"2px 8px",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
-                  PartsOuq
-                </a>
-                <a href={`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`} target="_blank" rel="noopener noreferrer"
-                  style={{fontSize:11,padding:"2px 8px",background:"rgba(52,211,153,.12)",color:"var(--green)",border:"1px solid rgba(52,211,153,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
-                  RealOEM
-                </a>
-                <a href={`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`} target="_blank" rel="noopener noreferrer"
-                  style={{fontSize:11,padding:"2px 8px",background:"rgba(251,191,36,.12)",color:"var(--yellow)",border:"1px solid rgba(251,191,36,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
-                  VinDecoderz
-                </a>
-                <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied to clipboard:\n\n${job.vin}\n\nPaste it into the VIN field on WolfOil.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
-                  style={{fontSize:11,padding:"2px 8px",background:"rgba(249,115,22,.12)",color:"#f97316",border:"1px solid rgba(249,115,22,.3)",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap"}}>
-                  WolfOil 📋
+            <div style={{borderTop:"1px solid var(--border)",paddingTop:12}}>
+              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:8}}>🔍 VIN Search</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                <code style={{fontFamily:"DM Mono,monospace",fontSize:14,fontWeight:700,letterSpacing:"1px",background:"var(--surface2)",padding:"5px 12px",borderRadius:7,border:"1px solid var(--border)"}}>{job.vin}</code>
+                <button onClick={()=>navigator.clipboard.writeText(job.vin).then(()=>alert("VIN copied!"))}
+                  style={{fontSize:11,padding:"4px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",color:"var(--text3)"}}>📋 Copy</button>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                {vinSearchLinks.map(lk=>(
+                  <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
+                      background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:10,
+                      color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                    <span style={{fontSize:20}}>{lk.icon}</span>
+                    <span>{lk.label}</span>
+                  </a>
+                ))}
+                <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied!\n\nPaste it into WolfOil's VIN field.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
+                    background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:10,
+                    color:"#f97316",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                  <span style={{fontSize:20}}>🛢️</span>
+                  <span>WolfOil</span>
                 </button>
-                <a href="https://willard.co.za/battery-selection-tool/" target="_blank" rel="noopener noreferrer"
-                  style={{fontSize:11,padding:"2px 8px",background:"rgba(220,38,38,.12)",color:"#ef4444",border:"1px solid rgba(220,38,38,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
-                  Willard 🔋
-                </a>
-                <a href="https://www.varta-automotive.com/battery-finder" target="_blank" rel="noopener noreferrer"
-                  style={{fontSize:11,padding:"2px 8px",background:"rgba(99,102,241,.12)",color:"#6366f1",border:"1px solid rgba(99,102,241,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
-                  VARTA 🔋
-                </a>
               </div>
             </div>
           )}
-          {job.engine_no&&(
-            <div>
-              <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>Engine No</div>
-              <code style={{fontWeight:600,fontSize:12,fontFamily:"DM Mono,monospace",letterSpacing:"0.5px"}}>{job.engine_no}</code>
-            </div>
-          )}
-        </div>
-        {job.complaint&&<div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
-          <div style={{fontSize:11,color:"var(--text3)",marginBottom:3}}>💬 Complaint</div>
-          <div style={{fontSize:13,lineHeight:1.5}}>{job.complaint}</div>
-        </div>}
-        {job.diagnosis&&<div style={{marginTop:10}}>
-          <div style={{fontSize:11,color:"var(--text3)",marginBottom:3}}>🔍 Diagnosis</div>
-          <div style={{fontSize:13,lineHeight:1.5,color:"var(--blue)"}}>{job.diagnosis}</div>
-        </div>}
-        {job.return_reason&&<div style={{marginTop:10,padding:"8px 12px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.25)",borderRadius:8}}>
-          <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>🔄 Return Reason</div>
-          <div style={{fontSize:13,color:"var(--yellow)"}}>{job.return_reason}</div>
-          {job.parent_job_id&&<div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Original job: <code style={{fontFamily:"DM Mono,monospace"}}>{job.parent_job_id}</code></div>}
-        </div>}
-      </div>
 
-      {/* Status update bar */}
-      {wsRole==="mechanic" ? (
-        <div className="card" style={{padding:12,marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          <span style={{fontSize:12,color:"var(--text3)",marginRight:4}}>Update status:</span>
-          {["Pending","In Progress"].map(s=>(
-            <button key={s} className={`btn btn-xs ${job.status===s?"btn-primary":"btn-ghost"}`}
-              onClick={()=>onSaveJob({...job,status:s})}>
-              {s}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="card" style={{padding:12,marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          <span style={{fontSize:12,color:"var(--text3)",marginRight:4}}>Update status:</span>
-          {JOB_STATUSES.map(s=>(
-            <button key={s} className={`btn btn-xs ${job.status===s?"btn-primary":"btn-ghost"}`}
-              onClick={()=>onSaveJob({...job,status:s})}>
-              {s}
-            </button>
-          ))}
+          {/* Complaint / Diagnosis / Return Reason */}
+          {job.complaint&&<div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>💬 Complaint</div>
+            <div style={{fontSize:13,lineHeight:1.6}}>{job.complaint}</div>
+          </div>}
+          {job.diagnosis&&<div style={{marginTop:10}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>🔍 Diagnosis</div>
+            <div style={{fontSize:13,lineHeight:1.6,color:"var(--blue)"}}>{job.diagnosis}</div>
+          </div>}
+          {job.return_reason&&<div style={{marginTop:10,padding:"8px 12px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.25)",borderRadius:8}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>🔄 Return Reason</div>
+            <div style={{fontSize:13,color:"var(--yellow)"}}>{job.return_reason}</div>
+            {job.parent_job_id&&<div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Original job: <code style={{fontFamily:"DM Mono,monospace"}}>{job.parent_job_id}</code></div>}
+          </div>}
+          {job.notes&&<div style={{marginTop:10}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>📝 Notes</div>
+            <div style={{fontSize:13,lineHeight:1.6,color:"var(--text2)"}}>{job.notes}</div>
+          </div>}
         </div>
       )}
 
-      {/* ── Check-in Checklist ── */}
-      <div className="card" style={{marginBottom:14,overflow:"hidden"}}>
-        <div style={{padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",userSelect:"none"}}
-          onClick={()=>setChecklistOpen(o=>!o)}>
-          <div style={{fontWeight:700,fontSize:14,display:"flex",alignItems:"center",gap:8}}>
-            ✅ Check-in Inspection
-            {checklistLoaded&&(()=>{
-              const done=CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length;
-              return <span style={{fontSize:11,fontWeight:400,color:"var(--text3)"}}>{done}/{CHECKLIST_ITEMS.length} checked</span>;
-            })()}
+      {/* ══ INSPECTION tab ══ */}
+      {jobTab==="inspect"&&(
+        <div className="card" style={{overflow:"hidden",marginBottom:14}}>
+          <div style={{padding:"12px 14px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{fontWeight:700,fontSize:14}}>✅ Check-in Inspection</div>
+            {checklistLoaded&&(
+              <span style={{fontSize:12,color:"var(--text3)"}}>
+                {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK ·{" "}
+                {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues
+              </span>
+            )}
           </div>
-          <span style={{fontSize:12,color:"var(--text3)"}}>{checklistOpen?"▲":"▼"}</span>
-        </div>
-        {checklistOpen&&(
-          <div style={{borderTop:"1px solid var(--border)"}}>
-            {!checklistLoaded?(
-              <div style={{padding:16,textAlign:"center",color:"var(--text3)",fontSize:13}}>Loading...</div>
-            ):(
-              CHECKLIST_ITEMS.map(item=>{
+          {!checklistLoaded?(
+            <div style={{padding:24,textAlign:"center",color:"var(--text3)",fontSize:13}}>Loading checklist...</div>
+          ):(
+            <>
+              {CHECKLIST_ITEMS.map(item=>{
                 const cl=checklist[item.key]||{status:"pending",note:"",photo_url:""};
-                const statusColor={ok:"#22c55e",issue:"#ef4444",na:"#94a3b8",pending:"#475569"};
                 return(
                   <div key={item.key} style={{padding:"10px 14px",borderBottom:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:6}}>
                     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                       <span style={{fontSize:16,width:22}}>{item.icon}</span>
                       <span style={{fontSize:13,fontWeight:600,flex:1,minWidth:120}}>{item.label}</span>
-                      {/* Status buttons */}
                       <div style={{display:"flex",gap:4}}>
                         {[{v:"ok",label:"✓ OK",bg:"rgba(34,197,94,.15)",col:"#22c55e",bdr:"rgba(34,197,94,.4)"},
                           {v:"issue",label:"✗ Issue",bg:"rgba(239,68,68,.15)",col:"#ef4444",bdr:"rgba(239,68,68,.4)"},
@@ -12067,233 +12082,181 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                           </button>
                         ))}
                       </div>
-                      {/* Photo button */}
                       <button onClick={()=>clCamRefs.current[item.key]?.click()}
                         style={{fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",
                           background:cl.photo_url?"rgba(96,165,250,.15)":"transparent",
                           color:cl.photo_url?"var(--blue)":"var(--text3)",
                           border:`1px solid ${cl.photo_url?"rgba(96,165,250,.3)":"var(--border)"}`}}>
-                        {clUploading[item.key]?"⏳":cl.photo_url?"📷 Photo ✓":"📷 Photo"}
+                        {clUploading[item.key]?"⏳":cl.photo_url?"📷 ✓":"📷"}
                       </button>
                       <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
                         ref={el=>clCamRefs.current[item.key]=el}
-                        onChange={e=>{
-                          const file=e.target.files?.[0]; e.target.value="";
-                          if(!file) return;
-                          const fr=new FileReader();
-                          fr.onload=ev=>uploadChecklistPhoto(item.key,ev.target.result);
-                          fr.readAsDataURL(file);
-                        }}/>
-                      {/* View photo thumbnail */}
+                        onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;const fr=new FileReader();fr.onload=ev=>uploadChecklistPhoto(item.key,ev.target.result);fr.readAsDataURL(file);}}/>
                       {cl.photo_url&&(
                         <img src={toImgUrl(cl.photo_url)} alt="check" onClick={()=>setViewPhoto(cl.photo_url)}
-                          style={{width:36,height:36,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)"}}/>
+                          style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)"}}/>
                       )}
                     </div>
-                    {/* Note input */}
                     <input className="inp" placeholder="Note (optional)..." value={cl.note}
                       onChange={e=>setChecklist(p=>({...p,[item.key]:{...cl,note:e.target.value}}))}
-                      onBlur={e=>{ if(e.target.value!==( checklist[item.key]?.note||"")) saveChecklistItem(item.key,{note:e.target.value}); else if(cl.status!=="pending"||cl.note) saveChecklistItem(item.key,{note:e.target.value}); }}
+                      onBlur={e=>{if(e.target.value!==(checklist[item.key]?.note||""))saveChecklistItem(item.key,{note:e.target.value});else if(cl.status!=="pending"||cl.note)saveChecklistItem(item.key,{note:e.target.value});}}
                       style={{fontSize:12,padding:"4px 8px"}}/>
                   </div>
                 );
-              })
-            )}
-            {checklistLoaded&&(
+              })}
               <div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"var(--text3)",flexWrap:"wrap",gap:8}}>
-                <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="na").length} N/A</span>
+                <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="na").length} N/A · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="pending").length} Pending</span>
                 <button className="btn btn-ghost btn-sm" onClick={()=>printChecklistReport(job,checklist,settings)}>🖨️ Print Report</button>
               </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Vehicle Photos ── */}
-      <div className="card" style={{padding:14,marginBottom:14}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:4}}>
-          <div style={{fontWeight:700,fontSize:14}}>
-            📷 Photos
-            {savedPhotos.length>0&&<span style={{marginLeft:8,fontSize:12,fontWeight:400,color:"var(--text3)"}}>{savedPhotos.length} saved</span>}
-          </div>
-          <div style={{display:"flex",gap:6}}>
-            <button className="btn btn-ghost btn-sm" title="Take new photo with camera" onClick={()=>jobPhotoCamRef.current?.click()}>📷 Camera</button>
-            <button className="btn btn-ghost btn-sm" title="Browse phone gallery, Google Drive, or Files" onClick={()=>jobPhotoGalRef.current?.click()}>🖼️ Gallery / Drive</button>
-          </div>
-          {/* Camera: direct capture only */}
-          <input ref={jobPhotoCamRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleJobPhotoFile}/>
-          {/* Browse: NO accept + NO capture → Android shows full picker (Gallery, Google Drive, Files) */}
-          <input ref={jobPhotoGalRef} type="file" multiple style={{display:"none"}} onChange={handleJobPhotoFile}/>
-        </div>
-        <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>
-          📷 Camera = take new photo · 🖼️ Gallery/Drive = browse phone, Google Drive, or files
-        </div>
-
-        {loadingPhotos?(
-          <div style={{textAlign:"center",padding:"16px 0",color:"var(--text3)",fontSize:12}}>Loading photos...</div>
-        ):(savedPhotos.length===0&&uploadPhotos.length===0)?(
-          <div style={{textAlign:"center",padding:"16px 0",color:"var(--text3)",fontSize:12}}>No photos yet — tap Camera or Gallery to add</div>
-        ):(
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
-            {/* Saved photos from DB */}
-            {savedPhotos.map(p=>{
-              const src=p.url?.includes("thumbnail?id=")||p.url?.includes("uc?export=")?p.url:toImgUrl(p.url);
-              return (
-                <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3",cursor:"pointer"}}
-                  onClick={()=>setViewPhoto(p.url)}>
-                  <img src={src} alt="vehicle photo"
-                    style={{width:"100%",height:"100%",objectFit:"cover"}}
-                    onError={e=>{
-                      const m=p.url?.match(/thumbnail[?]id=([^&]+)/)||p.url?.match(/[?&]id=([^&]+)/)||p.url?.match(/file\/d\/([^/?]+)/);
-                      if(m&&!e.target.src.includes("uc?export=view")) e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;
-                    }}
-                  />
-                  <button onClick={e=>{e.stopPropagation();deleteJobPhoto(p.id);}}
-                    style={{position:"absolute",top:3,right:3,background:"rgba(0,0,0,.55)",border:"none",borderRadius:"50%",
-                      width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",
-                      cursor:"pointer",color:"#fff",fontSize:10,lineHeight:1}}>✕</button>
-                </div>
-              );
-            })}
-            {/* In-progress uploads */}
-            {uploadPhotos.map(p=>(
-              <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3"}}>
-                <img src={p.dataUrl} alt="uploading" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",
-                  background:p.status==="done"?"rgba(0,0,0,0)":p.status==="error"?"rgba(180,0,0,.5)":"rgba(0,0,0,.45)"}}>
-                  {(p.status==="pending"||p.status==="uploading")&&(
-                    <div style={{width:20,height:20,border:"2px solid rgba(255,255,255,.3)",borderTop:"2px solid #fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
-                  )}
-                  {p.status==="done"&&<div style={{position:"absolute",top:3,right:5,fontSize:14}}>✅</div>}
-                  {p.status==="error"&&<div style={{fontSize:9,color:"#fff",textAlign:"center",padding:3}}>❌ {(p.error||"").slice(0,25)}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Full-screen photo preview */}
-        {viewPhoto&&(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}
-            onClick={()=>setViewPhoto(null)}>
-            <img src={toImgUrl(viewPhoto)} alt="preview"
-              style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8}}/>
-            <button style={{position:"absolute",top:16,right:20,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",
-              borderRadius:"50%",width:36,height:36,fontSize:18,cursor:"pointer"}}
-              onClick={()=>setViewPhoto(null)}>✕</button>
-            <a href={viewPhoto} target="_blank" rel="noreferrer"
-              style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",
-                background:"rgba(255,255,255,.15)",color:"#fff",padding:"8px 20px",borderRadius:20,fontSize:13,textDecoration:"none"}}
-              onClick={e=>e.stopPropagation()}>
-              Open in Drive ↗
-            </a>
-          </div>
-        )}
-      </div>
-
-      {/* ── Job Documents ── */}
-      <div className="card" style={{padding:14,marginBottom:14}}>
-        <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📎 Documents ({jobDocs.length})</div>
-        {/* Upload row */}
-        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:jobDocs.length>0?12:0}}>
-          <input ref={docFileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleDocFile}/>
-          <button className="btn btn-ghost btn-sm" onClick={()=>docFileRef.current?.click()}>
-            📂 {docFile?docFile.name:"Choose File"}
-          </button>
-          <input className="inp" style={{flex:1,minWidth:120,height:34,fontSize:13}} value={docName} onChange={e=>setDocName(e.target.value)} placeholder="Document name"/>
-          <input className="inp" style={{flex:1,minWidth:100,height:34,fontSize:13}} value={docNotes} onChange={e=>setDocNotes(e.target.value)} placeholder="Notes (optional)"/>
-          <button className="btn btn-primary btn-sm" onClick={uploadJobDoc} disabled={docUploading||!docFile}>
-            {docUploading?"⏳ Uploading...":"⬆️ Upload"}
-          </button>
-        </div>
-        {/* Image preview */}
-        {docPreview&&<div style={{marginBottom:8}}><img src={docPreview} alt="preview" style={{maxHeight:100,borderRadius:6,border:"1px solid var(--border)"}}/></div>}
-        {/* Saved docs list */}
-        {jobDocs.length>0&&(
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {jobDocs.map(d=>{
-              const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
-              const isEditing=editDocId===d.id;
-              return (
-                <div key={d.id} style={{padding:"7px 10px",background:"var(--surface2)",borderRadius:8}}>
-                  {isEditing?(
-                    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                      <input className="inp" style={{flex:2,minWidth:120,height:30,fontSize:13}} value={editDocVal.name} onChange={e=>setEditDocVal(v=>({...v,name:e.target.value}))} placeholder="Name"/>
-                      <input className="inp" style={{flex:2,minWidth:100,height:30,fontSize:13}} value={editDocVal.notes} onChange={e=>setEditDocVal(v=>({...v,notes:e.target.value}))} placeholder="Notes"/>
-                      <button className="btn btn-primary btn-xs" onClick={saveDocEdit}>✅</button>
-                      <button className="btn btn-ghost btn-xs" onClick={()=>setEditDocId(null)}>✕</button>
-                    </div>
-                  ):(
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <span style={{fontSize:20,flexShrink:0}}>{isPdf?"📄":"🖼️"}</span>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
-                        {d.notes&&<div style={{fontSize:11,color:"var(--text3)"}}>{d.notes}</div>}
-                      </div>
-                      <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{textDecoration:"none"}}>{isPdf?"📄 Open":"🔍 View"}</a>
-                      {!isPdf&&<button className="btn btn-ghost btn-xs" onClick={()=>setViewDocImg(d.file_url)}>🖼️</button>}
-                      <button className="btn btn-ghost btn-xs" onClick={()=>{setEditDocId(d.id);setEditDocVal({name:d.name||"",notes:d.notes||""});}}>✏️</button>
-                      <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete this document?"))deleteJobDoc(d.id);}}>🗑</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Image lightbox for job doc */}
-      {viewDocImg&&(
-        <div onClick={()=>setViewDocImg(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-          <img src={viewDocImg} alt="doc" style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:10}}/>
+            </>
+          )}
         </div>
       )}
 
-      {/* Line items */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <div style={{fontWeight:700,fontSize:14}}>🔧 Parts & Labour</div>
-        {wsRole!=="mechanic"&&(
+      {/* ══ PHOTOS tab ══ */}
+      {jobTab==="photos"&&(
+        <div className="card" style={{padding:14,marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
+            <div style={{fontWeight:700,fontSize:14}}>
+              📷 Photos {savedPhotos.length>0&&<span style={{fontSize:12,fontWeight:400,color:"var(--text3)",marginLeft:6}}>{savedPhotos.length} saved</span>}
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoCamRef.current?.click()}>📷 Camera</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoGalRef.current?.click()}>🖼️ Gallery</button>
+            </div>
+            <input ref={jobPhotoCamRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleJobPhotoFile}/>
+            <input ref={jobPhotoGalRef} type="file" multiple style={{display:"none"}} onChange={handleJobPhotoFile}/>
+          </div>
+          {loadingPhotos?(
+            <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:12}}>Loading photos...</div>
+          ):(savedPhotos.length===0&&uploadPhotos.length===0)?(
+            <div style={{textAlign:"center",padding:"32px 0",color:"var(--text3)",fontSize:13}}>No photos yet — tap Camera or Gallery</div>
+          ):(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
+              {savedPhotos.map(p=>{
+                const src=p.url?.includes("thumbnail?id=")||p.url?.includes("uc?export=")?p.url:toImgUrl(p.url);
+                return (
+                  <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3",cursor:"pointer"}} onClick={()=>setViewPhoto(p.url)}>
+                    <img src={src} alt="photo" style={{width:"100%",height:"100%",objectFit:"cover"}}
+                      onError={e=>{const m=p.url?.match(/thumbnail[?]id=([^&]+)/)||p.url?.match(/[?&]id=([^&]+)/)||p.url?.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view"))e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;}}/>
+                    <button onClick={e=>{e.stopPropagation();deleteJobPhoto(p.id);}}
+                      style={{position:"absolute",top:3,right:3,background:"rgba(0,0,0,.55)",border:"none",borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff",fontSize:10}}>✕</button>
+                  </div>
+                );
+              })}
+              {uploadPhotos.map(p=>(
+                <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3"}}>
+                  <img src={p.dataUrl} alt="uploading" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:p.status==="done"?"transparent":p.status==="error"?"rgba(180,0,0,.5)":"rgba(0,0,0,.45)"}}>
+                    {(p.status==="pending"||p.status==="uploading")&&<div style={{width:20,height:20,border:"2px solid rgba(255,255,255,.3)",borderTop:"2px solid #fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>}
+                    {p.status==="done"&&<div style={{position:"absolute",top:3,right:5,fontSize:14}}>✅</div>}
+                    {p.status==="error"&&<div style={{fontSize:9,color:"#fff",textAlign:"center",padding:3}}>❌ {(p.error||"").slice(0,25)}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {viewPhoto&&(
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setViewPhoto(null)}>
+              <img src={toImgUrl(viewPhoto)} alt="preview" style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8}}/>
+              <button style={{position:"absolute",top:16,right:20,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:"50%",width:36,height:36,fontSize:18,cursor:"pointer"}} onClick={()=>setViewPhoto(null)}>✕</button>
+              <a href={viewPhoto} target="_blank" rel="noreferrer" style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",background:"rgba(255,255,255,.15)",color:"#fff",padding:"8px 20px",borderRadius:20,fontSize:13,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>Open in Drive ↗</a>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ DOCUMENTS tab ══ */}
+      {jobTab==="docs"&&(
+        <div className="card" style={{padding:14,marginBottom:14}}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📎 Documents ({jobDocs.length})</div>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:jobDocs.length>0?12:0}}>
+            <input ref={docFileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleDocFile}/>
+            <button className="btn btn-ghost btn-sm" onClick={()=>docFileRef.current?.click()}>📂 {docFile?docFile.name:"Choose File"}</button>
+            <input className="inp" style={{flex:1,minWidth:120,height:34,fontSize:13}} value={docName} onChange={e=>setDocName(e.target.value)} placeholder="Document name"/>
+            <input className="inp" style={{flex:1,minWidth:100,height:34,fontSize:13}} value={docNotes} onChange={e=>setDocNotes(e.target.value)} placeholder="Notes (optional)"/>
+            <button className="btn btn-primary btn-sm" onClick={uploadJobDoc} disabled={docUploading||!docFile}>{docUploading?"⏳ Uploading...":"⬆️ Upload"}</button>
+          </div>
+          {docPreview&&<div style={{marginBottom:8}}><img src={docPreview} alt="preview" style={{maxHeight:100,borderRadius:6,border:"1px solid var(--border)"}}/></div>}
+          {jobDocs.length>0&&(
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {jobDocs.map(d=>{
+                const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
+                const isEditing=editDocId===d.id;
+                return (
+                  <div key={d.id} style={{padding:"7px 10px",background:"var(--surface2)",borderRadius:8}}>
+                    {isEditing?(
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                        <input className="inp" style={{flex:2,minWidth:120,height:30,fontSize:13}} value={editDocVal.name} onChange={e=>setEditDocVal(v=>({...v,name:e.target.value}))} placeholder="Name"/>
+                        <input className="inp" style={{flex:2,minWidth:100,height:30,fontSize:13}} value={editDocVal.notes} onChange={e=>setEditDocVal(v=>({...v,notes:e.target.value}))} placeholder="Notes"/>
+                        <button className="btn btn-primary btn-xs" onClick={saveDocEdit}>✅</button>
+                        <button className="btn btn-ghost btn-xs" onClick={()=>setEditDocId(null)}>✕</button>
+                      </div>
+                    ):(
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <span style={{fontSize:20,flexShrink:0}}>{isPdf?"📄":"🖼️"}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                          {d.notes&&<div style={{fontSize:11,color:"var(--text3)"}}>{d.notes}</div>}
+                        </div>
+                        <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{textDecoration:"none"}}>{isPdf?"📄 Open":"🔍 View"}</a>
+                        {!isPdf&&<button className="btn btn-ghost btn-xs" onClick={()=>setViewDocImg(d.file_url)}>🖼️</button>}
+                        <button className="btn btn-ghost btn-xs" onClick={()=>{setEditDocId(d.id);setEditDocVal({name:d.name||"",notes:d.notes||""});}}>✏️</button>
+                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete this document?"))deleteJobDoc(d.id);}}>🗑</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {viewDocImg&&(
+            <div onClick={()=>setViewDocImg(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+              <img src={viewDocImg} alt="doc" style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:10}}/>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ QUOTE tab ══ */}
+      {jobTab==="quote"&&wsRole!=="mechanic"&&(<>
+        {/* Parts & Labour */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontWeight:700,fontSize:14}}>🔧 Parts &amp; Labour</div>
           <div style={{display:"flex",gap:6}}>
             <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ Part</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ Labour</button>
           </div>
-        )}
-      </div>
-
-      <div className="card" style={{overflow:"hidden",marginBottom:14}}>
-        {items.length===0
-          ? <div style={{textAlign:"center",padding:24,color:"var(--text3)"}}>No items yet — add parts or labour</div>
-          : <table className="tbl" style={{width:"100%"}}>
-              <thead><tr>
-                {["Type","Description","Qty",...(wsRole!=="mechanic"?["Unit Price","Total"]:[]),""].map(h=><th key={h}>{h}</th>)}
-              </tr></thead>
+        </div>
+        <div className="card" style={{overflow:"hidden",marginBottom:14}}>
+          {items.length===0
+            ?<div style={{textAlign:"center",padding:24,color:"var(--text3)"}}>No items yet — add parts or labour</div>
+            :<table className="tbl" style={{width:"100%"}}>
+              <thead><tr>{["Type","Description","Qty","Unit Price","Total",""].map(h=><th key={h}>{h}</th>)}</tr></thead>
               <tbody>
                 {items.map(item=>(
                   <tr key={item.id}>
                     <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?"🔩 Part":"👷 Labour"}</span></td>
                     <td style={{fontWeight:500}}>{item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}</td>
                     <td style={{textAlign:"right"}}>{item.qty}</td>
-                    {wsRole!=="mechanic"&&<td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(item.unit_price)}</td>}
-                    {wsRole!=="mechanic"&&<td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(item.total)}</td>}
-                    <td>{wsRole!=="mechanic"&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button>}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(item.unit_price)}</td>
+                    <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(item.total)}</td>
+                    <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-        }
-        {/* Totals */}
-        {items.length>0&&wsRole!=="mechanic"&&(
-          <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-            <div style={{fontSize:13,color:"var(--text3)"}}>Subtotal: <strong style={{color:"var(--text)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(subtotal)}</strong></div>
-            {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(tax)}</strong></div>}
-            <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>Total: {fmtAmt(total)}</div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Quote section ── */}
-      {wsRole!=="mechanic"&&quote ? (
+          }
+          {items.length>0&&(
+            <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+              <div style={{fontSize:13,color:"var(--text3)"}}>Subtotal: <strong style={{color:"var(--text)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(subtotal)}</strong></div>
+              {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(tax)}</strong></div>}
+              <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>Total: {fmtAmt(total)}</div>
+            </div>
+          )}
+        </div>
+        {/* Quote */}
+        {quote ? (
         <div className="card" style={{padding:14,marginBottom:14,borderLeft:`3px solid ${
           quote.status==="accepted"?"var(--green)":quote.status==="declined"?"var(--red)":quote.status==="converted"?"var(--text3)":"var(--blue)"}`}}>
           {/* Header */}
@@ -12397,15 +12360,17 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               onClick={()=>setDeletingQuote(true)}>🗑️</button>
           </div>
         </div>
-      ) : !invoice&&items.length>0&&wsRole!=="mechanic"&&(
+      ) : (
         <button className="btn btn-ghost" style={{width:"100%",padding:12,fontSize:14,fontWeight:600,marginBottom:14,border:"2px dashed var(--border)"}}
           onClick={()=>setQuoteModal(true)}>
           📝 Create Quotation for Customer
         </button>
       )}
+      </>)}
 
-      {/* Invoice section */}
-      {wsRole!=="mechanic"&&invoice ? (
+      {/* ══ INVOICE tab ══ */}
+      {jobTab==="invoice"&&wsRole!=="mechanic"&&(<>
+      {invoice ? (
         <div className="card" style={{padding:14,borderLeft:`3px solid ${invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)"}`}}>
           {/* Header row */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:10}}>
@@ -12492,6 +12457,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               🧾 Create Workshop Invoice
             </button>
       )}
+      </>)}
 
       {/* Add item modal */}
       {addingItem&&(

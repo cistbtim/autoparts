@@ -1134,6 +1134,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [workshopVehicles,setWorkshopVehicles]=useState([]);
   const [workshopStock,setWorkshopStock]=useState([]);
   const [workshopServices,setWorkshopServices]=useState([]);
+  const [workshopSuppliers,setWorkshopSuppliers]=useState([]);
+  const [wsSupplierRequests,setWsSupplierRequests]=useState([]);
+  const [wsSupplierQuotes,  setWsSupplierQuotes]  =useState([]);
   const [workshopDocuments,setWorkshopDocuments]=useState([]);
   const [workshopProfile,setWorkshopProfile]=useState({});
   const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
@@ -1310,6 +1313,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]),
       api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]),
       api.get("workshop_profiles","select=id,name,city,country&order=name.asc").catch(()=>[]),
+      api.get("workshop_suppliers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.get("ws_supplier_requests",`select=*&order=sent_at.desc${wsF}`).catch(()=>[]),
+      api.get("ws_supplier_quotes",`select=*&order=quoted_at.desc${wsF}`).catch(()=>[]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -1340,6 +1346,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWorkshopServices(Array.isArray(rest[13])?rest[13]:[]);
     setWorkshopDocuments(Array.isArray(rest[14])?rest[14]:[]);
     setAllWsProfiles(Array.isArray(rest[15])?rest[15]:[]);
+    setWorkshopSuppliers(Array.isArray(rest[16])?rest[16]:[]);
+    setWsSupplierRequests(Array.isArray(rest[17])?rest[17]:[]);
+    setWsSupplierQuotes(Array.isArray(rest[18])?rest[18]:[]);
     // Load workshop profile for workshop role
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
@@ -1360,7 +1369,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
 
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
   const refreshWorkshopData=useCallback(async()=>{
-    const [jobs,items,invoices,quotes,wsCustomers,wsVehicles,wsStock,wsServices,wsDocs]=await Promise.all([
+    const [jobs,items,invoices,quotes,wsCustomers,wsVehicles,wsStock,wsServices,wsDocs,wsSupps,wsReqs,wsQts]=await Promise.all([
       api.get("workshop_jobs",`select=*&order=date_in.desc${wsF}`).catch(()=>[]),
       api.get("workshop_job_items",`select=*${wsF}`).catch(()=>[]),
       api.get("workshop_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]),
@@ -1370,6 +1379,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]),
       api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]),
       api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]),
+      api.get("workshop_suppliers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.get("ws_supplier_requests",`select=*&order=sent_at.desc${wsF}`).catch(()=>[]),
+      api.get("ws_supplier_quotes",`select=*&order=quoted_at.desc${wsF}`).catch(()=>[]),
     ]);
     setWorkshopJobs(Array.isArray(jobs)?jobs:[]);
     setWorkshopJobItems(Array.isArray(items)?items:[]);
@@ -1380,6 +1392,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWorkshopStock(Array.isArray(wsStock)?wsStock:[]);
     setWorkshopServices(Array.isArray(wsServices)?wsServices:[]);
     setWorkshopDocuments(Array.isArray(wsDocs)?wsDocs:[]);
+    setWorkshopSuppliers(Array.isArray(wsSupps)?wsSupps:[]);
+    setWsSupplierRequests(Array.isArray(wsReqs)?wsReqs:[]);
+    setWsSupplierQuotes(Array.isArray(wsQts)?wsQts:[]);
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
@@ -1846,6 +1861,38 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const deleteWsService=async(id)=>{
     await api.delete("workshop_services","id",id);
     await refreshWorkshopData(); showToast("Deleted","err");
+  };
+
+  // ── Workshop Suppliers ────────────────────────────────────────
+  const saveWsSupplier=async(sup)=>{
+    const {id,...rest}=sup;
+    const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
+    const clean=Object.fromEntries(Object.entries(rest).filter(([,v])=>v!=null));
+    if(id){ chkR(await api.patch("workshop_suppliers","id",id,clean),"Update supplier"); showToast("Supplier updated"); }
+    else { chkR(await api.insert("workshop_suppliers",{...clean,id:makeId("WSUP"),workshop_id:wsId||null}),"Add supplier"); showToast("Supplier added"); }
+    await refreshWorkshopData();
+  };
+  const deleteWsSupplier=async(id)=>{
+    await api.delete("workshop_suppliers","id",id);
+    await refreshWorkshopData(); showToast("Deleted","err");
+  };
+  const saveWsSupplierQuote=async(qt)=>{
+    const {id,...rest}=qt;
+    const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
+    if(id){ chkR(await api.patch("ws_supplier_quotes","id",id,rest),"Update quote"); }
+    else { chkR(await api.insert("ws_supplier_quotes",{...rest,id:makeId("WSQT"),workshop_id:wsId||null,quoted_at:new Date().toISOString()}),"Save quote"); }
+    const fresh=await api.get("ws_supplier_quotes",`select=*&order=quoted_at.desc${wsF}`).catch(()=>[]);
+    setWsSupplierQuotes(Array.isArray(fresh)?fresh:[]);
+  };
+
+  const saveWsSupplierRequest=async(req)=>{
+    await api.insert("ws_supplier_requests",{...req,id:makeId("WSRQ"),workshop_id:wsId||null,sent_at:new Date().toISOString()}).catch(e=>console.warn("Log send failed:",e));
+    setWsSupplierRequests(p=>[{...req,id:makeId("WSRQ"),sent_at:new Date().toISOString()},...p]);
+  };
+
+  const deleteWsSupplierRequest=async(id)=>{
+    await api.delete("ws_supplier_requests","id",id).catch(e=>console.warn("Delete send failed:",e));
+    setWsSupplierRequests(p=>p.filter(r=>r.id!==id));
   };
 
   // ── Workshop Documents ────────────────────────────────────────
@@ -2428,6 +2475,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {id:"wspayments",  icon:"💳",label:"WS Payments",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsstock",     icon:"📦",label:"WS Stock",     roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsservices",  icon:"🔧",label:"WS Services",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wssuppliers", icon:"🏪",label:"WS Suppliers", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wstransfer",  icon:"🔄",label:"WS Transfer",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
@@ -2681,8 +2729,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
           ...(wsRole!=="mechanic"?[
             {id:"wspayments", icon:"💳",label:"Payments"},
             {id:"wsstock",    icon:"📦",label:"Stock"},
-            {id:"wsservices", icon:"🔧",label:"Services"},
-            {id:"wstransfer", icon:"🔄",label:"Transfer"},
+            {id:"wsservices",  icon:"🔧",label:"Services"},
+            {id:"wssuppliers", icon:"🏪",label:"Suppliers"},
+            {id:"wstransfer",  icon:"🔄",label:"Transfer"},
             {id:"wsstatement",icon:"📋",label:"Statement"},
             {id:"wsreport",   icon:"📊",label:"Report"},
             ...(wsRole==="main"?[{id:"wsprofile",icon:"⚙️",label:"Settings"}]:[]),
@@ -3756,10 +3805,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
           <WsSubscriptionsPage settings={settings}/>
         )}
 
-        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager"||(role==="workshop"&&!subStatus?.expired))&&(
+        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager"||(role==="workshop"&&!subStatus?.expired))&&(
           <WorkshopPage
             key={tab}
-            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":"report"}
+            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":"report"}
             jobs={workshopJobs}
             jobItems={workshopJobItems}
             invoices={workshopInvoices}
@@ -3783,6 +3832,15 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             onDeleteQuote={deleteWorkshopQuote}
             onConvertQuoteToInvoice={convertQuoteToInvoice}
             onSendQuoteForApproval={sendQuoteForApproval}
+            suppliers={suppliers}
+            wsSuppliers={workshopSuppliers}
+            wsSupplierRequests={wsSupplierRequests}
+            wsSupplierQuotes={wsSupplierQuotes}
+            onSaveWsSupplier={saveWsSupplier}
+            onDeleteWsSupplier={deleteWsSupplier}
+            onSaveWsSupplierRequest={saveWsSupplierRequest}
+            onDeleteWsSupplierRequest={deleteWsSupplierRequest}
+            onSaveWsSupplierQuote={saveWsSupplierQuote}
             wsStock={workshopStock}
             wsServices={workshopServices}
             onSaveWsCustomer={saveWorkshopCustomer}
@@ -10942,7 +11000,7 @@ function WsVehicleForm({data,onSave,onClose,t}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],t,lang}) {
+function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],t,lang}) {
   const [view,      setView]      = useState("list");
   const [activeJob, setActiveJob] = useState(null);
   const [editJob,   setEditJob]   = useState(null);
@@ -11003,6 +11061,11 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
         job={activeJob} items={items} invoice={inv} quote={quote}
         parts={parts} partFitments={partFitments} vehicles={vehicles} settings={settings}
         wsVehicles={wsVehicles} wsCustomers={wsCustomers} wsStock={wsStock} wsServices={wsServices}
+        suppliers={suppliers} wsSuppliers={wsSuppliers} wsSupplierRequests={wsSupplierRequests}
+        wsSupplierQuotes={wsSupplierQuotes}
+        onSaveWsSupplierRequest={onSaveWsSupplierRequest}
+        onDeleteWsSupplierRequest={onDeleteWsSupplierRequest}
+        onSaveWsSupplierQuote={onSaveWsSupplierQuote}
         onBack={()=>{ setView("list"); setActiveJob(null); }}
         onSaveJob={async(d)=>{ await onSaveJob(d); setActiveJob({...activeJob,...d}); }}
         onDeleteJob={async()=>{ await onDeleteJob(activeJob.id); setView("list"); setActiveJob(null); }}
@@ -11011,6 +11074,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
         onSaveInvoice={onSaveInvoice} onUpdateInvoice={onUpdateInvoice} onDeleteInvoice={onDeleteInvoice}
         onSaveQuote={onSaveQuote} onDeleteQuote={onDeleteQuote} onConvertQuoteToInvoice={onConvertQuoteToInvoice}
         onSendQuoteForApproval={onSendQuoteForApproval}
+        onSaveWsVehicle={onSaveWsVehicle}
         wsRole={wsRole}
         t={t} lang={lang}/>
     );
@@ -11026,9 +11090,10 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
     ["quotations", quoteResponses>0?`📝 Quotations 🔔`:"📝 Quotations",  quotes.length],
     ["invoices",   "🧾 Invoices",    invoices.length],
     ["payments",   "💳 Payments",    invoices.filter(i=>(+i.paid_amount||0)>0).length],
-    ["wsstock",    "📦 WS Stock",    wsStock.length],
-    ["wsservices", "🔧 Services",    wsServices.length],
-    ["wstransfer", "🔄 Transfer",    null],
+    ["wsstock",      "📦 WS Stock",    wsStock.length],
+    ["wsservices",   "🔧 Services",    wsServices.length],
+    ["wssuppliers",  "🏪 Suppliers",   wsSuppliers.length],
+    ["wstransfer",   "🔄 Transfer",    null],
     ["wsdocs",     "📎 Documents",   wsDocs.length],
     ["statement",  "📋 Statement",   null],
     ["report",     "📊 Report",      null],
@@ -11371,6 +11436,12 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
           onSave={onSaveWsService} onDelete={onDeleteWsService}/>
       )}
 
+      {/* ══════════════ WS SUPPLIERS TAB ══════════════ */}
+      {wsTab==="wssuppliers"&&(
+        <WsSuppliersPage wsSuppliers={wsSuppliers}
+          onSave={onSaveWsSupplier} onDelete={onDeleteWsSupplier}/>
+      )}
+
       {/* ══════════════ WS TRANSFER TAB ══════════════ */}
       {wsTab==="wstransfer"&&(
         <WsTransferPage parts={parts} wsStock={wsStock} settings={settings}
@@ -11632,9 +11703,373 @@ const CHECKLIST_ITEMS=[
 ];
 
 // ═══════════════════════════════════════════════════════════════
+// SUPPLIER QUOTE MODAL — enter prices received from a supplier
+// ═══════════════════════════════════════════════════════════════
+function SupplierQuoteModal({request, existingQuote, onSave, onClose}) {
+  const parts = (() => { try { return JSON.parse(request.parts_list||"[]"); } catch { return []; } })();
+  const [prices, setPrices] = useState(() => {
+    if (existingQuote?.line_items) {
+      try { return JSON.parse(existingQuote.line_items); } catch {}
+    }
+    return parts.map(p => ({name: p, price: "", available: ""}));
+  });
+  const [notes,   setNotes]   = useState(existingQuote?.notes||"");
+  const [saving,  setSaving]  = useState(false);
+
+  const setLine = (idx, field, val) =>
+    setPrices(p => p.map((r,i) => i===idx ? {...r,[field]:val} : r));
+
+  const total = prices.reduce((s,r) => s + (+r.price||0), 0);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave({
+        ...(existingQuote?.id ? {id: existingQuote.id} : {}),
+        request_id:    request.id,
+        job_id:        request.job_id,
+        vehicle_reg:   request.vehicle_reg||"",
+        supplier_id:   request.supplier_id||null,
+        supplier_name: request.supplier_name||"",
+        line_items:    JSON.stringify(prices),
+        total:         total,
+        notes:         notes.trim()||null,
+      });
+      onClose();
+    } catch(e) { alert("Save failed: "+e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="💰 Enter Supplier Quote" onClose={onClose}/>
+
+      {/* Supplier + vehicle banner */}
+      <div style={{background:"var(--surface2)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:700,fontSize:13,color:"#25D366"}}>{request.via_group?"👥":"📲"} {request.supplier_name||request.supplier_phone||"Unknown supplier"}</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>🚗 {request.vehicle_reg||"—"} · Job {request.job_id}</div>
+        </div>
+      </div>
+
+      {/* Line items — one row per part */}
+      <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
+        Parts &amp; Prices
+      </div>
+      <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:14}}>
+        {/* Header */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 110px 100px",gap:8,padding:"7px 12px",background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>Part</div>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",textAlign:"right"}}>Price</div>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>Available</div>
+        </div>
+        {prices.map((row,idx) => (
+          <div key={idx} style={{display:"grid",gridTemplateColumns:"1fr 110px 100px",gap:8,padding:"8px 12px",borderBottom:idx<prices.length-1?"1px solid var(--border)":"none",alignItems:"center"}}>
+            <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.name}</div>
+            <input className="inp" type="number" min="0" step="0.01"
+              value={row.price} onChange={e=>setLine(idx,"price",e.target.value)}
+              placeholder="0.00"
+              style={{textAlign:"right",padding:"4px 8px",fontSize:13,fontWeight:700}}/>
+            <input className="inp"
+              value={row.available} onChange={e=>setLine(idx,"available",e.target.value)}
+              placeholder="In stock"
+              style={{padding:"4px 8px",fontSize:12}}/>
+          </div>
+        ))}
+        {/* Total row */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 110px 100px",gap:8,padding:"9px 12px",background:"var(--surface2)",borderTop:"1px solid var(--border)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--text2)"}}>Total</div>
+          <div style={{fontSize:14,fontWeight:800,color:"var(--accent)",textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>
+            {total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+          </div>
+          <div/>
+        </div>
+      </div>
+
+      <FD><FL label="Notes (optional)"/><textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. ETA 2 days, confirm order by 3pm" style={{minHeight:46,resize:"vertical"}}/></FD>
+
+      <div style={{display:"flex",gap:10,marginTop:4}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>
+          {saving?"Saving...":"💾 Save Quote"}
+        </button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPPLIER SEND MODAL
+// ═══════════════════════════════════════════════════════════════
+function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], quotes=[], onLogSend, onDeleteSend, onSaveQuote, onClose}) {
+  const shopName = settings?.shop_name || "Workshop";
+
+  // Job items — all pre-ticked
+  const jobItemIds = items.filter(i => i.description?.trim()).map(i => i.id);
+  const [selected,    setSelected]    = useState(jobItemIds);
+  // Extra parts typed manually  { id, label }
+  const [extraParts,  setExtraParts]  = useState([]);
+  const [extraInput,  setExtraInput]  = useState("");
+
+  const [supplierId,  setSupplierId]  = useState("");
+  const [manualPhone, setManualPhone] = useState("");
+  const [customNote,  setCustomNote]  = useState("");
+  const [copied,      setCopied]      = useState(false);
+  const [quoteTarget, setQuoteTarget] = useState(null); // { request, existingQuote }
+
+  const toggleItem = id =>
+    setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+
+  const addExtra = () => {
+    const v = extraInput.trim();
+    if (!v) return;
+    const id = "extra_" + Date.now();
+    setExtraParts(p => [...p, {id, label: v}]);
+    setSelected(p => [...p, id]);
+    setExtraInput("");
+  };
+
+  const removeExtra = id => {
+    setExtraParts(p => p.filter(x => x.id !== id));
+    setSelected(p => p.filter(x => x !== id));
+  };
+
+  // Build combined list: job items + extras
+  const allItems = [
+    ...items.filter(i => i.description?.trim()).map(i => ({id: i.id, label: i.description, qty: +i.qty||1, sku: i.part_sku||"", isExtra: false})),
+    ...extraParts.map(e => ({id: e.id, label: e.label, qty: 1, sku: "", isExtra: true})),
+  ];
+  const selectedItems = allItems.filter(i => selected.includes(i.id));
+
+  const chosenSupplier = wsSuppliers.find(s => String(s.id) === String(supplierId));
+  const phone = (chosenSupplier?.phone || manualPhone || "").replace(/\D/g, "");
+
+  const SEP = "─".repeat(28);
+  const msgLines = [
+    `🔧 *Parts Request* — ${shopName}`,
+    SEP,
+    `🚗 *${job.vehicle_reg||"—"}*  |  ${[job.vehicle_make, job.vehicle_model].filter(Boolean).join(" ")||"—"}${job.vehicle_color ? "  |  "+job.vehicle_color : ""}`,
+    job.vehicle_year ? `Year: ${job.vehicle_year}` : null,
+    job.vin          ? `VIN: \`${job.vin}\`` : null,
+    job.engine_no    ? `Engine #: ${job.engine_no}` : null,
+    `Job #: *${job.id}*  |  Date: ${job.date_in||"—"}`,
+    SEP,
+    `*Parts needed:*`,
+    ...selectedItems.map((i, idx) => `${idx + 1}. ${i.label}${i.qty > 1 ? ` x${i.qty}` : ""}`),
+    SEP,
+    customNote.trim() || "Please quote price & availability 🙏",
+  ].filter(l => l !== null).join("\n");
+
+  const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msgLines)}` : null;
+
+  const logSend = (viaGroup=false) => {
+    if (!onLogSend) return;
+    onLogSend({
+      job_id:         job.id,
+      vehicle_reg:    job.vehicle_reg||"",
+      supplier_id:    chosenSupplier?.id||null,
+      supplier_name:  chosenSupplier?.name || (manualPhone ? "Manual: "+manualPhone : ""),
+      supplier_phone: chosenSupplier?.phone||manualPhone||"",
+      via_group:      viaGroup,
+      parts_list:     JSON.stringify(selectedItems.map(i=>i.label)),
+      message:        msgLines,
+    });
+  };
+
+  const copyMsg = () => {
+    navigator.clipboard.writeText(msgLines).then(() => {
+      setCopied(true); setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const jobItemsList = items.filter(i => i.description?.trim());
+
+  return (
+    <div style={{maxWidth:520,width:"100%"}}>
+      <MHead title="📲 Send to Supplier" onClose={onClose}/>
+
+      {/* Car banner */}
+      <div style={{background:"var(--surface2)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+        <span style={{fontSize:20}}>🚗</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:700,fontSize:14}}>{job.vehicle_reg||"—"}&nbsp;<span style={{color:"var(--text3)",fontWeight:400,fontSize:13}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")||""}</span></div>
+          <div style={{fontSize:11,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap",marginTop:1}}>
+            {job.vehicle_color&&<span>{job.vehicle_color}</span>}
+            {job.vin&&<span>VIN: <code style={{fontFamily:"DM Mono,monospace"}}>{job.vin}</code></span>}
+            {job.engine_no&&<span>Eng: <code style={{fontFamily:"DM Mono,monospace"}}>{job.engine_no}</code></span>}
+          </div>
+        </div>
+        <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",flexShrink:0}}>{job.id}</code>
+      </div>
+
+      {/* Parts section */}
+      <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:6}}>
+        Select Parts to Include
+      </div>
+      <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:8}}>
+        {/* Job items */}
+        {jobItemsList.map((item, idx) => (
+          <label key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:selected.includes(item.id)?"var(--surface2)":"transparent"}}>
+            <input type="checkbox" checked={selected.includes(item.id)} onChange={()=>toggleItem(item.id)}
+              style={{width:16,height:16,accentColor:"var(--accent)",cursor:"pointer",flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.description}</div>
+              {item.part_sku&&<div style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{item.part_sku}</div>}
+            </div>
+            {+item.qty>1&&<span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>×{item.qty}</span>}
+          </label>
+        ))}
+        {/* Extra parts added manually */}
+        {extraParts.map(e => (
+          <label key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:selected.includes(e.id)?"rgba(99,102,241,.06)":"transparent"}}>
+            <input type="checkbox" checked={selected.includes(e.id)} onChange={()=>toggleItem(e.id)}
+              style={{width:16,height:16,accentColor:"var(--accent)",cursor:"pointer",flexShrink:0}}/>
+            <div style={{flex:1,fontSize:13,fontWeight:600,color:"var(--accent)"}}>{e.label}</div>
+            <button onClick={ev=>{ev.preventDefault();removeExtra(e.id);}}
+              style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
+          </label>
+        ))}
+        {/* Add extra part row */}
+        <div style={{display:"flex",gap:6,padding:"8px 10px"}}>
+          <input className="inp" placeholder="+ Type extra part name & press Enter"
+            value={extraInput} onChange={e=>setExtraInput(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&addExtra()}
+            style={{flex:1,fontSize:12,padding:"5px 10px"}}/>
+          <button className="btn btn-ghost btn-xs" onClick={addExtra} style={{flexShrink:0,fontSize:12,padding:"0 10px"}}>Add</button>
+        </div>
+      </div>
+      {jobItemsList.length===0&&extraParts.length===0&&(
+        <div style={{fontSize:12,color:"var(--text3)",marginBottom:8,paddingLeft:4}}>No job items yet — type parts above to include them</div>
+      )}
+
+      {/* Supplier selector */}
+      <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",margin:"14px 0 6px"}}>Supplier</div>
+      {wsSuppliers.length > 0
+        ? <select className="inp" value={supplierId} onChange={e=>{setSupplierId(e.target.value);setManualPhone("");}} style={{marginBottom:8}}>
+            <option value="">— Select supplier —</option>
+            {wsSuppliers.map(s=>(
+              <option key={s.id} value={s.id}>{s.name}{s.phone?` · ${s.phone}`:""}</option>
+            ))}
+          </select>
+        : <div style={{fontSize:12,color:"var(--text3)",marginBottom:6,padding:"8px 12px",background:"var(--surface2)",borderRadius:8}}>
+            No suppliers saved yet — go to <strong>WS → Suppliers</strong> tab to add them, or type a number below
+          </div>
+      }
+      <input className="inp" placeholder="Or enter phone number: +27 83 123 4567"
+        value={manualPhone} onChange={e=>{setManualPhone(e.target.value);setSupplierId("");}}
+        style={{marginBottom:14}}/>
+
+      {/* Custom note */}
+      <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:6}}>
+        Custom note <span style={{fontWeight:400,textTransform:"none",fontSize:10}}>(optional — replaces sign-off)</span>
+      </div>
+      <textarea className="inp" placeholder="e.g. Urgent — needed by tomorrow morning 🙏"
+        value={customNote} onChange={e=>setCustomNote(e.target.value)}
+        style={{minHeight:46,marginBottom:14,fontSize:13,resize:"vertical"}}/>
+
+      {/* Preview */}
+      <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:6}}>Message Preview</div>
+      <pre style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px",fontSize:12,lineHeight:1.65,whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:180,overflowY:"auto",marginBottom:14,color:"var(--text1)",fontFamily:"DM Mono,monospace"}}>
+        {msgLines}
+      </pre>
+
+      {/* Actions */}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {/* Direct WhatsApp (personal number) */}
+        {waUrl&&(
+          <a href={waUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}} onClick={()=>logSend(false)}>
+            <button className="btn btn-primary" style={{width:"100%",background:"#25D366",border:"none",fontSize:15,padding:"13px 0",fontWeight:700,borderRadius:10}}>
+              📲 Send via WhatsApp
+            </button>
+          </a>
+        )}
+        {/* WhatsApp Group — copy message then open group */}
+        {chosenSupplier?.group_link&&(
+          <button style={{width:"100%",background:"#128C7E",border:"none",fontSize:14,padding:"12px 0",fontWeight:700,borderRadius:10,color:"#fff",cursor:"pointer"}}
+            onClick={()=>{ logSend(true); navigator.clipboard.writeText(msgLines).then(()=>{ window.open(chosenSupplier.group_link,"_blank"); }); }}>
+            👥 Copy & Open Group Chat
+          </button>
+        )}
+        {/* Fallback — nothing selected yet */}
+        {!waUrl&&!chosenSupplier?.group_link&&(
+          <button disabled style={{width:"100%",fontSize:14,padding:"13px 0",opacity:.45,borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",cursor:"not-allowed"}}>
+            📲 Select a supplier or enter a phone above
+          </button>
+        )}
+        <button className="btn btn-ghost" style={{width:"100%",fontSize:13,padding:"10px 0",borderRadius:10}} onClick={copyMsg}>
+          {copied ? "✓ Copied!" : "📋 Copy Message"}
+        </button>
+        <button className="btn btn-ghost" style={{width:"100%",fontSize:13,borderRadius:10}} onClick={onClose}>Close</button>
+      </div>
+
+      {/* Send history for this job */}
+      {history.length>0&&(
+        <div style={{marginTop:18,borderTop:"1px solid var(--border)",paddingTop:14}}>
+          <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
+            📋 Send History ({history.length})
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {history.map((r,i)=>{
+              const parts = (() => { try { return JSON.parse(r.parts_list||"[]"); } catch { return []; } })();
+              const dt = r.sent_at ? new Date(r.sent_at).toLocaleString(undefined,{dateStyle:"short",timeStyle:"short"}) : "";
+              const existingQuote = quotes.find(q=>q.request_id===r.id);
+              const qLines = existingQuote ? (() => { try { return JSON.parse(existingQuote.line_items||"[]"); } catch { return []; } })() : [];
+              return (
+                <div key={r.id||i} style={{background:"var(--surface2)",borderRadius:10,padding:"10px 12px",fontSize:12,border: existingQuote?"1px solid rgba(52,211,153,.3)":"1px solid transparent"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,gap:6}}>
+                    <span style={{fontWeight:700,color:"#25D366",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {r.via_group?"👥":"📲"} {r.supplier_name||r.supplier_phone||"Unknown"}
+                    </span>
+                    <span style={{fontSize:10,color:"var(--text3)",flexShrink:0}}>{dt}</span>
+                  </div>
+                  <div style={{color:"var(--text2)",lineHeight:1.6,marginBottom:6}}>{parts.join(" · ")||"—"}</div>
+                  {/* Quote summary if entered */}
+                  {existingQuote&&(
+                    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:6,padding:"6px 10px",background:"rgba(52,211,153,.08)",borderRadius:7}}>
+                      <span style={{fontSize:11,color:"var(--green)",fontWeight:700}}>💰 Quote received</span>
+                      {qLines.filter(l=>+l.price>0).map((l,j)=>(
+                        <span key={j} style={{fontSize:11,color:"var(--text2)"}}>{l.name}: <strong>{(+l.price).toLocaleString(undefined,{minimumFractionDigits:2})}</strong></span>
+                      ))}
+                      {existingQuote.total>0&&<span style={{fontSize:12,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginLeft:"auto"}}>Total: {(+existingQuote.total).toLocaleString(undefined,{minimumFractionDigits:2})}</span>}
+                    </div>
+                  )}
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <button
+                      onClick={()=>setQuoteTarget({request:r, existingQuote: existingQuote||null})}
+                      style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:existingQuote?"rgba(52,211,153,.12)":"var(--surface3)",cursor:"pointer",color:existingQuote?"var(--green)":"var(--text2)",fontWeight:600}}>
+                      {existingQuote?"✏️ Edit Quote":"💰 Enter Quote"}
+                    </button>
+                    {onDeleteSend&&(
+                      <button
+                        onClick={()=>{ if(window.confirm("Delete this send record?")) onDeleteSend(r.id); }}
+                        style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid rgba(239,68,68,.3)",background:"rgba(239,68,68,.08)",cursor:"pointer",color:"#ef4444",fontWeight:600}}>
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Quote entry modal */}
+      {quoteTarget&&(
+        <SupplierQuoteModal
+          request={quoteTarget.request}
+          existingQuote={quoteTarget.existingQuote}
+          onSave={async(d)=>{ if(onSaveQuote) await onSaveQuote(d); setQuoteTarget(null); }}
+          onClose={()=>setQuoteTarget(null)}/>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,wsRole="main",t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",t,lang}) {
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);
@@ -11648,9 +12083,25 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [approvalModal, setApprovalModal] = useState(false);
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [moveModal,     setMoveModal]     = useState(false);
+  const [supplierModal, setSupplierModal] = useState(false);
   const [jobTab,        setJobTab]        = useState("car");
 
-  const vehiclePhotos = wsVehicles.reduce((acc,v)=>v.id===job.workshop_vehicle_id?{front:v.photo_front||"",rear:v.photo_rear||"",side:v.photo_side||""}:acc,{front:"",rear:"",side:""});
+  const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
+  const [localPhotoOverrides, setLocalPhotoOverrides] = useState({});
+  const [editPhotos, setEditPhotos] = useState(false);
+  const vehiclePhotos = wsVehicles.reduce((acc,v)=>v.id===job.workshop_vehicle_id?{
+    front: localPhotoOverrides.front!==undefined ? localPhotoOverrides.front : (v.photo_front||""),
+    rear:  localPhotoOverrides.rear !==undefined ? localPhotoOverrides.rear  : (v.photo_rear ||""),
+    side:  localPhotoOverrides.side !==undefined ? localPhotoOverrides.side  : (v.photo_side ||""),
+  }:acc,{front:"",rear:"",side:""});
+
+  const handleVehiclePhotoChange = async (field, key, url) => {
+    setLocalPhotoOverrides(p=>({...p,[key]:url}));
+    if(vehicleRecord && onSaveWsVehicle) {
+      const updated = {...vehicleRecord, [field]:url};
+      try { await onSaveWsVehicle(updated); } catch(e) { console.error("Photo save failed",e); }
+    }
+  };
 
   // ── Check-in Checklist ────────────────────────────────────────
   const [checklist,       setChecklist]       = useState({}); // { item_key: {status,note,photo_url} }
@@ -11904,6 +12355,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},
     {label:"Willard 🔋",icon:"🔋", color:"#ef4444",       bg:"rgba(220,38,38,.11)",   href:"https://willard.co.za/battery-selection-tool/"},
     {label:"VARTA 🔋",  icon:"⚡", color:"#6366f1",       bg:"rgba(99,102,241,.11)",  href:"https://www.varta-automotive.com/battery-finder"},
+    {label:"Amayma",    icon:"🔧", color:"#0ea5e9",       bg:"rgba(14,165,233,.11)",  href:`https://amayma.com/search?q=${encodeURIComponent(job.vin)}`},
+    {label:"Safeline",  icon:"🛑", color:"#dc2626",       bg:"rgba(220,38,38,.09)",   href:"https://safelinebrakes.co.za/"},
   ] : [];
 
   return (
@@ -11929,6 +12382,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ Edit</button>}
         <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardLabel(job,settings)}>🏷️ Label</button>
         <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 Collect</button>
+        <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📲 Supplier</button>
         <button className="btn btn-ghost btn-sm" onClick={()=>{
           const lines=["============================","  VEHICLE INFO","============================",
             `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,
@@ -12053,6 +12507,53 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>📝 Notes</div>
             <div style={{fontSize:13,lineHeight:1.6,color:"var(--text2)"}}>{job.notes}</div>
           </div>}
+
+          {/* ── Profile Photos ── */}
+          <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>📸 Profile Photos</div>
+              {vehicleRecord&&(
+                <button onClick={()=>setEditPhotos(p=>!p)}
+                  style={{fontSize:11,padding:"3px 10px",background:editPhotos?"var(--accent)":"var(--surface2)",color:editPhotos?"#fff":"var(--text2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",fontWeight:600}}>
+                  {editPhotos?"✓ Done":"✏️ Edit Photos"}
+                </button>
+              )}
+            </div>
+            {editPhotos&&vehicleRecord?(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                {[
+                  {field:"photo_front",key:"front",label:"Front"},
+                  {field:"photo_rear", key:"rear", label:"Rear"},
+                  {field:"photo_side", key:"side", label:"Side"},
+                ].map(({field,key,label})=>(
+                  <VehiclePhotoUploader key={field} label={label} url={vehiclePhotos[key]}
+                    vehicleId={vehicleRecord.id} make={vehicleRecord.make||"vehicle"}
+                    reg={vehicleRecord.reg||job.vehicle_reg} viewName={key}
+                    onChange={url=>handleVehiclePhotoChange(field,key,url)}/>
+                ))}
+              </div>
+            ):(vehiclePhotos.front||vehiclePhotos.rear||vehiclePhotos.side)?(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                {[
+                  {url:vehiclePhotos.front,label:"Front"},
+                  {url:vehiclePhotos.rear, label:"Rear"},
+                  {url:vehiclePhotos.side, label:"Side"},
+                ].map(({url,label})=>(
+                  <div key={label} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface3)",aspectRatio:"4/3"}}>
+                    {url
+                      ?<DriveImg url={url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                      :<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text3)",fontSize:12}}>—</div>
+                    }
+                    <div style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,.45)",color:"#fff",textAlign:"center",fontSize:10,padding:"2px 0",fontWeight:600}}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            ):(
+              <div style={{textAlign:"center",padding:12,background:"var(--surface2)",borderRadius:8,color:"var(--text3)",fontSize:12}}>
+                No profile photos — tap Edit Photos to add
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -12599,6 +13100,20 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           job={job}
           onMove={onMoveJob}
           onClose={()=>setMoveModal(false)}/>
+      )}
+
+      {/* Send to Supplier modal */}
+      {supplierModal&&(
+        <Overlay onClose={()=>setSupplierModal(false)}>
+          <SupplierSendModal
+            job={job} items={items} wsSuppliers={wsSuppliers} settings={settings}
+            history={wsSupplierRequests.filter(r=>r.job_id===job.id)}
+            quotes={wsSupplierQuotes.filter(q=>q.job_id===job.id)}
+            onLogSend={onSaveWsSupplierRequest}
+            onDeleteSend={onDeleteWsSupplierRequest}
+            onSaveQuote={onSaveWsSupplierQuote}
+            onClose={()=>setSupplierModal(false)}/>
+        </Overlay>
       )}
     </div>
   );
@@ -13522,6 +14037,122 @@ function WsServiceModal({item,onSave,onClose}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// WS SUPPLIERS PAGE
+// ═══════════════════════════════════════════════════════════════
+function WsSuppliersPage({wsSuppliers=[],onSave,onDelete}) {
+  const [modal,setModal]=useState(null);
+  const [search,setSearch]=useState("");
+
+  const filtered=wsSuppliers.filter(s=>{
+    if(!search.trim()) return true;
+    const h=`${s.name||""} ${s.phone||""} ${s.email||""} ${s.notes||""}`.toLowerCase();
+    return search.trim().toLowerCase().split(/\s+/).every(w=>h.includes(w));
+  });
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
+        <input className="inp" style={{flex:1,minWidth:200}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search suppliers..."/>
+        <button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Supplier</button>
+      </div>
+
+      {filtered.length===0
+        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
+            <div style={{fontSize:36,marginBottom:8}}>🏪</div>
+            <div style={{fontWeight:600,marginBottom:4}}>No suppliers yet</div>
+            <div style={{fontSize:13}}>Add your parts suppliers with their WhatsApp numbers</div>
+          </div>
+        : (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {filtered.map(s=>(
+              <div key={s.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                <div style={{width:38,height:38,borderRadius:10,background:"rgba(37,211,102,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🏪</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{s.name}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",display:"flex",gap:10,flexWrap:"wrap",marginTop:2}}>
+                    {s.phone&&<span>📲 {s.phone}</span>}
+                    {s.group_link&&<span style={{color:"#25D366"}}>👥 Group</span>}
+                    {s.email&&<span>✉️ {s.email}</span>}
+                    {s.notes&&<span style={{fontStyle:"italic"}}>{s.notes}</span>}
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  {s.phone&&(
+                    <a href={`https://wa.me/${s.phone.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer">
+                      <button className="btn btn-ghost btn-xs" style={{color:"#25D366"}}>💬 Chat</button>
+                    </a>
+                  )}
+                  {s.group_link&&(
+                    <a href={s.group_link} target="_blank" rel="noopener noreferrer">
+                      <button className="btn btn-ghost btn-xs" style={{color:"#25D366"}}>👥 Group</button>
+                    </a>
+                  )}
+                  <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:s})}>✏️</button>
+                  <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete ${s.name}?`))onDelete(s.id);}}>🗑</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      {(modal?.mode==="add"||modal?.mode==="edit")&&(
+        <WsSupplierModal item={modal.item}
+          onSave={async(d)=>{ await onSave(d); setModal(null); }}
+          onClose={()=>setModal(null)}/>
+      )}
+    </div>
+  );
+}
+
+function WsSupplierModal({item,onSave,onClose}) {
+  const [name,      setName]      = useState(item?.name||"");
+  const [phone,     setPhone]     = useState(item?.phone||"");
+  const [groupLink, setGroupLink] = useState(item?.group_link||"");
+  const [email,     setEmail]     = useState(item?.email||"");
+  const [notes,     setNotes]     = useState(item?.notes||"");
+  const [saving,    setSaving]    = useState(false);
+  const isEdit=!!item;
+
+  const handleSave=async()=>{
+    if(!name.trim()){alert("Name is required");return;}
+    setSaving(true);
+    try{
+      await onSave({
+        ...(isEdit?{id:item.id}:{}),
+        name:name.trim(),
+        phone:phone.trim()||null,
+        group_link:groupLink.trim()||null,
+        email:email.trim()||null,
+        notes:notes.trim()||null,
+      });
+    }catch(e){alert("Save failed: "+e.message);}
+    finally{setSaving(false);}
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title={isEdit?"✏️ Edit Supplier":"🏪 New Supplier"} onClose={onClose}/>
+      <FD><FL label="Supplier Name *"/><input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. ABC Auto Parts"/></FD>
+      <FG>
+        <FD><FL label="WhatsApp / Phone"/><input className="inp" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+27 83 000 0000"/></FD>
+        <FD><FL label="Email (optional)"/><input className="inp" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="supplier@example.com"/></FD>
+      </FG>
+      <FD>
+        <FL label="WhatsApp Group Link (optional)"/>
+        <input className="inp" value={groupLink} onChange={e=>setGroupLink(e.target.value)} placeholder="https://chat.whatsapp.com/xxxxx"/>
+        <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Paste the group invite link — tap ⋮ in WhatsApp group → Invite via link → Copy link</div>
+      </FD>
+      <FD><FL label="Notes (optional)"/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. BMW specialist, fast delivery"/></FD>
+      <div style={{display:"flex",gap:10,marginTop:18}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>{saving?"Saving...":"💾 Save"}</button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // WS TRANSFER PAGE — Transfer from spare shop → workshop stock
 // ═══════════════════════════════════════════════════════════════
 function WsTransferPage({parts=[],wsStock=[],settings,onSave}) {
@@ -13745,7 +14376,7 @@ function printChecklistReport(job, checklist, settings) {
     .print-btn{display:inline-block;margin-bottom:16px;padding:8px 20px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
   </style></head>
   <body>
-    <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+    <button class="print-btn no-print" onclick="var imgs=document.querySelectorAll('img');var n=imgs.length,done=0;function go(){window.print();}if(!n){go();return;}function chk(){if(++done>=n)go();}imgs.forEach(function(i){if(i.complete&&i.naturalHeight!==0)chk();else{i.onload=chk;i.onerror=chk;}});">🖨️ Print / Save PDF</button>
     <h1>🔧 ${shopName}</h1>
     <div class="sub">Vehicle Check-in Inspection Report · Printed: ${now}</div>
     <div class="veh">

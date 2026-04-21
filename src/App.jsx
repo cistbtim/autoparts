@@ -11126,40 +11126,51 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
             const inv=jobInvoice(j.id);
             const jq=jobQuote(j.id);
             const total=jItems.reduce((s,i)=>s+(+i.total||0),0);
+            const frontPhoto=wsVehicles.find(v=>v.id===j.workshop_vehicle_id)?.photo_front||"";
             return (
-              <div key={j.id} className="card card-hover" style={{padding:16,cursor:"pointer",borderLeft:`3px solid ${ST_COLOR[j.status]||"var(--border)"}`}}
+              <div key={j.id} className="card card-hover" style={{padding:0,cursor:"pointer",borderLeft:`3px solid ${ST_COLOR[j.status]||"var(--border)"}`,overflow:"hidden",display:"flex",minHeight:110}}
                 onClick={()=>{setActiveJob(j);setView("job");}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                  <div>
-                    <div style={{fontWeight:700,fontSize:15}}>{j.customer_name||<span style={{color:"var(--text3)"}}>No name</span>}</div>
-                    <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{j.customer_phone}</div>
-                  </div>
-                  <span className="badge" style={{background:ST_BG[j.status],color:ST_COLOR[j.status],flexShrink:0}}>{j.status}</span>
+                {/* Front photo */}
+                <div style={{width:84,flexShrink:0,background:"var(--surface2)",position:"relative",overflow:"hidden"}}>
+                  {frontPhoto?(
+                    <img src={toImgUrl(frontPhoto)} alt="car"
+                      style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+                      onError={e=>{const m=frontPhoto.match(/thumbnail[?]id=([^&]+)/)||frontPhoto.match(/[?&]id=([^&]+)/)||frontPhoto.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view"))e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;else e.target.style.display="none";}}/>
+                  ):(
+                    <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,color:"var(--border2)"}}>🚗</div>
+                  )}
                 </div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-                  {j.vehicle_reg&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text)",fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700}}>🚗 {j.vehicle_reg}</span>}
-                  {j.vehicle_make&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text2)",fontSize:11}}>{j.vehicle_make} {j.vehicle_model}</span>}
-                  {j.vehicle_year&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text3)",fontSize:11}}>{j.vehicle_year}</span>}
-                </div>
-                {j.return_reason&&<div style={{fontSize:11,color:"var(--yellow)",marginBottom:6}}>🔄 {j.return_reason.slice(0,50)}</div>}
-                {j.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:8,lineHeight:1.4,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>💬 {j.complaint}</div>}
-                {!wsId&&j.workshop_id&&(
-                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:6,display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{background:"rgba(251,146,60,.12)",color:"#f97316",borderRadius:6,padding:"2px 7px",fontWeight:600,fontSize:11}}>
-                      🏪 {wsProfileMap[j.workshop_id]||j.workshop_id}
-                    </span>
-                    <span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)"}}>{j.workshop_id}</span>
+                {/* Card content */}
+                <div style={{flex:1,padding:"12px 14px",minWidth:0,display:"flex",flexDirection:"column",gap:0}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.customer_name||<span style={{color:"var(--text3)"}}>No name</span>}</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{j.customer_phone}</div>
+                    </div>
+                    <span className="badge" style={{background:ST_BG[j.status],color:ST_COLOR[j.status],flexShrink:0,marginLeft:6}}>{j.status}</span>
                   </div>
-                )}
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid var(--border)",paddingTop:8}}>
-                  <div style={{fontSize:11,color:"var(--text3)"}}>
-                    <code style={{fontFamily:"DM Mono,monospace"}}>{j.id}</code>
-                    {j.mechanic&&<span style={{marginLeft:6}}>👷 {j.mechanic}</span>}
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
+                    {j.vehicle_reg&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text)",fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700}}>🚗 {j.vehicle_reg}</span>}
+                    {j.vehicle_make&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text2)",fontSize:11}}>{j.vehicle_make} {j.vehicle_model}</span>}
+                    {j.vehicle_year&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text3)",fontSize:11}}>{j.vehicle_year}</span>}
                   </div>
-                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                    {jq&&!inv&&<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",fontSize:10}}>📝 Quoted</span>}
-                    {inv&&<span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:10}}>🧾 Invoiced</span>}
-                    {total>0&&wsRole!=="mechanic"&&<span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmt(total)}</span>}
+                  {j.return_reason&&<div style={{fontSize:11,color:"var(--yellow)",marginBottom:5}}>🔄 {j.return_reason.slice(0,50)}</div>}
+                  {j.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:6,lineHeight:1.4,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>💬 {j.complaint}</div>}
+                  {!wsId&&j.workshop_id&&(
+                    <div style={{fontSize:11,color:"var(--text3)",marginBottom:5,display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{background:"rgba(251,146,60,.12)",color:"#f97316",borderRadius:6,padding:"2px 7px",fontWeight:600,fontSize:11}}>🏪 {wsProfileMap[j.workshop_id]||j.workshop_id}</span>
+                    </div>
+                  )}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid var(--border)",paddingTop:7,marginTop:"auto"}}>
+                    <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      <code style={{fontFamily:"DM Mono,monospace"}}>{j.id}</code>
+                      {j.mechanic&&<span style={{marginLeft:6}}>👷 {j.mechanic}</span>}
+                    </div>
+                    <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0,marginLeft:6}}>
+                      {jq&&!inv&&<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",fontSize:10}}>📝 Quoted</span>}
+                      {inv&&<span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:10}}>🧾 Invoiced</span>}
+                      {total>0&&wsRole!=="mechanic"&&<span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmt(total)}</span>}
+                    </div>
                   </div>
                 </div>
               </div>

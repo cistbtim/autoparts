@@ -12355,7 +12355,6 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},
     {label:"Willard 🔋",icon:"🔋", color:"#ef4444",       bg:"rgba(220,38,38,.11)",   href:"https://willard.co.za/battery-selection-tool/"},
     {label:"VARTA 🔋",  icon:"⚡", color:"#6366f1",       bg:"rgba(99,102,241,.11)",  href:"https://www.varta-automotive.com/battery-finder"},
-    {label:"Amayama",   icon:"🔧", color:"#0ea5e9",       bg:"rgba(14,165,233,.11)",  href:`https://www.amayama.com/en/genuine-catalogs/epc/toyota-japan/search_frame?frame_no=${encodeURIComponent(job.vin)}`},
     {label:"Safeline",  icon:"🛑", color:"#dc2626",       bg:"rgba(220,38,38,.09)",   href:"https://safelinebrakes.co.za/"},
   ] : [];
 
@@ -12478,6 +12477,13 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                     <span>{lk.label}</span>
                   </a>
                 ))}
+                <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
+                    background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:10,
+                    color:"#0ea5e9",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                  <span style={{fontSize:20}}>🔧</span>
+                  <span>Amayama 📋</span>
+                </button>
                 <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied!\n\nPaste it into WolfOil's VIN field.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
                   style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
                     background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:10,

@@ -12085,6 +12085,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [moveModal,     setMoveModal]     = useState(false);
   const [supplierModal, setSupplierModal] = useState(false);
   const [jobTab,        setJobTab]        = useState("car");
+  const [oeSearch,      setOeSearch]      = useState("");
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
   const [localPhotoOverrides, setLocalPhotoOverrides] = useState({});
@@ -12491,6 +12492,23 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                   <span style={{fontSize:20}}>🛢️</span>
                   <span>WolfOil</span>
                 </button>
+              </div>
+              {/* OE Number search */}
+              <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
+                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🔎 OE Number Search</div>
+                <div style={{display:"flex",gap:6}}>
+                  <input
+                    value={oeSearch} onChange={e=>setOeSearch(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==="Enter"&&oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
+                    placeholder="Enter OE / part number…"
+                    style={{flex:1,fontFamily:"DM Mono,monospace",fontSize:13,padding:"6px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)",outline:"none"}}/>
+                  <button
+                    onClick={()=>{ if(oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
+                    disabled={!oeSearch.trim()}
+                    style={{padding:"6px 14px",borderRadius:7,border:"none",background:"var(--accent)",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
+                    Search
+                  </button>
+                </div>
               </div>
             </div>
           )}

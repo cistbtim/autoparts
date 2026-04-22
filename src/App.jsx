@@ -13842,7 +13842,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], onSave, onClose, t}
   const selectItem=(p)=>{
     setSelItem(p);
     setDesc(p.name);
-    setPrice(p.default_price||p.price||p.rate||"");
+    setPrice(p.unit_price||p.default_price||p.price||p.rate||"");
     setSearch("");
   };
 
@@ -13905,7 +13905,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], onSave, onClose, t}
                       {p.description&&<div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{p.description}</div>}
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>{fmtAmt(p.default_price||p.price||p.rate||0)}</div>
+                      <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>{fmtAmt(p.unit_price||p.default_price||p.price||p.rate||0)}</div>
                       {type==="part"&&stockBadge(p)}
                     </div>
                   </div>

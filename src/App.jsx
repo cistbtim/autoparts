@@ -1714,10 +1714,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       res=await api.patch("workshop_job_items","id",id,dbItem);
     } else {
       res=await api.insert("workshop_job_items",{...dbItem,workshop_id:wsId||null});
-      // Deduct from workshop stock when adding a part to a job
+      // Deduct from workshop stock when adding a part to a job (skip quote_only items)
       if(ws_stock_id && item.type==="part"){
         const wsi=workshopStock.find(w=>w.id===ws_stock_id);
-        if(wsi){
+        if(wsi && !wsi.quote_only){
           const nq=Math.max(0,(+wsi.qty||0)-(+item.qty||1));
           await api.patch("workshop_stock","id",ws_stock_id,{qty:nq});
           await api.insert("workshop_stock_moves",{
@@ -13903,13 +13903,16 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], onSave, onClose, t}
                     onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                     <div style={{fontSize:22,flexShrink:0}}>{type==="part"?"🔩":"🔧"}</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
+                      <div style={{fontWeight:600,fontSize:13}}>
+                        {p.name}
+                        {p.quote_only&&<span style={{marginLeft:6,fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",borderRadius:4,padding:"1px 5px"}}>📋 Quote only</span>}
+                      </div>
                       {p.sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{p.sku}</code>}
                       {p.description&&<div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{p.description}</div>}
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
                       <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>{fmtAmt(p.unit_price||p.default_price||p.price||p.rate||0)}</div>
-                      {type==="part"&&stockBadge(p)}
+                      {type==="part"&&!p.quote_only&&stockBadge(p)}
                     </div>
                   </div>
                 ))
@@ -14004,9 +14007,12 @@ function WsStockPage({wsStock=[],settings,onSave,onDelete,onAdjust}) {
                   const qColor=qty<=0?"var(--red)":qty<=low?"var(--yellow)":"var(--green)";
                   return (
                     <tr key={p.id}>
-                      <td style={{fontWeight:600}}>{p.name}</td>
+                      <td style={{fontWeight:600}}>
+                        {p.name}
+                        {p.quote_only&&<span style={{marginLeft:6,fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",borderRadius:4,padding:"1px 5px"}}>📋 Quote only</span>}
+                      </td>
                       <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{p.sku||"—"}</code></td>
-                      <td style={{textAlign:"right",fontWeight:700,color:qColor,fontFamily:"Rajdhani,sans-serif"}}>{qty}</td>
+                      <td style={{textAlign:"right",fontWeight:700,color:p.quote_only?"var(--text3)":qColor,fontFamily:"Rajdhani,sans-serif"}}>{p.quote_only?"—":qty}</td>
                       <td style={{fontSize:12,color:"var(--text3)"}}>{p.unit||"—"}</td>
                       <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(p.unit_cost||0)}</td>
                       <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",fontWeight:700}}>{fmtAmt(p.unit_price||0)}</td>
@@ -14050,6 +14056,7 @@ function WsStockModal({item,onSave,onClose}) {
   const [cost,setCost]=useState(item?.unit_cost||"");
   const [price,setPrice]=useState(item?.unit_price||"");
   const [lowStock,setLowStock]=useState(item?.min_qty||"");
+  const [quoteOnly,setQuoteOnly]=useState(item?.quote_only||false);
   const [saving,setSaving]=useState(false);
   const isEdit=!!item;
 
@@ -14067,6 +14074,7 @@ function WsStockModal({item,onSave,onClose}) {
         unit_cost:+cost||0,
         unit_price:+price||0,
         min_qty:+lowStock||0,
+        quote_only:quoteOnly,
       });
     }catch(e){alert("Save failed: "+e.message);}
     finally{setSaving(false);}
@@ -14079,12 +14087,25 @@ function WsStockModal({item,onSave,onClose}) {
         <FD style={{gridColumn:"1/-1"}}><FL label="Name *"/><input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Oil Filter — Toyota"/></FD>
         <FD><FL label="SKU"/><input className="inp" value={sku} onChange={e=>setSku(e.target.value)} placeholder="WS-001"/></FD>
         <FD><FL label="Unit"/><input className="inp" value={unit} onChange={e=>setUnit(e.target.value)} placeholder="pcs / L / set"/></FD>
-        <FD><FL label="Qty on Hand"/><input className="inp" type="number" value={qty} onChange={e=>setQty(e.target.value)} min="0" step="1"/></FD>
-        <FD><FL label="Low Stock Alert"/><input className="inp" type="number" value={lowStock} onChange={e=>setLowStock(e.target.value)} min="0"/></FD>
+        <FD><FL label="Qty on Hand"/><input className="inp" type="number" value={qty} onChange={e=>setQty(e.target.value)} min="0" step="1" disabled={quoteOnly} style={{opacity:quoteOnly?.5:1}}/></FD>
+        <FD><FL label="Low Stock Alert"/><input className="inp" type="number" value={lowStock} onChange={e=>setLowStock(e.target.value)} min="0" disabled={quoteOnly} style={{opacity:quoteOnly?.5:1}}/></FD>
         <FD><FL label="Cost Price"/><input className="inp" type="number" value={cost} onChange={e=>setCost(e.target.value)} placeholder="0.00"/></FD>
         <FD><FL label="Selling Price"/><input className="inp" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0.00"/></FD>
       </FG>
       <FD style={{marginTop:8}}><FL label="Description"/><textarea className="inp" rows={2} value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Optional notes..."/></FD>
+
+      {/* Quote-only toggle */}
+      <label style={{display:"flex",alignItems:"flex-start",gap:10,marginTop:12,padding:"10px 14px",background:"rgba(96,165,250,.07)",border:"1px solid rgba(96,165,250,.2)",borderRadius:10,cursor:"pointer"}}>
+        <input type="checkbox" checked={quoteOnly} onChange={e=>setQuoteOnly(e.target.checked)}
+          style={{width:16,height:16,marginTop:2,accentColor:"var(--accent)",cursor:"pointer",flexShrink:0}}/>
+        <div>
+          <div style={{fontWeight:700,fontSize:13}}>📋 Quote reference only (no stock tracking)</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>
+            Price is used for quotations but stock qty is never deducted — even when added to a job or invoice.
+          </div>
+        </div>
+      </label>
+
       <div style={{display:"flex",gap:10,marginTop:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>{saving?"Saving...":"✅ Save"}</button>

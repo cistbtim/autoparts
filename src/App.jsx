@@ -11066,6 +11066,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
         onSaveWsSupplierRequest={onSaveWsSupplierRequest}
         onDeleteWsSupplierRequest={onDeleteWsSupplierRequest}
         onSaveWsSupplierQuote={onSaveWsSupplierQuote}
+        onSaveWsStock={onSaveWsStock}
         onBack={()=>{ setView("list"); setActiveJob(null); }}
         onSaveJob={async(d)=>{ await onSaveJob(d); setActiveJob({...activeJob,...d}); }}
         onDeleteJob={async()=>{ await onDeleteJob(activeJob.id); setView("list"); setActiveJob(null); }}
@@ -11705,7 +11706,8 @@ const CHECKLIST_ITEMS=[
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER QUOTE MODAL — enter prices received from a supplier
 // ═══════════════════════════════════════════════════════════════
-function SupplierQuoteModal({request, existingQuote, onSave, onClose}) {
+function SupplierQuoteModal({request, existingQuote, settings={}, onSave, onClose}) {
+  const vatRate = +(settings?.tax_rate||0) / 100;
   const parts = (() => { try { return JSON.parse(request.parts_list||"[]"); } catch { return []; } })();
   const [prices, setPrices] = useState(() => {
     if (existingQuote?.line_items) {
@@ -11713,16 +11715,35 @@ function SupplierQuoteModal({request, existingQuote, onSave, onClose}) {
     }
     return parts.map(p => ({name: p, price: "", available: ""}));
   });
+  const [vatExcluded, setVatExcluded] = useState(existingQuote?.vat_excluded??false);
   const [notes,   setNotes]   = useState(existingQuote?.notes||"");
   const [saving,  setSaving]  = useState(false);
 
   const setLine = (idx, field, val) =>
     setPrices(p => p.map((r,i) => i===idx ? {...r,[field]:val} : r));
 
-  const total = prices.reduce((s,r) => s + (+r.price||0), 0);
+  // Raw sum of entered prices
+  const rawTotal = prices.reduce((s,r) => s + (+r.price||0), 0);
+  // If supplier gave ex-VAT prices, add VAT to get incl-VAT total
+  const vatIncTotal = vatExcluded && vatRate > 0 ? rawTotal * (1 + vatRate) : rawTotal;
+  const vatAmount   = vatIncTotal - rawTotal;
+
+  // Per-line VAT-inclusive price for display
+  const inclPrice = (p) => {
+    const v = +p||0;
+    return vatExcluded && vatRate > 0 ? v * (1 + vatRate) : v;
+  };
+
+  const C = curSym(settings?.currency||"ZAR R");
+  const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
   const handleSave = async () => {
     setSaving(true);
+    // Save each line with vat_incl_price so the reference panel shows the real cost
+    const savedLines = prices.map(r => ({
+      ...r,
+      vat_incl_price: inclPrice(r.price),
+    }));
     try {
       await onSave({
         ...(existingQuote?.id ? {id: existingQuote.id} : {}),
@@ -11731,8 +11752,9 @@ function SupplierQuoteModal({request, existingQuote, onSave, onClose}) {
         vehicle_reg:   request.vehicle_reg||"",
         supplier_id:   request.supplier_id||null,
         supplier_name: request.supplier_name||"",
-        line_items:    JSON.stringify(prices),
-        total:         total,
+        line_items:    JSON.stringify(savedLines),
+        total:         vatIncTotal,
+        vat_excluded:  vatExcluded,
         notes:         notes.trim()||null,
       });
       onClose();
@@ -11752,24 +11774,48 @@ function SupplierQuoteModal({request, existingQuote, onSave, onClose}) {
         </div>
       </div>
 
+      {/* VAT toggle */}
+      <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"9px 14px",background:"var(--surface2)",borderRadius:10,cursor:"pointer",border:"1px solid var(--border)"}}>
+        <input type="checkbox" checked={vatExcluded} onChange={e=>setVatExcluded(e.target.checked)}
+          style={{width:16,height:16,accentColor:"var(--accent)",cursor:"pointer",flexShrink:0}}/>
+        <div style={{flex:1}}>
+          <div style={{fontSize:13,fontWeight:700}}>Prices are VAT excluded (ex-VAT)</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>
+            {vatExcluded
+              ? vatRate>0
+                ? `VAT (${settings.tax_rate}%) will be added — totals shown incl. VAT`
+                : "No VAT rate set in settings — configure it in Workshop Settings"
+              : "Prices already include VAT"}
+          </div>
+        </div>
+      </label>
+
       {/* Line items — one row per part */}
       <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
         Parts &amp; Prices
       </div>
       <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:14}}>
         {/* Header */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 110px 100px",gap:8,padding:"7px 12px",background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
+        <div style={{display:"grid",gridTemplateColumns:`1fr 110px${vatExcluded&&vatRate>0?" 100px":""} 100px`,gap:8,padding:"7px 12px",background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
           <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>Part</div>
-          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",textAlign:"right"}}>Price</div>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",textAlign:"right"}}>
+            {vatExcluded?"Ex-VAT":"Price"}
+          </div>
+          {vatExcluded&&vatRate>0&&<div style={{fontSize:10,fontWeight:700,color:"#f59e0b",textTransform:"uppercase",textAlign:"right"}}>Incl. VAT</div>}
           <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>Available</div>
         </div>
         {prices.map((row,idx) => (
-          <div key={idx} style={{display:"grid",gridTemplateColumns:"1fr 110px 100px",gap:8,padding:"8px 12px",borderBottom:idx<prices.length-1?"1px solid var(--border)":"none",alignItems:"center"}}>
+          <div key={idx} style={{display:"grid",gridTemplateColumns:`1fr 110px${vatExcluded&&vatRate>0?" 100px":""} 100px`,gap:8,padding:"8px 12px",borderBottom:idx<prices.length-1?"1px solid var(--border)":"none",alignItems:"center"}}>
             <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.name}</div>
             <input className="inp" type="number" min="0" step="0.01"
               value={row.price} onChange={e=>setLine(idx,"price",e.target.value)}
               placeholder="0.00"
               style={{textAlign:"right",padding:"4px 8px",fontSize:13,fontWeight:700}}/>
+            {vatExcluded&&vatRate>0&&(
+              <div style={{textAlign:"right",fontSize:12,fontWeight:700,color:"#f59e0b",fontFamily:"Rajdhani,sans-serif"}}>
+                {+row.price>0?inclPrice(row.price).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):"—"}
+              </div>
+            )}
             <input className="inp"
               value={row.available} onChange={e=>setLine(idx,"available",e.target.value)}
               placeholder="In stock"
@@ -11777,13 +11823,29 @@ function SupplierQuoteModal({request, existingQuote, onSave, onClose}) {
           </div>
         ))}
         {/* Total row */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 110px 100px",gap:8,padding:"9px 12px",background:"var(--surface2)",borderTop:"1px solid var(--border)"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"var(--text2)"}}>Total</div>
-          <div style={{fontSize:14,fontWeight:800,color:"var(--accent)",textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>
-            {total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+        <div style={{display:"grid",gridTemplateColumns:`1fr 110px${vatExcluded&&vatRate>0?" 100px":""} 100px`,gap:8,padding:"9px 12px",background:"var(--surface2)",borderTop:"1px solid var(--border)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--text2)"}}>
+            {vatExcluded&&vatRate>0?"Subtotal (ex-VAT)":"Total"}
           </div>
+          <div style={{fontSize:14,fontWeight:800,color:"var(--accent)",textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>
+            {rawTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+          </div>
+          {vatExcluded&&vatRate>0&&(
+            <div style={{fontSize:14,fontWeight:800,color:"#f59e0b",textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>
+              {vatIncTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+            </div>
+          )}
           <div/>
         </div>
+        {/* VAT breakdown row */}
+        {vatExcluded&&vatRate>0&&rawTotal>0&&(
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,padding:"5px 12px 8px",background:"var(--surface2)"}}>
+            <span style={{fontSize:11,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): </span>
+            <span style={{fontSize:11,fontWeight:700,color:"#f59e0b",fontFamily:"Rajdhani,sans-serif"}}>
+              + {vatAmount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+            </span>
+          </div>
+        )}
       </div>
 
       <FD><FL label="Notes (optional)"/><textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. ETA 2 days, confirm order by 3pm" style={{minHeight:46,resize:"vertical"}}/></FD>
@@ -11801,13 +11863,20 @@ function SupplierQuoteModal({request, existingQuote, onSave, onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER SEND MODAL
 // ═══════════════════════════════════════════════════════════════
-function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], quotes=[], onLogSend, onDeleteSend, onSaveQuote, onClose}) {
+// Generate a short SKU from a part name: "Air Filter" → "ws-af-m01" style
+const makePartSku = (name) => {
+  const abbr = name.trim().split(/\s+/).map(w=>w[0]||"").join("").toLowerCase().slice(0,4);
+  const rand = Math.random().toString(36).slice(2,5);
+  return `ws-${abbr}-${rand}`;
+};
+
+function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], quotes=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onClose}) {
   const shopName = settings?.shop_name || "Workshop";
 
   // Job items — all pre-ticked
   const jobItemIds = items.filter(i => i.description?.trim()).map(i => i.id);
   const [selected,    setSelected]    = useState(jobItemIds);
-  // Extra parts typed manually  { id, label }
+  // Extra parts typed manually  { id, label, sku }
   const [extraParts,  setExtraParts]  = useState([]);
   const [extraInput,  setExtraInput]  = useState("");
 
@@ -11820,13 +11889,29 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
   const toggleItem = id =>
     setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
-  const addExtra = () => {
+  const addExtra = async () => {
     const v = extraInput.trim();
     if (!v) return;
-    const id = "extra_" + Date.now();
-    setExtraParts(p => [...p, {id, label: v}]);
-    setSelected(p => [...p, id]);
+    const sku = makePartSku(v);
+    const tempId = "extra_" + Date.now();
+    setExtraParts(p => [...p, {id: tempId, label: v, sku, saving: true}]);
+    setSelected(p => [...p, tempId]);
     setExtraInput("");
+    // Insert to job items AND workshop stock in parallel
+    try {
+      await Promise.all([
+        onSaveItem
+          ? onSaveItem({job_id: job.id, type: "part", description: v, part_sku: sku, qty: 1, unit_price: 0, total: 0})
+          : Promise.resolve(),
+        onSaveWsStock
+          ? onSaveWsStock({name: v, sku, qty: 0, unit_cost: 0, unit_price: 0, min_qty: 0})
+          : Promise.resolve(),
+      ]);
+      setExtraParts(p => p.map(e => e.id===tempId ? {...e, saving: false, saved: true} : e));
+    } catch(e) {
+      console.error("Add item failed", e);
+      setExtraParts(p => p.map(e => e.id===tempId ? {...e, saving: false, error: true} : e));
+    }
   };
 
   const removeExtra = id => {
@@ -11837,7 +11922,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
   // Build combined list: job items + extras
   const allItems = [
     ...items.filter(i => i.description?.trim()).map(i => ({id: i.id, label: i.description, qty: +i.qty||1, sku: i.part_sku||"", isExtra: false})),
-    ...extraParts.map(e => ({id: e.id, label: e.label, qty: 1, sku: "", isExtra: true})),
+    ...extraParts.map(e => ({id: e.id, label: e.label, qty: 1, sku: e.sku||"", isExtra: true})),
   ];
   const selectedItems = allItems.filter(i => selected.includes(i.id));
 
@@ -11924,7 +12009,15 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
           <label key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:selected.includes(e.id)?"rgba(99,102,241,.06)":"transparent"}}>
             <input type="checkbox" checked={selected.includes(e.id)} onChange={()=>toggleItem(e.id)}
               style={{width:16,height:16,accentColor:"var(--accent)",cursor:"pointer",flexShrink:0}}/>
-            <div style={{flex:1,fontSize:13,fontWeight:600,color:"var(--accent)"}}>{e.label}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:600,color:"var(--accent)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.label}</div>
+              {e.sku&&<div style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginTop:1}}>
+                {e.sku}&nbsp;
+                {e.saving&&<span style={{color:"var(--text3)"}}>saving…</span>}
+                {e.saved&&<span style={{color:"var(--green)",fontWeight:600}}>✓ added to job</span>}
+                {e.error&&<span style={{color:"var(--red)",fontWeight:600}}>✗ save failed</span>}
+              </div>}
+            </div>
             <button onClick={ev=>{ev.preventDefault();removeExtra(e.id);}}
               style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
           </label>
@@ -12028,7 +12121,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
                     <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:6,padding:"6px 10px",background:"rgba(52,211,153,.08)",borderRadius:7}}>
                       <span style={{fontSize:11,color:"var(--green)",fontWeight:700}}>💰 Quote received</span>
                       {qLines.filter(l=>+l.price>0).map((l,j)=>(
-                        <span key={j} style={{fontSize:11,color:"var(--text2)"}}>{l.name}: <strong>{(+l.price).toLocaleString(undefined,{minimumFractionDigits:2})}</strong></span>
+                        <span key={j} style={{fontSize:11,color:"var(--text2)"}}>{l.name}: <strong>{(+(l.vat_incl_price||l.price)).toLocaleString(undefined,{minimumFractionDigits:2})}</strong>{l.vat_incl_price&&l.vat_incl_price!==l.price?<span style={{fontSize:10,color:"#f59e0b"}}> incl.VAT</span>:null}</span>
                       ))}
                       {existingQuote.total>0&&<span style={{fontSize:12,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginLeft:"auto"}}>Total: {(+existingQuote.total).toLocaleString(undefined,{minimumFractionDigits:2})}</span>}
                     </div>
@@ -12059,6 +12152,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
         <SupplierQuoteModal
           request={quoteTarget.request}
           existingQuote={quoteTarget.existingQuote}
+          settings={settings}
           onSave={async(d)=>{ if(onSaveQuote) await onSaveQuote(d); setQuoteTarget(null); }}
           onClose={()=>setQuoteTarget(null)}/>
       )}
@@ -12069,7 +12163,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",t,lang}) {
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);
@@ -12086,6 +12180,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [supplierModal, setSupplierModal] = useState(false);
   const [jobTab,        setJobTab]        = useState("car");
   const [oeSearch,      setOeSearch]      = useState("");
+  const [editPriceId,   setEditPriceId]   = useState(null);
+  const [editPriceVal,  setEditPriceVal]  = useState("");
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
   const [localPhotoOverrides, setLocalPhotoOverrides] = useState({});
@@ -12763,6 +12859,30 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       {/* ══ QUOTE tab ══ */}
       {jobTab==="quote"&&wsRole!=="mechanic"&&(<>
         {/* Parts & Labour */}
+        {(()=>{
+          const commitPrice = async (item) => {
+            const newPrice = +editPriceVal;
+            if (!isNaN(newPrice) && newPrice !== +item.unit_price) {
+              await onSaveItem({...item, unit_price: newPrice, total: newPrice * (+item.qty||1)});
+            }
+            setEditPriceId(null);
+          };
+
+          // Build supplier cost lookup: description (lowercase) → [{name, price}]
+          const jobSupQts = wsSupplierQuotes.filter(q=>q.job_id===job.id);
+          const supCostMap = {};
+          jobSupQts.forEach(sq=>{
+            const lines = (() => { try { return JSON.parse(sq.line_items||"[]"); } catch { return []; } })();
+            lines.forEach(l=>{
+              const key = (l.name||"").toLowerCase().trim();
+              if (!supCostMap[key]) supCostMap[key] = [];
+              const displayPrice = +(l.vat_incl_price||l.price)||0;
+              if (displayPrice > 0) supCostMap[key].push({name: sq.supplier_name||"Supplier", price: displayPrice});
+            });
+          });
+          const getSupCosts = (desc) => supCostMap[(desc||"").toLowerCase().trim()] || [];
+
+          return (<>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <div style={{fontWeight:700,fontSize:14}}>🔧 Parts &amp; Labour</div>
           <div style={{display:"flex",gap:6}}>
@@ -12776,16 +12896,48 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             :<table className="tbl" style={{width:"100%"}}>
               <thead><tr>{["Type","Description","Qty","Unit Price","Total",""].map(h=><th key={h}>{h}</th>)}</tr></thead>
               <tbody>
-                {items.map(item=>(
+                {items.map(item=>{
+                  const supCosts = getSupCosts(item.description);
+                  const isEditing = editPriceId === item.id;
+                  return (
                   <tr key={item.id}>
                     <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?"🔩 Part":"👷 Labour"}</span></td>
-                    <td style={{fontWeight:500}}>{item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}</td>
+                    <td style={{fontWeight:500}}>
+                      {item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
+                      {supCosts.length>0&&(
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
+                          {supCosts.map((sc,i)=>(
+                            <span key={i}
+                              title={`Click to use as unit price`}
+                              onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(sc.price)); }}
+                              style={{fontSize:10,color:"#f59e0b",fontWeight:600,cursor:"pointer",background:"rgba(251,191,36,.1)",borderRadius:4,padding:"1px 6px",border:"1px solid rgba(251,191,36,.25)"}}>
+                              💰 {sc.name}: {fmtAmt(sc.price)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                     <td style={{textAlign:"right"}}>{item.qty}</td>
-                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(item.unit_price)}</td>
-                    <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(item.total)}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",minWidth:100}}>
+                      {isEditing
+                        ? <input autoFocus type="number" min="0" step="0.01"
+                            value={editPriceVal}
+                            onChange={e=>setEditPriceVal(e.target.value)}
+                            onBlur={()=>commitPrice(item)}
+                            onKeyDown={e=>{ if(e.key==="Enter") commitPrice(item); if(e.key==="Escape") setEditPriceId(null); }}
+                            style={{width:90,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
+                        : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); }}
+                            title="Click to edit price"
+                            style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>
+                            {fmtAmt(item.unit_price)}
+                          </span>
+                      }
+                    </td>
+                    <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(isEditing?(+editPriceVal||0)*(+item.qty||1):item.total)}</td>
                     <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button></td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           }
@@ -12797,6 +12949,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             </div>
           )}
         </div>
+          </>);
+        })()}
         {/* Quote */}
         {quote ? (
         <div className="card" style={{padding:14,marginBottom:14,borderLeft:`3px solid ${
@@ -13071,6 +13225,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         <WsQuoteModal
           job={job} items={items} subtotal={subtotal} tax={tax} total={total}
           existing={quote} settings={settings}
+          wsSupplierQuotes={wsSupplierQuotes}
           onSave={async(q)=>{ await onSaveQuote(q); setQuoteModal(false); }}
           onClose={()=>setQuoteModal(false)}/>
       )}
@@ -13142,6 +13297,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             onLogSend={onSaveWsSupplierRequest}
             onDeleteSend={onDeleteWsSupplierRequest}
             onSaveQuote={onSaveWsSupplierQuote}
+            onSaveItem={onSaveItem}
+            onSaveWsStock={onSaveWsStock}
             onClose={()=>setSupplierModal(false)}/>
         </Overlay>
       )}
@@ -15218,7 +15375,7 @@ function WsDocumentsPage({docs=[],settings,onSave,onDelete}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP QUOTE — CREATE/EDIT MODAL
 // ═══════════════════════════════════════════════════════════════
-function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,onSave,onClose}) {
+function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,wsSupplierQuotes=[],onSave,onClose}) {
   const C=curSym(settings.currency||"ZAR R");
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [f,setF]=useState({
@@ -15235,10 +15392,58 @@ function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,onSave,onC
   });
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const [saving,setSaving]=useState(false);
+  const [showSupRef,setShowSupRef]=useState(true);
+
+  // Supplier quotes for this job
+  const jobSupQuotes = wsSupplierQuotes.filter(q=>q.job_id===job.id);
 
   return (
     <Overlay onClose={onClose} wide>
       <MHead title={existing?"✏️ Edit Quotation":"📝 Create Quotation"} onClose={onClose}/>
+
+      {/* Supplier price reference panel */}
+      {jobSupQuotes.length>0&&(
+        <div style={{marginBottom:14,border:"1px solid rgba(251,191,36,.35)",borderRadius:10,overflow:"hidden"}}>
+          <button
+            onClick={()=>setShowSupRef(p=>!p)}
+            style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 14px",background:"rgba(251,191,36,.08)",border:"none",cursor:"pointer",textAlign:"left"}}>
+            <span style={{fontWeight:700,fontSize:12,color:"#f59e0b"}}>💰 Supplier Prices ({jobSupQuotes.length} quote{jobSupQuotes.length!==1?"s":""})</span>
+            <span style={{fontSize:11,color:"var(--text3)"}}>{showSupRef?"▲ hide":"▼ show"}</span>
+          </button>
+          {showSupRef&&(
+            <div style={{padding:"10px 14px 12px",display:"flex",flexDirection:"column",gap:10}}>
+              {jobSupQuotes.map((sq,si)=>{
+                const lines=(() => { try { return JSON.parse(sq.line_items||"[]"); } catch { return []; } })();
+                return (
+                  <div key={sq.id||si} style={{background:"var(--surface2)",borderRadius:8,padding:"8px 12px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                      <span style={{fontWeight:700,fontSize:12,color:"#25D366"}}>{sq.supplier_name||"Unknown supplier"}</span>
+                      {sq.total>0&&<span style={{fontWeight:800,fontSize:13,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(sq.total)}</span>}
+                    </div>
+                    {lines.length>0&&(
+                      <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                        {lines.map((l,li)=>(
+                          <div key={li} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,gap:8}}>
+                            <span style={{color:"var(--text2)",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.name}</span>
+                            <span style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                              {l.available&&<span style={{fontSize:10,color:"var(--text3)"}}>{l.available}</span>}
+                              <span style={{fontWeight:700,color:(+l.price>0)?"var(--text1)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>
+                                {+(l.vat_incl_price||l.price)>0?fmt(+(l.vat_incl_price||l.price)):"—"}
+                              </span>
+                              {l.vat_incl_price&&+l.vat_incl_price!==+l.price&&<span style={{fontSize:10,color:"#f59e0b",fontWeight:600}}>incl.VAT</span>}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {sq.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:5,fontStyle:"italic"}}>{sq.notes}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Customer */}
       <div className="card" style={{padding:14,marginBottom:14,background:"var(--surface2)"}}>

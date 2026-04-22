@@ -12164,6 +12164,9 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
 function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",t,lang}) {
+  // Local currency formatter using the workshop's own settings currency
+  const _wsC = curSym(settings.currency||getSettings().currency);
+  const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);

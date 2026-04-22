@@ -8634,7 +8634,7 @@ function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpda
     const quotedCount=sessionQuotes.filter(q=>q.status==="quoted"||q.status==="selected").length;
     const totalQuotes=sessionQuotes.length;
     const hasSelected=sessionQuotes.some(q=>q.status==="selected");
-    const cur=curSym(settings.currency||"ZAR R");
+    const cur=curSym(settings.currency||getSettings().currency);
     const sortedSessions=[...rfqSessions].sort((a,b)=>a.created_at>b.created_at?-1:1);
     const curIdx=sortedSessions.findIndex(s=>s.id===activeSession.id);
     const prevSession=curIdx<sortedSessions.length-1?sortedSessions[curIdx+1]:null;
@@ -11048,7 +11048,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
   const jobInvoice = (jobId) => invoices.find(i=>i.job_id===jobId);
   const jobQuote   = (jobId) => quotes.find(q=>q.job_id===jobId);
 
-  const C   = curSym(settings.currency||"ZAR R");
+  const C   = curSym(settings.currency||getSettings().currency);
   const fmt = v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
   // ── Job detail view ──────────────────────────────────────────
@@ -11734,7 +11734,7 @@ function SupplierQuoteModal({request, existingQuote, settings={}, onSave, onClos
     return vatExcluded && vatRate > 0 ? v * (1 + vatRate) : v;
   };
 
-  const C = curSym(settings?.currency||"ZAR R");
+  const C = curSym(settings?.currency||getSettings().currency);
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
   const handleSave = async () => {
@@ -13013,7 +13013,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
                 const phone=(quote.quote_phone||job.customer_phone||"").replace(/\D/g,"");
                 const name=quote.quote_customer||job.customer_name||"";
-                const C=curSym(settings.currency||"ZAR R");
+                const C=curSym(settings.currency||getSettings().currency);
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
                 const lines=items.map(i=>`  • ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                 const msg=`📝 *Workshop Quotation ${quote.id}*\n──────────────────\n`+
@@ -13028,7 +13028,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)"}} onClick={()=>{
                 const email=quote.quote_email||job.customer_email||"";
                 const name=quote.quote_customer||job.customer_name||"";
-                const C=curSym(settings.currency||"ZAR R");
+                const C=curSym(settings.currency||getSettings().currency);
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
                 const lines=items.map(i=>`  - ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                 const subj=`Workshop Quotation ${quote.id} — ${name}`;
@@ -13104,7 +13104,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
                 const phone=(invoice.inv_phone||job.customer_phone||"").replace(/\D/g,"");
                 const name=invoice.invoice_customer||job.customer_name||"";
-                const C=curSym(settings.currency||"ZAR R");
+                const C=curSym(settings.currency||getSettings().currency);
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
                 const itemLines=items.map(i=>`  • ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                 const balance=(+invoice.total||0)-(+invoice.paid_amount||0);
@@ -13122,7 +13122,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)"}} onClick={()=>{
                 const email=invoice.inv_email||job.customer_email||"";
                 const name=invoice.invoice_customer||job.customer_name||"";
-                const C=curSym(settings.currency||"ZAR R");
+                const C=curSym(settings.currency||getSettings().currency);
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
                 const itemLines=items.map(i=>`  - ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                 const subject=`Workshop Invoice ${invoice.id} — ${name}`;
@@ -14349,7 +14349,7 @@ function WsTransferPage({parts=[],wsStock=[],settings,onSave}) {
   const [saving,setSaving]=useState(false);
   const [done,setDone]=useState(false);
 
-  const C=curSym(settings?.currency||"ZAR R");
+  const C=curSym(settings?.currency||getSettings().currency);
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
   const filteredParts=parts.filter(p=>{
@@ -14669,7 +14669,7 @@ function QuoteApprovalModal({quote, job, items, settings, onSend, onClose}) {
     navigator.clipboard.writeText(link).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
   };
 
-  const sym = curSym(settings?.currency||"ZAR R");
+  const sym = curSym(settings?.currency||getSettings().currency);
   const fmt = v => `${sym} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
   const sendWA = () => {
@@ -14769,7 +14769,7 @@ function DeliveryLabelModal({job, settings, onClose}) {
   const [timeSlot, setTimeSlot] = useState("");
   const [notes, setNotes] = useState("");
   const shopName = settings?.shop_name||"AutoParts";
-  const sym = curSym(settings?.currency||"ZAR R");
+  const sym = curSym(settings?.currency||getSettings().currency);
 
   const METHODS = [
     {id:"collection", icon:"🚶", label:"Self Collection", color:"#1565c0"},
@@ -14867,7 +14867,7 @@ function DeliveryLabelModal({job, settings, onClose}) {
 // WORKSHOP INVOICE PRINT
 // ═══════════════════════════════════════════════════════════════
 function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
-  const C = curSym(settings.currency||"ZAR R");
+  const C = curSym(settings.currency||getSettings().currency);
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
@@ -15032,7 +15032,7 @@ function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
 // WORKSHOP QUOTE — PRINT PDF
 // ═══════════════════════════════════════════════════════════════
 function printWorkshopQuote(job, items, quote, settings, photos={}) {
-  const C = curSym(settings.currency||"ZAR R");
+  const C = curSym(settings.currency||getSettings().currency);
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
@@ -15376,7 +15376,7 @@ function WsDocumentsPage({docs=[],settings,onSave,onDelete}) {
 // WORKSHOP QUOTE — CREATE/EDIT MODAL
 // ═══════════════════════════════════════════════════════════════
 function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,wsSupplierQuotes=[],onSave,onClose}) {
-  const C=curSym(settings.currency||"ZAR R");
+  const C=curSym(settings.currency||getSettings().currency);
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [f,setF]=useState({
     id:existing?.id||null,
@@ -15554,7 +15554,7 @@ function WsPaymentModal({invoice,settings,onSave,onClose}) {
   const [date,setDate]=useState(new Date().toISOString().slice(0,10));
   const [ref,setRef]=useState("");
   const [saving,setSaving]=useState(false);
-  const C=curSym(settings.currency||"ZAR R");
+  const C=curSym(settings.currency||getSettings().currency);
 
   const handleSave=async()=>{
     const paid=parseFloat(amount)||0;
@@ -15623,7 +15623,7 @@ function WsPaymentModal({invoice,settings,onSave,onClose}) {
 // WORKSHOP INVOICE — STATEMENT MODAL
 // ═══════════════════════════════════════════════════════════════
 function WsStatementModal({invoice,job,items,settings,onClose,onPrint}) {
-  const C=curSym(settings.currency||"ZAR R");
+  const C=curSym(settings.currency||getSettings().currency);
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const paid=+invoice.paid_amount||0;
   const balance=(+invoice.total||0)-paid;

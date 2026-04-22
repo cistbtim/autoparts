@@ -11221,7 +11221,7 @@ function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[]
                     {j.vehicle_year&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text3)",fontSize:11}}>{j.vehicle_year}</span>}
                   </div>
                   {j.return_reason&&<div style={{fontSize:11,color:"var(--yellow)",marginBottom:5}}>🔄 {j.return_reason.slice(0,50)}</div>}
-                  {j.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:6,lineHeight:1.4,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>💬 {j.complaint}</div>}
+                  {j.complaint&&<div style={{fontSize:12,fontWeight:600,color:"#ef4444",marginBottom:6,lineHeight:1.4,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",background:"rgba(239,68,68,.07)",borderLeft:"3px solid #ef4444",borderRadius:"0 6px 6px 0",padding:"3px 8px"}}>⚠️ {j.complaint}</div>}
                   {!wsId&&j.workshop_id&&(
                     <div style={{fontSize:11,color:"var(--text3)",marginBottom:5,display:"flex",alignItems:"center",gap:4}}>
                       <span style={{background:"rgba(251,146,60,.12)",color:"#f97316",borderRadius:6,padding:"2px 7px",fontWeight:600,fontSize:11}}>🏪 {wsProfileMap[j.workshop_id]||j.workshop_id}</span>
@@ -12616,10 +12616,24 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           )}
 
           {/* Complaint / Diagnosis / Return Reason */}
-          {job.complaint&&<div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
-            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>💬 Complaint</div>
-            <div style={{fontSize:13,lineHeight:1.6}}>{job.complaint}</div>
-          </div>}
+          {job.complaint&&(
+            <div style={{marginTop:12}}>
+              <style>{`@keyframes complaint-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.35)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}`}</style>
+              <div style={{
+                background:"rgba(239,68,68,.07)",
+                border:"2px solid rgba(239,68,68,.6)",
+                borderRadius:10,
+                padding:"10px 14px",
+                animation:"complaint-pulse 2.4s ease-in-out infinite",
+              }}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+                  <span style={{fontSize:16}}>⚠️</span>
+                  <span style={{fontSize:10,fontWeight:800,color:"#ef4444",textTransform:"uppercase",letterSpacing:".08em"}}>Customer Complaint</span>
+                </div>
+                <div style={{fontSize:15,fontWeight:700,color:"#ef4444",lineHeight:1.55}}>{job.complaint}</div>
+              </div>
+            </div>
+          )}
           {job.diagnosis&&<div style={{marginTop:10}}>
             <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>🔍 Diagnosis</div>
             <div style={{fontSize:13,lineHeight:1.6,color:"var(--blue)"}}>{job.diagnosis}</div>

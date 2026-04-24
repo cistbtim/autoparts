@@ -12,7 +12,8 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
   const [pTab,setPTab]=useState("profile"); // "profile" | "users"
   const [f,setF]=useState({
     name:"", vat_number:"", phone:"", whatsapp:"", email:"",
-    address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"", ...profile
+    address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
+    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", ...profile
   });
   const [saving,setSaving]=useState(false);
   const [detectingLoc,setDetectingLoc]=useState(false);
@@ -222,6 +223,16 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* Licence Renewal Agent */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div><FL label="🪪 Renewal Agent Name"/><input className="inp" value={f.licence_renewal_agent_name||""} onChange={e=>s("licence_renewal_agent_name",e.target.value)} placeholder="e.g. ABC Renewals"/></div>
+          <div>
+            <FL label="🪪 Renewal Agent WhatsApp"/>
+            <input className="inp" value={f.licence_renewal_agent_phone||""} onChange={e=>s("licence_renewal_agent_phone",e.target.value)} placeholder="27821234567"/>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Country code, no + or spaces</div>
           </div>
         </div>
 

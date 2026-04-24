@@ -230,6 +230,8 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     currency:   workshopProfile.currency  || settings.currency || "ZAR R",
     city:       workshopProfile.city      || "",
     country:    workshopProfile.country   || "",
+    licence_renewal_agent_name:  workshopProfile.licence_renewal_agent_name  || settings.licence_renewal_agent_name  || "",
+    licence_renewal_agent_phone: workshopProfile.licence_renewal_agent_phone || settings.licence_renewal_agent_phone || "",
   } : settings;
 
   const logInv=async(part,before,after,action,reason="")=>{

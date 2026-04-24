@@ -440,6 +440,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     tabRef.current === "wsquotations" ||
     tabRef.current === "wsinvoices" ||
     tabRef.current === "wspayments" ||
+    tabRef.current === "wssuporders" ||
     tabRef.current === "wsstatement" ||
     tabRef.current === "wsreport" ||
     (Date.now() - lastActivityRef.current) < 8000;
@@ -1649,8 +1650,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
         {id:"wspayments",  icon:"💳",label:"WS Payments",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsstock",     icon:"📦",label:"WS Stock",     roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsservices",  icon:"🔧",label:"WS Services",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wssuppliers", icon:"🏪",label:"WS Suppliers", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wstransfer",  icon:"🔄",label:"WS Transfer",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wssuppliers", icon:"🏪",label:"WS Suppliers",       roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wssuporders", icon:"📋",label:"WS Purchase Orders", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wstransfer",  icon:"🔄",label:"WS Transfer",        roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wsprofile",   icon:"⚙️",label:"WS Settings",  roles:["workshop"], wsRoles:["main"]},
@@ -1905,6 +1907,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             {id:"wsstock",    icon:"📦",label:"Stock"},
             {id:"wsservices",  icon:"🔧",label:"Services"},
             {id:"wssuppliers", icon:"🏪",label:"Suppliers"},
+            {id:"wssuporders", icon:"📋",label:"Purchase Orders"},
             {id:"wstransfer",  icon:"🔄",label:"Transfer"},
             {id:"wsstatement",icon:"📋",label:"Statement"},
             {id:"wsreport",   icon:"📊",label:"Report"},
@@ -2979,10 +2982,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
           <WsSubscriptionsPage settings={settings}/>
         )}
 
-        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager"||(role==="workshop"&&!subStatus?.expired))&&(
+        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager"||(role==="workshop"&&!subStatus?.expired))&&(
           <WorkshopPage
             key={tab}
-            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":"report"}
+            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":"report"}
             jobs={workshopJobs}
             jobItems={workshopJobItems}
             invoices={workshopInvoices}

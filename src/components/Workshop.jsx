@@ -2895,6 +2895,19 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               if (displayPrice > 0) supCostMap[key].push({name: sq.supplier_name||"Supplier", price: displayPrice});
             });
           });
+          // Also include prices from digital supplier replies
+          sqReplies.forEach(rep=>{
+            const req = wsSupplierRequests.find(r=>r.id===rep.request_id);
+            const supName = req?.supplier_name||"Supplier";
+            const replyItems = (() => { try { return JSON.parse(rep.items||"[]"); } catch { return []; } })();
+            replyItems.forEach(ri=>{
+              if(ri.condition==="no_stock") return;
+              const key=(ri.description||"").toLowerCase().trim();
+              if(!supCostMap[key]) supCostMap[key]=[];
+              const price=+ri.price||0;
+              if(price>0) supCostMap[key].push({name:supName,price});
+            });
+          });
           const getSupCosts = (desc) => supCostMap[(desc||"").toLowerCase().trim()] || [];
 
           return (<>

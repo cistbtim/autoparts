@@ -2969,13 +2969,19 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               </tbody>
             </table>
           }
-          {items.length>0&&(
-            <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-              <div style={{fontSize:13,color:"var(--text3)"}}>Subtotal: <strong style={{color:"var(--text)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(subtotal)}</strong></div>
-              {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(tax)}</strong></div>}
-              <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>Total: {fmtAmt(total)}</div>
+          <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{display:"flex",gap:6}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ Part</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ Labour</button>
             </div>
-          )}
+            {items.length>0&&(
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                <div style={{fontSize:13,color:"var(--text3)"}}>Subtotal: <strong style={{color:"var(--text)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(subtotal)}</strong></div>
+                {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(tax)}</strong></div>}
+                <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>Total: {fmtAmt(total)}</div>
+              </div>
+            )}
+          </div>
         </div>
           </>);
         })()}

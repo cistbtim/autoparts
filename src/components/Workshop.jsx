@@ -2973,6 +2973,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             <div style={{display:"flex",gap:6}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ Part</button>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ Labour</button>
+              <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📲 Supplier</button>
             </div>
             {items.length>0&&(
               <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>

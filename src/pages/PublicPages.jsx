@@ -741,44 +741,47 @@ export function WsSupplierQuoteReplyPage({token}) {
     </div>
   );
 
-  const ItemRow=({item,idx})=>(
-    <div style={{...card,opacity:item.condition==="no_stock"?0.7:1}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:8}}>
-        <div style={{flex:1}}>
-          <div style={{fontWeight:700,fontSize:14}}>{idx+1}. {item.description}</div>
-          {item.sku&&<div style={{fontSize:11,color:"#94a3b8",fontFamily:"monospace",marginTop:2}}>{item.sku}</div>}
-          {item.qty>1&&<div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>Qty needed: <strong style={{color:"#e2e8f0"}}>{item.qty}</strong></div>}
+  const renderItem=(item)=>{
+    const gi=items.indexOf(item);
+    return (
+      <div key={item.idx??gi} style={{...card,opacity:item.condition==="no_stock"?0.7:1}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:8}}>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:14}}>{gi+1}. {item.description}</div>
+            {item.sku&&<div style={{fontSize:11,color:"#94a3b8",fontFamily:"monospace",marginTop:2}}>{item.sku}</div>}
+            {item.qty>1&&<div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>Qty needed: <strong style={{color:"#e2e8f0"}}>{item.qty}</strong></div>}
+          </div>
+          <select value={item.condition} onChange={e=>set(gi,"condition",e.target.value)}
+            style={{...sel,width:130,fontSize:12,flexShrink:0,
+              color:item.condition==="in_stock"?"#34d399":item.condition==="can_order"?"#fbbf24":"#f87171",
+              borderColor:item.condition==="in_stock"?"#34d399":item.condition==="can_order"?"#fbbf24":"#f87171"}}>
+            <option value="in_stock">✅ In Stock</option>
+            <option value="can_order">📦 Can Order</option>
+            <option value="no_stock">❌ No Stock</option>
+          </select>
         </div>
-        <select value={item.condition} onChange={e=>set(items.indexOf(item),"condition",e.target.value)}
-          style={{...sel,width:130,fontSize:12,flexShrink:0,
-            color:item.condition==="in_stock"?"#34d399":item.condition==="can_order"?"#fbbf24":"#f87171",
-            borderColor:item.condition==="in_stock"?"#34d399":item.condition==="can_order"?"#fbbf24":"#f87171"}}>
-          <option value="in_stock">✅ In Stock</option>
-          <option value="can_order">📦 Can Order</option>
-          <option value="no_stock">❌ No Stock</option>
-        </select>
+        {item.condition!=="no_stock"&&(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <div>
+              <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Your Price <span style={{color:vatInclusive?"#fbbf24":"#64748b",fontWeight:600}}>({vatInclusive?"incl. VAT":"excl. VAT"})</span></div>
+              <input style={inp} type="number" min="0" step="0.01" placeholder="0.00"
+                value={item.price} onChange={e=>set(gi,"price",e.target.value)}/>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Your Part # <span style={{color:"#64748b"}}>(optional)</span></div>
+              <input style={inp} type="text" placeholder="e.g. AB-12345"
+                value={item.supplier_part_no} onChange={e=>set(gi,"supplier_part_no",e.target.value)}/>
+            </div>
+            <div style={{gridColumn:"1/-1"}}>
+              <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Notes <span style={{color:"#64748b"}}>(optional — e.g. condition, ETA)</span></div>
+              <input style={inp} type="text" placeholder="e.g. New OEM, available tomorrow"
+                value={item.notes} onChange={e=>set(gi,"notes",e.target.value)}/>
+            </div>
+          </div>
+        )}
       </div>
-      {item.condition!=="no_stock"&&(
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          <div>
-            <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Your Price <span style={{color:vatInclusive?"#fbbf24":"#64748b",fontWeight:600}}>({vatInclusive?"incl. VAT":"excl. VAT"})</span></div>
-            <input style={inp} type="number" min="0" step="0.01" placeholder="0.00"
-              value={item.price} onChange={e=>set(items.indexOf(item),"price",e.target.value)}/>
-          </div>
-          <div>
-            <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Your Part # <span style={{color:"#64748b"}}>(optional)</span></div>
-            <input style={inp} type="text" placeholder="e.g. AB-12345"
-              value={item.supplier_part_no} onChange={e=>set(items.indexOf(item),"supplier_part_no",e.target.value)}/>
-          </div>
-          <div style={{gridColumn:"1/-1"}}>
-            <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Notes <span style={{color:"#64748b"}}>(optional — e.g. condition, ETA)</span></div>
-            <input style={inp} type="text" placeholder="e.g. New OEM, available tomorrow"
-              value={item.notes} onChange={e=>set(items.indexOf(item),"notes",e.target.value)}/>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    );
+  };
 
   return (
     <div style={bg}><style>{CSS}</style>
@@ -807,7 +810,7 @@ export function WsSupplierQuoteReplyPage({token}) {
         {inStockItems.length>0&&(
           <>
             <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Parts to Quote</div>
-            {inStockItems.map(item=><ItemRow key={item.idx} item={item} idx={items.indexOf(item)}/>)}
+            {inStockItems.map(item=>renderItem(item))}
           </>
         )}
 
@@ -818,7 +821,7 @@ export function WsSupplierQuoteReplyPage({token}) {
               <span>❌ No Stock</span>
               <div style={{flex:1,height:1,background:"rgba(248,113,113,.3)"}}/>
             </div>
-            {noStockItems.map(item=><ItemRow key={item.idx} item={item} idx={items.indexOf(item)}/>)}
+            {noStockItems.map(item=>renderItem(item))}
           </>
         )}
 

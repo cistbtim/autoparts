@@ -1788,6 +1788,19 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
   const [customNote,  setCustomNote]  = useState("");
   const [copied,      setCopied]      = useState(false);
   const [quoteTarget, setQuoteTarget] = useState(null); // { request, existingQuote }
+  const [localReplies,setLocalReplies]= useState(sqReplies);
+  const [refreshing,  setRefreshing]  = useState(false);
+
+  useEffect(()=>{
+    if(!history.length) return;
+    const ids=history.map(r=>r.id).filter(Boolean).join(",");
+    if(!ids) return;
+    setRefreshing(true);
+    api.get("ws_sq_replies",`request_id=in.(${ids})&select=*`)
+      .then(res=>{ if(Array.isArray(res)) setLocalReplies(res); })
+      .catch(()=>{})
+      .finally(()=>setRefreshing(false));
+  },[]);
 
   const toggleItem = id =>
     setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
@@ -2029,8 +2042,21 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
       {/* Send history for this job */}
       {history.length>0&&(
         <div style={{marginTop:18,borderTop:"1px solid var(--border)",paddingTop:14}}>
-          <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
-            📋 Send History ({history.length})
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em"}}>
+              📋 Send History ({history.length})
+            </div>
+            <button disabled={refreshing} onClick={()=>{
+              const ids=history.map(r=>r.id).filter(Boolean).join(",");
+              if(!ids) return;
+              setRefreshing(true);
+              api.get("ws_sq_replies",`request_id=in.(${ids})&select=*`)
+                .then(res=>{ if(Array.isArray(res)) setLocalReplies(res); })
+                .catch(()=>{})
+                .finally(()=>setRefreshing(false));
+            }} style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface3)",cursor:refreshing?"not-allowed":"pointer",color:"var(--text2)"}}>
+              {refreshing?"…":"🔄 Refresh"}
+            </button>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {history.map((r,i)=>{
@@ -2038,7 +2064,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
               const dt = r.sent_at ? new Date(r.sent_at).toLocaleString(undefined,{dateStyle:"short",timeStyle:"short"}) : "";
               const existingQuote = quotes.find(q=>q.request_id===r.id);
               const qLines = existingQuote ? (() => { try { return JSON.parse(existingQuote.line_items||"[]"); } catch { return []; } })() : [];
-              const digitalReply = sqReplies.find(rep=>rep.request_id===r.id);
+              const digitalReply = localReplies.find(rep=>rep.request_id===r.id);
               const replyItems = digitalReply ? (() => { try { return JSON.parse(digitalReply.items||"[]"); } catch { return []; } })() : [];
               const inStockReplies = replyItems.filter(ri=>ri.condition!=="no_stock");
               const noStockReplies = replyItems.filter(ri=>ri.condition==="no_stock");

@@ -811,6 +811,16 @@ export function SettingsPage({settings,onSave,t}) {
               Separate deployment for vehicle photos → saves to Tim_Car_Phot/Make/ID/view.png
             </div>
           </FD>
+          <FD>
+            <FL label="🪪 Licence Renewal Agent Name"/>
+            <input className="inp" value={f.licence_renewal_agent_name||""} onChange={e=>s("licence_renewal_agent_name",e.target.value)} placeholder="e.g. ABC Renewals"/>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Name shown in renewal request modal</div>
+          </FD>
+          <FD>
+            <FL label="🪪 Renewal Agent WhatsApp Number"/>
+            <input className="inp" value={f.licence_renewal_agent_phone||""} onChange={e=>s("licence_renewal_agent_phone",e.target.value)} placeholder="27821234567 (no + or spaces)"/>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Renewal requests sent via WhatsApp to this number — include country code</div>
+          </FD>
           <FD><FL label={t.shopAddress}/><textarea className="inp" value={f.address||""} onChange={e=>s("address",e.target.value)} placeholder="Full shop address" style={{minHeight:70}}/></FD>
           <FG cols="1fr 1fr">
             <div><FL label="City"/><input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)} placeholder="e.g. Cape Town"/></div>

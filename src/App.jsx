@@ -113,6 +113,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [wsSqReplies,       setWsSqReplies]       =useState([]);
   const [wsPurchaseOrders,  setWsPurchaseOrders]  =useState([]);
   const [wsPoItems,         setWsPoItems]         =useState([]);
+  const [wsLicenceRenewals, setWsLicenceRenewals] =useState([]);
   const [workshopDocuments,setWorkshopDocuments]=useState([]);
   const [workshopProfile,setWorkshopProfile]=useState({});
   const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
@@ -297,6 +298,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
       api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
+      api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -337,6 +339,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWsSqReplies(Array.isArray(rest[23])?rest[23]:[]);
     setWsPurchaseOrders(Array.isArray(rest[24])?rest[24]:[]);
     setWsPoItems(Array.isArray(rest[25])?rest[25]:[]);
+    setWsLicenceRenewals(Array.isArray(rest[26])?rest[26]:[]);
     // Load workshop profile for workshop role
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
@@ -394,14 +397,16 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWsSupplierInvItems(Array.isArray(wsInvItems)?wsInvItems:[]);
     setWsSupplierPayments(Array.isArray(wsPayms)?wsPayms:[]);
     setWsSupplierReturns(Array.isArray(wsRets)?wsRets:[]);
-    const [sqReps,wsPOs,wsPOItems]=await Promise.all([
+    const [sqReps,wsPOs,wsPOItems,wsLicRen]=await Promise.all([
       api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
       api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
+      api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
     ]);
     setWsSqReplies(Array.isArray(sqReps)?sqReps:[]);
     setWsPurchaseOrders(Array.isArray(wsPOs)?wsPOs:[]);
     setWsPoItems(Array.isArray(wsPOItems)?wsPOItems:[]);
+    setWsLicenceRenewals(Array.isArray(wsLicRen)?wsLicRen:[]);
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
@@ -992,6 +997,19 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     await api.patch("ws_purchase_orders","id",poId,{status:allDone?"received":anyDone?"partial":po.status});
     await refreshWorkshopData();
     showToast("Goods received & stock updated");
+  };
+
+  // ── Workshop Licence Renewals ─────────────────────────────────
+  const saveWsLicenceRenewal=async(rec)=>{
+    const id=rec.id||makeId("WSLR");
+    const row={...rec,id,workshop_id:wsId||null};
+    await api.insert("ws_licence_renewals",row).catch(e=>console.warn("Save renewal failed:",e));
+    setWsLicenceRenewals(p=>[row,...p.filter(r=>r.id!==id)]);
+  };
+
+  const updateWsLicenceRenewal=async(id,patch)=>{
+    await api.patch("ws_licence_renewals","id",id,patch).catch(e=>console.warn("Update renewal failed:",e));
+    setWsLicenceRenewals(p=>p.map(r=>r.id===id?{...r,...patch}:r));
   };
 
   // ── Workshop Supplier Invoices ────────────────────────────────
@@ -3055,6 +3073,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             onSaveWsPurchaseOrder={saveWsPurchaseOrder}
             onDeleteWsPurchaseOrder={deleteWsPurchaseOrder}
             onReceiveWsPurchaseOrder={receiveWsPurchaseOrder}
+            wsLicenceRenewals={wsLicenceRenewals}
+            onSaveWsLicenceRenewal={saveWsLicenceRenewal}
+            onUpdateWsLicenceRenewal={updateWsLicenceRenewal}
             t={t} lang={lang}/>
         )}
 

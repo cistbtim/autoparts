@@ -868,9 +868,254 @@ function WsVehicleForm({data,onSave,onClose,t}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// LICENCE RENEWAL MODAL
+// ═══════════════════════════════════════════════════════════════
+function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave, onClose}) {
+  const agentPhone = (settings?.licence_renewal_agent_phone||"").replace(/[^0-9]/g,"");
+  const agentName  = settings?.licence_renewal_agent_name || "Renewal Agent";
+  const effExpiry  = vehicleRecord?.licence_disc_expiry || job?.licence_disc_expiry || "";
+  const [f, setF] = useState({
+    vehicle_reg:   job?.vehicle_reg   || vehicleRecord?.reg   || "",
+    vehicle_make:  job?.vehicle_make  || vehicleRecord?.make  || "",
+    vehicle_model: job?.vehicle_model || vehicleRecord?.model || "",
+    vin:           job?.vin           || vehicleRecord?.vin   || "",
+    engine_no:     job?.engine_no     || vehicleRecord?.engine_no || "",
+    current_expiry: effExpiry,
+    owner_name:    job?.customer_name  || "",
+    owner_phone:   job?.customer_phone || "",
+    owner_id:      "",
+    renewal_years: "1",
+    notes:         "",
+  });
+  const [saving, setSaving] = useState(false);
+  const s = (k,v) => setF(p=>({...p,[k]:v}));
+
+  const handleSubmit = async () => {
+    if (!f.vehicle_reg.trim()) { alert("Vehicle registration required"); return; }
+    setSaving(true);
+    const rec = {
+      ...f,
+      renewal_years: +f.renewal_years||1,
+      workshop_id: wsId || null,
+      job_id: job?.id || null,
+      status: "pending",
+      commission_status: "unpaid",
+      submitted_at: new Date().toISOString(),
+    };
+    await onSave(rec);
+    if (agentPhone) {
+      const msg = [
+        "🪪 Licence Renewal Request",
+        "",
+        `Reg: ${f.vehicle_reg}  ${f.vehicle_make} ${f.vehicle_model}`,
+        f.vin       ? `VIN: ${f.vin}` : null,
+        f.engine_no ? `Engine: ${f.engine_no}` : null,
+        f.current_expiry ? `Current Expiry: ${f.current_expiry}` : null,
+        `Renewal: ${f.renewal_years} year${+f.renewal_years>1?"s":""}`,
+        "",
+        `Owner: ${f.owner_name}`,
+        f.owner_id    ? `ID No: ${f.owner_id}` : null,
+        f.owner_phone ? `Phone: ${f.owner_phone}` : null,
+        f.notes       ? `Notes: ${f.notes}` : null,
+      ].filter(Boolean).join("\n");
+      window.open(`https://wa.me/${agentPhone}?text=${encodeURIComponent(msg)}`, "_blank");
+    }
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="🪪 Request Licence Renewal" onClose={onClose}/>
+      <div style={{padding:"0 2px 4px"}}>
+        {agentPhone ? (
+          <div style={{background:"rgba(37,211,102,.08)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"var(--text2)"}}>
+            Renewal request will be sent via WhatsApp to <strong>{agentName}</strong>
+          </div>
+        ) : (
+          <div style={{background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.3)",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"var(--red)"}}>
+            ⚠️ No renewal agent phone configured — set it in Settings → Licence Renewal Agent
+          </div>
+        )}
+        <FG cols="1fr 1fr 1fr">
+          <div><FL label="Reg Plate"/><input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="ABC123GP"/></div>
+          <div><FL label="Make"/><input className="inp" value={f.vehicle_make} onChange={e=>s("vehicle_make",e.target.value)}/></div>
+          <div><FL label="Model"/><input className="inp" value={f.vehicle_model} onChange={e=>s("vehicle_model",e.target.value)}/></div>
+        </FG>
+        <FG cols="1fr 1fr">
+          <div><FL label="VIN"/><input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value.toUpperCase())} style={{fontFamily:"DM Mono,monospace",fontSize:12}}/></div>
+          <div><FL label="Engine No."/><input className="inp" value={f.engine_no} onChange={e=>s("engine_no",e.target.value.toUpperCase())} style={{fontFamily:"DM Mono,monospace",fontSize:12}}/></div>
+        </FG>
+        <FG cols="1fr 1fr">
+          <div>
+            <FL label="Current Expiry"/>
+            <input className="inp" type="date" value={f.current_expiry} onChange={e=>s("current_expiry",e.target.value)}/>
+            {f.current_expiry&&<div style={{fontSize:11,marginTop:3,fontWeight:600,color:new Date(f.current_expiry)<new Date()?"var(--red)":"var(--green)"}}>{new Date(f.current_expiry)<new Date()?"⚠️ EXPIRED":"✅ Valid"}</div>}
+          </div>
+          <div>
+            <FL label="Renew for (years)"/>
+            <select className="inp" value={f.renewal_years} onChange={e=>s("renewal_years",e.target.value)}>
+              <option value="1">1 year</option>
+              <option value="2">2 years</option>
+              <option value="3">3 years</option>
+            </select>
+          </div>
+        </FG>
+        <div style={{borderTop:"1px solid var(--border)",paddingTop:12,marginTop:4}}>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>Owner Details</div>
+          <FG cols="1fr 1fr">
+            <div><FL label="Owner Name"/><input className="inp" value={f.owner_name} onChange={e=>s("owner_name",e.target.value)}/></div>
+            <div><FL label="Owner Phone"/><input className="inp" value={f.owner_phone} onChange={e=>s("owner_phone",e.target.value)}/></div>
+          </FG>
+          <FD><FL label="Owner ID / Passport No."/><input className="inp" value={f.owner_id} onChange={e=>s("owner_id",e.target.value)} placeholder="SA ID number or passport"/></FD>
+        </div>
+        <FD><FL label="Notes"/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Any special instructions..." style={{minHeight:50}}/></FD>
+        <div style={{display:"flex",gap:10,marginTop:16}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" style={{flex:2,background:"#25D366",borderColor:"#25D366"}} onClick={handleSubmit} disabled={saving}>
+            {saving?"Saving…":"📲 Send WhatsApp + Save"}
+          </button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WS LICENCE RENEWALS PAGE
+// ═══════════════════════════════════════════════════════════════
+function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUpdate}) {
+  const [showModal, setShowModal] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const C = curSym(settings?.currency||getSettings().currency);
+
+  const filtered = filter==="all" ? renewals : renewals.filter(r=>r.status===filter);
+  const unpaidComm = renewals.filter(r=>r.commission_status==="unpaid"&&r.status==="completed");
+  const totalComm = renewals.filter(r=>r.commission_status==="paid").reduce((s,r)=>s+(+r.commission_amount||0),0);
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:16}}>
+        <div>
+          <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🪪 Licence Renewals</div>
+          <div style={{fontSize:13,color:"var(--text3)"}}>{renewals.length} total · {unpaidComm.length} awaiting commission</div>
+        </div>
+        <button className="btn btn-primary" onClick={()=>setShowModal(true)}>+ New Renewal Request</button>
+      </div>
+
+      {unpaidComm.length>0&&(
+        <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.3)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13}}>
+          <strong style={{color:"var(--amber,#f59e0b)"}}>💰 {unpaidComm.length} completed renewal{unpaidComm.length!==1?"s":""} with unpaid commission</strong>
+        </div>
+      )}
+
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+        {[["all","All"],["pending","Pending"],["submitted","Submitted"],["completed","Completed"],["cancelled","Cancelled"]].map(([v,l])=>(
+          <button key={v} onClick={()=>setFilter(v)}
+            style={{padding:"5px 12px",borderRadius:20,border:"1px solid var(--border)",background:filter===v?"var(--accent)":"var(--surface2)",color:filter===v?"#fff":"var(--text2)",fontSize:12,cursor:"pointer",fontWeight:filter===v?700:400}}>
+            {l} <span style={{opacity:.6}}>{v==="all"?renewals.length:renewals.filter(r=>r.status===v).length}</span>
+          </button>
+        ))}
+        {totalComm>0&&<span style={{marginLeft:"auto",fontSize:12,color:"var(--green)",fontWeight:700,alignSelf:"center"}}>Commission earned: {C}{totalComm.toLocaleString()}</span>}
+      </div>
+
+      {filtered.length===0&&(
+        <div style={{textAlign:"center",padding:"40px 0",color:"var(--text3)"}}>
+          <div style={{fontSize:32,marginBottom:8}}>🪪</div>
+          <div style={{fontSize:14}}>No renewal requests yet</div>
+          <div style={{fontSize:12,marginTop:4}}>Click "+ New Renewal Request" to send a request to your renewal agent</div>
+        </div>
+      )}
+
+      {filtered.length>0&&(
+        <div className="card" style={{overflow:"auto"}}>
+          <table className="tbl" style={{width:"100%",minWidth:700}}>
+            <thead>
+              <tr>
+                <th>Vehicle</th>
+                <th>Owner</th>
+                <th>Expiry</th>
+                <th>Years</th>
+                <th>Status</th>
+                <th>Commission</th>
+                <th>Date</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(r=>{
+                const isExpired = r.current_expiry && new Date(r.current_expiry)<new Date();
+                return (
+                  <tr key={r.id}>
+                    <td>
+                      <div style={{fontWeight:700,fontFamily:"DM Mono,monospace",fontSize:12}}>{r.vehicle_reg}</div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>{r.vehicle_make} {r.vehicle_model}</div>
+                    </td>
+                    <td>
+                      <div style={{fontSize:13}}>{r.owner_name||"—"}</div>
+                      {r.owner_phone&&<div style={{fontSize:11,color:"var(--text3)"}}>{r.owner_phone}</div>}
+                    </td>
+                    <td>
+                      <span style={{fontSize:12,fontWeight:600,color:isExpired?"var(--red)":"var(--green)"}}>
+                        {r.current_expiry||"—"} {isExpired?"⚠️":""}
+                      </span>
+                    </td>
+                    <td style={{textAlign:"center"}}>{r.renewal_years||1}</td>
+                    <td>
+                      <select value={r.status||"pending"} onChange={e=>onUpdate(r.id,{status:e.target.value})}
+                        style={{fontSize:11,padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",cursor:"pointer",color:"var(--text1)"}}>
+                        <option value="pending">⏳ Pending</option>
+                        <option value="submitted">📤 Submitted</option>
+                        <option value="completed">✅ Completed</option>
+                        <option value="cancelled">❌ Cancelled</option>
+                      </select>
+                    </td>
+                    <td>
+                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                        <input
+                          type="number" min="0"
+                          value={r.commission_amount||""} placeholder="0"
+                          onChange={e=>onUpdate(r.id,{commission_amount:+e.target.value||null})}
+                          style={{width:70,fontSize:11,padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)"}}/>
+                        <button
+                          onClick={()=>onUpdate(r.id,{commission_status:r.commission_status==="paid"?"unpaid":"paid"})}
+                          style={{fontSize:10,padding:"3px 8px",borderRadius:12,border:"none",cursor:"pointer",
+                            background:r.commission_status==="paid"?"var(--green)":"var(--surface2)",
+                            color:r.commission_status==="paid"?"#fff":"var(--text3)",fontWeight:600}}>
+                          {r.commission_status==="paid"?"✓ Paid":"Mark Paid"}
+                        </button>
+                      </div>
+                    </td>
+                    <td style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>{(r.submitted_at||"").slice(0,10)}</td>
+                    <td>
+                      {r.owner_phone&&(
+                        <a href={`https://wa.me/${r.owner_phone.replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer">
+                          <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲</button>
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showModal&&(
+        <LicenceRenewalModal
+          job={null} vehicleRecord={null} settings={settings} wsId={wsId}
+          onSave={async(rec)=>{ await onSave(rec); setShowModal(false); }}
+          onClose={()=>setShowModal(false)}/>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,t,lang}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,t,lang}) {
   const [view,      setView]      = useState("list");
   const [activeJob, setActiveJob] = useState(null);
   const [editJob,   setEditJob]   = useState(null);
@@ -951,6 +1196,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onGenerateWsQuoteLink={onGenerateWsQuoteLink}
         onSaveWsPurchaseOrder={onSaveWsPurchaseOrder}
         onViewPurchaseOrders={()=>{ setView("list"); setWsTab("wssuporders"); }}
+        onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
+        wsId={wsId}
         t={t} lang={lang}/>
     );
   }
@@ -972,6 +1219,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
     ["wssupinv",     "🧾 Supplier Inv",wsSupplierInvoices.length],
     ["wstransfer",   "🔄 Transfer",    null],
     ["wsdocs",     "📎 Documents",   wsDocs.length],
+    ["wslicencerenewal", "🪪 Licence Renewals", wsLicenceRenewals.length||null],
     ["statement",  "📋 Statement",   null],
     ["report",     "📊 Report",      null],
   ];
@@ -1355,6 +1603,14 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       {wsTab==="wsdocs"&&(
         <WsDocumentsPage docs={wsDocs} settings={settings}
           onSave={onSaveWsDoc} onDelete={onDeleteWsDoc}/>
+      )}
+
+      {/* ══════════════ LICENCE RENEWALS TAB ══════════════ */}
+      {wsTab==="wslicencerenewal"&&(
+        <WsLicenceRenewalsPage
+          renewals={wsLicenceRenewals} settings={settings} wsId={wsId}
+          onSave={onSaveWsLicenceRenewal}
+          onUpdate={onUpdateWsLicenceRenewal}/>
       )}
 
       {/* ══════════════ STATEMENT TAB ══════════════ */}
@@ -2163,7 +2419,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onSaveWsLicenceRenewal,wsId=null,t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -2185,6 +2441,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [oeSearch,      setOeSearch]      = useState("");
   const [editPriceId,   setEditPriceId]   = useState(null);
   const [editPriceVal,  setEditPriceVal]  = useState("");
+  const [renewalModal,  setRenewalModal]  = useState(false);
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
   const [localPhotoOverrides, setLocalPhotoOverrides] = useState({});
@@ -2556,12 +2813,26 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                 <code style={{fontWeight:600,fontSize:12,fontFamily:"DM Mono,monospace"}}>{job.engine_no}</code>
               </div>
             )}
-            {vehicleRecord?.licence_disc_expiry&&(
-              <div>
+            {(vehicleRecord?.licence_disc_expiry||job?.licence_disc_expiry)&&(
+              <div style={{gridColumn:"1/-1"}}>
                 <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>Licence Disc Expiry</div>
-                <div style={{fontWeight:700,fontSize:13,color:new Date(vehicleRecord.licence_disc_expiry)<new Date()?"var(--red)":"var(--green)"}}>
-                  {vehicleRecord.licence_disc_expiry} {new Date(vehicleRecord.licence_disc_expiry)<new Date()?"⚠️ EXPIRED":"✅"}
-                </div>
+                {(()=>{
+                  const exp = vehicleRecord?.licence_disc_expiry||job.licence_disc_expiry;
+                  const expired = new Date(exp)<new Date();
+                  return (
+                    <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                      <div style={{fontWeight:700,fontSize:13,color:expired?"var(--red)":"var(--green)"}}>
+                        {exp} {expired?"⚠️ EXPIRED":"✅"}
+                      </div>
+                      {onSaveWsLicenceRenewal&&(
+                        <button onClick={()=>setRenewalModal(true)}
+                          style={{fontSize:11,padding:"4px 12px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.4)",borderRadius:12,cursor:"pointer",color:"#16a34a",fontWeight:600,whiteSpace:"nowrap"}}>
+                          🪪 Request Renewal
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -3349,6 +3620,14 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             onCreatePO={onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);setSupplierModal(false);if(onViewPurchaseOrders)onViewPurchaseOrders();}:undefined}
             onClose={()=>setSupplierModal(false)}/>
         </Overlay>
+      )}
+
+      {/* Licence Renewal modal */}
+      {renewalModal&&onSaveWsLicenceRenewal&&(
+        <LicenceRenewalModal
+          job={job} vehicleRecord={vehicleRecord} settings={settings} wsId={wsId}
+          onSave={async(rec)=>{ await onSaveWsLicenceRenewal(rec); setRenewalModal(false); }}
+          onClose={()=>setRenewalModal(false)}/>
       )}
     </div>
   );

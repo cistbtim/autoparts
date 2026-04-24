@@ -1,9 +1,9 @@
 // Dynamsoft Barcode Reader v7.4.0-v1 — PDF417 decoder for SA eNaTIS licence discs
 const DYNAMSOFT_CDN = "https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@7.4.0-v1/dist/";
-let _dsReader = null;
 
 export async function getDynamsoftReader() {
-  if (_dsReader) return _dsReader;
+  // Persist on window so HMR module re-evaluation doesn't lose the instance
+  if (window._dbrInstance) return window._dbrInstance;
   if (!window.Dynamsoft?.BarcodeReader) {
     await new Promise((res, rej) => {
       const s = document.createElement("script");
@@ -15,14 +15,15 @@ export async function getDynamsoftReader() {
   }
   // v7 API: window.Dynamsoft.BarcodeReader (not Dynamsoft.DBR)
   const BR = window.Dynamsoft.BarcodeReader;
-  BR.engineResourcePath = DYNAMSOFT_CDN;
-  _dsReader = await BR.createInstance();
-  const settings = await _dsReader.getRuntimeSettings();
+  // engineResourcePath cannot be set after WASM loads — ignore if it throws
+  try { BR.engineResourcePath = DYNAMSOFT_CDN; } catch {}
+  window._dbrInstance = await BR.createInstance();
+  const settings = await window._dbrInstance.getRuntimeSettings();
   settings.barcodeFormatIds = Dynamsoft.EnumBarcodeFormat.BF_PDF417;
   settings.deblurLevel = 9;
   settings.scaleDownThreshold = 99999; // don't downscale — keep full resolution
-  await _dsReader.updateRuntimeSettings(settings);
-  return _dsReader;
+  await window._dbrInstance.updateRuntimeSettings(settings);
+  return window._dbrInstance;
 }
 
 // Tries native BarcodeDetector first (Chrome/Edge/Safari 17+), then Dynamsoft.
@@ -62,6 +63,29 @@ export function parseLicenceDisc(rawText) {
   const safeGet = (idx) => arr[idx] ? arr[idx].split("/")[0].trim() : "";
   const n = v => v?.trim() || null;
 
+  // Scan every field for an expiry date — handles both YYYY-MM (hyphen) and YYYYMM (6-digit)
+  // formats, and strips the trailing '-' that appears when the date is the last field before ***.
+  let expiry_date = null;
+  for (let i = 0; i < arr.length && !expiry_date; i++) {
+    const raw = (arr[i] || "").split("/")[0].replace(/[-\s]+$/, "").trim();
+    if (!raw) continue;
+    // YYYY-MM or YYYY/MM
+    const mDash = raw.match(/^(20\d{2})[-/](0[1-9]|1[0-2])$/);
+    if (mDash) {
+      const yr = +mDash[1], mo = +mDash[2];
+      expiry_date = `${yr}-${String(mo).padStart(2,"0")}-${String(new Date(yr,mo,0).getDate()).padStart(2,"0")}`;
+      break;
+    }
+    // YYYYMM (six consecutive digits starting with 20)
+    if (/^20\d{4}$/.test(raw)) {
+      const yr = +raw.slice(0,4), mo = +raw.slice(4,6);
+      if (mo >= 1 && mo <= 12) {
+        expiry_date = `${yr}-${String(mo).padStart(2,"0")}-${String(new Date(yr,mo,0).getDate()).padStart(2,"0")}`;
+      }
+    }
+  }
+  const licence_no = n(safeGet(3));
+
   let reg, vin, engine_no, make, model, color, body_type;
   if (arr[0]?.startsWith("RC")) {
     reg = n(safeGet(5)); body_type = n(safeGet(6)); make = n(safeGet(7)); model = n(safeGet(8));
@@ -70,5 +94,5 @@ export function parseLicenceDisc(rawText) {
     reg = n(safeGet(5)); body_type = n(safeGet(7)); make = n(safeGet(8)); model = n(safeGet(9));
     color = n(safeGet(10)); vin = n(safeGet(11)); engine_no = n(safeGet(12));
   }
-  return { reg, vin, engine_no, make, model, color, body_type, expiry_date: null, licence_no: null, raw: rawText };
+  return { reg, vin, engine_no, make, model, color, body_type, expiry_date, licence_no, raw: rawText };
 }

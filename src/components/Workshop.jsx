@@ -1569,7 +1569,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       {bookIn&&(
         <BookInModal wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs} settings={settings}
           onSaveJob={async(d)=>{ await onSaveJob(d); setBookIn(false); }}
-          onReopenJob={async(d)=>{ await onSaveJob(d); setBookIn(false); }}
+          onReopenJob={async(d)=>{ await onSaveJob(d); setBookIn(false); setActiveJob(d); setView("job"); }}
           onClose={()=>setBookIn(false)} t={t}/>
       )}
       {editJob&&(
@@ -2003,7 +2003,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
             onClick={async()=>{
               setGeneratingLink(true);
               const linkItems=selectedItems.map(i=>({description:i.label,qty:i.qty,sku:i.sku}));
-              const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||""};
+              const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false};
               const url=await onGenerateLink(info,linkItems);
               setGeneratedLink(url);
               setGeneratingLink(false);
@@ -2169,9 +2169,9 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
 
   const handleVehiclePhotoChange = async (field, key, url) => {
     setLocalPhotoOverrides(p=>({...p,[key]:url}));
-    if(vehicleRecord && onSaveWsVehicle) {
-      const updated = {...vehicleRecord, [field]:url};
-      try { await onSaveWsVehicle(updated); } catch(e) { console.error("Photo save failed",e); }
+    if(vehicleRecord) {
+      try { await api.patch("workshop_vehicles","id",vehicleRecord.id,{[field]:url}); }
+      catch(e) { console.error("Photo save failed",e); }
     }
   };
 
@@ -5091,12 +5091,13 @@ function WsSuppliersPage({wsSuppliers=[],onSave,onDelete}) {
 }
 
 function WsSupplierModal({item,onSave,onClose}) {
-  const [name,      setName]      = useState(item?.name||"");
-  const [phone,     setPhone]     = useState(item?.phone||"");
-  const [groupLink, setGroupLink] = useState(item?.group_link||"");
-  const [email,     setEmail]     = useState(item?.email||"");
-  const [notes,     setNotes]     = useState(item?.notes||"");
-  const [saving,    setSaving]    = useState(false);
+  const [name,         setName]         = useState(item?.name||"");
+  const [phone,        setPhone]        = useState(item?.phone||"");
+  const [groupLink,    setGroupLink]    = useState(item?.group_link||"");
+  const [email,        setEmail]        = useState(item?.email||"");
+  const [notes,        setNotes]        = useState(item?.notes||"");
+  const [vatInclusive, setVatInclusive] = useState(item?.vat_inclusive||false);
+  const [saving,       setSaving]       = useState(false);
   const isEdit=!!item;
 
   const handleSave=async()=>{
@@ -5110,6 +5111,7 @@ function WsSupplierModal({item,onSave,onClose}) {
         group_link:groupLink.trim()||null,
         email:email.trim()||null,
         notes:notes.trim()||null,
+        vat_inclusive:vatInclusive,
       });
     }catch(e){alert("Save failed: "+e.message);}
     finally{setSaving(false);}
@@ -5129,6 +5131,13 @@ function WsSupplierModal({item,onSave,onClose}) {
         <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Paste the group invite link — tap ⋮ in WhatsApp group → Invite via link → Copy link</div>
       </FD>
       <FD><FL label="Notes (optional)"/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. BMW specialist, fast delivery"/></FD>
+      <FD>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0"}}>
+          <input type="checkbox" id="vatIncl" checked={vatInclusive} onChange={e=>setVatInclusive(e.target.checked)} style={{width:16,height:16,cursor:"pointer"}}/>
+          <label htmlFor="vatIncl" style={{cursor:"pointer",fontSize:13,fontWeight:500}}>Prices include VAT</label>
+          <span style={{fontSize:11,color:"var(--text3)"}}>(supplier quotes prices incl. VAT)</span>
+        </div>
+      </FD>
       <div style={{display:"flex",gap:10,marginTop:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>{saving?"Saving...":"💾 Save"}</button>

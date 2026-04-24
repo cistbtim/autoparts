@@ -916,6 +916,7 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     const now=new Date().toISOString();
     const rec={id:reqId,workshop_id:wsId||null,job_id:info.job_id||null,vehicle_reg:info.vehicle_reg||"",
       supplier_id:info.supplier_id||null,supplier_name:info.supplier_name||"",supplier_phone:info.supplier_phone||"",
+      supplier_vat_inclusive:info.supplier_vat_inclusive||false,
       parts_list:JSON.stringify(items.map(i=>i.label||i.description||"")),message:"",token,
       items_json:JSON.stringify(items),sent_at:now};
     await api.insert("ws_supplier_requests",rec).catch(e=>console.warn("Link gen failed:",e));

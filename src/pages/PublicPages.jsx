@@ -718,6 +718,7 @@ export function WsSupplierQuoteReplyPage({token}) {
     setSaving(false);
   };
 
+  const vatInclusive = req?.supplier_vat_inclusive||false;
   const inStockItems = items.filter(i=>i.condition!=="no_stock");
   const noStockItems = items.filter(i=>i.condition==="no_stock");
 
@@ -760,7 +761,7 @@ export function WsSupplierQuoteReplyPage({token}) {
       {item.condition!=="no_stock"&&(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           <div>
-            <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Your Price</div>
+            <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Your Price <span style={{color:vatInclusive?"#fbbf24":"#64748b",fontWeight:600}}>({vatInclusive?"incl. VAT":"excl. VAT"})</span></div>
             <input style={inp} type="number" min="0" step="0.01" placeholder="0.00"
               value={item.price} onChange={e=>set(items.indexOf(item),"price",e.target.value)}/>
           </div>
@@ -787,6 +788,11 @@ export function WsSupplierQuoteReplyPage({token}) {
           <div style={{fontSize:28,marginBottom:6}}>🔧</div>
           <h1 style={{fontSize:18,fontWeight:800,color:"#f8fafc",marginBottom:4}}>{shopSettings.shop_name||"Workshop"}</h1>
           <div style={{fontSize:13,color:"#94a3b8"}}>Parts quote request</div>
+          <div style={{display:"inline-block",marginTop:6,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700,
+            background:vatInclusive?"rgba(251,191,36,.15)":"rgba(148,163,184,.12)",
+            color:vatInclusive?"#fbbf24":"#94a3b8",border:`1px solid ${vatInclusive?"rgba(251,191,36,.4)":"rgba(148,163,184,.3)"}`}}>
+            {vatInclusive?"Prices INCL. VAT":"Prices EXCL. VAT"}
+          </div>
         </div>
 
         {/* Vehicle/job info */}

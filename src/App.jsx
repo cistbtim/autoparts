@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useRef } from "react";
 import { api, setDemoMode } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
-import { T, STATUS_ZH, setCurrentLang, tSt } from "./lib/i18n.js";
+import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
 import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, today, fmtAmt, makeId, makeToken, detectGeoLocation, waLink, mailLink } from "./lib/helpers.js";
 import { ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
@@ -19,13 +19,23 @@ export default function App() {
   const [lang,setLang] = useState(localStorage.getItem("ap_lang")||"en");
   const [user,setUser] = useState(null);
   const [settingsLoaded,setSettingsLoaded] = useState(false);
+  const [availLangs,setAvailLangs] = useState(getLangs());
   const [theme,setTheme] = useState(localStorage.getItem("ap_theme")||"dark");
   useEffect(()=>{ document.documentElement.setAttribute("data-theme",theme); },[theme]);
   const toggleTheme = ()=>{ const n=theme==="dark"?"light":"dark"; setTheme(n); localStorage.setItem("ap_theme",n); };
   const changeLang = (l)=>{setLang(l);localStorage.setItem("ap_lang",l);};
-  const t = T[lang];
+  const t = T[lang] || T.en;
 
-  useEffect(()=>{ loadSettings().then(()=>setSettingsLoaded(true)); },[]);
+  useEffect(()=>{
+    const init=async()=>{
+      await loadSettings();
+      const rows=await api.get("app_translations","active=eq.true&select=lang,name,flag,t,status_t").catch(()=>[]);
+      if(Array.isArray(rows)) rows.forEach(r=>registerLang(r.lang,r.name,r.flag,r.t||{},r.status_t||{}));
+      setAvailLangs(getLangs());
+      setSettingsLoaded(true);
+    };
+    init();
+  },[]);
 
   const rfqToken = new URLSearchParams(window.location.search).get("rfq");
   if(rfqToken) return <RfqReplyPage token={rfqToken} lang={lang}/>;
@@ -40,13 +50,13 @@ export default function App() {
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
   if(!user) return <LoginPage onLogin={setUser} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={()=>setUser(null)} lang={lang}/>;
-  return <MainApp user={user} onLogout={()=>setUser(null)} t={t} lang={lang} setLang={changeLang} theme={theme} toggleTheme={toggleTheme}/>;
+  return <MainApp user={user} onLogout={()=>setUser(null)} t={t} lang={lang} setLang={changeLang} langs={availLangs} theme={theme} toggleTheme={toggleTheme}/>;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════
-function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
+function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   setCurrentLang(lang); // sync for tSt
   const role = user.role;
   const wsRole = user.wsRole || "main"; // workshop sub-role: "main" | "manager" | "mechanic"
@@ -1816,8 +1826,11 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
           </div>
           <div style={{fontSize:10,color:"var(--green)",marginTop:4}}>{`🟢 ${t.connected}`}</div>
           <div style={{display:"flex",gap:5,marginTop:9,justifyContent:"center"}}>
-            <button className={`lang ${lang==="en"?"on":""}`} onClick={()=>setLang("en")}>EN</button>
-            <button className={`lang ${lang==="zh"?"on":""}`} onClick={()=>setLang("zh")}>中文</button>
+            {langs.map(l=>(
+              <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
+                {l.flag||l.lang.toUpperCase()}
+              </button>
+            ))}
           </div>
         </div>
         <div style={{margin:"0 10px 8px",background:"var(--surface2)",borderRadius:11,padding:"10px 12px",border:"1px solid var(--border)"}}>
@@ -1884,8 +1897,11 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             </div>
           </div>
           <div style={{display:"flex",gap:5,justifyContent:"center"}}>
-            <button className={`lang ${lang==="en"?"on":""}`} onClick={()=>setLang("en")}>EN</button>
-            <button className={`lang ${lang==="zh"?"on":""}`} onClick={()=>setLang("zh")}>中文</button>
+            {langs.map(l=>(
+              <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
+                {l.flag||l.lang.toUpperCase()}
+              </button>
+            ))}
           </div>
         </div>
         {/* Drawer nav groups */}

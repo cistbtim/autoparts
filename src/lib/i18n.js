@@ -1,3 +1,4 @@
+// English is the hardcoded fallback — all other languages load from app_translations DB table.
 export const T = {
   en: {
     appSub: "Parts Management System", dashboard: "Dashboard", inventory: "Inventory",
@@ -39,7 +40,7 @@ export const T = {
     jobCard: "Job Card", mechanic: "Mechanic", complaint: "Complaint",
     diagnosis: "Diagnosis", vehicleReg: "Vehicle Reg", mileage: "Mileage",
     dateIn: "Date In", dateOut: "Date Out", labour: "Labour",
-    addLabour: "Add Labour", addPart: "Add Part", jobItems: "Job Items",
+    addLabour: "Add Labour", jobItems: "Job Items",
     workshopInvoice: "Workshop Invoice", createWorkshopInv: "Create Invoice",
     inProgress: "In Progress", done: "Done", delivered: "Delivered",
     vehicleColor: "Color", selectMake: "Select Make", selectModel: "Select Model",
@@ -78,89 +79,29 @@ export const T = {
     depositRequested: "Awaiting Deposit", noQueries: "No queries yet",
     queryNotes: "Notes / Query Details", partQuery: "Part Query",
   },
-  zh: {
-    appSub: "零件管理銷售系統", dashboard: "儀表板", inventory: "庫存管理",
-    systemOverview: "系統總覽", recentOrders: "最近訂單", viewAll: "查看全部",
-    lowStockAlert: "低庫存", manage: "管理", orderStatus: "訂單狀態",
-    connected: "已連線", s_processing: "處理中", s_shipped: "待出貨",
-    s_done: "已完成", s_cancelled: "已取消",
-    shop: "線上商店", orders: "訂單管理", myOrders: "我的訂單", customers: "客戶管理",
-    users: "用戶管理", suppliers: "供應商", inquiries: "詢價管理", logs: "庫存記錄",
-    loginLogs: "登入記錄", logout: "登出", cart: "購物車", login: "登入",
-    settings: "系統設定", purchaseInvoices: "進貨單", supplierReturns: "供應商退貨",
-    salesInvoices: "銷售發票", customerReturns: "客戶退貨",
-    username: "帳號", password: "密碼", connecting: "載入中...",
-    wrongPass: "帳號或密碼錯誤", addPart: "新增零件",
-    adjustStock: "調整庫存", save: "儲存", cancel: "取消", delete: "刪除",
-    edit: "編輯", close: "關閉", confirm: "確認", sku: "料號", name: "名稱",
-    category: "分類", brand: "品牌", price: "單價", stock: "庫存",
-    minStock: "最低庫存", status: "狀態", normal: "正常", low: "庫存低", outOfStock: "缺貨",
-    placeOrder: "確認下單", addToCart: "加入購物車", checkout: "結帳",
-    orderHistory: "訂單歷史", totalSpent: "總消費", addSupplier: "新增供應商",
-    supplierName: "供應商名稱", email: "Email", phone: "電話", country: "國家",
-    contactPerson: "聯絡人", pending: "待處理", replied: "已回覆", closed: "已關閉",
-    paid: "已付款", unpaid: "未付款", partial: "部分付款", approved: "已核准",
-    role: "角色", admin: "管理員", manager: "經理", shipper: "出貨員", stockman: "盤點員", customer: "客戶",
-    revenue: "完成營收", pendingOrders: "待處理", lowStock: "低庫存", parts: "零件數",
-    all: "全部", total: "合計", subtotal: "小計", tax: "稅額", orders_count: "訂單數",
-    image_url: "圖片網址 (Google Drive)", gdrive_hint: "貼上分享連結，自動轉換",
-    chineseDesc: "中文說明", make: "廠牌", model: "車型", yearRange: "年份", oeNumber: "OE號碼",
-    lead_time: "交貨期", min_order: "最小訂量", supplier_price: "供應商報價",
-    notes: "備註", message: "訊息", send: "發送詢價",
-    invoice: "發票", invoiceNo: "發票號碼", invoiceDate: "發票日期", dueDate: "到期日",
-    unitCost: "單位成本", unitPrice: "單價", qty: "數量", amount: "金額",
-    supplierPartId: "供應商料號", addLine: "新增項目",
-    returnNote: "退貨/折讓單", returnDate: "退貨日期", reason: "原因",
-    stockIn: "入庫", stockOut: "出庫", createInvoice: "建立發票",
-    picking: "撿貨", pickOrder: "撿貨訂單", startPicking: "開始撿貨",
-    findByVehicle: "依車型找零件",
-    workshop: "維修", jobCards: "工單", newJob: "新工單",
-    jobCard: "工單", mechanic: "技師", complaint: "客訴",
-    diagnosis: "診斷", vehicleReg: "車牌", mileage: "里程",
-    dateIn: "入廠日", dateOut: "出廠日", labour: "工資",
-    addLabour: "加工資", addPart: "加零件", jobItems: "工單項目",
-    workshopInvoice: "維修發票", createWorkshopInv: "建立發票",
-    inProgress: "維修中", done: "完成", delivered: "已交車",
-    vehicleColor: "顏色", selectMake: "選擇品牌", selectModel: "選擇型號",
-    vehicles: "車型管理", addVehicle: "新增車型", editVehicle: "編輯車型", vehicleMgmt: "車型管理",
-    yearFrom: "起始年份", yearTo: "結束年份", engine: "引擎", variant: "配置",
-    selectYear: "選擇年份", fitsMycar: "我的車款零件", vehicleFitment: "適用車型",
-    linkedVehicles: "已連結車型", noFitment: "尚未連結車型",
-    scanBarcode: "掃描條碼", pickItem: "確認此項目", pickedAll: "全部撿完",
-    confirmShip: "確認出貨", scanOrConfirm: "掃描或點擊確認",
-    createReturn: "建立退貨", shopName: "商店名稱", currency: "幣別",
-    taxRate: "稅率 (%)", invoicePrefix: "發票前綴", whatsappNo: "WhatsApp號碼",
-    shopEmail: "商店Email", shopPhone: "商店電話", shopAddress: "商店地址",
-    saveSettings: "儲存設定", demoAccounts: "測試帳號",
-    selectSuppliers: "選擇供應商", sendToSelected: "發送給已選",
-    rfqSession: "詢價單", newRfq: "新詢價", rfqItems: "詢價項目", rfqQuotes: "報價",
-    sendRfq: "發送詢價", compareQuotes: "比較報價", createPO: "轉採購單",
-    qtyNeeded: "需求數量", leadDays: "交期(天)",
-    selectParts: "選擇零件", selectSupps: "選擇供應商", deadline: "截止日期",
-    reports: "報表", salesReport: "銷售報表", inventoryReport: "庫存報表",
-    stockTake: "盤點", stockMove: "移庫", stockSheet: "盤點表",
-    binLocation: "倉位", systemQty: "系統數量", countedQty: "盤點數量",
-    variance: "差異", startTake: "開始盤點", completeTake: "完成盤點",
-    moveStock: "移動庫存", fromBin: "原倉位", toBin: "新倉位",
-    customerReport: "客戶報表", supplierReport: "供應商報表",
-    payments: "付款記錄", addPayment: "新增付款", paymentMethod: "付款方式",
-    cash: "現金", bankTransfer: "銀行轉帳", card: "刷卡", outstanding: "未付款",
-    reconcile: "對帳", printInvoice: "列印/PDF", download: "下載 PDF",
-    sendWa: "WhatsApp 傳送", sendEmail: "Email 傳送",
-    daily: "每日", monthly: "每月", yearly: "每年",
-    queryPriceQty: "詢問價格及庫存", submitQuery: "提交詢問",
-    myQueries: "我的詢問", customerQueries: "客戶詢問",
-    queryReply: "回覆詢問", depositRequest: "要求訂金",
-    depositAmount: "訂金金額", depositNote: "付款說明",
-    confirmedPrice: "確認單價", confirmedQty: "可供數量",
-    sendReply: "發送回覆", depositPaid: "標記訂金已付",
-    depositRequested: "等待訂金", noQueries: "暫無詢問記錄",
-    queryNotes: "備註 / 詢問內容", partQuery: "零件詢問",
-  },
 };
 
-export const STATUS_ZH = { "Processing": "處理中", "Ready to Ship": "待出貨", "Completed": "已完成", "Cancelled": "已取消", "Paid": "已付款", "Unpaid": "未付款", "Partial": "部分付款", "Pending": "待報價", "Quoted": "已報價", "Selected": "已選", "Open": "進行中", "Counted": "已盤點", "ordered": "已訂購", "Draft": "草稿", "Sent": "已發送", "Comparing": "比較中" };
+// Lang metadata: lang code → { name, flag }
+const _meta = { en: { name: "English", flag: "🇬🇧" } };
+
+// Status string maps per language (for tSt)
+const _statusMaps = {};
+
+// Register a language pack from the DB. Merges over English so missing keys fall back.
+export function registerLang(lang, name, flag, translations, statusMap) {
+  T[lang] = { ...T.en, ...translations };
+  _meta[lang] = { name: name || lang, flag: flag || "" };
+  if (statusMap && Object.keys(statusMap).length) _statusMaps[lang] = statusMap;
+}
+
+// Returns sorted list of available language options.
+export function getLangs() {
+  return Object.entries(_meta).map(([lang, m]) => ({ lang, name: m.name, flag: m.flag }));
+}
 
 let _currentLang = "en";
 export const setCurrentLang = (lang) => { _currentLang = lang; };
-export const tSt = (s) => _currentLang === "zh" ? (STATUS_ZH[s] || s) : s;
+export const tSt = (s) => {
+  const map = _statusMaps[_currentLang];
+  return map ? (map[s] || s) : s;
+};

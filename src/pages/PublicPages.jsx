@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { CSS } from "../styles.js";
@@ -660,6 +660,172 @@ export function QuoteConfirmPage({token}) {
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORKSHOP SUPPLIER QUOTE REPLY PAGE
+// Supplier opens ?ws_supreq=<token> and fills in price/condition/part_no
+// ═══════════════════════════════════════════════════════════════
+export function WsSupplierQuoteReplyPage({token}) {
+  const [req, setReq]     = useState(null);
+  const [items, setItems] = useState([]); // [{idx,description,qty,sku,price,condition,supplier_part_no,notes}]
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+  const [done,    setDone]    = useState(false);
+  const [err,     setErr]     = useState("");
+  const shopSettings = getSettings();
+
+  useEffect(()=>{
+    api.get("ws_supplier_requests",`token=eq.${encodeURIComponent(token)}&select=*`)
+      .then(async r=>{
+        if(!Array.isArray(r)||!r[0]){setErr("Quote request not found or link has expired.");setLoading(false);return;}
+        const request=r[0];
+        setReq(request);
+        // Check if already replied
+        const reps=await api.get("ws_sq_replies",`request_id=eq.${request.id}&select=*`).catch(()=>[]);
+        if(Array.isArray(reps)&&reps[0]){
+          const prev=(() => { try{return JSON.parse(reps[0].items||"[]");}catch{return [];} })();
+          setItems(prev);
+          setDone(true);
+        } else {
+          const rawItems=(() => { try{return JSON.parse(request.items_json||"[]");}catch{return [];} })();
+          setItems(rawItems.map((it,idx)=>({
+            idx, description:it.label||it.description||"", qty:+it.qty||1, sku:it.sku||"",
+            price:"", condition:"in_stock", supplier_part_no:"", notes:""
+          })));
+        }
+        setLoading(false);
+      })
+      .catch(()=>{setErr("Failed to load request.");setLoading(false);});
+  },[token]);
+
+  const set=(idx,k,v)=>setItems(p=>p.map((r,i)=>i===idx?{...r,[k]:v}:r));
+
+  const submit=async()=>{
+    setSaving(true);
+    try{
+      const id="WSQR-"+Date.now()+"-"+Math.random().toString(36).slice(2,6);
+      await api.insert("ws_sq_replies",{
+        id, request_id:req.id, workshop_id:req.workshop_id,
+        items:JSON.stringify(items), submitted_at:new Date().toISOString()
+      });
+      await api.patch("ws_supplier_requests","id",req.id,{status:"replied"});
+      setDone(true);
+    }catch(e){setErr("Submit failed — please try again.");}
+    setSaving(false);
+  };
+
+  const inStockItems = items.filter(i=>i.condition!=="no_stock");
+  const noStockItems = items.filter(i=>i.condition==="no_stock");
+
+  const bg={background:"#0f172a",minHeight:"100vh",color:"#e2e8f0",fontFamily:"system-ui,sans-serif"};
+  const card={background:"#1e293b",borderRadius:12,padding:"16px 18px",marginBottom:12,border:"1px solid #334155"};
+  const inp={width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #475569",background:"#0f172a",color:"#e2e8f0",fontSize:13,boxSizing:"border-box"};
+  const sel={...inp,cursor:"pointer"};
+
+  if(loading) return <div style={{...bg,display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"#38bdf8",fontSize:15,fontWeight:600}}>Loading…</div></div>;
+  if(err&&!req) return <div style={{...bg,display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{textAlign:"center"}}><div style={{fontSize:32,marginBottom:8}}>⚠️</div><div style={{color:"#f87171"}}>{err}</div></div></div>;
+
+  if(done) return (
+    <div style={{...bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}><style>{CSS}</style>
+      <div style={{maxWidth:440,width:"100%",textAlign:"center"}}>
+        <div style={{fontSize:56,marginBottom:12}}>✅</div>
+        <h2 style={{fontSize:20,fontWeight:700,color:"#34d399",marginBottom:8}}>Quote Submitted!</h2>
+        <p style={{color:"#94a3b8",fontSize:14}}>Thank you — {shopSettings.shop_name||"the workshop"} will review your prices and be in touch.</p>
+        {err&&<p style={{color:"#f87171",marginTop:8,fontSize:13}}>{err}</p>}
+      </div>
+    </div>
+  );
+
+  const ItemRow=({item,idx})=>(
+    <div style={{...card,opacity:item.condition==="no_stock"?0.7:1}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:8}}>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:700,fontSize:14}}>{idx+1}. {item.description}</div>
+          {item.sku&&<div style={{fontSize:11,color:"#94a3b8",fontFamily:"monospace",marginTop:2}}>{item.sku}</div>}
+          {item.qty>1&&<div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>Qty needed: <strong style={{color:"#e2e8f0"}}>{item.qty}</strong></div>}
+        </div>
+        <select value={item.condition} onChange={e=>set(items.indexOf(item),"condition",e.target.value)}
+          style={{...sel,width:130,fontSize:12,flexShrink:0,
+            color:item.condition==="in_stock"?"#34d399":item.condition==="can_order"?"#fbbf24":"#f87171",
+            borderColor:item.condition==="in_stock"?"#34d399":item.condition==="can_order"?"#fbbf24":"#f87171"}}>
+          <option value="in_stock">✅ In Stock</option>
+          <option value="can_order">📦 Can Order</option>
+          <option value="no_stock">❌ No Stock</option>
+        </select>
+      </div>
+      {item.condition!=="no_stock"&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <div>
+            <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Your Price</div>
+            <input style={inp} type="number" min="0" step="0.01" placeholder="0.00"
+              value={item.price} onChange={e=>set(items.indexOf(item),"price",e.target.value)}/>
+          </div>
+          <div>
+            <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Your Part # <span style={{color:"#64748b"}}>(optional)</span></div>
+            <input style={inp} type="text" placeholder="e.g. AB-12345"
+              value={item.supplier_part_no} onChange={e=>set(items.indexOf(item),"supplier_part_no",e.target.value)}/>
+          </div>
+          <div style={{gridColumn:"1/-1"}}>
+            <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Notes <span style={{color:"#64748b"}}>(optional — e.g. condition, ETA)</span></div>
+            <input style={inp} type="text" placeholder="e.g. New OEM, available tomorrow"
+              value={item.notes} onChange={e=>set(items.indexOf(item),"notes",e.target.value)}/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div style={bg}><style>{CSS}</style>
+      <div style={{maxWidth:520,margin:"0 auto",padding:"20px 12px 40px"}}>
+        {/* Header */}
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <div style={{fontSize:28,marginBottom:6}}>🔧</div>
+          <h1 style={{fontSize:18,fontWeight:800,color:"#f8fafc",marginBottom:4}}>{shopSettings.shop_name||"Workshop"}</h1>
+          <div style={{fontSize:13,color:"#94a3b8"}}>Parts quote request</div>
+        </div>
+
+        {/* Vehicle/job info */}
+        {(req?.vehicle_reg||req?.supplier_name)&&(
+          <div style={{...card,background:"#162032",marginBottom:18}}>
+            {req.vehicle_reg&&<div style={{fontSize:15,fontWeight:700,color:"#38bdf8",marginBottom:4}}>🚗 {req.vehicle_reg}</div>}
+            {req.supplier_name&&<div style={{fontSize:12,color:"#94a3b8"}}>For: {req.supplier_name}</div>}
+          </div>
+        )}
+
+        {/* In-stock items */}
+        {inStockItems.length>0&&(
+          <>
+            <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Parts to Quote</div>
+            {inStockItems.map(item=><ItemRow key={item.idx} item={item} idx={items.indexOf(item)}/>)}
+          </>
+        )}
+
+        {/* No-stock section at bottom */}
+        {noStockItems.length>0&&(
+          <>
+            <div style={{fontSize:11,color:"#f87171",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",margin:"18px 0 8px",display:"flex",alignItems:"center",gap:6}}>
+              <span>❌ No Stock</span>
+              <div style={{flex:1,height:1,background:"rgba(248,113,113,.3)"}}/>
+            </div>
+            {noStockItems.map(item=><ItemRow key={item.idx} item={item} idx={items.indexOf(item)}/>)}
+          </>
+        )}
+
+        {err&&<div style={{color:"#f87171",fontSize:13,marginBottom:10,textAlign:"center"}}>{err}</div>}
+
+        <button onClick={submit} disabled={saving}
+          style={{width:"100%",padding:"14px 0",borderRadius:10,border:"none",
+            background:saving?"#334155":"#0ea5e9",color:"#fff",fontSize:15,fontWeight:700,cursor:saving?"not-allowed":"pointer",marginTop:8}}>
+          {saving?"Submitting…":"✅ Submit Quote"}
+        </button>
+        <div style={{textAlign:"center",fontSize:11,color:"#475569",marginTop:12}}>
+          Powered by AutoParts Workshop
+        </div>
       </div>
     </div>
   );

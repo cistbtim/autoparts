@@ -869,7 +869,7 @@ function WsVehicleForm({data,onSave,onClose,t}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],t,lang}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,t,lang}) {
   const [view,      setView]      = useState("list");
   const [activeJob, setActiveJob] = useState(null);
   const [editJob,   setEditJob]   = useState(null);
@@ -946,6 +946,9 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onSendQuoteForApproval={onSendQuoteForApproval}
         onSaveWsVehicle={onSaveWsVehicle}
         wsRole={wsRole}
+        sqReplies={wsSqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===activeJob.id))}
+        onGenerateWsQuoteLink={onGenerateWsQuoteLink}
+        onSaveWsPurchaseOrder={onSaveWsPurchaseOrder}
         t={t} lang={lang}/>
     );
   }
@@ -963,6 +966,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
     ["wsstock",      "📦 WS Stock",    wsStock.length],
     ["wsservices",   "🔧 Services",    wsServices.length],
     ["wssuppliers",  "🏪 Suppliers",   wsSuppliers.length],
+    ["wssuporders",  "📋 Purchase Orders", wsPurchaseOrders.length],
     ["wssupinv",     "🧾 Supplier Inv",wsSupplierInvoices.length],
     ["wstransfer",   "🔄 Transfer",    null],
     ["wsdocs",     "📎 Documents",   wsDocs.length],
@@ -1305,6 +1309,15 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       {wsTab==="wsservices"&&(
         <WsServicesPage wsServices={wsServices} settings={settings}
           onSave={onSaveWsService} onDelete={onDeleteWsService}/>
+      )}
+
+      {/* ══════════════ WS PURCHASE ORDERS TAB ══════════════ */}
+      {wsTab==="wssuporders"&&(
+        <WsPurchaseOrdersPage
+          purchaseOrders={wsPurchaseOrders} poItems={wsPoItems}
+          wsSuppliers={wsSuppliers} wsStock={wsStock} settings={settings}
+          onSave={onSaveWsPurchaseOrder} onDelete={onDeleteWsPurchaseOrder}
+          onReceive={onReceiveWsPurchaseOrder}/>
       )}
 
       {/* ══════════════ WS SUPPLIERS TAB ══════════════ */}
@@ -1757,7 +1770,7 @@ const makePartSku = (name) => {
   return `ws-${abbr}-${rand}`;
 };
 
-function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], quotes=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onClose}) {
+function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onGenerateLink, onCreatePO, onClose}) {
   const shopName = settings?.shop_name || "Workshop";
 
   // Job items — all pre-ticked
@@ -1765,6 +1778,9 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
   const [selected,    setSelected]    = useState(jobItemIds);
   // Extra parts typed manually  { id, label, sku }
   const [extraParts,  setExtraParts]  = useState([]);
+  const [generatedLink, setGeneratedLink] = useState("");
+  const [linkCopied,    setLinkCopied]   = useState(false);
+  const [generatingLink,setGeneratingLink]=useState(false);
   const [extraInput,  setExtraInput]  = useState("");
 
   const [supplierId,  setSupplierId]  = useState("");
@@ -1979,6 +1995,34 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
         <button className="btn btn-ghost" style={{width:"100%",fontSize:13,padding:"10px 0",borderRadius:10}} onClick={copyMsg}>
           {copied ? "✓ Copied!" : "📋 Copy Message"}
         </button>
+        {/* Generate digital quote link */}
+        {onGenerateLink&&selectedItems.length>0&&(
+          <button
+            disabled={generatingLink}
+            style={{width:"100%",fontSize:13,padding:"11px 0",borderRadius:10,border:"1px solid rgba(56,189,248,.4)",background:"rgba(56,189,248,.08)",color:"#38bdf8",cursor:generatingLink?"not-allowed":"pointer",fontWeight:600}}
+            onClick={async()=>{
+              setGeneratingLink(true);
+              const linkItems=selectedItems.map(i=>({description:i.label,qty:i.qty,sku:i.sku}));
+              const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||""};
+              const url=await onGenerateLink(info,linkItems);
+              setGeneratedLink(url);
+              setGeneratingLink(false);
+            }}>
+            {generatingLink?"Generating…":"🔗 Generate Supplier Quote Link"}
+          </button>
+        )}
+        {generatedLink&&(
+          <div style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.3)",borderRadius:10,padding:"10px 12px"}}>
+            <div style={{fontSize:11,color:"#38bdf8",fontWeight:700,marginBottom:6}}>🔗 Share this link with supplier:</div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <input readOnly value={generatedLink} style={{flex:1,fontSize:11,padding:"6px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface3)",color:"var(--text1)",fontFamily:"monospace"}}
+                onFocus={e=>e.target.select()}/>
+              <button className="btn btn-ghost btn-sm" style={{flexShrink:0,fontSize:11}} onClick={()=>{navigator.clipboard.writeText(generatedLink).then(()=>{setLinkCopied(true);setTimeout(()=>setLinkCopied(false),2000);});}}>
+                {linkCopied?"✓ Copied":"Copy"}
+              </button>
+            </div>
+          </div>
+        )}
         <button className="btn btn-ghost" style={{width:"100%",fontSize:13,borderRadius:10}} onClick={onClose}>Close</button>
       </div>
 
@@ -1994,16 +2038,57 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
               const dt = r.sent_at ? new Date(r.sent_at).toLocaleString(undefined,{dateStyle:"short",timeStyle:"short"}) : "";
               const existingQuote = quotes.find(q=>q.request_id===r.id);
               const qLines = existingQuote ? (() => { try { return JSON.parse(existingQuote.line_items||"[]"); } catch { return []; } })() : [];
+              const digitalReply = sqReplies.find(rep=>rep.request_id===r.id);
+              const replyItems = digitalReply ? (() => { try { return JSON.parse(digitalReply.items||"[]"); } catch { return []; } })() : [];
+              const inStockReplies = replyItems.filter(ri=>ri.condition!=="no_stock");
+              const noStockReplies = replyItems.filter(ri=>ri.condition==="no_stock");
               return (
-                <div key={r.id||i} style={{background:"var(--surface2)",borderRadius:10,padding:"10px 12px",fontSize:12,border: existingQuote?"1px solid rgba(52,211,153,.3)":"1px solid transparent"}}>
+                <div key={r.id||i} style={{background:"var(--surface2)",borderRadius:10,padding:"10px 12px",fontSize:12,border:digitalReply?"1px solid rgba(56,189,248,.3)":existingQuote?"1px solid rgba(52,211,153,.3)":"1px solid transparent"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,gap:6}}>
                     <span style={{fontWeight:700,color:"#25D366",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      {r.via_group?"👥":"📲"} {r.supplier_name||r.supplier_phone||"Unknown"}
+                      {r.token?"🔗":"📲"} {r.supplier_name||r.supplier_phone||"Unknown"}
                     </span>
-                    <span style={{fontSize:10,color:"var(--text3)",flexShrink:0}}>{dt}</span>
+                    <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
+                      {r.token&&<span style={{fontSize:10,background:"rgba(56,189,248,.12)",color:"#38bdf8",borderRadius:4,padding:"1px 5px",fontWeight:600}}>Link</span>}
+                      {digitalReply&&<span style={{fontSize:10,background:"rgba(52,211,153,.12)",color:"var(--green)",borderRadius:4,padding:"1px 5px",fontWeight:600}}>Replied ✅</span>}
+                      <span style={{fontSize:10,color:"var(--text3)"}}>{dt}</span>
+                    </div>
                   </div>
                   <div style={{color:"var(--text2)",lineHeight:1.6,marginBottom:6}}>{parts.join(" · ")||"—"}</div>
-                  {/* Quote summary if entered */}
+
+                  {/* Digital reply summary */}
+                  {digitalReply&&replyItems.length>0&&(
+                    <div style={{background:"rgba(56,189,248,.06)",border:"1px solid rgba(56,189,248,.2)",borderRadius:8,padding:"8px 10px",marginBottom:6}}>
+                      <div style={{fontSize:11,color:"#38bdf8",fontWeight:700,marginBottom:6}}>🔗 Supplier Digital Reply</div>
+                      {inStockReplies.map((ri,j)=>(
+                        <div key={j} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0",borderBottom:"1px solid rgba(56,189,248,.1)"}}>
+                          <div style={{flex:1}}>
+                            <span style={{color:"var(--text1)"}}>{ri.description}</span>
+                            {ri.supplier_part_no&&<span style={{color:"var(--text3)",fontSize:10,marginLeft:6,fontFamily:"monospace"}}>{ri.supplier_part_no}</span>}
+                            {ri.notes&&<span style={{color:"var(--text3)",fontSize:10,marginLeft:6,fontStyle:"italic"}}>{ri.notes}</span>}
+                          </div>
+                          <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                            <span style={{fontSize:10,color:ri.condition==="in_stock"?"var(--green)":"#fbbf24",fontWeight:600}}>{ri.condition==="in_stock"?"✅ Stock":"📦 Order"}</span>
+                            {+ri.price>0&&<span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)"}}>{(+ri.price).toLocaleString(undefined,{minimumFractionDigits:2})}</span>}
+                          </div>
+                        </div>
+                      ))}
+                      {noStockReplies.length>0&&(
+                        <div style={{marginTop:4,padding:"3px 0"}}>
+                          <span style={{fontSize:10,color:"var(--red)",fontWeight:600}}>❌ No Stock: </span>
+                          <span style={{color:"var(--text3)",fontSize:11}}>{noStockReplies.map(ri=>ri.description).join(", ")}</span>
+                        </div>
+                      )}
+                      {onCreatePO&&inStockReplies.some(ri=>+ri.price>0)&&(
+                        <button onClick={()=>onCreatePO({supplier_name:r.supplier_name||"",supplier_id:r.supplier_id||null,job_id:job.id,items:inStockReplies.map(ri=>({description:ri.description,sku:ri.sku||"",supplier_part_no:ri.supplier_part_no||"",qty:ri.qty||1,unit_price:+ri.price||0,condition:ri.condition==="can_order"?"to_order":"in_stock"}))})}
+                          style={{marginTop:8,fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(56,189,248,.4)",background:"rgba(56,189,248,.1)",cursor:"pointer",color:"#38bdf8",fontWeight:600,width:"100%"}}>
+                          📦 Create Purchase Order from Reply
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Manual quote summary if entered */}
                   {existingQuote&&(
                     <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:6,padding:"6px 10px",background:"rgba(52,211,153,.08)",borderRadius:7}}>
                       <span style={{fontSize:11,color:"var(--green)",fontWeight:700}}>💰 Quote received</span>
@@ -2050,7 +2135,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -3198,11 +3283,14 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             job={job} items={items} wsSuppliers={wsSuppliers} settings={settings}
             history={wsSupplierRequests.filter(r=>r.job_id===job.id)}
             quotes={wsSupplierQuotes.filter(q=>q.job_id===job.id)}
+            sqReplies={sqReplies}
             onLogSend={onSaveWsSupplierRequest}
             onDeleteSend={onDeleteWsSupplierRequest}
             onSaveQuote={onSaveWsSupplierQuote}
             onSaveItem={onSaveItem}
             onSaveWsStock={onSaveWsStock}
+            onGenerateLink={onGenerateWsQuoteLink}
+            onCreatePO={onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);setSupplierModal(false);}:undefined}
             onClose={()=>setSupplierModal(false)}/>
         </Overlay>
       )}
@@ -4615,6 +4703,319 @@ function WsServiceModal({item,onSave,onClose}) {
       <div style={{display:"flex",gap:10,marginTop:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>{saving?"Saving...":"✅ Save"}</button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WS PURCHASE ORDERS
+// ═══════════════════════════════════════════════════════════════
+function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsStock=[],settings,onSave,onDelete,onReceive}) {
+  const C=curSym(settings?.currency||getSettings().currency);
+  const fmt=v=>`${C}${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const [modal,setModal]=useState(null); // null | {mode:"add"|"edit"|"view"|"receive", po?}
+  const [search,setSearch]=useState("");
+  const [filterSt,setFilterSt]=useState("__all__");
+
+  const STATUS_COLOR={draft:"var(--text3)",sent:"var(--blue)",partial:"var(--yellow)",received:"var(--green)",cancelled:"var(--red)"};
+  const STATUS_BG={draft:"var(--surface3)",sent:"rgba(96,165,250,.12)",partial:"rgba(251,191,36,.12)",received:"rgba(52,211,153,.12)",cancelled:"rgba(248,113,113,.12)"};
+
+  const filtered=purchaseOrders.filter(po=>{
+    if(filterSt!=="__all__"&&po.status!==filterSt) return false;
+    if(search.trim()){const h=`${po.supplier_name||""} ${po.id}`.toLowerCase();if(!search.toLowerCase().split(/\s+/).every(w=>h.includes(w)))return false;}
+    return true;
+  });
+
+  const summary={
+    draft:purchaseOrders.filter(p=>p.status==="draft").length,
+    sent:purchaseOrders.filter(p=>p.status==="sent").length,
+    partial:purchaseOrders.filter(p=>p.status==="partial").length,
+    received:purchaseOrders.filter(p=>p.status==="received").length,
+  };
+
+  return (
+    <div>
+      {/* Summary */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
+        {[["Draft",summary.draft,"var(--text3)"],["Sent",summary.sent,"var(--blue)"],["Partial",summary.partial,"var(--yellow)"],["Received",summary.received,"var(--green)"]].map(([l,v,c])=>(
+          <div key={l} className="card" style={{padding:"10px 12px",cursor:"pointer",border:filterSt===l.toLowerCase()?"1px solid "+c:"1px solid transparent"}}
+            onClick={()=>setFilterSt(p=>p===l.toLowerCase()?"__all__":l.toLowerCase())}>
+            <div style={{fontSize:11,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",marginBottom:2}}>{l}</div>
+            <div style={{fontSize:20,fontWeight:800,color:c,fontFamily:"Rajdhani,sans-serif"}}>{v}</div>
+          </div>
+        ))}
+      </div>
+      {/* Controls */}
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+        <input className="inp" style={{flex:1,minWidth:140}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search supplier, PO #…"/>
+        <select className="inp" style={{width:130}} value={filterSt} onChange={e=>setFilterSt(e.target.value)}>
+          <option value="__all__">All Status</option>
+          {["draft","sent","partial","received","cancelled"].map(s=><option key={s}>{s}</option>)}
+        </select>
+        <button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ New PO</button>
+      </div>
+      {/* List */}
+      {filtered.length===0
+        ?<div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
+            <div style={{fontSize:32,marginBottom:8}}>📋</div>
+            <div style={{fontWeight:600}}>No purchase orders yet</div>
+            <div style={{fontSize:13,marginTop:4}}>Create POs to track orders to your suppliers</div>
+          </div>
+        :<div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {filtered.map(po=>{
+            const items=poItems.filter(i=>i.po_id===po.id);
+            const received=items.every(i=>(+i.received_qty||0)>=(+i.qty||0));
+            const partial=items.some(i=>(+i.received_qty||0)>0)&&!received;
+            return (
+              <div key={po.id} className="card" style={{padding:"12px 14px",cursor:"pointer"}} onClick={()=>setModal({mode:"view",po})}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:6}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:14}}>{po.supplier_name||"Unknown Supplier"}</div>
+                    <code style={{fontSize:10,color:"var(--text3)",fontFamily:"monospace"}}>{po.id}</code>
+                    {po.job_id&&<span style={{fontSize:10,color:"var(--text3)",marginLeft:8}}>Job: {po.job_id}</span>}
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                    <span style={{fontSize:11,padding:"2px 8px",borderRadius:6,background:STATUS_BG[po.status]||"var(--surface3)",color:STATUS_COLOR[po.status]||"var(--text3)",fontWeight:600,textTransform:"capitalize"}}>{po.status||"draft"}</span>
+                    <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:14,color:"var(--accent)"}}>{fmt(po.total_amount)}</span>
+                  </div>
+                </div>
+                <div style={{fontSize:12,color:"var(--text2)",marginBottom:6}}>{items.map(i=>i.description).join(" · ")||"No items"}</div>
+                {items.length>0&&(
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    {items.map(i=>{
+                      const pct=Math.min(100,((+i.received_qty||0)/(+i.qty||1))*100);
+                      return (
+                        <div key={i.id} style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:pct>=100?"rgba(52,211,153,.12)":pct>0?"rgba(251,191,36,.12)":"var(--surface3)",color:pct>=100?"var(--green)":pct>0?"var(--yellow)":"var(--text3)"}}>
+                          {i.description}: {+i.received_qty||0}/{+i.qty||0}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div style={{display:"flex",gap:6,marginTop:8}} onClick={e=>e.stopPropagation()}>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setModal({mode:"edit",po})}>✏️ Edit</button>
+                  {po.status!=="received"&&po.status!=="cancelled"&&(
+                    <button className="btn btn-sm" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",border:"1px solid rgba(52,211,153,.3)"}}
+                      onClick={()=>setModal({mode:"receive",po})}>📥 Receive Goods</button>
+                  )}
+                  <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",marginLeft:"auto"}}
+                    onClick={()=>{if(window.confirm("Delete this PO?"))onDelete(po.id);}}>🗑️</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      }
+      {(modal?.mode==="add"||modal?.mode==="edit")&&(
+        <WsPurchaseOrderModal po={modal.po||null} wsSuppliers={wsSuppliers} settings={settings}
+          onSave={async(po,items)=>{await onSave(po,items);setModal(null);}}
+          onClose={()=>setModal(null)}/>
+      )}
+      {modal?.mode==="receive"&&modal.po&&(
+        <WsReceiveGoodsModal po={modal.po} poItems={poItems.filter(i=>i.po_id===modal.po.id)}
+          wsStock={wsStock} settings={settings}
+          onReceive={async(receivedItems)=>{await onReceive(modal.po.id,receivedItems);setModal(null);}}
+          onClose={()=>setModal(null)}/>
+      )}
+      {modal?.mode==="view"&&modal.po&&(
+        <Overlay onClose={()=>setModal(null)}>
+          <MHead title={`PO — ${modal.po.supplier_name||"Unknown"}`} onClose={()=>setModal(null)}/>
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:4}}>Status: <span style={{color:STATUS_COLOR[modal.po.status]||"var(--text3)",fontWeight:700,textTransform:"capitalize"}}>{modal.po.status||"draft"}</span></div>
+            {modal.po.notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:4}}>Notes: {modal.po.notes}</div>}
+            {modal.po.job_id&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:4}}>Job: {modal.po.job_id}</div>}
+          </div>
+          <div style={{overflowX:"auto",marginBottom:12}}>
+            <table className="tbl" style={{width:"100%"}}>
+              <thead><tr><th>Description</th><th>SKU</th><th style={{textAlign:"right"}}>Qty</th><th style={{textAlign:"right"}}>Unit Price</th><th>Condition</th><th style={{textAlign:"right"}}>Received</th></tr></thead>
+              <tbody>
+                {poItems.filter(i=>i.po_id===modal.po.id).map(i=>(
+                  <tr key={i.id}>
+                    <td>{i.description}</td>
+                    <td><code style={{fontSize:11,fontFamily:"monospace",color:"var(--text3)"}}>{i.sku||"—"}</code></td>
+                    <td style={{textAlign:"right"}}>{i.qty}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)"}}>{fmt(i.unit_price)}</td>
+                    <td><span style={{fontSize:11,color:i.condition==="to_order"?"#fbbf24":"var(--green)"}}>{i.condition==="to_order"?"📦 To Order":"✅ In Stock"}</span></td>
+                    <td style={{textAlign:"right"}}>{+i.received_qty||0} / {i.qty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+            <button className="btn btn-ghost" onClick={()=>setModal({mode:"edit",po:modal.po})}>✏️ Edit</button>
+            {modal.po.status!=="received"&&modal.po.status!=="cancelled"&&(
+              <button className="btn btn-primary" style={{background:"rgba(52,211,153,.8)"}}
+                onClick={()=>setModal({mode:"receive",po:modal.po})}>📥 Receive Goods</button>
+            )}
+          </div>
+        </Overlay>
+      )}
+    </div>
+  );
+}
+
+function WsPurchaseOrderModal({po,wsSuppliers=[],settings,onSave,onClose,prefill=null}) {
+  const C=curSym(settings?.currency||getSettings().currency);
+  const [suppId,setSuppId]=useState(po?.supplier_id||"");
+  const [suppName,setSuppName]=useState(po?.supplier_name||"");
+  const [status,setStatus]=useState(po?.status||"draft");
+  const [notes,setNotes]=useState(po?.notes||"");
+  const [jobId,setJobId]=useState(po?.job_id||"");
+  const [items,setItems]=useState(()=>{
+    if(prefill) return prefill;
+    if(po){const stored=JSON.parse(po._items||"[]");return stored.length?stored:[{id:"i1",description:"",sku:"",supplier_part_no:"",qty:1,unit_price:0,condition:"in_stock"}];}
+    return [{id:"i1",description:"",sku:"",supplier_part_no:"",qty:1,unit_price:0,condition:"in_stock"}];
+  });
+  const [saving,setSaving]=useState(false);
+
+  const addItem=()=>setItems(p=>[...p,{id:"i"+Date.now(),description:"",sku:"",supplier_part_no:"",qty:1,unit_price:0,condition:"in_stock"}]);
+  const removeItem=idx=>setItems(p=>p.filter((_,i)=>i!==idx));
+  const setItem=(idx,k,v)=>setItems(p=>p.map((it,i)=>i===idx?{...it,[k]:v}:it));
+
+  const chosenSupplier=wsSuppliers.find(s=>String(s.id)===String(suppId));
+  const resolvedName=chosenSupplier?.name||suppName;
+  const total=items.reduce((s,i)=>s+(+i.qty||0)*(+i.unit_price||0),0);
+
+  const save=async()=>{
+    if(!resolvedName.trim()){alert("Supplier name required");return;}
+    if(!items.some(i=>i.description.trim())){alert("Add at least one item");return;}
+    setSaving(true);
+    await onSave({
+      id:po?.id||undefined,
+      supplier_id:suppId||null,supplier_name:resolvedName,
+      status,notes,job_id:jobId||null,
+    },items.filter(i=>i.description.trim()));
+    setSaving(false);
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title={po?"Edit Purchase Order":"New Purchase Order"} onClose={onClose}/>
+      {/* Supplier */}
+      <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>Supplier</div>
+      {wsSuppliers.length>0
+        ?<select className="inp" style={{marginBottom:8}} value={suppId} onChange={e=>{setSuppId(e.target.value);setSuppName("");}}>
+            <option value="">— Select supplier —</option>
+            {wsSuppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        :<input className="inp" style={{marginBottom:8}} placeholder="Supplier name" value={suppName} onChange={e=>setSuppName(e.target.value)}/>
+      }
+      {suppId&&!wsSuppliers.find(s=>String(s.id)===String(suppId))&&(
+        <input className="inp" style={{marginBottom:8}} placeholder="Supplier name" value={suppName} onChange={e=>setSuppName(e.target.value)}/>
+      )}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+        <div><FL label="Status"/><select className="inp" value={status} onChange={e=>setStatus(e.target.value)}>
+          {["draft","sent","partial","received","cancelled"].map(s=><option key={s}>{s}</option>)}
+        </select></div>
+        <div><FL label="Job # (optional)"/><input className="inp" value={jobId} onChange={e=>setJobId(e.target.value)} placeholder="e.g. WJ-123"/></div>
+      </div>
+      <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}><FL label="Notes (optional)"/></div>
+      <input className="inp" style={{marginBottom:14}} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Delivery instructions, reference…"/>
+
+      {/* Line items */}
+      <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Items</div>
+      <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:8}}>
+        {items.map((it,idx)=>(
+          <div key={it.id||idx} style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",border:"1px solid var(--border)"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:6,marginBottom:6}}>
+              <input className="inp" value={it.description} onChange={e=>setItem(idx,"description",e.target.value)} placeholder="Description *"/>
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>removeItem(idx)}>✕</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}>
+              <input className="inp" value={it.sku} onChange={e=>setItem(idx,"sku",e.target.value)} placeholder="SKU"/>
+              <input className="inp" value={it.supplier_part_no} onChange={e=>setItem(idx,"supplier_part_no",e.target.value)} placeholder="Supplier Part #"/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr",gap:6}}>
+              <div><FL label="Qty"/><input className="inp" type="number" min="0" value={it.qty} onChange={e=>setItem(idx,"qty",e.target.value)}/></div>
+              <div><FL label={`Unit Price (${C})`}/><input className="inp" type="number" min="0" step="0.01" value={it.unit_price} onChange={e=>setItem(idx,"unit_price",e.target.value)}/></div>
+              <div><FL label="Condition"/><select className="inp" value={it.condition} onChange={e=>setItem(idx,"condition",e.target.value)}>
+                <option value="in_stock">✅ In Stock</option>
+                <option value="to_order">📦 To Order</option>
+              </select></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button className="btn btn-ghost btn-sm" style={{marginBottom:14,width:"100%"}} onClick={addItem}>+ Add Item</button>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,padding:"8px 12px",background:"var(--surface2)",borderRadius:8}}>
+        <span style={{fontSize:13,color:"var(--text2)"}}>Total</span>
+        <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:16,color:"var(--accent)"}}>{C}{total.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={saving} onClick={save}>{saving?"Saving…":"💾 Save PO"}</button>
+      </div>
+    </Overlay>
+  );
+}
+
+function WsReceiveGoodsModal({po,poItems=[],wsStock=[],settings,onReceive,onClose}) {
+  const C=curSym(settings?.currency||getSettings().currency);
+  const fmt=v=>`${C}${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const [rows,setRows]=useState(()=>poItems.map(i=>({
+    po_item_id:i.id,description:i.description,sku:i.sku||"",
+    qty:+i.qty||0,received_qty:+i.received_qty||0,
+    receive_qty:Math.max(0,(+i.qty||0)-(+i.received_qty||0)),
+    unit_price:+i.unit_price||0,stock_id:"",
+  })));
+  const [saving,setSaving]=useState(false);
+
+  const setRow=(idx,k,v)=>setRows(p=>p.map((r,i)=>i===idx?{...r,[k]:v}:r));
+  const total=rows.reduce((s,r)=>s+(+r.receive_qty||0)*(+r.unit_price||0),0);
+  const outstanding=rows.filter(r=>r.received_qty<r.qty);
+  const fullyReceived=rows.filter(r=>r.received_qty>=r.qty);
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="📥 Receive Goods" onClose={onClose}/>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>
+        Supplier: <strong style={{color:"var(--text1)"}}>{po.supplier_name}</strong>
+        &nbsp;·&nbsp;PO: <code style={{fontFamily:"monospace",fontSize:11}}>{po.id}</code>
+      </div>
+      {outstanding.length>0&&(
+        <>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Pending Items</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+            {outstanding.map((r,idx)=>{
+              const globalIdx=rows.indexOf(r);
+              const stockMatch=wsStock.filter(w=>w.sku&&r.sku&&w.sku===r.sku);
+              return (
+                <div key={r.po_item_id} style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",border:"1px solid var(--border)"}}>
+                  <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>{r.description}{r.sku&&<span style={{color:"var(--text3)",fontFamily:"monospace",fontSize:10,marginLeft:6}}>{r.sku}</span>}</div>
+                  <div style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr",gap:6,marginBottom:6}}>
+                    <div><FL label="Receive Qty"/><input className="inp" type="number" min="0" max={r.qty-r.received_qty} value={r.receive_qty} onChange={e=>setRow(globalIdx,"receive_qty",e.target.value)}/></div>
+                    <div><FL label="Unit Price"/><input className="inp" type="number" min="0" step="0.01" value={r.unit_price} onChange={e=>setRow(globalIdx,"unit_price",e.target.value)}/></div>
+                    <div><FL label="WS Stock Item"/>
+                      <select className="inp" value={r.stock_id} onChange={e=>setRow(globalIdx,"stock_id",e.target.value)}>
+                        <option value="">— Link stock (optional) —</option>
+                        {wsStock.map(w=><option key={w.id} value={w.id}>{w.name}{w.sku?` (${w.sku})`:""}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>Ordered: {r.qty} · Already received: {r.received_qty}</div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {fullyReceived.length>0&&(
+        <div style={{fontSize:12,color:"var(--green)",marginBottom:10,padding:"6px 10px",background:"rgba(52,211,153,.08)",borderRadius:6}}>
+          ✅ Already fully received: {fullyReceived.map(r=>r.description).join(", ")}
+        </div>
+      )}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"var(--surface2)",borderRadius:8,marginBottom:14}}>
+        <span style={{fontSize:13,color:"var(--text2)"}}>Invoice Total</span>
+        <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:16,color:"var(--accent)"}}>{fmt(total)}</span>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2,background:"rgba(52,211,153,.8)"}} disabled={saving}
+          onClick={async()=>{setSaving(true);await onReceive(rows);setSaving(false);}}>
+          {saving?"Processing…":"📥 Confirm Receipt & Create Invoice"}
+        </button>
       </div>
     </Overlay>
   );

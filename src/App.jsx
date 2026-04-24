@@ -12,7 +12,7 @@ import { WorkshopProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubsc
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
-import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage } from "./pages/PublicPages.jsx";
+import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage } from "./pages/PublicPages.jsx";
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -35,6 +35,8 @@ export default function App() {
   if(rfqBatchToken) return <RfqBatchReplyPage token={rfqBatchToken}/>;
   const wsqToken = new URLSearchParams(window.location.search).get("wsq");
   if(wsqToken) return <QuoteConfirmPage token={wsqToken}/>;
+  const wsSupReqToken = new URLSearchParams(window.location.search).get("ws_supreq");
+  if(wsSupReqToken) return <WsSupplierQuoteReplyPage token={wsSupReqToken}/>;
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
   if(!user) return <LoginPage onLogin={setUser} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={()=>setUser(null)} lang={lang}/>;
@@ -108,6 +110,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const [wsSupplierInvItems,setWsSupplierInvItems]=useState([]);
   const [wsSupplierPayments,setWsSupplierPayments]=useState([]);
   const [wsSupplierReturns, setWsSupplierReturns] =useState([]);
+  const [wsSqReplies,       setWsSqReplies]       =useState([]);
+  const [wsPurchaseOrders,  setWsPurchaseOrders]  =useState([]);
+  const [wsPoItems,         setWsPoItems]         =useState([]);
   const [workshopDocuments,setWorkshopDocuments]=useState([]);
   const [workshopProfile,setWorkshopProfile]=useState({});
   const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
@@ -289,6 +294,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("ws_supplier_invoice_items",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_supplier_payments",`select=*&order=payment_date.desc${wsF}`).catch(()=>[]),
       api.get("ws_supplier_returns",`select=*&order=return_date.desc${wsF}`).catch(()=>[]),
+      api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
+      api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
+      api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -326,6 +334,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWsSupplierInvItems(Array.isArray(rest[20])?rest[20]:[]);
     setWsSupplierPayments(Array.isArray(rest[21])?rest[21]:[]);
     setWsSupplierReturns(Array.isArray(rest[22])?rest[22]:[]);
+    setWsSqReplies(Array.isArray(rest[23])?rest[23]:[]);
+    setWsPurchaseOrders(Array.isArray(rest[24])?rest[24]:[]);
+    setWsPoItems(Array.isArray(rest[25])?rest[25]:[]);
     // Load workshop profile for workshop role
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
@@ -363,6 +374,9 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       api.get("ws_supplier_invoice_items",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_supplier_payments",`select=*&order=payment_date.desc${wsF}`).catch(()=>[]),
       api.get("ws_supplier_returns",`select=*&order=return_date.desc${wsF}`).catch(()=>[]),
+      api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
+      api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
+      api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
     ]);
     setWorkshopJobs(Array.isArray(jobs)?jobs:[]);
     setWorkshopJobItems(Array.isArray(items)?items:[]);
@@ -380,6 +394,14 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
     setWsSupplierInvItems(Array.isArray(wsInvItems)?wsInvItems:[]);
     setWsSupplierPayments(Array.isArray(wsPayms)?wsPayms:[]);
     setWsSupplierReturns(Array.isArray(wsRets)?wsRets:[]);
+    const [sqReps,wsPOs,wsPOItems]=await Promise.all([
+      api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
+      api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
+      api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
+    ]);
+    setWsSqReplies(Array.isArray(sqReps)?sqReps:[]);
+    setWsPurchaseOrders(Array.isArray(wsPOs)?wsPOs:[]);
+    setWsPoItems(Array.isArray(wsPOItems)?wsPOItems:[]);
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
@@ -886,6 +908,86 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
   const deleteWsSupplierRequest=async(id)=>{
     await api.delete("ws_supplier_requests","id",id).catch(e=>console.warn("Delete send failed:",e));
     setWsSupplierRequests(p=>p.filter(r=>r.id!==id));
+  };
+
+  const generateWsSupplierQuoteLink=async(info,items)=>{
+    const token=makeToken();
+    const reqId=makeId("WSRQ");
+    const now=new Date().toISOString();
+    const rec={id:reqId,workshop_id:wsId||null,job_id:info.job_id||null,vehicle_reg:info.vehicle_reg||"",
+      supplier_id:info.supplier_id||null,supplier_name:info.supplier_name||"",supplier_phone:info.supplier_phone||"",
+      parts_list:JSON.stringify(items.map(i=>i.label||i.description||"")),message:"",token,
+      items_json:JSON.stringify(items),sent_at:now};
+    await api.insert("ws_supplier_requests",rec).catch(e=>console.warn("Link gen failed:",e));
+    setWsSupplierRequests(p=>[rec,...p]);
+    return `${window.location.origin}${window.location.pathname}?ws_supreq=${token}`;
+  };
+
+  const saveWsPurchaseOrder=async(po,items=[])=>{
+    const chk=(r,l)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${l}: ${r.message||r.code}`); return r; };
+    const {id,...rest}=po;
+    const isNew=!id;
+    const poId=id||makeId("WSPO");
+    const total=items.reduce((s,i)=>s+(+i.qty||0)*(+i.unit_price||0),0);
+    if(isNew){
+      chk(await api.insert("ws_purchase_orders",{...rest,id:poId,workshop_id:wsId||null,total_amount:total,created_at:new Date().toISOString()}),"Create PO");
+    } else {
+      chk(await api.patch("ws_purchase_orders","id",poId,{...rest,total_amount:total}),"Update PO");
+      await api.delete("ws_po_items","po_id",poId);
+    }
+    for(const it of items){
+      chk(await api.insert("ws_po_items",{...it,id:makeId("WSPI"),po_id:poId,workshop_id:wsId||null}),"Add PO item");
+    }
+    await refreshWorkshopData();
+    showToast(isNew?"Purchase order created":"Purchase order updated");
+  };
+
+  const deleteWsPurchaseOrder=async(id)=>{
+    await api.delete("ws_po_items","po_id",id);
+    await api.delete("ws_purchase_orders","id",id);
+    await refreshWorkshopData();
+    showToast("Purchase order deleted","err");
+  };
+
+  const receiveWsPurchaseOrder=async(poId,receivedItems)=>{
+    const chk=(r,l)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${l}: ${r.message||r.code}`); return r; };
+    const po=wsPurchaseOrders.find(p=>p.id===poId);
+    if(!po) return;
+    const toReceive=receivedItems.filter(i=>+i.receive_qty>0);
+    if(!toReceive.length){showToast("Enter qty to receive","err");return;}
+    const invId=makeId("WSIN");
+    const total=toReceive.reduce((s,i)=>s+(+i.receive_qty)*(+i.unit_price||0),0);
+    chk(await api.insert("ws_supplier_invoices",{id:invId,workshop_id:wsId||null,
+      supplier_id:po.supplier_id||null,supplier_name:po.supplier_name||"",
+      invoice_ref:`PO-${poId}`,invoice_date:new Date().toISOString().slice(0,10),
+      total,paid_amount:0,status:"pending"}),"Create invoice");
+    for(const it of toReceive){
+      chk(await api.insert("ws_supplier_invoice_items",{id:makeId("WSII"),invoice_id:invId,workshop_id:wsId||null,
+        description:it.description,sku:it.sku||"",qty:+it.receive_qty,
+        unit_cost:+it.unit_price||0,total:(+it.receive_qty)*(+it.unit_price||0),stock_id:it.stock_id||null}),"Add item");
+      if(it.stock_id){
+        const wsi=workshopStock.find(w=>w.id===it.stock_id);
+        if(wsi&&!wsi.quote_only){
+          const nq=(+wsi.qty||0)+(+it.receive_qty);
+          await api.patch("workshop_stock","id",it.stock_id,{qty:nq,unit_cost:+it.unit_price||+wsi.unit_cost||0});
+          await api.insert("workshop_stock_moves",{id:makeId("WSM"),stock_id:it.stock_id,stock_name:wsi.name,
+            move_type:"purchase",qty_change:+it.receive_qty,qty_after:nq,reference:invId,
+            notes:`PO ${poId}`,moved_at:new Date().toISOString()});
+        }
+      }
+      if(it.po_item_id){
+        const poi=wsPoItems.find(p=>p.id===it.po_item_id);
+        if(poi) await api.patch("ws_po_items","id",it.po_item_id,{received_qty:(+poi.received_qty||0)+(+it.receive_qty)});
+      }
+    }
+    // Determine new PO status
+    const allItems=wsPoItems.filter(i=>i.po_id===poId);
+    const updatedItems=allItems.map(i=>{const r=receivedItems.find(x=>x.po_item_id===i.id);return{...i,received_qty:(+i.received_qty||0)+(r?+r.receive_qty:0)};});
+    const allDone=updatedItems.every(i=>(+i.received_qty||0)>=(+i.qty||0));
+    const anyDone=updatedItems.some(i=>(+i.received_qty||0)>0);
+    await api.patch("ws_purchase_orders","id",poId,{status:allDone?"received":anyDone?"partial":po.status});
+    await refreshWorkshopData();
+    showToast("Goods received & stock updated");
   };
 
   // ── Workshop Supplier Invoices ────────────────────────────────
@@ -2940,6 +3042,13 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
             wsRole={wsRole}
             wsId={wsId}
             wsProfiles={allWsProfiles}
+            wsSqReplies={wsSqReplies}
+            wsPurchaseOrders={wsPurchaseOrders}
+            wsPoItems={wsPoItems}
+            onGenerateWsQuoteLink={generateWsSupplierQuoteLink}
+            onSaveWsPurchaseOrder={saveWsPurchaseOrder}
+            onDeleteWsPurchaseOrder={deleteWsPurchaseOrder}
+            onReceiveWsPurchaseOrder={receiveWsPurchaseOrder}
             t={t} lang={lang}/>
         )}
 

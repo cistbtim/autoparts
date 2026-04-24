@@ -612,8 +612,10 @@ function MainApp({user,onLogout,t,lang,setLang,theme,toggleTheme}) {
       // Auto-create workshop_vehicle if not linked yet
       if(!d.workshop_vehicle_id && d.vehicle_reg?.trim()){
         const vehId=makeId("WSV");
-        chk(await api.insert("workshop_vehicles",{id:vehId,workshop_customer_id:d.workshop_customer_id||null,reg:d.vehicle_reg.trim(),make:d.vehicle_make||"",model:d.vehicle_model||"",year:d.vehicle_year||"",color:d.vehicle_color||"",vin:d.vin||"",engine_no:d.engine_no||"",workshop_id:wsId||null}),"Save vehicle");
+        chk(await api.insert("workshop_vehicles",{id:vehId,workshop_customer_id:d.workshop_customer_id||null,reg:d.vehicle_reg.trim(),make:d.vehicle_make||"",model:d.vehicle_model||"",year:d.vehicle_year||"",color:d.vehicle_color||"",vin:d.vin||"",engine_no:d.engine_no||"",licence_disc_expiry:d.licence_disc_expiry||null,workshop_id:wsId||null}),"Save vehicle");
         d.workshop_vehicle_id=vehId;
+      } else if(d.workshop_vehicle_id && d.licence_disc_expiry) {
+        await api.patch("workshop_vehicles","id",d.workshop_vehicle_id,{licence_disc_expiry:d.licence_disc_expiry}).catch(()=>{});
       }
       // Build job record — empty strings → null so Supabase doesn't choke on typed columns
       const str=v=>v?.toString().trim()||null;

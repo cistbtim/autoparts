@@ -161,6 +161,7 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
       vehicle_color:scanResult?.color||foundVehicle?.color||"",
       vin:scanResult?.vin||foundVehicle?.vin||"",
       engine_no:scanResult?.engine_no||foundVehicle?.engine_no||"",
+      licence_disc_expiry:scanResult?.expiry_date||foundVehicle?.licence_disc_expiry||"",
       mileage:"",complaint:"",diagnosis:"",mechanic:"",
       date_in:new Date().toISOString().slice(0,10),
       date_out:"",notes:"",status:"Pending",
@@ -2555,6 +2556,14 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                 <code style={{fontWeight:600,fontSize:12,fontFamily:"DM Mono,monospace"}}>{job.engine_no}</code>
               </div>
             )}
+            {vehicleRecord?.licence_disc_expiry&&(
+              <div>
+                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>Licence Disc Expiry</div>
+                <div style={{fontWeight:700,fontSize:13,color:new Date(vehicleRecord.licence_disc_expiry)<new Date()?"var(--red)":"var(--green)"}}>
+                  {vehicleRecord.licence_disc_expiry} {new Date(vehicleRecord.licence_disc_expiry)<new Date()?"⚠️ EXPIRED":"✅"}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* VIN + Search tools */}
@@ -3402,7 +3411,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
     vehicle_reg:job.vehicle_reg||"", vehicle_make:job.vehicle_make||"",
     vehicle_model:job.vehicle_model||"", vehicle_year:job.vehicle_year||"",
     vehicle_color:job.vehicle_color||"", mileage:job.mileage||"",
-    vin:job.vin||"", engine_no:job.engine_no||"",
+    vin:job.vin||"", engine_no:job.engine_no||"", licence_disc_expiry:job.licence_disc_expiry||"",
     complaint:job.complaint||"", diagnosis:job.diagnosis||"",
     mechanic:job.mechanic||"", date_in:job.date_in||new Date().toISOString().slice(0,10),
     date_out:job.date_out||"", notes:job.notes||"", status:job.status||"Pending",
@@ -3650,6 +3659,15 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
             </div>
             <div><FL label="Engine No."/><input className="inp" value={f.engine_no} onChange={e=>s("engine_no",e.target.value.toUpperCase())} placeholder="Engine number..." style={{fontFamily:"DM Mono,monospace",fontSize:12}}/></div>
           </FG>
+          <FD>
+            <FL label="🗓️ Licence Disc Expiry"/>
+            <input className="inp" type="date" value={f.licence_disc_expiry} onChange={e=>s("licence_disc_expiry",e.target.value)}/>
+            {f.licence_disc_expiry&&(
+              <div style={{marginTop:4,fontSize:12,fontWeight:600,color:new Date(f.licence_disc_expiry)<new Date()?"var(--red)":"var(--green)"}}>
+                {new Date(f.licence_disc_expiry)<new Date()?"⚠️ EXPIRED":"✅ Valid"}
+              </div>
+            )}
+          </FD>
         </div>
       )}
 

@@ -949,6 +949,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         sqReplies={wsSqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===activeJob.id))}
         onGenerateWsQuoteLink={onGenerateWsQuoteLink}
         onSaveWsPurchaseOrder={onSaveWsPurchaseOrder}
+        onViewPurchaseOrders={()=>{ setView("list"); setWsTab("wssuporders"); }}
         t={t} lang={lang}/>
     );
   }
@@ -2161,7 +2162,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -3336,7 +3337,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             onSaveItem={onSaveItem}
             onSaveWsStock={onSaveWsStock}
             onGenerateLink={onGenerateWsQuoteLink}
-            onCreatePO={onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);setSupplierModal(false);}:undefined}
+            onCreatePO={onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);setSupplierModal(false);if(onViewPurchaseOrders)onViewPurchaseOrders();}:undefined}
             onClose={()=>setSupplierModal(false)}/>
         </Overlay>
       )}

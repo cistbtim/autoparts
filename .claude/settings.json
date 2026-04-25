@@ -17,7 +17,18 @@
       "Bash(awk 'NR>=3262' src/App.jsx)",
       "Bash(awk -F: '$2>3261')",
       "Bash(awk 'NR>=4696 && NR<=5042' src/App.jsx)",
-      "Bash(awk -F: '$2>=1445 && $2<=1700')"
+      "Bash(awk -F: '$2>=1445 && $2<=1700')",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(bun --version)",
+      "Bash(git --version)",
+      "Read(//c/Users/Tim/.claude/**)",
+      "PowerShell(powershell -c \"irm bun.sh/install.ps1 | iex\" 2>&1)",
+      "Bash(git clone *)",
+      "Bash(/c/Users/Tim/.bun/bin/bun run *)",
+      "Bash(bash setup *)",
+      "Bash(export PATH=\"$PATH:/c/Users/Tim/.bun/bin\")",
+      "Skill(qa)",
+      "Skill(qa:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory"

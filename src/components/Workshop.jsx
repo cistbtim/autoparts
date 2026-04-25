@@ -1866,7 +1866,7 @@ const CHECKLIST_ITEMS=[
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER QUOTE MODAL — enter prices received from a supplier
 // ═══════════════════════════════════════════════════════════════
-function SupplierQuoteModal({request, existingQuote, settings={}, onSave, onClose}) {
+function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=false, onSave, onClose}) {
   const vatRate = +(settings?.tax_rate||0) / 100;
   const parts = (() => { try { return JSON.parse(request.parts_list||"[]"); } catch { return []; } })();
   const [prices, setPrices] = useState(() => {
@@ -1924,7 +1924,7 @@ function SupplierQuoteModal({request, existingQuote, settings={}, onSave, onClos
 
   return (
     <Overlay onClose={onClose} wide>
-      <MHead title="💰 Enter Supplier Quote" onClose={onClose}/>
+      <MHead title={priceOnly?"↩️ Return Quote":"💰 Enter Supplier Quote"} onClose={onClose}/>
 
       {/* Supplier + vehicle banner */}
       <div style={{background:"var(--surface2)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
@@ -1934,21 +1934,23 @@ function SupplierQuoteModal({request, existingQuote, settings={}, onSave, onClos
         </div>
       </div>
 
-      {/* VAT toggle */}
-      <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"9px 14px",background:"var(--surface2)",borderRadius:10,cursor:"pointer",border:"1px solid var(--border)"}}>
-        <input type="checkbox" checked={vatExcluded} onChange={e=>setVatExcluded(e.target.checked)}
-          style={{width:16,height:16,accentColor:"var(--accent)",cursor:"pointer",flexShrink:0}}/>
-        <div style={{flex:1}}>
-          <div style={{fontSize:13,fontWeight:700}}>Prices are VAT excluded (ex-VAT)</div>
-          <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>
-            {vatExcluded
-              ? vatRate>0
-                ? `VAT (${settings.tax_rate}%) will be added — totals shown incl. VAT`
-                : "No VAT rate set in settings — configure it in Workshop Settings"
-              : "Prices already include VAT"}
+      {/* VAT toggle — hidden in priceOnly mode */}
+      {!priceOnly&&(
+        <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"9px 14px",background:"var(--surface2)",borderRadius:10,cursor:"pointer",border:"1px solid var(--border)"}}>
+          <input type="checkbox" checked={vatExcluded} onChange={e=>setVatExcluded(e.target.checked)}
+            style={{width:16,height:16,accentColor:"var(--accent)",cursor:"pointer",flexShrink:0}}/>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700}}>Prices are VAT excluded (ex-VAT)</div>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>
+              {vatExcluded
+                ? vatRate>0
+                  ? `VAT (${settings.tax_rate}%) will be added — totals shown incl. VAT`
+                  : "No VAT rate set in settings — configure it in Workshop Settings"
+                : "Prices already include VAT"}
+            </div>
           </div>
-        </div>
-      </label>
+        </label>
+      )}
 
       {/* Line items — one row per part */}
       <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
@@ -1956,30 +1958,30 @@ function SupplierQuoteModal({request, existingQuote, settings={}, onSave, onClos
       </div>
       <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:14}}>
         {/* Header */}
-        <div style={{display:"grid",gridTemplateColumns:`1fr 110px${vatExcluded&&vatRate>0?" 100px":""} 100px`,gap:8,padding:"7px 12px",background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
+        <div style={{display:"grid",gridTemplateColumns:priceOnly?`1fr 120px`:`1fr 110px${vatExcluded&&vatRate>0?" 100px":""} 100px`,gap:8,padding:"7px 12px",background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
           <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>Part</div>
           <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",textAlign:"right"}}>
-            {vatExcluded?"Ex-VAT":"Price"}
+            {priceOnly?"Price":vatExcluded?"Ex-VAT":"Price"}
           </div>
-          {vatExcluded&&vatRate>0&&<div style={{fontSize:10,fontWeight:700,color:"#f59e0b",textTransform:"uppercase",textAlign:"right"}}>Incl. VAT</div>}
-          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>Available</div>
+          {!priceOnly&&vatExcluded&&vatRate>0&&<div style={{fontSize:10,fontWeight:700,color:"#f59e0b",textTransform:"uppercase",textAlign:"right"}}>Incl. VAT</div>}
+          {!priceOnly&&<div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>Available</div>}
         </div>
         {prices.map((row,idx) => (
-          <div key={idx} style={{display:"grid",gridTemplateColumns:`1fr 110px${vatExcluded&&vatRate>0?" 100px":""} 100px`,gap:8,padding:"8px 12px",borderBottom:idx<prices.length-1?"1px solid var(--border)":"none",alignItems:"center"}}>
+          <div key={idx} style={{display:"grid",gridTemplateColumns:priceOnly?`1fr 120px`:`1fr 110px${vatExcluded&&vatRate>0?" 100px":""} 100px`,gap:8,padding:"8px 12px",borderBottom:idx<prices.length-1?"1px solid var(--border)":"none",alignItems:"center"}}>
             <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.name}</div>
             <input className="inp" type="number" min="0" step="0.01"
               value={row.price} onChange={e=>setLine(idx,"price",e.target.value)}
               placeholder="0.00"
               style={{textAlign:"right",padding:"4px 8px",fontSize:13,fontWeight:700}}/>
-            {vatExcluded&&vatRate>0&&(
+            {!priceOnly&&vatExcluded&&vatRate>0&&(
               <div style={{textAlign:"right",fontSize:12,fontWeight:700,color:"#f59e0b",fontFamily:"Rajdhani,sans-serif"}}>
                 {+row.price>0?inclPrice(row.price).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):"—"}
               </div>
             )}
-            <input className="inp"
+            {!priceOnly&&<input className="inp"
               value={row.available} onChange={e=>setLine(idx,"available",e.target.value)}
               placeholder="In stock"
-              style={{padding:"4px 8px",fontSize:12}}/>
+              style={{padding:"4px 8px",fontSize:12}}/>}
           </div>
         ))}
         {/* Total row */}
@@ -2008,12 +2010,12 @@ function SupplierQuoteModal({request, existingQuote, settings={}, onSave, onClos
         )}
       </div>
 
-      <FD><FL label="Notes (optional)"/><textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. ETA 2 days, confirm order by 3pm" style={{minHeight:46,resize:"vertical"}}/></FD>
+      {!priceOnly&&<FD><FL label="Notes (optional)"/><textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. ETA 2 days, confirm order by 3pm" style={{minHeight:46,resize:"vertical"}}/></FD>}
 
       <div style={{display:"flex",gap:10,marginTop:4}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>
-          {saving?"Saving...":"💾 Save Quote"}
+          {saving?"Saving...":priceOnly?"↩️ Save Return Quote":"💾 Save Quote"}
         </button>
       </div>
     </Overlay>
@@ -2386,9 +2388,14 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
                   )}
                   <div style={{display:"flex",gap:6,alignItems:"center"}}>
                     <button
-                      onClick={()=>setQuoteTarget({request:r, existingQuote: existingQuote||null})}
+                      onClick={()=>setQuoteTarget({request:r, existingQuote: existingQuote||null, priceOnly:false})}
                       style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:existingQuote?"rgba(52,211,153,.12)":"var(--surface3)",cursor:"pointer",color:existingQuote?"var(--green)":"var(--text2)",fontWeight:600}}>
                       {existingQuote?"✏️ Edit Quote":"💰 Enter Quote"}
+                    </button>
+                    <button
+                      onClick={()=>setQuoteTarget({request:r, existingQuote: existingQuote||null, priceOnly:true})}
+                      style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(56,189,248,.35)",background:"rgba(56,189,248,.08)",cursor:"pointer",color:"#38bdf8",fontWeight:600}}>
+                      ↩️ Return Quote
                     </button>
                     {onDeleteSend&&(
                       <button
@@ -2410,6 +2417,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
         <SupplierQuoteModal
           request={quoteTarget.request}
           existingQuote={quoteTarget.existingQuote}
+          priceOnly={quoteTarget.priceOnly||false}
           settings={settings}
           onSave={async(d)=>{ if(onSaveQuote) await onSaveQuote(d); setQuoteTarget(null); }}
           onClose={()=>setQuoteTarget(null)}/>

@@ -3100,6 +3100,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             wsLicenceRenewals={wsLicenceRenewals}
             onSaveWsLicenceRenewal={saveWsLicenceRenewal}
             onUpdateWsLicenceRenewal={updateWsLicenceRenewal}
+            wsProfile={workshopProfile}
             t={t} lang={lang}/>
         )}
 

@@ -13,7 +13,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
   const [f,setF]=useState({
     name:"", vat_number:"", phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
-    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", ...profile
+    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", default_markup_pct:0, ...profile
   });
   const [saving,setSaving]=useState(false);
   const [detectingLoc,setDetectingLoc]=useState(false);
@@ -223,6 +223,11 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <FL label="Default Markup %"/>
+            <input className="inp" type="number" min="0" step="0.1" value={f.default_markup_pct??0} onChange={e=>s("default_markup_pct",+e.target.value)} placeholder="0"/>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Auto-applied when a supplier cost is tapped in Parts &amp; Labour</div>
           </div>
         </div>
 

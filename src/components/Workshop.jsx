@@ -1116,7 +1116,7 @@ function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUpdate}) 
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,t,lang}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsProfile={},t,lang}) {
   const [view,      setView]      = useState("list");
   const [activeJob, setActiveJob] = useState(null);
   const [editJob,   setEditJob]   = useState(null);
@@ -1199,6 +1199,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onViewPurchaseOrders={()=>{ setView("list"); setWsTab("wssuporders"); }}
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
+        wsProfile={wsProfile}
         t={t} lang={lang}/>
     );
   }
@@ -2420,7 +2421,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onSaveWsLicenceRenewal,wsId=null,t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onSaveWsLicenceRenewal,wsId=null,wsProfile={},t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -2444,6 +2445,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [editPriceVal,  setEditPriceVal]  = useState("");
   const [editQtyId,     setEditQtyId]     = useState(null);
   const [editQtyVal,    setEditQtyVal]    = useState("");
+  const [editMarkupId,  setEditMarkupId]  = useState(null);
+  const [editMarkupVal, setEditMarkupVal] = useState("");
   const [renewalModal,  setRenewalModal]  = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
@@ -3199,12 +3202,24 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       {jobTab==="quote"&&wsRole!=="mechanic"&&(<>
         {/* Parts & Labour */}
         {(()=>{
+          const defaultMarkup = +(wsProfile?.default_markup_pct||0);
           const commitPrice = async (item) => {
             const newPrice = +editPriceVal;
             if (!isNaN(newPrice) && newPrice !== +item.unit_price) {
-              await onSaveItem({...item, unit_price: newPrice, total: newPrice * (+item.qty||1)});
+              const costP = +(item.cost_price||0);
+              const newMarkup = costP > 0 ? +((newPrice/costP - 1)*100).toFixed(1) : +(item.markup_pct||0);
+              await onSaveItem({...item, unit_price: newPrice, markup_pct: newMarkup, total: newPrice * (+item.qty||1)});
             }
             setEditPriceId(null);
+          };
+          const commitMarkup = async (item) => {
+            const markup = +editMarkupVal;
+            if (!isNaN(markup) && markup !== +(item.markup_pct||0)) {
+              const costP = +(item.cost_price||0);
+              const newPrice = costP > 0 ? +(costP * (1 + markup/100)).toFixed(2) : +(item.unit_price||0);
+              await onSaveItem({...item, markup_pct: markup, unit_price: newPrice, total: newPrice * (+item.qty||1)});
+            }
+            setEditMarkupId(null);
           };
           const commitQty = async (item) => {
             const newQty = Math.max(1, Math.round(+editQtyVal||1));
@@ -3278,16 +3293,22 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                       {/* Supplier cost badges */}
                       {supCosts.length>0&&(
                         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-                          {supCosts.map((sc,i)=>(
-                            <span key={i} onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(sc.price)); }}
+                          {supCosts.map((sc,i)=>{
+                            const sellP = +(sc.price*(1+defaultMarkup/100)).toFixed(2);
+                            return (
+                            <span key={i} onClick={async()=>{
+                                await onSaveItem({...item, cost_price:sc.price, markup_pct:defaultMarkup, unit_price:sellP, total:sellP*(+item.qty||1)});
+                              }}
+                              title={defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price"}
                               style={{fontSize:11,color:"#f59e0b",fontWeight:600,cursor:"pointer",background:"rgba(251,191,36,.1)",borderRadius:4,padding:"2px 8px",border:"1px solid rgba(251,191,36,.25)"}}>
                               💰 {sc.name}: {fmtAmt(sc.price)}
                             </span>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                       {/* Qty × Price = Total row */}
-                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:"var(--surface2)",borderRadius:8,padding:"8px 10px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:"var(--surface2)",borderRadius:item.type==="part"?"8px 8px 0 0":"8px",padding:"8px 10px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:4}}>
                           <span style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>Qty</span>
                           {isEditingQty
@@ -3313,7 +3334,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                                 onBlur={()=>commitPrice(item)}
                                 onKeyDown={e=>{ if(e.key==="Enter") commitPrice(item); if(e.key==="Escape") setEditPriceId(null); }}
                                 style={{width:80,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text1)"}}/>
-                            : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); setEditQtyId(null); }}
+                            : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); setEditQtyId(null); setEditMarkupId(null); }}
                                 style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:"pointer",borderBottom:"1px dashed var(--text3)",color:"var(--text)"}}>
                                 {fmtAmt(item.unit_price)}
                               </span>
@@ -3324,6 +3345,29 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                           {fmtAmt(rowTotal)}
                         </span>
                       </div>
+                      {/* Cost / Markup row (parts only) */}
+                      {item.type==="part"&&(
+                        <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(251,191,36,.07)",borderRadius:"0 0 8px 8px",padding:"5px 10px",borderTop:"1px solid rgba(251,191,36,.15)"}}>
+                          {+(item.cost_price||0)>0&&<>
+                            <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>Cost</span>
+                            <span style={{fontFamily:"Rajdhani,sans-serif",fontSize:12,color:"var(--text2)",flexShrink:0}}>{fmtAmt(item.cost_price)}</span>
+                            <span style={{fontSize:10,color:"var(--text3)"}}>·</span>
+                          </>}
+                          <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>Markup</span>
+                          {editMarkupId===item.id
+                            ? <input autoFocus type="number" min="0" step="0.1"
+                                value={editMarkupVal}
+                                onChange={e=>setEditMarkupVal(e.target.value)}
+                                onBlur={()=>commitMarkup(item)}
+                                onKeyDown={e=>{ if(e.key==="Enter") commitMarkup(item); if(e.key==="Escape") setEditMarkupId(null); }}
+                                style={{width:56,fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 5px",borderRadius:5,border:"1px solid #f59e0b",background:"var(--surface2)",color:"var(--text1)"}}/>
+                            : <span onClick={()=>{ setEditMarkupId(item.id); setEditMarkupVal(String(item.markup_pct||0)); setEditPriceId(null); setEditQtyId(null); }}
+                                style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",color:"#f59e0b",borderBottom:"1px dashed rgba(251,191,36,.4)"}}>
+                                {item.markup_pct||0}%
+                              </span>
+                          }
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -3343,13 +3387,16 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                         {item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
                         {supCosts.length>0&&(
                           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
-                            {supCosts.map((sc,i)=>(
-                              <span key={i} title="Click to use as unit price"
-                                onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(sc.price)); }}
+                            {supCosts.map((sc,i)=>{
+                              const sellP=+(sc.price*(1+defaultMarkup/100)).toFixed(2);
+                              return (
+                              <span key={i} title={defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price"}
+                                onClick={async()=>{ await onSaveItem({...item, cost_price:sc.price, markup_pct:defaultMarkup, unit_price:sellP, total:sellP*(+item.qty||1)}); }}
                                 style={{fontSize:10,color:"#f59e0b",fontWeight:600,cursor:"pointer",background:"rgba(251,191,36,.1)",borderRadius:4,padding:"1px 6px",border:"1px solid rgba(251,191,36,.25)"}}>
                                 💰 {sc.name}: {fmtAmt(sc.price)}
                               </span>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </td>
@@ -3368,7 +3415,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                             </span>
                         }
                       </td>
-                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",minWidth:100}}>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",minWidth:110}}>
                         {isEditing
                           ? <input autoFocus type="number" min="0" step="0.01"
                               value={editPriceVal}
@@ -3376,12 +3423,31 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                               onBlur={()=>commitPrice(item)}
                               onKeyDown={e=>{ if(e.key==="Enter") commitPrice(item); if(e.key==="Escape") setEditPriceId(null); }}
                               style={{width:90,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
-                          : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); }}
+                          : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); setEditMarkupId(null); }}
                               title="Click to edit price"
                               style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>
                               {fmtAmt(item.unit_price)}
                             </span>
                         }
+                        {item.type==="part"&&(
+                          <div style={{fontSize:10,color:"var(--text3)",marginTop:2,textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end",gap:3}}>
+                            {+(item.cost_price||0)>0&&<span style={{color:"var(--text3)"}}>Cost {fmtAmt(item.cost_price)} ·</span>}
+                            {editMarkupId===item.id
+                              ? <input autoFocus type="number" min="0" step="0.1"
+                                  value={editMarkupVal}
+                                  onChange={e=>setEditMarkupVal(e.target.value)}
+                                  onBlur={()=>commitMarkup(item)}
+                                  onKeyDown={e=>{ if(e.key==="Enter") commitMarkup(item); if(e.key==="Escape") setEditMarkupId(null); }}
+                                  style={{width:50,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:11,padding:"1px 4px",borderRadius:4,border:"1px solid #f59e0b",background:"var(--surface2)",color:"#f59e0b"}}/>
+                              : <span onClick={()=>{ setEditMarkupId(item.id); setEditMarkupVal(String(item.markup_pct||0)); setEditPriceId(null); }}
+                                  title="Click to edit markup %"
+                                  style={{cursor:"pointer",color:"#f59e0b",fontWeight:600,borderBottom:"1px dashed rgba(251,191,36,.4)"}}>
+                                  +{item.markup_pct||0}%
+                                </span>
+                            }
+                            <span>markup</span>
+                          </div>
+                        )}
                       </td>
                       <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(isEditing?(+editPriceVal||0)*(editQtyId===item.id?+editQtyVal||1:+item.qty||1):editQtyId===item.id?(+item.unit_price||0)*(+editQtyVal||1):item.total)}</td>
                       <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button></td>
@@ -3619,6 +3685,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           type={addingItem}
           wsStock={wsStock}
           wsServices={wsServices}
+          defaultMarkupPct={wsProfile?.default_markup_pct||0}
           onSave={async(item)=>{ await onSaveItem({...item,job_id:job.id}); setAddingItem(null); }}
           onClose={()=>setAddingItem(null)}
           t={t}/>
@@ -4282,10 +4349,12 @@ function JobPhotoSlot({label, value, onChange, reg}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP ITEM MODAL — Add Part or Labour (uses workshop stock)
 // ═══════════════════════════════════════════════════════════════
-function WorkshopItemModal({type, wsStock=[], wsServices=[], onSave, onClose, t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], defaultMarkupPct=0, onSave, onClose, t}) {
   const [desc,      setDesc]      = useState("");
   const [qty,       setQty]       = useState(1);
   const [price,     setPrice]     = useState("");
+  const [costPrice, setCostPrice] = useState(0);
+  const [markupPct, setMarkupPct] = useState(defaultMarkupPct);
   const [selItem,   setSelItem]   = useState(null);
   const [search,    setSearch]    = useState("");
   const [saving,    setSaving]    = useState(false);
@@ -4301,12 +4370,27 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], onSave, onClose, t}
 
   const total = (+qty||0)*(+price||0);
 
-  const resetForm=()=>{ setDesc(""); setQty(1); setPrice(""); setSelItem(null); setSearch(""); };
+  const resetForm=()=>{ setDesc(""); setQty(1); setPrice(""); setCostPrice(0); setMarkupPct(defaultMarkupPct); setSelItem(null); setSearch(""); };
 
   const selectItem=(p)=>{
     setSelItem(p);
     setDesc(p.name);
-    setPrice(p.unit_price||p.default_price||p.price||p.rate||"");
+    const cost=+(p.unit_cost||0);
+    const listPrice=+(p.unit_price||p.default_price||p.price||p.rate||0);
+    if(type==="part"&&cost>0&&defaultMarkupPct>0){
+      setCostPrice(cost);
+      setMarkupPct(defaultMarkupPct);
+      setPrice(String(+(cost*(1+defaultMarkupPct/100)).toFixed(2)));
+    } else if(type==="part"&&cost>0){
+      setCostPrice(cost);
+      const mp=listPrice>0?+((listPrice/cost-1)*100).toFixed(1):0;
+      setMarkupPct(mp);
+      setPrice(String(listPrice||cost));
+    } else {
+      setCostPrice(0);
+      setMarkupPct(defaultMarkupPct);
+      setPrice(String(listPrice||""));
+    }
     setSearch("");
   };
 
@@ -4321,6 +4405,8 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], onSave, onClose, t}
         ws_stock_id:type==="part"&&selItem?selItem.id:null,
         qty:+qty,
         unit_price:+price,
+        cost_price:type==="part"?+costPrice:0,
+        markup_pct:type==="part"?+markupPct:0,
         total:(+qty)*(+price),
       });
       resetForm();

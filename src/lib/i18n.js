@@ -147,6 +147,7 @@ export const T = {
     wsLicenceExpiry: "Licence Disc Expiry", wsExpired: "EXPIRED",
     wsRequestRenewal: "Request Renewal", wsVinSearch: "VIN Search", wsCopy: "Copy",
     wsOeSearch: "OE Number Search",
+    wsMarkupPct: "Markup %", wsMarkupDefault: "Default Markup %",
   },
 };
 

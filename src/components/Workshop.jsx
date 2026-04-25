@@ -601,10 +601,10 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
         {/* Vehicles */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <div style={{fontWeight:700,fontSize:14}}>🚗 Vehicles ({custVehicles.length})</div>
-          <button className="btn btn-ghost btn-sm" onClick={()=>setEditVehicle({workshop_customer_id:activeCust.id,reg:"",make:"",model:"",year:"",color:"",notes:""})}>+ Add Vehicle</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setEditVehicle({workshop_customer_id:activeCust.id,reg:"",make:"",model:"",year:"",color:"",notes:""})}>+ {t.wsAddVehicle}</button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:10,marginBottom:20}}>
-          {custVehicles.length===0&&<div className="card" style={{padding:20,color:"var(--text3)",textAlign:"center",gridColumn:"1/-1"}}>No vehicles yet</div>}
+          {custVehicles.length===0&&<div className="card" style={{padding:20,color:"var(--text3)",textAlign:"center",gridColumn:"1/-1"}}>{t.wsNoVehicles}</div>}
           {custVehicles.map(v=>{
             const vJobs=jobs.filter(j=>j.workshop_vehicle_id===v.id||j.vehicle_reg===v.reg);
             const openJob=vJobs.find(j=>j.status!=="Delivered");
@@ -637,7 +637,7 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
 
         {/* Job history */}
         <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>📋 Job History ({custJobs.length})</div>
-        {custJobs.length===0&&<div className="card" style={{padding:20,color:"var(--text3)",textAlign:"center"}}>No jobs yet</div>}
+        {custJobs.length===0&&<div className="card" style={{padding:20,color:"var(--text3)",textAlign:"center"}}>{t.wsNoJobs}</div>}
         {onOpenJob&&custJobs.length>0&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>Double-click a job to open job card</div>}
         {custJobs.map(j=>(
           <div key={j.id} className="card" style={{padding:12,marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:onOpenJob?"pointer":"default"}}
@@ -718,7 +718,7 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
       {/* Modals outside .fu so position:fixed isn't trapped by the animation stacking context */}
       {editCust&&(
         <Overlay onClose={()=>setEditCust(null)} wide>
-          <MHead title={editCust.id?"✏️ Edit Customer":"👤 New Customer"} onClose={()=>setEditCust(null)}/>
+          <MHead title={editCust.id?"✏️ "+t.wsEditCustomer:"👤 "+t.wsNewCustomer} onClose={()=>setEditCust(null)}/>
           <WsCustomerForm data={editCust}
             onSave={async(d)=>{ await onSaveCustomer(d); setEditCust(null); if(activeCust&&activeCust.id===d.id) setActiveCust({...activeCust,...d}); }}
             onClose={()=>setEditCust(null)} t={t}/>
@@ -726,7 +726,7 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
       )}
       {editVehicle&&(
         <Overlay onClose={()=>setEditVehicle(null)} wide>
-          <MHead title={editVehicle.id?"✏️ Edit Vehicle":"🚗 Add Vehicle"} onClose={()=>setEditVehicle(null)}/>
+          <MHead title={editVehicle.id?"✏️ "+t.editVehicle:"🚗 "+t.addVehicle} onClose={()=>setEditVehicle(null)}/>
           <WsVehicleForm data={editVehicle}
             onSave={async(d)=>{ await onSaveVehicle(d); setEditVehicle(null); }}
             onClose={()=>setEditVehicle(null)} t={t}/>
@@ -740,18 +740,18 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
     <div className="fu">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>👤 {lang==="zh"?"維修客戶":"Workshop Customers"}</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{wsCustomers.length} customers · {wsVehicles.length} vehicles</p>
+          <h1 style={{fontSize:20,fontWeight:700}}>👤 {t.wsCustomers}</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{wsCustomers.length} {t.wsCountCustomers} · {wsVehicles.length} {t.wsCountVehicles}</p>
         </div>
-        <button className="btn btn-primary" onClick={()=>setEditCust({name:"",phone:"",email:"",notes:""})}>+ New Customer</button>
+        <button className="btn btn-primary" onClick={()=>setEditCust({name:"",phone:"",email:"",notes:""})}>+ {t.wsNewCustomer}</button>
       </div>
 
       <div style={{position:"relative",marginBottom:14,maxWidth:320}}>
-        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, phone..."/>
+        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder={t.wsSearchCustomer}/>
         {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16}}>✕</button>}
       </div>
 
-      {filtered.length===0&&<div className="card" style={{padding:36,textAlign:"center",color:"var(--text3)"}}>No customers yet</div>}
+      {filtered.length===0&&<div className="card" style={{padding:36,textAlign:"center",color:"var(--text3)"}}>{t.wsNoCustomers}</div>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
         {filtered.map(c=>{
           const cv=wsVehicles.filter(v=>v.workshop_customer_id===c.id);
@@ -778,7 +778,7 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
       {/* Edit customer modal */}
       {editCust&&(
         <Overlay onClose={()=>setEditCust(null)} wide>
-          <MHead title={editCust.id?"✏️ Edit Customer":"👤 New Customer"} onClose={()=>setEditCust(null)}/>
+          <MHead title={editCust.id?"✏️ "+t.wsEditCustomer:"👤 "+t.wsNewCustomer} onClose={()=>setEditCust(null)}/>
           <WsCustomerForm data={editCust}
             onSave={async(d)=>{ await onSaveCustomer(d); setEditCust(null); if(activeCust&&activeCust.id===d.id) setActiveCust({...activeCust,...d}); }}
             onClose={()=>setEditCust(null)} t={t}/>
@@ -788,7 +788,7 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
       {/* Edit vehicle modal */}
       {editVehicle&&(
         <Overlay onClose={()=>setEditVehicle(null)} wide>
-          <MHead title={editVehicle.id?"✏️ Edit Vehicle":"🚗 Add Vehicle"} onClose={()=>setEditVehicle(null)}/>
+          <MHead title={editVehicle.id?"✏️ "+t.editVehicle:"🚗 "+t.addVehicle} onClose={()=>setEditVehicle(null)}/>
           <WsVehicleForm data={editVehicle}
             onSave={async(d)=>{ await onSaveVehicle(d); setEditVehicle(null); }}
             onClose={()=>setEditVehicle(null)} t={t}/>
@@ -1309,7 +1309,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             )}
           </>)}
         </div>
-        {filtered.length===0&&<div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No jobs found</div>}
+        {filtered.length===0&&<div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.wsNoJobsFound}</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
           {filtered.slice(jobPage*JOB_PAGE_SIZE,(jobPage+1)*JOB_PAGE_SIZE).map(j=>{
             const jItems=jobItems.filter(i=>i.job_id===j.id);

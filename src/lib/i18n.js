@@ -103,11 +103,17 @@ export const T = {
     grpDashboard: "Dashboard", grpInventory: "Inventory", grpPurchase: "Purchasing",
     grpWorkshop: "Workshop Module", grpSales: "Sales & Customers", grpReports: "Reports", grpSystem: "System",
     // Workshop sidebar nav items
-    wsJobs: "Jobs", wsCustomers: "WS Customers", wsQuotations: "WS Quotations",
+    wsJobs: "Jobs", wsCustomers: "Workshop Customers", wsQuotations: "WS Quotations",
     wsInvoices: "WS Invoices", wsPayments: "WS Payments", wsStock: "WS Stock",
     wsServices: "WS Services", wsSuppliers: "WS Suppliers", wsPurchaseOrders: "WS Purchase Orders",
     wsTransfer: "WS Transfer", wsStatement: "WS Statement", wsReport: "WS Report",
     wsSettings: "WS Settings", wsSubscriptions: "WS Subscriptions",
+    // Workshop page strings
+    wsCountCustomers: "customers", wsCountVehicles: "vehicles",
+    wsSearchCustomer: "Search name, phone...", wsNoCustomers: "No customers yet",
+    wsNoVehicles: "No vehicles yet", wsNoJobs: "No jobs yet", wsNoJobsFound: "No jobs found",
+    wsAddVehicle: "Add Vehicle", wsNewCustomer: "New Customer", wsEditCustomer: "Edit Customer",
+    wsNewJob: "New Job Card", wsEditJob: "Edit Job Card",
   },
 };
 

@@ -3867,7 +3867,7 @@ Current: ${item.system_qty}`,item.system_qty));if(!isNaN(n)&&n>=0){onAdjustItem(
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,flexWrap:"wrap",gap:10}}>
         <div>
           <h1 style={{fontSize:20,fontWeight:700}}>🔢 {t.stockTake}</h1>
-          <p style={{color:"var(--text)",fontSize:13,marginTop:3}}>{stockTakes.length} stock takes</p>
+          <p style={{color:"var(--text)",fontSize:13,marginTop:3}}>{stockTakes.length} {t.stTakes}</p>
         </div>
         {(user.role==="admin" || user.role==="manager") && <button className="btn btn-primary" onClick={()=>{setShowWizard(true);setFilterMode("all");setManualSelected(new Set());setSearchWiz("");}}>
           + {t.startTake}
@@ -3875,16 +3875,16 @@ Current: ${item.system_qty}`,item.system_qty));if(!isNaN(n)&&n>=0){onAdjustItem(
       </div>
       <div className="card" style={{overflow:"hidden"}}>
         <table className="tbl">
-          <thead><tr>{["Name","Status","Created By","Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <thead><tr>{[t.name,t.status,t.createdBy,t.actions].map(h=><th key={h}>{h}</th>)}</tr></thead>
           <tbody>
             {stockTakes.map(st=>(
               <tr key={st.id}>
                 <td style={{fontWeight:600}}>{st.name}</td>
-                <td><span className="badge" style={{background:st.status==="completed"?"rgba(52,211,153,.12)":st.status==="counted"?"rgba(139,92,246,.12)":"rgba(251,191,36,.12)",color:st.status==="completed"?"var(--green)":st.status==="counted"?"var(--purple)":"var(--yellow)"}}>{st.status==="completed"?"✅ Completed":st.status==="counted"?"📦 Counted":"🔄 Open"}</span></td>
+                <td><span className="badge" style={{background:st.status==="completed"?"rgba(52,211,153,.12)":st.status==="counted"?"rgba(139,92,246,.12)":"rgba(251,191,36,.12)",color:st.status==="completed"?"var(--green)":st.status==="counted"?"var(--purple)":"var(--yellow)"}}>{st.status==="completed"?`✅ ${t.stCompleted}`:st.status==="counted"?`📦 ${t.stCounted}`:`🔄 ${t.stOpen}`}</span></td>
                 <td style={{color:"var(--text3)",fontSize:13}}>{st.created_at?.slice(0,16)} · {st.created_by}</td>
                 <td>
                   <button className="btn btn-info btn-xs" onClick={()=>openTake(st)}>
-                    {st.status==="completed"?"👁 View":st.status==="counted"?"🔍 Review":"▶ Continue"}
+                    {st.status==="completed"?`👁 ${t.stView}`:st.status==="counted"?`🔍 ${t.stReview}`:`▶ ${t.stContinue}`}
                   </button>
                 </td>
               </tr>

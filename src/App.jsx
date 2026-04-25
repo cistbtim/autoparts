@@ -2901,7 +2901,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             : logs;
           return (
           <div className="fu">
-            <PH title={`📝 ${t.logs}`} subtitle={`${filteredLogs.length}${logQ?` of ${logs.length}`:""} records`}/>
+            <PH title={`📝 ${t.logs}`} subtitle={`${filteredLogs.length}${logQ?` of ${logs.length}`:""} ${t.records}`}/>
             <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
               <div style={{position:"relative",flex:"1 1 220px",maxWidth:320}}>
                 <input className="inp" type="text"
@@ -2922,7 +2922,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
-                  <thead><tr>{["Time","Part","Action","Before","After","Change","By","Reason"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{[t.time,t.rptPart,t.action,t.before,t.after,t.change,t.by,t.reason].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {filteredLogs.map(l=>{const d=l.qty_after-l.qty_before;return(
                       <tr key={l.id} style={{cursor:"pointer"}}

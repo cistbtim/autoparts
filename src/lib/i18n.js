@@ -120,6 +120,12 @@ export const T = {
     costPrice: "Cost Price",
     // Login Logs page
     time: "Time", user: "User", city: "City", llEvents: "events",
+    // Stock Logs columns
+    action: "Action", before: "Before", after: "After", change: "Change", by: "By", records: "records",
+    // Stock Take page
+    createdBy: "Created By", actions: "Actions", stTakes: "stock takes",
+    stOpen: "Open", stCounted: "Counted", stCompleted: "Completed",
+    stContinue: "Continue", stView: "View", stReview: "Review",
     // PartPhotoUploader strings
     phuUploading: "Uploading to Google Drive...",
     phuUploaded: "Photo uploaded", phuClickEnlarge: "Click photo to enlarge · drop here to replace",

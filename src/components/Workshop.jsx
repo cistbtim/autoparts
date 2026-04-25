@@ -2443,6 +2443,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [editPriceId,   setEditPriceId]   = useState(null);
   const [editPriceVal,  setEditPriceVal]  = useState("");
   const [renewalModal,  setRenewalModal]  = useState(false);
+  const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
+  useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
   const [localPhotoOverrides, setLocalPhotoOverrides] = useState({});
@@ -3203,53 +3205,118 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         <div className="card" style={{overflow:"hidden",marginBottom:14}}>
           {items.length===0
             ?<div style={{textAlign:"center",padding:24,color:"var(--text3)"}}>No items yet — add parts or labour</div>
-            :<table className="tbl" style={{width:"100%"}}>
-              <thead><tr>{["Type","Description","Qty","Unit Price","Total",""].map(h=><th key={h}>{h}</th>)}</tr></thead>
-              <tbody>
-                {items.map(item=>{
-                  const supCosts = getSupCosts(item.description);
-                  const isEditing = editPriceId === item.id;
+            : isMobile ? (
+              /* ── Mobile card list ── */
+              <div style={{display:"flex",flexDirection:"column",gap:0}}>
+                {items.map((item,idx)=>{
+                  const supCosts=getSupCosts(item.description);
+                  const isEditing=editPriceId===item.id;
+                  const rowTotal=isEditing?(+editPriceVal||0)*(+item.qty||1):+item.total||0;
                   return (
-                  <tr key={item.id}>
-                    <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?"🔩 Part":"👷 Labour"}</span></td>
-                    <td style={{fontWeight:500}}>
-                      {item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
+                    <div key={item.id} style={{padding:"12px 14px",borderBottom:idx<items.length-1?"1px solid var(--border)":undefined}}>
+                      {/* Top row: badge + name + delete */}
+                      <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:6}}>
+                        <span className="badge" style={{flexShrink:0,background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)",fontSize:11}}>
+                          {item.type==="part"?"🔩 Part":"👷 Labour"}
+                        </span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:600,fontSize:14,lineHeight:1.3}}>{item.description}</div>
+                          {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{item.part_sku}</code>}
+                        </div>
+                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
+                      </div>
+                      {/* Supplier cost badges */}
                       {supCosts.length>0&&(
-                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
                           {supCosts.map((sc,i)=>(
-                            <span key={i}
-                              title={`Click to use as unit price`}
-                              onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(sc.price)); }}
-                              style={{fontSize:10,color:"#f59e0b",fontWeight:600,cursor:"pointer",background:"rgba(251,191,36,.1)",borderRadius:4,padding:"1px 6px",border:"1px solid rgba(251,191,36,.25)"}}>
+                            <span key={i} onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(sc.price)); }}
+                              style={{fontSize:11,color:"#f59e0b",fontWeight:600,cursor:"pointer",background:"rgba(251,191,36,.1)",borderRadius:4,padding:"2px 8px",border:"1px solid rgba(251,191,36,.25)"}}>
                               💰 {sc.name}: {fmtAmt(sc.price)}
                             </span>
                           ))}
                         </div>
                       )}
-                    </td>
-                    <td style={{textAlign:"right"}}>{item.qty}</td>
-                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",minWidth:100}}>
-                      {isEditing
-                        ? <input autoFocus type="number" min="0" step="0.01"
-                            value={editPriceVal}
-                            onChange={e=>setEditPriceVal(e.target.value)}
-                            onBlur={()=>commitPrice(item)}
-                            onKeyDown={e=>{ if(e.key==="Enter") commitPrice(item); if(e.key==="Escape") setEditPriceId(null); }}
-                            style={{width:90,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
-                        : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); }}
-                            title="Click to edit price"
-                            style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>
-                            {fmtAmt(item.unit_price)}
-                          </span>
-                      }
-                    </td>
-                    <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(isEditing?(+editPriceVal||0)*(+item.qty||1):item.total)}</td>
-                    <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button></td>
-                  </tr>
+                      {/* Qty × Price = Total row */}
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:"var(--surface2)",borderRadius:8,padding:"8px 10px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:4}}>
+                          <span style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>Qty</span>
+                          <span style={{fontWeight:700,fontSize:15}}>{item.qty}</span>
+                        </div>
+                        <span style={{color:"var(--text3)"}}>×</span>
+                        <div style={{display:"flex",alignItems:"center",gap:4}}>
+                          <span style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>Price</span>
+                          {isEditing
+                            ? <input autoFocus type="number" min="0" step="0.01"
+                                value={editPriceVal}
+                                onChange={e=>setEditPriceVal(e.target.value)}
+                                onBlur={()=>commitPrice(item)}
+                                onKeyDown={e=>{ if(e.key==="Enter") commitPrice(item); if(e.key==="Escape") setEditPriceId(null); }}
+                                style={{width:80,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text1)"}}/>
+                            : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); }}
+                                style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:"pointer",borderBottom:"1px dashed var(--text3)",color:"var(--text)"}}>
+                                {fmtAmt(item.unit_price)}
+                              </span>
+                          }
+                          <span style={{fontSize:10,color:"var(--text3)"}}>(tap to edit)</span>
+                        </div>
+                        <span style={{color:"var(--text3)"}}>=</span>
+                        <span style={{fontWeight:700,fontSize:16,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",marginLeft:"auto"}}>
+                          {fmtAmt(rowTotal)}
+                        </span>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            ) : (
+              /* ── Desktop table ── */
+              <table className="tbl" style={{width:"100%"}}>
+                <thead><tr>{["Type","Description","Qty","Unit Price","Total",""].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {items.map(item=>{
+                    const supCosts = getSupCosts(item.description);
+                    const isEditing = editPriceId === item.id;
+                    return (
+                    <tr key={item.id}>
+                      <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?"🔩 Part":"👷 Labour"}</span></td>
+                      <td style={{fontWeight:500}}>
+                        {item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
+                        {supCosts.length>0&&(
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
+                            {supCosts.map((sc,i)=>(
+                              <span key={i} title="Click to use as unit price"
+                                onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(sc.price)); }}
+                                style={{fontSize:10,color:"#f59e0b",fontWeight:600,cursor:"pointer",background:"rgba(251,191,36,.1)",borderRadius:4,padding:"1px 6px",border:"1px solid rgba(251,191,36,.25)"}}>
+                                💰 {sc.name}: {fmtAmt(sc.price)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{textAlign:"right"}}>{item.qty}</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",minWidth:100}}>
+                        {isEditing
+                          ? <input autoFocus type="number" min="0" step="0.01"
+                              value={editPriceVal}
+                              onChange={e=>setEditPriceVal(e.target.value)}
+                              onBlur={()=>commitPrice(item)}
+                              onKeyDown={e=>{ if(e.key==="Enter") commitPrice(item); if(e.key==="Escape") setEditPriceId(null); }}
+                              style={{width:90,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
+                          : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); }}
+                              title="Click to edit price"
+                              style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>
+                              {fmtAmt(item.unit_price)}
+                            </span>
+                        }
+                      </td>
+                      <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(isEditing?(+editPriceVal||0)*(+item.qty||1):item.total)}</td>
+                      <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button></td>
+                    </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )
           }
           <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{display:"flex",gap:6}}>

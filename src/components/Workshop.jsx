@@ -2741,27 +2741,6 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         </span>
       </div>
 
-      {/* Action buttons row */}
-      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-        {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ {t.edit}</button>}
-        <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardLabel(job,settings)}>🏷️ {t.wsLabel}</button>
-        <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 {t.wsCollect}</button>
-        <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📲 {t.suppliers}</button>
-        <button className="btn btn-ghost btn-sm" onClick={()=>{
-          const lines=["============================","  VEHICLE INFO","============================",
-            `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,
-            `Model    : ${job.vehicle_model||"—"}`,`Year     : ${job.vehicle_year||"—"}`,
-            `Color    : ${job.vehicle_color||"—"}`,`Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,
-            job.vin?`VIN      : ${job.vin}`:"",job.engine_no?`Engine No: ${job.engine_no}`:"",
-            "============================",].filter(Boolean).join("\r\n");
-          const a=document.createElement("a");
-          a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));
-          a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`; a.click();
-        }}>⬇️ {t.wsInfoBtn}</button>
-        {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>setMoveModal(true)}>🔀 {t.wsMove}</button>}
-        {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
-      </div>
-
       {/* ── Status bar ── */}
       <div className="card" style={{padding:"10px 14px",marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
         <span style={{fontSize:12,color:"var(--text3)",marginRight:2}}>{t.status}:</span>
@@ -2837,6 +2816,25 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       {/* ══ CAR INFO tab ══ */}
       {jobTab==="car"&&(
         <div className="card" style={{padding:16,marginBottom:14}}>
+          {/* Action buttons */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+            {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ {t.edit}</button>}
+            <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardLabel(job,settings)}>🏷️ {t.wsLabel}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 {t.wsCollect}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{
+              const lines=["============================","  VEHICLE INFO","============================",
+                `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,
+                `Model    : ${job.vehicle_model||"—"}`,`Year     : ${job.vehicle_year||"—"}`,
+                `Color    : ${job.vehicle_color||"—"}`,`Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,
+                job.vin?`VIN      : ${job.vin}`:"",job.engine_no?`Engine No: ${job.engine_no}`:"",
+                "============================",].filter(Boolean).join("\r\n");
+              const a=document.createElement("a");
+              a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));
+              a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`; a.click();
+            }}>⬇️ {t.wsInfoBtn}</button>
+            {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>setMoveModal(true)}>🔀 {t.wsMove}</button>}
+            {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
+          </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:12}}>
             {[
               [`🚗 ${t.wsPlate}`,job.vehicle_reg],
@@ -3462,7 +3460,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             <div style={{display:"flex",gap:6}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ Part</button>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ Labour</button>
-              <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📲 Supplier</button>
+              <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📤 Send Quote</button>
             </div>
             {items.length>0&&(
               <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>

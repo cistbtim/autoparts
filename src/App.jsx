@@ -31,7 +31,11 @@ export default function App() {
       await loadSettings();
       const rows=await api.get("app_translations","active=eq.true&select=lang,name,flag,t,status_t").catch(()=>[]);
       if(Array.isArray(rows)) rows.forEach(r=>registerLang(r.lang,r.name,r.flag,r.t||{},r.status_t||{}));
-      setAvailLangs(getLangs());
+      const loaded=getLangs();
+      setAvailLangs(loaded);
+      // If stored lang is not in active list, reset to English
+      const storedLang=localStorage.getItem("ap_lang")||"en";
+      if(!loaded.find(l=>l.lang===storedLang)) changeLang("en");
       setSettingsLoaded(true);
     };
     init();
@@ -1630,14 +1634,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const getPartSupps=(pid)=>partSuppliers.filter(ps=>ps.part_id===pid).map(ps=>({...ps,supplier:suppliers.find(s=>s.id===ps.supplier_id)}));
   const OS = role==="shipper"
     ? [
-        ["__active__", lang==="zh"?"待處理":"Active"],
+        ["__active__", t.activeOrders],
         ["Processing",  tSt("Processing")],
         ["Ready to Ship", tSt("Ready to Ship")],
         ["Completed",   tSt("Completed")],
         ["Cancelled",   tSt("Cancelled")],
       ]
     : [
-        ["__all__",     lang==="zh"?"全部":"All"],
+        ["__all__",     t.all],
         ["Processing",  tSt("Processing")],
         ["Ready to Ship", tSt("Ready to Ship")],
         ["Completed",   tSt("Completed")],
@@ -1648,14 +1652,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   // Grouped nav for sidebar
   const navGroups=[
     {
-      id:"grp_dashboard", icon:"📊", label:lang==="zh"?"儀表板":"Dashboard", roles:["admin"],
+      id:"grp_dashboard", icon:"📊", label:t.grpDashboard, roles:["admin"],
       children:[
         {id:"dashboard",icon:"📊",label:t.dashboard,roles:["admin"]},
         {id:"loginlogs",icon:"🌍",label:t.loginLogs,roles:["admin"]},
       ]
     },
     {
-      id:"grp_inventory", icon:"📦", label:lang==="zh"?"庫存管理":"Inventory", roles:["admin","manager","shipper","stockman"],
+      id:"grp_inventory", icon:"📦", label:t.grpInventory, roles:["admin","manager","shipper","stockman"],
       children:[
         {id:"inventory",icon:"📦",label:t.inventory,roles:["admin","manager","shipper","stockman"],badge:lowStock.length},
         {id:"stocktake",icon:"🔢",label:t.stockTake,roles:["admin","manager","shipper","stockman"]},
@@ -1664,7 +1668,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       ]
     },
     {
-      id:"grp_purchase", icon:"🏭", label:lang==="zh"?"採購與供應商":"Purchasing", roles:["admin"],
+      id:"grp_purchase", icon:"🏭", label:t.grpPurchase, roles:["admin"],
       badge: pendingInq,
       children:[
         {id:"suppliers",icon:"🏭",label:t.suppliers,roles:["admin"]},
@@ -1675,26 +1679,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       ]
     },
     {
-      id:"grp_workshop", icon:"🔧", label:lang==="zh"?"維修工場":"Workshop", roles:["admin","manager","workshop"],
+      id:"grp_workshop", icon:"🔧", label:t.grpWorkshop, roles:["admin","manager","workshop"],
       children:[
-        {id:"workshop",    icon:"🔧",label:"Jobs",         roles:["admin","manager","workshop"]},
-        {id:"wscustomers", icon:"👥",label:"WS Customers", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsquotations",icon:"📝",label:"WS Quotations",roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsinvoices",  icon:"🧾",label:"WS Invoices",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wspayments",  icon:"💳",label:"WS Payments",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsstock",     icon:"📦",label:"WS Stock",     roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsservices",  icon:"🔧",label:"WS Services",  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wssuppliers", icon:"🏪",label:"WS Suppliers",       roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wssuporders", icon:"📋",label:"WS Purchase Orders", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wstransfer",  icon:"🔄",label:"WS Transfer",        roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsstatement", icon:"📋",label:"WS Statement", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsreport",    icon:"📊",label:"WS Report",    roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsprofile",   icon:"⚙️",label:"WS Settings",  roles:["workshop"], wsRoles:["main"]},
-        {id:"wssubscriptions",icon:"💳",label:"WS Subscriptions",roles:["admin"]},
+        {id:"workshop",    icon:"🔧",label:t.wsJobs,            roles:["admin","manager","workshop"]},
+        {id:"wscustomers", icon:"👥",label:t.wsCustomers,       roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsquotations",icon:"📝",label:t.wsQuotations,      roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,        roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wspayments",  icon:"💳",label:t.wsPayments,        roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsstock",     icon:"📦",label:t.wsStock,           roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsservices",  icon:"🔧",label:t.wsServices,        roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wssuppliers", icon:"🏪",label:t.wsSuppliers,       roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wssuporders", icon:"📋",label:t.wsPurchaseOrders,  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wstransfer",  icon:"🔄",label:t.wsTransfer,        roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsstatement", icon:"📋",label:t.wsStatement,       roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsreport",    icon:"📊",label:t.wsReport,          roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsprofile",   icon:"⚙️",label:t.wsSettings,        roles:["workshop"], wsRoles:["main"]},
+        {id:"wssubscriptions",icon:"💳",label:t.wsSubscriptions,roles:["admin"]},
       ]
     },
     {
-      id:"grp_sales", icon:"🛒", label:lang==="zh"?"銷售與客戶":"Sales", roles:["admin","manager","shipper","customer","workshop"],
+      id:"grp_sales", icon:"🛒", label:t.grpSales, roles:["admin","manager","shipper","customer","workshop"],
       badge: pendingCnt,
       children:[
         {id:"shop",icon:"🛒",label:t.shop,roles:["admin","customer","workshop"]},
@@ -1709,14 +1713,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       ]
     },
     {
-      id:"grp_reports", icon:"📊", label:lang==="zh"?"報表":"Reports", roles:["admin"],
+      id:"grp_reports", icon:"📊", label:t.grpReports, roles:["admin"],
       children:[
         {id:"reports",icon:"📊",label:t.reports,roles:["admin"]},
         {id:"payments",icon:"💳",label:t.payments,roles:["admin"]},
       ]
     },
     {
-      id:"grp_system", icon:"⚙️", label:lang==="zh"?"系統設定":"System", roles:["admin"],
+      id:"grp_system", icon:"⚙️", label:t.grpSystem, roles:["admin"],
       children:[
         {id:"vehicles",icon:"🚗",label:t.vehicleMgmt||"Vehicles",roles:["admin"]},
         {id:"settings",icon:"⚙️",label:t.settings,roles:["admin"]},

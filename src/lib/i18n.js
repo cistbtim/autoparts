@@ -78,6 +78,24 @@ export const T = {
     sendReply: "Send Reply", depositPaid: "Mark Deposit Paid",
     depositRequested: "Awaiting Deposit", noQueries: "No queries yet",
     queryNotes: "Notes / Query Details", partQuery: "Part Query",
+    // Login page tabs & buttons
+    loginShop: "Parts Shop", loginWorkshop: "Workshop", loginStaff: "Staff",
+    signIn: "Sign In", registerNew: "Register", registerWorkshop: "Register Workshop",
+    noAccount: "No account?", createAccount: "Create Account",
+    startFreeTrial: "Start Free Trial", alreadyAccount: "Already have an account?",
+    freeTrial30: "30-day free trial — no credit card needed. After trial, a monthly fee applies.",
+    confirmPwd: "Confirm Password", workshopNameField: "Workshop Name",
+    cityCountryField: "City & Country", autoDetect: "Auto-detect", detectingLoc: "Detecting...",
+    activeOrders: "Active",
+    // Sidebar group headings
+    grpDashboard: "Dashboard", grpInventory: "Inventory", grpPurchase: "Purchasing",
+    grpWorkshop: "Workshop Module", grpSales: "Sales & Customers", grpReports: "Reports", grpSystem: "System",
+    // Workshop sidebar nav items
+    wsJobs: "Jobs", wsCustomers: "WS Customers", wsQuotations: "WS Quotations",
+    wsInvoices: "WS Invoices", wsPayments: "WS Payments", wsStock: "WS Stock",
+    wsServices: "WS Services", wsSuppliers: "WS Suppliers", wsPurchaseOrders: "WS Purchase Orders",
+    wsTransfer: "WS Transfer", wsStatement: "WS Statement", wsReport: "WS Report",
+    wsSettings: "WS Settings", wsSubscriptions: "WS Subscriptions",
   },
 };
 

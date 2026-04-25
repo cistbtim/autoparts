@@ -90,7 +90,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
     if(!cName||!cPhone||!cPass){setErr("Name, phone & password required");return;}
     if(cPass!==cPass2){setErr("Passwords don't match");return;}
     const digitsOnly=cPhone.replace(/[^0-9]/g,"");
-    if(digitsOnly.length<9){setErr(lang==="zh"?"電話號碼不足，請輸入完整號碼（最少9位數字）":"Phone number too short — please enter full number (min 9 digits)");return;}
+    if(digitsOnly.length<9){setErr("Phone number too short — please enter full number (min 9 digits)");return;}
     setLoading(true);setErr("");
     const ex = await api.get("customers",`phone=eq.${encodeURIComponent(cPhone)}&select=id`);
     if(Array.isArray(ex)&&ex.length>0){setErr("Phone already registered — login instead");setLoading(false);return;}
@@ -122,7 +122,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
         </div>
         {/* Login type tabs */}
         <div style={{display:"flex",borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",marginBottom:16}}>
-          {[["customer","🛒 "+(lang==="zh"?"零件店客戶":"Parts Shop")],["workshop","🔧 Workshop"],["staff","🏢 "+(lang==="zh"?"員工":"Staff")]].map(([id,lb])=>(
+          {[["customer","🛒 "+t.loginShop],["workshop","🔧 "+t.loginWorkshop],["staff","🏢 "+t.loginStaff]].map(([id,lb])=>(
             <button key={id} onClick={()=>{setAuthTab(id);setErr("");}}
               style={{flex:1,padding:"9px 4px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",fontFamily:"DM Sans,sans-serif",
                 background:authTab===id?"var(--accent)":"var(--surface2)",
@@ -144,7 +144,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
           {authTab==="workshop"&&(
             <div style={{display:"flex",flexDirection:"column",gap:13}}>
               <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:4}}>
-                {[["login","Sign In"],["signup","Register Workshop"]].map(([id,lb])=>(
+                {[["login",t.signIn],["signup",t.registerWorkshop]].map(([id,lb])=>(
                   <button key={id} className={`auth-tab ${wsTab===id?"on":""}`} onClick={()=>{setWsTab(id);setErr("");}}>{lb}</button>
                 ))}
               </div>
@@ -156,12 +156,12 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
               </>)}
               {wsTab==="signup"&&(<>
                 <div style={{background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.2)",borderRadius:8,padding:"10px 13px",fontSize:12,color:"var(--green)",lineHeight:1.5}}>
-                  ✅ <strong>30-day free trial</strong> — no credit card needed. After trial, a monthly fee applies.
+                  ✅ {t.freeTrial30}
                 </div>
-                <div><FL label="Workshop Name *"/><input className="inp" value={wsRegName} onChange={e=>setWsRegName(e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
-                <div><FL label="Username *"/><input className="inp" value={wsRegUser} onChange={e=>setWsRegUser(e.target.value)} autoCapitalize="none" placeholder="Choose a login username"/></div>
-                <div><FL label="Password *"/><input className="inp" type="password" value={wsRegPass} onChange={e=>setWsRegPass(e.target.value)}/></div>
-                <div><FL label="Confirm Password *"/><input className="inp" type="password" value={wsRegPass2} onChange={e=>setWsRegPass2(e.target.value)}/></div>
+                <div><FL label={t.workshopNameField+" *"}/><input className="inp" value={wsRegName} onChange={e=>setWsRegName(e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
+                <div><FL label={t.username+" *"}/><input className="inp" value={wsRegUser} onChange={e=>setWsRegUser(e.target.value)} autoCapitalize="none" placeholder="Choose a login username"/></div>
+                <div><FL label={t.password+" *"}/><input className="inp" type="password" value={wsRegPass} onChange={e=>setWsRegPass(e.target.value)}/></div>
+                <div><FL label={t.confirmPwd+" *"}/><input className="inp" type="password" value={wsRegPass2} onChange={e=>setWsRegPass2(e.target.value)}/></div>
                 <div><FL label="Email"/><input className="inp" type="email" value={wsRegEmail} onChange={e=>setWsRegEmail(e.target.value)} placeholder="workshop@email.com"/></div>
                 <div><FL label="Phone"/><input className="inp" type="tel" value={wsRegPhone} onChange={e=>setWsRegPhone(e.target.value)} placeholder="+27..."/></div>
                 <div>
@@ -172,7 +172,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                       try{const loc=await detectGeoLocation();setWsRegCity(loc.city);setWsRegCountry(loc.country);}catch{}
                       setDetectingLoc(false);
                     }} style={{fontSize:11,padding:"3px 9px"}}>
-                      {detectingLoc?"Detecting...":"📍 Auto-detect"}
+                      {detectingLoc?t.detectingLoc:"📍 "+t.autoDetect}
                     </button>
                   </div>
                   <div style={{display:"flex",gap:10}}>
@@ -181,15 +181,15 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                   </div>
                 </div>
                 {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
-                <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doWsSignup} disabled={loading}>{loading?"Creating account...":"🚀 Start Free Trial"}</button>
-                <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",marginTop:-4}}>Already have an account? <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setWsTab("login");setErr("");}}>Sign in</span></p>
+                <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doWsSignup} disabled={loading}>{loading?t.connecting:"🚀 "+t.startFreeTrial}</button>
+                <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",marginTop:-4}}>{t.alreadyAccount} <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setWsTab("login");setErr("");}}>{t.signIn}</span></p>
               </>)}
             </div>
           )}
           {authTab==="customer"&&(
             <div>
               <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:20}}>
-                {[["login",lang==="zh"?"已有帳號":"Sign In"],["register",lang==="zh"?"新客戶":"Register"]].map(([id,lb])=>(
+                {[["login",t.signIn],["register",t.registerNew]].map(([id,lb])=>(
                   <button key={id} className={`auth-tab ${custTab===id?"on":""}`} onClick={()=>{setCustTab(id);setErr("");}}>{lb}</button>
                 ))}
               </div>
@@ -199,24 +199,22 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                   <div><FL label={t.password}/><input className="inp" type="password" value={cPass} onChange={e=>setCPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustLogin()}/></div>
                   {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
                   <button className="btn btn-primary" style={{width:"100%",padding:13}} onClick={doCustLogin} disabled={loading}>{loading?t.connecting:t.login}</button>
-                  <p style={{fontSize:13,color:"var(--text3)",textAlign:"center"}}>{lang==="zh"?"沒有帳號？":"No account? "}<span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setCustTab("register");setErr("");}}>{lang==="zh"?"立即註冊":"Register"}</span></p>
+                  <p style={{fontSize:13,color:"var(--text3)",textAlign:"center"}}>{t.noAccount} <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setCustTab("register");setErr("");}}>{t.registerNew}</span></p>
                 </div>
               )}
               {custTab==="register"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                  <div><FL label={lang==="zh"?"姓名 *":"Name *"}/><input className="inp" value={cName} onChange={e=>setCName(e.target.value)}/></div>
+                  <div><FL label={t.name+" *"}/><input className="inp" value={cName} onChange={e=>setCName(e.target.value)}/></div>
                   <div>
-                    <FL label={lang==="zh"?"手機號碼 *":"Phone Number *"}/>
+                    <FL label={t.phone+" *"}/>
                     <input className="inp" type="tel" value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="+27..."/>
-                    <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>
-                      {lang==="zh"?"請輸入完整電話號碼（最少9位數字）":"Full number required (min 9 digits)"}
-                    </div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Full number required (min 9 digits)</div>
                   </div>
                   <div><FL label="Email"/><input className="inp" type="email" value={cEmail} onChange={e=>setCEmail(e.target.value)}/></div>
-                  <div><FL label={lang==="zh"?"密碼 *":"Password *"}/><input className="inp" type="password" value={cPass} onChange={e=>setCPass(e.target.value)}/></div>
-                  <div><FL label={lang==="zh"?"確認密碼 *":"Confirm *"}/><input className="inp" type="password" value={cPass2} onChange={e=>setCPass2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustRegister()}/></div>
+                  <div><FL label={t.password+" *"}/><input className="inp" type="password" value={cPass} onChange={e=>setCPass(e.target.value)}/></div>
+                  <div><FL label={t.confirmPwd+" *"}/><input className="inp" type="password" value={cPass2} onChange={e=>setCPass2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustRegister()}/></div>
                   {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
-                  <button className="btn btn-primary" style={{width:"100%",padding:13}} onClick={doCustRegister} disabled={loading}>{loading?t.connecting:(lang==="zh"?"立即註冊":"Create Account")}</button>
+                  <button className="btn btn-primary" style={{width:"100%",padding:13}} onClick={doCustRegister} disabled={loading}>{loading?t.connecting:t.createAccount}</button>
                 </div>
               )}
             </div>

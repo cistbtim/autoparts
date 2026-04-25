@@ -2767,29 +2767,67 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       </div>
 
       {/* ── Tab bar ── */}
-      <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:14,overflowX:"auto",gap:0,scrollbarWidth:"none"}}>
-        {[
-          {id:"car",     label:`🚗 ${t.wsTabCar}`},
-          {id:"inspect", label:`✅ ${t.wsTabInspect}`, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
-          {id:"photos",  label:`📷 ${t.wsTabPhotos}`,  badge:savedPhotos.length>0?savedPhotos.length:null},
-          {id:"docs",    label:`📎 ${t.wsTabDocs}`,     badge:jobDocs.length>0?jobDocs.length:null},
-          ...(wsRole!=="mechanic"?[
-            {id:"quote",   label:`📝 ${t.wsTabQuote}`,   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
-            {id:"invoice", label:`🧾 ${t.invoice}`, badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
-          ]:[]),
-        ].map(tab=>(
-          <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
-            padding:"9px 13px",border:"none",background:"none",cursor:"pointer",flexShrink:0,
-            fontSize:13,fontWeight:jobTab===tab.id?700:400,
-            color:jobTab===tab.id?"var(--accent)":"var(--text2)",
-            borderBottom:jobTab===tab.id?"2px solid var(--accent)":"2px solid transparent",
-            marginBottom:-1,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,
-          }}>
-            {tab.label}
-            {tab.badge!=null&&<span style={{fontSize:10,fontWeight:600,opacity:.7,background:"var(--surface2)",borderRadius:99,padding:"1px 5px"}}>{tab.badge}</span>}
-          </button>
-        ))}
-      </div>
+      {isMobile ? (
+        /* Mobile: icon pill grid — all 6 fit on one row, no scrolling */
+        <div style={{display:"grid",gridTemplateColumns:`repeat(${wsRole==="mechanic"?4:6},1fr)`,gap:6,marginBottom:14}}>
+          {[
+            {id:"car",     icon:"🚗", label:t.wsTabCar},
+            {id:"inspect", icon:"✅", label:t.wsTabInspect, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
+            {id:"photos",  icon:"📷", label:t.wsTabPhotos,  badge:savedPhotos.length>0?savedPhotos.length:null},
+            {id:"docs",    icon:"📎", label:t.wsTabDocs,    badge:jobDocs.length>0?jobDocs.length:null},
+            ...(wsRole!=="mechanic"?[
+              {id:"quote",   icon:"📝", label:t.wsTabQuote,  badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
+              {id:"invoice", icon:"🧾", label:t.invoice,     badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
+            ]:[]),
+          ].map(tab=>{
+            const active=jobTab===tab.id;
+            return (
+              <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
+                position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+                padding:"8px 4px",border:"none",borderRadius:10,cursor:"pointer",
+                background:active?"var(--accent)":"var(--surface2)",
+                color:active?"#fff":"var(--text3)",
+                transition:"background .15s",
+              }}>
+                <span style={{fontSize:20,lineHeight:1}}>{tab.icon}</span>
+                <span style={{fontSize:9,fontWeight:active?700:500,letterSpacing:".02em",lineHeight:1,whiteSpace:"nowrap"}}>{tab.label}</span>
+                {tab.badge!=null&&(
+                  <span style={{
+                    position:"absolute",top:4,right:6,fontSize:9,fontWeight:700,
+                    background:active?"rgba(255,255,255,.3)":"var(--accent)",
+                    color:active?"#fff":"#fff",borderRadius:99,padding:"1px 4px",lineHeight:1.4,minWidth:14,textAlign:"center"
+                  }}>{tab.badge}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        /* Desktop: underline tabs */
+        <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:14,overflowX:"auto",gap:0,scrollbarWidth:"none"}}>
+          {[
+            {id:"car",     label:`🚗 ${t.wsTabCar}`},
+            {id:"inspect", label:`✅ ${t.wsTabInspect}`, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
+            {id:"photos",  label:`📷 ${t.wsTabPhotos}`,  badge:savedPhotos.length>0?savedPhotos.length:null},
+            {id:"docs",    label:`📎 ${t.wsTabDocs}`,     badge:jobDocs.length>0?jobDocs.length:null},
+            ...(wsRole!=="mechanic"?[
+              {id:"quote",   label:`📝 ${t.wsTabQuote}`,   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
+              {id:"invoice", label:`🧾 ${t.invoice}`, badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
+            ]:[]),
+          ].map(tab=>(
+            <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
+              padding:"9px 13px",border:"none",background:"none",cursor:"pointer",flexShrink:0,
+              fontSize:13,fontWeight:jobTab===tab.id?700:400,
+              color:jobTab===tab.id?"var(--accent)":"var(--text2)",
+              borderBottom:jobTab===tab.id?"2px solid var(--accent)":"2px solid transparent",
+              marginBottom:-1,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,
+            }}>
+              {tab.label}
+              {tab.badge!=null&&<span style={{fontSize:10,fontWeight:600,opacity:.7,background:"var(--surface2)",borderRadius:99,padding:"1px 5px"}}>{tab.badge}</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ══ CAR INFO tab ══ */}
       {jobTab==="car"&&(

@@ -2449,8 +2449,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [editQtyVal,    setEditQtyVal]    = useState("");
   const [editMarkupId,  setEditMarkupId]  = useState(null);
   const [editMarkupVal, setEditMarkupVal] = useState("");
-  const [returnQuoteOpen, setReturnQuoteOpen] = useState(false);
-  const [returnQtPrices,  setReturnQtPrices]  = useState({}); // itemId → price string
+  const [returnQuoteOpen,  setReturnQuoteOpen]  = useState(false);
+  const [returnQuoteTarget,setReturnQuoteTarget]= useState(null); // {request, existingQuote}
   const [renewalModal,  setRenewalModal]  = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
@@ -3465,7 +3465,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ Part</button>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ Labour</button>
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📤 Send Quote</button>
-              {items.length>0&&<button className="btn btn-ghost btn-sm" style={{color:"#38bdf8",borderColor:"rgba(56,189,248,.35)"}} onClick={()=>{ const init={}; items.forEach(i=>{init[i.id]=String(i.unit_price||0);}); setReturnQtPrices(init); setReturnQuoteOpen(true); }}>↩️ Return Quote</button>}
+              {wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&<button className="btn btn-ghost btn-sm" style={{color:"#38bdf8",borderColor:"rgba(56,189,248,.35)"}} onClick={()=>setReturnQuoteOpen(true)}>↩️ Return Quote</button>}
             </div>
             {items.length>0&&(
               <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
@@ -3682,46 +3682,46 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       )}
       </>)}
 
-      {/* Return Quote modal — quick price entry for all items */}
-      {returnQuoteOpen&&(
-        <Overlay onClose={()=>setReturnQuoteOpen(false)} wide>
-          <MHead title="↩️ Return Quote — Enter Prices" onClose={()=>setReturnQuoteOpen(false)}/>
-          <div style={{marginBottom:14,fontSize:13,color:"var(--text3)"}}>Enter the prices received from your supplier. Saves directly to Parts &amp; Labour.</div>
-          <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:16}}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 130px",gap:8,padding:"7px 14px",background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
-              <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>Description</div>
-              <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",textAlign:"right"}}>Unit Price</div>
+      {/* Return Quote — supplier picker */}
+      {returnQuoteOpen&&!returnQuoteTarget&&(()=>{
+        const jobRequests=wsSupplierRequests.filter(r=>r.job_id===job.id);
+        return(
+          <Overlay onClose={()=>setReturnQuoteOpen(false)}>
+            <MHead title="↩️ Return Quote — Select Supplier" onClose={()=>setReturnQuoteOpen(false)}/>
+            <div style={{marginBottom:12,fontSize:13,color:"var(--text3)"}}>Choose which supplier is returning their quote:</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {jobRequests.map(r=>{
+                const existing=wsSupplierQuotes.find(q=>q.request_id===r.id);
+                return(
+                  <button key={r.id}
+                    onClick={()=>setReturnQuoteTarget({request:r,existingQuote:existing||null})}
+                    style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",cursor:"pointer",textAlign:"left",width:"100%"}}>
+                    <span style={{fontSize:22,flexShrink:0}}>📲</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:14}}>{r.supplier_name||r.supplier_phone||"Unknown supplier"}</div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{new Date(r.sent_at||r.created_at).toLocaleString()}</div>
+                    </div>
+                    {existing
+                      ? <span style={{fontSize:11,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.12)",borderRadius:6,padding:"3px 8px",flexShrink:0}}>✅ Quoted</span>
+                      : <span style={{fontSize:11,fontWeight:700,color:"var(--text3)",background:"var(--surface3)",borderRadius:6,padding:"3px 8px",flexShrink:0}}>Pending</span>
+                    }
+                  </button>
+                );
+              })}
             </div>
-            {items.map((item,idx)=>(
-              <div key={item.id} style={{display:"grid",gridTemplateColumns:"1fr 130px",gap:8,padding:"9px 14px",borderBottom:idx<items.length-1?"1px solid var(--border)":"none",alignItems:"center"}}>
-                <div>
-                  <span className="badge" style={{fontSize:10,marginRight:6,background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?"🔩":"👷"}</span>
-                  <span style={{fontSize:13,fontWeight:600}}>{item.description}</span>
-                  {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:6}}>{item.part_sku}</code>}
-                </div>
-                <input className="inp" type="number" min="0" step="0.01"
-                  value={returnQtPrices[item.id]??String(item.unit_price||0)}
-                  onChange={e=>setReturnQtPrices(p=>({...p,[item.id]:e.target.value}))}
-                  placeholder="0.00"
-                  style={{textAlign:"right",padding:"4px 8px",fontSize:13,fontWeight:700}}/>
-              </div>
-            ))}
-          </div>
-          <div style={{display:"flex",gap:10}}>
-            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setReturnQuoteOpen(false)}>Cancel</button>
-            <button className="btn btn-primary" style={{flex:2}} onClick={async()=>{
-              for(const item of items){
-                const newPrice=+(returnQtPrices[item.id]??item.unit_price);
-                if(!isNaN(newPrice)&&newPrice!==+(item.unit_price||0)){
-                  const costP=+(item.cost_price||0);
-                  const newMarkup=costP>0?+((newPrice/costP-1)*100).toFixed(1):+(item.markup_pct||0);
-                  await onSaveItem({...item,unit_price:newPrice,markup_pct:newMarkup,total:newPrice*(+item.qty||1)});
-                }
-              }
-              setReturnQuoteOpen(false);
-            }}>💾 Save Prices</button>
-          </div>
-        </Overlay>
+            <button className="btn btn-ghost" style={{width:"100%",marginTop:14}} onClick={()=>setReturnQuoteOpen(false)}>Cancel</button>
+          </Overlay>
+        );
+      })()}
+      {/* Return Quote — price entry (reuses SupplierQuoteModal) */}
+      {returnQuoteOpen&&returnQuoteTarget&&(
+        <SupplierQuoteModal
+          request={returnQuoteTarget.request}
+          existingQuote={returnQuoteTarget.existingQuote}
+          priceOnly
+          settings={settings}
+          onSave={async(d)=>{ if(onSaveWsSupplierQuote) await onSaveWsSupplierQuote(d); setReturnQuoteTarget(null); setReturnQuoteOpen(false); }}
+          onClose={()=>setReturnQuoteTarget(null)}/>
       )}
 
       {/* Add item modal */}

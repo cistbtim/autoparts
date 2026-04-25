@@ -2388,14 +2388,9 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
                   )}
                   <div style={{display:"flex",gap:6,alignItems:"center"}}>
                     <button
-                      onClick={()=>setQuoteTarget({request:r, existingQuote: existingQuote||null, priceOnly:false})}
+                      onClick={()=>setQuoteTarget({request:r, existingQuote: existingQuote||null})}
                       style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:existingQuote?"rgba(52,211,153,.12)":"var(--surface3)",cursor:"pointer",color:existingQuote?"var(--green)":"var(--text2)",fontWeight:600}}>
                       {existingQuote?"✏️ Edit Quote":"💰 Enter Quote"}
-                    </button>
-                    <button
-                      onClick={()=>setQuoteTarget({request:r, existingQuote: existingQuote||null, priceOnly:true})}
-                      style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(56,189,248,.35)",background:"rgba(56,189,248,.08)",cursor:"pointer",color:"#38bdf8",fontWeight:600}}>
-                      ↩️ Return Quote
                     </button>
                     {onDeleteSend&&(
                       <button
@@ -2417,7 +2412,6 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
         <SupplierQuoteModal
           request={quoteTarget.request}
           existingQuote={quoteTarget.existingQuote}
-          priceOnly={quoteTarget.priceOnly||false}
           settings={settings}
           onSave={async(d)=>{ if(onSaveQuote) await onSaveQuote(d); setQuoteTarget(null); }}
           onClose={()=>setQuoteTarget(null)}/>
@@ -2455,6 +2449,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [editQtyVal,    setEditQtyVal]    = useState("");
   const [editMarkupId,  setEditMarkupId]  = useState(null);
   const [editMarkupVal, setEditMarkupVal] = useState("");
+  const [returnQuoteOpen, setReturnQuoteOpen] = useState(false);
+  const [returnQtPrices,  setReturnQtPrices]  = useState({}); // itemId → price string
   const [renewalModal,  setRenewalModal]  = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
@@ -3469,6 +3465,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ Part</button>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ Labour</button>
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📤 Send Quote</button>
+              {items.length>0&&<button className="btn btn-ghost btn-sm" style={{color:"#38bdf8",borderColor:"rgba(56,189,248,.35)"}} onClick={()=>{ const init={}; items.forEach(i=>{init[i.id]=String(i.unit_price||0);}); setReturnQtPrices(init); setReturnQuoteOpen(true); }}>↩️ Return Quote</button>}
             </div>
             {items.length>0&&(
               <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
@@ -3684,6 +3681,48 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             </button>
       )}
       </>)}
+
+      {/* Return Quote modal — quick price entry for all items */}
+      {returnQuoteOpen&&(
+        <Overlay onClose={()=>setReturnQuoteOpen(false)} wide>
+          <MHead title="↩️ Return Quote — Enter Prices" onClose={()=>setReturnQuoteOpen(false)}/>
+          <div style={{marginBottom:14,fontSize:13,color:"var(--text3)"}}>Enter the prices received from your supplier. Saves directly to Parts &amp; Labour.</div>
+          <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:16}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 130px",gap:8,padding:"7px 14px",background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
+              <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>Description</div>
+              <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",textAlign:"right"}}>Unit Price</div>
+            </div>
+            {items.map((item,idx)=>(
+              <div key={item.id} style={{display:"grid",gridTemplateColumns:"1fr 130px",gap:8,padding:"9px 14px",borderBottom:idx<items.length-1?"1px solid var(--border)":"none",alignItems:"center"}}>
+                <div>
+                  <span className="badge" style={{fontSize:10,marginRight:6,background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?"🔩":"👷"}</span>
+                  <span style={{fontSize:13,fontWeight:600}}>{item.description}</span>
+                  {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:6}}>{item.part_sku}</code>}
+                </div>
+                <input className="inp" type="number" min="0" step="0.01"
+                  value={returnQtPrices[item.id]??String(item.unit_price||0)}
+                  onChange={e=>setReturnQtPrices(p=>({...p,[item.id]:e.target.value}))}
+                  placeholder="0.00"
+                  style={{textAlign:"right",padding:"4px 8px",fontSize:13,fontWeight:700}}/>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setReturnQuoteOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" style={{flex:2}} onClick={async()=>{
+              for(const item of items){
+                const newPrice=+(returnQtPrices[item.id]??item.unit_price);
+                if(!isNaN(newPrice)&&newPrice!==+(item.unit_price||0)){
+                  const costP=+(item.cost_price||0);
+                  const newMarkup=costP>0?+((newPrice/costP-1)*100).toFixed(1):+(item.markup_pct||0);
+                  await onSaveItem({...item,unit_price:newPrice,markup_pct:newMarkup,total:newPrice*(+item.qty||1)});
+                }
+              }
+              setReturnQuoteOpen(false);
+            }}>💾 Save Prices</button>
+          </div>
+        </Overlay>
+      )}
 
       {/* Add item modal */}
       {addingItem&&(

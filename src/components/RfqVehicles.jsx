@@ -847,7 +847,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
         {uploading ? (
           <div style={{color:"var(--accent)",fontSize:14}}>
             <div style={{width:24,height:24,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 8px"}}/>
-            Uploading to Google Drive...
+            {t.phuUploading}
           </div>
         ) : preview ? (
           <div style={{display:"flex",alignItems:"center",gap:12,justifyContent:"center"}}>
@@ -858,15 +858,15 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
               <div style={{position:"absolute",bottom:2,right:2,background:"rgba(0,0,0,.55)",borderRadius:4,padding:"1px 4px",fontSize:9,color:"#fff",pointerEvents:"none"}}>🔍</div>
             </div>
             <div style={{textAlign:"left"}}>
-              <div style={{fontSize:13,fontWeight:600,color:"var(--green)"}}>✅ Photo uploaded</div>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Click photo to enlarge · drop here to replace</div>
+              <div style={{fontSize:13,fontWeight:600,color:"var(--green)"}}>✅ {t.phuUploaded}</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{t.phuClickEnlarge}</div>
             </div>
           </div>
         ) : (
           <div>
             <div style={{fontSize:26,marginBottom:6}}>📷</div>
-            <div style={{fontSize:14,fontWeight:600}}>Click or drag & drop photo</div>
-            <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>Auto-uploads to Google Drive · PNG, JPG</div>
+            <div style={{fontSize:14,fontWeight:600}}>{t.phuDrop}</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>{t.phuAutoUpload}</div>
           </div>
         )}
       </div>
@@ -892,10 +892,10 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
               fileRef.current?.click();
             }
           }}>
-          📋 Paste Image from Clipboard
+          📋 {t.phuPasteClipboard}
         </button>
         <button className="btn btn-ghost btn-sm" onClick={()=>fileRef.current?.click()}>
-          📁 Browse
+          📁 {t.phuBrowse}
         </button>
       </div>
 
@@ -910,10 +910,10 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
       <div style={{display:"flex",gap:6,alignItems:"center"}}>
         <input className="inp" type="url" value={imageUrl||""} style={{fontSize:12,flex:1}}
           onChange={e => onChange(e.target.value)}
-          placeholder="Or paste Google Drive URL manually..."/>
+          placeholder={t.phuUrlPlaceholder}/>
         <button className="cp-btn"
           onClick={async()=>{try{const t2=await navigator.clipboard.readText();if(t2)onChange(t2);}catch{}}}>
-          📥 Paste
+          📥 {t.phuPaste}
         </button>
         {imageUrl && (
           <button className="cp-btn" style={{color:"var(--red)"}}

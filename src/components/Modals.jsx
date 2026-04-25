@@ -1895,7 +1895,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
       {/* ── TAB: PHOTO ── */}
       {ptab==="photo"&&(
         <div>
-          {part&&<div style={{fontSize:12,color:"var(--green)",marginBottom:10,background:"rgba(34,197,94,.08)",borderRadius:8,padding:"6px 10px"}}>✅ Photo saves automatically when uploaded</div>}
+          {part&&<div style={{fontSize:12,color:"var(--green)",marginBottom:10,background:"rgba(34,197,94,.08)",borderRadius:8,padding:"6px 10px"}}>✅ {t.phuAutoSave}</div>}
           <PartPhotoUploader imageUrl={f.image_url} onChange={handlePhotoChange} sku={f.sku} t={t}/>
         </div>
       )}

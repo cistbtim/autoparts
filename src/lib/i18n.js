@@ -118,6 +118,13 @@ export const T = {
     pmEditPart: "Edit Part", pmNewPart: "New Part",
     pmTabInfo: "Info", pmTabPhoto: "Photo", pmTabVehicle: "Vehicle", pmTabFits: "Fits", pmTabRfq: "RFQ",
     costPrice: "Cost Price",
+    // PartPhotoUploader strings
+    phuUploading: "Uploading to Google Drive...",
+    phuUploaded: "Photo uploaded", phuClickEnlarge: "Click photo to enlarge · drop here to replace",
+    phuDrop: "Click or drag & drop photo", phuAutoUpload: "Auto-uploads to Google Drive · PNG, JPG",
+    phuPasteClipboard: "Paste Image from Clipboard", phuBrowse: "Browse", phuPaste: "Paste",
+    phuAutoSave: "Photo saves automatically when uploaded",
+    phuUrlPlaceholder: "Or paste Google Drive URL manually...",
     // WorkshopJobDetail strings
     wsBack: "← Back", wsLabel: "Label", wsCollect: "Collect", wsInfoBtn: "Info", wsMove: "Move",
     wsTabCar: "Car", wsTabInspect: "Inspect", wsTabPhotos: "Photos", wsTabDocs: "Docs", wsTabQuote: "Quote",

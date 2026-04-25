@@ -2451,6 +2451,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [editMarkupVal, setEditMarkupVal] = useState("");
   const [returnQuoteOpen,  setReturnQuoteOpen]  = useState(false);
   const [returnQuoteTarget,setReturnQuoteTarget]= useState(null); // {request, existingQuote}
+  const [photoLightbox,    setPhotoLightbox]    = useState(null); // null | index into visible photos
   const [renewalModal,  setRenewalModal]  = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
@@ -3004,19 +3005,24 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               </div>
             ):(vehiclePhotos.front||vehiclePhotos.rear||vehiclePhotos.side)?(
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                {[
-                  {url:vehiclePhotos.front,label:"Front"},
-                  {url:vehiclePhotos.rear, label:"Rear"},
-                  {url:vehiclePhotos.side, label:"Side"},
-                ].map(({url,label})=>(
-                  <div key={label} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface3)",aspectRatio:"4/3"}}>
+                {(()=>{
+                  const allPhotos=[
+                    {url:vehiclePhotos.front,label:"Front"},
+                    {url:vehiclePhotos.rear, label:"Rear"},
+                    {url:vehiclePhotos.side, label:"Side"},
+                  ];
+                  const visiblePhotos=allPhotos.filter(p=>p.url);
+                  return allPhotos.map(({url,label})=>(
+                  <div key={label} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface3)",aspectRatio:"4/3",cursor:url?"pointer":undefined}}
+                    onClick={url?()=>setPhotoLightbox(visiblePhotos.findIndex(p=>p.label===label)):undefined}>
                     {url
                       ?<DriveImg url={url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
                       :<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text3)",fontSize:12}}>—</div>
                     }
                     <div style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,.45)",color:"#fff",textAlign:"center",fontSize:10,padding:"2px 0",fontWeight:600}}>{label}</div>
                   </div>
-                ))}
+                  ));
+                })()}
               </div>
             ):(
               <div style={{textAlign:"center",padding:12,background:"var(--surface2)",borderRadius:8,color:"var(--text3)",fontSize:12}}>
@@ -3026,6 +3032,37 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           </div>
         </div>
       )}
+
+      {/* Photo lightbox */}
+      {photoLightbox!==null&&(()=>{
+        const visiblePhotos=[
+          {url:vehiclePhotos.front,label:"Front"},
+          {url:vehiclePhotos.rear, label:"Rear"},
+          {url:vehiclePhotos.side, label:"Side"},
+        ].filter(p=>p.url);
+        const idx=((photoLightbox%visiblePhotos.length)+visiblePhotos.length)%visiblePhotos.length;
+        const photo=visiblePhotos[idx];
+        const canNav=visiblePhotos.length>1;
+        return(
+          <div onClick={()=>setPhotoLightbox(null)}
+            style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {/* Close */}
+            <button onClick={e=>{e.stopPropagation();setPhotoLightbox(null);}}
+              style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",width:40,height:40,fontSize:20,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+            {/* Prev arrow */}
+            {canNav&&<button onClick={e=>{e.stopPropagation();setPhotoLightbox(idx-1);}}
+              style={{position:"absolute",left:16,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",width:48,height:48,fontSize:24,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>}
+            {/* Image */}
+            <div onClick={e=>e.stopPropagation()} style={{maxWidth:"90vw",maxHeight:"85vh",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+              <img src={photo.url} alt={photo.label} style={{maxWidth:"90vw",maxHeight:"78vh",objectFit:"contain",borderRadius:8,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
+              <div style={{color:"#fff",fontWeight:700,fontSize:14,letterSpacing:".05em"}}>{photo.label} <span style={{opacity:.5,fontWeight:400,fontSize:12}}>{idx+1} / {visiblePhotos.length}</span></div>
+            </div>
+            {/* Next arrow */}
+            {canNav&&<button onClick={e=>{e.stopPropagation();setPhotoLightbox(idx+1);}}
+              style={{position:"absolute",right:16,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",width:48,height:48,fontSize:24,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>}
+          </div>
+        );
+      })()}
 
       {/* ══ INSPECTION tab ══ */}
       {jobTab==="inspect"&&(

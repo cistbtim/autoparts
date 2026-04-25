@@ -114,6 +114,13 @@ export const T = {
     wsNoVehicles: "No vehicles yet", wsNoJobs: "No jobs yet", wsNoJobsFound: "No jobs found",
     wsAddVehicle: "Add Vehicle", wsNewCustomer: "New Customer", wsEditCustomer: "Edit Customer",
     wsNewJob: "New Job Card", wsEditJob: "Edit Job Card",
+    // WorkshopJobDetail strings
+    wsBack: "← Back", wsLabel: "Label", wsCollect: "Collect", wsInfoBtn: "Info", wsMove: "Move",
+    wsTabCar: "Car", wsTabInspect: "Inspect", wsTabPhotos: "Photos", wsTabDocs: "Docs", wsTabQuote: "Quote",
+    wsPlate: "Plate", wsMakeModel: "Make / Model", year: "Year",
+    wsLicenceExpiry: "Licence Disc Expiry", wsExpired: "EXPIRED",
+    wsRequestRenewal: "Request Renewal", wsVinSearch: "VIN Search", wsCopy: "Copy",
+    wsOeSearch: "OE Number Search",
   },
 };
 

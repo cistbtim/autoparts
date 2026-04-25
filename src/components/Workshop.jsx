@@ -3,6 +3,7 @@ import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { getSettings, C, curSym, updateSettings } from "../lib/settings.js";
 import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, waLink, extractDriveId } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
+import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
 import { VehiclePhotoUploader } from "./RfqVehicles.jsx";
@@ -2719,7 +2720,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
     <div className="fu">
       {/* ── Header ── */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}>
-        <button className="btn btn-ghost btn-sm" onClick={onBack}>← Back</button>
+        <button className="btn btn-ghost btn-sm" onClick={onBack}>{t.wsBack}</button>
         <div style={{flex:1,minWidth:0}}>
           <h1 style={{fontSize:18,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name}</h1>
           <div style={{fontSize:12,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap",marginTop:2}}>
@@ -2729,16 +2730,16 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           </div>
         </div>
         <span className="badge" style={{background:"rgba(96,165,250,.12)",color:ST_COLOR[job.status]||"var(--blue)",fontSize:13,padding:"5px 12px",flexShrink:0}}>
-          {job.status}
+          {tSt(job.status)}
         </span>
       </div>
 
       {/* Action buttons row */}
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-        {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ Edit</button>}
-        <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardLabel(job,settings)}>🏷️ Label</button>
-        <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 Collect</button>
-        <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📲 Supplier</button>
+        {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ {t.edit}</button>}
+        <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardLabel(job,settings)}>🏷️ {t.wsLabel}</button>
+        <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 {t.wsCollect}</button>
+        <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📲 {t.suppliers}</button>
         <button className="btn btn-ghost btn-sm" onClick={()=>{
           const lines=["============================","  VEHICLE INFO","============================",
             `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,
@@ -2749,41 +2750,41 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           const a=document.createElement("a");
           a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));
           a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`; a.click();
-        }}>⬇️ Info</button>
-        {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>setMoveModal(true)}>🔀 Move</button>}
-        {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 Delete</button>}
+        }}>⬇️ {t.wsInfoBtn}</button>
+        {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>setMoveModal(true)}>🔀 {t.wsMove}</button>}
+        {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
       </div>
 
       {/* ── Status bar ── */}
       <div className="card" style={{padding:"10px 14px",marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontSize:12,color:"var(--text3)",marginRight:2}}>Status:</span>
+        <span style={{fontSize:12,color:"var(--text3)",marginRight:2}}>{t.status}:</span>
         {(wsRole==="mechanic"?["Pending","In Progress"]:JOB_STATUSES).map(s=>(
           <button key={s} className={`btn btn-xs ${job.status===s?"btn-primary":"btn-ghost"}`}
-            onClick={()=>onSaveJob({...job,status:s})}>{s}</button>
+            onClick={()=>onSaveJob({...job,status:s})}>{tSt(s)}</button>
         ))}
       </div>
 
       {/* ── Tab bar ── */}
       <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:14,overflowX:"auto",gap:0,scrollbarWidth:"none"}}>
         {[
-          {id:"car",     label:"🚗 Car"},
-          {id:"inspect", label:"✅ Inspect", badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
-          {id:"photos",  label:"📷 Photos",  badge:savedPhotos.length>0?savedPhotos.length:null},
-          {id:"docs",    label:"📎 Docs",     badge:jobDocs.length>0?jobDocs.length:null},
+          {id:"car",     label:`🚗 ${t.wsTabCar}`},
+          {id:"inspect", label:`✅ ${t.wsTabInspect}`, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
+          {id:"photos",  label:`📷 ${t.wsTabPhotos}`,  badge:savedPhotos.length>0?savedPhotos.length:null},
+          {id:"docs",    label:`📎 ${t.wsTabDocs}`,     badge:jobDocs.length>0?jobDocs.length:null},
           ...(wsRole!=="mechanic"?[
-            {id:"quote",   label:"📝 Quote",   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
-            {id:"invoice", label:"🧾 Invoice", badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
+            {id:"quote",   label:`📝 ${t.wsTabQuote}`,   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
+            {id:"invoice", label:`🧾 ${t.invoice}`, badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
           ]:[]),
-        ].map(t=>(
-          <button key={t.id} onClick={()=>setJobTab(t.id)} style={{
+        ].map(tab=>(
+          <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
             padding:"9px 13px",border:"none",background:"none",cursor:"pointer",flexShrink:0,
-            fontSize:13,fontWeight:jobTab===t.id?700:400,
-            color:jobTab===t.id?"var(--accent)":"var(--text2)",
-            borderBottom:jobTab===t.id?"2px solid var(--accent)":"2px solid transparent",
+            fontSize:13,fontWeight:jobTab===tab.id?700:400,
+            color:jobTab===tab.id?"var(--accent)":"var(--text2)",
+            borderBottom:jobTab===tab.id?"2px solid var(--accent)":"2px solid transparent",
             marginBottom:-1,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,
           }}>
-            {t.label}
-            {t.badge!=null&&<span style={{fontSize:10,fontWeight:600,opacity:.7,background:"var(--surface2)",borderRadius:99,padding:"1px 5px"}}>{t.badge}</span>}
+            {tab.label}
+            {tab.badge!=null&&<span style={{fontSize:10,fontWeight:600,opacity:.7,background:"var(--surface2)",borderRadius:99,padding:"1px 5px"}}>{tab.badge}</span>}
           </button>
         ))}
       </div>
@@ -2793,14 +2794,14 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         <div className="card" style={{padding:16,marginBottom:14}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:12}}>
             {[
-              ["🚗 Plate",job.vehicle_reg],
-              ["Make / Model",`${job.vehicle_make||""} ${job.vehicle_model||""}`.trim()||"—"],
-              ["Year",job.vehicle_year||"—"],
-              ["Color",job.vehicle_color||"—"],
-              ["Mileage",job.mileage?`${job.mileage.toLocaleString()} km`:"—"],
-              ["👷 Mechanic",job.mechanic||"—"],
-              ["📅 Date In",job.date_in||"—"],
-              ["📅 Date Out",job.date_out||"—"],
+              [`🚗 ${t.wsPlate}`,job.vehicle_reg],
+              [t.wsMakeModel,`${job.vehicle_make||""} ${job.vehicle_model||""}`.trim()||"—"],
+              [t.year,job.vehicle_year||"—"],
+              [t.vehicleColor,job.vehicle_color||"—"],
+              [t.mileage,job.mileage?`${job.mileage.toLocaleString()} km`:"—"],
+              [`👷 ${t.mechanic}`,job.mechanic||"—"],
+              [`📅 ${t.dateIn}`,job.date_in||"—"],
+              [`📅 ${t.dateOut}`,job.date_out||"—"],
             ].map(([l,v])=>(
               <div key={l}>
                 <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>{l}</div>
@@ -2809,25 +2810,25 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             ))}
             {job.engine_no&&(
               <div>
-                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>Engine No</div>
+                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>{t.engine} No</div>
                 <code style={{fontWeight:600,fontSize:12,fontFamily:"DM Mono,monospace"}}>{job.engine_no}</code>
               </div>
             )}
             {(vehicleRecord?.licence_disc_expiry||job?.licence_disc_expiry)&&(
               <div style={{gridColumn:"1/-1"}}>
-                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>Licence Disc Expiry</div>
+                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>{t.wsLicenceExpiry}</div>
                 {(()=>{
                   const exp = vehicleRecord?.licence_disc_expiry||job.licence_disc_expiry;
                   const expired = new Date(exp)<new Date();
                   return (
                     <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                       <div style={{fontWeight:700,fontSize:13,color:expired?"var(--red)":"var(--green)"}}>
-                        {exp} {expired?"⚠️ EXPIRED":"✅"}
+                        {exp} {expired?`⚠️ ${t.wsExpired}`:"✅"}
                       </div>
                       {onSaveWsLicenceRenewal&&(
                         <button onClick={()=>setRenewalModal(true)}
                           style={{fontSize:11,padding:"4px 12px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.4)",borderRadius:12,cursor:"pointer",color:"#16a34a",fontWeight:600,whiteSpace:"nowrap"}}>
-                          🪪 Request Renewal
+                          🪪 {t.wsRequestRenewal}
                         </button>
                       )}
                     </div>
@@ -2840,11 +2841,11 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           {/* VIN + Search tools */}
           {job.vin&&(
             <div style={{borderTop:"1px solid var(--border)",paddingTop:12}}>
-              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:8}}>🔍 VIN Search</div>
+              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:8}}>🔍 {t.wsVinSearch}</div>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
                 <code style={{fontFamily:"DM Mono,monospace",fontSize:14,fontWeight:700,letterSpacing:"1px",background:"var(--surface2)",padding:"5px 12px",borderRadius:7,border:"1px solid var(--border)"}}>{job.vin}</code>
                 <button onClick={()=>navigator.clipboard.writeText(job.vin).then(()=>alert("VIN copied!"))}
-                  style={{fontSize:11,padding:"4px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",color:"var(--text3)"}}>📋 Copy</button>
+                  style={{fontSize:11,padding:"4px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",color:"var(--text3)"}}>📋 {t.wsCopy}</button>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                 {vinSearchLinks.map(lk=>(
@@ -2873,7 +2874,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               </div>
               {/* OE Number search */}
               <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
-                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🔎 OE Number Search</div>
+                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🔎 {t.wsOeSearch}</div>
                 <div style={{display:"flex",gap:6}}>
                   <div style={{flex:1,position:"relative",display:"flex",alignItems:"center"}}>
                     <input

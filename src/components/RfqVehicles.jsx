@@ -11,6 +11,8 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
   const [activeSession,setActiveSession]=useState(null);
   const [lq,setLq]=useState([]); // local quote state for detail view (no auto-refresh)
   const needSync=useRef(false);
+  const [isMobile,setIsMobile]=useState(()=>window.innerWidth<=700);
+  useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
 
   // Sync lq when opening a session
   useEffect(()=>{
@@ -292,7 +294,87 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
           })}
         </div>
 
-        {/* Comparison table */}
+        {/* Comparison — card on mobile, table on desktop */}
+        {isMobile ? (
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {sessionItems.map(item=>{
+              const itemQuotes=sessionQuotes.filter(q=>q.rfq_item_id===item.id);
+              const quotedPrices=itemQuotes.filter(q=>q.status==="quoted"&&q.unit_price!=null).map(q=>q.unit_price);
+              const minPrice=quotedPrices.length?Math.min(...quotedPrices):null;
+              return (
+                <div key={item.id} className="card" style={{padding:14}}>
+                  {/* Part header */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:14,color:"var(--accent)",cursor:"pointer",textDecoration:"underline dotted"}}
+                        onClick={()=>onEditPart&&onEditPart(parts.find(p=>String(p.id)===String(item.part_id)))}>
+                        {item.part_name}
+                      </div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{item.part_sku}{item.oe_number&&" · "+item.oe_number}</div>
+                    </div>
+                    <span style={{fontWeight:700,fontSize:15,color:"var(--accent)",background:"rgba(251,146,60,.1)",borderRadius:8,padding:"2px 10px",flexShrink:0,marginLeft:8}}>×{item.qty_needed}</span>
+                  </div>
+                  {/* Supplier quotes */}
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {allSuppliers.map(s=>{
+                      const q=itemQuotes.find(x=>x.supplier_id===s.id);
+                      const isBest=q?.unit_price!=null&&q.unit_price===minPrice&&quotedPrices.length>1;
+                      const replyUrl=`${window.location.origin}${window.location.pathname}?rfq_quote=${q?.token}`;
+                      const isSelected=q?.status==="selected";
+                      return (
+                        <div key={s.id} style={{
+                          borderRadius:8,padding:"10px 12px",
+                          background:isSelected?"rgba(52,211,153,.07)":"var(--surface2)",
+                          border:`1px solid ${isSelected?"rgba(52,211,153,.4)":isBest?"rgba(251,146,60,.3)":"var(--border)"}`,
+                          display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"
+                        }}>
+                          <div style={{fontWeight:600,fontSize:13,minWidth:80}}>{s.name}</div>
+                          {(!q||q.status==="pending") ? (
+                            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                              <span style={{fontSize:11,color:"var(--text3)"}}>⏳ Awaiting</span>
+                              {s.phone&&<a href={`https://wa.me/${s.phone}?text=${encodeURIComponent(`Hi, please quote for: ${item.part_name} (${item.part_sku})\nQty: ${item.qty_needed}\n\nSubmit quote: ${replyUrl}`)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                                <button className="cp-btn" style={{fontSize:10,padding:"2px 8px",color:"#25D366",borderColor:"rgba(37,211,102,.3)"}}>📲 WA</button>
+                              </a>}
+                              {s.email&&<a href={`mailto:${s.email}?subject=RFQ: ${item.part_name}&body=${encodeURIComponent(`Please quote for:\n${item.part_name} (${item.part_sku})\nQty: ${item.qty_needed}\n\nSubmit quote here: ${replyUrl}`)}`} style={{textDecoration:"none"}}>
+                                <button className="cp-btn" style={{fontSize:10,padding:"2px 8px"}}>✉</button>
+                              </a>}
+                              <button className="cp-btn" style={{fontSize:10,padding:"2px 8px"}} onClick={()=>navigator.clipboard.writeText(replyUrl)}>🔗</button>
+                              <a href={replyUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="cp-btn" style={{fontSize:10,padding:"2px 8px",color:"var(--blue)"}}>↗</button></a>
+                            </div>
+                          ) : (
+                            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                              <div>
+                                <div style={{fontWeight:700,fontSize:17,fontFamily:"Rajdhani,sans-serif",
+                                  color:isBest?"var(--green)":isSelected?"var(--accent)":"var(--text)"}}>
+                                  {cur}{q.unit_price?.toLocaleString()}
+                                  {isBest&&<span style={{fontSize:10,marginLeft:4,color:"var(--green)"}}>★</span>}
+                                </div>
+                                <div style={{display:"flex",gap:8,fontSize:11,color:"var(--text3)"}}>
+                                  {q.stock_qty!=null&&<span>Stock: {q.stock_qty}</span>}
+                                  {q.lead_days!=null&&<span>Lead: {q.lead_days}d</span>}
+                                </div>
+                                {q.notes&&<div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic"}}>{q.notes}</div>}
+                              </div>
+                              {!isSelected
+                                ? <button className="cp-btn" style={{fontSize:12,padding:"4px 12px",color:"var(--accent)",borderColor:"rgba(251,146,60,.3)",whiteSpace:"nowrap"}}
+                                    onClick={()=>handleSelect(q.id,item.id)}>Select</button>
+                                : <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                                    <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:11}}>✓ Selected</span>
+                                    <button className="cp-btn" style={{fontSize:10,padding:"2px 8px",color:"var(--red)",borderColor:"rgba(239,68,68,.3)"}}
+                                      onClick={()=>handleUnselect(q.id)}>Unselect</button>
+                                  </div>
+                              }
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
         <div className="card" style={{overflow:"hidden"}}>
           <div className="tbl-wrap">
             <table className="tbl">
@@ -373,6 +455,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
             </table>
           </div>
         </div>
+        )}
       </div>
     );
   }

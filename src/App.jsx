@@ -2424,12 +2424,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {/* ── STOCK MOVE ── */}
         {tab==="stockmove"&&(
           <div className="fu">
-            <PH title={`🔀 ${t.stockMove}`} subtitle={`${stockMoves.length} moves`}
-              action={<button className="btn btn-primary" onClick={()=>openM("stockMove",null)}>+ New Move</button>}/>
+            <PH title={`🔀 ${t.stockMove}`} subtitle={`${stockMoves.length} ${t.smMoves}`}
+              action={<button className="btn btn-primary" onClick={()=>openM("stockMove",null)}>+ {t.smNewMove}</button>}/>
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
-                  <thead><tr>{["Date","Part","SKU",t.fromBin,t.toBin,"Qty","By","Reason"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{[t.date,t.rptPart,t.sku,t.fromBin,t.toBin,t.qty,t.by,t.reason].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {stockMoves.map(m=>(
                       <tr key={m.id}>
@@ -2445,7 +2445,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                     ))}
                   </tbody>
                 </table>
-                {stockMoves.length===0&&<div style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No stock moves recorded</div>}
+                {stockMoves.length===0&&<div style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.smNoMoves}</div>}
               </div>
             </div>
           </div>

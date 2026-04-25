@@ -120,8 +120,9 @@ export const T = {
     costPrice: "Cost Price",
     // Login Logs page
     time: "Time", user: "User", city: "City", llEvents: "events",
-    // Stock Logs columns
+    // Stock Logs / Stock Move columns
     action: "Action", before: "Before", after: "After", change: "Change", by: "By", records: "records",
+    date: "Date", smMoves: "moves", smNewMove: "New Move", smNoMoves: "No stock moves recorded",
     // Stock Take page
     createdBy: "Created By", actions: "Actions", stTakes: "stock takes",
     stOpen: "Open", stCounted: "Counted", stCompleted: "Completed",

@@ -170,7 +170,7 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
       parent_job_id:openJobs.length>0?(openJobs.find(j=>j.id===reopenJobId)||openJobs[0]).id:null,
     };
     setJobPrefill(prefill);
-    setStep("jobform");
+    setStep("intake");
   };
 
   const handleProceed=async()=>{
@@ -186,27 +186,52 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
     proceedToJob();
   };
 
-  // ── Job form step ────────────────────────────────────────────
-  if(step==="jobform"&&jobPrefill){
-    return (
-      <WorkshopJobModal
-        job={jobPrefill}
-        wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs}
-        onSave={async(d)=>{
-          const jobId=await onSaveJob(d);
-          // After vehicle/job saved → go to photo capture
-          const now=new Date();
-          const pad2=n=>String(n).padStart(2,"0");
-          const dateStr=`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`;
-          const timeStr=`${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`;
-          setBookInJobId(jobId||null);
-          setPhotoSession({date:dateStr,time:timeStr});
-          setPhotoList([]);
-          photoCounter.current=0;
-          setStep("photos");
-        }}
-        onReopenJob={async(d)=>{ await onReopenJob(d); onClose(); }}
-        onClose={()=>setStep("lookup")} t={t}/>
+  // ── Quick intake step ─────────────────────────────────────────
+  if(step==="intake"&&jobPrefill){
+    const [intakeName,    setIntakeName]    = [jobPrefill.customer_name,    (v)=>setJobPrefill(p=>({...p,customer_name:v}))];
+    const [intakePhone,   setIntakePhone]   = [jobPrefill.customer_phone,   (v)=>setJobPrefill(p=>({...p,customer_phone:v}))];
+    const [intakeMileage, setIntakeMileage] = [jobPrefill.mileage,          (v)=>setJobPrefill(p=>({...p,mileage:v}))];
+    const [intakeComplaint,setIntakeComplaint]=[jobPrefill.complaint,       (v)=>setJobPrefill(p=>({...p,complaint:v}))];
+    const canSave=intakeName.trim()&&intakePhone.trim()&&intakeMileage&&intakeComplaint.trim();
+    const [savingIntake,setSavingIntake]=useState(false);
+    const saveIntake=async()=>{
+      if(!canSave){alert("Please fill in all fields");return;}
+      setSavingIntake(true);
+      try{
+        const jobId=await onSaveJob(jobPrefill);
+        const now=new Date();
+        const pad2=n=>String(n).padStart(2,"0");
+        setBookInJobId(jobId||null);
+        setPhotoSession({date:`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`,time:`${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`});
+        setPhotoList([]); photoCounter.current=0;
+        setStep("photos");
+      }catch(e){alert("Save failed: "+e.message);}
+      setSavingIntake(false);
+    };
+    return(
+      <Overlay onClose={onClose} wide>
+        <MHead title="🚗 Quick Book-In" onClose={onClose}/>
+        {/* Vehicle banner */}
+        <div style={{background:"var(--surface2)",borderRadius:10,padding:"10px 14px",marginBottom:16,display:"flex",gap:10,alignItems:"center"}}>
+          <span style={{fontSize:26}}>🚗</span>
+          <div>
+            <div style={{fontWeight:700,fontSize:15}}>{plate}</div>
+            <div style={{fontSize:12,color:"var(--text3)"}}>{[jobPrefill.vehicle_make,jobPrefill.vehicle_model,jobPrefill.vehicle_color].filter(Boolean).join(" · ")||"Vehicle"}</div>
+          </div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div><FL label="Customer Name *"/><input className="inp" autoFocus value={intakeName} onChange={e=>setIntakeName(e.target.value)} placeholder="e.g. John Smith"/></div>
+          <div><FL label="Phone *"/><input className="inp" type="tel" value={intakePhone} onChange={e=>setIntakePhone(e.target.value)} placeholder="+27 82 000 0000"/></div>
+          <div><FL label="Current Mileage *"/><input className="inp" type="number" min="0" value={intakeMileage} onChange={e=>setIntakeMileage(e.target.value)} placeholder="e.g. 120000"/></div>
+          <div><FL label="Main Job / Customer Complaint *"/><textarea className="inp" rows={3} value={intakeComplaint} onChange={e=>setIntakeComplaint(e.target.value)} placeholder="e.g. Check engine light on, service due" style={{resize:"vertical"}}/></div>
+        </div>
+        <div style={{display:"flex",gap:10,marginTop:16}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setStep("lookup")}>← Back</button>
+          <button className="btn btn-primary" style={{flex:2,padding:14,fontSize:15}} onClick={saveIntake} disabled={savingIntake||!canSave}>
+            {savingIntake?"Saving...":"✅ Save & Take Photos →"}
+          </button>
+        </div>
+      </Overlay>
     );
   }
 
@@ -2761,11 +2786,13 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         <div style={{display:"grid",gridTemplateColumns:`repeat(${wsRole==="mechanic"?4:6},1fr)`,gap:6,marginBottom:14}}>
           {[
             {id:"car",     icon:"🚗", label:t.wsTabCar},
+            ...(wsRole!=="mechanic"?[
+              {id:"quote",   icon:"📝", label:t.wsTabQuote,  badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
+            ]:[]),
             {id:"inspect", icon:"✅", label:t.wsTabInspect, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
             {id:"photos",  icon:"📷", label:t.wsTabPhotos,  badge:savedPhotos.length>0?savedPhotos.length:null},
             {id:"docs",    icon:"📎", label:t.wsTabDocs,    badge:jobDocs.length>0?jobDocs.length:null},
             ...(wsRole!=="mechanic"?[
-              {id:"quote",   icon:"📝", label:t.wsTabQuote,  badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
               {id:"invoice", icon:"🧾", label:t.invoice,     badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
             ]:[]),
           ].map(tab=>{
@@ -2796,11 +2823,13 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:14,overflowX:"auto",gap:0,scrollbarWidth:"none"}}>
           {[
             {id:"car",     label:`🚗 ${t.wsTabCar}`},
+            ...(wsRole!=="mechanic"?[
+              {id:"quote",   label:`📝 ${t.wsTabQuote}`,   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
+            ]:[]),
             {id:"inspect", label:`✅ ${t.wsTabInspect}`, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
             {id:"photos",  label:`📷 ${t.wsTabPhotos}`,  badge:savedPhotos.length>0?savedPhotos.length:null},
             {id:"docs",    label:`📎 ${t.wsTabDocs}`,     badge:jobDocs.length>0?jobDocs.length:null},
             ...(wsRole!=="mechanic"?[
-              {id:"quote",   label:`📝 ${t.wsTabQuote}`,   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
               {id:"invoice", label:`🧾 ${t.invoice}`, badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
             ]:[]),
           ].map(tab=>(

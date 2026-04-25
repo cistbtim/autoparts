@@ -118,6 +118,8 @@ export const T = {
     pmEditPart: "Edit Part", pmNewPart: "New Part",
     pmTabInfo: "Info", pmTabPhoto: "Photo", pmTabVehicle: "Vehicle", pmTabFits: "Fits", pmTabRfq: "RFQ",
     costPrice: "Cost Price",
+    // Login Logs page
+    time: "Time", user: "User", city: "City", llEvents: "events",
     // PartPhotoUploader strings
     phuUploading: "Uploading to Google Drive...",
     phuUploaded: "Photo uploaded", phuClickEnlarge: "Click photo to enlarge · drop here to replace",

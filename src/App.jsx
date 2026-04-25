@@ -2983,7 +2983,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {/* ── LOGIN LOGS ── */}
         {tab==="loginlogs"&&role==="admin"&&(
           <div className="fu">
-            <PH title={`🌍 ${t.loginLogs}`} subtitle={`${loginLogs.length} events`}/>
+            <PH title={`🌍 ${t.loginLogs}`} subtitle={`${loginLogs.length} ${t.llEvents}`}/>
             <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
               {Object.entries(loginLogs.reduce((a,l)=>{const c=l.country||"?";a[c]=(a[c]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>(
                 <span key={c} className="badge" style={{background:"var(--surface2)",color:"var(--text2)",padding:"5px 13px",fontSize:13}}>{c} · {n}</span>
@@ -2992,7 +2992,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
-                  <thead><tr>{["Time","User",t.role,"Country","City","IP",t.status].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{[t.time,t.user,t.role,t.country,t.city,"IP",t.status].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {loginLogs.map(l=>(
                       <tr key={l.id}>

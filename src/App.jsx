@@ -460,6 +460,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     tabRef.current === "wssuporders" ||
     tabRef.current === "wsstatement" ||
     tabRef.current === "wsreport" ||
+    tabRef.current === "settings" ||    // always pause on settings page
+    tabRef.current === "wsprofile" ||   // always pause on workshop profile/settings
     (Date.now() - lastActivityRef.current) < 8000;
 
   useEffect(()=>{

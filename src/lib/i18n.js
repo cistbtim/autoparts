@@ -78,6 +78,18 @@ export const T = {
     sendReply: "Send Reply", depositPaid: "Mark Deposit Paid",
     depositRequested: "Awaiting Deposit", noQueries: "No queries yet",
     queryNotes: "Notes / Query Details", partQuery: "Part Query",
+    // Reports page
+    rptBusinessAnalytics: "Business analytics",
+    rptTotalRevenue: "Total Revenue", rptTotalOrders: "Total Orders",
+    rptInventoryValue: "Inventory Value", rptCashReceived: "Cash Received",
+    rptPeriod: "Period", rptAvgOrder: "Avg Order", rptNoOrders: "No completed orders yet",
+    rptTotalParts: "Total Parts", rptTotalInventoryValue: "Total Inventory Value",
+    rptCurrentStock: "Current Stock", rptValue: "Value", rptPart: "Part",
+    rptTopCustomers: "Top Customers by Spend", rptRank: "Rank", rptTotalSpend: "Total Spend",
+    rptNoCustomers: "No customer data yet",
+    rptSupplierSummary: "Supplier Purchase Summary", rptInvoices: "Invoices",
+    rptTotalPurchased: "Total Purchased", rptAvgInvoice: "Avg Invoice",
+    rptNoSuppliers: "No purchase invoice data yet",
     // Login page tabs & buttons
     loginShop: "Parts Shop", loginWorkshop: "Workshop", loginStaff: "Staff",
     signIn: "Sign In", registerNew: "Register", registerWorkshop: "Register Workshop",

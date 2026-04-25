@@ -3074,16 +3074,16 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
   return (
     <div className="fu">
       <div className="page-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-        <div><h1 style={{fontSize:20,fontWeight:700}}>📊 {t.reports}</h1><p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>Business analytics</p></div>
+        <div><h1 style={{fontSize:20,fontWeight:700}}>📊 {t.reports}</h1><p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{t.rptBusinessAnalytics}</p></div>
       </div>
 
       {/* Summary cards */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
         {[
-          {label:"Total Revenue",value:fmt(totalRevenue),icon:"💰",color:"var(--green)"},
-          {label:"Total Orders",value:totalOrders,icon:"📋",color:"var(--blue)"},
-          {label:"Inventory Value",value:fmt(totalInventoryValue),icon:"📦",color:"var(--purple)"},
-          {label:"Cash Received",value:fmt(totalReceived),icon:"💳",color:"var(--accent)"},
+          {label:t.rptTotalRevenue,value:fmt(totalRevenue),icon:"💰",color:"var(--green)"},
+          {label:t.rptTotalOrders,value:totalOrders,icon:"📋",color:"var(--blue)"},
+          {label:t.rptInventoryValue,value:fmt(totalInventoryValue),icon:"📦",color:"var(--purple)"},
+          {label:t.rptCashReceived,value:fmt(totalReceived),icon:"💳",color:"var(--accent)"},
         ].map(s=>(
           <div key={s.label} className="card stat-card" style={{"--gc":s.color+"20"}}>
             <div style={{display:"flex",justifyContent:"space-between"}}>
@@ -3104,7 +3104,7 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
       {reportTab==="sales"&&(
         <div>
           <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center"}}>
-            <span style={{fontSize:13,color:"var(--text3)"}}>Period:</span>
+            <span style={{fontSize:13,color:"var(--text3)"}}>{t.rptPeriod}:</span>
             {["daily","monthly","yearly"].map(p=>(
               <button key={p} className={`btn btn-sm ${period===p?"btn-primary":"btn-ghost"}`} onClick={()=>setPeriod(p)} style={{fontSize:12}}>
                 {p==="daily"?t.daily:p==="monthly"?t.monthly:t.yearly}
@@ -3113,9 +3113,9 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
           </div>
           <div className="card" style={{overflow:"hidden"}}>
             <table className="tbl">
-              <thead><tr>{["Period","Orders","Revenue","Avg Order"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>{[t.rptPeriod,t.orders_count,t.revenue,t.rptAvgOrder].map(h=><th key={h}>{h}</th>)}</tr></thead>
               <tbody>
-                {salesByPeriod.length===0&&<tr><td colSpan={4} style={{textAlign:"center",padding:30,color:"var(--text3)"}}>No completed orders yet</td></tr>}
+                {salesByPeriod.length===0&&<tr><td colSpan={4} style={{textAlign:"center",padding:30,color:"var(--text3)"}}>{t.rptNoOrders}</td></tr>}
                 {salesByPeriod.map(row=>(
                   <tr key={row.key}>
                     <td style={{fontWeight:600,fontFamily:"DM Mono,monospace"}}>{row.key}</td>
@@ -3136,9 +3136,9 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
         <div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:18}}>
             {[
-              {label:"Total Parts",value:parts.length,color:"var(--blue)"},
-              {label:"Low Stock",value:lowStockParts.length,color:"var(--yellow)"},
-              {label:"Out of Stock",value:outOfStock.length,color:"var(--red)"},
+              {label:t.rptTotalParts,value:parts.length,color:"var(--blue)"},
+              {label:t.lowStock,value:lowStockParts.length,color:"var(--yellow)"},
+              {label:t.outOfStock,value:outOfStock.length,color:"var(--red)"},
             ].map(s=>(
               <div key={s.label} className="card" style={{padding:"16px 20px",textAlign:"center"}}>
                 <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>{s.label}</div>
@@ -3148,15 +3148,15 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
           </div>
           <div className="card" style={{padding:20,marginBottom:16}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-              <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em"}}>📦 Total Inventory Value</h3>
+              <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em"}}>📦 {t.rptTotalInventoryValue}</h3>
               <span style={{fontSize:24,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(totalInventoryValue)}</span>
             </div>
           </div>
           {lowStockParts.length>0&&(
             <div className="card" style={{overflow:"hidden"}}>
-              <div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",fontWeight:700,color:"var(--red)",fontSize:13}}>⚠️ Low Stock Alert ({lowStockParts.length} parts)</div>
+              <div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",fontWeight:700,color:"var(--red)",fontSize:13}}>⚠️ {t.lowStockAlert} ({lowStockParts.length})</div>
               <table className="tbl">
-                <thead><tr>{["SKU","Part","Category","Current Stock","Min Stock","Value"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{[t.sku,t.rptPart,t.category,t.rptCurrentStock,t.minStock,t.rptValue].map(h=><th key={h}>{h}</th>)}</tr></thead>
                 <tbody>
                   {lowStockParts.map(p=>(
                     <tr key={p.id}>
@@ -3178,9 +3178,9 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
       {/* CUSTOMER REPORT */}
       {reportTab==="customers"&&(
         <div className="card" style={{overflow:"hidden"}}>
-          <div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13}}>🏆 Top Customers by Spend</div>
+          <div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13}}>🏆 {t.rptTopCustomers}</div>
           <table className="tbl">
-            <thead><tr>{["Rank","Customer","Phone","Orders","Total Spend","Avg Order"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+            <thead><tr>{[t.rptRank,t.customer,t.phone,t.orders_count,t.rptTotalSpend,t.rptAvgOrder].map(h=><th key={h}>{h}</th>)}</tr></thead>
             <tbody>
               {topCustomers.map((c,i)=>(
                 <tr key={c.id}>
@@ -3192,7 +3192,7 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
                   <td style={{color:"var(--text2)"}}>{c.orders?fmt(Math.round((c.total_spent||0)/(c.orders||1))):"—"}</td>
                 </tr>
               ))}
-              {topCustomers.length===0&&<tr><td colSpan={6} style={{textAlign:"center",padding:30,color:"var(--text3)"}}>No customer data yet</td></tr>}
+              {topCustomers.length===0&&<tr><td colSpan={6} style={{textAlign:"center",padding:30,color:"var(--text3)"}}>{t.rptNoCustomers}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -3201,9 +3201,9 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
       {/* SUPPLIER REPORT */}
       {reportTab==="suppliers"&&(
         <div className="card" style={{overflow:"hidden"}}>
-          <div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13}}>🏭 Supplier Purchase Summary</div>
+          <div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13}}>🏭 {t.rptSupplierSummary}</div>
           <table className="tbl">
-            <thead><tr>{["Rank","Supplier","Invoices","Total Purchased","Avg Invoice"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+            <thead><tr>{[t.rptRank,t.suppliers,t.rptInvoices,t.rptTotalPurchased,t.rptAvgInvoice].map(h=><th key={h}>{h}</th>)}</tr></thead>
             <tbody>
               {topSuppliers.map((s,i)=>(
                 <tr key={s.name}>
@@ -3214,7 +3214,7 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
                   <td style={{color:"var(--text2)"}}>{fmt(Math.round(s.total/s.count))}</td>
                 </tr>
               ))}
-              {topSuppliers.length===0&&<tr><td colSpan={5} style={{textAlign:"center",padding:30,color:"var(--text3)"}}>No purchase invoice data yet</td></tr>}
+              {topSuppliers.length===0&&<tr><td colSpan={5} style={{textAlign:"center",padding:30,color:"var(--text3)"}}>{t.rptNoSuppliers}</td></tr>}
             </tbody>
           </table>
         </div>

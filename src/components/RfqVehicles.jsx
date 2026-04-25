@@ -2,6 +2,7 @@
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
 import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl } from "../lib/helpers.js";
+import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
 
@@ -382,7 +383,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,flexWrap:"wrap",gap:10}}>
         <div>
           <h1 style={{fontSize:20,fontWeight:700}}>📋 {t.rfqSession}</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{rfqSessions.length} sessions</p>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{rfqSessions.length} {t.rfqSesCount}</p>
         </div>
         <button className="btn btn-primary" onClick={()=>{setView("create");setWStep(1);setWParts([]);setWSuppliers([]);}}>
           + {t.newRfq}
@@ -390,7 +391,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
       </div>
       <div className="card" style={{overflow:"hidden"}}>
         <table className="tbl">
-          <thead><tr>{["Name","Status","Parts","Suppliers","Quotes","Created","Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <thead><tr>{[t.name,t.status,t.parts,t.suppliers,t.rfqQuotes,t.rfqCreated,t.actions].map(h=><th key={h}>{h}</th>)}</tr></thead>
           <tbody>
             {rfqSessions.map(s=>{
               const sItems=rfqItems.filter(i=>i.rfq_id===s.id);
@@ -401,18 +402,18 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
               return (
                 <tr key={s.id}>
                   <td style={{fontWeight:600}}>{s.name}</td>
-                  <td><span className="badge" style={{background:statusColor+"20",color:statusColor,textTransform:"capitalize"}}>{s.status}</span></td>
+                  <td><span className="badge" style={{background:statusColor+"20",color:statusColor,textTransform:"capitalize"}}>{tSt(s.status)}</span></td>
                   <td style={{textAlign:"center"}}>{sItems.length}</td>
                   <td style={{textAlign:"center"}}>{sSupps.length}</td>
                   <td style={{textAlign:"center"}}>
                     <span style={{color:quotedCnt===sQuotes.length&&sQuotes.length>0?"var(--green)":"var(--text2)"}}>{quotedCnt}/{sQuotes.length}</span>
                   </td>
                   <td style={{color:"var(--text3)",fontSize:13}}>{s.created_at?.slice(0,10)}</td>
-                  <td><button className="btn btn-info btn-xs" onClick={()=>openSession(s)}>View →</button></td>
+                  <td><button className="btn btn-info btn-xs" onClick={()=>openSession(s)}>{t.rfqView}</button></td>
                 </tr>
               );
             })}
-            {rfqSessions.length===0&&<tr><td colSpan={7} style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No RFQ sessions yet — click "+ New RFQ" to start</td></tr>}
+            {rfqSessions.length===0&&<tr><td colSpan={7} style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.rfqNoSessions}</td></tr>}
           </tbody>
         </table>
       </div>

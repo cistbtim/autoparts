@@ -123,6 +123,9 @@ export const T = {
     // Stock Logs / Stock Move columns
     action: "Action", before: "Before", after: "After", change: "Change", by: "By", records: "records",
     date: "Date", smMoves: "moves", smNewMove: "New Move", smNoMoves: "No stock moves recorded",
+    // RFQ page
+    rfqSesCount: "sessions", rfqCreated: "Created", rfqView: "View →",
+    rfqNoSessions: "No RFQ sessions yet — click \"+\" to start",
     supplier: "Supplier", srReturns: "returns", srNewReturn: "New Return",
     srReturnNo: "Return No", srOrigInvoice: "Original Invoice",
     srNoSupRet: "No supplier returns", srNoCusRet: "No customer returns",

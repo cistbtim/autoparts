@@ -1821,12 +1821,12 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
   const partSessionQuotes = rfqQuotes.filter(q=>partItemIds.includes(q.rfq_item_id));
   const rfqTotal = partRfqs.length + partSessionQuotes.length;
   const TABS = [
-    {id:"info",    label:"📋 Info"},
-    {id:"photo",   label:"📸 Photo"},
-    {id:"stock",   label:"💰 Stock"},
-    {id:"vehicle", label:"🚗 Vehicle"},
-    {id:"fitment", label:"🔗 Fits"},
-    {id:"rfq",     label:`📩 RFQ${rfqTotal>0?" ("+rfqTotal+")":""}`},
+    {id:"info",    label:`📋 ${t.pmTabInfo}`},
+    {id:"photo",   label:`📸 ${t.pmTabPhoto}`},
+    {id:"stock",   label:`💰 ${t.stock}`},
+    {id:"vehicle", label:`🚗 ${t.pmTabVehicle}`},
+    {id:"fitment", label:`🔗 ${t.pmTabFits}`},
+    {id:"rfq",     label:`📩 ${t.pmTabRfq}${rfqTotal>0?" ("+rfqTotal+")":""}`},
   ];
 
   const Err = ({k}) => errors[k]
@@ -1835,7 +1835,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
 
   return (
     <Overlay onClose={handleClose} wide>
-      <MHead title={part?"✏️ Edit Part":"+ New Part"} onClose={handleClose}/>
+      <MHead title={part?`✏️ ${t.pmEditPart}`:`+ ${t.pmNewPart}`} onClose={handleClose}/>
 
       {/* Tab bar */}
       <div className="tabs" style={{marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
@@ -1911,7 +1911,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
               <Err k="price"/>
             </div>
             <div>
-              <FL label="💰 Cost Price"/>
+              <FL label={`💰 ${t.costPrice}`}/>
               <input className="inp" type="number" value={f.cost_price} onChange={e=>s("cost_price",e.target.value)} placeholder="0.00"/>
               {f.cost_price>0&&f.price>0&&<div style={{fontSize:11,color:"var(--green)",marginTop:3}}>Margin: {(((+f.price-(+f.cost_price))/(+f.price))*100).toFixed(1)}%</div>}
             </div>

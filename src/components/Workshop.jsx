@@ -2476,6 +2476,9 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [editMarkupVal, setEditMarkupVal] = useState("");
   const [returnQuoteOpen,  setReturnQuoteOpen]  = useState(false);
   const [returnQuoteTarget,setReturnQuoteTarget]= useState(null); // {request, existingQuote}
+  const [movePinOpen,      setMovePinOpen]      = useState(false);
+  const [movePinVal,       setMovePinVal]        = useState("");
+  const [movePinErr,       setMovePinErr]        = useState("");
   const [photoLightbox,    setPhotoLightbox]    = useState(null); // null | index into visible photos
   const [renewalModal,  setRenewalModal]  = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
@@ -2866,7 +2869,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));
               a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`; a.click();
             }}>⬇️ {t.wsInfoBtn}</button>
-            {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>setMoveModal(true)}>🔀 {t.wsMove}</button>}
+            {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>{ if(wsProfile?.move_pin){setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}else{setMoveModal(true);} }}>🔀 {t.wsMove}</button>}
             {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:12}}>
@@ -3914,6 +3917,25 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
         <DeliveryLabelModal
           job={job} settings={settings}
           onClose={()=>setDeliveryModal(false)}/>
+      )}
+
+      {/* Move PIN prompt */}
+      {movePinOpen&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div className="card" style={{width:"100%",maxWidth:320,padding:24,display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{fontWeight:700,fontSize:16,textAlign:"center"}}>🔒 Move Job — Enter PIN</div>
+            <div style={{fontSize:13,color:"var(--text3)",textAlign:"center"}}>This action is restricted. Enter the Move PIN to continue.</div>
+            <input className="inp" type="password" autoFocus value={movePinVal}
+              onChange={e=>{setMovePinVal(e.target.value);setMovePinErr("");}}
+              onKeyDown={e=>{ if(e.key==="Enter"){ if(movePinVal===wsProfile.move_pin){setMovePinOpen(false);setMoveModal(true);}else{setMovePinErr("Incorrect PIN");} } }}
+              placeholder="Enter PIN" style={{textAlign:"center",fontSize:18,letterSpacing:4}}/>
+            {movePinErr&&<div style={{color:"var(--red)",fontSize:13,textAlign:"center"}}>⚠ {movePinErr}</div>}
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setMovePinOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" style={{flex:1}} onClick={()=>{ if(movePinVal===wsProfile.move_pin){setMovePinOpen(false);setMoveModal(true);}else{setMovePinErr("Incorrect PIN");} }}>Unlock</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {moveModal&&(

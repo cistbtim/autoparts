@@ -1406,7 +1406,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, t}) {
           {search&&<button onClick={()=>setSearch("")}
             style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16}}>✕</button>}
         </div>
-        <select className="inp" value={filterMake} onChange={e=>setFilterMake(e.target.value)} style={{width:150}}>
+        <select className="inp" value={filterMake} onChange={e=>{setFilterMake(e.target.value);setSearch("");}} style={{width:150}}>
           {makes.map(m=><option key={m} value={m}>{m==="__all__"?"All Makes":m}</option>)}
         </select>
       </div>
@@ -1419,7 +1419,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, t}) {
           return (
             <div key={make} className="card" style={{padding:"8px 14px",cursor:"pointer",
               borderColor:filterMake===make?"var(--accent)":"var(--border)"}}
-              onClick={()=>setFilterMake(filterMake===make?"__all__":make)}>
+              onClick={()=>{setFilterMake(filterMake===make?"__all__":make);setSearch("");}}>
               <div style={{fontWeight:700,fontSize:13}}>{make}</div>
               <div style={{fontSize:11,color:"var(--text3)"}}>{cnt} models · {links} links</div>
             </div>

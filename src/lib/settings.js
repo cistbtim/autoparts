@@ -3,8 +3,10 @@ import { api } from "./api.js";
 let _settings = {
   shop_name: "AutoParts", logo_url: "", logo_data: "", logo_h_login: 140,
   logo_h_sidebar: 36, logo_h_pdf: 70, logo_blend: "normal", currency: "TWD NT$",
-  whatsapp: "", email: "", phone: "", address: "", tax_rate: 0, vat_number: "",
+  whatsapp: "", email: "", phone: "", address: "", city: "", country: "",
+  tax_rate: 0, vat_number: "",
   invoice_prefix: "INV", credit_note_prefix: "CN", apps_script_url: "", vehicle_script_url: "",
+  licence_renewal_agent_name: "", licence_renewal_agent_phone: "",
 };
 
 export const getSettings = () => _settings;

@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.production
+
+# Keep the example template
+!.env.example

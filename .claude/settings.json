@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.wolfoil.com)",
+      "Bash(npx --no vite build)",
+      "Bash(xargs grep *)",
+      "Bash(npx tsc *)",
+      "Read(//c/c/Users/Tim/car-parts-app/src/**)",
+      "Read(//c/c/Users/Tim/**)",
+      "Bash(awk -F: '{print NR, $0}')",
+      "Bash(awk 'NR<=6833' src/App.jsx)",
+      "Bash(awk 'NR>=8562' src/App.jsx)",
+      "Bash(awk 'NR>=6834' src/App.jsx)",
+      "Bash(awk -F: '$2>6833')",
+      "Bash(awk 'NR>=6834 && NR<=8561' src/App.jsx)",
+      "Bash(awk 'NR>=46 && NR<=3261' src/App.jsx)",
+      "Bash(awk 'NR>=3262' src/App.jsx)",
+      "Bash(awk -F: '$2>3261')",
+      "Bash(awk 'NR>=4696 && NR<=5042' src/App.jsx)",
+      "Bash(awk -F: '$2>=1445 && $2<=1700')"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory"
+    ]
+  }
+}

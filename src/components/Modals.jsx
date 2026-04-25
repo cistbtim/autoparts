@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "../lib/api.js";
 import { getSettings, C, curSym, updateSettings } from "../lib/settings.js";
-import { tSt } from "../lib/i18n.js";
+import { T, tSt, registerLang } from "../lib/i18n.js";
 import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, toLogoUrl, extractDriveId } from "../lib/helpers.js";
 import { CAR_MAKES, getCategories, DEFAULT_CATS } from "../lib/constants.js";
 import { CSS } from "../styles.js";
@@ -687,16 +687,302 @@ export function LogoUploader({f,s}) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// TRANSLATION EDITOR  (admin — edit key/value pairs per language)
+// ═══════════════════════════════════════════════════════════════
+function TranslationEditor({row, onClose, onSaved}) {
+  // row = { lang, name, flag, t:{}, status_t:{} }  (null = adding English override)
+  const isEn = row.lang === "en";
+  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState("ui"); // "ui" | "status"
+  const [vals, setVals] = useState(() => ({ ...T.en, ...(row.t || {}) }));
+  const [stVals, setStVals] = useState(() => ({ ...(row.status_t || {}) }));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const allKeys = Object.keys(T.en);
+  const filtered = allKeys.filter(k => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return k.toLowerCase().includes(q) || (T.en[k] || "").toLowerCase().includes(q) || (vals[k] || "").toLowerCase().includes(q);
+  });
+
+  const save = async () => {
+    setSaving(true); setErr("");
+    try {
+      // Build translation object — only store keys that differ from English (for non-EN)
+      const tObj = isEn ? { ...vals } : Object.fromEntries(
+        Object.entries(vals).filter(([k, v]) => v !== T.en[k])
+      );
+      const stObj = Object.fromEntries(Object.entries(stVals).filter(([, v]) => v?.trim()));
+      const payload = {
+        lang: row.lang, name: row.name, flag: row.flag || "",
+        active: row.active !== false,
+        t: tObj, status_t: stObj,
+      };
+      await api.upsert("app_translations", payload);
+      // Update in-memory translation so changes take effect immediately
+      if (isEn) {
+        // Patch T.en directly
+        Object.assign(T.en, tObj);
+        // Rebuild all registered languages so they re-inherit new English values
+        for (const [l, obj] of Object.entries(T)) {
+          if (l !== "en") T[l] = { ...T.en, ...obj };
+        }
+      } else {
+        registerLang(row.lang, row.name, row.flag, tObj, stObj);
+      }
+      onSaved();
+      onClose();
+    } catch(e) { setErr("Save failed: " + e.message); }
+    setSaving(false);
+  };
+
+  const STATUS_KEYS = ["Pending","Replied","Closed","Paid","Unpaid","Partial","Approved",
+    "Processing","Ready to Ship","Completed","Cancelled","In Progress","Done","Delivered"];
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center"}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:"var(--surface)",borderRadius:16,width:"min(900px,96vw)",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,.4)"}}>
+        {/* Header */}
+        <div style={{padding:"18px 22px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+          <span style={{fontSize:24}}>{row.flag||"🌐"}</span>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:16}}>{row.name} — Translation Editor</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
+              {isEn ? "Editing English (base language) — changes affect all languages" : `Editing ${row.name} translations. Blank = falls back to English.`}
+            </div>
+          </div>
+          <button className="cp-btn btn-primary" onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
+          <button className="cp-btn" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:0,borderBottom:"1px solid var(--border)",flexShrink:0}}>
+          {[["ui","🗂 UI Strings"],["status","📊 Status Labels"]].map(([k,label])=>(
+            <button key={k} onClick={()=>setTab(k)}
+              style={{padding:"10px 20px",border:"none",background:"none",cursor:"pointer",fontWeight:tab===k?700:400,
+                borderBottom:tab===k?"2px solid var(--accent)":"2px solid transparent",
+                color:tab===k?"var(--accent)":"var(--text2)",fontSize:13}}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        {tab==="ui" && (
+          <div style={{padding:"12px 22px",flexShrink:0,borderBottom:"1px solid var(--border)"}}>
+            <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
+              placeholder="Search keys or text…" style={{maxWidth:400}}/>
+            <span style={{marginLeft:12,fontSize:12,color:"var(--text3)"}}>{filtered.length} / {allKeys.length} keys</span>
+          </div>
+        )}
+
+        {/* Body */}
+        <div style={{overflow:"auto",flex:1,padding:"0 22px"}}>
+          {tab==="ui" ? (
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+              <thead>
+                <tr style={{position:"sticky",top:0,background:"var(--surface)",zIndex:1}}>
+                  <th style={{padding:"10px 8px",textAlign:"left",borderBottom:"1px solid var(--border)",color:"var(--text3)",fontWeight:600,width:"18%"}}>Key</th>
+                  <th style={{padding:"10px 8px",textAlign:"left",borderBottom:"1px solid var(--border)",color:"var(--text3)",fontWeight:600,width:"35%"}}>English (original)</th>
+                  <th style={{padding:"10px 8px",textAlign:"left",borderBottom:"1px solid var(--border)",color:"var(--text3)",fontWeight:600}}>{isEn ? "Override value" : row.name}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(k=>(
+                  <tr key={k} style={{borderBottom:"1px solid var(--border)"}}>
+                    <td style={{padding:"6px 8px",fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",verticalAlign:"top",paddingTop:9}}>{k}</td>
+                    <td style={{padding:"6px 8px",color:"var(--text2)",verticalAlign:"top"}}>
+                      {isEn
+                        ? <input className="inp" style={{fontSize:12,padding:"4px 8px"}}
+                            value={vals[k]||""} onChange={e=>setVals(p=>({...p,[k]:e.target.value}))}/>
+                        : <span style={{fontSize:12,lineHeight:1.5}}>{T.en[k]}</span>
+                      }
+                    </td>
+                    {!isEn && (
+                      <td style={{padding:"6px 8px",verticalAlign:"top"}}>
+                        <input className="inp" style={{fontSize:12,padding:"4px 8px",
+                          background: vals[k] && vals[k]!==T.en[k] ? "rgba(var(--accent-rgb),.07)" : ""}}
+                          value={vals[k]||""} placeholder={T.en[k]}
+                          onChange={e=>setVals(p=>({...p,[k]:e.target.value}))}/>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{paddingTop:16,paddingBottom:16}}>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>
+                Map English status strings to {isEn?"overrides":row.name}. Leave blank to use English as-is.
+              </div>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                <thead>
+                  <tr>
+                    <th style={{padding:"8px",textAlign:"left",borderBottom:"1px solid var(--border)",color:"var(--text3)",fontWeight:600,width:"40%"}}>English Status</th>
+                    <th style={{padding:"8px",textAlign:"left",borderBottom:"1px solid var(--border)",color:"var(--text3)",fontWeight:600}}>{isEn?"Override":row.name}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {STATUS_KEYS.map(k=>(
+                    <tr key={k} style={{borderBottom:"1px solid var(--border)"}}>
+                      <td style={{padding:"6px 8px",color:"var(--text2)"}}>{k}</td>
+                      <td style={{padding:"6px 8px"}}>
+                        <input className="inp" style={{fontSize:12,padding:"4px 8px",maxWidth:260}}
+                          value={stVals[k]||""} placeholder={k}
+                          onChange={e=>setStVals(p=>({...p,[k]:e.target.value}))}/>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        {err && <div style={{padding:"10px 22px",color:"var(--red)",fontSize:13,flexShrink:0}}>{err}</div>}
+      </div>
+    </div>
+  );
+}
+
+function LangManagerSection() {
+  const [rows, setRows] = useState(null); // null = loading
+  const [editing, setEditing] = useState(null); // row being edited
+  const [addForm, setAddForm] = useState(null); // null | {lang,name,flag}
+  const [addErr, setAddErr] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    const res = await api.get("app_translations", "select=lang,name,flag,active,t,status_t&order=lang.asc").catch(()=>[]);
+    setRows(Array.isArray(res) ? res : []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const toggleActive = async (row) => {
+    const updated = !row.active;
+    await api.patch("app_translations", "lang", row.lang, { active: updated });
+    setRows(p => p.map(r => r.lang===row.lang ? {...r, active: updated} : r));
+  };
+
+  const startAdd = () => setAddForm({ lang:"", name:"", flag:"" });
+
+  const saveAdd = async () => {
+    if (!addForm.lang.trim() || !addForm.name.trim()) { setAddErr("Language code and name required"); return; }
+    const code = addForm.lang.trim().toLowerCase();
+    if (rows.find(r=>r.lang===code)) { setAddErr("Language code already exists"); return; }
+    setSaving(true); setAddErr("");
+    try {
+      await api.upsert("app_translations", { lang:code, name:addForm.name.trim(), flag:addForm.flag.trim(), active:true, t:{}, status_t:{} });
+      await load();
+      setAddForm(null);
+    } catch(e) { setAddErr("Failed: " + e.message); }
+    setSaving(false);
+  };
+
+  const deleteLang = async (lang) => {
+    if (!window.confirm(`Delete ${lang} language? All translations will be lost.`)) return;
+    await api.delete("app_translations", "lang", lang);
+    setRows(p => p.filter(r => r.lang !== lang));
+  };
+
+  // English is always shown first even if not in DB
+  const enRow = { lang:"en", name:"English", flag:"🇬🇧", active:true, t:{}, status_t:{} };
+  const allRows = rows ? [enRow, ...rows.filter(r=>r.lang!=="en")] : [enRow];
+
+  return (
+    <div className="card" style={{padding:22,marginTop:20,gridColumn:"1/-1"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",margin:0}}>🌐 Languages & Translations</h3>
+        <button className="btn btn-primary btn-sm" onClick={startAdd}>+ Add Language</button>
+      </div>
+
+      {/* Add form */}
+      {addForm && (
+        <div style={{background:"var(--surface2)",border:"1px solid var(--border2)",borderRadius:10,padding:16,marginBottom:16}}>
+          <div style={{fontWeight:600,fontSize:13,marginBottom:12}}>New Language</div>
+          <FG cols="1fr 1fr 1fr">
+            <div>
+              <FL label="Language Code (e.g. zh, ms, fr)"/>
+              <input className="inp" value={addForm.lang} onChange={e=>setAddForm(p=>({...p,lang:e.target.value}))} placeholder="zh"/>
+            </div>
+            <div>
+              <FL label="Language Name"/>
+              <input className="inp" value={addForm.name} onChange={e=>setAddForm(p=>({...p,name:e.target.value}))} placeholder="Chinese"/>
+            </div>
+            <div>
+              <FL label="Flag Emoji"/>
+              <input className="inp" value={addForm.flag} onChange={e=>setAddForm(p=>({...p,flag:e.target.value}))} placeholder="🇨🇳"/>
+            </div>
+          </FG>
+          {addErr && <div style={{color:"var(--red)",fontSize:12,marginTop:6}}>{addErr}</div>}
+          <div style={{display:"flex",gap:8,marginTop:12}}>
+            <button className="btn btn-primary btn-sm" onClick={saveAdd} disabled={saving}>{saving?"Adding…":"Add Language"}</button>
+            <button className="cp-btn" onClick={()=>{setAddForm(null);setAddErr("");}}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Language list */}
+      {rows === null ? (
+        <div style={{color:"var(--text3)",fontSize:13,padding:"20px 0",textAlign:"center"}}>Loading…</div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:0,border:"1px solid var(--border)",borderRadius:10,overflow:"hidden"}}>
+          {allRows.map((row, i) => (
+            <div key={row.lang} style={{
+              display:"flex",alignItems:"center",gap:14,padding:"12px 16px",
+              background: i%2===0 ? "var(--surface)" : "var(--surface2)",
+              borderBottom: i<allRows.length-1 ? "1px solid var(--border)" : "none"
+            }}>
+              <span style={{fontSize:22,flexShrink:0}}>{row.flag||"🌐"}</span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:14}}>{row.name}</div>
+                <div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{row.lang}</div>
+              </div>
+              {/* Active toggle (not for English) */}
+              {row.lang !== "en" ? (
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:12,color:"var(--text3)"}}>Active</span>
+                  <div onClick={()=>toggleActive(row)}
+                    style={{width:38,height:22,borderRadius:11,background:row.active?"var(--green)":"var(--border2)",
+                      cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}>
+                    <div style={{position:"absolute",top:3,left:row.active?18:3,width:16,height:16,borderRadius:"50%",
+                      background:"#fff",transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.25)"}}/>
+                  </div>
+                </div>
+              ) : (
+                <span style={{fontSize:11,color:"var(--green)",fontWeight:600,padding:"3px 10px",background:"rgba(var(--green-rgb),.1)",borderRadius:20}}>Base language</span>
+              )}
+              <button className="btn btn-primary btn-sm" onClick={()=>setEditing(row)}>✏️ Edit Translations</button>
+              {row.lang !== "en" && (
+                <button className="cp-btn" style={{color:"var(--red)"}} onClick={()=>deleteLang(row.lang)} title="Delete language">🗑</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{fontSize:12,color:"var(--text3)",marginTop:10}}>
+        Languages marked active appear in the language switcher. Blank translation values fall back to English automatically.
+      </div>
+
+      {editing && (
+        <TranslationEditor row={editing} onClose={()=>setEditing(null)} onSaved={load}/>
+      )}
+    </div>
+  );
+}
+
 export function SettingsPage({settings,onSave,t}) {
   const [f,setF]=useState({...settings});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const [sTab,setSTab]=useState("shop");
   const [cats,setCats]=useState(getCategories());
   const [newCat,setNewCat]=useState("");
   const addCat=()=>{
     if(!newCat.trim())return;
     const updated=[...cats,newCat.trim()];
     setCats(updated);
-    // Save to Supabase via settings
     onSave({categories:JSON.stringify(updated)});
     setNewCat("");
   };
@@ -705,213 +991,225 @@ export function SettingsPage({settings,onSave,t}) {
     setCats(updated);
     onSave({categories:JSON.stringify(updated)});
   };
+
+  const TABS=[["shop","🏪 Shop"],["billing","💰 Billing"],["inventory","🏷️ Inventory"],["languages","🌐 Languages"]];
+
   return (
     <div className="fu">
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-        <div><h1 style={{fontSize:20,fontWeight:700}}>⚙️ {t.settings}</h1><p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>Shop configuration</p></div>
-        <button className="btn btn-primary" onClick={()=>onSave(f)}>💾 {t.saveSettings}</button>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <div><h1 style={{fontSize:20,fontWeight:700}}>⚙️ {t.settings}</h1></div>
+        {(sTab==="shop"||sTab==="billing")&&(
+          <button className="btn btn-primary" onClick={()=>onSave(f)}>💾 {t.saveSettings}</button>
+        )}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
-        <div className="card" style={{padding:22}}>
-          <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>🏪 Shop Info</h3>
-          <FD><FL label={t.shopName}/><input className="inp" value={f.shop_name||""} onChange={e=>s("shop_name",e.target.value)} placeholder="AutoParts"/></FD>
-          <FD>
-            <FL label="Logo"/>
-            <LogoUploader f={f} s={s}/>
-            {/* OR paste Google Drive URL */}
-            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:6,marginTop:10}}>
-              <div style={{fontSize:12,color:"var(--text3)",flexShrink:0}}>Or URL:</div>
-              <input className="inp" value={f.logo_url||""} 
-                disabled={!!f.logo_data}
-                onChange={e=>{s("logo_url",e.target.value);}}
-                placeholder={f.logo_data?"Remove uploaded logo first...":"https://drive.google.com/file/d/..."} 
-                style={{fontSize:12,opacity:f.logo_data?0.5:1,cursor:f.logo_data?"not-allowed":"text"}}/>
-              <button className="cp-btn" 
-                disabled={!!f.logo_data}
-                style={{opacity:f.logo_data?0.4:1}}
-                onClick={async()=>{if(f.logo_data){alert("Remove the uploaded logo first.");return;}try{const txt=await navigator.clipboard.readText();s("logo_url",txt);}catch{}}}>📥 Paste</button>
-            </div>
-            <div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>
-              💡 <strong style={{color:"var(--text)"}}>Upload</strong> = stored in database, no white border &nbsp;·&nbsp;
-              <strong style={{color:"var(--text)"}}>URL</strong> = Google Drive &nbsp;·&nbsp;
-              ⚠️ Remove current logo before switching method
-            </div>
-            {/* Logo preview + size sliders */}
-            <div style={{marginTop:10,background:"var(--surface3)",borderRadius:10,border:"1px solid var(--border)",padding:14}}>
-              {/* Current logo preview */}
-              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,flexWrap:"wrap"}}>
-                {(f.logo_data||f.logo_url)
-                  ? <img
-                      src={f.logo_data||(toLogoUrl(f.logo_url)||f.logo_url)}
-                      alt="preview"
-                      style={{maxHeight:56,maxWidth:220,width:"auto",height:"auto",objectFit:"contain",display:"block"}}
-                      onError={e=>e.target.style.display="none"}/>
-                  : <LogoSVG height={44}/>
-                }
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontWeight:600,color:(f.logo_data||f.logo_url)?"var(--green)":"var(--text3)",marginBottom:2}}>
-                    {f.logo_data?"✅ Uploaded & stored in database":f.logo_url?"✓ Google Drive URL set":"Using built-in SVG logo"}
-                  </div>
-                  <div style={{fontSize:11,color:"var(--text3)"}}>
-                    {f.logo_data?"No white border · Works offline · Loads instantly":
-                     f.logo_url?"Loads from Google Drive":
-                     "Upload a file or paste a URL above"}
-                  </div>
-                </div>
-              </div>
 
-              {/* Size sliders per location */}
-              <div style={{borderTop:"1px solid var(--border)",paddingTop:12}}>
-                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:12}}>Logo Size per Location</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
-                  {[
-                    {key:"logo_h_login",   label:"🔐 Login Page",  def:80},
-                    {key:"logo_h_sidebar", label:"📋 Sidebar",      def:36},
-                    {key:"logo_h_pdf",     label:"🖨️ PDF Invoice",  def:70},
-                  ].map(({key,label,def})=>(
-                    <div key={key}>
-                      <div style={{fontSize:12,fontWeight:600,color:"var(--text2)",marginBottom:6}}>{label}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
-                        <input type="range" min={20} max={key==="logo_h_login"?400:key==="logo_h_pdf"?300:150} step={2}
-                          value={+(f[key]||def)}
-                          onChange={e=>s(key,+e.target.value)}
-                          style={{flex:1,accentColor:"var(--accent)",cursor:"pointer"}}/>
-                        <span style={{fontFamily:"DM Mono,monospace",fontSize:13,fontWeight:700,color:"var(--accent)",minWidth:40,textAlign:"right"}}>{f[key]||def}px</span>
-                      </div>
-                      {/* Live mini-preview */}
-                      <div style={{background:"var(--surface2)",borderRadius:6,padding:6,border:"1px solid var(--border)",minHeight:+(f[key]||def)+12,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        {(f.logo_data||f.logo_url)
-                          ? <img src={f.logo_data||(toLogoUrl(f.logo_url)||f.logo_url)} alt=""
-                              style={{maxHeight:+(f[key]||def),maxWidth:160,width:"auto",height:"auto",objectFit:"contain"}}
-                              onError={e=>e.target.style.display="none"}/>
-                          : <LogoSVG height={Math.min(+(f[key]||def),60)}/>
-                        }
-                      </div>
+      {/* Tab bar */}
+      <div style={{display:"flex",gap:0,borderBottom:"1px solid var(--border)",marginBottom:22}}>
+        {TABS.map(([k,label])=>(
+          <button key={k} onClick={()=>setSTab(k)}
+            style={{padding:"10px 20px",border:"none",background:"none",cursor:"pointer",
+              fontWeight:sTab===k?700:400,fontSize:13,
+              borderBottom:sTab===k?"2px solid var(--accent)":"2px solid transparent",
+              color:sTab===k?"var(--accent)":"var(--text2)"}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── TAB: SHOP ── */}
+      {sTab==="shop"&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+          <div className="card" style={{padding:22}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>🏪 Shop Info</h3>
+            <FD><FL label={t.shopName}/><input className="inp" value={f.shop_name||""} onChange={e=>s("shop_name",e.target.value)} placeholder="AutoParts"/></FD>
+            <FD><FL label={t.shopPhone}/><input className="inp" type="tel" value={f.phone||""} onChange={e=>s("phone",e.target.value)} placeholder="+886..."/></FD>
+            <FD><FL label={t.shopEmail}/><input className="inp" type="email" value={f.email||""} onChange={e=>s("email",e.target.value)} placeholder="shop@email.com"/></FD>
+            <FD><FL label={t.whatsappNo}/><input className="inp" type="tel" value={f.whatsapp||""} onChange={e=>s("whatsapp",e.target.value)} placeholder="886912345678 (no + or spaces)"/></FD>
+            <FD><FL label={t.shopAddress}/><textarea className="inp" value={f.address||""} onChange={e=>s("address",e.target.value)} placeholder="Full shop address" style={{minHeight:70}}/></FD>
+            <FG cols="1fr 1fr">
+              <div><FL label="City"/><input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)} placeholder="e.g. Cape Town"/></div>
+              <div><FL label="Country"/><input className="inp" value={f.country||""} onChange={e=>s("country",e.target.value)} placeholder="e.g. South Africa"/></div>
+            </FG>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:20}}>
+            <div className="card" style={{padding:22}}>
+              <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>🖼️ Logo</h3>
+              <LogoUploader f={f} s={s}/>
+              <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:6,marginTop:10}}>
+                <div style={{fontSize:12,color:"var(--text3)",flexShrink:0}}>Or URL:</div>
+                <input className="inp" value={f.logo_url||""}
+                  disabled={!!f.logo_data}
+                  onChange={e=>s("logo_url",e.target.value)}
+                  placeholder={f.logo_data?"Remove uploaded logo first...":"https://drive.google.com/file/d/..."}
+                  style={{fontSize:12,opacity:f.logo_data?0.5:1,cursor:f.logo_data?"not-allowed":"text"}}/>
+                <button className="cp-btn"
+                  disabled={!!f.logo_data}
+                  style={{opacity:f.logo_data?0.4:1}}
+                  onClick={async()=>{if(f.logo_data){alert("Remove the uploaded logo first.");return;}try{const txt=await navigator.clipboard.readText();s("logo_url",txt);}catch{}}}>📥 Paste</button>
+              </div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>
+                💡 <strong style={{color:"var(--text)"}}>Upload</strong> = stored in DB &nbsp;·&nbsp;
+                <strong style={{color:"var(--text)"}}>URL</strong> = Google Drive &nbsp;·&nbsp;
+                ⚠️ Remove current logo before switching method
+              </div>
+              <div style={{background:"var(--surface3)",borderRadius:10,border:"1px solid var(--border)",padding:14}}>
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,flexWrap:"wrap"}}>
+                  {(f.logo_data||f.logo_url)
+                    ? <img src={f.logo_data||(toLogoUrl(f.logo_url)||f.logo_url)} alt="preview"
+                        style={{maxHeight:56,maxWidth:220,width:"auto",height:"auto",objectFit:"contain",display:"block"}}
+                        onError={e=>e.target.style.display="none"}/>
+                    : <LogoSVG height={44}/>
+                  }
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:600,color:(f.logo_data||f.logo_url)?"var(--green)":"var(--text3)",marginBottom:2}}>
+                      {f.logo_data?"✅ Uploaded & stored in database":f.logo_url?"✓ Google Drive URL set":"Using built-in SVG logo"}
                     </div>
-                  ))}
+                    <div style={{fontSize:11,color:"var(--text3)"}}>
+                      {f.logo_data?"No white border · Works offline":f.logo_url?"Loads from Google Drive":"Upload a file or paste a URL above"}
+                    </div>
+                  </div>
+                </div>
+                <div style={{borderTop:"1px solid var(--border)",paddingTop:12}}>
+                  <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:12}}>Logo Size per Location</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+                    {[
+                      {key:"logo_h_login",   label:"🔐 Login",   def:80},
+                      {key:"logo_h_sidebar", label:"📋 Sidebar",  def:36},
+                      {key:"logo_h_pdf",     label:"🖨️ PDF",     def:70},
+                    ].map(({key,label,def})=>(
+                      <div key={key}>
+                        <div style={{fontSize:12,fontWeight:600,color:"var(--text2)",marginBottom:6}}>{label}</div>
+                        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
+                          <input type="range" min={20} max={key==="logo_h_login"?400:key==="logo_h_pdf"?300:150} step={2}
+                            value={+(f[key]||def)} onChange={e=>s(key,+e.target.value)}
+                            style={{flex:1,accentColor:"var(--accent)",cursor:"pointer"}}/>
+                          <span style={{fontFamily:"DM Mono,monospace",fontSize:13,fontWeight:700,color:"var(--accent)",minWidth:40,textAlign:"right"}}>{f[key]||def}px</span>
+                        </div>
+                        <div style={{background:"var(--surface2)",borderRadius:6,padding:6,border:"1px solid var(--border)",minHeight:+(f[key]||def)+12,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {(f.logo_data||f.logo_url)
+                            ? <img src={f.logo_data||(toLogoUrl(f.logo_url)||f.logo_url)} alt=""
+                                style={{maxHeight:+(f[key]||def),maxWidth:160,width:"auto",height:"auto",objectFit:"contain"}}
+                                onError={e=>e.target.style.display="none"}/>
+                            : <LogoSVG height={Math.min(+(f[key]||def),60)}/>
+                          }
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
-          </FD>
-          <FD><FL label={t.shopPhone}/><input className="inp" type="tel" value={f.phone||""} onChange={e=>s("phone",e.target.value)} placeholder="+886..."/></FD>
-          <FD><FL label={t.shopEmail}/><input className="inp" type="email" value={f.email||""} onChange={e=>s("email",e.target.value)} placeholder="shop@email.com"/></FD>
-          <FD><FL label={t.whatsappNo}/><input className="inp" type="tel" value={f.whatsapp||""} onChange={e=>s("whatsapp",e.target.value)} placeholder="886912345678 (no + or spaces)"/></FD>
-          <FD>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-              <FL label="📷 Google Drive Upload (Apps Script URL)"/>
-              <a href="https://script.google.com" target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
-                <button className="cp-btn" style={{color:"#4285F4",borderColor:"rgba(66,133,244,.3)"}}>Open Apps Script →</button>
-              </a>
-            </div>
-            <input className="inp" value={f.apps_script_url||""} onChange={e=>s("apps_script_url",e.target.value)}
-              placeholder="https://script.google.com/macros/s/YOUR_ID/exec"/>
-            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>
-              Deploy your Apps Script as Web App → paste the URL here → part photos auto-upload to Google Drive
-            </div>
-          </FD>
-          <FD>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-              <FL label="🚗 Vehicle Photos Upload (Apps Script URL)"/>
-              <a href="https://script.google.com" target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
-                <button className="cp-btn" style={{color:"#4285F4",borderColor:"rgba(66,133,244,.3)"}}>Open Apps Script →</button>
-              </a>
-            </div>
-            <input className="inp" value={f.vehicle_script_url||""} onChange={e=>s("vehicle_script_url",e.target.value)}
-              placeholder="https://script.google.com/macros/s/YOUR_VEHICLE_ID/exec"/>
-            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>
-              Separate deployment for vehicle photos → saves to Tim_Car_Phot/Make/ID/view.png
-            </div>
-          </FD>
-          <FD>
-            <FL label="🪪 Licence Renewal Agent Name"/>
-            <input className="inp" value={f.licence_renewal_agent_name||""} onChange={e=>s("licence_renewal_agent_name",e.target.value)} placeholder="e.g. ABC Renewals"/>
-            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Name shown in renewal request modal</div>
-          </FD>
-          <FD>
-            <FL label="🪪 Renewal Agent WhatsApp Number"/>
-            <input className="inp" value={f.licence_renewal_agent_phone||""} onChange={e=>s("licence_renewal_agent_phone",e.target.value)} placeholder="27821234567 (no + or spaces)"/>
-            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Renewal requests sent via WhatsApp to this number — include country code</div>
-          </FD>
-          <FD><FL label={t.shopAddress}/><textarea className="inp" value={f.address||""} onChange={e=>s("address",e.target.value)} placeholder="Full shop address" style={{minHeight:70}}/></FD>
-          <FG cols="1fr 1fr">
-            <div><FL label="City"/><input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)} placeholder="e.g. Cape Town"/></div>
-            <div><FL label="Country"/><input className="inp" value={f.country||""} onChange={e=>s("country",e.target.value)} placeholder="e.g. South Africa"/></div>
-          </FG>
-        </div>
-        <div className="card" style={{padding:22}}>
-          <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>💰 Billing Settings</h3>
-          <FD><FL label={t.currency}/><select className="inp" value={f.currency||"TWD NT$"} onChange={e=>s("currency",e.target.value)}>
-            {["TWD NT$","USD $","MYR RM","SGD $","HKD $","JPY ¥","EUR €","GBP £","CNY ¥","THB ฿","IDR Rp","PHP ₱","ZAR R","AUD $","CAD $","KRW ₩"].map(c=><option key={c}>{c}</option>)}
-          </select></FD>
-          <FG cols="1fr 1fr">
-            <div><FL label={t.taxRate}/><input className="inp" type="number" value={f.tax_rate||0} onChange={e=>s("tax_rate",+e.target.value)} placeholder="0 (no VAT)"/></div>
-            <div>
-              <FL label="VAT Registration No."/>
-              <input className="inp" value={f.vat_number||""} onChange={e=>s("vat_number",e.target.value)} placeholder="Leave blank if not VAT registered"/>
-            </div>
-          </FG>
-          <FG cols="1fr 1fr">
-            <div><FL label={t.invoicePrefix}/><input className="inp" value={f.invoice_prefix||"INV"} onChange={e=>s("invoice_prefix",e.target.value)} placeholder="INV"/></div>
-            <div><FL label="Credit Note Prefix"/><input className="inp" value={f.credit_note_prefix||"CN"} onChange={e=>s("credit_note_prefix",e.target.value)} placeholder="CN"/></div>
-          </FG>
-          <div style={{background:"var(--surface2)",borderRadius:10,padding:14,marginTop:6,border:"1px solid var(--border)"}}>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:10,fontWeight:600}}>Preview</div>
-            <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.9}}>
-              <div>Currency: <span style={{color:"var(--accent)",fontWeight:700}}>{f.currency||"NT$"}100</span></div>
-              <div>Tax ({f.tax_rate||0}%): <span style={{color:"var(--text)"}}>{f.currency||"NT$"}{((100*(f.tax_rate||0))/100).toFixed(2)}</span></div>
-              <div>Invoice No: <span style={{fontFamily:"DM Mono,monospace",color:"var(--blue)"}}>{f.invoice_prefix||"INV"}-001</span></div>
-              {f.vat_number&&<div>VAT No: <span style={{fontFamily:"DM Mono,monospace",color:"var(--blue)"}}>{f.vat_number}</span></div>}
-              {!f.vat_number&&<div style={{color:"var(--text3)"}}>VAT No: <em>Not registered — will not appear on documents</em></div>}
+            <div className="card" style={{padding:22}}>
+              <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>🔗 Integrations</h3>
+              <FD>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                  <FL label="📷 Parts Photo Upload (Apps Script URL)"/>
+                  <a href="https://script.google.com" target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                    <button className="cp-btn" style={{color:"#4285F4",borderColor:"rgba(66,133,244,.3)"}}>Open Apps Script →</button>
+                  </a>
+                </div>
+                <input className="inp" value={f.apps_script_url||""} onChange={e=>s("apps_script_url",e.target.value)}
+                  placeholder="https://script.google.com/macros/s/YOUR_ID/exec"/>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Deploy as Web App → part photos auto-upload to Google Drive</div>
+              </FD>
+              <FD>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                  <FL label="🚗 Vehicle Photo Upload (Apps Script URL)"/>
+                  <a href="https://script.google.com" target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                    <button className="cp-btn" style={{color:"#4285F4",borderColor:"rgba(66,133,244,.3)"}}>Open Apps Script →</button>
+                  </a>
+                </div>
+                <input className="inp" value={f.vehicle_script_url||""} onChange={e=>s("vehicle_script_url",e.target.value)}
+                  placeholder="https://script.google.com/macros/s/YOUR_VEHICLE_ID/exec"/>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Separate deployment → saves to Tim_Car_Phot/Make/ID/view.png</div>
+              </FD>
+              <FD>
+                <FL label="🪪 Licence Renewal Agent Name"/>
+                <input className="inp" value={f.licence_renewal_agent_name||""} onChange={e=>s("licence_renewal_agent_name",e.target.value)} placeholder="e.g. ABC Renewals"/>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Name shown in renewal request modal</div>
+              </FD>
+              <FD>
+                <FL label="🪪 Renewal Agent WhatsApp Number"/>
+                <input className="inp" value={f.licence_renewal_agent_phone||""} onChange={e=>s("licence_renewal_agent_phone",e.target.value)} placeholder="27821234567 (no + or spaces)"/>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Renewal requests sent via WhatsApp — include country code</div>
+              </FD>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Categories Management */}
-      <div className="card" style={{padding:22,marginTop:20,gridColumn:"1/-1"}}>
-        <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:16}}>🏷️ Part Categories</h3>
-        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
-          {cats.map((c,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:5,background:"var(--surface2)",border:"1px solid var(--border2)",borderRadius:8,padding:"5px 10px"}}>
-              <span style={{fontSize:13,fontWeight:500}}>{c}</span>
-              <button onClick={()=>delCat(i)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--red)",fontSize:14,lineHeight:1,padding:"0 2px"}} title="Remove">✕</button>
+      {/* ── TAB: BILLING ── */}
+      {sTab==="billing"&&(
+        <div style={{maxWidth:600}}>
+          <div className="card" style={{padding:22}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>💰 Billing Settings</h3>
+            <FD><FL label={t.currency}/><select className="inp" value={f.currency||"TWD NT$"} onChange={e=>s("currency",e.target.value)}>
+              {["TWD NT$","USD $","MYR RM","SGD $","HKD $","JPY ¥","EUR €","GBP £","CNY ¥","THB ฿","IDR Rp","PHP ₱","ZAR R","AUD $","CAD $","KRW ₩"].map(c=><option key={c}>{c}</option>)}
+            </select></FD>
+            <FG cols="1fr 1fr">
+              <div><FL label={t.taxRate}/><input className="inp" type="number" value={f.tax_rate||0} onChange={e=>s("tax_rate",+e.target.value)} placeholder="0 (no VAT)"/></div>
+              <div><FL label="VAT Registration No."/><input className="inp" value={f.vat_number||""} onChange={e=>s("vat_number",e.target.value)} placeholder="Leave blank if not registered"/></div>
+            </FG>
+            <FG cols="1fr 1fr">
+              <div><FL label={t.invoicePrefix}/><input className="inp" value={f.invoice_prefix||"INV"} onChange={e=>s("invoice_prefix",e.target.value)} placeholder="INV"/></div>
+              <div><FL label="Credit Note Prefix"/><input className="inp" value={f.credit_note_prefix||"CN"} onChange={e=>s("credit_note_prefix",e.target.value)} placeholder="CN"/></div>
+            </FG>
+            <div style={{background:"var(--surface2)",borderRadius:10,padding:14,marginTop:6,border:"1px solid var(--border)"}}>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:10,fontWeight:600}}>Preview</div>
+              <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.9}}>
+                <div>Currency: <span style={{color:"var(--accent)",fontWeight:700}}>{f.currency||"NT$"}100</span></div>
+                <div>Tax ({f.tax_rate||0}%): <span style={{color:"var(--text)"}}>{f.currency||"NT$"}{((100*(f.tax_rate||0))/100).toFixed(2)}</span></div>
+                <div>Invoice No: <span style={{fontFamily:"DM Mono,monospace",color:"var(--blue)"}}>{f.invoice_prefix||"INV"}-001</span></div>
+                {f.vat_number&&<div>VAT No: <span style={{fontFamily:"DM Mono,monospace",color:"var(--blue)"}}>{f.vat_number}</span></div>}
+                {!f.vat_number&&<div style={{color:"var(--text3)"}}>VAT No: <em>Not registered</em></div>}
+              </div>
             </div>
-          ))}
+          </div>
         </div>
-        <div style={{display:"flex",gap:10,maxWidth:400}}>
-          <input className="inp" value={newCat} onChange={e=>setNewCat(e.target.value)} placeholder="New category name..." onKeyDown={e=>e.key==="Enter"&&addCat()} style={{flex:1}}/>
-          <button className="btn btn-primary btn-sm" onClick={addCat} disabled={!newCat.trim()}>+ Add</button>
-        </div>
-        <div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>Categories are saved locally on this device.</div>
-      </div>
+      )}
 
-      {/* Label Size Settings */}
-      <div className="card" style={{padding:22,marginTop:20}}>
-        <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:16}}>🏷️ Stock Label Size</h3>
-        <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Set the print size for stock labels (used when printing part labels)</div>
-        <FG cols="1fr 1fr">
-          <div>
-            <FL label="Label Width (mm)"/>
-            <input className="inp" type="number" min="20" max="200" value={f.label_w||50} onChange={e=>s("label_w",+e.target.value)} placeholder="50"/>
+      {/* ── TAB: INVENTORY ── */}
+      {sTab==="inventory"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:20,maxWidth:700}}>
+          <div className="card" style={{padding:22}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:16}}>🏷️ Part Categories</h3>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
+              {cats.map((c,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:5,background:"var(--surface2)",border:"1px solid var(--border2)",borderRadius:8,padding:"5px 10px"}}>
+                  <span style={{fontSize:13,fontWeight:500}}>{c}</span>
+                  <button onClick={()=>delCat(i)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--red)",fontSize:14,lineHeight:1,padding:"0 2px"}} title="Remove">✕</button>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:10,maxWidth:400}}>
+              <input className="inp" value={newCat} onChange={e=>setNewCat(e.target.value)} placeholder="New category name..." onKeyDown={e=>e.key==="Enter"&&addCat()} style={{flex:1}}/>
+              <button className="btn btn-primary btn-sm" onClick={addCat} disabled={!newCat.trim()}>+ Add</button>
+            </div>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>Categories are saved locally on this device.</div>
           </div>
-          <div>
-            <FL label="Label Height (mm)"/>
-            <input className="inp" type="number" min="15" max="200" value={f.label_h||50} onChange={e=>s("label_h",+e.target.value)} placeholder="50"/>
+          <div className="card" style={{padding:22}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:16}}>🏷️ Stock Label Size</h3>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Set the print size for stock labels</div>
+            <FG cols="1fr 1fr">
+              <div><FL label="Label Width (mm)"/><input className="inp" type="number" min="20" max="200" value={f.label_w||50} onChange={e=>s("label_w",+e.target.value)} placeholder="50"/></div>
+              <div><FL label="Label Height (mm)"/><input className="inp" type="number" min="15" max="200" value={f.label_h||50} onChange={e=>s("label_h",+e.target.value)} placeholder="50"/></div>
+            </FG>
+            <div style={{background:"var(--surface2)",borderRadius:8,padding:12,border:"1px solid var(--border)",marginTop:10,display:"inline-flex",alignItems:"center",gap:12}}>
+              <div style={{width:Math.min(+(f.label_w||50)*2,160),height:Math.min(+(f.label_h||50)*2,100),border:"1px dashed var(--border2)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--surface3)",flexShrink:0}}>
+                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.label_w||50}×{f.label_h||50}mm</span>
+              </div>
+              <div style={{fontSize:12,color:"var(--text3)"}}>Preview (2× scale)<br/>Default: 50mm × 50mm</div>
+            </div>
+            <div style={{marginTop:14}}>
+              <button className="btn btn-primary btn-sm" onClick={()=>onSave({label_w:f.label_w,label_h:f.label_h})}>💾 Save Label Size</button>
+            </div>
           </div>
-        </FG>
-        <div style={{background:"var(--surface2)",borderRadius:8,padding:12,border:"1px solid var(--border)",marginTop:10,display:"inline-flex",alignItems:"center",gap:12}}>
-          <div style={{
-            width: Math.min(+(f.label_w||50)*2, 160),
-            height: Math.min(+(f.label_h||50)*2, 100),
-            border:"1px dashed var(--border2)",borderRadius:4,
-            display:"flex",alignItems:"center",justifyContent:"center",
-            background:"var(--surface3)",flexShrink:0
-          }}>
-            <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.label_w||50}×{f.label_h||50}mm</span>
-          </div>
-          <div style={{fontSize:12,color:"var(--text3)"}}>Preview (2× scale)<br/>Default: 50mm × 50mm</div>
         </div>
-      </div>
+      )}
+
+      {/* ── TAB: LANGUAGES ── */}
+      {sTab==="languages"&&<LangManagerSection/>}
     </div>
   );
 }

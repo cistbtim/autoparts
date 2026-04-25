@@ -48,7 +48,7 @@ export default function App() {
   const wsSupReqToken = new URLSearchParams(window.location.search).get("ws_supreq");
   if(wsSupReqToken) return <WsSupplierQuoteReplyPage token={wsSupReqToken}/>;
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
-  if(!user) return <LoginPage onLogin={setUser} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()}/>;
+  if(!user) return <LoginPage onLogin={setUser} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={()=>setUser(null)} lang={lang}/>;
   return <MainApp user={user} onLogout={()=>setUser(null)} t={t} lang={lang} setLang={changeLang} langs={availLangs} theme={theme} toggleTheme={toggleTheme}/>;
 }

@@ -5,7 +5,7 @@ import { CSS } from "../styles.js";
 import { ShopLogo, FL, FG } from "../components/shared.jsx";
 import { makeId, detectGeoLocation } from "../lib/helpers.js";
 
-export function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
+export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
   const [authTab,setAuthTab] = useState("customer"); // customer | workshop | staff
   const [user,setUser] = useState(""); const [pass,setPass] = useState("");
   const [wsUser,setWsUser] = useState(""); const [wsPass,setWsPass] = useState("");
@@ -112,9 +112,12 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings}) {
             </div>
           </div>
           <div style={{color:"var(--text3)",fontSize:13,marginTop:8}}>{t.appSub}</div>
-          <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:12}}>
-            <button className={`lang ${lang==="en"?"on":""}`} onClick={()=>setLang("en")}>EN</button>
-            <button className={`lang ${lang==="zh"?"on":""}`} onClick={()=>setLang("zh")}>中文</button>
+          <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:12,flexWrap:"wrap"}}>
+            {langs.map(l=>(
+              <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
+                {l.flag||l.lang.toUpperCase()}
+              </button>
+            ))}
           </div>
         </div>
         {/* Login type tabs */}

@@ -1,0 +1,27 @@
+<svg width="100%" viewBox="0 0 420 120" xmlns="http://www.w3.org/2000/svg">
+
+<rect x="0" y="0" width="420" height="110" fill="#C0000A" rx="12" style="fill:rgb(192, 0, 10);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+<!-- Gold border lines top/bottom -->
+<rect x="0" y="0" width="420" height="5" fill="#FFD700" rx="2" style="fill:rgb(255, 215, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<rect x="0" y="105" width="420" height="5" fill="#FFD700" rx="2" style="fill:rgb(255, 215, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+<!-- Star -->
+<polygon points="36,16 40.5,30 55,30 43.5,38.5 47.5,52 36,44 24.5,52 28.5,38.5 17,30 31.5,30" fill="#FFD700" style="fill:rgb(255, 215, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+<!-- Vertical divider -->
+<rect x="66" y="10" width="2.5" height="90" fill="#FFD700" opacity="0.6" rx="1" style="fill:rgb(255, 215, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.6;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+<!-- AUTO EXCEL — big bold -->
+<text x="80" y="48" font-family="Arial Black,Arial" font-size="32" font-weight="900" fill="#FFD700" letter-spacing="2" style="fill:rgb(255, 215, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Arial Black&quot;, Arial;font-size:32px;font-weight:900;text-anchor:start;dominant-baseline:auto">AUTO EXCEL</text>
+
+<!-- SOUTH AFRICA -->
+<text x="82" y="68" font-family="Arial Black,Arial" font-size="14" font-weight="700" fill="#FFFFFF" letter-spacing="5" style="fill:rgb(255, 255, 255);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Arial Black&quot;, Arial;font-size:14px;font-weight:700;text-anchor:start;dominant-baseline:auto">SOUTH AFRICA</text>
+
+<!-- Divider -->
+<rect x="80" y="75" width="316" height="1.5" fill="#FFD700" opacity="0.4" rx="1" style="fill:rgb(255, 215, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.4;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+<!-- China Car Parts -->
+<text x="82" y="93" font-family="Arial Black,Arial" font-size="13" font-weight="700" fill="#FFFFFF" letter-spacing="2" opacity="0.95" style="fill:rgb(255, 255, 255);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.95;font-family:&quot;Arial Black&quot;, Arial;font-size:13px;font-weight:700;text-anchor:start;dominant-baseline:auto">CHINA CAR PARTS &amp; ENGINE OIL</text>
+
+</svg>

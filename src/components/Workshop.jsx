@@ -2442,6 +2442,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [oeSearch,      setOeSearch]      = useState("");
   const [editPriceId,   setEditPriceId]   = useState(null);
   const [editPriceVal,  setEditPriceVal]  = useState("");
+  const [editQtyId,     setEditQtyId]     = useState(null);
+  const [editQtyVal,    setEditQtyVal]    = useState("");
   const [renewalModal,  setRenewalModal]  = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
@@ -3204,6 +3206,13 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             }
             setEditPriceId(null);
           };
+          const commitQty = async (item) => {
+            const newQty = Math.max(1, Math.round(+editQtyVal||1));
+            if (newQty !== +item.qty) {
+              await onSaveItem({...item, qty: newQty, total: (+item.unit_price||0) * newQty});
+            }
+            setEditQtyId(null);
+          };
 
           // Build supplier cost lookup: description (lowercase) → [{name, price}]
           const jobSupQts = wsSupplierQuotes.filter(q=>q.job_id===job.id);
@@ -3248,8 +3257,11 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <div style={{display:"flex",flexDirection:"column",gap:0}}>
                 {items.map((item,idx)=>{
                   const supCosts=getSupCosts(item.description);
-                  const isEditing=editPriceId===item.id;
-                  const rowTotal=isEditing?(+editPriceVal||0)*(+item.qty||1):+item.total||0;
+                  const isEditingPrice=editPriceId===item.id;
+                  const isEditingQty=editQtyId===item.id;
+                  const isEditing=isEditingPrice; // keep alias for price block
+                  const displayQty=isEditingQty?(+editQtyVal||1):(+item.qty||1);
+                  const rowTotal=isEditingPrice?(+editPriceVal||0)*displayQty:isEditingQty?(+item.unit_price||0)*displayQty:+item.total||0;
                   return (
                     <div key={item.id} style={{padding:"12px 14px",borderBottom:idx<items.length-1?"1px solid var(--border)":undefined}}>
                       {/* Top row: badge + name + delete */}
@@ -3278,24 +3290,34 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                       <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:"var(--surface2)",borderRadius:8,padding:"8px 10px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:4}}>
                           <span style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>Qty</span>
-                          <span style={{fontWeight:700,fontSize:15}}>{item.qty}</span>
+                          {isEditingQty
+                            ? <input autoFocus type="number" min="1" step="1"
+                                value={editQtyVal}
+                                onChange={e=>setEditQtyVal(e.target.value)}
+                                onBlur={()=>commitQty(item)}
+                                onKeyDown={e=>{ if(e.key==="Enter") commitQty(item); if(e.key==="Escape") setEditQtyId(null); }}
+                                style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text1)"}}/>
+                            : <span onClick={()=>{ setEditQtyId(item.id); setEditQtyVal(String(item.qty||1)); setEditPriceId(null); }}
+                                style={{fontWeight:700,fontSize:15,cursor:"pointer",borderBottom:"1px dashed var(--text3)",color:"var(--text)"}}>
+                                {item.qty}
+                              </span>
+                          }
                         </div>
                         <span style={{color:"var(--text3)"}}>×</span>
                         <div style={{display:"flex",alignItems:"center",gap:4}}>
                           <span style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>Price</span>
-                          {isEditing
+                          {isEditingPrice
                             ? <input autoFocus type="number" min="0" step="0.01"
                                 value={editPriceVal}
                                 onChange={e=>setEditPriceVal(e.target.value)}
                                 onBlur={()=>commitPrice(item)}
                                 onKeyDown={e=>{ if(e.key==="Enter") commitPrice(item); if(e.key==="Escape") setEditPriceId(null); }}
                                 style={{width:80,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text1)"}}/>
-                            : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); }}
+                            : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); setEditQtyId(null); }}
                                 style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:"pointer",borderBottom:"1px dashed var(--text3)",color:"var(--text)"}}>
                                 {fmtAmt(item.unit_price)}
                               </span>
                           }
-                          <span style={{fontSize:10,color:"var(--text3)"}}>(tap to edit)</span>
                         </div>
                         <span style={{color:"var(--text3)"}}>=</span>
                         <span style={{fontWeight:700,fontSize:16,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",marginLeft:"auto"}}>
@@ -3331,7 +3353,21 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                           </div>
                         )}
                       </td>
-                      <td style={{textAlign:"right"}}>{item.qty}</td>
+                      <td style={{textAlign:"right"}}>
+                        {editQtyId===item.id
+                          ? <input autoFocus type="number" min="1" step="1"
+                              value={editQtyVal}
+                              onChange={e=>setEditQtyVal(e.target.value)}
+                              onBlur={()=>commitQty(item)}
+                              onKeyDown={e=>{ if(e.key==="Enter") commitQty(item); if(e.key==="Escape") setEditQtyId(null); }}
+                              style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
+                          : <span onClick={()=>{ setEditQtyId(item.id); setEditQtyVal(String(item.qty||1)); setEditPriceId(null); }}
+                              title="Click to edit qty"
+                              style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>
+                              {item.qty}
+                            </span>
+                        }
+                      </td>
                       <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",minWidth:100}}>
                         {isEditing
                           ? <input autoFocus type="number" min="0" step="0.01"
@@ -3347,7 +3383,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                             </span>
                         }
                       </td>
-                      <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(isEditing?(+editPriceVal||0)*(+item.qty||1):item.total)}</td>
+                      <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(isEditing?(+editPriceVal||0)*(editQtyId===item.id?+editQtyVal||1:+item.qty||1):editQtyId===item.id?(+item.unit_price||0)*(+editQtyVal||1):item.total)}</td>
                       <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button></td>
                     </tr>
                     );

@@ -123,6 +123,9 @@ export const T = {
     // Stock Logs / Stock Move columns
     action: "Action", before: "Before", after: "After", change: "Change", by: "By", records: "records",
     date: "Date", smMoves: "moves", smNewMove: "New Move", smNoMoves: "No stock moves recorded",
+    supplier: "Supplier", srReturns: "returns", srNewReturn: "New Return",
+    srReturnNo: "Return No", srOrigInvoice: "Original Invoice",
+    srNoSupRet: "No supplier returns", srNoCusRet: "No customer returns",
     // Stock Take page
     createdBy: "Created By", actions: "Actions", stTakes: "stock takes",
     stOpen: "Open", stCounted: "Counted", stCompleted: "Completed",

@@ -2676,12 +2676,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {/* ── SUPPLIER RETURNS ── */}
         {tab==="supplierReturns"&&(
           <div className="fu">
-            <PH title={`↩️ ${t.supplierReturns}`} subtitle={`${supplierReturns.length} returns`}
-              action={<button className="btn btn-primary" onClick={()=>openM("supplierReturn",{isNew:true})}>+ New Return</button>}/>
+            <PH title={`↩️ ${t.supplierReturns}`} subtitle={`${supplierReturns.length} ${t.srReturns}`}
+              action={<button className="btn btn-primary" onClick={()=>openM("supplierReturn",{isNew:true})}>+ {t.srNewReturn}</button>}/>
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
-                  <thead><tr>{["Return No","Supplier","Date","Original Invoice",t.total,t.status,"Reason"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{[t.srReturnNo,t.supplier,t.date,t.srOrigInvoice,t.total,t.status,t.reason].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {supplierReturns.map(r=>(
                       <tr key={r.id}>
@@ -2696,7 +2696,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                     ))}
                   </tbody>
                 </table>
-                {supplierReturns.length===0&&<div style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No supplier returns</div>}
+                {supplierReturns.length===0&&<div style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.srNoSupRet}</div>}
               </div>
             </div>
           </div>
@@ -2743,12 +2743,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {/* ── CUSTOMER RETURNS ── */}
         {tab==="customerReturns"&&(
           <div className="fu">
-            <PH title={`↩️ ${t.customerReturns}`} subtitle={`${customerReturns.length} returns`}
-              action={<button className="btn btn-primary" onClick={()=>openM("customerReturn",{isNew:true})}>+ New Return</button>}/>
+            <PH title={`↩️ ${t.customerReturns}`} subtitle={`${customerReturns.length} ${t.srReturns}`}
+              action={<button className="btn btn-primary" onClick={()=>openM("customerReturn",{isNew:true})}>+ {t.srNewReturn}</button>}/>
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
-                  <thead><tr>{["Return No","Customer","Date","Invoice",t.total,t.status,"Reason"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{[t.srReturnNo,t.customer,t.date,t.invoice,t.total,t.status,t.reason].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {customerReturns.map(r=>(
                       <tr key={r.id}>
@@ -2763,7 +2763,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                     ))}
                   </tbody>
                 </table>
-                {customerReturns.length===0&&<div style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No customer returns</div>}
+                {customerReturns.length===0&&<div style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.srNoCusRet}</div>}
               </div>
             </div>
           </div>

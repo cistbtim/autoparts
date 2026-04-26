@@ -1945,10 +1945,40 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
     setStage("scanning");
     setProgress(0);
     try {
+      // Preprocess: upscale + grayscale + contrast boost for better OCR
+      const processed = await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          // Scale up to at least 1800px wide for table text
+          const scale = Math.max(1, 1800 / img.width);
+          const w = Math.round(img.width  * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement("canvas");
+          canvas.width  = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          const d = ctx.getImageData(0, 0, w, h);
+          for (let i = 0; i < d.data.length; i += 4) {
+            // Grayscale (luminance formula)
+            const g = Math.round(0.299*d.data[i] + 0.587*d.data[i+1] + 0.114*d.data[i+2]);
+            // Contrast stretch: push away from mid-grey
+            const c = g < 160 ? Math.max(0, g - 40) : Math.min(255, g + 40);
+            d.data[i] = d.data[i+1] = d.data[i+2] = c;
+            d.data[i+3] = 255;
+          }
+          ctx.putImageData(d, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.src = src;
+      });
+
       const worker = await createWorker("eng", 1, {
         logger: m => { if(m.status==="recognizing text") setProgress(Math.round(m.progress*100)); },
       });
-      const { data: { text } } = await worker.recognize(src);
+      // PSM 6 = assume a single uniform block of text (works better for tables)
+      await worker.setParameters({ tessedit_pageseg_mode: "6" });
+      const { data: { text } } = await worker.recognize(processed);
       await worker.terminate();
       setRawText(text);
       setRows(parseText(text));

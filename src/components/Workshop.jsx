@@ -1914,19 +1914,43 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
     const SKIP = /^(sub\s*total|vat|total|tax|gst|discount|amount due|balance)\b/i;
     // Recover garbled price tokens: T4328→743.28, L168→ (letters mixed with digits)
     const tryHealPrice = (tok) => {
-      if(!/[A-Z]/.test(tok) || !/\d/.test(tok)) return null; // must have both
+      if(!/[A-Z]/.test(tok) || !/\d/.test(tok)) return null;
       const h = tok.replace(/O/g,"0").replace(/[Il]/g,"1").replace(/S/g,"5")
                    .replace(/T/g,"7").replace(/B/g,"8").replace(/G/g,"9");
       if(/^\d{4,7}$/.test(h)) return parseFloat(h.slice(0,-2)+"."+h.slice(-2));
       return null;
     };
+    // Normalise SA-format number string: "1 450,00" → 1450.00
+    const normNum = (s) => {
+      // Remove vertical line separators (commonly OCR-read from table borders)
+      // Patterns: " | ", " |", "| " → single space
+      let n = s.replace(/\s*\|\s*/g, " ");
+      
+      // Space-thousands with COMMA only (true SA format)
+      // In SA, numbers have NO spaces, so space = field separator (qty vs price)
+      // ONLY merge "1 450,00" format (comma-decimal), NOT "1 904.50" (already has dot)
+      // Pattern: 1 followed by space + exactly 3 digits + COMMA + 2 digits
+      n = n.replace(/(?<!\d)(1)\s+(\d{3}),(\d{2})(?!\d)/g,"1$2.$3");
+      
+      // comma-thousands: 1,450.00
+      n = n.replace(/(\d),(\d{3})(?=[.,\s]|$)/g,"$1$2");
+      // comma-decimal: 450,00 → 450.00
+      n = n.replace(/(\d),(\d{2})(?!\d)/g,"$1.$2");
+      return n;
+    };
     const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
     const candidates = [];
     for(const line of lines){
       if(SKIP.test(line)) continue;
-      // Collapse thousands separators: 1,099.00 → 1099.00
-      const norm = line.replace(/(\d),(\d{3}(?=[.,\s]|$))/g, "$1$2");
-      // Primary: clean decimal prices
+      // Strip leading item/part codes (3-6 digit standalone numbers at line start)
+      const stripped = line.replace(/^\d{3,6}\s+/,"");
+      // Strip trailing single-letter VAT codes (S, Z, E, T at end of line)
+      const clean = stripped.replace(/\s+[A-Z]\s*$/,"");
+      // Strip bin location codes like "JH.4", "JD.23", "JD.8C", "J.VB.1" (letters.alphanumeric)
+      // This prevents them from interfering with qty/price extraction
+      const noBinCodes = clean.replace(/\s[A-Z]{1,4}\.\s*[\dA-Z]{0,4}(?=\s|$)/g, " ");
+      const norm = normNum(noBinCodes);
+      // Primary: decimal prices (no spaces allowed in digit group — prevents qty being merged)
       const nums = [...norm.matchAll(/R?\s*(\d+\.\d{2})/g)].map(m=>+m[1]);
       // Secondary: recover garbled tokens like "T4328" → 743.28
       for(const m of norm.matchAll(/\b([A-Z][A-Z0-9]{3,6}|[A-Z0-9]{1,4}[A-Z][A-Z0-9]{1,4})\b/g)){
@@ -1934,22 +1958,46 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
         if(v && v > 10 && !nums.some(n=>Math.abs(n-v)<0.01)) nums.push(v);
       }
       if(!nums.length) continue;
-      const price = Math.max(...nums);
+      // Extract qty: prefer 2-digit quantities, then 1-digit, then default to 1
+      // This helps avoid picking up stray "1" OCR artifacts
+      // Look for all qty candidates (1-99)
+      const allQtys = [...norm.matchAll(/(?<![A-Za-z.\d])([1-9][0-9]?)(?![A-Za-z.\d])/g)];
+      let qty = 1;
+      if(allQtys.length > 0) {
+        // Prefer 2-digit quantities (10-99) over single-digit ones
+        const twoDigit = allQtys.find(m => +m[1] >= 10);
+        if(twoDigit) {
+          qty = +twoDigit[1];
+        } else {
+          // If no 2-digit qty found, only use single-digit if it's not obviously a line artifact
+          // (Line artifacts are usually solitary "1" followed by whitespace and a price)
+          const firstQty = +allQtys[0][1];
+          // Take the first qty candidate unless it's a suspicious solitary "1"
+          if(!(firstQty === 1 && allQtys.length === 1 && nums.length >= 1)) {
+            qty = firstQty;
+          }
+        }
+      }
+      // When qty>1 and two prices where larger ≈ smaller × qty, prefer the unit price
+      let price = Math.max(...nums);
+      if(qty > 1 && nums.length >= 2){
+        const sorted = [...nums].sort((a,b)=>a-b);
+        const unit = sorted[0], total = sorted[sorted.length-1];
+        if(Math.abs(total - unit*qty) / total < 0.05) price = unit;
+      }
       if(price < 1) continue;
-      // Strip prices, bin codes, garbled tokens from description
+      // Strip prices, item codes, bin codes, VAT codes from description
       const desc = norm
         .replace(/[A-Z]{1,4}\.\d+/g,"")           // bin codes: JC.27
-        .replace(/R?\s*\d+\.\d{2}/g,"")             // clean prices
-        .replace(/\b[A-Z][A-Z0-9]{3,6}\b/g,"")     // garbled tokens
-        .replace(/\d+\.?\d*\s*%/g,"")               // percentages
+        .replace(/R?\s*\d+\.\d{2}/g,"")            // decimal prices
+        .replace(/\b[A-Z][A-Z0-9]{3,6}\b/g,"")    // garbled tokens
+        .replace(/\d+\.?\d*\s*%/g,"")              // percentages
         .replace(/[[\]|!]/g," ").replace(/\s+/g," ").trim();
       if(desc.length < 2) continue;
       const dl = desc.toLowerCase();
       const partIdx = parts.findIndex(p=>
         dl.includes(p.toLowerCase().slice(0,6)) || p.toLowerCase().includes(dl.slice(0,6))
       );
-      const qtyM = norm.match(/(?<![A-Za-z.\d])([1-9][0-9]?)(?![A-Za-z.\d])/);
-      const qty = qtyM ? +qtyM[1] : 1;
       candidates.push({desc, qty, price, partIdx});
     }
     return candidates;
@@ -2302,23 +2350,21 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
         </div>
       </div>
 
-      {/* VAT toggle — hidden in priceOnly mode */}
-      {!priceOnly&&(
-        <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"9px 14px",background:"var(--surface2)",borderRadius:10,cursor:"pointer",border:"1px solid var(--border)"}}>
-          <input type="checkbox" checked={vatExcluded} onChange={e=>setVatExcluded(e.target.checked)}
-            style={{width:16,height:16,accentColor:"var(--accent)",cursor:"pointer",flexShrink:0}}/>
-          <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:700}}>Prices are VAT excluded (ex-VAT)</div>
-            <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>
-              {vatExcluded
-                ? vatRate>0
-                  ? `VAT (${settings.tax_rate}%) will be added — totals shown incl. VAT`
-                  : "No VAT rate set in settings — configure it in Workshop Settings"
-                : "Prices already include VAT"}
-            </div>
+      {/* VAT toggle */}
+      <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"9px 14px",background:"var(--surface2)",borderRadius:10,cursor:"pointer",border:"1px solid var(--border)"}}>
+        <input type="checkbox" checked={!vatExcluded} onChange={e=>setVatExcluded(!e.target.checked)}
+          style={{width:16,height:16,accentColor:"var(--accent)",cursor:"pointer",flexShrink:0}}/>
+        <div style={{flex:1}}>
+          <div style={{fontSize:13,fontWeight:700}}>Prices include VAT</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>
+            {vatExcluded
+              ? vatRate>0
+                ? `Prices are ex-VAT — VAT (${settings.tax_rate}%) will be added to totals`
+                : "Prices are ex-VAT — no VAT rate configured in Workshop Settings"
+              : "Prices already include VAT — no VAT will be added"}
           </div>
-        </label>
-      )}
+        </div>
+      </label>
 
       {/* Line items — one row per part */}
       <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
@@ -2353,19 +2399,19 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
           </div>
         ))}
         {/* Total row */}
-        <div style={{display:"grid",gridTemplateColumns:`1fr 110px${vatExcluded&&vatRate>0?" 100px":""} 100px`,gap:8,padding:"9px 12px",background:"var(--surface2)",borderTop:"1px solid var(--border)"}}>
+        <div style={{display:"grid",gridTemplateColumns:priceOnly?`1fr 120px`:`1fr 110px${vatExcluded&&vatRate>0?" 100px":""} 100px`,gap:8,padding:"9px 12px",background:"var(--surface2)",borderTop:"1px solid var(--border)"}}>
           <div style={{fontSize:13,fontWeight:700,color:"var(--text2)"}}>
             {vatExcluded&&vatRate>0?"Subtotal (ex-VAT)":"Total"}
           </div>
-          <div style={{fontSize:14,fontWeight:800,color:"var(--accent)",textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>
+          <div style={{fontSize:14,fontWeight:800,color:vatExcluded&&vatRate>0?"var(--text2)":"var(--accent)",textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>
             {rawTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
           </div>
-          {vatExcluded&&vatRate>0&&(
+          {!priceOnly&&vatExcluded&&vatRate>0&&(
             <div style={{fontSize:14,fontWeight:800,color:"#f59e0b",textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>
               {vatIncTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
             </div>
           )}
-          <div/>
+          {!priceOnly&&<div/>}
         </div>
         {/* VAT breakdown row */}
         {vatExcluded&&vatRate>0&&rawTotal>0&&(
@@ -2510,15 +2556,16 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
   const logSend = (viaGroup=false) => {
     if (!onLogSend) return;
     onLogSend({
-      job_id:         job.id,
-      vehicle_reg:    job.vehicle_reg||"",
-      supplier_id:    chosenSupplier?.id||null,
-      supplier_name:  chosenSupplier?.name || (manualPhone ? "Manual: "+manualPhone : ""),
-      supplier_phone: chosenSupplier?.phone||manualPhone||"",
-      via_group:      viaGroup,
-      parts_list:     JSON.stringify(selectedItems.map(i=>i.label)),
-      items_json:     JSON.stringify(selectedItems.map(i=>({label:i.label,description:i.label,sku:i.sku||"",qty:i.qty||1}))),
-      message:        msgLines,
+      job_id:               job.id,
+      vehicle_reg:          job.vehicle_reg||"",
+      supplier_id:          chosenSupplier?.id||null,
+      supplier_name:        chosenSupplier?.name || (manualPhone ? "Manual: "+manualPhone : ""),
+      supplier_phone:       chosenSupplier?.phone||manualPhone||"",
+      supplier_vat_inclusive: chosenSupplier?.vat_inclusive||false,
+      via_group:            viaGroup,
+      parts_list:           JSON.stringify(selectedItems.map(i=>i.label)),
+      items_json:           JSON.stringify(selectedItems.map(i=>({label:i.label,description:i.label,sku:i.sku||"",qty:i.qty||1}))),
+      message:              msgLines,
     });
   };
 
@@ -2777,7 +2824,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
                     </button>
                     {onDeleteSend&&(
                       <button
-                        onClick={()=>{ if(window.confirm("Delete this send record?")) onDeleteSend(r.id); }}
+                        onClick={()=>{ if(window.confirm("Delete this send record and its entered quote prices?")) onDeleteSend(r.id); }}
                         style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid rgba(239,68,68,.3)",background:"rgba(239,68,68,.08)",cursor:"pointer",color:"#ef4444",fontWeight:600}}>
                         🗑️
                       </button>

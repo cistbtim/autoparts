@@ -927,13 +927,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   const saveWsSupplierRequest=async(req)=>{
-    await api.insert("ws_supplier_requests",{...req,id:makeId("WSRQ"),workshop_id:wsId||null,sent_at:new Date().toISOString()}).catch(e=>console.warn("Log send failed:",e));
-    setWsSupplierRequests(p=>[{...req,id:makeId("WSRQ"),sent_at:new Date().toISOString()},...p]);
+    const reqId=makeId("WSRQ");
+    const sentAt=new Date().toISOString();
+    await api.insert("ws_supplier_requests",{...req,id:reqId,workshop_id:wsId||null,sent_at:sentAt}).catch(e=>console.warn("Log send failed:",e));
+    setWsSupplierRequests(p=>[{...req,id:reqId,sent_at:sentAt},...p]);
   };
 
   const deleteWsSupplierRequest=async(id)=>{
-    await api.delete("ws_supplier_requests","id",id).catch(e=>console.warn("Delete send failed:",e));
+    await Promise.all([
+      api.delete("ws_supplier_requests","id",id).catch(e=>console.warn("Delete send failed:",e)),
+      api.delete("ws_supplier_quotes","request_id",id).catch(()=>{}),
+    ]);
     setWsSupplierRequests(p=>p.filter(r=>r.id!==id));
+    setWsSupplierQuotes(p=>p.filter(q=>q.request_id!==id));
   };
 
   const generateWsSupplierQuoteLink=async(info,items)=>{

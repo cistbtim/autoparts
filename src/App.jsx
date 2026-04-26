@@ -1680,22 +1680,37 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       ]
     },
     {
-      id:"grp_workshop", icon:"🔧", label:t.grpWorkshop, roles:["admin","manager","workshop"],
+      id:"grp_ws_jobs", icon:"🔧", label:t.grpWorkshop||"Workshop — Jobs", roles:["admin","manager","workshop"],
       children:[
-        {id:"workshop",    icon:"🔧",label:t.wsJobs,            roles:["admin","manager","workshop"]},
-        {id:"wscustomers", icon:"👥",label:t.wsCustomers,       roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsquotations",icon:"📝",label:t.wsQuotations,      roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,        roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wspayments",  icon:"💳",label:t.wsPayments,        roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsstock",     icon:"📦",label:t.wsStock,           roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsservices",  icon:"🔧",label:t.wsServices,        roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wssuppliers", icon:"🏪",label:t.wsSuppliers,       roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wssuporders", icon:"📋",label:t.wsPurchaseOrders,  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"workshop",    icon:"🔧",label:t.wsJobs,       roles:["admin","manager","workshop"]},
+        {id:"wscustomers", icon:"👥",label:t.wsCustomers,  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsquotations",icon:"📝",label:t.wsQuotations, roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,   roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wspayments",  icon:"💳",label:t.wsPayments,   roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+      ]
+    },
+    {
+      id:"grp_ws_procurement", icon:"🏪", label:t.wsProcurement||"Workshop — Procurement", roles:["admin","manager","workshop"],
+      children:[
+        {id:"wssuppliers", icon:"🏪",label:t.wsSuppliers,              roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wssuporders", icon:"📋",label:t.wsPurchaseOrders,         roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
         {id:"wssupinv",    icon:"🧾",label:t.wsSupInvoices||"Supplier Inv", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wstransfer",  icon:"🔄",label:t.wsTransfer,        roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsstatement", icon:"📋",label:t.wsStatement,       roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsreport",    icon:"📊",label:t.wsReport,          roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsprofile",   icon:"⚙️",label:t.wsSettings,        roles:["workshop"], wsRoles:["main"]},
+      ]
+    },
+    {
+      id:"grp_ws_stock", icon:"📦", label:t.wsStockGroup||"Workshop — Stock", roles:["admin","manager","workshop"],
+      children:[
+        {id:"wsstock",    icon:"📦",label:t.wsStock,    roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wstransfer", icon:"🔄",label:t.wsTransfer, roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsservices", icon:"🔧",label:t.wsServices, roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+      ]
+    },
+    {
+      id:"grp_ws_admin", icon:"📊", label:t.wsAdmin||"Workshop — Admin", roles:["admin","manager","workshop"],
+      children:[
+        {id:"wsstatement",    icon:"📄",label:t.wsStatement,   roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsreport",       icon:"📊",label:t.wsReport,      roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"wsprofile",      icon:"⚙️",label:t.wsSettings,    roles:["workshop"], wsRoles:["main"]},
         {id:"wssubscriptions",icon:"💳",label:t.wsSubscriptions,roles:["admin"]},
       ]
     },
@@ -1946,21 +1961,41 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
       {/* WS MORE SHEET — workshop mobile app style bottom sheet */}
       {role==="workshop"&&(()=>{
-        const moreItems=[
-          {id:"shop",        icon:"🛒", label:t.shop||"Shop"},
-          ...(wsRole!=="mechanic"?[
-            {id:"wspayments", icon:"💳", label:t.wsPayments||"Payments"},
-            {id:"wsstock",    icon:"📦", label:t.wsStock||"Stock"},
-            {id:"wsservices", icon:"🔧", label:t.wsServices||"Services"},
-            {id:"wssuppliers",icon:"🏪", label:t.wsSuppliers||"Suppliers"},
-            {id:"wssuporders",icon:"📋", label:t.wsPurchaseOrders||"Purchase Orders"},
-            {id:"wssupinv",   icon:"🧾", label:t.wsSupInvoices||"Supplier Inv"},
-            {id:"wstransfer", icon:"🔄", label:t.wsTransfer||"Transfer"},
-            {id:"wsstatement",icon:"📄", label:t.wsStatement||"Statement"},
-            {id:"wsreport",   icon:"📊", label:t.wsReport||"Report"},
-            ...(wsRole==="main"?[{id:"wsprofile",icon:"⚙️",label:t.wsSettings||"Settings"}]:[]),
-          ]:[]),
+        // Grouped sections for mobile more-sheet
+        const moreSections=[
+          {
+            label:t.grpWorkshop||"Jobs",
+            items:[
+              {id:"shop",        icon:"🛒", label:t.shop||"Shop"},
+              ...(wsRole!=="mechanic"?[
+                {id:"wspayments", icon:"💳", label:t.wsPayments||"Payments"},
+              ]:[]),
+            ]
+          },
+          ...(wsRole!=="mechanic"?[{
+            label:t.wsProcurement||"Procurement",
+            items:[
+              {id:"wssuppliers",icon:"🏪", label:t.wsSuppliers||"Suppliers"},
+              {id:"wssuporders",icon:"📋", label:t.wsPurchaseOrders||"Purchase Orders"},
+              {id:"wssupinv",   icon:"🧾", label:t.wsSupInvoices||"Supplier Inv"},
+            ]
+          },{
+            label:t.wsStockGroup||"Stock",
+            items:[
+              {id:"wsstock",    icon:"📦", label:t.wsStock||"Stock"},
+              {id:"wstransfer", icon:"🔄", label:t.wsTransfer||"Transfer"},
+              {id:"wsservices", icon:"🔧", label:t.wsServices||"Services"},
+            ]
+          },{
+            label:t.wsAdmin||"Admin",
+            items:[
+              {id:"wsstatement",icon:"📄", label:t.wsStatement||"Statement"},
+              {id:"wsreport",   icon:"📊", label:t.wsReport||"Report"},
+              ...(wsRole==="main"?[{id:"wsprofile",icon:"⚙️",label:t.wsSettings||"Settings"}]:[]),
+            ]
+          }]:[]),
         ];
+        const moreItems=moreSections.flatMap(s=>s.items);
         return (
           <>
             <div className={`drawer-backdrop${wsMoreOpen?" open":""}`} style={{zIndex:205}} onClick={()=>setWsMoreOpen(false)}/>
@@ -1981,17 +2016,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                   ))}
                 </div>
               </div>
-              {/* Grid of nav items */}
-              {moreItems.length>0&&(
-                <div className="ws-more-grid">
-                  {moreItems.map(n=>(
-                    <button key={n.id} className={`ws-more-item${tab===n.id?" on":""}`} onClick={()=>{setTab(n.id);setWsMoreOpen(false);}}>
-                      <span style={{fontSize:24,lineHeight:1}}>{n.icon}</span>
-                      <span>{n.label}</span>
-                    </button>
-                  ))}
+              {/* Grouped nav sections */}
+              {moreSections.map(sec=>(
+                <div key={sec.label}>
+                  <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:"var(--text3)",padding:"10px 14px 4px"}}>{sec.label}</div>
+                  <div className="ws-more-grid" style={{paddingTop:0}}>
+                    {sec.items.map(n=>(
+                      <button key={n.id} className={`ws-more-item${tab===n.id?" on":""}`} onClick={()=>{setTab(n.id);setWsMoreOpen(false);}}>
+                        <span style={{fontSize:24,lineHeight:1}}>{n.icon}</span>
+                        <span>{n.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              )}
+              ))}
               <div className="ws-more-sep"/>
               {/* Action buttons */}
               <div className="ws-more-actions">

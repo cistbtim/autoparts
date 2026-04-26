@@ -967,6 +967,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     }
     await refreshWorkshopData();
     showToast(isNew?"Purchase order created":"Purchase order updated");
+    return {id:poId,...rest};
   };
 
   const deleteWsPurchaseOrder=async(id)=>{

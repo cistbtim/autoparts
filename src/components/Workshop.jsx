@@ -5571,6 +5571,7 @@ function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierRequests=[],s
     return init;
   });
   const [saving,setSaving]=useState(false);
+  const [createdPos,setCreatedPos]=useState(null); // null | [{poId,group,supplier}]
 
   const toggle=(id)=>setSelected(p=>({...p,[id]:!p[id]}));
   const toggleGroup=(g)=>{
@@ -5580,6 +5581,33 @@ function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierRequests=[],s
 
   const totalSelected=groups.reduce((s,g)=>s+g.items.filter(it=>selected[it.id]).reduce((ss,it)=>ss+(+it.qty||0)*(+it.unit_price||0),0),0);
   const countSelected=groups.reduce((s,g)=>s+g.items.filter(it=>selected[it.id]).length,0);
+
+  const shopName=settings?.shop_name||"Workshop";
+  const vatRate=+(settings?.tax_rate||0)/100;
+  const SEP="─".repeat(26);
+
+  const buildMsg=(grp,poId,supplier)=>{
+    const isExVat=supplier&&!supplier.vat_inclusive;
+    const exVatPrice=(p)=>isExVat&&vatRate>0?+p/(1+vatRate):+p;
+    const exVatTotal=Math.round(grp.items.reduce((s,i)=>s+(+i.qty||0)*exVatPrice(+i.unit_price||0),0)*100)/100;
+    const rawTotal=grp.items.reduce((s,i)=>s+(+i.qty||0)*(+i.unit_price||0),0);
+    const vatAmt=Math.round((rawTotal-exVatTotal)*100)/100;
+    const totalDisplay=isExVat&&vatRate>0?(exVatTotal+vatAmt):rawTotal;
+    return [
+      `📋 *Purchase Order* — ${shopName}`,SEP,
+      poId?`PO#: ${poId}`:"",
+      `Supplier: *${grp.supplierName}*`,
+      grp.quoteRef?`Your Quote Ref: *${grp.quoteRef}*`:"",
+      `Job: ${job.id}`,"",
+      `*Items:*${isExVat?" (prices ex-VAT)":""}`,
+      ...grp.items.map(i=>`• ${i.description}${i.sku?" ("+i.sku+")":""} ×${i.qty} @ ${C}${exVatPrice(+i.unit_price||0).toFixed(2)}`),
+      "",SEP,
+      isExVat&&vatRate>0?`Subtotal (ex-VAT): ${C}${exVatTotal.toFixed(2)}`:"",
+      isExVat&&vatRate>0?`VAT (${settings?.tax_rate}%): ${C}${vatAmt.toFixed(2)}`:"",
+      `*Total: ${C}${totalDisplay.toFixed(2)}*`,
+      grp.quoteRef?"\nPlease process against your quote ref above and confirm.":"\nPlease confirm availability and delivery timeframe.",
+    ].filter(l=>l!==undefined&&l!=="").join("\n");
+  };
 
   const createOrders=async()=>{
     const bySupplier={};
@@ -5594,15 +5622,65 @@ function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierRequests=[],s
     if(!entries.length) return;
     setSaving(true);
     try{
+      const results=[];
       for(const grp of entries){
-        await onSave({supplier_id:grp.supplierId||null,supplier_name:grp.supplierName,job_id:job.id,status:"draft",supplier_quote_ref:grp.quoteRef||null},
+        const po=await onSave({supplier_id:grp.supplierId||null,supplier_name:grp.supplierName,job_id:job.id,status:"draft",supplier_quote_ref:grp.quoteRef||null},
           grp.items.map(it=>({description:it.description,sku:it.sku||"",supplier_part_no:it.supplier_part_no||"",qty:it.qty,unit_price:it.unit_price,condition:it.condition})));
+        const supplier=wsSuppliers.find(s=>String(s.id)===String(grp.supplierId));
+        results.push({poId:po?.id||"",group:grp,supplier});
       }
-      onViewPOs?.();
-      onClose();
+      setCreatedPos(results);
     }catch(e){alert("Failed to create order: "+e.message);}
     setSaving(false);
   };
+
+  // ── Success screen: show WA send buttons ──
+  if(createdPos){
+    return (
+      <Overlay onClose={onClose}>
+        <MHead title="✅ Order Placed — Send to Supplier" onClose={onClose}/>
+        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
+          {createdPos.map(({poId,group:grp,supplier})=>{
+            const phone=(supplier?.phone||"").replace(/\D/g,"");
+            const groupLink=supplier?.group_link||"";
+            const msg=buildMsg(grp,poId,supplier);
+            const total=grp.items.reduce((s,i)=>s+(+i.qty||0)*(+i.unit_price||0),0);
+            return (
+              <div key={poId} className="card" style={{padding:"12px 14px"}}>
+                <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{grp.supplierName}</div>
+                {grp.quoteRef&&<div style={{fontSize:11,color:"var(--blue)",marginBottom:2}}>Ref: {grp.quoteRef}</div>}
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>
+                  {grp.items.length} item{grp.items.length!==1?"s":""} · {C}{total.toFixed(2)} (incl. VAT)
+                </div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {phone&&(
+                    <a href={`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer"
+                      className="btn btn-sm" style={{background:"rgba(37,211,102,.15)",color:"#25d366",border:"1px solid rgba(37,211,102,.3)",textDecoration:"none",flex:1,textAlign:"center"}}>
+                      📤 Send via WhatsApp
+                    </a>
+                  )}
+                  {!phone&&groupLink&&(
+                    <button className="btn btn-sm" style={{background:"rgba(37,211,102,.15)",color:"#25d366",border:"1px solid rgba(37,211,102,.3)",flex:1}}
+                      onClick={async()=>{ await navigator.clipboard.writeText(msg); window.open(groupLink,"_blank"); }}>
+                      👥 Copy & Open Group
+                    </button>
+                  )}
+                  <button className="btn btn-ghost btn-sm" style={{flex:"0 0 auto"}}
+                    onClick={()=>navigator.clipboard.writeText(msg).then(()=>alert("Copied!"))}>
+                    📋 Copy
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{ onViewPOs?.(); onClose(); }}>View All POs</button>
+          <button className="btn btn-primary" style={{flex:1}} onClick={onClose}>✅ Done</button>
+        </div>
+      </Overlay>
+    );
+  }
 
   return (
     <Overlay onClose={onClose}>

@@ -1204,6 +1204,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         wsVehicles={wsVehicles} wsCustomers={wsCustomers} wsStock={wsStock} wsServices={wsServices}
         suppliers={suppliers} wsSuppliers={wsSuppliers} wsSupplierRequests={wsSupplierRequests}
         wsSupplierQuotes={wsSupplierQuotes}
+        wsPurchaseOrders={wsPurchaseOrders.filter(p=>p.job_id===activeJob.id)}
         onSaveWsSupplierRequest={onSaveWsSupplierRequest}
         onDeleteWsSupplierRequest={onDeleteWsSupplierRequest}
         onSaveWsSupplierQuote={onSaveWsSupplierQuote}
@@ -2467,7 +2468,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onSaveWsLicenceRenewal,wsId=null,wsProfile={},t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onSaveWsLicenceRenewal,wsId=null,wsProfile={},t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -2801,6 +2802,22 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           <button key={s} className={`btn btn-xs ${job.status===s?"btn-primary":"btn-ghost"}`}
             onClick={()=>onSaveJob({...job,status:s})}>{tSt(s)}</button>
         ))}
+        {(job.status==="Done"||job.status==="Delivered")&&(job.customer_phone||job.customer_name)&&(()=>{
+          const phone=(job.customer_phone||"").replace(/\D/g,"");
+          const name=job.customer_name||"there";
+          const reg=job.vehicle_reg?`your ${job.vehicle_make?`${job.vehicle_make} `:""}${job.vehicle_model?`${job.vehicle_model} `:""}(${job.vehicle_reg})`:"your vehicle";
+          const shopName=wsProfile?.name||settings?.shop_name||"Workshop";
+          const shopPhone=wsProfile?.phone||settings?.phone||"";
+          const msg=`Hi ${name}! 🎉 Great news — ${reg} is ready for collection at *${shopName}*.\n\nPlease contact us to arrange collection${shopPhone?` on ${shopPhone}`:""}.`;
+          if(!phone) return null;
+          return (
+            <a href={`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer"
+              className="btn btn-ghost btn-xs"
+              style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)",marginLeft:"auto",textDecoration:"none"}}>
+              📱 Car Ready — Notify Customer
+            </a>
+          );
+        })()}
       </div>
 
       {/* ── Tab bar ── */}
@@ -3549,6 +3566,23 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               </table>
             )
           }
+          {/* ── Supplier order status ── */}
+          {wsPurchaseOrders.length>0&&(
+            <div style={{padding:"8px 16px",borderTop:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+              <span style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>Orders:</span>
+              {wsPurchaseOrders.map(po=>{
+                const PO_C={draft:"var(--text3)",sent:"var(--blue)",partial:"var(--yellow)",received:"var(--green)",cancelled:"var(--red)"};
+                const PO_BG={draft:"var(--surface3)",sent:"rgba(96,165,250,.12)",partial:"rgba(251,191,36,.12)",received:"rgba(52,211,153,.12)",cancelled:"rgba(248,113,113,.12)"};
+                return (
+                  <button key={po.id} onClick={onViewPurchaseOrders}
+                    style={{display:"flex",alignItems:"center",gap:5,fontSize:11,fontWeight:600,borderRadius:6,padding:"3px 8px",border:"none",cursor:"pointer",background:PO_BG[po.status]||PO_BG.draft,color:PO_C[po.status]||PO_C.draft}}>
+                    📋 {po.supplier_name||"Supplier"}
+                    <span style={{opacity:.7,fontWeight:400,textTransform:"capitalize"}}>{po.status||"draft"}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{display:"flex",gap:6}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ Part</button>

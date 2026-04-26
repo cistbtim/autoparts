@@ -5798,7 +5798,6 @@ function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsSto
   const [filterSt,setFilterSt]=useState("__all__");
 
   // Auto-open view modal when navigated from job card
-  const {useEffect}=React;
   useEffect(()=>{
     if(initialViewPoId){
       const po=purchaseOrders.find(p=>p.id===initialViewPoId);

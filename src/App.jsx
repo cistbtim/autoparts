@@ -1690,7 +1690,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"wspayments",  icon:"💳",label:t.wsPayments,                  roles:["admin","manager"]},
         {id:"wssuppliers", icon:"🏪",label:t.wsSuppliers,                 roles:["admin","manager"]},
         {id:"wssuporders", icon:"📋",label:t.wsPurchaseOrders,            roles:["admin","manager"]},
-        {id:"wssupinv",    icon:"🧾",label:t.wsSupInvoices||"Supplier Inv",roles:["admin","manager"]},
+        {id:"wssupinv",    icon:"🧾",label:t.wsSupInvoices,roles:["admin","manager"]},
         {id:"wsstock",     icon:"📦",label:t.wsStock,                     roles:["admin","manager"]},
         {id:"wstransfer",  icon:"🔄",label:t.wsTransfer,                  roles:["admin","manager"]},
         {id:"wsservices",  icon:"🔧",label:t.wsServices,                  roles:["admin","manager"]},
@@ -1712,15 +1712,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         ]
       },
       {
-        id:"grp_ws_procurement", icon:"🏪", label:t.wsProcurement||"Procurement", roles:["workshop"],
+        id:"grp_ws_procurement", icon:"🏪", label:t.wsProcurement, roles:["workshop"],
         children:[
           {id:"wssuppliers", icon:"🏪",label:t.wsSuppliers,                  roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wssuporders", icon:"📋",label:t.wsPurchaseOrders,             roles:["workshop"], wsRoles:["main","manager"]},
-          {id:"wssupinv",    icon:"🧾",label:t.wsSupInvoices||"Supplier Inv", roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wssupinv",    icon:"🧾",label:t.wsSupInvoices, roles:["workshop"], wsRoles:["main","manager"]},
         ]
       },
       {
-        id:"grp_ws_stock", icon:"📦", label:t.wsStockGroup||"Stock", roles:["workshop"],
+        id:"grp_ws_stock", icon:"📦", label:t.wsStockGroup, roles:["workshop"],
         children:[
           {id:"wsstock",    icon:"📦",label:t.wsStock,    roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wstransfer", icon:"🔄",label:t.wsTransfer, roles:["workshop"], wsRoles:["main","manager"]},
@@ -1728,7 +1728,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         ]
       },
       {
-        id:"grp_ws_admin", icon:"📊", label:t.wsAdmin||"Admin", roles:["workshop"],
+        id:"grp_ws_admin", icon:"📊", label:t.wsAdmin, roles:["workshop"],
         children:[
           {id:"wsstatement", icon:"📄",label:t.wsStatement,    roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsreport",    icon:"📊",label:t.wsReport,       roles:["workshop"], wsRoles:["main","manager"]},
@@ -1995,21 +1995,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             ]
           },
           ...(wsRole!=="mechanic"?[{
-            label:t.wsProcurement||"Procurement",
+            label:t.wsProcurement,
             items:[
               {id:"wssuppliers",icon:"🏪", label:t.wsSuppliers||"Suppliers"},
               {id:"wssuporders",icon:"📋", label:t.wsPurchaseOrders||"Purchase Orders"},
-              {id:"wssupinv",   icon:"🧾", label:t.wsSupInvoices||"Supplier Inv"},
+              {id:"wssupinv",   icon:"🧾", label:t.wsSupInvoices},
             ]
           },{
-            label:t.wsStockGroup||"Stock",
+            label:t.wsStockGroup,
             items:[
               {id:"wsstock",    icon:"📦", label:t.wsStock||"Stock"},
               {id:"wstransfer", icon:"🔄", label:t.wsTransfer||"Transfer"},
               {id:"wsservices", icon:"🔧", label:t.wsServices||"Services"},
             ]
           },{
-            label:t.wsAdmin||"Admin",
+            label:t.wsAdmin,
             items:[
               {id:"wsstatement",icon:"📄", label:t.wsStatement||"Statement"},
               {id:"wsreport",   icon:"📊", label:t.wsReport||"Report"},

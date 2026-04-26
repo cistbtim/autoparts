@@ -106,8 +106,10 @@ export const T = {
     wsJobs: "Jobs", wsCustomers: "Workshop Customers", wsQuotations: "WS Quotations",
     wsInvoices: "WS Invoices", wsPayments: "WS Payments", wsStock: "WS Stock",
     wsServices: "WS Services", wsSuppliers: "WS Suppliers", wsPurchaseOrders: "WS Purchase Orders",
+    wsSupInvoices: "WS Supplier Invoice",
     wsTransfer: "WS Transfer", wsStatement: "WS Statement", wsReport: "WS Report",
     wsSettings: "WS Settings", wsSubscriptions: "WS Subscriptions",
+    wsProcurement: "Procurement", wsStockGroup: "Stock", wsAdmin: "Admin",
     // Workshop page strings
     wsCountCustomers: "customers", wsCountVehicles: "vehicles",
     wsSearchCustomer: "Search name, phone...", wsNoCustomers: "No customers yet",

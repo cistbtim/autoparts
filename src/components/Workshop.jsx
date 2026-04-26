@@ -1905,35 +1905,48 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
   const [progress, setProgress] = useState(0);
   const [rawText,  setRawText]  = useState("");
   const [rows,     setRows]     = useState([]); // [{desc, qty, price, partIdx}]
+  const [zoomed,   setZoomed]   = useState(false);
   const fileRef = useRef();
 
   // Parse OCR text into candidate rows
   const parseText = (text) => {
     const SKIP = /^(sub\s*total|vat|total|tax|gst|discount|amount due|balance)\b/i;
+    // Recover garbled price tokens: T4328→743.28, L168→ (letters mixed with digits)
+    const tryHealPrice = (tok) => {
+      if(!/[A-Z]/.test(tok) || !/\d/.test(tok)) return null; // must have both
+      const h = tok.replace(/O/g,"0").replace(/[Il]/g,"1").replace(/S/g,"5")
+                   .replace(/T/g,"7").replace(/B/g,"8").replace(/G/g,"9");
+      if(/^\d{4,7}$/.test(h)) return parseFloat(h.slice(0,-2)+"."+h.slice(-2));
+      return null;
+    };
     const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
     const candidates = [];
     for(const line of lines){
       if(SKIP.test(line)) continue;
       // Collapse thousands separators: 1,099.00 → 1099.00
       const norm = line.replace(/(\d),(\d{3}(?=[.,\s]|$))/g, "$1$2");
-      // Find all price-like numbers (must have dot + 2 decimal digits)
+      // Primary: clean decimal prices
       const nums = [...norm.matchAll(/R?\s*(\d+\.\d{2})/g)].map(m=>+m[1]);
+      // Secondary: recover garbled tokens like "T4328" → 743.28
+      for(const m of norm.matchAll(/\b([A-Z][A-Z0-9]{3,6}|[A-Z0-9]{1,4}[A-Z][A-Z0-9]{1,4})\b/g)){
+        const v = tryHealPrice(m[1]);
+        if(v && v > 10 && !nums.some(n=>Math.abs(n-v)<0.01)) nums.push(v);
+      }
       if(!nums.length) continue;
       const price = Math.max(...nums);
       if(price < 1) continue;
-      // Strip prices and bin-location codes (like JC.27) from description
+      // Strip prices, bin codes, garbled tokens from description
       const desc = norm
-        .replace(/[A-Z]{1,4}\.\d+/g,"")        // bin codes: JC.27, A.12
-        .replace(/R?\s*\d+\.\d{2}/g,"")          // prices
-        .replace(/\d+\.?\d*\s*%/g,"")            // percentages
-        .replace(/\s+/g," ").trim();
+        .replace(/[A-Z]{1,4}\.\d+/g,"")           // bin codes: JC.27
+        .replace(/R?\s*\d+\.\d{2}/g,"")             // clean prices
+        .replace(/\b[A-Z][A-Z0-9]{3,6}\b/g,"")     // garbled tokens
+        .replace(/\d+\.?\d*\s*%/g,"")               // percentages
+        .replace(/[[\]|!]/g," ").replace(/\s+/g," ").trim();
       if(desc.length < 2) continue;
-      // Try to match to a known part (case-insensitive, partial)
       const dl = desc.toLowerCase();
       const partIdx = parts.findIndex(p=>
         dl.includes(p.toLowerCase().slice(0,6)) || p.toLowerCase().includes(dl.slice(0,6))
       );
-      // Qty: standalone 1-2 digit integer, not glued to letters or dots (avoids bin codes)
       const qtyM = norm.match(/(?<![A-Za-z.\d])([1-9][0-9]?)(?![A-Za-z.\d])/);
       const qty = qtyM ? +qtyM[1] : 1;
       candidates.push({desc, qty, price, partIdx});
@@ -2040,21 +2053,44 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
 
       {stage==="review"&&(
         <>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-            {/* Left: original image */}
+          {/* Warning banner */}
+          <div style={{background:"#fef3c7",border:"1px solid #f59e0b",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:12,color:"#92400e",display:"flex",gap:8,alignItems:"flex-start"}}>
+            <span style={{fontSize:16,flexShrink:0}}>⚠️</span>
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>Original Image</div>
-              {imgSrc&&<img src={imgSrc} alt="" style={{width:"100%",borderRadius:8,objectFit:"contain",maxHeight:260,background:"#000"}}/>}
-            </div>
-            {/* Right: raw OCR text */}
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>OCR Text</div>
-              <textarea readOnly value={rawText} style={{width:"100%",height:260,fontSize:10,fontFamily:"monospace",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:8,resize:"none",color:"var(--text2)"}}/>
+              <strong>Always verify prices against the original document.</strong>
+              {" "}OCR can misread digits — especially on watermarked or photo documents.
+              Click any price to correct it before applying.
             </div>
           </div>
 
+          {/* Image (full width, tall) — tap to zoom */}
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>
+              Original Image — read prices from here
+              <span style={{fontWeight:400,textTransform:"none",marginLeft:8,color:"var(--accent)"}}>tap to enlarge 🔍</span>
+            </div>
+            {imgSrc&&(
+              <img src={imgSrc} alt="" onClick={()=>setZoomed(true)}
+                style={{width:"100%",borderRadius:8,objectFit:"contain",maxHeight:340,background:"#000",cursor:"zoom-in"}}/>
+            )}
+          </div>
+
+          {/* Zoom lightbox */}
+          {zoomed&&imgSrc&&(
+            <div onClick={()=>setZoomed(false)}
+              style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
+              <img src={imgSrc} alt="" style={{maxWidth:"95vw",maxHeight:"95vh",objectFit:"contain",borderRadius:8}}/>
+              <button onClick={e=>{e.stopPropagation();setZoomed(false);}}
+                style={{position:"absolute",top:16,right:20,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:28,width:44,height:44,borderRadius:"50%",cursor:"pointer",lineHeight:1}}>×</button>
+            </div>
+          )}
+          <details style={{marginBottom:12}}>
+            <summary style={{fontSize:11,color:"var(--text3)",cursor:"pointer",userSelect:"none"}}>Show raw OCR text</summary>
+            <textarea readOnly value={rawText} style={{width:"100%",height:160,fontSize:10,fontFamily:"monospace",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:8,resize:"none",color:"var(--text2)",marginTop:6}}/>
+          </details>
+
           <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>
-            Extracted Items — review &amp; correct before applying
+            Extracted Items — check &amp; correct each price
           </div>
 
           {rows.length===0
@@ -2062,7 +2098,7 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
                 No price rows detected. The image may be too blurry or the layout unusual.<br/>
                 <button className="btn btn-ghost btn-sm" style={{marginTop:8}} onClick={()=>setStage("upload")}>Try another image</button>
               </div>
-            : <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14,maxHeight:240,overflowY:"auto"}}>
+            : <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14,maxHeight:260,overflowY:"auto"}}>
                 {rows.map((r,i)=>(
                   <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 60px 90px 28px",gap:6,alignItems:"center",background:"var(--surface2)",borderRadius:8,padding:"6px 10px"}}>
                     <div>
@@ -2079,9 +2115,10 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
                         onChange={e=>setRow(i,"qty",e.target.value)} style={{padding:"2px 4px",fontSize:12}}/>
                     </div>
                     <div>
-                      <div style={{fontSize:10,color:"var(--text3)",marginBottom:2}}>Price</div>
+                      <div style={{fontSize:10,color:"#92400e",marginBottom:2,fontWeight:700}}>Price ✏️</div>
                       <input className="inp" type="number" min="0" step="0.01" value={r.price}
-                        onChange={e=>setRow(i,"price",e.target.value)} style={{padding:"2px 4px",fontSize:12}}/>
+                        onChange={e=>setRow(i,"price",e.target.value)}
+                        style={{padding:"2px 4px",fontSize:12,background:"#fef3c7",borderColor:"#f59e0b"}}/>
                     </div>
                     <button onClick={()=>delRow(i)} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:16,padding:0,lineHeight:1}} title="Remove row">×</button>
                   </div>

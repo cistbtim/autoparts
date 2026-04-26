@@ -1909,23 +1909,32 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
 
   // Parse OCR text into candidate rows
   const parseText = (text) => {
-    const priceRe = /R?\s*(\d[\d\s]*[,.]?\d{0,2})/gi;
+    const SKIP = /^(sub\s*total|vat|total|tax|gst|discount|amount due|balance)\b/i;
     const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
     const candidates = [];
     for(const line of lines){
-      // Find all price-like numbers in this line
-      const nums = [...line.matchAll(/R?\s*(\d+[.,]\d{2})/g)].map(m=>+(m[1].replace(",",".")));
+      if(SKIP.test(line)) continue;
+      // Collapse thousands separators: 1,099.00 → 1099.00
+      const norm = line.replace(/(\d),(\d{3}(?=[.,\s]|$))/g, "$1$2");
+      // Find all price-like numbers (must have dot + 2 decimal digits)
+      const nums = [...norm.matchAll(/R?\s*(\d+\.\d{2})/g)].map(m=>+m[1]);
       if(!nums.length) continue;
-      const price = Math.max(...nums); // take the largest number as unit price
-      if(price < 1) continue;         // skip tiny numbers (qty matches etc.)
-      // Description = line with prices stripped
-      const desc = line.replace(/R?\s*\d+[.,]\d{2}/g,"").replace(/\s+/g," ").trim();
+      const price = Math.max(...nums);
+      if(price < 1) continue;
+      // Strip prices and bin-location codes (like JC.27) from description
+      const desc = norm
+        .replace(/[A-Z]{1,4}\.\d+/g,"")        // bin codes: JC.27, A.12
+        .replace(/R?\s*\d+\.\d{2}/g,"")          // prices
+        .replace(/\d+\.?\d*\s*%/g,"")            // percentages
+        .replace(/\s+/g," ").trim();
       if(desc.length < 2) continue;
       // Try to match to a known part (case-insensitive, partial)
       const dl = desc.toLowerCase();
-      const partIdx = parts.findIndex(p=>dl.includes(p.toLowerCase().slice(0,6))||p.toLowerCase().includes(dl.slice(0,6)));
-      // Qty: look for small standalone integer on the line (1-99)
-      const qtyM = line.match(/\b([1-9][0-9]?)\b/);
+      const partIdx = parts.findIndex(p=>
+        dl.includes(p.toLowerCase().slice(0,6)) || p.toLowerCase().includes(dl.slice(0,6))
+      );
+      // Qty: standalone 1-2 digit integer, not glued to letters or dots (avoids bin codes)
+      const qtyM = norm.match(/(?<![A-Za-z.\d])([1-9][0-9]?)(?![A-Za-z.\d])/);
       const qty = qtyM ? +qtyM[1] : 1;
       candidates.push({desc, qty, price, partIdx});
     }
@@ -1958,6 +1967,7 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
   };
 
   const setRow = (i, k, v) => setRows(p=>p.map((r,idx)=>idx===i?{...r,[k]:v}:r));
+  const delRow = (i) => setRows(p=>p.filter((_,idx)=>idx!==i));
 
   const apply = () => {
     // Build price map: partIdx → price (or desc → price for unmatched)
@@ -2024,7 +2034,7 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
               </div>
             : <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14,maxHeight:240,overflowY:"auto"}}>
                 {rows.map((r,i)=>(
-                  <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 60px 90px",gap:6,alignItems:"center",background:"var(--surface2)",borderRadius:8,padding:"6px 10px"}}>
+                  <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 60px 90px 28px",gap:6,alignItems:"center",background:"var(--surface2)",borderRadius:8,padding:"6px 10px"}}>
                     <div>
                       <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>OCR: {r.desc}</div>
                       <select className="inp" style={{fontSize:12,padding:"2px 6px"}}
@@ -2043,6 +2053,7 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
                       <input className="inp" type="number" min="0" step="0.01" value={r.price}
                         onChange={e=>setRow(i,"price",e.target.value)} style={{padding:"2px 4px",fontSize:12}}/>
                     </div>
+                    <button onClick={()=>delRow(i)} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:16,padding:0,lineHeight:1}} title="Remove row">×</button>
                   </div>
                 ))}
               </div>

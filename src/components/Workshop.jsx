@@ -2027,6 +2027,23 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
     return () => document.removeEventListener("paste", handle);
   }, [stage]);
 
+  const pasteFromClipboard = async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for(const item of items){
+        const imgType = item.types.find(t=>t.startsWith("image/"));
+        if(imgType){
+          const blob = await item.getType(imgType);
+          onFile(new File([blob],"paste.png",{type:imgType}));
+          return;
+        }
+      }
+      alert("No image in clipboard — copy an image first, then tap Paste.");
+    } catch(e) {
+      alert("Cannot access clipboard. Use 'Choose from Gallery' below instead.");
+    }
+  };
+
   const setRow = (i, k, v) => setRows(p=>p.map((r,idx)=>idx===i?{...r,[k]:v}:r));
   const delRow = (i) => setRows(p=>p.filter((_,idx)=>idx!==i));
 
@@ -2047,38 +2064,40 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
 
       {stage==="upload"&&(
         <div style={{padding:"16px 0"}}>
-          <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
             onChange={e=>onFile(e.target.files[0])}/>
 
-          {/* Paste zone — big, obvious, click also triggers file picker */}
+          {/* Primary: Paste button — works on desktop (Ctrl+V) and mobile (clipboard API) */}
+          <button className="btn btn-primary"
+            style={{width:"100%",padding:"18px",fontSize:16,fontWeight:700,marginBottom:10,borderRadius:12}}
+            onClick={pasteFromClipboard}>
+            📋 Paste Image from Clipboard
+          </button>
+          <div style={{fontSize:11,color:"var(--text3)",textAlign:"center",marginBottom:18}}>
+            On phone: copy the WhatsApp image → come back here → tap Paste
+            <br/>On PC: Ctrl+C the image → Ctrl+V anywhere on this page
+          </div>
+
+          {/* Keyboard paste zone for desktop Ctrl+V */}
           <div
-            onClick={()=>fileRef.current.click()}
             onPaste={e=>{
               const item=[...e.clipboardData.items].find(i=>i.type.startsWith("image/"));
               if(item){e.preventDefault();onFile(item.getAsFile());}
             }}
             tabIndex={0}
             style={{
-              border:"2.5px dashed var(--accent)",borderRadius:14,padding:"36px 24px",
-              textAlign:"center",cursor:"pointer",background:"var(--surface2)",
-              outline:"none",userSelect:"none",marginBottom:14,
-            }}
-          >
-            <div style={{fontSize:44,marginBottom:8}}>📋</div>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Paste screenshot here</div>
-            <div style={{fontSize:13,color:"var(--accent)",fontWeight:600,marginBottom:10}}>
-              Ctrl+V &nbsp;/&nbsp; ⌘V
-            </div>
-            <div style={{fontSize:11,color:"var(--text3)"}}>
-              Copy image in WhatsApp → click this box → Ctrl+V
-            </div>
+              border:"2px dashed var(--border)",borderRadius:12,padding:"14px",
+              textAlign:"center",color:"var(--text3)",fontSize:12,marginBottom:18,
+              outline:"none",cursor:"text",
+            }}>
+            Or click here and press Ctrl+V (desktop)
           </div>
 
-          <div style={{textAlign:"center",color:"var(--text3)",fontSize:12,marginBottom:14}}>— or —</div>
+          <div style={{textAlign:"center",color:"var(--text3)",fontSize:12,marginBottom:10}}>— or —</div>
 
-          <button className="btn btn-ghost" style={{width:"100%",padding:"10px"}}
+          <button className="btn btn-ghost" style={{width:"100%",padding:"12px"}}
             onClick={()=>fileRef.current.click()}>
-            📁 Browse &amp; choose image file
+            📁 Choose from Gallery / Files
           </button>
           <div style={{marginTop:8,fontSize:11,color:"var(--text3)",textAlign:"center"}}>
             JPG, PNG or WebP · WhatsApp photos, PDF screenshots, scanned pages

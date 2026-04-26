@@ -1679,41 +1679,63 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"supplierReturns",icon:"↩️",label:t.supplierReturns,roles:["admin"]},
       ]
     },
-    {
-      id:"grp_ws_jobs", icon:"🔧", label:t.grpWorkshop||"Workshop — Jobs", roles:["admin","manager","workshop"],
+    // Admin/manager: single flat Workshop group (compact)
+    ...(role!=="workshop"?[{
+      id:"grp_workshop", icon:"🔧", label:t.grpWorkshop||"Workshop", roles:["admin","manager"],
       children:[
-        {id:"workshop",    icon:"🔧",label:t.wsJobs,       roles:["admin","manager","workshop"]},
-        {id:"wscustomers", icon:"👥",label:t.wsCustomers,  roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsquotations",icon:"📝",label:t.wsQuotations, roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,   roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wspayments",  icon:"💳",label:t.wsPayments,   roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
+        {id:"workshop",    icon:"🔧",label:t.wsJobs,                      roles:["admin","manager"]},
+        {id:"wscustomers", icon:"👥",label:t.wsCustomers,                 roles:["admin","manager"]},
+        {id:"wsquotations",icon:"📝",label:t.wsQuotations,                roles:["admin","manager"]},
+        {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,                  roles:["admin","manager"]},
+        {id:"wspayments",  icon:"💳",label:t.wsPayments,                  roles:["admin","manager"]},
+        {id:"wssuppliers", icon:"🏪",label:t.wsSuppliers,                 roles:["admin","manager"]},
+        {id:"wssuporders", icon:"📋",label:t.wsPurchaseOrders,            roles:["admin","manager"]},
+        {id:"wssupinv",    icon:"🧾",label:t.wsSupInvoices||"Supplier Inv",roles:["admin","manager"]},
+        {id:"wsstock",     icon:"📦",label:t.wsStock,                     roles:["admin","manager"]},
+        {id:"wstransfer",  icon:"🔄",label:t.wsTransfer,                  roles:["admin","manager"]},
+        {id:"wsservices",  icon:"🔧",label:t.wsServices,                  roles:["admin","manager"]},
+        {id:"wsstatement", icon:"📄",label:t.wsStatement,                 roles:["admin","manager"]},
+        {id:"wsreport",    icon:"📊",label:t.wsReport,                    roles:["admin","manager"]},
+        {id:"wssubscriptions",icon:"💳",label:t.wsSubscriptions,          roles:["admin"]},
       ]
-    },
-    {
-      id:"grp_ws_procurement", icon:"🏪", label:t.wsProcurement||"Workshop — Procurement", roles:["admin","manager","workshop"],
-      children:[
-        {id:"wssuppliers", icon:"🏪",label:t.wsSuppliers,              roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wssuporders", icon:"📋",label:t.wsPurchaseOrders,         roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wssupinv",    icon:"🧾",label:t.wsSupInvoices||"Supplier Inv", roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-      ]
-    },
-    {
-      id:"grp_ws_stock", icon:"📦", label:t.wsStockGroup||"Workshop — Stock", roles:["admin","manager","workshop"],
-      children:[
-        {id:"wsstock",    icon:"📦",label:t.wsStock,    roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wstransfer", icon:"🔄",label:t.wsTransfer, roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsservices", icon:"🔧",label:t.wsServices, roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-      ]
-    },
-    {
-      id:"grp_ws_admin", icon:"📊", label:t.wsAdmin||"Workshop — Admin", roles:["admin","manager","workshop"],
-      children:[
-        {id:"wsstatement",    icon:"📄",label:t.wsStatement,   roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsreport",       icon:"📊",label:t.wsReport,      roles:["admin","manager","workshop"], wsRoles:["main","manager"]},
-        {id:"wsprofile",      icon:"⚙️",label:t.wsSettings,    roles:["workshop"], wsRoles:["main"]},
-        {id:"wssubscriptions",icon:"💳",label:t.wsSubscriptions,roles:["admin"]},
-      ]
-    },
+    }]:[]),
+    // Workshop role: 4 organised sub-groups (this IS their whole app)
+    ...(role==="workshop"?[
+      {
+        id:"grp_ws_jobs", icon:"🔧", label:t.grpWorkshop||"Workshop — Jobs", roles:["workshop"],
+        children:[
+          {id:"workshop",    icon:"🔧",label:t.wsJobs,       roles:["workshop"]},
+          {id:"wscustomers", icon:"👥",label:t.wsCustomers,  roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wsquotations",icon:"📝",label:t.wsQuotations, roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,   roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wspayments",  icon:"💳",label:t.wsPayments,   roles:["workshop"], wsRoles:["main","manager"]},
+        ]
+      },
+      {
+        id:"grp_ws_procurement", icon:"🏪", label:t.wsProcurement||"Procurement", roles:["workshop"],
+        children:[
+          {id:"wssuppliers", icon:"🏪",label:t.wsSuppliers,                  roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wssuporders", icon:"📋",label:t.wsPurchaseOrders,             roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wssupinv",    icon:"🧾",label:t.wsSupInvoices||"Supplier Inv", roles:["workshop"], wsRoles:["main","manager"]},
+        ]
+      },
+      {
+        id:"grp_ws_stock", icon:"📦", label:t.wsStockGroup||"Stock", roles:["workshop"],
+        children:[
+          {id:"wsstock",    icon:"📦",label:t.wsStock,    roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wstransfer", icon:"🔄",label:t.wsTransfer, roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wsservices", icon:"🔧",label:t.wsServices, roles:["workshop"], wsRoles:["main","manager"]},
+        ]
+      },
+      {
+        id:"grp_ws_admin", icon:"📊", label:t.wsAdmin||"Admin", roles:["workshop"],
+        children:[
+          {id:"wsstatement", icon:"📄",label:t.wsStatement,    roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wsreport",    icon:"📊",label:t.wsReport,       roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wsprofile",   icon:"⚙️",label:t.wsSettings,     roles:["workshop"], wsRoles:["main"]},
+        ]
+      },
+    ]:[]),
     {
       id:"grp_sales", icon:"🛒", label:t.grpSales, roles:["admin","manager","shipper","customer","workshop"],
       badge: pendingCnt,

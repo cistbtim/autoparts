@@ -5798,8 +5798,9 @@ function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsSto
         const isViewExVat=viewSupplier&&!viewSupplier.vat_inclusive;
         const viewVatRate=+(settings?.tax_rate||0)/100;
         const viewExVatPrice=(p)=>isViewExVat&&viewVatRate>0?+p/(1+viewVatRate):+p;
-        const viewExVatTotal=viewItems.reduce((s,i)=>s+(+i.qty||0)*viewExVatPrice(+i.unit_price||0),0);
-        const viewVatAmt=viewTotal-viewExVatTotal;
+        const viewExVatTotal=Math.round(viewItems.reduce((s,i)=>s+(+i.qty||0)*viewExVatPrice(+i.unit_price||0),0)*100)/100;
+        const viewVatAmt=Math.round((viewTotal-viewExVatTotal)*100)/100;
+        const viewTotalDisplay=isViewExVat&&viewVatRate>0?(viewExVatTotal+viewVatAmt):viewTotal;
         const buildViewWaMsg=()=>{
           const lines=[
             `📋 *Purchase Order* — ${shopName}`,SEP2,
@@ -5813,7 +5814,7 @@ function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsSto
             "",SEP2,
             isViewExVat&&viewVatRate>0?`Subtotal (ex-VAT): ${C}${viewExVatTotal.toFixed(2)}`:"",
             isViewExVat&&viewVatRate>0?`VAT (${settings.tax_rate}%): ${C}${viewVatAmt.toFixed(2)}`:"",
-            `*Total: ${C}${viewTotal.toLocaleString(undefined,{minimumFractionDigits:2})}*`,
+            `*Total: ${C}${viewTotalDisplay.toFixed(2)}*`,
             viewPo.notes?`\nNote: ${viewPo.notes}`:"",
             viewPo.supplier_quote_ref?"\nPlease process against your quote ref above and confirm.":"\nPlease confirm availability and delivery timeframe.",
           ].filter(l=>l!==undefined&&l!=="");
@@ -5830,20 +5831,27 @@ function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsSto
             </div>
             <div style={{overflowX:"auto",marginBottom:12}}>
               <table className="tbl" style={{width:"100%"}}>
-                <thead><tr><th>Description</th><th>SKU</th><th style={{textAlign:"right"}}>Qty</th><th style={{textAlign:"right"}}>Unit Price</th><th>Condition</th><th style={{textAlign:"right"}}>Received</th></tr></thead>
+                <thead><tr><th>Description</th><th>SKU</th><th style={{textAlign:"right"}}>Qty</th><th style={{textAlign:"right"}}>Unit Price{isViewExVat?" (ex-VAT)":""}</th><th>Condition</th><th style={{textAlign:"right"}}>Received</th></tr></thead>
                 <tbody>
                   {viewItems.map(i=>(
                     <tr key={i.id}>
                       <td>{i.description}</td>
                       <td><code style={{fontSize:11,fontFamily:"monospace",color:"var(--text3)"}}>{i.sku||"—"}</code></td>
                       <td style={{textAlign:"right"}}>{i.qty}</td>
-                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)"}}>{fmt(i.unit_price)}</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)"}}>{fmt(viewExVatPrice(+i.unit_price||0))}</td>
                       <td><span style={{fontSize:11,color:i.condition==="to_order"?"#fbbf24":"var(--green)"}}>{i.condition==="to_order"?"📦 To Order":"✅ In Stock"}</span></td>
                       <td style={{textAlign:"right"}}>{+i.received_qty||0} / {i.qty}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {isViewExVat&&viewVatRate>0&&(
+                <div style={{textAlign:"right",padding:"6px 8px",fontSize:12,color:"var(--text3)"}}>
+                  Subtotal ex-VAT: <strong style={{fontFamily:"Rajdhani,sans-serif",color:"var(--text1)"}}>{fmt(viewExVatTotal)}</strong>
+                  &nbsp;·&nbsp;VAT ({settings?.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(viewVatAmt)}</strong>
+                  &nbsp;·&nbsp;Total: <strong style={{fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmt(viewTotalDisplay)}</strong>
+                </div>
+              )}
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
               <button className="btn btn-ghost" onClick={()=>setModal({mode:"edit",po:viewPo})}>✏️ Edit</button>
@@ -5961,8 +5969,9 @@ function WsPurchaseOrderModal({po,wsSuppliers=[],settings,wsSupplierQuotes=[],ws
     const isExVat=chosenSupplier&&!chosenSupplier.vat_inclusive;
     const vatRate=+(settings?.tax_rate||0)/100;
     const exVatPrice=(p)=>isExVat&&vatRate>0?+p/(1+vatRate):+p;
-    const exVatTotal=filled.reduce((s,i)=>s+(+i.qty||0)*exVatPrice(+i.unit_price||0),0);
-    const vatAmt=total-exVatTotal;
+    const exVatTotal=Math.round(filled.reduce((s,i)=>s+(+i.qty||0)*exVatPrice(+i.unit_price||0),0)*100)/100;
+    const vatAmt=Math.round((total-exVatTotal)*100)/100;
+    const totalDisplay=isExVat&&vatRate>0?(exVatTotal+vatAmt):total;
     const lines=[
       `📋 *Purchase Order* — ${shopName}`,SEP,
       `Supplier: *${resolvedName}*`,
@@ -5974,7 +5983,7 @@ function WsPurchaseOrderModal({po,wsSuppliers=[],settings,wsSupplierQuotes=[],ws
       "",SEP,
       isExVat&&vatRate>0?`Subtotal (ex-VAT): ${C}${exVatTotal.toFixed(2)}`:"",
       isExVat&&vatRate>0?`VAT (${settings.tax_rate}%): ${C}${vatAmt.toFixed(2)}`:"",
-      `*Total: ${C}${total.toLocaleString(undefined,{minimumFractionDigits:2})}*`,
+      `*Total: ${C}${totalDisplay.toFixed(2)}*`,
       notes?`\nNote: ${notes}`:"",
       sqRef?"\nPlease process against your quote ref above and confirm.":"\nPlease confirm availability and delivery timeframe.",
     ].filter(l=>l!==undefined&&l!=="");

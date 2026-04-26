@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { getSettings, C, curSym, updateSettings } from "../lib/settings.js";
 import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, waLink, extractDriveId } from "../lib/helpers.js";
@@ -1896,6 +1897,169 @@ const CHECKLIST_ITEMS=[
 ];
 
 // ═══════════════════════════════════════════════════════════════
+// OCR QUOTE MODAL — scan supplier screenshot → extract prices
+// ═══════════════════════════════════════════════════════════════
+function OcrQuoteModal({parts=[], onApply, onClose}) {
+  const [stage,    setStage]    = useState("upload"); // upload | scanning | review
+  const [imgSrc,   setImgSrc]   = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [rawText,  setRawText]  = useState("");
+  const [rows,     setRows]     = useState([]); // [{desc, qty, price, partIdx}]
+  const fileRef = useRef();
+
+  // Parse OCR text into candidate rows
+  const parseText = (text) => {
+    const priceRe = /R?\s*(\d[\d\s]*[,.]?\d{0,2})/gi;
+    const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
+    const candidates = [];
+    for(const line of lines){
+      // Find all price-like numbers in this line
+      const nums = [...line.matchAll(/R?\s*(\d+[.,]\d{2})/g)].map(m=>+(m[1].replace(",",".")));
+      if(!nums.length) continue;
+      const price = Math.max(...nums); // take the largest number as unit price
+      if(price < 1) continue;         // skip tiny numbers (qty matches etc.)
+      // Description = line with prices stripped
+      const desc = line.replace(/R?\s*\d+[.,]\d{2}/g,"").replace(/\s+/g," ").trim();
+      if(desc.length < 2) continue;
+      // Try to match to a known part (case-insensitive, partial)
+      const dl = desc.toLowerCase();
+      const partIdx = parts.findIndex(p=>dl.includes(p.toLowerCase().slice(0,6))||p.toLowerCase().includes(dl.slice(0,6)));
+      // Qty: look for small standalone integer on the line (1-99)
+      const qtyM = line.match(/\b([1-9][0-9]?)\b/);
+      const qty = qtyM ? +qtyM[1] : 1;
+      candidates.push({desc, qty, price, partIdx});
+    }
+    return candidates;
+  };
+
+  const runOcr = async (src) => {
+    setStage("scanning");
+    setProgress(0);
+    try {
+      const worker = await createWorker("eng", 1, {
+        logger: m => { if(m.status==="recognizing text") setProgress(Math.round(m.progress*100)); },
+      });
+      const { data: { text } } = await worker.recognize(src);
+      await worker.terminate();
+      setRawText(text);
+      setRows(parseText(text));
+      setStage("review");
+    } catch(e) {
+      alert("OCR failed: "+e.message);
+      setStage("upload");
+    }
+  };
+
+  const onFile = (file) => {
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = e => { setImgSrc(e.target.result); runOcr(e.target.result); };
+    reader.readAsDataURL(file);
+  };
+
+  const setRow = (i, k, v) => setRows(p=>p.map((r,idx)=>idx===i?{...r,[k]:v}:r));
+
+  const apply = () => {
+    // Build price map: partIdx → price (or desc → price for unmatched)
+    const mapped = rows.filter(r=>+r.price>0).map(r=>({
+      partIdx: r.partIdx,
+      desc:    r.desc,
+      price:   +r.price,
+      qty:     +r.qty||1,
+    }));
+    onApply(mapped);
+  };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="📷 Scan Supplier Quote" onClose={onClose}/>
+
+      {stage==="upload"&&(
+        <div style={{textAlign:"center",padding:"32px 16px"}}>
+          <div style={{fontSize:48,marginBottom:12}}>📸</div>
+          <div style={{fontWeight:600,fontSize:15,marginBottom:6}}>Upload supplier screenshot or photo</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginBottom:20}}>JPG, PNG or WebP — WhatsApp screenshots work best</div>
+          <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
+            onChange={e=>onFile(e.target.files[0])}/>
+          <button className="btn btn-primary" style={{padding:"10px 28px"}} onClick={()=>fileRef.current.click()}>
+            Choose Image
+          </button>
+          <div style={{marginTop:12,fontSize:11,color:"var(--text3)"}}>Tip: Save the WhatsApp image to your device first, then upload it here</div>
+        </div>
+      )}
+
+      {stage==="scanning"&&(
+        <div style={{textAlign:"center",padding:"40px 16px"}}>
+          {imgSrc&&<img src={imgSrc} alt="" style={{maxWidth:"100%",maxHeight:200,borderRadius:8,marginBottom:16,objectFit:"contain"}}/>}
+          <div style={{fontWeight:600,marginBottom:8}}>Reading image… {progress}%</div>
+          <div style={{background:"var(--surface2)",borderRadius:99,height:8,overflow:"hidden",maxWidth:280,margin:"0 auto"}}>
+            <div style={{height:"100%",background:"var(--accent)",borderRadius:99,width:`${progress}%`,transition:"width .3s"}}/>
+          </div>
+        </div>
+      )}
+
+      {stage==="review"&&(
+        <>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+            {/* Left: original image */}
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>Original Image</div>
+              {imgSrc&&<img src={imgSrc} alt="" style={{width:"100%",borderRadius:8,objectFit:"contain",maxHeight:260,background:"#000"}}/>}
+            </div>
+            {/* Right: raw OCR text */}
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>OCR Text</div>
+              <textarea readOnly value={rawText} style={{width:"100%",height:260,fontSize:10,fontFamily:"monospace",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:8,resize:"none",color:"var(--text2)"}}/>
+            </div>
+          </div>
+
+          <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>
+            Extracted Items — review &amp; correct before applying
+          </div>
+
+          {rows.length===0
+            ? <div style={{textAlign:"center",padding:20,color:"var(--text3)",fontSize:13}}>
+                No price rows detected. The image may be too blurry or the layout unusual.<br/>
+                <button className="btn btn-ghost btn-sm" style={{marginTop:8}} onClick={()=>setStage("upload")}>Try another image</button>
+              </div>
+            : <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14,maxHeight:240,overflowY:"auto"}}>
+                {rows.map((r,i)=>(
+                  <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 60px 90px",gap:6,alignItems:"center",background:"var(--surface2)",borderRadius:8,padding:"6px 10px"}}>
+                    <div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>OCR: {r.desc}</div>
+                      <select className="inp" style={{fontSize:12,padding:"2px 6px"}}
+                        value={r.partIdx} onChange={e=>setRow(i,"partIdx",+e.target.value)}>
+                        <option value={-1}>— unmatched —</option>
+                        {parts.map((p,pi)=><option key={pi} value={pi}>{p}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{fontSize:10,color:"var(--text3)",marginBottom:2}}>Qty</div>
+                      <input className="inp" type="number" min="1" step="1" value={r.qty}
+                        onChange={e=>setRow(i,"qty",e.target.value)} style={{padding:"2px 4px",fontSize:12}}/>
+                    </div>
+                    <div>
+                      <div style={{fontSize:10,color:"var(--text3)",marginBottom:2}}>Price</div>
+                      <input className="inp" type="number" min="0" step="0.01" value={r.price}
+                        onChange={e=>setRow(i,"price",e.target.value)} style={{padding:"2px 4px",fontSize:12}}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+          }
+
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setStage("upload")}>↩ Try Again</button>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+            {rows.length>0&&<button className="btn btn-primary" style={{flex:2}} onClick={apply}>✅ Apply Prices</button>}
+          </div>
+        </>
+      )}
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SUPPLIER QUOTE MODAL — enter prices received from a supplier
 // ═══════════════════════════════════════════════════════════════
 function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=false, onSave, onClose}) {
@@ -1922,6 +2086,20 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
   const [notes,     setNotes]     = useState(existingQuote?.notes||"");
   const [quoteRef,  setQuoteRef]  = useState(existingQuote?.quote_ref||"");
   const [saving,    setSaving]    = useState(false);
+  const [showOcr,   setShowOcr]   = useState(false);
+
+  const onOcrApply = (mapped) => {
+    setPrices(prev => {
+      const next = [...prev];
+      mapped.forEach(row => {
+        if(row.partIdx >= 0 && row.partIdx < next.length) {
+          next[row.partIdx] = {...next[row.partIdx], price: String(row.price)};
+        }
+      });
+      return next;
+    });
+    setShowOcr(false);
+  };
 
   const setLine = (idx, field, val) =>
     setPrices(p => p.map((r,i) => i===idx ? {...r,[field]:val} : r));
@@ -2062,10 +2240,23 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
 
       <div style={{display:"flex",gap:10,marginTop:4}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        {!priceOnly&&(
+          <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowOcr(true)} title="Read prices from a screenshot">
+            📷 Scan Image
+          </button>
+        )}
         <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>
           {saving?"Saving...":priceOnly?"↩️ Save Return Quote":"💾 Save Quote"}
         </button>
       </div>
+
+      {showOcr&&(
+        <OcrQuoteModal
+          parts={parts}
+          onApply={onOcrApply}
+          onClose={()=>setShowOcr(false)}
+        />
+      )}
     </Overlay>
   );
 }

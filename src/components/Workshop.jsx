@@ -1593,6 +1593,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         <WsPurchaseOrdersPage
           purchaseOrders={wsPurchaseOrders} poItems={wsPoItems}
           wsSuppliers={wsSuppliers} wsStock={wsStock} settings={settings}
+          wsSupplierQuotes={wsSupplierQuotes} wsSqReplies={wsSqReplies}
+          wsSupplierRequests={wsSupplierRequests}
           onSave={onSaveWsPurchaseOrder} onDelete={onDeleteWsPurchaseOrder}
           onReceive={onReceiveWsPurchaseOrder}/>
       )}
@@ -1894,15 +1896,27 @@ const CHECKLIST_ITEMS=[
 function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=false, onSave, onClose}) {
   const vatRate = +(settings?.tax_rate||0) / 100;
   const parts = (() => { try { return JSON.parse(request.parts_list||"[]"); } catch { return []; } })();
+  // Build name→sku map from items_json (present on generated-link and new manual-send requests)
+  const reqSkuMap = (() => {
+    const items = (() => { try { return JSON.parse(request.items_json||"[]"); } catch { return []; } })();
+    const m = {};
+    items.forEach(it => { const k=(it.label||it.description||"").toLowerCase().trim(); if(k) m[k]=it.sku||""; });
+    return m;
+  })();
   const [prices, setPrices] = useState(() => {
     if (existingQuote?.line_items) {
-      try { return JSON.parse(existingQuote.line_items); } catch {}
+      try {
+        const lines = JSON.parse(existingQuote.line_items);
+        // Back-fill sku if saved line is missing it
+        return lines.map(l => ({...l, sku: l.sku||reqSkuMap[(l.name||"").toLowerCase().trim()]||""}));
+      } catch {}
     }
-    return parts.map(p => ({name: p, price: "", available: ""}));
+    return parts.map(p => ({name: p, price: "", available: "", sku: reqSkuMap[p.toLowerCase().trim()]||""}));
   });
   const [vatExcluded, setVatExcluded] = useState(existingQuote?.vat_excluded??false);
-  const [notes,   setNotes]   = useState(existingQuote?.notes||"");
-  const [saving,  setSaving]  = useState(false);
+  const [notes,     setNotes]     = useState(existingQuote?.notes||"");
+  const [quoteRef,  setQuoteRef]  = useState(existingQuote?.quote_ref||"");
+  const [saving,    setSaving]    = useState(false);
 
   const setLine = (idx, field, val) =>
     setPrices(p => p.map((r,i) => i===idx ? {...r,[field]:val} : r));
@@ -1940,6 +1954,7 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
         line_items:    JSON.stringify(savedLines),
         total:         vatIncTotal,
         vat_excluded:  vatExcluded,
+        quote_ref:     quoteRef.trim()||null,
         notes:         notes.trim()||null,
       });
       onClose();
@@ -2035,7 +2050,10 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
         )}
       </div>
 
-      {!priceOnly&&<FD><FL label="Notes (optional)"/><textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. ETA 2 days, confirm order by 3pm" style={{minHeight:46,resize:"vertical"}}/></FD>}
+      <div style={{display:"grid",gridTemplateColumns:priceOnly?"1fr":"1fr 1fr",gap:8,marginBottom:8}}>
+        <FD><FL label="Supplier Quote Ref # (Doc Nr)"/><input className="inp" value={quoteRef} onChange={e=>setQuoteRef(e.target.value)} placeholder="e.g. Q100814"/></FD>
+        {!priceOnly&&<FD><FL label="Notes (optional)"/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="ETA, conditions…"/></FD>}
+      </div>
 
       <div style={{display:"flex",gap:10,marginTop:4}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
@@ -2160,6 +2178,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
       supplier_phone: chosenSupplier?.phone||manualPhone||"",
       via_group:      viaGroup,
       parts_list:     JSON.stringify(selectedItems.map(i=>i.label)),
+      items_json:     JSON.stringify(selectedItems.map(i=>({label:i.label,description:i.label,sku:i.sku||"",qty:i.qty||1}))),
       message:        msgLines,
     });
   };
@@ -2466,6 +2485,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [moveModal,     setMoveModal]     = useState(false);
   const [supplierModal, setSupplierModal] = useState(false);
+  const [createPoOpen,  setCreatePoOpen]  = useState(false);
   const [jobTab,        setJobTab]        = useState("car");
   const [oeSearch,      setOeSearch]      = useState("");
   const [editPriceId,   setEditPriceId]   = useState(null);
@@ -3535,6 +3555,9 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ Labour</button>
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📤 Send Quote</button>
               {wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&<button className="btn btn-ghost btn-sm" style={{color:"#38bdf8",borderColor:"rgba(56,189,248,.35)"}} onClick={()=>setReturnQuoteOpen(true)}>↩️ Return Quote</button>}
+              {(wsSupplierQuotes.filter(q=>q.job_id===job.id).length>0||sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id)).length>0)&&(
+                <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(251,146,60,.35)"}} onClick={()=>setCreatePoOpen(true)}>📦 Create Order</button>
+              )}
             </div>
             {items.length>0&&(
               <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
@@ -3761,9 +3784,21 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {jobRequests.map(r=>{
                 const existing=wsSupplierQuotes.find(q=>q.request_id===r.id);
+                // Fall back to digital reply to pre-fill prices when no manual quote exists
+                const digReply=!existing?sqReplies.find(rep=>rep.request_id===r.id):null;
+                const prefillFromReply=digReply?(()=>{
+                  const parts=(() => { try{return JSON.parse(r.parts_list||"[]");}catch{return [];} })();
+                  const repItems=(() => { try{return JSON.parse(digReply.items||"[]");}catch{return [];} })();
+                  const lineItems=parts.map(pName=>{
+                    const ri=repItems.find(ri=>(ri.description||"").toLowerCase()===pName.toLowerCase());
+                    return {name:pName,price:ri&&ri.condition!=="no_stock"?String(ri.price||""):"",available:ri?ri.condition==="in_stock"?"In stock":ri.condition==="can_order"?"Can order":"No stock":""};
+                  });
+                  return {line_items:JSON.stringify(lineItems)};
+                })():null;
+                const resolved=existing||prefillFromReply||null;
                 return(
                   <button key={r.id}
-                    onClick={()=>setReturnQuoteTarget({request:r,existingQuote:existing||null})}
+                    onClick={()=>setReturnQuoteTarget({request:r,existingQuote:resolved})}
                     style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",cursor:"pointer",textAlign:"left",width:"100%"}}>
                     <span style={{fontSize:22,flexShrink:0}}>📲</span>
                     <div style={{flex:1,minWidth:0}}>
@@ -3772,7 +3807,9 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                     </div>
                     {existing
                       ? <span style={{fontSize:11,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.12)",borderRadius:6,padding:"3px 8px",flexShrink:0}}>✅ Quoted</span>
-                      : <span style={{fontSize:11,fontWeight:700,color:"var(--text3)",background:"var(--surface3)",borderRadius:6,padding:"3px 8px",flexShrink:0}}>Pending</span>
+                      : digReply
+                        ? <span style={{fontSize:11,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",borderRadius:6,padding:"3px 8px",flexShrink:0}}>📲 App Reply</span>
+                        : <span style={{fontSize:11,fontWeight:700,color:"var(--text3)",background:"var(--surface3)",borderRadius:6,padding:"3px 8px",flexShrink:0}}>Pending</span>
                     }
                   </button>
                 );
@@ -3962,6 +3999,18 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             onCreatePO={onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);setSupplierModal(false);if(onViewPurchaseOrders)onViewPurchaseOrders();}:undefined}
             onClose={()=>setSupplierModal(false)}/>
         </Overlay>
+      )}
+
+      {createPoOpen&&onSaveWsPurchaseOrder&&(
+        <WsCreatePoFromJobModal
+          job={job}
+          wsSupplierQuotes={wsSupplierQuotes.filter(q=>q.job_id===job.id)}
+          wsSupplierRequests={wsSupplierRequests}
+          sqReplies={sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id))}
+          wsSuppliers={wsSuppliers} settings={settings}
+          onSave={onSaveWsPurchaseOrder}
+          onViewPOs={onViewPurchaseOrders}
+          onClose={()=>setCreatePoOpen(false)}/>
       )}
 
       {/* Licence Renewal modal */}
@@ -5414,9 +5463,189 @@ function WsServiceModal({item,onSave,onClose}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// CREATE PO FROM JOB MODAL
+// ═══════════════════════════════════════════════════════════════
+function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierRequests=[],sqReplies=[],wsSuppliers=[],settings,onSave,onViewPOs,onClose}) {
+  const C=curSym(settings?.currency||getSettings().currency);
+
+  // Build groups: one entry per supplier, merging manual quotes + digital replies
+  const groupMap={};
+  const addToGroup=(supplierId,supplierName,items,quoteRef)=>{
+    const key=supplierName||supplierId||"unknown";
+    if(!groupMap[key]) groupMap[key]={supplierId:supplierId||"",supplierName,quoteRef:quoteRef||"",items:[]};
+    else if(quoteRef&&!groupMap[key].quoteRef) groupMap[key].quoteRef=quoteRef;
+    groupMap[key].items.push(...items);
+  };
+
+  wsSupplierQuotes.forEach(sq=>{
+    const lines=(() => { try{return JSON.parse(sq.line_items||"[]");}catch{return[];} })();
+    const linkedReq=wsSupplierRequests.find(r=>r.id===sq.request_id);
+    const reqItems=(() => { try{return JSON.parse(linkedReq?.items_json||"[]");}catch{return[];} })();
+    const skuByName={};
+    reqItems.forEach(it=>{ const k=(it.label||it.description||"").toLowerCase().trim(); if(k) skuByName[k]=it.sku||""; });
+    const valid=lines.filter(l=>l.name);
+    if(!valid.length) return;
+    addToGroup(sq.supplier_id||"",sq.supplier_name||"Unknown",
+      valid.map(l=>({
+        id:"sq-"+sq.id+"-"+l.name,
+        description:l.name||"",
+        sku:skuByName[(l.name||"").toLowerCase().trim()]||l.sku||"",
+        supplier_part_no:"",
+        qty:+l.qty||1,
+        unit_price:+(l.vat_incl_price||l.price)||0,
+        condition:"in_stock",
+      })),
+      sq.quote_ref||""
+    );
+  });
+
+  sqReplies.forEach(rep=>{
+    const req=wsSupplierRequests.find(r=>r.id===rep.request_id);
+    const replyItems=(() => { try{return JSON.parse(rep.items||"[]");}catch{return[];} })()
+      .filter(ri=>ri.condition!=="no_stock"&&ri.description);
+    if(!replyItems.length) return;
+    const sName=req?.supplier_name||"Supplier";
+    const sId=req?.supplier_id||"";
+    addToGroup(sId,sName,
+      replyItems.map(ri=>({
+        id:"rep-"+rep.id+"-"+ri.description,
+        description:ri.description||"",
+        sku:ri.sku||"",
+        supplier_part_no:ri.supplier_part_no||"",
+        qty:+ri.qty||1,
+        unit_price:+ri.price||0,
+        condition:ri.condition==="can_order"?"to_order":"in_stock",
+      }))
+    );
+  });
+
+  const groups=Object.values(groupMap);
+
+  // Deduplicate items within each group by description (keep highest price)
+  groups.forEach(g=>{
+    const seen={};
+    g.items=g.items.filter(it=>{
+      const k=it.description.toLowerCase().trim();
+      if(seen[k]) return false;
+      seen[k]=true; return true;
+    });
+  });
+
+  const [selected,setSelected]=useState(()=>{
+    const init={};
+    groups.forEach(g=>g.items.forEach(it=>{ init[it.id]=true; }));
+    return init;
+  });
+  const [saving,setSaving]=useState(false);
+
+  const toggle=(id)=>setSelected(p=>({...p,[id]:!p[id]}));
+  const toggleGroup=(g)=>{
+    const allOn=g.items.every(it=>selected[it.id]);
+    setSelected(p=>{const n={...p}; g.items.forEach(it=>{n[it.id]=!allOn;}); return n;});
+  };
+
+  const totalSelected=groups.reduce((s,g)=>s+g.items.filter(it=>selected[it.id]).reduce((ss,it)=>ss+(+it.qty||0)*(+it.unit_price||0),0),0);
+  const countSelected=groups.reduce((s,g)=>s+g.items.filter(it=>selected[it.id]).length,0);
+
+  const createOrders=async()=>{
+    const bySupplier={};
+    groups.forEach(g=>{
+      const checked=g.items.filter(it=>selected[it.id]);
+      if(!checked.length) return;
+      const key=g.supplierName;
+      if(!bySupplier[key]) bySupplier[key]={supplierId:g.supplierId,supplierName:g.supplierName,quoteRef:g.quoteRef||"",items:[]};
+      bySupplier[key].items.push(...checked);
+    });
+    const entries=Object.values(bySupplier);
+    if(!entries.length) return;
+    setSaving(true);
+    try{
+      for(const grp of entries){
+        await onSave({supplier_id:grp.supplierId||null,supplier_name:grp.supplierName,job_id:job.id,status:"draft",supplier_quote_ref:grp.quoteRef||null},
+          grp.items.map(it=>({description:it.description,sku:it.sku||"",supplier_part_no:it.supplier_part_no||"",qty:it.qty,unit_price:it.unit_price,condition:it.condition})));
+      }
+      onViewPOs?.();
+      onClose();
+    }catch(e){alert("Failed to create order: "+e.message);}
+    setSaving(false);
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="📦 Create Purchase Order" onClose={onClose}/>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
+        Job: <strong style={{color:"var(--text1)",fontFamily:"monospace"}}>{job.id}</strong>
+        {" · "}{job.vehicle_reg||"—"}
+        {(job.vehicle_make||job.vehicle_model)&&" · "+(job.vehicle_make||"")+" "+(job.vehicle_model||"")}
+      </div>
+
+      {groups.length===0
+        ?<div style={{textAlign:"center",padding:32,color:"var(--text3)"}}>
+            <div style={{fontSize:28,marginBottom:8}}>📭</div>
+            <div style={{fontWeight:600}}>No supplier quotes for this job yet</div>
+            <div style={{fontSize:12,marginTop:4}}>Send Quote to a supplier first, then come back here to place the order.</div>
+          </div>
+        :<div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+          {groups.map(g=>{
+            const groupChecked=g.items.filter(it=>selected[it.id]).length;
+            const groupTotal=g.items.filter(it=>selected[it.id]).reduce((s,it)=>s+(+it.qty||0)*(+it.unit_price||0),0);
+            return (
+              <div key={g.supplierName} className="card" style={{padding:"10px 12px",border:"1px solid var(--border)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,cursor:"pointer"}}
+                  onClick={()=>toggleGroup(g)}>
+                  <div style={{fontWeight:700,fontSize:13}}>{g.supplierName}
+                    {g.quoteRef&&<span style={{fontSize:10,color:"var(--blue)",fontFamily:"monospace",marginLeft:8,fontWeight:600}}>Ref: {g.quoteRef}</span>}
+                  </div>
+                  <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                    {groupTotal>0&&<span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)",fontSize:13}}>{C}{groupTotal.toLocaleString(undefined,{minimumFractionDigits:2})}</span>}
+                    <span style={{fontSize:11,color:"var(--text3)"}}>{groupChecked}/{g.items.length} selected</span>
+                  </div>
+                </div>
+                {g.items.map(it=>(
+                  <label key={it.id} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"6px 0",borderTop:"1px solid var(--border)",cursor:"pointer"}}>
+                    <input type="checkbox" checked={!!selected[it.id]} onChange={()=>toggle(it.id)} style={{marginTop:2,flexShrink:0}}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:13}}>{it.description}
+                        {it.sku&&<span style={{fontSize:10,color:"var(--text3)",fontFamily:"monospace",marginLeft:6}}>{it.sku}</span>}
+                      </div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>
+                        Qty: {it.qty}
+                        {+it.unit_price>0&&<span style={{marginLeft:8,color:"var(--text2)"}}>@ {C}{(+it.unit_price).toFixed(2)}</span>}
+                        {it.condition==="to_order"&&<span style={{marginLeft:8,color:"#fbbf24"}}>📦 To Order</span>}
+                      </div>
+                    </div>
+                    {+it.unit_price>0&&<div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,color:"var(--accent)",flexShrink:0}}>{C}{((+it.qty||0)*(+it.unit_price||0)).toFixed(2)}</div>}
+                  </label>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      }
+
+      {groups.length>0&&(
+        <div style={{padding:"8px 12px",background:"var(--surface2)",borderRadius:8,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:13,color:"var(--text2)"}}>{countSelected} item{countSelected!==1?"s":""} selected</span>
+          <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:15,color:"var(--accent)"}}>{C}{totalSelected.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+        </div>
+      )}
+
+      <div style={{display:"flex",gap:8}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        {countSelected>0&&(
+          <button className="btn btn-primary" style={{flex:2}} disabled={saving} onClick={createOrders}>
+            {saving?"Creating…":`📦 Place Order${Object.keys(Object.fromEntries(groups.filter(g=>g.items.some(it=>selected[it.id])).map(g=>[g.supplierName,1]))).length>1?" ("+Object.keys(Object.fromEntries(groups.filter(g=>g.items.some(it=>selected[it.id])).map(g=>[g.supplierName,1]))).length+" POs)":""}` }
+          </button>
+        )}
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // WS PURCHASE ORDERS
 // ═══════════════════════════════════════════════════════════════
-function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsStock=[],settings,onSave,onDelete,onReceive}) {
+function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsStock=[],settings,wsSupplierQuotes=[],wsSqReplies=[],wsSupplierRequests=[],onSave,onDelete,onReceive}) {
   const C=curSym(settings?.currency||getSettings().currency);
   const fmt=v=>`${C}${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [modal,setModal]=useState(null); // null | {mode:"add"|"edit"|"view"|"receive", po?}
@@ -5514,6 +5743,7 @@ function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsSto
       }
       {(modal?.mode==="add"||modal?.mode==="edit")&&(
         <WsPurchaseOrderModal po={modal.po||null} wsSuppliers={wsSuppliers} settings={settings}
+          wsSupplierQuotes={wsSupplierQuotes} wsSqReplies={wsSqReplies} wsSupplierRequests={wsSupplierRequests}
           onSave={async(po,items)=>{await onSave(po,items);setModal(null);}}
           onClose={()=>setModal(null)}/>
       )}
@@ -5523,57 +5753,111 @@ function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsSto
           onReceive={async(receivedItems)=>{await onReceive(modal.po.id,receivedItems);setModal(null);}}
           onClose={()=>setModal(null)}/>
       )}
-      {modal?.mode==="view"&&modal.po&&(
-        <Overlay onClose={()=>setModal(null)}>
-          <MHead title={`PO — ${modal.po.supplier_name||"Unknown"}`} onClose={()=>setModal(null)}/>
-          <div style={{marginBottom:8}}>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:4}}>Status: <span style={{color:STATUS_COLOR[modal.po.status]||"var(--text3)",fontWeight:700,textTransform:"capitalize"}}>{modal.po.status||"draft"}</span></div>
-            {modal.po.notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:4}}>Notes: {modal.po.notes}</div>}
-            {modal.po.job_id&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:4}}>Job: {modal.po.job_id}</div>}
-          </div>
-          <div style={{overflowX:"auto",marginBottom:12}}>
-            <table className="tbl" style={{width:"100%"}}>
-              <thead><tr><th>Description</th><th>SKU</th><th style={{textAlign:"right"}}>Qty</th><th style={{textAlign:"right"}}>Unit Price</th><th>Condition</th><th style={{textAlign:"right"}}>Received</th></tr></thead>
-              <tbody>
-                {poItems.filter(i=>i.po_id===modal.po.id).map(i=>(
-                  <tr key={i.id}>
-                    <td>{i.description}</td>
-                    <td><code style={{fontSize:11,fontFamily:"monospace",color:"var(--text3)"}}>{i.sku||"—"}</code></td>
-                    <td style={{textAlign:"right"}}>{i.qty}</td>
-                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)"}}>{fmt(i.unit_price)}</td>
-                    <td><span style={{fontSize:11,color:i.condition==="to_order"?"#fbbf24":"var(--green)"}}>{i.condition==="to_order"?"📦 To Order":"✅ In Stock"}</span></td>
-                    <td style={{textAlign:"right"}}>{+i.received_qty||0} / {i.qty}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-            <button className="btn btn-ghost" onClick={()=>setModal({mode:"edit",po:modal.po})}>✏️ Edit</button>
-            {modal.po.status!=="received"&&modal.po.status!=="cancelled"&&(
-              <button className="btn btn-primary" style={{background:"rgba(52,211,153,.8)"}}
-                onClick={()=>setModal({mode:"receive",po:modal.po})}>📥 Receive Goods</button>
-            )}
-          </div>
-        </Overlay>
-      )}
+      {modal?.mode==="view"&&modal.po&&(()=>{
+        const viewPo=modal.po;
+        const viewItems=poItems.filter(i=>i.po_id===viewPo.id);
+        const viewSupplier=wsSuppliers.find(s=>String(s.id)===String(viewPo.supplier_id));
+        const viewPhone=(viewSupplier?.phone||"").replace(/\D/g,"");
+        const viewTotal=viewItems.reduce((s,i)=>s+(+i.qty||0)*(+i.unit_price||0),0);
+        const shopName=settings?.shop_name||"Workshop";
+        const SEP2="─".repeat(26);
+        const isViewExVat=viewSupplier&&!viewSupplier.vat_inclusive;
+        const viewVatRate=+(settings?.tax_rate||0)/100;
+        const viewExVatPrice=(p)=>isViewExVat&&viewVatRate>0?+p/(1+viewVatRate):+p;
+        const viewExVatTotal=viewItems.reduce((s,i)=>s+(+i.qty||0)*viewExVatPrice(+i.unit_price||0),0);
+        const viewVatAmt=viewTotal-viewExVatTotal;
+        const buildViewWaMsg=()=>{
+          const lines=[
+            `📋 *Purchase Order* — ${shopName}`,SEP2,
+            `PO#: ${viewPo.id}`,
+            `Supplier: *${viewPo.supplier_name||""}*`,
+            viewPo.supplier_quote_ref?`Your Quote Ref: *${viewPo.supplier_quote_ref}*`:"",
+            viewPo.job_id?`Job: ${viewPo.job_id}`:"",
+            "",
+            `*Items:*${isViewExVat?" (prices ex-VAT)":""}`,
+            ...viewItems.map(i=>`• ${i.description}${i.sku?" ("+i.sku+")":""} ×${i.qty} @ ${C}${viewExVatPrice(+i.unit_price||0).toFixed(2)}`),
+            "",SEP2,
+            isViewExVat&&viewVatRate>0?`Subtotal (ex-VAT): ${C}${viewExVatTotal.toFixed(2)}`:"",
+            isViewExVat&&viewVatRate>0?`VAT (${settings.tax_rate}%): ${C}${viewVatAmt.toFixed(2)}`:"",
+            `*Total: ${C}${viewTotal.toLocaleString(undefined,{minimumFractionDigits:2})}*`,
+            viewPo.notes?`\nNote: ${viewPo.notes}`:"",
+            viewPo.supplier_quote_ref?"\nPlease process against your quote ref above and confirm.":"\nPlease confirm availability and delivery timeframe.",
+          ].filter(l=>l!==undefined&&l!=="");
+          return lines.join("\n");
+        };
+        return (
+          <Overlay onClose={()=>setModal(null)}>
+            <MHead title={`PO — ${viewPo.supplier_name||"Unknown"}`} onClose={()=>setModal(null)}/>
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:4}}>Status: <span style={{color:STATUS_COLOR[viewPo.status]||"var(--text3)",fontWeight:700,textTransform:"capitalize"}}>{viewPo.status||"draft"}</span></div>
+              {viewPo.supplier_quote_ref&&<div style={{fontSize:12,color:"var(--blue)",marginBottom:4}}>Quote Ref: <strong>{viewPo.supplier_quote_ref}</strong></div>}
+              {viewPo.notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:4}}>Notes: {viewPo.notes}</div>}
+              {viewPo.job_id&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:4}}>Job: {viewPo.job_id}</div>}
+            </div>
+            <div style={{overflowX:"auto",marginBottom:12}}>
+              <table className="tbl" style={{width:"100%"}}>
+                <thead><tr><th>Description</th><th>SKU</th><th style={{textAlign:"right"}}>Qty</th><th style={{textAlign:"right"}}>Unit Price</th><th>Condition</th><th style={{textAlign:"right"}}>Received</th></tr></thead>
+                <tbody>
+                  {viewItems.map(i=>(
+                    <tr key={i.id}>
+                      <td>{i.description}</td>
+                      <td><code style={{fontSize:11,fontFamily:"monospace",color:"var(--text3)"}}>{i.sku||"—"}</code></td>
+                      <td style={{textAlign:"right"}}>{i.qty}</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)"}}>{fmt(i.unit_price)}</td>
+                      <td><span style={{fontSize:11,color:i.condition==="to_order"?"#fbbf24":"var(--green)"}}>{i.condition==="to_order"?"📦 To Order":"✅ In Stock"}</span></td>
+                      <td style={{textAlign:"right"}}>{+i.received_qty||0} / {i.qty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
+              <button className="btn btn-ghost" onClick={()=>setModal({mode:"edit",po:viewPo})}>✏️ Edit</button>
+              {viewPhone&&viewItems.length>0&&(
+                <a href={waLink(viewPhone,buildViewWaMsg())} target="_blank" rel="noreferrer"
+                  className="btn btn-sm" onClick={async()=>{ if(viewPo.status==="draft") await onSave({...viewPo,status:"sent"},viewItems); }}
+                  style={{background:"rgba(37,211,102,.15)",color:"#25d366",border:"1px solid rgba(37,211,102,.3)",textDecoration:"none",display:"flex",alignItems:"center",gap:4}}>
+                  📤 Send via WhatsApp
+                </a>
+              )}
+              {!viewPhone&&viewSupplier?.group_link&&viewItems.length>0&&(
+                <button className="btn btn-sm" style={{background:"rgba(37,211,102,.15)",color:"#25d366",border:"1px solid rgba(37,211,102,.3)"}}
+                  onClick={async()=>{
+                    await navigator.clipboard.writeText(buildViewWaMsg());
+                    window.open(viewSupplier.group_link,"_blank");
+                    if(viewPo.status==="draft") await onSave({...viewPo,status:"sent"},viewItems);
+                  }}>
+                  👥 Copy & Open Group
+                </button>
+              )}
+              {viewPo.status!=="received"&&viewPo.status!=="cancelled"&&(
+                <button className="btn btn-primary" style={{background:"rgba(52,211,153,.8)"}}
+                  onClick={()=>setModal({mode:"receive",po:viewPo})}>📥 Receive Goods</button>
+              )}
+            </div>
+          </Overlay>
+        );
+      })()}
     </div>
   );
 }
 
-function WsPurchaseOrderModal({po,wsSuppliers=[],settings,onSave,onClose,prefill=null}) {
+function WsPurchaseOrderModal({po,wsSuppliers=[],settings,wsSupplierQuotes=[],wsSqReplies=[],wsSupplierRequests=[],onSave,onClose,prefill=null}) {
   const C=curSym(settings?.currency||getSettings().currency);
+  const shopName=settings?.shop_name||"Workshop";
   const [suppId,setSuppId]=useState(po?.supplier_id||"");
   const [suppName,setSuppName]=useState(po?.supplier_name||"");
   const [status,setStatus]=useState(po?.status||"draft");
   const [notes,setNotes]=useState(po?.notes||"");
   const [jobId,setJobId]=useState(po?.job_id||"");
+  const [sqRef,setSqRef]=useState(po?.supplier_quote_ref||"");
   const [items,setItems]=useState(()=>{
     if(prefill) return prefill;
     if(po){const stored=JSON.parse(po._items||"[]");return stored.length?stored:[{id:"i1",description:"",sku:"",supplier_part_no:"",qty:1,unit_price:0,condition:"in_stock"}];}
     return [{id:"i1",description:"",sku:"",supplier_part_no:"",qty:1,unit_price:0,condition:"in_stock"}];
   });
   const [saving,setSaving]=useState(false);
+  const [importOpen,setImportOpen]=useState(false);
 
   const addItem=()=>setItems(p=>[...p,{id:"i"+Date.now(),description:"",sku:"",supplier_part_no:"",qty:1,unit_price:0,condition:"in_stock"}]);
   const removeItem=idx=>setItems(p=>p.filter((_,i)=>i!==idx));
@@ -5583,6 +5867,47 @@ function WsPurchaseOrderModal({po,wsSuppliers=[],settings,onSave,onClose,prefill
   const resolvedName=chosenSupplier?.name||suppName;
   const total=items.reduce((s,i)=>s+(+i.qty||0)*(+i.unit_price||0),0);
 
+  // Build importable quote sources from manual quotes + digital replies
+  const quoteSources=[];
+  wsSupplierQuotes.forEach(sq=>{
+    const lines=(() => { try{return JSON.parse(sq.line_items||"[]");}catch{return [];} })();
+    const valid=lines.filter(l=>l.name&&(+l.price>0||+(l.vat_incl_price)||0>0));
+    if(!valid.length) return;
+    // Build name→sku map from the original request's items_json (has our internal SKUs)
+    const linkedReq=wsSupplierRequests.find(r=>r.id===sq.request_id);
+    const reqItems=(() => { try{return JSON.parse(linkedReq?.items_json||"[]");}catch{return [];} })();
+    const skuByName={};
+    reqItems.forEach(it=>{ const k=(it.label||it.description||"").toLowerCase().trim(); if(k) skuByName[k]=it.sku||""; });
+    quoteSources.push({
+      id:"sq-"+sq.id,
+      label:`${sq.supplier_name||"?"} — ${valid.slice(0,2).map(l=>l.name).join(", ")}${valid.length>2?" +more":""}`,
+      supplierId:sq.supplier_id||"",supplierName:sq.supplier_name||"",jobId:sq.job_id||"",quoteRef:sq.quote_ref||"",
+      items:valid.map((l,i)=>({id:"qi"+Date.now()+i,description:l.name||"",sku:skuByName[(l.name||"").toLowerCase().trim()]||l.sku||"",supplier_part_no:"",qty:+l.qty||1,unit_price:+(l.vat_incl_price||l.price)||0,condition:"in_stock"})),
+    });
+  });
+  wsSqReplies.forEach(rep=>{
+    const req=wsSupplierRequests.find(r=>r.id===rep.request_id);
+    const replyItems=(() => { try{return JSON.parse(rep.items||"[]");}catch{return [];} })().filter(ri=>ri.condition!=="no_stock"&&ri.description);
+    if(!replyItems.length) return;
+    const sName=req?.supplier_name||"Supplier";
+    const sId=req?.supplier_id||"";
+    quoteSources.push({
+      id:"rep-"+rep.id,
+      label:`${sName} (reply) — ${replyItems.slice(0,2).map(i=>i.description).join(", ")}${replyItems.length>2?" +more":""}`,
+      supplierId:sId,supplierName:sName,jobId:req?.job_id||"",
+      items:replyItems.map((ri,i)=>({id:"ri"+Date.now()+i,description:ri.description||"",sku:ri.sku||"",supplier_part_no:ri.supplier_part_no||"",qty:+ri.qty||1,unit_price:+ri.price||0,condition:ri.condition==="can_order"?"to_order":"in_stock"})),
+    });
+  });
+
+  const importQuote=(src)=>{
+    setSuppId(src.supplierId);
+    setSuppName(src.supplierName);
+    if(src.jobId) setJobId(src.jobId);
+    if(src.quoteRef) setSqRef(src.quoteRef);
+    setItems(src.items.map((it,i)=>({...it,id:"imp"+Date.now()+i})));
+    setImportOpen(false);
+  };
+
   const save=async()=>{
     if(!resolvedName.trim()){alert("Supplier name required");return;}
     if(!items.some(i=>i.description.trim())){alert("Add at least one item");return;}
@@ -5590,14 +5915,62 @@ function WsPurchaseOrderModal({po,wsSuppliers=[],settings,onSave,onClose,prefill
     await onSave({
       id:po?.id||undefined,
       supplier_id:suppId||null,supplier_name:resolvedName,
-      status,notes,job_id:jobId||null,
+      status,notes,job_id:jobId||null,supplier_quote_ref:sqRef.trim()||null,
     },items.filter(i=>i.description.trim()));
     setSaving(false);
+  };
+
+  const phone=(chosenSupplier?.phone||"").replace(/\D/g,"");
+  const SEP="─".repeat(26);
+  const buildWaMsg=()=>{
+    const filled=items.filter(i=>i.description.trim());
+    const isExVat=chosenSupplier&&!chosenSupplier.vat_inclusive;
+    const vatRate=+(settings?.tax_rate||0)/100;
+    const exVatPrice=(p)=>isExVat&&vatRate>0?+p/(1+vatRate):+p;
+    const exVatTotal=filled.reduce((s,i)=>s+(+i.qty||0)*exVatPrice(+i.unit_price||0),0);
+    const vatAmt=total-exVatTotal;
+    const lines=[
+      `📋 *Purchase Order* — ${shopName}`,SEP,
+      `Supplier: *${resolvedName}*`,
+      sqRef?`Your Quote Ref: *${sqRef}*`:"",
+      jobId?`Job: ${jobId}`:"",
+      "",
+      `*Items:*${isExVat?" (prices ex-VAT)":""}`,
+      ...filled.map(i=>`• ${i.description}${i.sku?" ("+i.sku+")":""} ×${i.qty} @ ${C}${exVatPrice(+i.unit_price||0).toFixed(2)}`),
+      "",SEP,
+      isExVat&&vatRate>0?`Subtotal (ex-VAT): ${C}${exVatTotal.toFixed(2)}`:"",
+      isExVat&&vatRate>0?`VAT (${settings.tax_rate}%): ${C}${vatAmt.toFixed(2)}`:"",
+      `*Total: ${C}${total.toLocaleString(undefined,{minimumFractionDigits:2})}*`,
+      notes?`\nNote: ${notes}`:"",
+      sqRef?"\nPlease process against your quote ref above and confirm.":"\nPlease confirm availability and delivery timeframe.",
+    ].filter(l=>l!==undefined&&l!=="");
+    return lines.join("\n");
   };
 
   return (
     <Overlay onClose={onClose}>
       <MHead title={po?"Edit Purchase Order":"New Purchase Order"} onClose={onClose}/>
+
+      {/* Import from quote */}
+      {quoteSources.length>0&&(
+        <div style={{marginBottom:12}}>
+          {!importOpen
+            ?<button className="btn btn-ghost btn-sm" style={{width:"100%",border:"1px dashed var(--border)",color:"var(--blue)"}}
+                onClick={()=>setImportOpen(true)}>📥 Import items from a supplier quote</button>
+            :<div style={{background:"var(--surface2)",borderRadius:8,padding:10,border:"1px solid var(--border)"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:6}}>SELECT QUOTE TO IMPORT</div>
+              {quoteSources.map(src=>(
+                <div key={src.id} style={{padding:"6px 8px",borderRadius:6,cursor:"pointer",marginBottom:4,border:"1px solid var(--border)",background:"var(--surface)",fontSize:12}}
+                  onClick={()=>importQuote(src)}>
+                  <span style={{color:"var(--text2)"}}>{src.label}</span>
+                </div>
+              ))}
+              <button className="btn btn-ghost btn-sm" style={{marginTop:4}} onClick={()=>setImportOpen(false)}>Cancel</button>
+            </div>
+          }
+        </div>
+      )}
+
       {/* Supplier */}
       <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>Supplier</div>
       {wsSuppliers.length>0
@@ -5615,6 +5988,7 @@ function WsPurchaseOrderModal({po,wsSuppliers=[],settings,onSave,onClose,prefill
           {["draft","sent","partial","received","cancelled"].map(s=><option key={s}>{s}</option>)}
         </select></div>
         <div><FL label="Job # (optional)"/><input className="inp" value={jobId} onChange={e=>setJobId(e.target.value)} placeholder="e.g. WJ-123"/></div>
+        <div style={{gridColumn:"1/-1"}}><FL label="Supplier Quote Ref # (Doc Nr)"/><input className="inp" value={sqRef} onChange={e=>setSqRef(e.target.value)} placeholder="e.g. Q100814"/></div>
       </div>
       <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}><FL label="Notes (optional)"/></div>
       <input className="inp" style={{marginBottom:14}} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Delivery instructions, reference…"/>
@@ -5650,6 +6024,18 @@ function WsPurchaseOrderModal({po,wsSuppliers=[],settings,onSave,onClose,prefill
       </div>
       <div style={{display:"flex",gap:8}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        {items.some(i=>i.description.trim())&&phone&&(
+          <a href={waLink(phone,buildWaMsg())} target="_blank" rel="noreferrer"
+            className="btn btn-sm" style={{flex:1,background:"rgba(37,211,102,.15)",color:"#25d366",border:"1px solid rgba(37,211,102,.3)",textAlign:"center",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+            📤 Send WA
+          </a>
+        )}
+        {items.some(i=>i.description.trim())&&!phone&&chosenSupplier?.group_link&&(
+          <button className="btn btn-sm" style={{flex:1,background:"rgba(37,211,102,.15)",color:"#25d366",border:"1px solid rgba(37,211,102,.3)"}}
+            onClick={()=>navigator.clipboard.writeText(buildWaMsg()).then(()=>window.open(chosenSupplier.group_link,"_blank"))}>
+            👥 Copy & Open Group
+          </button>
+        )}
         <button className="btn btn-primary" style={{flex:2}} disabled={saving} onClick={save}>{saving?"Saving…":"💾 Save PO"}</button>
       </div>
     </Overlay>

@@ -28,6 +28,7 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
   const [reopenJobId,setReopenJobId]=useState(null);
   // job prefill for WorkshopJobModal
   const [jobPrefill,setJobPrefill]=useState(null);
+  const [savingIntake,setSavingIntake]=useState(false);
   // photo step
   const [photoSession,setPhotoSession]=useState(null);   // {date,time} strings fixed at session start
   const [photoList,setPhotoList]=useState([]);            // [{id,dataUrl,status,url,error}]
@@ -194,7 +195,6 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
     const [intakeMileage, setIntakeMileage] = [jobPrefill.mileage,          (v)=>setJobPrefill(p=>({...p,mileage:v}))];
     const [intakeComplaint,setIntakeComplaint]=[jobPrefill.complaint,       (v)=>setJobPrefill(p=>({...p,complaint:v}))];
     const canSave=intakeName.trim()&&intakePhone.trim()&&intakeMileage&&intakeComplaint.trim();
-    const [savingIntake,setSavingIntake]=useState(false);
     const saveIntake=async()=>{
       if(!canSave){alert("Please fill in all fields");return;}
       setSavingIntake(true);

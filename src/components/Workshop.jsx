@@ -2009,6 +2009,24 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
     reader.readAsDataURL(file);
   };
 
+  // Global paste listener — works anywhere while modal is open
+  useEffect(() => {
+    if(stage !== "upload") return;
+    const handle = (e) => {
+      const items = e.clipboardData?.items;
+      if(!items) return;
+      for(const item of items){
+        if(item.type.startsWith("image/")){
+          e.preventDefault();
+          onFile(item.getAsFile());
+          break;
+        }
+      }
+    };
+    document.addEventListener("paste", handle);
+    return () => document.removeEventListener("paste", handle);
+  }, [stage]);
+
   const setRow = (i, k, v) => setRows(p=>p.map((r,idx)=>idx===i?{...r,[k]:v}:r));
   const delRow = (i) => setRows(p=>p.filter((_,idx)=>idx!==i));
 
@@ -2028,16 +2046,43 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
       <MHead title="📷 Scan Supplier Quote" onClose={onClose}/>
 
       {stage==="upload"&&(
-        <div style={{textAlign:"center",padding:"32px 16px"}}>
-          <div style={{fontSize:48,marginBottom:12}}>📸</div>
-          <div style={{fontWeight:600,fontSize:15,marginBottom:6}}>Upload supplier screenshot or photo</div>
-          <div style={{fontSize:12,color:"var(--text3)",marginBottom:20}}>JPG, PNG or WebP — WhatsApp screenshots work best</div>
+        <div style={{padding:"16px 0"}}>
           <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
             onChange={e=>onFile(e.target.files[0])}/>
-          <button className="btn btn-primary" style={{padding:"10px 28px"}} onClick={()=>fileRef.current.click()}>
-            Choose Image
+
+          {/* Paste zone — big, obvious, click also triggers file picker */}
+          <div
+            onClick={()=>fileRef.current.click()}
+            onPaste={e=>{
+              const item=[...e.clipboardData.items].find(i=>i.type.startsWith("image/"));
+              if(item){e.preventDefault();onFile(item.getAsFile());}
+            }}
+            tabIndex={0}
+            style={{
+              border:"2.5px dashed var(--accent)",borderRadius:14,padding:"36px 24px",
+              textAlign:"center",cursor:"pointer",background:"var(--surface2)",
+              outline:"none",userSelect:"none",marginBottom:14,
+            }}
+          >
+            <div style={{fontSize:44,marginBottom:8}}>📋</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Paste screenshot here</div>
+            <div style={{fontSize:13,color:"var(--accent)",fontWeight:600,marginBottom:10}}>
+              Ctrl+V &nbsp;/&nbsp; ⌘V
+            </div>
+            <div style={{fontSize:11,color:"var(--text3)"}}>
+              Copy image in WhatsApp → click this box → Ctrl+V
+            </div>
+          </div>
+
+          <div style={{textAlign:"center",color:"var(--text3)",fontSize:12,marginBottom:14}}>— or —</div>
+
+          <button className="btn btn-ghost" style={{width:"100%",padding:"10px"}}
+            onClick={()=>fileRef.current.click()}>
+            📁 Browse &amp; choose image file
           </button>
-          <div style={{marginTop:12,fontSize:11,color:"var(--text3)"}}>Tip: Save the WhatsApp image to your device first, then upload it here</div>
+          <div style={{marginTop:8,fontSize:11,color:"var(--text3)",textAlign:"center"}}>
+            JPG, PNG or WebP · WhatsApp photos, PDF screenshots, scanned pages
+          </div>
         </div>
       )}
 

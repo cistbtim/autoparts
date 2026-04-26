@@ -1142,16 +1142,17 @@ function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUpdate}) 
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
 export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsProfile={},t,lang}) {
-  const [view,      setView]      = useState("list");
-  const [activeJob, setActiveJob] = useState(null);
-  const [editJob,   setEditJob]   = useState(null);
-  const [filterSt,  setFilterSt]  = useState("__all__");
-  const [search,    setSearch]    = useState("");
-  const [bookIn,    setBookIn]    = useState(false);
-  const [wsTab,     setWsTab]     = useState(initialTab||"jobs");
-  const [stmtCust,  setStmtCust]  = useState("");  // statement: selected customer id
-  const [qInvModal, setQInvModal] = useState(null); // {job, items, quote} for convert-from-list
-  const [sortBy,    setSortBy]    = useState("date_desc");
+  const [view,           setView]           = useState("list");
+  const [activeJob,      setActiveJob]      = useState(null);
+  const [editJob,        setEditJob]        = useState(null);
+  const [filterSt,       setFilterSt]       = useState("__all__");
+  const [search,         setSearch]         = useState("");
+  const [bookIn,         setBookIn]         = useState(false);
+  const [wsTab,          setWsTab]          = useState(initialTab||"jobs");
+  const [stmtCust,       setStmtCust]       = useState("");
+  const [qInvModal,      setQInvModal]      = useState(null);
+  const [sortBy,         setSortBy]         = useState("date_desc");
+  const [pendingViewPoId,setPendingViewPoId] = useState(null);
   const [filterWs,      setFilterWs]      = useState("__all__");
   const [filterCity,    setFilterCity]    = useState("__all__");
   const [filterCountry, setFilterCountry] = useState("__all__");
@@ -1223,6 +1224,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onGenerateWsQuoteLink={onGenerateWsQuoteLink}
         onSaveWsPurchaseOrder={onSaveWsPurchaseOrder}
         onViewPurchaseOrders={()=>{ setView("list"); setWsTab("wssuporders"); }}
+        onViewPO={(poId)=>{ setPendingViewPoId(poId); setView("list"); setWsTab("wssuporders"); }}
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
@@ -1596,6 +1598,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           wsSuppliers={wsSuppliers} wsStock={wsStock} settings={settings}
           wsSupplierQuotes={wsSupplierQuotes} wsSqReplies={wsSqReplies}
           wsSupplierRequests={wsSupplierRequests}
+          initialViewPoId={pendingViewPoId}
+          onClearInitialView={()=>setPendingViewPoId(null)}
           onSave={onSaveWsPurchaseOrder} onDelete={onDeleteWsPurchaseOrder}
           onReceive={onReceiveWsPurchaseOrder}/>
       )}
@@ -2468,7 +2472,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onSaveWsLicenceRenewal,wsId=null,wsProfile={},t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,wsId=null,wsProfile={},t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -3566,23 +3570,52 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               </table>
             )
           }
-          {/* ── Supplier order status ── */}
-          {wsPurchaseOrders.length>0&&(
-            <div style={{padding:"8px 16px",borderTop:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-              <span style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>Orders:</span>
-              {wsPurchaseOrders.map(po=>{
-                const PO_C={draft:"var(--text3)",sent:"var(--blue)",partial:"var(--yellow)",received:"var(--green)",cancelled:"var(--red)"};
-                const PO_BG={draft:"var(--surface3)",sent:"rgba(96,165,250,.12)",partial:"rgba(251,191,36,.12)",received:"rgba(52,211,153,.12)",cancelled:"rgba(248,113,113,.12)"};
-                return (
-                  <button key={po.id} onClick={onViewPurchaseOrders}
-                    style={{display:"flex",alignItems:"center",gap:5,fontSize:11,fontWeight:600,borderRadius:6,padding:"3px 8px",border:"none",cursor:"pointer",background:PO_BG[po.status]||PO_BG.draft,color:PO_C[po.status]||PO_C.draft}}>
-                    📋 {po.supplier_name||"Supplier"}
-                    <span style={{opacity:.7,fontWeight:400,textTransform:"capitalize"}}>{po.status||"draft"}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* ── Supplier quote requests + PO status ── */}
+          {(()=>{
+            const jobReqs=wsSupplierRequests.filter(r=>r.job_id===job.id);
+            if(!jobReqs.length&&!wsPurchaseOrders.length) return null;
+            const PO_C={draft:"var(--text3)",sent:"var(--blue)",partial:"var(--yellow)",received:"var(--green)",cancelled:"var(--red)"};
+            const PO_BG={draft:"var(--surface3)",sent:"rgba(96,165,250,.12)",partial:"rgba(251,191,36,.12)",received:"rgba(52,211,153,.12)",cancelled:"rgba(248,113,113,.12)"};
+            return (
+              <div style={{borderTop:"1px solid var(--border)",padding:"8px 16px",display:"flex",flexDirection:"column",gap:5}}>
+                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>Supplier Quotes</div>
+                {jobReqs.map(r=>{
+                  const hasQuote=wsSupplierQuotes.find(q=>q.request_id===r.id);
+                  const hasReply=sqReplies.find(rep=>rep.request_id===r.id);
+                  const po=wsPurchaseOrders.find(p=>p.supplier_id&&r.supplier_id&&String(p.supplier_id)===String(r.supplier_id))||wsPurchaseOrders.find(p=>p.supplier_name===r.supplier_name);
+                  return (
+                    <div key={r.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+                      <span style={{flex:1,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.supplier_name||r.supplier_phone||"Unknown"}</span>
+                      {hasQuote
+                        ? <span style={{fontSize:10,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.1)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>✅ Quoted</span>
+                        : hasReply
+                          ? <span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.1)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>📲 App Reply</span>
+                          : <span style={{fontSize:10,fontWeight:600,color:"var(--text3)",background:"var(--surface3)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>⏳ Pending</span>
+                      }
+                      {po&&(
+                        <button onClick={()=>onViewPO?.(po.id)}
+                          style={{fontSize:10,fontWeight:700,borderRadius:5,padding:"2px 8px",border:"none",cursor:"pointer",background:PO_BG[po.status]||PO_BG.draft,color:PO_C[po.status]||PO_C.draft,flexShrink:0}}>
+                          📋 PO · {po.status||"draft"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                {/* POs not linked to a request (edge case) */}
+                {wsPurchaseOrders.filter(po=>!jobReqs.some(r=>
+                  (r.supplier_id&&String(po.supplier_id)===String(r.supplier_id))||(r.supplier_name===po.supplier_name)
+                )).map(po=>(
+                  <div key={po.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+                    <span style={{flex:1,fontWeight:600}}>{po.supplier_name}</span>
+                    <button onClick={()=>onViewPO?.(po.id)}
+                      style={{fontSize:10,fontWeight:700,borderRadius:5,padding:"2px 8px",border:"none",cursor:"pointer",background:PO_BG[po.status]||PO_BG.draft,color:PO_C[po.status]||PO_C.draft}}>
+                      📋 PO · {po.status||"draft"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{display:"flex",gap:6}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ Part</button>
@@ -5757,12 +5790,21 @@ function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierRequests=[],s
 // ═══════════════════════════════════════════════════════════════
 // WS PURCHASE ORDERS
 // ═══════════════════════════════════════════════════════════════
-function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsStock=[],settings,wsSupplierQuotes=[],wsSqReplies=[],wsSupplierRequests=[],onSave,onDelete,onReceive}) {
+function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsStock=[],settings,wsSupplierQuotes=[],wsSqReplies=[],wsSupplierRequests=[],initialViewPoId=null,onClearInitialView,onSave,onDelete,onReceive}) {
   const C=curSym(settings?.currency||getSettings().currency);
   const fmt=v=>`${C}${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [modal,setModal]=useState(null); // null | {mode:"add"|"edit"|"view"|"receive", po?}
   const [search,setSearch]=useState("");
   const [filterSt,setFilterSt]=useState("__all__");
+
+  // Auto-open view modal when navigated from job card
+  const {useEffect}=React;
+  useEffect(()=>{
+    if(initialViewPoId){
+      const po=purchaseOrders.find(p=>p.id===initialViewPoId);
+      if(po){ setModal({mode:"view",po}); onClearInitialView?.(); }
+    }
+  },[initialViewPoId,purchaseOrders]);
 
   const STATUS_COLOR={draft:"var(--text3)",sent:"var(--blue)",partial:"var(--yellow)",received:"var(--green)",cancelled:"var(--red)"};
   const STATUS_BG={draft:"var(--surface3)",sent:"rgba(96,165,250,.12)",partial:"rgba(251,191,36,.12)",received:"rgba(52,211,153,.12)",cancelled:"rgba(248,113,113,.12)"};

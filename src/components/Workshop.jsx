@@ -2385,11 +2385,9 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
 
       <div style={{display:"flex",gap:10,marginTop:4}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-        {!priceOnly&&(
-          <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowOcr(true)} title="Read prices from a screenshot">
-            📷 Scan Image
-          </button>
-        )}
+        <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowOcr(true)} title="Read prices from a screenshot">
+          📷 Scan Image
+        </button>
         <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>
           {saving?"Saving...":priceOnly?"↩️ Save Return Quote":"💾 Save Quote"}
         </button>

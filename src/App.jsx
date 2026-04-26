@@ -1971,9 +1971,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                   <div style={{fontSize:13,fontWeight:700,color:"var(--text)"}}>{user.name||user.username}</div>
                   <span className="badge" style={{background:ROLES[role]?.bg,color:ROLES[role]?.color,fontSize:10,padding:"1px 8px"}}>{wsRole}</span>
                 </div>
-                <div style={{display:"flex",gap:4}}>
-                  <button className={`lang ${lang==="en"?"on":""}`} onClick={()=>setLang("en")}>EN</button>
-                  <button className={`lang ${lang==="zh"?"on":""}`} onClick={()=>setLang("zh")}>中文</button>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                  {langs.map(l=>(
+                    <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
+                      {l.flag||l.lang.toUpperCase()}
+                    </button>
+                  ))}
                 </div>
               </div>
               {/* Grid of nav items */}

@@ -1906,7 +1906,8 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
   const [rawText,  setRawText]  = useState("");
   const [rows,     setRows]     = useState([]); // [{desc, qty, price, partIdx}]
   const [zoomed,   setZoomed]   = useState(false);
-  const fileRef = useRef();
+  const fileRef    = useRef(); // gallery / files (no capture)
+  const cameraRef  = useRef(); // camera only (capture="environment")
 
   // Parse OCR text into candidate rows
   const parseText = (text) => {
@@ -2064,16 +2065,17 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
 
       {stage==="upload"&&(
         <div style={{padding:"16px 0"}}>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
-            onChange={e=>onFile(e.target.files[0])}/>
+          {/* Hidden inputs — separate so capture doesn't force camera for gallery */}
+          <input ref={fileRef}   type="file" accept="image/*" style={{display:"none"}} onChange={e=>onFile(e.target.files[0])}/>
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>onFile(e.target.files[0])}/>
 
-          {/* Primary: Paste button — works on desktop (Ctrl+V) and mobile (clipboard API) */}
+          {/* Primary: Paste button */}
           <button className="btn btn-primary"
             style={{width:"100%",padding:"18px",fontSize:16,fontWeight:700,marginBottom:10,borderRadius:12}}
             onClick={pasteFromClipboard}>
             📋 Paste Image from Clipboard
           </button>
-          <div style={{fontSize:11,color:"var(--text3)",textAlign:"center",marginBottom:18}}>
+          <div style={{fontSize:11,color:"var(--text3)",textAlign:"center",marginBottom:16}}>
             On phone: copy the WhatsApp image → come back here → tap Paste
             <br/>On PC: Ctrl+C the image → Ctrl+V anywhere on this page
           </div>
@@ -2085,22 +2087,23 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
               if(item){e.preventDefault();onFile(item.getAsFile());}
             }}
             tabIndex={0}
-            style={{
-              border:"2px dashed var(--border)",borderRadius:12,padding:"14px",
-              textAlign:"center",color:"var(--text3)",fontSize:12,marginBottom:18,
-              outline:"none",cursor:"text",
-            }}>
+            style={{border:"2px dashed var(--border)",borderRadius:12,padding:"12px",textAlign:"center",color:"var(--text3)",fontSize:12,marginBottom:16,outline:"none",cursor:"text"}}>
             Or click here and press Ctrl+V (desktop)
           </div>
 
           <div style={{textAlign:"center",color:"var(--text3)",fontSize:12,marginBottom:10}}>— or —</div>
 
-          <button className="btn btn-ghost" style={{width:"100%",padding:"12px"}}
-            onClick={()=>fileRef.current.click()}>
-            📁 Choose from Gallery / Files
-          </button>
-          <div style={{marginTop:8,fontSize:11,color:"var(--text3)",textAlign:"center"}}>
-            JPG, PNG or WebP · WhatsApp photos, PDF screenshots, scanned pages
+          {/* Two separate buttons: gallery vs camera */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <button className="btn btn-ghost" style={{padding:"12px",fontSize:13}} onClick={()=>fileRef.current.click()}>
+              🖼️ Gallery / Files
+            </button>
+            <button className="btn btn-ghost" style={{padding:"12px",fontSize:13}} onClick={()=>cameraRef.current.click()}>
+              📷 Take Photo
+            </button>
+          </div>
+          <div style={{fontSize:11,color:"var(--text3)",textAlign:"center"}}>
+            Gallery opens saved photos · Camera opens the phone camera
           </div>
         </div>
       )}

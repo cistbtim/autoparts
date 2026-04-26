@@ -1914,7 +1914,7 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
     }
     return parts.map(p => ({name: p, price: "", available: "", sku: reqSkuMap[p.toLowerCase().trim()]||""}));
   });
-  const [vatExcluded, setVatExcluded] = useState(existingQuote?.vat_excluded??false);
+  const [vatExcluded, setVatExcluded] = useState(existingQuote?.vat_excluded??(request.supplier_vat_inclusive===false));
   const [notes,     setNotes]     = useState(existingQuote?.notes||"");
   const [quoteRef,  setQuoteRef]  = useState(existingQuote?.quote_ref||"");
   const [saving,    setSaving]    = useState(false);

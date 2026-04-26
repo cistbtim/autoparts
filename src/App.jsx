@@ -1946,17 +1946,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {/* WS MORE SHEET — workshop mobile app style bottom sheet */}
       {role==="workshop"&&(()=>{
         const moreItems=[
-          {id:"shop", icon:"🛒", label:"Shop"},
+          {id:"shop",        icon:"🛒", label:t.shop||"Shop"},
           ...(wsRole!=="mechanic"?[
-            {id:"wspayments", icon:"💳",label:"Payments"},
-            {id:"wsstock",    icon:"📦",label:"Stock"},
-            {id:"wsservices",  icon:"🔧",label:"Services"},
-            {id:"wssuppliers", icon:"🏪",label:"Suppliers"},
-            {id:"wssuporders", icon:"📋",label:"Purchase Orders"},
-            {id:"wstransfer",  icon:"🔄",label:"Transfer"},
-            {id:"wsstatement",icon:"📋",label:"Statement"},
-            {id:"wsreport",   icon:"📊",label:"Report"},
-            ...(wsRole==="main"?[{id:"wsprofile",icon:"⚙️",label:"Settings"}]:[]),
+            {id:"wspayments", icon:"💳", label:t.wsPayments||"Payments"},
+            {id:"wsstock",    icon:"📦", label:t.wsStock||"Stock"},
+            {id:"wsservices", icon:"🔧", label:t.wsServices||"Services"},
+            {id:"wssuppliers",icon:"🏪", label:t.wsSuppliers||"Suppliers"},
+            {id:"wssuporders",icon:"📋", label:t.wsPurchaseOrders||"Purchase Orders"},
+            {id:"wstransfer", icon:"🔄", label:t.wsTransfer||"Transfer"},
+            {id:"wsstatement",icon:"📄", label:t.wsStatement||"Statement"},
+            {id:"wsreport",   icon:"📊", label:t.wsReport||"Report"},
+            ...(wsRole==="main"?[{id:"wsprofile",icon:"⚙️",label:t.wsSettings||"Settings"}]:[]),
           ]:[]),
         ];
         return (
@@ -1994,8 +1994,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               {/* Action buttons */}
               <div className="ws-more-actions">
                 <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light":"🌙 Dark"}</button>
-                <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12}} onClick={()=>{openM("changePassword");setWsMoreOpen(false);}}>🔑 Password</button>
-                <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 Logout</button>
+                <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12}} onClick={()=>{openM("changePassword");setWsMoreOpen(false);}}>🔑 {t.changePassword||"Password"}</button>
+                <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 {t.logout||"Logout"}</button>
               </div>
             </div>
           </>

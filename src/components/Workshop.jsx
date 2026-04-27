@@ -2963,7 +2963,15 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       const filename=`CL_${key}_${dateStr.replace(/-/g,"")}_${timeStr.replace(/-/g,"")}.jpg`;
       const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType:"image/jpeg",folderPath})});
       const result=await resp.json();
-      if(result.success){ await saveChecklistItem(key,{photo_url:result.url}); }
+      console.log("[CL Photo Upload] Success:",result.success,"URL:",result.url);
+      if(result.success){
+        if(!result.url||(!result.url.includes("/file/d/")&&!result.url.includes("?id="))){
+          console.warn("[CL Photo] Invalid URL format returned:",result.url);
+          alert("Photo uploaded but URL format is invalid. Check Apps Script configuration.");
+          return;
+        }
+        await saveChecklistItem(key,{photo_url:result.url});
+      }
       else { alert("Photo upload failed: "+(result.error||"Unknown error")); }
     }catch(e){ alert("Upload error: "+e.message); }
     finally{ setClUploading(p=>({...p,[key]:false})); }
@@ -3567,7 +3575,8 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                         onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;const fr=new FileReader();fr.onload=ev=>uploadChecklistPhoto(item.key,ev.target.result);fr.readAsDataURL(file);}}/>
                       {cl.photo_url&&(
                         <img src={toImgUrl(cl.photo_url)} alt="check" onClick={()=>setViewPhoto(cl.photo_url)}
-                          style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)"}}/>
+                          style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)"}}
+                          onError={e=>{const m=cl.photo_url.match(/thumbnail[?]id=([^&]+)/)||cl.photo_url.match(/[?&]id=([^&]+)/)||cl.photo_url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){console.log("[CL Photo] Thumbnail failed, retrying with uc?export=view",m[1]);e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {console.warn("[CL Photo] Both thumbnail and uc?export=view failed or no Drive ID found");e.target.style.display="none";}}}/>
                       )}
                     </div>
                     <input className="inp" placeholder="Note (optional)..." value={cl.note}
@@ -3629,13 +3638,15 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
               ))}
             </div>
           )}
-          {viewPhoto&&(
-            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setViewPhoto(null)}>
-              <img src={toImgUrl(viewPhoto)} alt="preview" style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8}}/>
-              <button style={{position:"absolute",top:16,right:20,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:"50%",width:36,height:36,fontSize:18,cursor:"pointer"}} onClick={()=>setViewPhoto(null)}>✕</button>
-              <a href={viewPhoto} target="_blank" rel="noreferrer" style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",background:"rgba(255,255,255,.15)",color:"#fff",padding:"8px 20px",borderRadius:20,fontSize:13,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>Open in Drive ↗</a>
-            </div>
-          )}
+        </div>
+      )}
+
+      {/* ══ PHOTO LIGHTBOX (global) ══ */}
+      {viewPhoto&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setViewPhoto(null)}>
+          <img src={toImgUrl(viewPhoto)} alt="preview" style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8}}/>
+          <button style={{position:"absolute",top:16,right:20,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:"50%",width:36,height:36,fontSize:18,cursor:"pointer"}} onClick={()=>setViewPhoto(null)}>✕</button>
+          <a href={viewPhoto} target="_blank" rel="noreferrer" style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",background:"rgba(255,255,255,.15)",color:"#fff",padding:"8px 20px",borderRadius:20,fontSize:13,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>Open in Drive ↗</a>
         </div>
       )}
 
@@ -6969,12 +6980,16 @@ function printChecklistReport(job, checklist, settings) {
     const st=cl.status||"pending";
     const note=cl.note||"";
     const photo=cl.photo_url||"";
-    const thumbUrl=photo?photo.replace(/\/file\/d\/([^/]+)\/.*/,"https://drive.google.com/thumbnail?id=$1&sz=w120").replace(/[?&]id=([^&]+).*/,"https://drive.google.com/thumbnail?id=$1&sz=w120"):"";
+    const thumbUrl=photo?toImgUrl(photo).replace(/sz=w200/,"sz=w120"):"";
+    const fullUrl=photo?(() => {
+      const m = photo.match(/\/file\/d\/([^/]+)/) || photo.match(/thumbnail[?]id=([^&]+)/) || photo.match(/[?&]id=([^&]+)/);
+      return m ? `https://drive.google.com/uc?export=view&id=${m[1]}` : photo;
+    })():"";
     return `<tr>
       <td style="padding:6px 8px;font-size:12px">${item.icon} ${item.label}</td>
       <td style="padding:6px 8px;text-align:center;font-weight:700;font-size:14px;color:${statusColor(st)}">${statusIcon(st)}</td>
       <td style="padding:6px 8px;font-size:11px;color:#374151">${note||""}</td>
-      <td style="padding:6px 8px;text-align:center">${thumbUrl?`<img src="${thumbUrl}" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb"/>`:""}</td>
+      <td style="padding:6px 8px;text-align:center">${thumbUrl?`<a href="${fullUrl}" target="_blank" style="cursor:pointer;text-decoration:none"><img src="${thumbUrl}" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb;transition:opacity 0.2s;cursor:pointer" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"/></a>`:""}</td>
     </tr>`;
   }).join("");
   const okCount   = CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length;

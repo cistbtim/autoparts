@@ -622,7 +622,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     }
   };
   // ── Workshop ──
-  const saveWorkshopJob=async(data)=>{
+  const saveWorkshopJob=async(data, onProgress)=>{
     const chk=(r,label)=>{ if(r&&!Array.isArray(r)&&r.message){ throw new Error(`${label}: ${r.message}`); } return r; };
     try {
       let d={...data};
@@ -693,7 +693,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           const _dt=`${_date.replace(/-/g,"")}_${_p(_n.getHours())}${_p(_n.getMinutes())}${_p(_n.getSeconds())}`;
           const _plate=(d.vehicle_reg||vehId).replace(/\s/g,"").toUpperCase();
           const folderPath="Tim_Car_Phot/"+_plate+"/"+_date;
-          for(const p of uploadEntries){
+          for(let _pi=0;_pi<uploadEntries.length;_pi++){
+            const p=uploadEntries[_pi];
+            onProgress?.({current:_pi+1,total:uploadEntries.length,name:p.viewName});
             try{
               const resized=await new Promise((res,rej)=>{
                 const img=new Image();

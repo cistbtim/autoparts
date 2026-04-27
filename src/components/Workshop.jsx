@@ -1214,7 +1214,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onSaveWsSupplierQuote={onSaveWsSupplierQuote}
         onSaveWsStock={onSaveWsStock}
         onBack={()=>{ setView("list"); setActiveJob(null); }}
-        onSaveJob={async(d)=>{ await onSaveJob(d); setActiveJob({...activeJob,...d}); }}
+        onSaveJob={async(d,onProgress)=>{ await onSaveJob(d,onProgress); setActiveJob({...activeJob,...d}); }}
         onDeleteJob={async()=>{ await onDeleteJob(activeJob.id); setView("list"); setActiveJob(null); }}
         onMoveJob={async(targetWsId)=>{ await onMoveJob(activeJob.id,targetWsId); setView("list"); setActiveJob(null); }}
         onSaveItem={onSaveItem} onDeleteItem={onDeleteItem}
@@ -1870,7 +1870,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       )}
       {editJob&&(
         <WorkshopJobModal job={editJob} wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs}
-          onSave={async(d)=>{ await onSaveJob(d); setEditJob(null); }}
+          onSave={async(d,onProgress)=>{ await onSaveJob(d,onProgress); setEditJob(null); }}
           onReopenJob={async(d)=>{ await onSaveJob(d); setEditJob(null); }}
           onClose={()=>setEditJob(null)} t={t}/>
       )}
@@ -4335,7 +4335,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
       {/* Edit job modal */}
       {editJob&&(
         <WorkshopJobModal job={job} wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={[]}
-          onSave={async(d)=>{ await onSaveJob(d); setEditJob(false); }}
+          onSave={async(d,onProgress)=>{ await onSaveJob(d,onProgress); setEditJob(false); }}
           onReopenJob={async(d)=>{ await onSaveJob(d); setEditJob(false); }}
           onClose={()=>setEditJob(false)} t={t}/>
       )}
@@ -4583,6 +4583,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const [tab,setTab]=useState("customer");
   const [saving,setSaving]=useState(false);
+  const [uploadProgress,setUploadProgress]=useState(null); // {current,total,name}
   const [custSearch,setCustSearch]=useState(job.customer_name||"");
   const [showCustDrop,setShowCustDrop]=useState(false);
   const [selCustomer,setSelCustomer]=useState(()=>wsCustomers.find(c=>c.id===job.workshop_customer_id)||null);
@@ -4890,14 +4891,15 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
           if(!f.mileage){alert("Mileage required — go to Vehicle tab");setTab("vehicle");return;}
           if(!f.complaint.trim()){alert("Main job / complaint required — go to Job tab");setTab("job");return;}
           if(f.parent_job_id&&!f.return_reason.trim()){alert("Return reason required for return jobs — go to Job tab");setTab("job");return;}
-          setSaving(true);
-          try{ await onSave(f); }
-          catch(e){ alert("Save failed: "+e.message); setSaving(false); }
+          setSaving(true); setUploadProgress(null);
+          try{ await onSave(f, prog=>setUploadProgress(prog)); }
+          catch(e){ alert("Save failed: "+e.message); setSaving(false); setUploadProgress(null); }
         }}>
-          {saving?(()=>{
-            const n=[f.photo_front,f.photo_rear,f.photo_side].filter(p=>p&&p.startsWith("data:")).length;
-            return n>0?`📤 Uploading ${n} photo${n>1?"s":""}...`:"💾 Saving...";
-          })():`💾 ${t.save}`}
+          {saving
+            ? uploadProgress
+              ? `📤 Uploading ${uploadProgress.name} (${uploadProgress.current}/${uploadProgress.total})...`
+              : "💾 Saving..."
+            : `💾 ${t.save}`}
         </button>
       </div>
     </Overlay>

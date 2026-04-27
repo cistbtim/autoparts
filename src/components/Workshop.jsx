@@ -4926,6 +4926,26 @@ function JobPhotoSlot({label, value, onChange, reg}) {
     e.target.value = "";
   };
 
+  const handlePaste = async (e) => {
+    e.stopPropagation();
+    try{
+      const items = await navigator.clipboard.read();
+      let found = false;
+      for(const item of items){
+        const imgType = item.types.find(t=>t.startsWith("image/"));
+        if(!imgType) continue;
+        found = true;
+        const blob = await item.getType(imgType);
+        const fr = new FileReader();
+        fr.onload = ev => onChange(ev.target.result);
+        fr.readAsDataURL(blob);
+      }
+      if(!found) setError("No image in clipboard — copy an image first.");
+    }catch(e){
+      setError("Clipboard access denied — allow it in your browser.");
+    }
+  };
+
   const openBrowse = async () => {
     const SCRIPT_URL = getScriptUrl();
     if (!SCRIPT_URL) { setError("⚙️ Set Vehicle Script URL in Settings first"); return; }
@@ -4983,6 +5003,12 @@ function JobPhotoSlot({label, value, onChange, reg}) {
           title={plate?`Browse Drive: ${plate}`:"Enter vehicle reg first"}
           onClick={e=>{e.stopPropagation();openBrowse();}}>
           <span style={{fontSize:13}}>☁️</span><span>Drive</span>
+        </button>
+        <button className="btn btn-ghost btn-xs"
+          style={{flex:1,padding:"4px 2px",fontSize:10,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}
+          title="Paste image from clipboard"
+          onClick={handlePaste}>
+          <span style={{fontSize:13}}>📋</span><span>Paste</span>
         </button>
         {value&&(
           <button className="btn btn-ghost btn-xs"

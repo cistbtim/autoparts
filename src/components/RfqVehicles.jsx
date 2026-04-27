@@ -1652,20 +1652,20 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
 
     setUploading(true); setError(null);
     try {
-      // ── Step 1: Resize ──
+      // ── Step 1: Resize to JPEG (matches uploadBookInPhoto approach) ──
       setStatus("Resizing image...");
       const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = ev => {
           const img = new Image();
           img.onload = () => {
-            const MAX = 800;
+            const MAX = 1200;
             const canvas = document.createElement("canvas");
             let w = img.width, h = img.height;
             if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
             canvas.width = w; canvas.height = h;
             canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL("image/png"));
+            resolve(canvas.toDataURL("image/jpeg", 0.88));
           };
           img.onerror = reject;
           img.src = ev.target.result;
@@ -1674,30 +1674,21 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
         reader.readAsDataURL(file);
       });
 
-      // ── Step 2: Create folder Tim_Car_Phot/<plate>/<date> ──
+      // ── Step 2: Upload (script handles folder creation internally) ──
       const _now=new Date(), _p=n=>String(n).padStart(2,"0");
       const _date=`${_now.getFullYear()}-${_p(_now.getMonth()+1)}-${_p(_now.getDate())}`;
       const _dt=`${_date.replace(/-/g,"")}_${_p(_now.getHours())}${_p(_now.getMinutes())}${_p(_now.getSeconds())}`;
       const _plate=String(reg||vehicleId||"vehicle").replace(/\s/g,"").toUpperCase();
       const folderPath = "Tim_Car_Phot/" + _plate + "/" + _date;
-      setStatus("Creating folder " + folderPath + "...");
-      const folderResp = await fetch(SCRIPT_URL, {
-        method: "POST",
-        body: JSON.stringify({ action:"createFolder", folderPath })
-      });
-      const folderResult = await folderResp.json();
-      if (!folderResult.success) throw new Error("Folder error: " + folderResult.error);
-
-      // ── Step 3: Upload photo ──
-      const filename = _dt + "_" + viewName + ".png";
+      const filename = _dt + "_" + viewName + ".jpg";
       setStatus("Uploading " + filename + "...");
       const uploadResp = await fetch(SCRIPT_URL, {
         method: "POST",
-        body: JSON.stringify({ action:"upload", image:base64, filename, mimeType:"image/png", folderPath })
+        body: JSON.stringify({ action:"upload", image:base64, filename, mimeType:"image/jpeg", folderPath })
       });
       const result = await uploadResp.json();
       if (result.success) {
-        onChange(result.url);  // no cache-buster — Drive rejects &t= on thumbnail URLs
+        onChange(result.url);
         setStatus(""); setError(null);
       } else {
         throw new Error(result.error || "Upload failed");

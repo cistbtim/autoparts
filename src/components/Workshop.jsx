@@ -756,6 +756,7 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
           <MHead title={editVehicle.id?"✏️ "+t.editVehicle:"🚗 "+t.addVehicle} onClose={()=>setEditVehicle(null)}/>
           <WsVehicleForm data={editVehicle}
             onSave={async(d)=>{ await onSaveVehicle(d); setEditVehicle(null); }}
+            onPhotoSaved={onSaveVehicle}
             onClose={()=>setEditVehicle(null)} t={t}/>
         </Overlay>
       )}
@@ -818,6 +819,7 @@ function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,on
           <MHead title={editVehicle.id?"✏️ "+t.editVehicle:"🚗 "+t.addVehicle} onClose={()=>setEditVehicle(null)}/>
           <WsVehicleForm data={editVehicle}
             onSave={async(d)=>{ await onSaveVehicle(d); setEditVehicle(null); }}
+            onPhotoSaved={onSaveVehicle}
             onClose={()=>setEditVehicle(null)} t={t}/>
         </Overlay>
       )}
@@ -847,7 +849,7 @@ function WsCustomerForm({data,onSave,onClose,t}) {
   );
 }
 
-function WsVehicleForm({data,onSave,onClose,t}) {
+function WsVehicleForm({data,onSave,onPhotoSaved,onClose,t}) {
   const [f,setF]=useState({id:data.id||null,workshop_customer_id:data.workshop_customer_id,reg:data.reg||"",make:data.make||"",model:data.model||"",year:data.year||"",color:data.color||"",vin:data.vin||"",engine_no:data.engine_no||"",notes:data.notes||"",photo_front:data.photo_front||"",photo_rear:data.photo_rear||"",photo_side:data.photo_side||""});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   return (
@@ -878,7 +880,7 @@ function WsVehicleForm({data,onSave,onClose,t}) {
             ].map(({key,label})=>(
               <VehiclePhotoUploader key={key} label={label} url={f[key]}
                 vehicleId={f.id} make={f.make||"vehicle"} reg={f.reg} viewName={key.replace("photo_","")}
-                onChange={url=>s(key,url)}/>
+                onChange={url=>{ const upd={...f,[key]:url}; s(key,url); onPhotoSaved?onPhotoSaved(upd):api.patch("workshop_vehicles",f.id,{[key]:url}).catch(()=>{}); }}/>
             ))}
           </div>
         : <div style={{textAlign:"center",padding:16,background:"var(--surface2)",borderRadius:10,color:"var(--text3)",fontSize:13}}>
@@ -2902,7 +2904,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const handleVehiclePhotoChange = async (field, key, url) => {
     setLocalPhotoOverrides(p=>({...p,[key]:url}));
     if(vehicleRecord) {
-      try { await api.patch("workshop_vehicles","id",vehicleRecord.id,{[field]:url}); }
+      try { await onSaveWsVehicle({...vehicleRecord,[field]:url}); }
       catch(e) { console.error("Photo save failed",e); }
     }
   };
@@ -4574,9 +4576,8 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
     setSelCustomer(c); setCustSearch(c.name); setShowCustDrop(false);
     s("customer_name",c.name); s("customer_phone",c.phone||""); s("customer_email",c.email||"");
     s("workshop_customer_id",c.id);
-    // Only clear the vehicle link — keep scanned/entered vehicle data in the fields
-    setSelVehicle(null);
-    s("workshop_vehicle_id",null);
+    // Only clear the vehicle link for new jobs — editing keeps the existing vehicle link
+    if(!f.id){ setSelVehicle(null); s("workshop_vehicle_id",null); }
   };
 
   const selectVehicle=(v)=>{

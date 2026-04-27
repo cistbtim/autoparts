@@ -632,8 +632,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         chk(await api.insert("workshop_customers",{id:custId,name:d.customer_name.trim(),phone:d.customer_phone||"",email:d.customer_email||"",workshop_id:wsId||null}),"Save customer");
         d.workshop_customer_id=custId;
       }
-      // Auto-create workshop_vehicle if not linked yet
-      if(!d.workshop_vehicle_id && d.vehicle_reg?.trim()){
+      // Auto-create workshop_vehicle if not linked yet, or if the linked ID no longer exists
+      const vehicleExists=d.workshop_vehicle_id&&workshopVehicles.some(v=>v.id===d.workshop_vehicle_id);
+      if(!vehicleExists && d.vehicle_reg?.trim()){
         const vehId=makeId("WSV");
         chk(await api.insert("workshop_vehicles",{id:vehId,workshop_customer_id:d.workshop_customer_id||null,reg:d.vehicle_reg.trim(),make:d.vehicle_make||"",model:d.vehicle_model||"",year:d.vehicle_year||"",color:d.vehicle_color||"",vin:d.vin||"",engine_no:d.engine_no||"",licence_disc_expiry:d.licence_disc_expiry||null,workshop_id:wsId||null}),"Save vehicle");
         d.workshop_vehicle_id=vehId;

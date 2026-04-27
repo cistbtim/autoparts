@@ -671,7 +671,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       if(d.id){ chk(await api.patch("workshop_jobs","id",d.id,jobRow),"Update job"); }
       else { savedId=makeId("JOB"); chk(await api.insert("workshop_jobs",{...jobRow, id:savedId}),"Create job"); }
 
-      // Save/upload condition photos captured during job creation (fire-and-forget)
+      // Save/upload condition photos — awaited so modal stays open until Drive URLs are back
       const allPhotoEntries=[
         {field:"photo_front",viewName:"front",data:d.photo_front},
         {field:"photo_rear", viewName:"rear", data:d.photo_rear},
@@ -681,42 +681,37 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       const uploadEntries   = allPhotoEntries.filter(p=>p.data.startsWith("data:"));
       if(allPhotoEntries.length&&d.workshop_vehicle_id){
         const vehId=d.workshop_vehicle_id;
-        // Drive URLs selected from picker — save directly to vehicle record
         if(driveUrlEntries.length){
           const patch={};
           driveUrlEntries.forEach(p=>{ patch[p.field]=p.data; });
           try{ await api.patch("workshop_vehicles","id",vehId,patch); }catch{}
         }
-        // data: URLs — resize + upload to Drive, then save URL
         const SCRIPT_URL=(window._VEHICLE_SCRIPT_URL?.trim())||(window._APPS_SCRIPT_URL?.trim())||"";
         if(uploadEntries.length&&SCRIPT_URL){
-          (async()=>{
-            const _n=new Date(),_p=n=>String(n).padStart(2,"0");
-            const _date=`${_n.getFullYear()}-${_p(_n.getMonth()+1)}-${_p(_n.getDate())}`;
-            const _dt=`${_date.replace(/-/g,"")}_${_p(_n.getHours())}${_p(_n.getMinutes())}${_p(_n.getSeconds())}`;
-            const _plate=(d.vehicle_reg||vehId).replace(/\s/g,"").toUpperCase();
-            const folderPath="Tim_Car_Phot/"+_plate+"/"+_date;
-            for(const p of uploadEntries){
-              try{
-                const resized=await new Promise((res,rej)=>{
-                  const img=new Image();
-                  img.onload=()=>{
-                    const MAX=1200; const canvas=document.createElement("canvas");
-                    let w=img.width,h=img.height;
-                    if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
-                    canvas.width=w;canvas.height=h;
-                    canvas.getContext("2d").drawImage(img,0,0,w,h);
-                    res(canvas.toDataURL("image/jpeg",0.88));
-                  };
-                  img.onerror=rej; img.src=p.data;
-                });
-                const filename=_dt+"_"+p.viewName+".jpg";
-                const r=await(await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:resized,filename,mimeType:"image/jpeg",folderPath})})).json();
-                if(r.success) await api.patch("workshop_vehicles","id",vehId,{[p.field]:r.url});
-              }catch{}
-            }
-            await refreshWorkshopData();
-          })();
+          const _n=new Date(),_p=n=>String(n).padStart(2,"0");
+          const _date=`${_n.getFullYear()}-${_p(_n.getMonth()+1)}-${_p(_n.getDate())}`;
+          const _dt=`${_date.replace(/-/g,"")}_${_p(_n.getHours())}${_p(_n.getMinutes())}${_p(_n.getSeconds())}`;
+          const _plate=(d.vehicle_reg||vehId).replace(/\s/g,"").toUpperCase();
+          const folderPath="Tim_Car_Phot/"+_plate+"/"+_date;
+          for(const p of uploadEntries){
+            try{
+              const resized=await new Promise((res,rej)=>{
+                const img=new Image();
+                img.onload=()=>{
+                  const MAX=1200; const canvas=document.createElement("canvas");
+                  let w=img.width,h=img.height;
+                  if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+                  canvas.width=w;canvas.height=h;
+                  canvas.getContext("2d").drawImage(img,0,0,w,h);
+                  res(canvas.toDataURL("image/jpeg",0.88));
+                };
+                img.onerror=rej; img.src=p.data;
+              });
+              const filename=_dt+"_"+p.viewName+".jpg";
+              const r=await(await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:resized,filename,mimeType:"image/jpeg",folderPath})})).json();
+              if(r.success) await api.patch("workshop_vehicles","id",vehId,{[p.field]:r.url});
+            }catch{}
+          }
         }
       }
 

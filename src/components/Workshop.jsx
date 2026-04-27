@@ -4553,6 +4553,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
   });
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const [tab,setTab]=useState("customer");
+  const [saving,setSaving]=useState(false);
   const [custSearch,setCustSearch]=useState(job.customer_name||"");
   const [showCustDrop,setShowCustDrop]=useState(false);
   const [selCustomer,setSelCustomer]=useState(()=>wsCustomers.find(c=>c.id===job.workshop_customer_id)||null);
@@ -4853,15 +4854,22 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
       )}
 
       <div style={{display:"flex",gap:10,marginTop:18}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={()=>{
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose} disabled={saving}>{t.cancel}</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={saving} onClick={async()=>{
           if(!f.customer_name.trim()){alert("Customer name required — go to Customer tab");setTab("customer");return;}
           if(!f.vehicle_reg.trim()){alert("Vehicle plate required — go to Vehicle tab");setTab("vehicle");return;}
           if(!f.mileage){alert("Mileage required — go to Vehicle tab");setTab("vehicle");return;}
           if(!f.complaint.trim()){alert("Main job / complaint required — go to Job tab");setTab("job");return;}
           if(f.parent_job_id&&!f.return_reason.trim()){alert("Return reason required for return jobs — go to Job tab");setTab("job");return;}
-          onSave(f);
-        }}>💾 {t.save}</button>
+          setSaving(true);
+          try{ await onSave(f); }
+          catch(e){ alert("Save failed: "+e.message); setSaving(false); }
+        }}>
+          {saving?(()=>{
+            const n=[f.photo_front,f.photo_rear,f.photo_side].filter(p=>p&&p.startsWith("data:")).length;
+            return n>0?`📤 Uploading ${n} photo${n>1?"s":""}...`:"💾 Saving...";
+          })():`💾 ${t.save}`}
+        </button>
       </div>
     </Overlay>
   );

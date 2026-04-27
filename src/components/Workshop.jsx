@@ -4325,7 +4325,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           wsStock={wsStock}
           wsServices={wsServices}
           defaultMarkupPct={wsProfile?.default_markup_pct||0}
-          onSave={async(item)=>{ await onSaveItem({...item,job_id:job.id}); setAddingItem(null); }}
+          onSave={async(item)=>{ await onSaveItem({...item,job_id:job.id}); }}
           onClose={()=>setAddingItem(null)}
           onGoToStock={onGoToStock}
           t={t}/>

@@ -1228,6 +1228,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onSaveWsPurchaseOrder={onSaveWsPurchaseOrder}
         onViewPurchaseOrders={()=>{ setView("list"); setWsTab("wssuporders"); }}
         onViewPO={(poId)=>{ setPendingViewPoId(poId); setView("list"); setWsTab("wssuporders"); }}
+        onGoToStock={()=>{ setView("list"); setWsTab("wsstock"); }}
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
@@ -2855,7 +2856,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,wsId=null,wsProfile={},t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -4326,6 +4327,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           defaultMarkupPct={wsProfile?.default_markup_pct||0}
           onSave={async(item)=>{ await onSaveItem({...item,job_id:job.id}); setAddingItem(null); }}
           onClose={()=>setAddingItem(null)}
+          onGoToStock={onGoToStock}
           t={t}/>
       )}
 
@@ -5051,7 +5053,7 @@ function JobPhotoSlot({label, value, onChange, reg}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP ITEM MODAL — Add Part or Labour (uses workshop stock)
 // ═══════════════════════════════════════════════════════════════
-function WorkshopItemModal({type, wsStock=[], wsServices=[], defaultMarkupPct=0, onSave, onClose, t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, t}) {
   const [desc,      setDesc]      = useState("");
   const [qty,       setQty]       = useState(1);
   const [price,     setPrice]     = useState("");
@@ -5142,8 +5144,17 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], defaultMarkupPct=0,
         {(search||list.length<=10)&&!selItem&&(
           <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:300,overflowY:"auto",marginBottom:8}}>
             {(search?filtered:list.slice(0,20)).length===0
-              ? <div style={{padding:12,color:"var(--text3)",fontSize:13,textAlign:"center"}}>
-                  {type==="part"?"No workshop stock — add items in WS Stock tab":"No services — add presets in Services tab"}
+              ? <div style={{padding:16,textAlign:"center"}}>
+                  <div style={{color:"var(--text3)",fontSize:13,marginBottom:10}}>
+                    {type==="part"
+                      ? (search ? `No stock found for "${search}"` : "No workshop stock yet")
+                      : (search ? `No services found for "${search}"` : "No services yet")}
+                  </div>
+                  {type==="part"&&onGoToStock&&(
+                    <button className="btn btn-primary btn-sm" onClick={()=>{onClose();onGoToStock();}}>
+                      + Add to WS Stock
+                    </button>
+                  )}
                 </div>
               : (search?filtered:list.slice(0,20)).map(p=>(
                   <div key={p.id} onClick={()=>selectItem(p)}

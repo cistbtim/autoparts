@@ -5779,7 +5779,7 @@ function WsStockPage({wsStock=[],settings,onSave,onDelete,onAdjust}) {
           onClose={()=>setModal(null)}/>
       )}
       {(modal?.mode==="add"||modal?.mode==="edit")&&(
-        <WsStockModal item={modal.item}
+        <WsStockModal item={modal.item} wsStock={wsStock}
           onSave={async(d)=>{ await onSave(d); setModal(null); }}
           onClose={()=>setModal(null)}/>
       )}
@@ -5787,7 +5787,7 @@ function WsStockPage({wsStock=[],settings,onSave,onDelete,onAdjust}) {
   );
 }
 
-function WsStockModal({item,onSave,onClose}) {
+function WsStockModal({item,wsStock=[],onSave,onClose}) {
   const [name,setName]=useState(item?.name||"");
   const [sku,setSku]=useState(item?.sku||"");
   const [desc,setDesc]=useState(item?.description||"");
@@ -5798,7 +5798,14 @@ function WsStockModal({item,onSave,onClose}) {
   const [lowStock,setLowStock]=useState(item?.min_qty||"");
   const [quoteOnly,setQuoteOnly]=useState(item?.quote_only||false);
   const [saving,setSaving]=useState(false);
+  const [skuOpen,setSkuOpen]=useState(false);
   const isEdit=!!item;
+
+  const skuTerm = sku.trim().toLowerCase();
+  const skuMatches = wsStock.filter(p=>
+    p.sku && p.id!==item?.id &&
+    (skuTerm ? p.sku.toLowerCase().includes(skuTerm) || (p.name||"").toLowerCase().includes(skuTerm) : true)
+  ).slice(0,8);
 
   const handleSave=async()=>{
     if(!name.trim()){alert("Name is required");return;}
@@ -5825,7 +5832,34 @@ function WsStockModal({item,onSave,onClose}) {
       <MHead title={isEdit?"✏️ Edit Stock Item":"+ New Stock Item"} onClose={onClose}/>
       <FG>
         <FD style={{gridColumn:"1/-1"}}><FL label="Name *"/><input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Oil Filter — Toyota"/></FD>
-        <FD><FL label="SKU"/><input className="inp" value={sku} onChange={e=>setSku(e.target.value)} placeholder="WS-001"/></FD>
+        <FD><FL label="SKU"/>
+          <div style={{position:"relative"}}>
+            <input className="inp" value={sku}
+              onChange={e=>{setSku(e.target.value);setSkuOpen(true);}}
+              onFocus={()=>setSkuOpen(true)}
+              onBlur={()=>setTimeout(()=>setSkuOpen(false),150)}
+              placeholder="WS-001"/>
+            {skuOpen&&(skuMatches.length>0||skuTerm)&&(
+              <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:200,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",maxHeight:220,overflowY:"auto",marginTop:2}}>
+                {skuMatches.map(p=>(
+                  <div key={p.id} onMouseDown={()=>{setSku(p.sku);setSkuOpen(false);}}
+                    style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,fontSize:13}}
+                    onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
+                    onMouseLeave={e=>e.currentTarget.style.background=""}>
+                    <span><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{p.sku}</code> — {p.name}</span>
+                    <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>already in stock</span>
+                  </div>
+                ))}
+                {skuTerm&&!skuMatches.find(p=>p.sku.toLowerCase()===skuTerm)&&(
+                  <div onMouseDown={()=>setSkuOpen(false)}
+                    style={{padding:"8px 12px",fontSize:13,color:"var(--accent)",fontWeight:600,cursor:"default"}}>
+                    + Add new: <code style={{fontFamily:"DM Mono,monospace"}}>{sku.trim()}</code>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </FD>
         <FD><FL label="Unit"/><input className="inp" value={unit} onChange={e=>setUnit(e.target.value)} placeholder="pcs / L / set"/></FD>
         <FD><FL label="Qty on Hand"/><input className="inp" type="number" value={qty} onChange={e=>setQty(e.target.value)} min="0" step="1" disabled={quoteOnly} style={{opacity:quoteOnly?.5:1}}/></FD>
         <FD><FL label="Low Stock Alert"/><input className="inp" type="number" value={lowStock} onChange={e=>setLowStock(e.target.value)} min="0" disabled={quoteOnly} style={{opacity:quoteOnly?.5:1}}/></FD>

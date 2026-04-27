@@ -3155,6 +3155,30 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
     setSavedPhotos(p=>p.filter(x=>x.id!==photoId));
   };
 
+  const pasteJobPhoto=async()=>{
+    try{
+      const items=await navigator.clipboard.read();
+      let found=false;
+      for(const item of items){
+        const imgType=item.types.find(t=>t.startsWith("image/"));
+        if(!imgType) continue;
+        found=true;
+        const blob=await item.getType(imgType);
+        const fr=new FileReader();
+        fr.onload=ev=>{
+          jobPhotoCounter.current+=1;
+          const uid=jobPhotoCounter.current;
+          setUploadPhotos(p=>[...p,{id:uid,dataUrl:ev.target.result,status:"pending",url:null,error:null}]);
+          uploadJobPhoto(uid,ev.target.result);
+        };
+        fr.readAsDataURL(blob);
+      }
+      if(!found) alert("No image found in clipboard — copy an image first then paste.");
+    }catch(e){
+      alert("Clipboard access denied. Allow clipboard permission in your browser and try again.");
+    }
+  };
+
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const tax      = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
   const total    = subtotal+tax;
@@ -3608,6 +3632,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             <div style={{display:"flex",gap:6}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoCamRef.current?.click()}>📷 Camera</button>
               <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoGalRef.current?.click()}>🖼️ Gallery</button>
+              <button className="btn btn-ghost btn-sm" onClick={pasteJobPhoto}>📋 Paste</button>
             </div>
             <input ref={jobPhotoCamRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleJobPhotoFile}/>
             <input ref={jobPhotoGalRef} type="file" multiple style={{display:"none"}} onChange={handleJobPhotoFile}/>
@@ -3615,7 +3640,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           {loadingPhotos?(
             <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:12}}>Loading photos...</div>
           ):(savedPhotos.length===0&&uploadPhotos.length===0)?(
-            <div style={{textAlign:"center",padding:"32px 0",color:"var(--text3)",fontSize:13}}>No photos yet — tap Camera or Gallery</div>
+            <div style={{textAlign:"center",padding:"32px 0",color:"var(--text3)",fontSize:13}}>No photos yet — tap Camera, Gallery or Paste</div>
           ):(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
               {savedPhotos.map(p=>{

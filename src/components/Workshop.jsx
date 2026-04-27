@@ -3167,6 +3167,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
     {label:"PartsOuq",  icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:`https://partsouq.com/en/search/all?q=${encodeURIComponent(job.vin)}`},
     {label:"RealOEM",   icon:"🚗", color:"var(--green)",  bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`},
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},
+    {label:"17VIN",     icon:"🆔", color:"var(--text2)",  bg:"rgba(148,163,184,.13)", href:`https://en.17vin.com/vin/${encodeURIComponent(job.vin)}`},
     {label:"Willard 🔋",icon:"🔋", color:"#ef4444",       bg:"rgba(220,38,38,.11)",   href:"https://willard.co.za/battery-selection-tool/"},
     {label:"VARTA 🔋",  icon:"⚡", color:"#6366f1",       bg:"rgba(99,102,241,.11)",  href:"https://www.varta-automotive.com/battery-finder"},
     {label:"Safeline",  icon:"🛑", color:"#dc2626",       bg:"rgba(220,38,38,.09)",   href:"https://safelinebrakes.co.za/"},

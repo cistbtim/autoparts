@@ -5063,10 +5063,12 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], defaultMarkupPct=0,
   const [search,    setSearch]    = useState("");
   const [saving,    setSaving]    = useState(false);
   const [justAdded, setJustAdded] = useState(false);
+  const [addedIds,  setAddedIds]  = useState(new Set());
 
   const list = type==="part" ? wsStock : wsServices;
 
   const filtered = list.filter(p=>{
+    if(addedIds.has(p.id)) return false;
     if(!search.trim()) return true;
     const hay=`${p.name||""} ${p.sku||""} ${p.description||""}`.toLowerCase();
     return search.trim().toLowerCase().split(/\s+/).every(w=>hay.includes(w));
@@ -5113,6 +5115,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], defaultMarkupPct=0,
         markup_pct:type==="part"?+markupPct:0,
         total:(+qty)*(+price),
       });
+      if(selItem?.id) setAddedIds(prev=>new Set([...prev,selItem.id]));
       resetForm();
       setJustAdded(true);
       setTimeout(()=>setJustAdded(false),2000);

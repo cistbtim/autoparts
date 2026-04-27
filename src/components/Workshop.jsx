@@ -5068,11 +5068,12 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 
   const list = type==="part" ? wsStock : wsServices;
 
-  // IDs already on the job (pre-existing) + added this session
-  const existingStockIds = new Set(existingItems.map(i=>i.ws_stock_id).filter(Boolean));
+  // SKUs already on the job (pre-existing) + IDs added this session
+  const existingSkus = new Set(existingItems.map(i=>i.part_sku).filter(Boolean));
 
   const filtered = list.filter(p=>{
-    if(addedIds.has(p.id)||existingStockIds.has(p.id)) return false;
+    if(addedIds.has(p.id)) return false;
+    if(p.sku && existingSkus.has(p.sku)) return false;
     if(!search.trim()) return true;
     const hay=`${p.name||""} ${p.sku||""} ${p.description||""}`.toLowerCase();
     return search.trim().toLowerCase().split(/\s+/).every(w=>hay.includes(w));

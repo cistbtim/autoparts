@@ -696,23 +696,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             const _dt=`${_date.replace(/-/g,"")}_${_p(_n.getHours())}${_p(_n.getMinutes())}${_p(_n.getSeconds())}`;
             const _plate=(d.vehicle_reg||vehId).replace(/\s/g,"").toUpperCase();
             const folderPath="Tim_Car_Phot/"+_plate+"/"+_date;
-            try{ await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"createFolder",folderPath})}); }catch{}
             for(const p of uploadEntries){
               try{
                 const resized=await new Promise((res,rej)=>{
                   const img=new Image();
                   img.onload=()=>{
-                    const MAX=800; const canvas=document.createElement("canvas");
+                    const MAX=1200; const canvas=document.createElement("canvas");
                     let w=img.width,h=img.height;
                     if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
                     canvas.width=w;canvas.height=h;
                     canvas.getContext("2d").drawImage(img,0,0,w,h);
-                    res(canvas.toDataURL("image/png"));
+                    res(canvas.toDataURL("image/jpeg",0.88));
                   };
                   img.onerror=rej; img.src=p.data;
                 });
-                const filename=_dt+"_"+p.viewName+".png";
-                const r=await(await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:resized,filename,mimeType:"image/png",folderPath})})).json();
+                const filename=_dt+"_"+p.viewName+".jpg";
+                const r=await(await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:resized,filename,mimeType:"image/jpeg",folderPath})})).json();
                 if(r.success) await api.patch("workshop_vehicles","id",vehId,{[p.field]:r.url});
               }catch{}
             }

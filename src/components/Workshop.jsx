@@ -4324,6 +4324,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           type={addingItem}
           wsStock={wsStock}
           wsServices={wsServices}
+          existingItems={items}
           defaultMarkupPct={wsProfile?.default_markup_pct||0}
           onSave={async(item)=>{ await onSaveItem({...item,job_id:job.id}); }}
           onClose={()=>setAddingItem(null)}
@@ -5053,7 +5054,7 @@ function JobPhotoSlot({label, value, onChange, reg}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP ITEM MODAL — Add Part or Labour (uses workshop stock)
 // ═══════════════════════════════════════════════════════════════
-function WorkshopItemModal({type, wsStock=[], wsServices=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, t}) {
   const [desc,      setDesc]      = useState("");
   const [qty,       setQty]       = useState(1);
   const [price,     setPrice]     = useState("");
@@ -5067,8 +5068,11 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], defaultMarkupPct=0,
 
   const list = type==="part" ? wsStock : wsServices;
 
+  // IDs already on the job (pre-existing) + added this session
+  const existingStockIds = new Set(existingItems.map(i=>i.ws_stock_id).filter(Boolean));
+
   const filtered = list.filter(p=>{
-    if(addedIds.has(p.id)) return false;
+    if(addedIds.has(p.id)||existingStockIds.has(p.id)) return false;
     if(!search.trim()) return true;
     const hay=`${p.name||""} ${p.sku||""} ${p.description||""}`.toLowerCase();
     return search.trim().toLowerCase().split(/\s+/).every(w=>hay.includes(w));

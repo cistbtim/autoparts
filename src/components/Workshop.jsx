@@ -2436,12 +2436,12 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
                     <span>{lk.label}</span>
                   </a>
                 ))}
-                <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.autozoneonline.co.za","_blank");}}
+                <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open(`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`,"_blank");}}
                   style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
                     background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:10,
                     color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
                   <span style={{fontSize:20}}>🔴</span>
-                  <span>AutoZone 📋</span>
+                  <span>AutoZone</span>
                 </button>
                 <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
                   style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",

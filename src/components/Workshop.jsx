@@ -1820,7 +1820,10 @@ function decodeVin(vin) {
     '5N':'Tiguan 2007–2016','AD':'Tiguan 2016–',
     '7P':'Touareg 2010–2018','CR':'Touareg 2018–',
     '6R':'Polo V 2009–2017','AW':'Polo VI 2017–',
-    '7N':'Sharan 2010–','1T':'Touran 2003–2010','5T':'Touran 2015–',
+    '6S':'Polo Vivo 2010–2019','6C':'Polo 2014–2017',
+    '2K':'Caddy 2004–2015','SB':'Caddy 2015–',
+    'S1':'Amarok 2010–','7N':'Sharan 2010–',
+    '1T':'Touran 2003–2010','5T':'Touran 2015–',
   };
 
   let model = null;

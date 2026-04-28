@@ -2082,7 +2082,19 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
 
   // VIN search lookup helper
+  const catcarSlug=(make)=>{
+    const m=(make||"").toLowerCase().replace(/[-\s]+/g,"");
+    const map={mercedesbenz:"mercedes-benz",mercedes:"mercedes-benz",vw:"volkswagen",landrover:"land-rover",rangerover:"land-rover",alfaromeo:"alfa-romeo"};
+    const slug=map[m]||(make||"").toLowerCase().replace(/\s+/g,"-");
+    return slug;
+  };
+  const catcarHref=job.vin
+    ? (job.vehicle_make
+        ? `https://catcar.info/${catcarSlug(job.vehicle_make)}/?lang=en&vin=${encodeURIComponent(job.vin)}`
+        : `https://catcar.info/?lang=en&vin=${encodeURIComponent(job.vin)}`)
+    : null;
   const vinSearchLinks = job.vin ? [
+    ...(catcarHref?[{label:"CatCar",    icon:"🐱", color:"#f97316",       bg:"rgba(249,115,22,.13)",  href:catcarHref}]:[]),
     {label:"PartsOuq",  icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:`https://partsouq.com/en/search/all?q=${encodeURIComponent(job.vin)}`},
     {label:"RealOEM",   icon:"🚗", color:"var(--green)",  bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`},
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},

@@ -1,0 +1,515 @@
+import { useState, useRef } from "react";
+import { api } from "../../lib/api.js";
+import { makeId } from "../../lib/helpers.js";
+import { decodePDF417fromImage, parseLicenceDisc } from "../../lib/barcode.js";
+import { Overlay, MHead, FL } from "../shared.jsx";
+import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
+
+export function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,onReopenJob,onClose,t}) {
+  const [step,setStep]=useState("scan");
+  const [plate,setPlate]=useState("");
+  const [scanLoading,setScanLoading]=useState(false);
+  const [scanError,setScanError]=useState(null);
+  const [scanResult,setScanResult]=useState(null);  // parsed disc data
+  const [rawBarcode,setRawBarcode]=useState("");     // raw decoded text
+  const [capturedImg,setCapturedImg]=useState(null);
+  // lookup results
+  const [foundVehicle,setFoundVehicle]=useState(null);
+  const [foundCustomer,setFoundCustomer]=useState(null);
+  const [openJobs,setOpenJobs]=useState([]);
+  const [history,setHistory]=useState([]);
+  // decision
+  const [decision,setDecision]=useState("new");
+  const [returnReason,setReturnReason]=useState("");
+  const [reopenJobId,setReopenJobId]=useState(null);
+  // job prefill for WorkshopJobModal
+  const [jobPrefill,setJobPrefill]=useState(null);
+  const [savingIntake,setSavingIntake]=useState(false);
+  // photo step
+  const [photoSession,setPhotoSession]=useState(null);   // {date,time} strings fixed at session start
+  const [photoList,setPhotoList]=useState([]);            // [{id,dataUrl,status,url,error}]
+  const [bookInJobId,setBookInJobId]=useState(null);      // job ID for linking photos to DB
+  const photoCounter=useRef(0);
+  const photoCamRef=useRef(null);
+  const photoGalRef=useRef(null);
+
+  // Native file inputs — no getUserMedia, no HTTPS required
+  const cameraRef=useRef(null);  // capture="environment" → opens native camera app
+  const galleryRef=useRef(null); // no capture → opens file picker / gallery
+
+  // ── Upload one photo to Google Drive + save URL to DB ─────────
+  const uploadBookInPhoto=async(photoId,dataUrl,session,reg,jobId)=>{
+    const SCRIPT_URL=
+      (window._VEHICLE_SCRIPT_URL&&window._VEHICLE_SCRIPT_URL.trim())||
+      (window._APPS_SCRIPT_URL&&window._APPS_SCRIPT_URL.trim())||"";
+    if(!SCRIPT_URL){
+      setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"error",error:"No script URL — set Vehicle Script URL in Settings"}:x));
+      return;
+    }
+    const setStatus=(s)=>setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:s}:x));
+    setStatus("uploading");
+    try{
+      // resize to max 1600px
+      const base64=await new Promise((res,rej)=>{
+        const img=new Image();
+        img.onload=()=>{
+          const MAX=1600;
+          const canvas=document.createElement("canvas");
+          let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          canvas.width=w;canvas.height=h;
+          canvas.getContext("2d").drawImage(img,0,0,w,h);
+          res(canvas.toDataURL("image/jpeg",0.88));
+        };
+        img.onerror=rej;
+        img.src=dataUrl;
+      });
+      const folderPath=`Tim_Car_Phot/${reg}/${session.date}`;
+      const n=String(photoId).padStart(3,"0");
+      const filename=`${session.date.replace(/-/g,"")}_${session.time.replace(/-/g,"")}_${n}.jpg`;
+      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType:"image/jpeg",folderPath})});
+      const result=await resp.json();
+      if(result.success){
+        // Save URL to DB linked to this job
+        if(jobId) await api.insert("workshop_job_photos",{id:makeId("PH"),job_id:jobId,url:result.url,folder_path:folderPath}).catch(()=>{});
+        setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"done",url:result.url}:x));
+      } else {
+        setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"error",error:result.error||"Upload failed"}:x));
+      }
+    }catch(e){
+      setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"error",error:e.message}:x));
+    }
+  };
+
+  const handlePhotoFile=(e)=>{
+    const files=Array.from(e.target.files||[]);
+    const fromCamera=e.target===photoCamRef.current;
+    e.target.value="";
+    if(!files.length) return;
+    const session=photoSession;
+    const reg=plate.replace(/\s/g,"").toUpperCase();
+    const jid=bookInJobId;
+    files.forEach(file=>{
+      if(!file.type.startsWith("image/")) return;
+      photoCounter.current+=1;
+      const id=photoCounter.current;
+      if(fromCamera){
+        const bUrl=URL.createObjectURL(file);
+        const a=document.createElement("a");
+        a.href=bUrl; a.download=`Workshop_${reg||"photo"}_${id}.jpg`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(()=>URL.revokeObjectURL(bUrl),5000);
+      }
+      const fr=new FileReader();
+      fr.onload=ev=>{
+        const dataUrl=ev.target.result;
+        setPhotoList(p=>[...p,{id,dataUrl,status:"pending",url:null,error:null}]);
+        uploadBookInPhoto(id,dataUrl,session,reg,jid);
+      };
+      fr.readAsDataURL(file);
+    });
+  };
+
+  // ── Process an image file → decode PDF417 ──────────────────────
+  const processImage=async(dataUrl)=>{
+    setScanLoading(true); setScanError(null); setRawBarcode(""); setScanResult(null);
+    try{
+      const raw=await decodePDF417fromImage(dataUrl);
+      setRawBarcode(raw);
+      const parsed=parseLicenceDisc(raw);
+      setScanResult(parsed);
+      const reg=parsed.reg?.replace(/\s/g,"").toUpperCase()||"";
+      if(reg) setPlate(reg);
+      setScanLoading(false);
+      // Auto-proceed to lookup — pass reg directly to avoid stale state on mobile
+      if(reg) doLookup(reg);
+    }catch(e){
+      setScanError("PDF417 not detected — try a clearer, closer photo. ("+e.message+")");
+      setScanLoading(false);
+    }
+  };
+
+  const handleFile=(e)=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    const fr=new FileReader();
+    fr.onload=ev=>{setCapturedImg(ev.target.result); processImage(ev.target.result);};
+    fr.readAsDataURL(file);
+    e.target.value="";
+  };
+
+  const doLookup=(regOverride)=>{
+    const reg=(regOverride||plate).toUpperCase().trim();
+    if(!reg){alert("Enter or scan a plate first");return;}
+    const veh=wsVehicles.find(v=>(v.reg||"").toUpperCase().replace(/\s/g,"")===reg.replace(/\s/g,""));
+    const cust=veh?wsCustomers.find(c=>c.id===veh.workshop_customer_id):null;
+    const h=jobs.filter(j=>{
+      const jr=(j.vehicle_reg||"").toUpperCase().replace(/\s/g,"");
+      return jr===reg.replace(/\s/g,"")||(veh&&j.workshop_vehicle_id===veh.id);
+    }).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
+    const open=h.filter(j=>j.status!=="Delivered");
+    setFoundVehicle(veh||null); setFoundCustomer(cust||null);
+    setHistory(h); setOpenJobs(open);
+    if(open.length>0){ setDecision("reopen"); setReopenJobId(open[0].id); }
+    else { setDecision("new"); }
+    setStep("lookup");
+  };
+
+  const proceedToJob=()=>{
+    const prefill={
+      workshop_customer_id:foundCustomer?.id||null,
+      workshop_vehicle_id:foundVehicle?.id||null,
+      customer_name:foundCustomer?.name||"",
+      customer_phone:foundCustomer?.phone||"",
+      customer_email:foundCustomer?.email||"",
+      vehicle_reg:plate,
+      vehicle_make:scanResult?.make||foundVehicle?.make||"",
+      vehicle_model:scanResult?.model||foundVehicle?.model||"",
+      vehicle_year:foundVehicle?.year||"",
+      vehicle_color:scanResult?.color||foundVehicle?.color||"",
+      vin:scanResult?.vin||foundVehicle?.vin||"",
+      engine_no:scanResult?.engine_no||foundVehicle?.engine_no||"",
+      licence_disc_expiry:scanResult?.expiry_date||foundVehicle?.licence_disc_expiry||"",
+      mileage:"",complaint:"",diagnosis:"",mechanic:"",
+      date_in:new Date().toISOString().slice(0,10),
+      date_out:"",notes:"",status:"Pending",
+      return_reason:openJobs.length>0?returnReason:"",
+      parent_job_id:openJobs.length>0?(openJobs.find(j=>j.id===reopenJobId)||openJobs[0]).id:null,
+    };
+    setJobPrefill(prefill);
+    setStep("intake");
+  };
+
+  const handleProceed=async()=>{
+    if(openJobs.length>0&&decision==="reopen"){
+      if(!returnReason.trim()){alert("Return reason required");return;}
+      const ej=openJobs.find(j=>j.id===reopenJobId)||openJobs[0];
+      await onReopenJob({...ej,status:"In Progress",return_reason:returnReason,date_in:new Date().toISOString().slice(0,10),mileage:ej.mileage});
+      return;
+    }
+    if(openJobs.length>0&&decision==="new"&&!returnReason.trim()){
+      alert("Return reason required when vehicle has open jobs");return;
+    }
+    proceedToJob();
+  };
+
+  // ── Quick intake step ─────────────────────────────────────────
+  if(step==="intake"&&jobPrefill){
+    const [intakeName,    setIntakeName]    = [jobPrefill.customer_name,    (v)=>setJobPrefill(p=>({...p,customer_name:v}))];
+    const [intakePhone,   setIntakePhone]   = [jobPrefill.customer_phone,   (v)=>setJobPrefill(p=>({...p,customer_phone:v}))];
+    const [intakeMileage, setIntakeMileage] = [jobPrefill.mileage,          (v)=>setJobPrefill(p=>({...p,mileage:v}))];
+    const [intakeComplaint,setIntakeComplaint]=[jobPrefill.complaint,       (v)=>setJobPrefill(p=>({...p,complaint:v}))];
+    const canSave=intakeName.trim()&&intakePhone.trim()&&intakeMileage&&intakeComplaint.trim();
+    const saveIntake=async()=>{
+      if(!canSave){alert("Please fill in all fields");return;}
+      setSavingIntake(true);
+      try{
+        const jobId=await onSaveJob(jobPrefill);
+        const now=new Date();
+        const pad2=n=>String(n).padStart(2,"0");
+        setBookInJobId(jobId||null);
+        setPhotoSession({date:`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`,time:`${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`});
+        setPhotoList([]); photoCounter.current=0;
+        setStep("photos");
+      }catch(e){alert("Save failed: "+e.message);}
+      setSavingIntake(false);
+    };
+    return(
+      <Overlay onClose={onClose} wide>
+        <MHead title="🚗 Quick Book-In" onClose={onClose}/>
+        {/* Vehicle banner */}
+        <div style={{background:"var(--surface2)",borderRadius:10,padding:"10px 14px",marginBottom:16,display:"flex",gap:10,alignItems:"center"}}>
+          <span style={{fontSize:26}}>🚗</span>
+          <div>
+            <div style={{fontWeight:700,fontSize:15}}>{plate}</div>
+            <div style={{fontSize:12,color:"var(--text3)"}}>{[jobPrefill.vehicle_make,jobPrefill.vehicle_model,jobPrefill.vehicle_color].filter(Boolean).join(" · ")||"Vehicle"}</div>
+          </div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div><FL label="Customer Name *"/><input className="inp" autoFocus value={intakeName} onChange={e=>setIntakeName(e.target.value)} placeholder="e.g. John Smith"/></div>
+          <div><FL label="Phone *"/><input className="inp" type="tel" value={intakePhone} onChange={e=>setIntakePhone(e.target.value)} placeholder="+27 82 000 0000"/></div>
+          <div><FL label="Current Mileage *"/><input className="inp" type="number" min="0" value={intakeMileage} onChange={e=>setIntakeMileage(e.target.value)} placeholder="e.g. 120000"/></div>
+          <div><FL label="Main Job / Customer Complaint *"/><textarea className="inp" rows={3} value={intakeComplaint} onChange={e=>setIntakeComplaint(e.target.value)} placeholder="e.g. Check engine light on, service due" style={{resize:"vertical"}}/></div>
+        </div>
+        <div style={{display:"flex",gap:10,marginTop:16}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setStep("lookup")}>← Back</button>
+          <button className="btn btn-primary" style={{flex:2,padding:14,fontSize:15}} onClick={saveIntake} disabled={savingIntake||!canSave}>
+            {savingIntake?"Saving...":"✅ Save & Take Photos →"}
+          </button>
+        </div>
+      </Overlay>
+    );
+  }
+
+  // ── Photo capture step ───────────────────────────────────────
+  if(step==="photos"&&photoSession){
+    const reg=plate.replace(/\s/g,"").toUpperCase();
+    const folderDisplay=`Tim_Car_Phot/${reg}/${photoSession.date}/`;
+    const done=photoList.filter(p=>p.status==="done").length;
+    const uploading=photoList.filter(p=>p.status==="uploading"||p.status==="pending").length;
+    const hasScript=!!(
+      (window._VEHICLE_SCRIPT_URL&&window._VEHICLE_SCRIPT_URL.trim())||
+      (window._APPS_SCRIPT_URL&&window._APPS_SCRIPT_URL.trim())
+    );
+    return (
+      <Overlay onClose={onClose} wide>
+        <MHead title={`📷 Vehicle Photos — ${reg}`} onClose={onClose}/>
+
+        {/* Job saved banner */}
+        <div style={{marginBottom:14,padding:10,background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.25)",borderRadius:10,fontSize:13}}>
+          <div style={{fontWeight:700,color:"var(--green)"}}>✅ Job card saved!</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Now take photos of the vehicle. Tap Done to skip.</div>
+        </div>
+
+        {/* Save path info */}
+        <div style={{marginBottom:12,padding:"8px 10px",background:"var(--surface2)",borderRadius:8,fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace",wordBreak:"break-all"}}>
+          📁 {folderDisplay}
+        </div>
+
+        {!hasScript&&(
+          <div style={{marginBottom:12,padding:10,background:"rgba(251,100,60,.08)",border:"1px solid rgba(251,100,60,.2)",borderRadius:8,fontSize:12,color:"var(--red)"}}>
+            ⚙️ No Apps Script URL configured — photos will not upload to Google Drive. Set <strong>Vehicle Script URL</strong> in Settings.
+          </div>
+        )}
+
+        {/* Camera / gallery buttons */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+          <button className="btn btn-primary" style={{padding:18,flexDirection:"column",display:"flex",alignItems:"center",gap:6,fontSize:13}}
+            onClick={()=>photoCamRef.current?.click()}>
+            <span style={{fontSize:26}}>📷</span>
+            Take Photo
+          </button>
+          <button className="btn btn-ghost" style={{padding:18,flexDirection:"column",display:"flex",alignItems:"center",gap:6,fontSize:13}}
+            onClick={()=>photoGalRef.current?.click()}>
+            <span style={{fontSize:26}}>🖼️</span>
+            Gallery
+          </button>
+          <input ref={photoCamRef} type="file" accept="image/*" capture="environment" multiple style={{display:"none"}} onChange={handlePhotoFile}/>
+          <input ref={photoGalRef} type="file" multiple style={{display:"none"}} onChange={handlePhotoFile}/>
+        </div>
+
+        {/* Photo grid */}
+        {photoList.length>0&&(
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:600,color:"var(--text3)",marginBottom:8}}>
+              {photoList.length} photo{photoList.length!==1?"s":""} — {done} uploaded{uploading>0?`, ${uploading} in progress`:""}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(90px,1fr))",gap:8}}>
+              {photoList.map(p=>(
+                <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3"}}>
+                  <img src={p.dataUrl} alt={`photo ${p.id}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  {/* Status overlay */}
+                  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",
+                    background:p.status==="done"?"rgba(0,0,0,0)":p.status==="error"?"rgba(200,30,30,.5)":"rgba(0,0,0,.45)"}}>
+                    {(p.status==="pending"||p.status==="uploading")&&(
+                      <div style={{width:18,height:18,border:"2px solid rgba(255,255,255,.3)",borderTop:"2px solid #fff",
+                        borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+                    )}
+                    {p.status==="done"&&(
+                      <div style={{position:"absolute",top:3,right:5,fontSize:14}}>✅</div>
+                    )}
+                    {p.status==="error"&&(
+                      <div style={{fontSize:10,color:"#fff",textAlign:"center",padding:4}}>❌<br/>{(p.error||"").slice(0,30)}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {photoList.length===0&&(
+          <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:13}}>
+            No photos yet — tap <strong>Take Photo</strong> to start
+          </div>
+        )}
+
+        <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,fontWeight:700,marginTop:4}}
+          onClick={onClose} disabled={uploading>0}>
+          {uploading>0?`⏳ Uploading ${uploading} photo${uploading!==1?"s":""}...`:`✅ Done${done>0?` (${done} photo${done!==1?"s":""} saved)`:""}`}
+        </button>
+      </Overlay>
+    );
+  }
+
+  // ── Scan step ────────────────────────────────────────────────
+  if(step==="scan"){
+    return (
+      <Overlay onClose={onClose} wide>
+        <MHead title="📷 Book In Car" onClose={onClose}/>
+
+        {/* Camera or file capture — native file inputs, no getUserMedia, works on HTTP/mobile */}
+        {!capturedImg&&(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
+            <button className="btn btn-ghost" style={{padding:20,flexDirection:"column",display:"flex",alignItems:"center",gap:6,fontSize:13}}
+              onClick={()=>cameraRef.current?.click()}>
+              <span style={{fontSize:28}}>📷</span>
+              Take Photo
+            </button>
+            <button className="btn btn-ghost" style={{padding:20,flexDirection:"column",display:"flex",alignItems:"center",gap:6,fontSize:13}}
+              onClick={()=>galleryRef.current?.click()}>
+              <span style={{fontSize:28}}>🖼️</span>
+              Choose Photo
+            </button>
+            {/* capture="environment" opens rear camera directly on mobile */}
+            <input ref={cameraRef}  type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFile}/>
+            <input ref={galleryRef} type="file" style={{display:"none"}} onChange={handleFile}/>
+          </div>
+        )}
+
+        {/* Captured image + scan result */}
+        {capturedImg&&(
+          <div style={{marginBottom:14}}>
+            <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+              <img src={capturedImg} alt="disc" style={{width:120,height:90,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",flexShrink:0}}/>
+              <div style={{flex:1}}>
+                {scanLoading&&<div style={{color:"var(--blue)",fontSize:13}}>🔍 Reading barcode...</div>}
+                {scanError&&<div style={{color:"var(--red)",fontSize:12}}>⚠️ {scanError}</div>}
+                {rawBarcode&&!scanLoading&&(
+                  <div style={{fontSize:12,lineHeight:1.7}}>
+                    <div style={{color:"var(--green)",fontWeight:600,marginBottom:4}}>✓ Barcode decoded</div>
+                    {scanResult?.reg&&<div><strong>Plate:</strong> <code style={{fontFamily:"DM Mono,monospace",fontWeight:700}}>{scanResult.reg}</code></div>}
+                    {scanResult?.make&&<div><strong>Make:</strong> {scanResult.make}</div>}
+                    {scanResult?.model&&<div><strong>Model:</strong> {scanResult.model}</div>}
+                    {scanResult?.color&&<div><strong>Color:</strong> {scanResult.color}</div>}
+                    {scanResult?.vin&&<div><strong>VIN:</strong> <code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{scanResult.vin}</code></div>}
+                    {scanResult?.engine_no&&<div><strong>Engine:</strong> <code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{scanResult.engine_no}</code></div>}
+                    {scanResult?.expiry_date&&<div><strong>Disc Expiry:</strong> <span style={{color:new Date(scanResult.expiry_date)<new Date()?"var(--red)":"var(--green)"}}>{scanResult.expiry_date}</span></div>}
+                    {/* Raw text — always shown so we can diagnose format issues */}
+                    <details style={{marginTop:6}}>
+                      <summary style={{cursor:"pointer",color:"var(--text3)",fontSize:11}}>Raw barcode text</summary>
+                      <pre style={{fontSize:10,background:"var(--bg2)",padding:6,borderRadius:6,marginTop:4,whiteSpace:"pre-wrap",wordBreak:"break-all",maxHeight:100,overflow:"auto"}}>{rawBarcode}</pre>
+                    </details>
+                  </div>
+                )}
+              </div>
+            </div>
+            <button className="btn btn-ghost btn-sm" style={{marginTop:8}} onClick={()=>{setCapturedImg(null);setScanResult(null);setPlate("");}}>↺ Rescan</button>
+          </div>
+        )}
+
+        {/* Manual plate input */}
+        <div style={{marginBottom:14}}>
+          <FL label="Plate / Registration Number"/>
+          <div style={{display:"flex",gap:8}}>
+            <input className="inp" value={plate} onChange={e=>setPlate(e.target.value.toUpperCase())}
+              onKeyDown={e=>e.key==="Enter"&&doLookup()}
+              placeholder="JNJ808L" style={{fontFamily:"DM Mono,monospace",fontWeight:700,letterSpacing:".06em",fontSize:16,flex:1}}/>
+            <button className="btn btn-primary" onClick={()=>doLookup()} disabled={!plate.trim()}>🔍 Look Up</button>
+          </div>
+        </div>
+
+        {scanResult&&plate&&(
+          <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15}} onClick={()=>doLookup()}>
+            🔍 Look Up {plate}
+          </button>
+        )}
+      </Overlay>
+    );
+  }
+
+  // ── Lookup + decision step ───────────────────────────────────
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title={`🔍 ${plate}`} onClose={onClose}/>
+
+      {/* Scan result summary */}
+      {scanResult&&(
+        <div style={{marginBottom:14,padding:10,background:"var(--surface2)",borderRadius:10,fontSize:12,display:"flex",gap:16,flexWrap:"wrap"}}>
+          {scanResult.make&&<span>Make: <strong>{scanResult.make}</strong></span>}
+          {scanResult.vin&&<span>VIN: <code style={{fontFamily:"DM Mono,monospace"}}>{scanResult.vin}</code></span>}
+          {scanResult.engine_no&&<span>Engine: <code style={{fontFamily:"DM Mono,monospace"}}>{scanResult.engine_no}</code></span>}
+          {scanResult.expiry_date&&<span style={{color:new Date(scanResult.expiry_date)<new Date()?"var(--red)":"var(--green)"}}>
+            Disc: {scanResult.expiry_date} {new Date(scanResult.expiry_date)<new Date()?"⚠️ EXPIRED":"✅"}
+          </span>}
+        </div>
+      )}
+
+      {/* Customer / vehicle info */}
+      {foundCustomer&&(
+        <div style={{marginBottom:12,padding:12,background:"rgba(52,211,153,.07)",border:"1px solid rgba(52,211,153,.2)",borderRadius:10}}>
+          <div style={{fontWeight:700,fontSize:14}}>👤 {foundCustomer.name}</div>
+          {foundCustomer.phone&&<div style={{fontSize:12,color:"var(--text3)"}}>{foundCustomer.phone}</div>}
+        </div>
+      )}
+      {foundVehicle&&(
+        <div style={{marginBottom:12,padding:12,background:"rgba(96,165,250,.07)",border:"1px solid rgba(96,165,250,.2)",borderRadius:10,fontSize:13}}>
+          <div style={{fontWeight:700}}>🚗 {foundVehicle.reg} — {foundVehicle.make} {foundVehicle.model} {foundVehicle.year&&`(${foundVehicle.year})`}</div>
+          {foundVehicle.color&&<div style={{fontSize:12,color:"var(--text3)"}}>{foundVehicle.color}</div>}
+          {foundVehicle.vin&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>VIN: {foundVehicle.vin}</div>}
+        </div>
+      )}
+      {!foundCustomer&&!foundVehicle&&(
+        <div style={{marginBottom:12,padding:12,background:"var(--surface2)",borderRadius:10,fontSize:13,color:"var(--text3)"}}>
+          🆕 First visit — no record found for <strong>{plate}</strong>
+        </div>
+      )}
+
+      {/* Open jobs warning */}
+      {openJobs.length>0&&(
+        <div style={{marginBottom:14,padding:12,background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.3)",borderRadius:10}}>
+          <div style={{fontWeight:700,marginBottom:6}}>⚠️ {openJobs.length} open job(s) for this vehicle</div>
+          {openJobs.map(j=>(
+            <div key={j.id} style={{fontSize:12,marginBottom:3}}>
+              <code style={{fontFamily:"DM Mono,monospace"}}>{j.id}</code>
+              <span style={{marginLeft:6,color:"var(--yellow)"}}>{j.status}</span>
+              <span style={{marginLeft:6,color:"var(--text3)"}}>{j.date_in}</span>
+              {j.complaint&&<span style={{marginLeft:6,color:"var(--text2)"}}>"{j.complaint.slice(0,40)}"</span>}
+            </div>
+          ))}
+
+          <div style={{marginTop:10}}>
+            <FL label="What to do?"/>
+            <div style={{display:"flex",gap:8,marginBottom:10}}>
+              <button className={`btn ${decision==="reopen"?"btn-primary":"btn-ghost"}`} style={{flex:1}} onClick={()=>setDecision("reopen")}>🔄 Continue Existing</button>
+              <button className={`btn ${decision==="new"?"btn-primary":"btn-ghost"}`} style={{flex:1}} onClick={()=>setDecision("new")}>📋 New Job Card</button>
+            </div>
+            {decision==="reopen"&&openJobs.length>1&&(
+              <div style={{marginBottom:10}}>
+                {openJobs.map(j=>(
+                  <label key={j.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",border:"1px solid var(--border)",borderRadius:8,marginBottom:5,cursor:"pointer"}}>
+                    <input type="radio" name="reopenJob" checked={reopenJobId===j.id} onChange={()=>setReopenJobId(j.id)}/>
+                    <code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{j.id}</code>
+                    <span style={{fontSize:11,color:"var(--text3)"}}>{j.status} · {j.date_in}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <FL label="Return / Visit Reason *"/>
+            <textarea className="inp" value={returnReason} onChange={e=>setReturnReason(e.target.value)}
+              placeholder="e.g. Same issue recurred, warranty claim, additional work requested..."
+              style={{minHeight:60}}/>
+          </div>
+        </div>
+      )}
+
+      {/* Service history (collapsed) */}
+      {history.length>0&&(
+        <details style={{marginBottom:14}}>
+          <summary style={{cursor:"pointer",fontSize:13,color:"var(--text3)",padding:"8px 0"}}>📋 Service history — {history.length} jobs</summary>
+          <div style={{marginTop:8}}>
+            {history.map(j=>(
+              <div key={j.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid var(--border)",fontSize:12}}>
+                <div>
+                  <code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{j.id}</code>
+                  <span style={{marginLeft:8,color:"var(--text2)"}}>{j.complaint?.slice(0,40)||"—"}</span>
+                  {j.return_reason&&<span style={{marginLeft:8,color:"var(--yellow)",fontSize:11}}>🔄{j.return_reason.slice(0,30)}</span>}
+                </div>
+                <div style={{display:"flex",gap:8,flexShrink:0}}>
+                  <span style={{color:"var(--text3)"}}>{j.date_in}</span>
+                  <span className="badge" style={{fontSize:10}}>{j.status}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      <div style={{display:"flex",gap:10,marginTop:4}}>
+        <button className="btn btn-ghost" onClick={()=>setStep("scan")}>← Back</button>
+        <button className="btn btn-primary" style={{flex:1,padding:14,fontSize:15,fontWeight:700}} onClick={handleProceed}>
+          {openJobs.length>0&&decision==="reopen" ? "🔄 Reopen Job" : "📋 Create New Job →"}
+        </button>
+      </div>
+    </Overlay>
+  );
+}

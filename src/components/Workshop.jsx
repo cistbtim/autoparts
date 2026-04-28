@@ -1738,6 +1738,114 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 }
 
 // ═══════════════════════════════════════════════════════════════
+// VIN DECODER
+// ═══════════════════════════════════════════════════════════════
+function decodeVin(vin) {
+  if (!vin || vin.length < 11) return null;
+  const v = vin.toUpperCase();
+
+  // Position 10 (index 9) = model year
+  const YR = {A:[1980,2010],B:[1981,2011],C:[1982,2012],D:[1983,2013],E:[1984,2014],
+    F:[1985,2015],G:[1986,2016],H:[1987,2017],J:[1988,2018],K:[1989,2019],
+    L:[1990,2020],M:[1991,2021],N:[1992,2022],P:[1993,2023],R:[1994,2024],
+    S:[1995],T:[1996],V:[1997],W:[1998],X:[1999],Y:[2000],
+    '1':[2001],'2':[2002],'3':[2003],'4':[2004],'5':[2005],
+    '6':[2006],'7':[2007],'8':[2008],'9':[2009]};
+  const yc = v[9], ys = YR[yc];
+  const year = ys ? (ys.length===2 ? `${ys[0]} / ${ys[1]}` : String(ys[0])) : '?';
+
+  // WMI (positions 1–3)
+  const wmi = v.substring(0,3);
+  const wmi2 = v.substring(0,2);
+
+  // Country from first char
+  const CC = {
+    '1':'USA','2':'Canada','3':'Mexico','4':'USA','5':'USA',
+    '6':'Australia','7':'New Zealand','8':'Argentina','9':'Brazil',
+    A:'South Africa',B:'Angola / Kenya',C:'Ivory Coast',
+    D:'Germany',E:'Spain',F:'France',G:'UK',H:'Switzerland',
+    J:'Japan',K:'Korea',L:'China',M:'India',N:'Netherlands',
+    P:'Philippines',R:'Taiwan',S:'UK / Sweden',T:'Hungary / Thailand',
+    U:'Hungary',V:'France / Croatia',W:'Germany',X:'Russia',
+    Y:'Sweden / Finland',Z:'Italy'
+  };
+  const country = CC[v[0]] || '—';
+
+  // Make from WMI
+  const WMI_MAP = {
+    WAU:'Audi (DE)',WA1:'Audi Q (DE)',TRU:'Audi (HU)',
+    WVW:'Volkswagen (DE)',AAV:'Volkswagen (SA)',
+    WBA:'BMW (DE)',WBS:'BMW M (DE)',WBY:'BMW i (DE)',WBX:'BMW X (DE)',
+    WDB:'Mercedes-Benz (DE)',WDC:'Mercedes-Benz SUV (DE)',WDD:'Mercedes-Benz (DE)',
+    WDF:'Mercedes-Benz Vans',W1K:'Mercedes-Benz',
+    WMW:'Mini (DE)',
+    WP0:'Porsche (DE)',WP1:'Porsche Cayenne (DE)',
+    WJM:'Rolls-Royce (DE)',SCA:'Rolls-Royce (UK)',
+    SAJ:'Jaguar (UK)',SAL:'Land Rover (UK)',
+    VSS:'SEAT (ES)',TMB:'Škoda (CZ)',
+    VF1:'Renault (FR)',VF3:'Peugeot (FR)',
+    ZAR:'Alfa Romeo (IT)',ZFA:'Fiat (IT)',
+    W0L:'Opel / Vauxhall (DE)',
+    KMH:'Hyundai (KR)',KMJ:'Hyundai (KR)',
+    KNA:'Kia (KR)',KND:'Kia SUV (KR)',
+    JHM:'Honda (JP)',JN1:'Nissan (JP)',JN6:'Nissan (JP)',
+    JMZ:'Mazda (JP)',JS3:'Suzuki (JP)',JS4:'Suzuki (JP)',
+    AAT:'Toyota (SA)',
+  };
+  const JT_MAKES = {JT:'Toyota (JP)',JA:'Isuzu (JP)',JD:'Daihatsu (JP)',JM:'Mazda (JP)'};
+  const make = WMI_MAP[wmi] || WMI_MAP[wmi2] || JT_MAKES[wmi2] || `WMI: ${wmi}`;
+
+  // European VINs have ZZZ padding at positions 4–6; model code is at positions 7–8 (index 6–7)
+  const isEuro = v.substring(3,6)==='ZZZ';
+  const mc = isEuro ? v.substring(6,8) : null;
+
+  // Audi model codes
+  const AUDI_M = {
+    '4L':'Q7 2005–2015','4M':'Q7 2015–','GA':'Q8 2018–',
+    '8R':'Q5 2008–2017','FY':'Q5 2017–',
+    '8U':'Q3 2011–2018','F3':'Q3 2018–',
+    '8P':'A3 2003–2013','8V':'A3 2013–2020','8Y':'A3 2020–',
+    '8J':'TT 2006–2014','8S':'TT 2014–',
+    '8E':'A4 2000–2008','8K':'A4 2008–2015','B9':'A4 2015–',
+    '8T':'A5 2007–2016','F5':'A5 2016–',
+    '4F':'A6 2004–2011','4G':'A6 2011–2018','C8':'A6 2018–',
+    '4E':'A8 2002–2009','4H':'A8 2009–2017','4N':'A8 2017–',
+    'RS':'RS model','SQ':'SQ model',
+  };
+  // VW model codes
+  const VW_M = {
+    '1J':'Golf IV 1997–2003','1K':'Golf V 2003–2008',
+    '5K':'Golf VI 2008–2012','AU':'Golf VII 2012–2019','CD':'Golf VIII 2019–',
+    '3C':'Passat B6 2005–2010','3G':'Passat B8 2014–',
+    '5N':'Tiguan 2007–2016','AD':'Tiguan 2016–',
+    '7P':'Touareg 2010–2018','CR':'Touareg 2018–',
+    '6R':'Polo V 2009–2017','AW':'Polo VI 2017–',
+    '7N':'Sharan 2010–','1T':'Touran 2003–2010','5T':'Touran 2015–',
+  };
+
+  let model = null;
+  if (mc) {
+    if (wmi==='WAU'||wmi==='WA1'||wmi==='TRU') model = AUDI_M[mc] || `Code: ${mc}`;
+    else if (wmi==='WVW'||wmi==='AAV')          model = VW_M[mc]   || `Code: ${mc}`;
+  }
+
+  // Assembly plant (position 11, index 10)
+  const pc = v[10];
+  const AUDI_P  = {A:'Ingolstadt',B:'Brussels',D:'Neckarsulm',H:'Győr (HU)',N:'Neckarsulm'};
+  const BMW_P   = {A:'Munich',C:'Regensburg',D:'Dingolfing',F:'Oxford (Mini)',G:'Graz (AT)',J:'Leipzig',P:'Spartanburg (US)',R:'Rosslyn (SA)'};
+  const MB_P    = {A:'Sindelfingen',B:'Bremen',E:'Rastatt',H:'Hambach (Smart)',K:'Tuscaloosa (US)',P:'East London (SA)'};
+  const TOYOTA_P= {A:'Tahara (JP)',B:'Motomachi (JP)',C:'Tsutsumi (JP)',E:'Proton (Durban SA)',T:'Proton (SA)',Z:'Johannesburg (SA)'};
+
+  let plant = null;
+  if      (wmi==='WAU'||wmi==='WA1') plant = AUDI_P[pc]  ? `${AUDI_P[pc]} (${pc})`  : null;
+  else if (wmi==='WBA'||wmi==='WBS') plant = BMW_P[pc]   ? `${BMW_P[pc]} (${pc})`   : null;
+  else if (wmi==='WDB'||wmi==='WDC'||wmi==='WDD') plant = MB_P[pc] ? `${MB_P[pc]} (${pc})` : null;
+  else if (wmi==='AAT'||wmi2==='JT') plant = TOYOTA_P[pc]? `${TOYOTA_P[pc]} (${pc})`: null;
+
+  return {year, country, make, model, plant};
+}
+
+// ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
 function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},t,lang}) {
@@ -2286,11 +2394,35 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           {job.vin&&(
             <div style={{borderTop:"1px solid var(--border)",paddingTop:12}}>
               <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:8}}>🔍 {t.wsVinSearch}</div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
                 <code style={{fontFamily:"DM Mono,monospace",fontSize:14,fontWeight:700,letterSpacing:"1px",background:"var(--surface2)",padding:"5px 12px",borderRadius:7,border:"1px solid var(--border)"}}>{job.vin}</code>
                 <button onClick={()=>navigator.clipboard.writeText(job.vin).then(()=>alert("VIN copied!"))}
                   style={{fontSize:11,padding:"4px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",color:"var(--text3)"}}>📋 {t.wsCopy}</button>
               </div>
+              {(()=>{
+                const d=decodeVin(job.vin);
+                if(!d) return null;
+                const fields=[
+                  {k:'Year',   v:d.year},
+                  {k:'Origin', v:d.country},
+                  {k:'Make',   v:d.make},
+                  d.model ? {k:'Model', v:d.model} : null,
+                  d.plant ? {k:'Plant', v:d.plant} : null,
+                ].filter(Boolean);
+                return (
+                  <div style={{marginBottom:10,padding:"8px 12px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
+                    <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>📡 VIN Decoded</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {fields.map(f=>(
+                        <div key={f.k} style={{fontSize:11,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 9px",lineHeight:1.5}}>
+                          <span style={{color:"var(--text3)",marginRight:4}}>{f.k}:</span>
+                          <span style={{fontWeight:700,color:"var(--text1)"}}>{f.v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                 {vinSearchLinks.map(lk=>(
                   <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"

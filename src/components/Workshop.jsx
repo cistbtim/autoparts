@@ -2084,7 +2084,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   // VIN search lookup helper
   const catcarSlug=(make)=>{
     const m=(make||"").toLowerCase().replace(/[-\s]+/g,"");
-    const map={mercedesbenz:"mercedes-benz",mercedes:"mercedes-benz",vw:"volkswagen",landrover:"land-rover",rangerover:"land-rover",alfaromeo:"alfa-romeo"};
+    const map={mercedesbenz:"mercedes-benz",mercedes:"mercedes-benz",vw:"volkswagen",landrover:"land-rover",rangerover:"land-rover",alfaromeo:"alfa-romeo",mini:"bmw"};
     const slug=map[m]||(make||"").toLowerCase().replace(/\s+/g,"-");
     return slug;
   };

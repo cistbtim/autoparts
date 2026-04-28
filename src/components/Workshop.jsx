@@ -87,6 +87,7 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
 
   const handlePhotoFile=(e)=>{
     const files=Array.from(e.target.files||[]);
+    const fromCamera=e.target===photoCamRef.current;
     e.target.value="";
     if(!files.length) return;
     const session=photoSession;
@@ -96,6 +97,13 @@ function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,on
       if(!file.type.startsWith("image/")) return;
       photoCounter.current+=1;
       const id=photoCounter.current;
+      if(fromCamera){
+        const bUrl=URL.createObjectURL(file);
+        const a=document.createElement("a");
+        a.href=bUrl; a.download=`Workshop_${reg||"photo"}_${id}.jpg`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(()=>URL.revokeObjectURL(bUrl),5000);
+      }
       const fr=new FileReader();
       fr.onload=ev=>{
         const dataUrl=ev.target.result;
@@ -3132,14 +3140,24 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   };
 
   const handleJobPhotoFile=(e)=>{
-    const files=Array.from(e.target.files||[]); e.target.value="";
+    const files=Array.from(e.target.files||[]);
+    const fromCamera=e.target===jobPhotoCamRef.current;
+    e.target.value="";
     if(!files.length) return;
+    const reg=(job?.vehicle_reg||"photo").replace(/\s/g,"").toUpperCase();
     files.forEach(file=>{
       const isImage = file.type.startsWith("image/") || file.type==="" ||
         /\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(file.name);
       if(!isImage) return;
       jobPhotoCounter.current+=1;
       const uid=jobPhotoCounter.current;
+      if(fromCamera){
+        const bUrl=URL.createObjectURL(file);
+        const a=document.createElement("a");
+        a.href=bUrl; a.download=`Job_${reg}_${uid}.jpg`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(()=>URL.revokeObjectURL(bUrl),5000);
+      }
       const fr=new FileReader();
       fr.onload=ev=>{
         const dataUrl=ev.target.result;
@@ -4110,6 +4128,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           {/* Actions */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
             <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos)}>🖨️ Print PDF</button>
+            <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos,true)}>📱 PDF via WA</button>
             {quote.status!=="converted"&&onSendQuoteForApproval&&(
               <button className="btn btn-sm" style={{background:"rgba(37,211,102,.12)",color:"#25D366",border:"1px solid rgba(37,211,102,.3)"}}
                 onClick={()=>setApprovalModal(true)}>
@@ -7603,13 +7622,15 @@ function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP QUOTE — PRINT PDF
 // ═══════════════════════════════════════════════════════════════
-function printWorkshopQuote(job, items, quote, settings, photos={}) {
+function printWorkshopQuote(job, items, quote, settings, photos={}, shareMode=false) {
   const C = curSym(settings.currency||getSettings().currency);
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
   const total    = subtotal+taxAmt;
   const shopName = settings.shop_name||"Auto Workshop";
+  const phone = (quote.quote_phone||job.customer_phone||"").replace(/\D/g,"");
+  const waMsg = `📝 *Workshop Quotation ${quote.id}*\n👤 ${quote.quote_customer||job.customer_name||""}\n🚗 ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n💰 Total: ${fmt(total)}\n\nPlease find the attached PDF quotation and confirm to proceed.\n\n${shopName}${settings.phone?`\n📞 ${settings.phone}`:""}`;
   const logoSrc = settings.logo_data || settings.logo_url || "";
   const logoHtml = logoSrc ? `<img src="${logoSrc}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
   const photoList = [{url:photos.front,label:"Front"},{url:photos.rear,label:"Rear"},{url:photos.side,label:"Side"}].filter(p=>p.url);
@@ -7663,8 +7684,13 @@ function printWorkshopQuote(job, items, quote, settings, photos={}) {
   .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
   .sig-box{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
   .sig-line{border-top:1px solid #aaa;padding-top:6px;font-size:11px;color:#888;text-align:center}
-  @media print{body{padding:18px}}
+  @media print{body{padding:18px}.ws-share-bar{display:none!important}}
 </style></head><body>
+${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:0;background:#1a1a2e;padding:11px 20px;display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 2px 12px rgba(0,0,0,.35)">
+  <span style="color:#fff;font-weight:700;font-size:13px;flex:1">📄 ${shopName} — Quotation ${quote.id}</span>
+  ${phone?`<a href="https://wa.me/${phone}?text=${encodeURIComponent(waMsg)}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;background:#25D366;color:#fff;border-radius:7px;font-size:13px;font-weight:700;text-decoration:none">📱 Send via WhatsApp</a>`:""}
+  <button onclick="window.print()" style="padding:8px 18px;background:#2563eb;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Save as PDF</button>
+</div><div style="height:58px"></div>`:""}
 
   <div class="header">
     <div>
@@ -7767,7 +7793,7 @@ function printWorkshopQuote(job, items, quote, settings, photos={}) {
   const w = window.open("","_blank","width=860,height=1100");
   w.document.write(html);
   w.document.close();
-  setTimeout(()=>w.print(),400);
+  if (!shareMode) setTimeout(()=>w.print(),400);
 }
 
 // ═══════════════════════════════════════════════════════════════

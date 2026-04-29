@@ -1047,6 +1047,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setWsBookings(p=>p.map(b=>b.id===id?{...b,...patch}:b));
   };
 
+  const deleteWsBooking=async(id)=>{
+    await api.delete("workshop_bookings","id",id).catch(e=>console.warn("Delete booking failed:",e));
+    setWsBookings(p=>p.filter(b=>b.id!==id));
+  };
+
   const refreshWsBookings=async()=>{
     const bk=await api.get("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]);
     setWsBookings(Array.isArray(bk)?bk:[]);
@@ -3189,6 +3194,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             onUpdateWsLicenceRenewal={updateWsLicenceRenewal}
             wsBookings={wsBookings}
             onPatchWsBooking={patchWsBooking}
+            onDeleteWsBooking={deleteWsBooking}
             onRefreshBookings={refreshWsBookings}
             wsProfile={workshopProfile}
             t={t} lang={lang}/>

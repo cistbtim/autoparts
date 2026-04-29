@@ -482,26 +482,31 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSav
         </div>
       )}
 
-      {/* Service history (collapsed) */}
+      {/* Service record summary — auto-expanded */}
       {history.length>0&&(
-        <details style={{marginBottom:14}}>
-          <summary style={{cursor:"pointer",fontSize:13,color:"var(--text3)",padding:"8px 0"}}>📋 Service history — {history.length} jobs</summary>
-          <div style={{marginTop:8}}>
-            {history.map(j=>(
-              <div key={j.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid var(--border)",fontSize:12}}>
-                <div>
-                  <code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{j.id}</code>
-                  <span style={{marginLeft:8,color:"var(--text2)"}}>{j.complaint?.slice(0,40)||"—"}</span>
-                  {j.return_reason&&<span style={{marginLeft:8,color:"var(--yellow)",fontSize:11}}>🔄{j.return_reason.slice(0,30)}</span>}
+        <div style={{marginBottom:14,border:"1px solid var(--border)",borderRadius:10,overflow:"hidden"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
+            <div style={{fontWeight:700,fontSize:13}}>📋 Service Record — {history.length} visit{history.length!==1?"s":""}</div>
+            <div style={{fontSize:11,color:"var(--text3)"}}>Most recent first</div>
+          </div>
+          <div style={{maxHeight:220,overflowY:"auto"}}>
+            {history.map((j,i)=>(
+              <div key={j.id} style={{padding:"10px 14px",borderBottom:i<history.length-1?"1px solid var(--border)":undefined,background:j.status==="Delivered"?"transparent":"rgba(251,191,36,.04)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:4}}>
+                  <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                    <span style={{fontSize:12,fontWeight:700,color:"var(--text1)"}}>{j.date_in}</span>
+                    {j.mileage&&<span style={{fontSize:11,color:"var(--text3)"}}>🛣️ {Number(j.mileage).toLocaleString()} km</span>}
+                    {j.mechanic&&<span style={{fontSize:11,color:"var(--text3)"}}>👷 {j.mechanic}</span>}
+                  </div>
+                  <span className="badge" style={{fontSize:10,flexShrink:0}}>{j.status}</span>
                 </div>
-                <div style={{display:"flex",gap:8,flexShrink:0}}>
-                  <span style={{color:"var(--text3)"}}>{j.date_in}</span>
-                  <span className="badge" style={{fontSize:10}}>{j.status}</span>
-                </div>
+                {j.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:j.diagnosis?3:0}}>🔧 {j.complaint.slice(0,80)}{j.complaint.length>80?"…":""}</div>}
+                {j.diagnosis&&<div style={{fontSize:11,color:"var(--text3)"}}>🔬 {j.diagnosis.slice(0,80)}{j.diagnosis.length>80?"…":""}</div>}
+                {j.return_reason&&<div style={{fontSize:11,color:"var(--yellow)",marginTop:2}}>🔄 Return: {j.return_reason.slice(0,60)}</div>}
               </div>
             ))}
           </div>
-        </details>
+        </div>
       )}
 
       <div style={{display:"flex",gap:10,marginTop:4}}>

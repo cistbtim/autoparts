@@ -88,6 +88,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
     return (
       <WorkshopJobDetail
         job={activeJob} items={items} invoice={inv} quote={quote}
+        jobs={jobs}
         parts={parts} partFitments={partFitments} vehicles={vehicles} settings={settings}
         wsVehicles={wsVehicles} wsCustomers={wsCustomers} wsStock={wsStock} wsServices={wsServices}
         suppliers={suppliers} wsSuppliers={wsSuppliers} wsSupplierRequests={wsSupplierRequests}
@@ -1851,7 +1852,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -1885,10 +1886,20 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
   const [movePinErr,       setMovePinErr]        = useState("");
   const [photoLightbox,    setPhotoLightbox]    = useState(null); // null | index into visible photos
   const [renewalModal,  setRenewalModal]  = useState(false);
+  const [serviceHistModal, setServiceHistModal] = useState(false);
+  const [addingPastRecord, setAddingPastRecord] = useState(false);
+  const [pastRec, setPastRec] = useState({date_in:"",date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});
+  const [savingPastRec, setSavingPastRec] = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
+  const vehicleHistory = jobs.filter(j=>{
+    if(j.id===job.id) return false;
+    if(job.workshop_vehicle_id&&j.workshop_vehicle_id===job.workshop_vehicle_id) return true;
+    const reg=(job.vehicle_reg||"").replace(/\s/g,"").toUpperCase();
+    return reg&&reg===(j.vehicle_reg||"").replace(/\s/g,"").toUpperCase();
+  }).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
   const [localPhotoOverrides, setLocalPhotoOverrides] = useState({});
   const [editPhotos, setEditPhotos] = useState(false);
   const vehiclePhotos = wsVehicles.reduce((acc,v)=>v.id===job.workshop_vehicle_id?{
@@ -2333,6 +2344,7 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
             {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ {t.edit}</button>}
             <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardLabel(job,settings)}>🏷️ {t.wsLabel}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 {t.wsCollect}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setServiceHistModal(true)}>📋 History{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>{
               const lines=["============================","  VEHICLE INFO","============================",
                 `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,
@@ -3558,6 +3570,152 @@ function WorkshopJobDetail({job,items,invoice,quote,parts,partFitments=[],vehicl
           job={job} vehicleRecord={vehicleRecord} settings={settings} wsId={wsId}
           onSave={async(rec)=>{ await onSaveWsLicenceRenewal(rec); setRenewalModal(false); }}
           onClose={()=>setRenewalModal(false)}/>
+      )}
+
+      {/* Service Record History modal */}
+      {serviceHistModal&&(
+        <Overlay onClose={()=>setServiceHistModal(false)} wide>
+          <MHead title={`📋 Service Record — ${job.vehicle_reg||job.vehicle_make||"Vehicle"}`} onClose={()=>setServiceHistModal(false)}/>
+
+          {/* Vehicle summary */}
+          <div style={{padding:"10px 14px",background:"var(--surface2)",borderRadius:10,marginBottom:14,fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+            <div>
+              <div style={{fontWeight:700}}>{job.vehicle_reg} — {[job.vehicle_make,job.vehicle_model,job.vehicle_year&&`(${job.vehicle_year})`].filter(Boolean).join(" ")}</div>
+              {job.vin&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginTop:2}}>VIN: {job.vin}</div>}
+            </div>
+            {!addingPastRecord&&(
+              <button className="btn btn-ghost btn-sm" onClick={()=>{
+                setPastRec({date_in:new Date().toISOString().slice(0,10),date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});
+                setAddingPastRecord(true);
+              }}>+ Add Past Record</button>
+            )}
+          </div>
+
+          {/* Add past record form */}
+          {addingPastRecord&&(
+            <div style={{border:"1px solid var(--accent)",borderRadius:10,padding:14,marginBottom:14,background:"rgba(var(--accent-rgb),.04)"}}>
+              <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>📝 Add Manual Service Record</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,marginBottom:4}}>DATE IN *</div>
+                  <input className="inp" type="date" value={pastRec.date_in} onChange={e=>setPastRec(p=>({...p,date_in:e.target.value}))}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,marginBottom:4}}>DATE OUT</div>
+                  <input className="inp" type="date" value={pastRec.date_out} onChange={e=>setPastRec(p=>({...p,date_out:e.target.value}))}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,marginBottom:4}}>MILEAGE (km)</div>
+                  <input className="inp" type="number" min="0" value={pastRec.mileage} onChange={e=>setPastRec(p=>({...p,mileage:e.target.value}))} placeholder="e.g. 85000"/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,marginBottom:4}}>MECHANIC</div>
+                  <input className="inp" value={pastRec.mechanic} onChange={e=>setPastRec(p=>({...p,mechanic:e.target.value}))} placeholder="Name"/>
+                </div>
+              </div>
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,marginBottom:4}}>COMPLAINT / WORK DONE *</div>
+                <textarea className="inp" rows={2} value={pastRec.complaint} onChange={e=>setPastRec(p=>({...p,complaint:e.target.value}))} placeholder="e.g. Oil service, brake pads replaced" style={{resize:"vertical"}}/>
+              </div>
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,marginBottom:4}}>DIAGNOSIS / FINDINGS</div>
+                <textarea className="inp" rows={2} value={pastRec.diagnosis} onChange={e=>setPastRec(p=>({...p,diagnosis:e.target.value}))} placeholder="Optional — what was found" style={{resize:"vertical"}}/>
+              </div>
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,marginBottom:4}}>NOTES</div>
+                <textarea className="inp" rows={2} value={pastRec.notes} onChange={e=>setPastRec(p=>({...p,notes:e.target.value}))} placeholder="Optional" style={{resize:"vertical"}}/>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setAddingPastRecord(false)}>Cancel</button>
+                <button className="btn btn-primary" style={{flex:2}} disabled={savingPastRec||!pastRec.date_in||!pastRec.complaint.trim()} onClick={async()=>{
+                  setSavingPastRec(true);
+                  try{
+                    await onSaveJob({
+                      workshop_customer_id:job.workshop_customer_id||null,
+                      workshop_vehicle_id:job.workshop_vehicle_id||null,
+                      customer_name:job.customer_name||"",
+                      customer_phone:job.customer_phone||"",
+                      customer_email:job.customer_email||"",
+                      vehicle_reg:job.vehicle_reg||"",
+                      vehicle_make:job.vehicle_make||"",
+                      vehicle_model:job.vehicle_model||"",
+                      vehicle_year:job.vehicle_year||"",
+                      vehicle_color:job.vehicle_color||"",
+                      vin:job.vin||"",
+                      engine_no:job.engine_no||"",
+                      date_in:pastRec.date_in,
+                      date_out:pastRec.date_out||null,
+                      mileage:pastRec.mileage||"",
+                      complaint:pastRec.complaint,
+                      diagnosis:pastRec.diagnosis||"",
+                      mechanic:pastRec.mechanic||"",
+                      notes:pastRec.notes||"",
+                      status:"Delivered",
+                    });
+                    setAddingPastRecord(false);
+                    setPastRec({date_in:"",date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});
+                  }catch(e){alert("Save failed: "+e.message);}
+                  setSavingPastRec(false);
+                }}>
+                  {savingPastRec?"Saving…":"✅ Save Record"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* History list */}
+          {vehicleHistory.length===0&&!addingPastRecord?(
+            <div style={{textAlign:"center",padding:"32px 0",color:"var(--text3)",fontSize:14}}>
+              <div style={{fontSize:32,marginBottom:8}}>🆕</div>
+              First visit — no previous service records for this vehicle.
+            </div>
+          ):(
+            vehicleHistory.length>0&&(
+              <div>
+                <div style={{fontSize:12,color:"var(--text3)",marginBottom:10,fontWeight:600}}>{vehicleHistory.length} previous visit{vehicleHistory.length!==1?"s":""}</div>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {vehicleHistory.map(j=>(
+                    <div key={j.id} style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
+                        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                          <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{j.id}</code>
+                          <span style={{fontWeight:700,fontSize:13}}>{j.date_in}</span>
+                          {j.date_out&&j.status==="Delivered"&&<span style={{fontSize:11,color:"var(--text3)"}}>→ {j.date_out}</span>}
+                          {j.mileage&&<span style={{fontSize:11,color:"var(--text3)"}}>🛣️ {Number(j.mileage).toLocaleString()} km</span>}
+                          {j.mechanic&&<span style={{fontSize:11,color:"var(--text3)"}}>👷 {j.mechanic}</span>}
+                        </div>
+                        <span className="badge" style={{fontSize:11,flexShrink:0}}>{j.status}</span>
+                      </div>
+                      <div style={{padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
+                        {j.complaint&&(
+                          <div style={{fontSize:13}}>
+                            <span style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginRight:6}}>Complaint</span>
+                            {j.complaint}
+                          </div>
+                        )}
+                        {j.diagnosis&&(
+                          <div style={{fontSize:13}}>
+                            <span style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginRight:6}}>Diagnosis</span>
+                            {j.diagnosis}
+                          </div>
+                        )}
+                        {j.notes&&(
+                          <div style={{fontSize:12,color:"var(--text3)"}}>
+                            <span style={{fontWeight:700,marginRight:6}}>Notes:</span>{j.notes.slice(0,120)}{j.notes.length>120?"…":""}
+                          </div>
+                        )}
+                        {j.return_reason&&(
+                          <div style={{fontSize:12,color:"var(--yellow)"}}>🔄 Return reason: {j.return_reason}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          )}
+          <button className="btn btn-ghost" style={{width:"100%",marginTop:16}} onClick={()=>{setServiceHistModal(false);setAddingPastRecord(false);}}>Close</button>
+        </Overlay>
       )}
     </div>
   );

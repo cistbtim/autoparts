@@ -537,6 +537,113 @@ export function QuoteConfirmPage({token}) {
   const fmt=v=>`${sym} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const shopName=shopSettings.shop_name||"Auto Workshop";
 
+  const downloadPdf=()=>{
+    if(!quote) return;
+    const subtotal=items.reduce((s,i)=>s+(+i.total||0),0);
+    const taxRate=shopSettings.vat_number?(shopSettings.tax_rate||0):0;
+    const taxAmt=subtotal*taxRate/100;
+    const total=subtotal+taxAmt;
+    const logoSrc=shopSettings.logo_data||shopSettings.logo_url||"";
+    const logoHtml=logoSrc?`<img src="${logoSrc}" style="max-height:60px;max-width:180px;object-fit:contain;display:block;margin-bottom:8px"/>`:"";
+    const rowsHtml=items.map((it,i)=>`
+      <tr style="background:${i%2===0?"#fff":"#f9f9f9"}">
+        <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5">
+          <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;
+            background:${it.type==="part"?"#dbeafe":"#dcfce7"};color:${it.type==="part"?"#1d4ed8":"#166534"};margin-right:6px">
+            ${it.type==="part"?"PART":"LABOUR"}</span>
+          ${it.description||""}${it.part_sku?`<br/><span style="font-size:11px;color:#888;font-family:monospace">${it.part_sku}</span>`:""}
+        </td>
+        <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${it.qty}</td>
+        <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${fmt(it.unit_price)}</td>
+        <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:700">${fmt(it.total)}</td>
+      </tr>`).join("");
+    const html=`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Quotation ${quote.id}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:36px;max-width:820px;margin:0 auto}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;border-bottom:3px solid #2563eb;margin-bottom:24px}
+  .shop{font-size:24px;font-weight:900;color:#f97316}
+  .shop-info{font-size:11px;color:#555;margin-top:5px;line-height:1.8}
+  .qblock{text-align:right}
+  .qtitle{font-size:18px;font-weight:700;color:#2563eb}
+  .qno{font-size:14px;font-weight:700;color:#f97316;margin-top:4px}
+  .qmeta{font-size:12px;color:#555;margin-top:4px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+  .card{background:#f9f9f9;border:1px solid #e5e5e5;border-radius:8px;padding:14px}
+  .clabel{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+  .cname{font-size:15px;font-weight:700;margin-bottom:3px}
+  .cinfo{font-size:12px;color:#555;line-height:1.7}
+  table{width:100%;border-collapse:collapse;margin-bottom:20px}
+  thead tr{background:#2563eb;color:#fff}
+  thead th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  thead th:nth-child(n+2){text-align:right}
+  .totals{margin-left:auto;width:260px;margin-bottom:24px}
+  .t-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #eee}
+  .t-total{display:flex;justify-content:space-between;padding:10px 0;font-size:17px;font-weight:800;color:#2563eb;border-top:2px solid #2563eb;margin-top:4px}
+  .notes-box{background:#fff8ed;border:1px solid #fcd34d;border-radius:8px;padding:12px;font-size:12px;margin-bottom:20px}
+  .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
+  @media print{body{padding:18px}}
+</style></head><body>
+<div class="hdr">
+  <div>${logoHtml}<div class="shop">${shopName}</div>
+    <div class="shop-info">
+      ${shopSettings.phone?`📞 ${shopSettings.phone}<br/>`:""}
+      ${shopSettings.email?`✉️ ${shopSettings.email}<br/>`:""}
+      ${shopSettings.address?`📍 ${shopSettings.address}<br/>`:""}
+      ${shopSettings.vat_number?`VAT Reg No: <strong>${shopSettings.vat_number}</strong>`:""}
+    </div>
+  </div>
+  <div class="qblock">
+    <div class="qtitle">QUOTATION</div>
+    <div class="qno">${quote.id}</div>
+    <div class="qmeta">
+      Date: ${quote.quote_date||""}<br/>
+      ${quote.valid_until?`Valid until: ${quote.valid_until}<br/>`:""}
+    </div>
+  </div>
+</div>
+<div class="grid2">
+  <div class="card">
+    <div class="clabel">Customer</div>
+    <div class="cname">${quote.quote_customer||job?.customer_name||"—"}</div>
+    <div class="cinfo">
+      ${job?.customer_phone?`📞 ${job.customer_phone}<br/>`:""}
+      ${job?.customer_email?`✉️ ${job.customer_email}<br/>`:""}
+    </div>
+  </div>
+  <div class="card">
+    <div class="clabel">Vehicle</div>
+    <div class="cname">${job?.vehicle_reg||"—"}</div>
+    <div class="cinfo">
+      ${[job?.vehicle_make,job?.vehicle_model,job?.vehicle_year].filter(Boolean).join(" ")||""}<br/>
+      ${job?.vehicle_color?`${job.vehicle_color}<br/>`:""}
+      ${job?.mileage?`Mileage: ${Number(job.mileage).toLocaleString()} km`:""}
+    </div>
+  </div>
+</div>
+<table>
+  <thead><tr>
+    <th>Description</th>
+    <th style="text-align:right">Qty</th>
+    <th style="text-align:right">Unit Price</th>
+    <th style="text-align:right">Total</th>
+  </tr></thead>
+  <tbody>${rowsHtml}</tbody>
+</table>
+<div class="totals">
+  <div class="t-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+  ${taxRate>0?`<div class="t-row"><span>VAT (${taxRate}%)</span><span>${fmt(taxAmt)}</span></div>`:""}
+  <div class="t-total"><span>TOTAL</span><span>${fmt(total)}</span></div>
+</div>
+${quote.notes?`<div class="notes-box"><strong>Notes:</strong> ${quote.notes}</div>`:""}
+<div class="footer">
+  ${shopName}${shopSettings.phone?` · 📞 ${shopSettings.phone}`:""}${shopSettings.email?` · ✉️ ${shopSettings.email}`:""}
+</div>
+</body></html>`;
+    const w=window.open("","_blank");
+    if(w){ w.document.write(html); w.document.close(); setTimeout(()=>w.print(),400); }
+  };
+
   if(loading) return (
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
       <style>{CSS}</style>
@@ -591,7 +698,14 @@ export function QuoteConfirmPage({token}) {
                   <div style={{fontWeight:700,fontSize:15}}>📝 Quotation <code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{quote.id}</code></div>
                   <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>Date: {quote.quote_date}{quote.valid_until&&` · Valid until: ${quote.valid_until}`}</div>
                 </div>
-                <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:22,color:"var(--accent)"}}>{fmt(quote.total)}</div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                  <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:22,color:"var(--accent)"}}>{fmt(quote.total)}</div>
+                  <button onClick={downloadPdf}
+                    style={{fontSize:12,padding:"5px 12px",background:"rgba(37,99,235,.12)",border:"1px solid rgba(37,99,235,.3)",
+                      borderRadius:8,cursor:"pointer",color:"var(--blue)",fontWeight:600,whiteSpace:"nowrap"}}>
+                    📄 Download PDF
+                  </button>
+                </div>
               </div>
               {/* Vehicle / Customer */}
               <div style={{display:"flex",gap:10,flexWrap:"wrap",fontSize:13}}>

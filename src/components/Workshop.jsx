@@ -3493,6 +3493,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
       {approvalModal&&quote&&(
         <QuoteApprovalModal
           quote={quote} job={job} items={items} settings={settings}
+          vehiclePhotos={vehiclePhotos}
           onSend={async()=>{
             const token = await onSendQuoteForApproval(quote.id);
             return `${window.location.origin}${window.location.pathname}?wsq=${token}`;
@@ -3751,7 +3752,7 @@ function QuoteApprovalModal({quote,job,items,settings,onSend,onClose}) {
     navigator.clipboard.writeText(link).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
   };
 
-  const waMsg = `Hi${job?.customer_name?" "+job.customer_name:""},\n\n${shopName} has sent you a quotation for ${reg?" your vehicle "+reg:""} totalling *${total}*.\n\nPlease review and approve or decline here:\n${link}`;
+  const waMsg = `Hi${job?.customer_name?" "+job.customer_name:""},\n\n${shopName} has sent you a quotation for ${reg?"your vehicle "+reg+" ":""}totalling *${total}*.\n\nOpen the link to:\n• View all work items\n• Download the PDF\n• Approve or decline\n\n${link}`;
 
   const alreadySent = !!quote.confirm_token;
 

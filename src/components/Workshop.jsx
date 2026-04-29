@@ -53,6 +53,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [bkDeleting,      setBkDeleting]      = useState(false);
   const [bkShowDeleted,   setBkShowDeleted]   = useState(false);
   const [bkDeletedPeriod, setBkDeletedPeriod] = useState("week");
+  const [kanbanView,      setKanbanView]      = useState(true);
 
   // Auto-refresh bookings every 30 s while on the bookings tab
   useEffect(()=>{
@@ -96,6 +97,27 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
   const C   = curSym(settings.currency||getSettings().currency);
   const fmt = v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+  const confirmBooking = async(b) => {
+    let vehicleId = b.workshop_vehicle_id || null;
+    if (!vehicleId) {
+      const custId = makeId("WSC");
+      await api.insert("workshop_customers",{id:custId,workshop_id:wsId,name:b.customer_name||"",phone:b.customer_phone||"",email:b.customer_email||null,created_at:new Date().toISOString()}).catch(()=>{});
+      vehicleId = makeId("WSV");
+      await api.insert("workshop_vehicles",{id:vehicleId,workshop_id:wsId,workshop_customer_id:custId,reg:b.vehicle_reg||"",make:b.vehicle_make||"",model:b.vehicle_model||"",year:b.vehicle_year||"",color:b.vehicle_color||"",vin:b.vin||"",engine_no:b.engine_no||"",licence_disc_expiry:b.licence_disc_expiry||""}).catch(()=>{});
+    }
+    await onPatchWsBooking(b.id,{status:"confirmed",workshop_vehicle_id:vehicleId});
+  };
+
+  const flagProblem = async(job) => {
+    await onSaveJob({...job, is_problem:true, problem_prev_status:job.status});
+  };
+  const unflagProblem = async(job) => {
+    await onSaveJob({...job, is_problem:false, status:job.problem_prev_status||"Pending"});
+  };
+  const moveJobStatus = async(job, newStatus) => {
+    await onSaveJob({...job, status:newStatus});
+  };
 
   // ── Job detail view ──────────────────────────────────────────
   if(view==="job"&&activeJob){
@@ -178,7 +200,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           </p>
         </div>
         {wsTab==="jobs"&&(
-          <div style={{display:"flex",gap:8}}>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <button className="btn btn-primary" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
             <button className="btn btn-ghost" onClick={()=>setEditJob({
               customer_name:"",customer_phone:"",vehicle_reg:"",vehicle_make:"",
@@ -186,6 +208,10 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
               complaint:"",diagnosis:"",mechanic:"",date_in:new Date().toISOString().slice(0,10),
               date_out:"",notes:"",status:"Pending"
             })}>+ Manual</button>
+            <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+              <button title="List view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:!kanbanView?"var(--accent)":"transparent",color:!kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(false)}>≡</button>
+              <button title="Board view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:kanbanView?"var(--accent)":"transparent",color:kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(true)}>⬜</button>
+            </div>
           </div>
         )}
       </div>
@@ -207,6 +233,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
       {/* ══════════════ JOBS TAB ══════════════ */}
       {wsTab==="jobs"&&(<>
+        {!kanbanView&&(<>
         <div className="tabs" style={{marginBottom:14,width:"fit-content",maxWidth:"100%",flexWrap:"wrap"}}>
           {[["__all__","All"],["Pending","🔵 Pending"],["In Progress","🟡 In Progress"],["Done","🟢 Done"],["Delivered","⚫ Delivered"]].map(([v,l])=>{
             const cnt=v==="__all__"?jobs.length:jobs.filter(j=>j.status===v).length;
@@ -313,6 +340,106 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <button className="btn btn-ghost btn-sm" disabled={(jobPage+1)*JOB_PAGE_SIZE>=filtered.length} onClick={()=>setJobPage(p=>p+1)}>Next →</button>
           </div>
         )}
+        </>)}
+
+        {/* ══════════════ KANBAN BOARD VIEW ══════════════ */}
+        {kanbanView&&(()=>{
+          const jInv = id => invoices.find(i=>i.job_id===id);
+          const bkCol   = wsBookings.filter(b=>b.status==="confirmed");
+          const pendCol = jobs.filter(j=>!j.is_problem&&j.status==="Pending");
+          const wipCol  = jobs.filter(j=>!j.is_problem&&j.status==="In Progress");
+          const doneCol = jobs.filter(j=>!j.is_problem&&j.status==="Done"&&!jInv(j.id));
+          const invCol  = jobs.filter(j=>!j.is_problem&&jInv(j.id)&&jInv(j.id)?.status!=="paid");
+          const paidCol = jobs.filter(j=>!j.is_problem&&jInv(j.id)?.status==="paid");
+          const probCol = jobs.filter(j=>j.is_problem);
+
+          const COLS = [
+            {id:"booking",  label:"🗓️ Booking",          color:"#60a5fa", items:bkCol,   type:"booking"},
+            {id:"pending",  label:"⏳ Pending",            color:"#a78bfa", items:pendCol, type:"job", nextStatus:"In Progress", nextLabel:"▶ Start"},
+            {id:"wip",      label:"⚙️ In Progress",        color:"#fbbf24", items:wipCol,  type:"job", nextStatus:"Done",        nextLabel:"✅ Done"},
+            {id:"done",     label:"✅ Done",               color:"#34d399", items:doneCol, type:"job"},
+            {id:"invoiced", label:"🧾 Invoiced",            color:"#f97316", items:invCol,  type:"job"},
+            {id:"paid",     label:"💚 Payment Received",    color:"#10b981", items:paidCol, type:"job"},
+            {id:"problem",  label:"⚠️ Problem Job",         color:"#f87171", items:probCol, type:"job"},
+          ];
+
+          const BkCard = ({b}) => (
+            <div className="card" style={{marginBottom:8,padding:10,fontSize:13}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:5}}>
+                <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13,color:"var(--accent)"}}>{b.vehicle_reg||"—"}</code>
+                {b.preferred_date&&<span style={{fontSize:10,color:"#60a5fa",flexShrink:0}}>📅 {b.preferred_date}</span>}
+              </div>
+              <div style={{fontWeight:600,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.customer_name}</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>{b.customer_phone}</div>
+              {b.complaint&&<div style={{fontSize:11,color:"var(--text2)",background:"var(--surface)",borderRadius:6,padding:"3px 7px",marginBottom:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🔧 {b.complaint}</div>}
+              <button className="btn btn-primary btn-sm" style={{width:"100%",fontSize:11,padding:"5px 0"}}
+                onClick={()=>confirmBooking(b)}>➕ Create Job</button>
+            </div>
+          );
+
+          const JobCard = ({job, col}) => {
+            const inv = jInv(job.id);
+            const fp  = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)?.photo_front||"";
+            const canFlag   = col.id!=="paid"&&col.id!=="problem";
+            const canUnflag = col.id==="problem";
+            const canInvoice= col.id==="done";
+            return (
+              <div className="card" style={{marginBottom:8,padding:0,overflow:"hidden"}}
+                onClick={()=>{setActiveJob(job);setView("job");}}>
+                {fp&&<div style={{height:56,overflow:"hidden",flexShrink:0}}>
+                  <img src={toImgUrl(fp)} alt="car" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+                    onError={e=>{e.target.style.display="none";}}/>
+                </div>}
+                <div style={{padding:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:4}}>
+                    <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13,color:"var(--accent)"}}>{job.vehicle_reg||"—"}</code>
+                    {canFlag&&(
+                      <button title="Flag as Problem" style={{padding:"2px 5px",border:"1px solid rgba(248,113,113,.3)",background:"rgba(248,113,113,.08)",color:"#f87171",borderRadius:5,cursor:"pointer",fontSize:10,flexShrink:0,lineHeight:1}}
+                        onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>
+                    )}
+                    {canUnflag&&(
+                      <button title="Return to previous stage" style={{padding:"2px 5px",border:"1px solid rgba(52,211,153,.3)",background:"rgba(52,211,153,.08)",color:"#34d399",borderRadius:5,cursor:"pointer",fontSize:10,flexShrink:0,lineHeight:1}}
+                        onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩ Return</button>
+                    )}
+                  </div>
+                  <div style={{fontWeight:600,fontSize:13,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name||"—"}</div>
+                  {(job.vehicle_make||job.vehicle_model)&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:3}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}</div>}
+                  {job.complaint&&<div style={{fontSize:11,color:"var(--text2)",marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{job.complaint}</div>}
+                  {inv&&wsRole!=="mechanic"&&<div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:6}}>
+                    <span style={{color:"var(--text3)"}}>Invoice</span>
+                    <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
+                  </div>}
+                  {(col.nextStatus||canInvoice)&&(
+                    <div style={{marginTop:4}} onClick={e=>e.stopPropagation()}>
+                      {col.nextStatus&&<button className="btn btn-xs" style={{width:"100%",fontSize:11,padding:"5px 0"}}
+                        onClick={()=>moveJobStatus(job,col.nextStatus)}>{col.nextLabel}</button>}
+                      {canInvoice&&<button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:11,padding:"5px 0",marginTop:col.nextStatus?4:0}}
+                        onClick={()=>{setActiveJob(job);setView("job");}}>🧾 Create Invoice</button>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          };
+
+          return (
+            <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:20,alignItems:"flex-start",marginLeft:-4,marginRight:-4,paddingLeft:4,paddingRight:4}}>
+              {COLS.map(col=>(
+                <div key={col.id} style={{minWidth:220,maxWidth:220,flexShrink:0,display:"flex",flexDirection:"column"}}>
+                  <div style={{borderRadius:"10px 10px 0 0",padding:"9px 12px",background:"var(--surface2)",borderTop:`3px solid ${col.color}`,display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:0}}>
+                    <span style={{fontWeight:700,fontSize:12}}>{col.label}</span>
+                    <span style={{background:`${col.color}28`,color:col.color,borderRadius:10,padding:"1px 8px",fontSize:11,fontWeight:700}}>{col.items.length}</span>
+                  </div>
+                  <div style={{background:"var(--surface2)",opacity:1,borderRadius:"0 0 10px 10px",padding:6,minHeight:120,maxHeight:"calc(100vh - 370px)",overflowY:"auto"}}>
+                    {col.items.length===0&&<div style={{textAlign:"center",padding:"18px 4px",color:"var(--text3)",fontSize:11,fontStyle:"italic"}}>Empty</div>}
+                    {col.type==="booking"&&col.items.map(b=><BkCard key={b.id} b={b}/>)}
+                    {col.type==="job"&&col.items.map(j=><JobCard key={j.id} job={j} col={col}/>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </>)}
 
       {/* ══════════════ CUSTOMERS TAB ══════════════ */}
@@ -413,31 +540,6 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         const statusColor=(s)=>s==="pending"?"rgba(251,191,36,.15)":s==="confirmed"?"rgba(52,211,153,.15)":"rgba(100,116,139,.15)";
         const statusTextColor=(s)=>s==="pending"?"var(--yellow)":s==="confirmed"?"var(--green)":"var(--text3)";
         const statusLabel=(s)=>s==="pending"?"⏳ Pending":s==="confirmed"?"✅ Confirmed":s==="cancelled"?"❌ Cancelled":s;
-
-        const confirmBooking=async(b)=>{
-          let vehicleId=b.workshop_vehicle_id||null;
-          // Vehicle not yet in system — create customer + vehicle automatically
-          if(!vehicleId){
-            const custId=makeId("WSC");
-            await api.insert("workshop_customers",{
-              id:custId, workshop_id:wsId,
-              name:b.customer_name||"", phone:b.customer_phone||"",
-              email:b.customer_email||null,
-              created_at:new Date().toISOString(),
-            }).catch(()=>{});
-            vehicleId=makeId("WSV");
-            await api.insert("workshop_vehicles",{
-              id:vehicleId, workshop_id:wsId,
-              workshop_customer_id:custId,
-              reg:b.vehicle_reg||"", make:b.vehicle_make||"",
-              model:b.vehicle_model||"", year:b.vehicle_year||"",
-              color:b.vehicle_color||"", vin:b.vin||"",
-              engine_no:b.engine_no||"",
-              licence_disc_expiry:b.licence_disc_expiry||"",
-            }).catch(()=>{});
-          }
-          await onPatchWsBooking(b.id,{status:"confirmed",workshop_vehicle_id:vehicleId});
-        };
 
         return(<>
           {/* Toolbar: title + refresh */}

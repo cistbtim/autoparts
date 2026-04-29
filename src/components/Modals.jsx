@@ -752,8 +752,7 @@ function TranslationEditor({row, onClose, onSaved}) {
     "Processing","Ready to Ship","Completed","Cancelled","In Progress","Done","Delivered"];
 
   return (
-    <div style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center"}}
-      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+    <div style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{background:"var(--surface)",borderRadius:16,width:"min(900px,96vw)",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,.4)"}}>
         {/* Header */}
         <div style={{padding:"18px 22px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>

@@ -54,6 +54,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [bkShowDeleted,   setBkShowDeleted]   = useState(false);
   const [bkDeletedPeriod, setBkDeletedPeriod] = useState("week");
   const [kanbanView,      setKanbanView]      = useState(true);
+  const [jobDetailTab,    setJobDetailTab]    = useState("car");
   const [kanbanInvJob,    setKanbanInvJob]    = useState(null);
   const [kanbanInvOpen,   setKanbanInvOpen]   = useState(false);
   const kanbanInvPanelRef = useRef(null);
@@ -159,6 +160,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
+        initialTab={jobDetailTab}
         t={t} lang={lang}/>
     );
   }
@@ -286,7 +288,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             const frontPhoto=wsVehicles.find(v=>v.id===j.workshop_vehicle_id)?.photo_front||"";
             return (
               <div key={j.id} className="card card-hover" style={{padding:0,cursor:"pointer",borderLeft:`3px solid ${ST_COLOR[j.status]||"var(--border)"}`,overflow:"hidden",display:"flex",minHeight:110}}
-                onClick={()=>{setActiveJob(j);setView("job");}}>
+                onClick={()=>{setJobDetailTab("car");setActiveJob(j);setView("job");}}>
                 {/* Front photo */}
                 <div style={{width:64,flexShrink:0,background:"var(--surface2)",position:"relative",overflow:"hidden"}}>
                   {frontPhoto?(
@@ -388,7 +390,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             const canInvoice= col.id==="done";
             return (
               <div className="card" style={{marginBottom:8,padding:0,overflow:"hidden"}}
-                onClick={()=>{setActiveJob(job);setView("job");}}>
+                onClick={()=>{setJobDetailTab("car");setActiveJob(job);setView("job");}}>
                 {fp&&<div style={{height:56,overflow:"hidden",flexShrink:0}}>
                   <img src={toImgUrl(fp)} alt="car" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
                     onError={e=>{e.target.style.display="none";}}/>
@@ -412,17 +414,17 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                     <span style={{color:"var(--text3)"}}>Invoice</span>
                     <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
                   </div>}
-                  {(col.nextStatus||canInvoice)&&(
+                  {(col.nextStatus||canInvoice||col.id==="wip")&&(
                     <div style={{marginTop:4}} onClick={e=>e.stopPropagation()}>
                       {col.nextStatus&&<button className="btn btn-xs" style={{width:"100%",fontSize:11,padding:"5px 0"}}
                         onClick={()=>moveJobStatus(job,col.nextStatus)}>{col.nextLabel}</button>}
+                      {col.id==="wip"&&(
+                        <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:11,padding:"5px 0",marginTop:col.nextStatus?4:0}}
+                          onClick={()=>{ setJobDetailTab("quote"); setActiveJob(job); setView("job"); }}>📝 Quote</button>
+                      )}
                       {canInvoice&&(
-                        <div style={{display:"flex",gap:4,marginTop:4}}>
-                          <button className="btn btn-xs btn-ghost" style={{flex:1,fontSize:11,padding:"5px 0"}}
-                            onClick={()=>{setActiveJob(job);setView("job");}}>📝 Quote</button>
-                          <button className="btn btn-xs btn-primary" style={{flex:1,fontSize:11,padding:"5px 0"}}
-                            onClick={()=>{ setKanbanInvJob(job); setTimeout(()=>kanbanInvPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),80); }}>🧾 Invoice</button>
-                        </div>
+                        <button className="btn btn-xs btn-primary" style={{width:"100%",fontSize:11,padding:"5px 0"}}
+                          onClick={()=>{ setKanbanInvJob(job); setTimeout(()=>kanbanInvPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),80); }}>🧾 Invoice</button>
                       )}
                     </div>
                   )}
@@ -2264,7 +2266,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},initialTab="car",t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -2283,7 +2285,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   const [moveModal,     setMoveModal]     = useState(false);
   const [supplierModal, setSupplierModal] = useState(false);
   const [createPoOpen,  setCreatePoOpen]  = useState(false);
-  const [jobTab,        setJobTab]        = useState("car");
+  const [jobTab,        setJobTab]        = useState(initialTab||"car");
   const [oeSearch,      setOeSearch]      = useState("");
   const [editPriceId,   setEditPriceId]   = useState(null);
   const [editPriceVal,  setEditPriceVal]  = useState("");

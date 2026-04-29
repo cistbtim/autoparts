@@ -397,6 +397,32 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         const statusColor=(s)=>s==="pending"?"rgba(251,191,36,.15)":s==="confirmed"?"rgba(52,211,153,.15)":"rgba(100,116,139,.15)";
         const statusTextColor=(s)=>s==="pending"?"var(--yellow)":s==="confirmed"?"var(--green)":"var(--text3)";
         const statusLabel=(s)=>s==="pending"?"⏳ Pending":s==="confirmed"?"✅ Confirmed":s==="cancelled"?"❌ Cancelled":s;
+
+        const confirmBooking=async(b)=>{
+          let vehicleId=b.workshop_vehicle_id||null;
+          // Vehicle not yet in system — create customer + vehicle automatically
+          if(!vehicleId){
+            const custId=makeId("WSC");
+            await api.insert("workshop_customers",{
+              id:custId, workshop_id:wsId,
+              name:b.customer_name||"", phone:b.customer_phone||"",
+              email:b.customer_email||null,
+              created_at:new Date().toISOString(),
+            }).catch(()=>{});
+            vehicleId=makeId("WSV");
+            await api.insert("workshop_vehicles",{
+              id:vehicleId, workshop_id:wsId,
+              workshop_customer_id:custId,
+              reg:b.vehicle_reg||"", make:b.vehicle_make||"",
+              model:b.vehicle_model||"", year:b.vehicle_year||"",
+              color:b.vehicle_color||"", vin:b.vin||"",
+              engine_no:b.engine_no||"",
+              licence_disc_expiry:b.licence_disc_expiry||"",
+            }).catch(()=>{});
+          }
+          await onPatchWsBooking(b.id,{status:"confirmed",workshop_vehicle_id:vehicleId});
+        };
+
         return(<>
           {/* Booking link card */}
           <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
@@ -436,7 +462,9 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                 {b.complaint&&<div style={{fontSize:13,color:"var(--text2)",padding:"8px 10px",background:"var(--surface2)",borderRadius:8,marginBottom:8}}>🔧 {b.complaint}</div>}
                 {b.status==="pending"&&(
                   <div style={{display:"flex",gap:8}}>
-                    <button className="btn btn-success btn-sm" onClick={()=>onPatchWsBooking&&onPatchWsBooking(b.id,{status:"confirmed"})}>✅ Confirm</button>
+                    <button className="btn btn-success btn-sm" onClick={()=>confirmBooking(b)}>
+                      ✅ Confirm{!b.workshop_vehicle_id?" & Add to System":""}
+                    </button>
                     <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>onPatchWsBooking&&onPatchWsBooking(b.id,{status:"cancelled"})}>❌ Cancel</button>
                   </div>
                 )}

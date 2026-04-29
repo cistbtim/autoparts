@@ -28,7 +28,7 @@ import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, Wor
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,wsProfile={},t,lang}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onRefreshBookings,wsProfile={},t,lang}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -44,7 +44,17 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [filterCity,    setFilterCity]    = useState("__all__");
   const [filterCountry, setFilterCountry] = useState("__all__");
   const [jobPage,   setJobPage]   = useState(0);
-  const [bookingToken, setBookingToken] = useState(wsProfile?.booking_token||"");
+  const [bookingToken,    setBookingToken]    = useState(wsProfile?.booking_token||"");
+  const [bookingsRefreshing, setBookingsRefreshing] = useState(false);
+  const [bookingsLastAt,     setBookingsLastAt]     = useState(null);
+
+  // Auto-refresh bookings every 30 s while on the bookings tab
+  useEffect(()=>{
+    if(wsTab!=="wsbookings"||!onRefreshBookings) return;
+    const run=async()=>{ setBookingsRefreshing(true); await onRefreshBookings(); setBookingsRefreshing(false); setBookingsLastAt(new Date()); };
+    const id=setInterval(run,30000);
+    return()=>clearInterval(id);
+  },[wsTab,onRefreshBookings]);
   const JOB_PAGE_SIZE = typeof window!=="undefined"&&window.innerWidth<=767 ? 5 : 20;
 
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
@@ -424,6 +434,18 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         };
 
         return(<>
+          {/* Toolbar: title + refresh */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,gap:8}}>
+            <div style={{fontWeight:700,fontSize:15}}>🗓️ Bookings ({wsBookings.length})</div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              {bookingsLastAt&&<span style={{fontSize:11,color:"var(--text3)"}}>Updated {bookingsLastAt.toLocaleTimeString()}</span>}
+              <button className="btn btn-ghost btn-sm" disabled={bookingsRefreshing}
+                onClick={async()=>{ if(!onRefreshBookings)return; setBookingsRefreshing(true); await onRefreshBookings(); setBookingsRefreshing(false); setBookingsLastAt(new Date()); }}>
+                {bookingsRefreshing?"⏳":"🔄"} Refresh
+              </button>
+            </div>
+          </div>
+
           {/* Booking link card */}
           <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
             <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🔗 Customer Booking Link</div>

@@ -23,7 +23,7 @@ export default function App() {
   const [theme,setTheme] = useState(localStorage.getItem("ap_theme")||"dark");
   useEffect(()=>{ document.documentElement.setAttribute("data-theme",theme); },[theme]);
   const toggleTheme = ()=>{ const n=theme==="dark"?"light":"dark"; setTheme(n); localStorage.setItem("ap_theme",n); };
-  const changeLang = (l)=>{setLang(l);localStorage.setItem("ap_lang",l);};
+  const changeLang = (l)=>{setLang(l);localStorage.setItem("ap_lang",l);api.patch("settings","id",1,{default_lang:l}).catch(()=>{});};
   const t = T[lang] || T.en;
 
   useEffect(()=>{
@@ -33,9 +33,10 @@ export default function App() {
       if(Array.isArray(rows)) rows.forEach(r=>registerLang(r.lang,r.name,r.flag,r.t||{},r.status_t||{}));
       const loaded=getLangs();
       setAvailLangs(loaded);
-      // If stored lang is not in active list, reset to English
-      const storedLang=localStorage.getItem("ap_lang")||"en";
+      // Prefer localStorage; fall back to shop's saved default_lang; then English
+      const storedLang=localStorage.getItem("ap_lang")||getSettings().default_lang||"en";
       if(!loaded.find(l=>l.lang===storedLang)) changeLang("en");
+      else if(storedLang!==lang){ setLang(storedLang); localStorage.setItem("ap_lang",storedLang); }
       setSettingsLoaded(true);
     };
     init();

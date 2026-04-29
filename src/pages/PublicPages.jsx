@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { getSettings, curSym } from "../lib/settings.js";
+import { T } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ShopLogo, MHead, FG, FD, FL } from "../components/shared.jsx";
 
@@ -497,6 +498,7 @@ export function QuoteConfirmPage({token}) {
   const [note,setNote]=useState("");
   const [done,setDone]=useState(null); // null | "confirmed" | "declined"
   const [saving,setSaving]=useState(false);
+  const [t,setT]=useState(T.en);
 
   useEffect(()=>{
     (async()=>{
@@ -505,6 +507,7 @@ export function QuoteConfirmPage({token}) {
         api.get("settings","id=eq.1&select=*").catch(()=>[]),
       ]);
       const q=Array.isArray(qs)&&qs[0]?qs[0]:null;
+      const shopSett=Array.isArray(ss)&&ss[0]?ss[0]:{};
       if(q){
         setQuote(q);
         if(q.confirm_status==="confirmed"||q.confirm_status==="declined") setDone(q.confirm_status);
@@ -515,7 +518,13 @@ export function QuoteConfirmPage({token}) {
         setItems(Array.isArray(ji)?ji:[]);
         if(Array.isArray(jj)&&jj[0]) setJob(jj[0]);
       }
-      if(Array.isArray(ss)&&ss[0]) setShopSettings(ss[0]);
+      setShopSettings(shopSett);
+      // Load shop language translation pack
+      const lang=shopSett.default_lang||"en";
+      if(lang!=="en"){
+        const tr=await api.get("app_translations",`lang=eq.${lang}&active=eq.true&select=t`).catch(()=>[]);
+        if(Array.isArray(tr)&&tr[0]?.t) setT({...T.en,...tr[0].t});
+      }
       setLoading(false);
     })();
   },[token]);
@@ -550,7 +559,7 @@ export function QuoteConfirmPage({token}) {
         <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5">
           <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;
             background:${it.type==="part"?"#dbeafe":"#dcfce7"};color:${it.type==="part"?"#1d4ed8":"#166534"};margin-right:6px">
-            ${it.type==="part"?"PART":"LABOUR"}</span>
+            ${it.type==="part"?t.wsqPart:t.wsqLabour}</span>
           ${it.description||""}${it.part_sku?`<br/><span style="font-size:11px;color:#888;font-family:monospace">${it.part_sku}</span>`:""}
         </td>
         <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${it.qty}</td>
@@ -594,17 +603,17 @@ export function QuoteConfirmPage({token}) {
     </div>
   </div>
   <div class="qblock">
-    <div class="qtitle">QUOTATION</div>
+    <div class="qtitle">${t.wsqPdfQuotation}</div>
     <div class="qno">${quote.id}</div>
     <div class="qmeta">
-      Date: ${quote.quote_date||""}<br/>
-      ${quote.valid_until?`Valid until: ${quote.valid_until}<br/>`:""}
+      ${t.wsqPdfDate}: ${quote.quote_date||""}<br/>
+      ${quote.valid_until?`${t.wsqPdfValidUntil}: ${quote.valid_until}<br/>`:""}
     </div>
   </div>
 </div>
 <div class="grid2">
   <div class="card">
-    <div class="clabel">Customer</div>
+    <div class="clabel">${t.wsqPdfCustomer}</div>
     <div class="cname">${quote.quote_customer||job?.customer_name||"—"}</div>
     <div class="cinfo">
       ${job?.customer_phone?`📞 ${job.customer_phone}<br/>`:""}
@@ -612,30 +621,30 @@ export function QuoteConfirmPage({token}) {
     </div>
   </div>
   <div class="card">
-    <div class="clabel">Vehicle</div>
+    <div class="clabel">${t.wsqPdfVehicle}</div>
     <div class="cname">${job?.vehicle_reg||"—"}</div>
     <div class="cinfo">
       ${[job?.vehicle_make,job?.vehicle_model,job?.vehicle_year].filter(Boolean).join(" ")||""}<br/>
       ${job?.vehicle_color?`${job.vehicle_color}<br/>`:""}
-      ${job?.mileage?`Mileage: ${Number(job.mileage).toLocaleString()} km`:""}
+      ${job?.mileage?`${t.wsqPdfMileage}: ${Number(job.mileage).toLocaleString()} km`:""}
     </div>
   </div>
 </div>
 <table>
   <thead><tr>
-    <th>Description</th>
-    <th style="text-align:right">Qty</th>
-    <th style="text-align:right">Unit Price</th>
-    <th style="text-align:right">Total</th>
+    <th>${t.wsqPdfDescription}</th>
+    <th style="text-align:right">${t.wsqPdfQty}</th>
+    <th style="text-align:right">${t.wsqPdfUnitPrice}</th>
+    <th style="text-align:right">${t.total}</th>
   </tr></thead>
   <tbody>${rowsHtml}</tbody>
 </table>
 <div class="totals">
-  <div class="t-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
-  ${taxRate>0?`<div class="t-row"><span>VAT (${taxRate}%)</span><span>${fmt(taxAmt)}</span></div>`:""}
-  <div class="t-total"><span>TOTAL</span><span>${fmt(total)}</span></div>
+  <div class="t-row"><span>${t.wsqPdfSubtotal}</span><span>${fmt(subtotal)}</span></div>
+  ${taxRate>0?`<div class="t-row"><span>${t.wsqPdfVat} (${taxRate}%)</span><span>${fmt(taxAmt)}</span></div>`:""}
+  <div class="t-total"><span>${t.wsqPdfTotal}</span><span>${fmt(total)}</span></div>
 </div>
-${quote.notes?`<div class="notes-box"><strong>Notes:</strong> ${quote.notes}</div>`:""}
+${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote.notes}</div>`:""}
 <div class="footer">
   ${shopName}${shopSettings.phone?` · 📞 ${shopSettings.phone}`:""}${shopSettings.email?` · ✉️ ${shopSettings.email}`:""}
 </div>
@@ -670,19 +679,17 @@ ${quote.notes?`<div class="notes-box"><strong>Notes:</strong> ${quote.notes}</di
         <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{fontSize:28,marginBottom:6}}>🔧</div>
           <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:24,fontWeight:700,color:"var(--accent)"}}>{shopName}</div>
-          <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>Workshop Quotation Approval</div>
+          <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>{t.wsqApprovalTitle}</div>
         </div>
 
         {done?(
           <div className="card" style={{padding:32,textAlign:"center"}}>
             <div style={{fontSize:56,marginBottom:12}}>{done==="confirmed"?"✅":"❌"}</div>
             <div style={{fontSize:20,fontWeight:700,marginBottom:8,color:done==="confirmed"?"var(--green)":"var(--red)"}}>
-              {done==="confirmed"?"Quotation Approved!":"Quotation Declined"}
+              {done==="confirmed"?t.wsqApproved:t.wsqDeclined}
             </div>
             <div style={{color:"var(--text3)",fontSize:14,lineHeight:1.6}}>
-              {done==="confirmed"
-                ?"Thank you! We will proceed with the work as quoted. We will contact you shortly."
-                :"Thank you for your response. We will get in touch to discuss alternatives."}
+              {done==="confirmed"?t.wsqApprovedMsg:t.wsqDeclinedMsg}
             </div>
             <div style={{marginTop:16,fontSize:13,color:"var(--text3)"}}>
               {shopSettings.phone&&<div>📞 {shopSettings.phone}</div>}
@@ -703,7 +710,7 @@ ${quote.notes?`<div class="notes-box"><strong>Notes:</strong> ${quote.notes}</di
                   <button onClick={downloadPdf}
                     style={{fontSize:12,padding:"5px 12px",background:"rgba(37,99,235,.12)",border:"1px solid rgba(37,99,235,.3)",
                       borderRadius:8,cursor:"pointer",color:"var(--blue)",fontWeight:600,whiteSpace:"nowrap"}}>
-                    📄 Download PDF
+                    📄 {t.wsqDownloadPdf}
                   </button>
                 </div>
               </div>
@@ -717,15 +724,15 @@ ${quote.notes?`<div class="notes-box"><strong>Notes:</strong> ${quote.notes}</di
 
             {/* Line items */}
             <div className="card" style={{padding:0,marginBottom:14,overflow:"hidden"}}>
-              <div style={{padding:"10px 16px",fontWeight:700,fontSize:13,borderBottom:"1px solid var(--border)",background:"var(--surface2)"}}>📋 Work Items</div>
+              <div style={{padding:"10px 16px",fontWeight:700,fontSize:13,borderBottom:"1px solid var(--border)",background:"var(--surface2)"}}>📋 {t.wsqWorkItems}</div>
               {items.length===0
-                ? <div style={{padding:16,color:"var(--text3)",fontSize:13,textAlign:"center"}}>No items found</div>
+                ? <div style={{padding:16,color:"var(--text3)",fontSize:13,textAlign:"center"}}>{t.wsqNoItems}</div>
                 : items.map((it,i)=>(
                   <div key={it.id||i} style={{padding:"10px 16px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",gap:8,alignItems:"center"}}>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:600,fontSize:13}}>{it.description}</div>
                       <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
-                        {it.type==="part"?"🔩 Part":"👷 Labour"} · Qty: {it.qty} × {fmt(it.unit_price)}
+                        {it.type==="part"?`🔩 ${t.wsqPart}`:`👷 ${t.wsqLabour}`} · {t.wsqPdfQty}: {it.qty} × {fmt(it.unit_price)}
                       </div>
                     </div>
                     <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)",flexShrink:0}}>{fmt(it.total)}</div>
@@ -741,33 +748,33 @@ ${quote.notes?`<div class="notes-box"><strong>Notes:</strong> ${quote.notes}</di
             {/* Notes from workshop */}
             {quote.notes&&(
               <div className="card" style={{padding:"10px 16px",marginBottom:14,background:"rgba(96,165,250,.06)",borderLeft:"3px solid var(--blue)"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>Workshop Notes</div>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>{t.wsqWorkshopNotes}</div>
                 <div style={{fontSize:13}}>{quote.notes}</div>
               </div>
             )}
 
             {/* Customer note */}
             <div style={{marginBottom:14}}>
-              <FL label="Your message (optional)"/>
+              <FL label={t.wsqYourMsg}/>
               <textarea className="inp" rows={3} value={note} onChange={e=>setNote(e.target.value)}
-                placeholder="Any questions or comments for the workshop..."/>
+                placeholder={t.wsqMsgPlaceholder}/>
             </div>
 
             {/* Action buttons */}
             <div style={{display:"flex",gap:12,marginBottom:24}}>
               <button className="btn" style={{flex:1,padding:16,fontSize:15,fontWeight:700,background:"rgba(248,113,113,.15)",color:"var(--red)",border:"2px solid rgba(248,113,113,.4)",borderRadius:12}}
                 onClick={()=>respond("declined")} disabled={saving}>
-                ❌ Decline
+                ❌ {t.wsqDeclineBtn}
               </button>
               <button className="btn btn-primary" style={{flex:2,padding:16,fontSize:15,fontWeight:700,borderRadius:12}}
                 onClick={()=>respond("confirmed")} disabled={saving}>
-                {saving?"Submitting...":"✅ Approve & Confirm"}
+                {saving?t.wsqSubmitting:`✅ ${t.wsqApproveBtn}`}
               </button>
             </div>
 
             {/* Workshop contact */}
             <div style={{textAlign:"center",color:"var(--text3)",fontSize:12}}>
-              <div style={{marginBottom:4}}>Questions? Contact us:</div>
+              <div style={{marginBottom:4}}>{t.wsqContact}</div>
               {shopSettings.phone&&<div>📞 {shopSettings.phone}</div>}
               {shopSettings.email&&<div>✉️ {shopSettings.email}</div>}
               {shopSettings.address&&<div>📍 {shopSettings.address}</div>}

@@ -381,7 +381,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       {/* ══════════════ INVOICES TAB ══════════════ */}
       {wsTab==="invoices"&&(<>
         <div style={{marginBottom:12,display:"flex",gap:16,flexWrap:"wrap"}}>
-          {[["Total Invoiced",totalInvoiced,"var(--accent)"],["Total Paid",totalPaid,"var(--green)"],["Outstanding",totalOutstanding,"var(--red)"]].map(([l,v,c])=>(
+          {[[t.wsiTotalInvoiced,totalInvoiced,"var(--accent)"],[t.wsiTotalPaid,totalPaid,"var(--green)"],[t.outstanding,totalOutstanding,"var(--red)"]].map(([l,v,c])=>(
             <div key={l} className="card" style={{padding:"10px 16px",minWidth:150}}>
               <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{l}</div>
               <div style={{fontWeight:700,fontSize:17,fontFamily:"Rajdhani,sans-serif",color:c}}>{fmt(v)}</div>
@@ -389,10 +389,10 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           ))}
         </div>
         {invoices.length===0
-          ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No invoices yet</div>
+          ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.wsiNoInvoices}</div>
           : <div className="card" style={{overflow:"auto"}}>
               <table className="tbl" style={{width:"100%",minWidth:750}}>
-                <thead><tr><th>Invoice ID</th><th>Customer</th><th>Vehicle</th><th>Date</th><th style={{textAlign:"right"}}>Total</th><th style={{textAlign:"right"}}>Paid</th><th style={{textAlign:"right"}}>Balance</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>{t.invoiceNo}</th><th>{t.customer}</th><th>{t.wsiVehicle}</th><th>{t.date}</th><th style={{textAlign:"right"}}>{t.total}</th><th style={{textAlign:"right"}}>{t.paid}</th><th style={{textAlign:"right"}}>{t.wsiBalance}</th><th>{t.status}</th><th></th></tr></thead>
                 <tbody>
                   {[...invoices].sort((a,b)=>new Date(b.invoice_date)-new Date(a.invoice_date)).map(inv=>{
                     const j=jobs.find(jb=>jb.id===inv.job_id);
@@ -409,10 +409,10 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                         <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.total)}</td>
                         <td style={{textAlign:"right",color:"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{paid>0?fmt(paid):"—"}</td>
                         <td style={{textAlign:"right",color:bal>0?"var(--red)":"var(--green)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{fmt(bal)}</td>
-                        <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ Paid":inv.status==="partial"?"💛 Partial":"⏳ Unpaid"}</span></td>
+                        <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ "+t.paid:inv.status==="partial"?"💛 "+t.partial:"⏳ "+t.unpaid}</span></td>
                         <td>
                           <div style={{display:"flex",gap:4}}>
-                            {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{setActiveJob(j);setView("job");}}>Open</button>}
+                            {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{setActiveJob(j);setView("job");}}>{t.stOpen}</button>}
                             {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
                           </div>
                         </td>
@@ -430,7 +430,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         const paid=invoices.filter(i=>(+i.paid_amount||0)>0).sort((a,b)=>new Date(b.payment_date||b.invoice_date)-new Date(a.payment_date||a.invoice_date));
         return (<>
           <div style={{marginBottom:12,display:"flex",gap:16,flexWrap:"wrap"}}>
-            {[["Payments Received",paid.length+" transactions","var(--blue)"],["Total Collected",fmt(paid.reduce((s,i)=>s+(+i.paid_amount||0),0)),"var(--green)"]].map(([l,v,c])=>(
+            {[[t.wsiPaymentsReceived,paid.length+" "+t.wsiTransactions,"var(--blue)"],[t.wsiTotalCollected,fmt(paid.reduce((s,i)=>s+(+i.paid_amount||0),0)),"var(--green)"]].map(([l,v,c])=>(
               <div key={l} className="card" style={{padding:"10px 16px",minWidth:150}}>
                 <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{l}</div>
                 <div style={{fontWeight:700,fontSize:16,fontFamily:"Rajdhani,sans-serif",color:c}}>{v}</div>
@@ -438,10 +438,10 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             ))}
           </div>
           {paid.length===0
-            ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No payments recorded yet</div>
+            ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.wsiNoPayments}</div>
             : <div className="card" style={{overflow:"auto"}}>
                 <table className="tbl" style={{width:"100%",minWidth:700}}>
-                  <thead><tr><th>Invoice</th><th>Customer</th><th>Vehicle</th><th>Pay Date</th><th>Method</th><th>Reference</th><th style={{textAlign:"right"}}>Invoice Total</th><th style={{textAlign:"right"}}>Paid</th><th>Status</th></tr></thead>
+                  <thead><tr><th>{t.invoice}</th><th>{t.customer}</th><th>{t.wsiVehicle}</th><th>{t.wsiPayDate}</th><th>{t.paymentMethod}</th><th>{t.wsiReference}</th><th style={{textAlign:"right"}}>{t.wsiInvTotal}</th><th style={{textAlign:"right"}}>{t.paid}</th><th>{t.status}</th></tr></thead>
                   <tbody>
                     {paid.map(inv=>{
                       const j=jobs.find(jb=>jb.id===inv.job_id);
@@ -457,7 +457,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                           <td style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{inv.payment_ref||"—"}</td>
                           <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.total)}</td>
                           <td style={{textAlign:"right",fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.paid_amount)}</td>
-                          <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ Paid":"💛 Partial"}</span></td>
+                          <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ "+t.paid:"💛 "+t.partial}</span></td>
                         </tr>
                       );
                     })}

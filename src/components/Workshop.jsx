@@ -3170,7 +3170,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           {/* Actions */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
             <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos)}>🖨️ Print PDF</button>
-            <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos,true)}>📱 PDF via WA</button>
             {quote.status!=="converted"&&onSendQuoteForApproval&&(
               <button className="btn btn-sm" style={{background:"rgba(37,211,102,.12)",color:"#25D366",border:"1px solid rgba(37,211,102,.3)"}}
                 onClick={()=>setApprovalModal(true)}>

@@ -938,6 +938,39 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           onReopenJob={async(d)=>{ await onSaveJob(d); setEditJob(null); }}
           onClose={()=>setEditJob(null)} t={t}/>
       )}
+
+      {/* ── Booking delete confirmation modal ── */}
+      {bkDeleteModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div className="card" style={{width:"100%",maxWidth:400,padding:24,display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{fontWeight:700,fontSize:16}}>🗑️ Delete Booking</div>
+            <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",fontSize:13}}>
+              <div><strong>{bkDeleteModal.booking.vehicle_reg}</strong> — {bkDeleteModal.booking.customer_name}</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{bkDeleteModal.booking.customer_phone}</div>
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:600,color:"var(--text3)",marginBottom:5}}>YOUR NAME *</div>
+              <input className="inp" autoFocus placeholder="Who is deleting this?" value={bkDeleteBy} onChange={e=>setBkDeleteBy(e.target.value)}/>
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:600,color:"var(--text3)",marginBottom:5}}>REASON *</div>
+              <textarea className="inp" rows={3} placeholder="Why is this booking being deleted?" value={bkDeleteReason} onChange={e=>setBkDeleteReason(e.target.value)} style={{resize:"vertical"}}/>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:4}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setBkDeleteModal(null)} disabled={bkDeleting}>Cancel</button>
+              <button className="btn" style={{flex:1,background:"rgba(248,113,113,.15)",color:"var(--red)",border:"1px solid rgba(248,113,113,.3)"}}
+                disabled={bkDeleting||!bkDeleteReason.trim()||!bkDeleteBy.trim()}
+                onClick={async()=>{
+                  setBkDeleting(true);
+                  await onDeleteWsBooking(bkDeleteModal.booking.id,{deleted_by:bkDeleteBy.trim(),deleted_reason:bkDeleteReason.trim()});
+                  setBkDeleteModal(null); setBkDeleting(false);
+                }}>
+                {bkDeleting?"⏳ Deleting…":"🗑️ Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3687,39 +3720,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
       )}
 
       {/* Move PIN prompt */}
-      {/* ── Booking delete confirmation modal ── */}
-      {bkDeleteModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div className="card" style={{width:"100%",maxWidth:400,padding:24,display:"flex",flexDirection:"column",gap:14}}>
-            <div style={{fontWeight:700,fontSize:16}}>🗑️ Delete Booking</div>
-            <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",fontSize:13}}>
-              <div><strong>{bkDeleteModal.booking.vehicle_reg}</strong> — {bkDeleteModal.booking.customer_name}</div>
-              <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{bkDeleteModal.booking.customer_phone}</div>
-            </div>
-            <div>
-              <div style={{fontSize:12,fontWeight:600,color:"var(--text3)",marginBottom:5}}>YOUR NAME *</div>
-              <input className="inp" autoFocus placeholder="Who is deleting this?" value={bkDeleteBy} onChange={e=>setBkDeleteBy(e.target.value)}/>
-            </div>
-            <div>
-              <div style={{fontSize:12,fontWeight:600,color:"var(--text3)",marginBottom:5}}>REASON *</div>
-              <textarea className="inp" rows={3} placeholder="Why is this booking being deleted?" value={bkDeleteReason} onChange={e=>setBkDeleteReason(e.target.value)} style={{resize:"vertical"}}/>
-            </div>
-            <div style={{display:"flex",gap:8,marginTop:4}}>
-              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setBkDeleteModal(null)} disabled={bkDeleting}>Cancel</button>
-              <button className="btn" style={{flex:1,background:"rgba(248,113,113,.15)",color:"var(--red)",border:"1px solid rgba(248,113,113,.3)"}}
-                disabled={bkDeleting||!bkDeleteReason.trim()||!bkDeleteBy.trim()}
-                onClick={async()=>{
-                  setBkDeleting(true);
-                  await onDeleteWsBooking(bkDeleteModal.booking.id,{deleted_by:bkDeleteBy.trim(),deleted_reason:bkDeleteReason.trim()});
-                  setBkDeleteModal(null); setBkDeleting(false);
-                }}>
-                {bkDeleting?"⏳ Deleting…":"🗑️ Confirm Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {movePinOpen&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div className="card" style={{width:"100%",maxWidth:320,padding:24,display:"flex",flexDirection:"column",gap:14}}>

@@ -47,6 +47,12 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [bookingToken,    setBookingToken]    = useState(wsProfile?.booking_token||"");
   const [bookingsRefreshing, setBookingsRefreshing] = useState(false);
   const [bookingsLastAt,     setBookingsLastAt]     = useState(null);
+  const [bkDeleteModal,   setBkDeleteModal]   = useState(null); // {booking}
+  const [bkDeleteReason,  setBkDeleteReason]  = useState("");
+  const [bkDeleteBy,      setBkDeleteBy]      = useState("");
+  const [bkDeleting,      setBkDeleting]      = useState(false);
+  const [bkShowDeleted,   setBkShowDeleted]   = useState(false);
+  const [bkDeletedPeriod, setBkDeletedPeriod] = useState("week");
 
   // Auto-refresh bookings every 30 s while on the bookings tab
   useEffect(()=>{
@@ -462,9 +468,9 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             )}
           </div>
 
-          {wsBookings.length===0
+          {(()=>{ const active=wsBookings.filter(b=>b.status!=="deleted"); return active.length===0
             ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No bookings yet — share the link above with customers</div>
-            : wsBookings.map(b=>(
+            : active.map(b=>(
               <div key={b.id} className="card" style={{marginBottom:12,padding:14}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
                   <div>
@@ -496,10 +502,58 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   </div>
                 )}
                 <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",marginLeft:"auto",display:"block",marginTop:6}}
-                  onClick={()=>{ if(confirm("Delete this booking?")) onDeleteWsBooking&&onDeleteWsBooking(b.id); }}>🗑️ Delete</button>
+                  onClick={()=>{ setBkDeleteModal({booking:b}); setBkDeleteReason(""); setBkDeleteBy(""); }}>🗑️ Delete</button>
               </div>
-            ))
-          }
+            )); })()}
+
+          {/* ── Deleted bookings section ── */}
+          {(()=>{
+            const now=new Date();
+            const cutoff=bkDeletedPeriod==="today"?new Date(now.getFullYear(),now.getMonth(),now.getDate())
+              :bkDeletedPeriod==="week"?new Date(now-7*864e5)
+              :bkDeletedPeriod==="month"?new Date(now-30*864e5)
+              :null;
+            const deleted=wsBookings.filter(b=>b.status==="deleted"&&(!cutoff||new Date(b.deleted_at||b.created_at)>=cutoff));
+            return(<>
+              <div style={{marginTop:18,display:"flex",alignItems:"center",gap:10}}>
+                <button className={`btn btn-ghost btn-sm ${bkShowDeleted?"":"opacity-60"}`}
+                  style={{color:"var(--text3)"}}
+                  onClick={()=>setBkShowDeleted(v=>!v)}>
+                  {bkShowDeleted?"▲":"▼"} {bkShowDeleted?"Hide":"Show"} Deleted ({deleted.length})
+                </button>
+                {bkShowDeleted&&(
+                  <div style={{display:"flex",gap:4}}>
+                    {[["today","Today"],["week","7 Days"],["month","30 Days"],["all","All"]].map(([k,l])=>(
+                      <button key={k} className={`btn btn-xs ${bkDeletedPeriod===k?"btn-primary":"btn-ghost"}`}
+                        onClick={()=>setBkDeletedPeriod(k)}>{l}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {bkShowDeleted&&deleted.length===0&&(
+                <div style={{textAlign:"center",padding:"20px 0",color:"var(--text3)",fontSize:13}}>No deleted bookings in this period</div>
+              )}
+              {bkShowDeleted&&deleted.map(b=>(
+                <div key={b.id} className="card" style={{marginTop:8,padding:12,opacity:0.65,borderColor:"rgba(248,113,113,.2)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:6}}>
+                    <div>
+                      <span style={{fontFamily:"DM Mono,monospace",fontWeight:700,color:"var(--accent)",fontSize:13}}>{b.vehicle_reg}</span>
+                      <span style={{fontSize:12,color:"var(--text2)",marginLeft:8}}>{b.customer_name}</span>
+                      <span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{b.customer_phone}</span>
+                    </div>
+                    <span className="badge" style={{background:"rgba(248,113,113,.12)",color:"var(--red)",fontSize:10}}>🗑️ Deleted</span>
+                  </div>
+                  {b.complaint&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>🔧 {b.complaint}</div>}
+                  <div style={{fontSize:11,color:"var(--text3)",borderTop:"1px solid var(--border)",paddingTop:6,display:"flex",flexWrap:"wrap",gap:10}}>
+                    <span>🗑️ By: <strong style={{color:"var(--text2)"}}>{b.deleted_by||"—"}</strong></span>
+                    <span>📅 {b.deleted_at?new Date(b.deleted_at).toLocaleString():"—"}</span>
+                    {b.preferred_date&&<span>🗓️ Was booked for: {b.preferred_date}</span>}
+                    <span>📋 Reason: <em style={{color:"var(--text2)"}}>{b.deleted_reason||"—"}</em></span>
+                  </div>
+                </div>
+              ))}
+            </>);
+          })()}
         </>);
       })()}
 
@@ -3633,6 +3687,39 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
       )}
 
       {/* Move PIN prompt */}
+      {/* ── Booking delete confirmation modal ── */}
+      {bkDeleteModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div className="card" style={{width:"100%",maxWidth:400,padding:24,display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{fontWeight:700,fontSize:16}}>🗑️ Delete Booking</div>
+            <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",fontSize:13}}>
+              <div><strong>{bkDeleteModal.booking.vehicle_reg}</strong> — {bkDeleteModal.booking.customer_name}</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{bkDeleteModal.booking.customer_phone}</div>
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:600,color:"var(--text3)",marginBottom:5}}>YOUR NAME *</div>
+              <input className="inp" autoFocus placeholder="Who is deleting this?" value={bkDeleteBy} onChange={e=>setBkDeleteBy(e.target.value)}/>
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:600,color:"var(--text3)",marginBottom:5}}>REASON *</div>
+              <textarea className="inp" rows={3} placeholder="Why is this booking being deleted?" value={bkDeleteReason} onChange={e=>setBkDeleteReason(e.target.value)} style={{resize:"vertical"}}/>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:4}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setBkDeleteModal(null)} disabled={bkDeleting}>Cancel</button>
+              <button className="btn" style={{flex:1,background:"rgba(248,113,113,.15)",color:"var(--red)",border:"1px solid rgba(248,113,113,.3)"}}
+                disabled={bkDeleting||!bkDeleteReason.trim()||!bkDeleteBy.trim()}
+                onClick={async()=>{
+                  setBkDeleting(true);
+                  await onDeleteWsBooking(bkDeleteModal.booking.id,{deleted_by:bkDeleteBy.trim(),deleted_reason:bkDeleteReason.trim()});
+                  setBkDeleteModal(null); setBkDeleting(false);
+                }}>
+                {bkDeleting?"⏳ Deleting…":"🗑️ Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {movePinOpen&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div className="card" style={{width:"100%",maxWidth:320,padding:24,display:"flex",flexDirection:"column",gap:14}}>

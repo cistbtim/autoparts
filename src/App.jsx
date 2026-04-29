@@ -1047,8 +1047,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setWsBookings(p=>p.map(b=>b.id===id?{...b,...patch}:b));
   };
 
-  const deleteWsBooking=async(id)=>{
-    await api.delete("workshop_bookings","id",id).catch(e=>console.warn("Delete booking failed:",e));
+  const deleteWsBooking=async(id,meta={})=>{
+    const patch={status:"deleted",deleted_by:meta.deleted_by||"",deleted_reason:meta.deleted_reason||"",deleted_at:new Date().toISOString()};
+    await api.patch("workshop_bookings","id",id,patch).catch(e=>console.warn("Delete booking failed:",e));
+    setWsBookings(p=>p.map(b=>b.id===id?{...b,...patch}:b)); return;
     setWsBookings(p=>p.filter(b=>b.id!==id));
   };
 

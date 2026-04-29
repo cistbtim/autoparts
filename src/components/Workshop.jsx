@@ -2851,15 +2851,15 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
 
           return (<>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <div style={{fontWeight:700,fontSize:14}}>🔧 {t.wsPartsLabour}</div>
+          <div style={{fontWeight:700,fontSize:14}}>🔧 {t.wsqtPartsLabour}</div>
           <div style={{display:"flex",gap:6}}>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>{t.wsAddPart}</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>{t.wsAddLabour}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ {t.wsqtPart}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ {t.wsqtLabour}</button>
           </div>
         </div>
         <div className="card" style={{overflow:"hidden",marginBottom:14}}>
           {items.length===0
-            ?<div style={{textAlign:"center",padding:24,color:"var(--text3)"}}>{t.wsNoItemsYet}</div>
+            ?<div style={{textAlign:"center",padding:24,color:"var(--text3)"}}>{t.wsqtNoItems}</div>
             : isMobile ? (
               /* ── Mobile card list ── */
               <div style={{display:"flex",flexDirection:"column",gap:0}}>
@@ -2875,7 +2875,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                       {/* Top row: badge + name + delete */}
                       <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:6}}>
                         <span className="badge" style={{flexShrink:0,background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)",fontSize:11}}>
-                          {item.type==="part"?`🔩 ${t.wsqPart}`:`👷 ${t.wsqLabour}`}
+                          {item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}
                         </span>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontWeight:600,fontSize:14,lineHeight:1.3}}>{item.description}</div>
@@ -2919,7 +2919,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                         </div>
                         <span style={{color:"var(--text3)"}}>×</span>
                         <div style={{display:"flex",alignItems:"center",gap:4}}>
-                          <span style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>{t.wsPriceLabel}</span>
+                          <span style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>{t.wsqtPrice}</span>
                           {isEditingPrice
                             ? <input autoFocus type="number" min="0" step="0.01"
                                 value={editPriceVal}
@@ -2942,11 +2942,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                       {item.type==="part"&&(
                         <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(251,191,36,.07)",borderRadius:"0 0 8px 8px",padding:"5px 10px",borderTop:"1px solid rgba(251,191,36,.15)"}}>
                           {+(item.cost_price||0)>0&&<>
-                            <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsCostLabel}</span>
+                            <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsqtCost}</span>
                             <span style={{fontFamily:"Rajdhani,sans-serif",fontSize:12,color:"var(--text2)",flexShrink:0}}>{fmtAmt(item.cost_price)}</span>
                             <span style={{fontSize:10,color:"var(--text3)"}}>·</span>
                           </>}
-                          <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsMarkupLabel}</span>
+                          <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsqtMarkup}</span>
                           {editMarkupId===item.id
                             ? <input autoFocus type="number" min="0" step="0.1"
                                 value={editMarkupVal}
@@ -2968,14 +2968,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             ) : (
               /* ── Desktop table ── */
               <table className="tbl" style={{width:"100%"}}>
-                <thead><tr>{[t.wsTypeCol,t.wsDescCol,t.qty,t.unitPrice,t.total,""].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{[t.wsqtType,t.wsqPdfDescription,t.qty,t.unitPrice,t.total,""].map(h=><th key={h}>{h}</th>)}</tr></thead>
                 <tbody>
                   {items.map(item=>{
                     const supCosts = getSupCosts(item.description);
                     const isEditing = editPriceId === item.id;
                     return (
                     <tr key={item.id}>
-                      <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?`🔩 ${t.wsqPart}`:`👷 ${t.wsqLabour}`}</span></td>
+                      <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}</span></td>
                       <td style={{fontWeight:500}}>
                         {item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
                         {supCosts.length>0&&(
@@ -3024,7 +3024,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                         }
                         {item.type==="part"&&(
                           <div style={{fontSize:10,color:"var(--text3)",marginTop:2,textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end",gap:3}}>
-                            {+(item.cost_price||0)>0&&<span style={{color:"var(--text3)"}}>{t.wsCostLabel} {fmtAmt(item.cost_price)} ·</span>}
+                            {+(item.cost_price||0)>0&&<span style={{color:"var(--text3)"}}>Cost {fmtAmt(item.cost_price)} ·</span>}
                             {editMarkupId===item.id
                               ? <input autoFocus type="number" min="0" step="0.1"
                                   value={editMarkupVal}
@@ -3038,7 +3038,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                                   +{item.markup_pct||0}%
                                 </span>
                             }
-                            <span>{t.wsMarkupLabel}</span>
+                            <span>markup</span>
                           </div>
                         )}
                       </td>
@@ -3059,7 +3059,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             const PO_BG={draft:"var(--surface3)",sent:"rgba(96,165,250,.12)",partial:"rgba(251,191,36,.12)",received:"rgba(52,211,153,.12)",cancelled:"rgba(248,113,113,.12)"};
             return (
               <div style={{borderTop:"1px solid var(--border)",padding:"8px 16px",display:"flex",flexDirection:"column",gap:5}}>
-                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>{t.wsSupQuotes}</div>
+                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>{t.wsqtSupplierQuotes}</div>
                 {jobReqs.map(r=>{
                   const hasQuote=wsSupplierQuotes.find(q=>q.request_id===r.id);
                   const hasReply=sqReplies.find(rep=>rep.request_id===r.id);
@@ -3068,10 +3068,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                     <div key={r.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
                       <span style={{flex:1,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.supplier_name||r.supplier_phone||"Unknown"}</span>
                       {hasQuote
-                        ? <span style={{fontSize:10,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.1)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>✅ {t.wsQuoted}</span>
+                        ? <span style={{fontSize:10,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.1)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>✅ Quoted</span>
                         : hasReply
-                          ? <span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.1)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>📲 {t.wsAppReply}</span>
-                          : <span style={{fontSize:10,fontWeight:600,color:"var(--text3)",background:"var(--surface3)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>⏳ {t.wsPendingStatus}</span>
+                          ? <span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.1)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>📲 App Reply</span>
+                          : <span style={{fontSize:10,fontWeight:600,color:"var(--text3)",background:"var(--surface3)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>⏳ Pending</span>
                       }
                       {po&&(
                         <button onClick={()=>onViewPO?.(po.id)}
@@ -3099,12 +3099,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           })()}
           <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{display:"flex",gap:6}}>
-              <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>{t.wsAddPart}</button>
-              <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>{t.wsAddLabour}</button>
-              <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📤 {t.wsSendQuote}</button>
-              {wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&<button className="btn btn-ghost btn-sm" style={{color:"#38bdf8",borderColor:"rgba(56,189,248,.35)"}} onClick={()=>setReturnQuoteOpen(true)}>↩️ {t.wsReturnQuote}</button>}
+              <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ {t.wsqtPart}</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ {t.wsqtLabour}</button>
+              <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📤 {t.wsqtSendQuote}</button>
+              {wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&<button className="btn btn-ghost btn-sm" style={{color:"#38bdf8",borderColor:"rgba(56,189,248,.35)"}} onClick={()=>setReturnQuoteOpen(true)}>↩️ {t.wsqtReturnQuote}</button>}
               {(wsSupplierQuotes.filter(q=>q.job_id===job.id).length>0||sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id)).length>0)&&(
-                <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(251,146,60,.35)"}} onClick={()=>setCreatePoOpen(true)}>📦 {t.wsCreateOrder}</button>
+                <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(251,146,60,.35)"}} onClick={()=>setCreatePoOpen(true)}>📦 {t.wsqtCreateOrder}</button>
               )}
             </div>
             {items.length>0&&(
@@ -3125,9 +3125,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           {/* Header */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:10}}>
             <div>
-              <div style={{fontWeight:700,fontSize:14}}>📝 Quotation <code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{quote.id}</code></div>
+              <div style={{fontWeight:700,fontSize:14}}>📝 {t.wsqtQuotation} <code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{quote.id}</code></div>
               <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
-                {quote.quote_date}{quote.valid_until&&` · ${t.wsValidUntil} ${quote.valid_until}`}
+                {quote.quote_date}{quote.valid_until&&` · ${t.wsqtValidUntil} ${quote.valid_until}`}
               </div>
               <div style={{fontSize:13,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginTop:3}}>{fmtAmt(quote.total)}</div>
             </div>
@@ -3136,7 +3136,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
               color:quote.status==="accepted"?"var(--green)":quote.status==="declined"?"var(--red)":quote.status==="converted"?"var(--text3)":"var(--blue)",
               fontSize:12,padding:"4px 10px"
             }}>
-              {quote.status==="accepted"?"✅ Accepted":quote.status==="declined"?"❌ Declined":quote.status==="converted"?"📄 Converted":"📤 "+quote.status.charAt(0).toUpperCase()+quote.status.slice(1)}
+              {quote.status==="accepted"?"✅ "+t.wsqtAccepted:quote.status==="declined"?"❌ "+t.wsqtDeclined:quote.status==="converted"?"📄 "+t.wsqtConverted:"📤 "+quote.status.charAt(0).toUpperCase()+quote.status.slice(1)}
             </span>
           </div>
           {/* Customer confirm status */}
@@ -3148,7 +3148,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
               <span style={{fontSize:18}}>{quote.confirm_status==="confirmed"?"✅":"❌"}</span>
               <div>
                 <div style={{fontWeight:700,fontSize:13,color:quote.confirm_status==="confirmed"?"var(--green)":"var(--red)"}}>
-                  {quote.confirm_status==="confirmed"?t.wsCustApproved:t.wsCustDeclined}
+                  {quote.confirm_status==="confirmed"?t.wsqtCustApproved:t.wsqtCustDeclined}
                 </div>
                 {quote.confirmed_at&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{new Date(quote.confirmed_at).toLocaleString()}</div>}
                 {quote.customer_note&&<div style={{fontSize:12,color:"var(--text2)",marginTop:3}}>💬 "{quote.customer_note}"</div>}
@@ -3157,7 +3157,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           )}
           {quote.confirm_status==="pending"&&(
             <div style={{marginBottom:10,padding:"8px 12px",borderRadius:8,background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.3)",fontSize:12,color:"var(--yellow)"}}>
-              ⏳ {t.wsAwaitingResp}
+              ⏳ {t.wsqtAwaitingResponse}
             </div>
           )}
           {/* Invoice exists warning */}
@@ -3169,11 +3169,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           )}
           {/* Actions */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
-            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos)}>🖨️ Print PDF</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos)}>🖨️ {t.wsqtPrintPdf}</button>
             {quote.status!=="converted"&&onSendQuoteForApproval&&(
               <button className="btn btn-sm" style={{background:"rgba(37,211,102,.12)",color:"#25D366",border:"1px solid rgba(37,211,102,.3)"}}
                 onClick={()=>setApprovalModal(true)}>
-                🔗 {t.wsSendApproval}
+                🔗 {t.wsqtSendApproval}
               </button>
             )}
             {(quote.quote_phone||job.customer_phone)&&(
@@ -3210,14 +3210,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             {quote.status!=="converted"&&quote.status!=="declined"&&(
               <button className={`btn btn-xs ${quote.status==="accepted"?"btn-ghost":"btn-success"}`}
                 onClick={()=>onSaveQuote({...quote,status:quote.status==="accepted"?"sent":"accepted"})}>
-                {quote.status==="accepted"?`↩ ${t.wsUnaccept}`:`✅ ${t.wsMarkAccepted}`}
+                {quote.status==="accepted"?"↩ "+t.wsqtUnaccept:"✅ "+t.wsqtMarkAccepted}
               </button>
             )}
             {quote.status!=="converted"&&(
               <button className="btn btn-ghost btn-xs" onClick={()=>setQuoteModal(true)}>✏️ Edit</button>
             )}
             {!invoice&&quote.status==="accepted"&&(
-              <button className="btn btn-primary btn-sm" onClick={()=>{ setQuoteSrcForInv(quote); setCreatingInv(true); }}>🧾 {t.wsConvertInv}</button>
+              <button className="btn btn-primary btn-sm" onClick={()=>{ setQuoteSrcForInv(quote); setCreatingInv(true); }}>🧾 {t.wsqtConvertInv}</button>
             )}
             <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",marginLeft:"auto"}}
               onClick={()=>setDeletingQuote(true)}>🗑️</button>
@@ -3226,7 +3226,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
       ) : (
         <button className="btn btn-ghost" style={{width:"100%",padding:12,fontSize:14,fontWeight:600,marginBottom:14,border:"2px dashed var(--border)"}}
           onClick={()=>setQuoteModal(true)}>
-          📝 {t.wsCreateQuote}
+          📝 Create Quotation for Customer
         </button>
       )}
       </>)}

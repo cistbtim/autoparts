@@ -54,6 +54,9 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [bkShowDeleted,   setBkShowDeleted]   = useState(false);
   const [bkDeletedPeriod, setBkDeletedPeriod] = useState("week");
   const [kanbanView,      setKanbanView]      = useState(true);
+  const [kanbanInvJob,    setKanbanInvJob]    = useState(null);
+  const [kanbanInvOpen,   setKanbanInvOpen]   = useState(false);
+  const kanbanInvPanelRef = useRef(null);
 
   // Auto-refresh bookings every 30 s while on the bookings tab
   useEffect(()=>{
@@ -413,8 +416,14 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                     <div style={{marginTop:4}} onClick={e=>e.stopPropagation()}>
                       {col.nextStatus&&<button className="btn btn-xs" style={{width:"100%",fontSize:11,padding:"5px 0"}}
                         onClick={()=>moveJobStatus(job,col.nextStatus)}>{col.nextLabel}</button>}
-                      {canInvoice&&<button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:11,padding:"5px 0",marginTop:col.nextStatus?4:0}}
-                        onClick={()=>{setActiveJob(job);setView("job");}}>🧾 Create Invoice</button>}
+                      {canInvoice&&(
+                        <div style={{display:"flex",gap:4,marginTop:4}}>
+                          <button className="btn btn-xs btn-ghost" style={{flex:1,fontSize:11,padding:"5px 0"}}
+                            onClick={()=>{setActiveJob(job);setView("job");}}>📝 Quote</button>
+                          <button className="btn btn-xs btn-primary" style={{flex:1,fontSize:11,padding:"5px 0"}}
+                            onClick={()=>{ setKanbanInvJob(job); setTimeout(()=>kanbanInvPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),80); }}>🧾 Invoice</button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -437,6 +446,79 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   </div>
                 </div>
               ))}
+            </div>
+          );
+        })()}
+
+        {/* ── Kanban: invoice preview panel (scrolls into view) ── */}
+        {kanbanView&&kanbanInvJob&&(()=>{
+          const kItems = jobItems.filter(i=>i.job_id===kanbanInvJob.id);
+          const sub    = kItems.reduce((s,i)=>s+(+i.total||0),0);
+          const tax    = settings.vat_number ? sub*(settings.tax_rate||0)/100 : 0;
+          const total  = sub+tax;
+          return (
+            <div ref={kanbanInvPanelRef} style={{marginTop:24,border:"2px solid var(--accent)",borderRadius:14,background:"var(--surface)",overflow:"hidden"}}>
+              {/* Header */}
+              <div style={{background:"var(--accent)",padding:"12px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:16,color:"#fff"}}>🧾 Create Invoice</div>
+                  <div style={{fontSize:12,color:"rgba(255,255,255,.8)",marginTop:2}}>
+                    {kanbanInvJob.vehicle_reg} · {kanbanInvJob.customer_name}
+                  </div>
+                </div>
+                <button style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:8,padding:"6px 12px",color:"#fff",cursor:"pointer",fontSize:13}}
+                  onClick={()=>setKanbanInvJob(null)}>✕ Close</button>
+              </div>
+              <div style={{padding:18}}>
+                {/* Items table */}
+                {kItems.length>0?(
+                  <div className="card" style={{overflow:"auto",marginBottom:16}}>
+                    <table className="tbl" style={{width:"100%",minWidth:500}}>
+                      <thead><tr>
+                        <th>Description</th><th>Type</th>
+                        <th style={{textAlign:"right"}}>Qty</th>
+                        <th style={{textAlign:"right"}}>Unit Price</th>
+                        <th style={{textAlign:"right"}}>Total</th>
+                      </tr></thead>
+                      <tbody>
+                        {kItems.map(it=>(
+                          <tr key={it.id}>
+                            <td style={{fontSize:13}}>{it.description||it.part_name||"—"}</td>
+                            <td><span className="badge" style={{fontSize:10,textTransform:"capitalize"}}>{it.item_type||"part"}</span></td>
+                            <td style={{textAlign:"right",fontSize:13}}>{it.qty}</td>
+                            <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmt(it.unit_price||0)}</td>
+                            <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{fmt(it.total||0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ):(
+                  <div className="card" style={{padding:16,color:"var(--text3)",fontSize:13,marginBottom:16}}>
+                    No items on this job yet — you can still create the invoice and add items manually.
+                  </div>
+                )}
+                {/* Totals */}
+                <div style={{display:"flex",justifyContent:"flex-end",gap:20,marginBottom:20}}>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>Subtotal</div>
+                    <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:16}}>{fmt(sub)}</div>
+                  </div>
+                  {tax>0&&<div style={{textAlign:"right"}}>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>Tax ({settings.tax_rate}%)</div>
+                    <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:16}}>{fmt(tax)}</div>
+                  </div>}
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>Total</div>
+                    <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:22,color:"var(--accent)"}}>{fmt(total)}</div>
+                  </div>
+                </div>
+                {/* Create Invoice button */}
+                <button className="btn btn-primary" style={{fontSize:15,padding:"11px 32px"}}
+                  onClick={()=>setKanbanInvOpen(true)}>
+                  ✅ Create Invoice
+                </button>
+              </div>
             </div>
           );
         })()}
@@ -1040,6 +1122,22 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           onReopenJob={async(d)=>{ await onSaveJob(d); setEditJob(null); }}
           onClose={()=>setEditJob(null)} t={t}/>
       )}
+
+      {/* ── Kanban: create invoice modal ── */}
+      {kanbanInvOpen&&kanbanInvJob&&(()=>{
+        const kItems = jobItems.filter(i=>i.job_id===kanbanInvJob.id);
+        const sub    = kItems.reduce((s,i)=>s+(+i.total||0),0);
+        const tax    = settings.vat_number ? sub*(settings.tax_rate||0)/100 : 0;
+        return (
+          <WorkshopInvoiceModal
+            job={kanbanInvJob} items={kItems}
+            subtotal={sub} tax={tax} total={sub+tax}
+            settings={settings}
+            prefill={{invCust:kanbanInvJob.customer_name||"",invPhone:kanbanInvJob.customer_phone||"",invEmail:"",dueDate:"",notes:""}}
+            onSave={async(inv)=>{ await onSaveInvoice(inv); setKanbanInvJob(null); setKanbanInvOpen(false); }}
+            onClose={()=>setKanbanInvOpen(false)} t={t}/>
+        );
+      })()}
 
       {/* ── Booking delete confirmation modal ── */}
       {bkDeleteModal&&(

@@ -3722,6 +3722,106 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
 }
 
 // ═══════════════════════════════════════════════════════════════
+// QUOTE APPROVAL MODAL
+// ═══════════════════════════════════════════════════════════════
+function QuoteApprovalModal({quote,job,items,settings,onSend,onClose}) {
+  const sym = curSym(settings.currency||getSettings().currency);
+  const fmt = v=>`${sym}${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const [link, setLink] = useState(quote.confirm_token
+    ? `${window.location.origin}${window.location.pathname}?wsq=${quote.confirm_token}`
+    : null);
+  const [sending, setSending] = useState(false);
+  const [copied,  setCopied]  = useState(false);
+
+  const phone = job?.customer_phone||"";
+  const shopName = settings.shop_name||"Workshop";
+  const total = fmt(quote.total||0);
+  const reg   = job?.vehicle_reg||"";
+
+  const generate = async () => {
+    setSending(true);
+    try {
+      const url = await onSend();
+      setLink(url);
+    } catch(e) { alert("Failed to generate link: "+e.message); }
+    setSending(false);
+  };
+
+  const copy = () => {
+    navigator.clipboard.writeText(link).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
+  };
+
+  const waMsg = `Hi${job?.customer_name?" "+job.customer_name:""},\n\n${shopName} has sent you a quotation for ${reg?" your vehicle "+reg:""} totalling *${total}*.\n\nPlease review and approve or decline here:\n${link}`;
+
+  const alreadySent = !!quote.confirm_token;
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="📤 Send Quote for Approval" onClose={onClose}/>
+
+      {/* Quote summary */}
+      <div style={{padding:"12px 14px",background:"var(--surface2)",borderRadius:10,marginBottom:16,fontSize:13}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+          <div style={{fontWeight:700}}>📝 {quote.id}</div>
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:18,color:"var(--accent)"}}>{total}</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",color:"var(--text3)"}}>
+          {reg&&<span>🚗 {reg}</span>}
+          {job?.vehicle_make&&<span>{job.vehicle_make} {job.vehicle_model||""}</span>}
+          {(quote.quote_customer||job?.customer_name)&&<span>👤 {quote.quote_customer||job.customer_name}</span>}
+          {phone&&<span>📞 {phone}</span>}
+        </div>
+        {items.length>0&&<div style={{marginTop:6,fontSize:11,color:"var(--text3)"}}>{items.length} line item{items.length!==1?"s":""}</div>}
+      </div>
+
+      {/* Status */}
+      {alreadySent&&!link&&(
+        <div style={{marginBottom:12,padding:"8px 12px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.3)",borderRadius:8,fontSize:12,color:"var(--yellow)"}}>
+          ⚠️ A link was previously generated. Generating again will create a new token.
+        </div>
+      )}
+      {quote.confirm_status==="confirmed"&&(
+        <div style={{marginBottom:12,padding:"8px 12px",background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",borderRadius:8,fontSize:12,color:"var(--green)"}}>
+          ✅ Customer already approved this quote.
+        </div>
+      )}
+      {quote.confirm_status==="declined"&&(
+        <div style={{marginBottom:12,padding:"8px 12px",background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.3)",borderRadius:8,fontSize:12,color:"var(--red)"}}>
+          ❌ Customer declined this quote.
+        </div>
+      )}
+
+      {/* Link area */}
+      {link ? (
+        <div>
+          <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:6}}>🔗 Approval link</div>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            <input readOnly value={link} className="inp" style={{fontFamily:"DM Mono,monospace",fontSize:11,flex:1,cursor:"text"}} onClick={e=>e.target.select()}/>
+            <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={copy}>{copied?"✅ Copied":"📋 Copy"}</button>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {phone&&(
+              <a href={waLink(phone,waMsg)} target="_blank" rel="noreferrer"
+                style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"11px 14px",
+                  background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,
+                  color:"#25D366",fontWeight:700,fontSize:13,textDecoration:"none",minWidth:120}}>
+                <span style={{fontSize:18}}>📱</span> Send via WhatsApp
+              </a>
+            )}
+            <button className="btn btn-ghost" style={{flex:1,minWidth:100}} onClick={()=>window.open(link,"_blank")}>🔗 Preview link</button>
+          </div>
+          <div style={{marginTop:10,fontSize:11,color:"var(--text3)",textAlign:"center"}}>Share this link with the customer. They can approve or decline without logging in.</div>
+        </div>
+      ) : (
+        <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,fontWeight:700}} onClick={generate} disabled={sending}>
+          {sending?"⏳ Generating link…":"📤 Generate Approval Link"}
+        </button>
+      )}
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MOVE JOB MODAL
 // ═══════════════════════════════════════════════════════════════
 function MoveJobModal({job,onMove,onClose}) {

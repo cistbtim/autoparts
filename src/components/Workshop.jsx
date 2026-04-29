@@ -44,6 +44,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [filterCity,    setFilterCity]    = useState("__all__");
   const [filterCountry, setFilterCountry] = useState("__all__");
   const [jobPage,   setJobPage]   = useState(0);
+  const [bookingToken, setBookingToken] = useState(wsProfile?.booking_token||"");
   const JOB_PAGE_SIZE = typeof window!=="undefined"&&window.innerWidth<=767 ? 5 : 20;
 
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
@@ -381,14 +382,17 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
       {/* ══════════════ BOOKINGS TAB ══════════════ */}
       {wsTab==="wsbookings"&&(()=>{
-        const bToken=wsProfile?.booking_token||"";
+        const bToken=bookingToken||wsProfile?.booking_token||"";
         const bookingUrl=bToken?`${window.location.origin}${window.location.pathname}?wsbooking=${bToken}`:"";
         const genToken=async()=>{
           const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
           const tok=Array.from({length:8},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
-          await api.patch("workshop_profiles","id",wsId,{booking_token:tok});
-          wsProfile.booking_token=tok; // optimistic local update
-          alert("Booking link generated! Please refresh to see it.");
+          const res=await api.patch("workshop_profiles","id",wsId,{booking_token:tok}).catch(e=>({error:e.message}));
+          if(res&&Array.isArray(res)&&res[0]?.booking_token){
+            setBookingToken(res[0].booking_token);
+          } else {
+            alert("❌ Save failed — run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles ADD COLUMN IF NOT EXISTS booking_token text;\n\nThen try again.");
+          }
         };
         const statusColor=(s)=>s==="pending"?"rgba(251,191,36,.15)":s==="confirmed"?"rgba(52,211,153,.15)":"rgba(100,116,139,.15)";
         const statusTextColor=(s)=>s==="pending"?"var(--yellow)":s==="confirmed"?"var(--green)":"var(--text3)";

@@ -381,7 +381,15 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
       {/* ══════════════ BOOKINGS TAB ══════════════ */}
       {wsTab==="wsbookings"&&(()=>{
-        const bookingUrl=wsId?`${window.location.origin}${window.location.pathname}?wsbooking=${wsId}`:"";
+        const bToken=wsProfile?.booking_token||"";
+        const bookingUrl=bToken?`${window.location.origin}${window.location.pathname}?wsbooking=${bToken}`:"";
+        const genToken=async()=>{
+          const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+          const tok=Array.from({length:8},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
+          await api.patch("workshop_profiles","id",wsId,{booking_token:tok});
+          wsProfile.booking_token=tok; // optimistic local update
+          alert("Booking link generated! Please refresh to see it.");
+        };
         const statusColor=(s)=>s==="pending"?"rgba(251,191,36,.15)":s==="confirmed"?"rgba(52,211,153,.15)":"rgba(100,116,139,.15)";
         const statusTextColor=(s)=>s==="pending"?"var(--yellow)":s==="confirmed"?"var(--green)":"var(--text3)";
         const statusLabel=(s)=>s==="pending"?"⏳ Pending":s==="confirmed"?"✅ Confirmed":s==="cancelled"?"❌ Cancelled":s;
@@ -392,10 +400,14 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>
               Share this link with customers so they can book online — they must scan their licence disc (no manual plate entry).
             </div>
-            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-              <code style={{fontSize:11,background:"var(--surface2)",padding:"6px 10px",borderRadius:6,flex:1,wordBreak:"break-all",color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{bookingUrl}</code>
-              <button className="btn btn-ghost btn-sm" onClick={()=>navigator.clipboard?.writeText(bookingUrl).then(()=>alert("Link copied!"))}>📋 Copy</button>
-            </div>
+            {bToken ? (
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <code style={{fontSize:11,background:"var(--surface2)",padding:"6px 10px",borderRadius:6,flex:1,wordBreak:"break-all",color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{bookingUrl}</code>
+                <button className="btn btn-ghost btn-sm" onClick={()=>navigator.clipboard?.writeText(bookingUrl).then(()=>alert("Link copied!"))}>📋 Copy</button>
+              </div>
+            ) : (
+              <button className="btn btn-primary btn-sm" onClick={genToken}>🔑 Generate Booking Link</button>
+            )}
           </div>
 
           {wsBookings.length===0

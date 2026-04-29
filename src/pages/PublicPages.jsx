@@ -962,8 +962,9 @@ export function WsSupplierQuoteReplyPage({token}) {
   );
 }
 
-// ── Customer Online Booking Page (?wsbooking=WORKSHOP_ID) ─────────────────────
-export function WorkshopBookingPage({wsId}) {
+// ── Customer Online Booking Page (?wsbooking=TOKEN) ──────────────────────────
+export function WorkshopBookingPage({token}) {
+  const [wsId,       setWsId]       = useState(null);  // resolved from token
   const [step,       setStep]       = useState("scan"); // scan | details | done
   const [shopInfo,   setShopInfo]   = useState(null);
   const [shopLoading,setShopLoading]= useState(true);
@@ -985,13 +986,16 @@ export function WorkshopBookingPage({wsId}) {
   const galleryRef = useRef(null);
 
   useEffect(()=>{
-    fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles?id=eq.${wsId}&select=id,name,phone,email`,
+    // Look up workshop by opaque booking token — never expose the UUID in the URL
+    fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles?booking_token=eq.${encodeURIComponent(token)}&select=id,name,phone,email`,
       {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}})
       .then(r=>r.json())
-      .then(rows=>{ if(rows?.[0]) setShopInfo(rows[0]); })
+      .then(rows=>{
+        if(rows?.[0]){ setShopInfo(rows[0]); setWsId(rows[0].id); }
+      })
       .catch(()=>{})
       .finally(()=>setShopLoading(false));
-  },[wsId]);
+  },[token]);
 
   const processImage=async(dataUrl)=>{
     setScanLoading(true); setScanError(null);
@@ -1092,6 +1096,11 @@ export function WorkshopBookingPage({wsId}) {
   if(shopLoading) return(
     <div style={{minHeight:"100vh",background:CL.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{color:CL.accent,fontSize:16,fontWeight:600}}>⏳ Loading…</div>
+    </div>
+  );
+  if(!wsId) return(
+    <div style={{minHeight:"100vh",background:CL.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center",color:CL.text2,fontSize:15}}>❌ Invalid booking link.<br/>Please contact the workshop for a new link.</div>
     </div>
   );
 

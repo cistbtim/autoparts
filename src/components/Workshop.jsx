@@ -28,7 +28,7 @@ import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, Wor
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsProfile={},t,lang}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,wsProfile={},t,lang}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -128,6 +128,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   ] : [
     ["jobs",       "🔧 Jobs",        jobs.length],
     ["customers",  "👥 Customers",   wsCustomers.length],
+    ["wsbookings", wsBookings.filter(b=>b.status==="pending").length>0?`🗓️ Bookings 🔔`:"🗓️ Bookings", wsBookings.length||null],
     ["quotations", quoteResponses>0?`📝 Quotations 🔔`:"📝 Quotations",  quotes.length],
     ["invoices",   "🧾 Invoices",    invoices.length],
     ["payments",   "💳 Payments",    invoices.filter(i=>(+i.paid_amount||0)>0).length],
@@ -377,6 +378,62 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           }}
           onClose={()=>setQInvModal(null)} t={t}/>
       )}
+
+      {/* ══════════════ BOOKINGS TAB ══════════════ */}
+      {wsTab==="wsbookings"&&(()=>{
+        const bookingUrl=wsId?`${window.location.origin}${window.location.pathname}?wsbooking=${wsId}`:"";
+        const statusColor=(s)=>s==="pending"?"rgba(251,191,36,.15)":s==="confirmed"?"rgba(52,211,153,.15)":"rgba(100,116,139,.15)";
+        const statusTextColor=(s)=>s==="pending"?"var(--yellow)":s==="confirmed"?"var(--green)":"var(--text3)";
+        const statusLabel=(s)=>s==="pending"?"⏳ Pending":s==="confirmed"?"✅ Confirmed":s==="cancelled"?"❌ Cancelled":s;
+        return(<>
+          {/* Booking link card */}
+          <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🔗 Customer Booking Link</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>
+              Share this link with customers so they can book online — they must scan their licence disc (no manual plate entry).
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+              <code style={{fontSize:11,background:"var(--surface2)",padding:"6px 10px",borderRadius:6,flex:1,wordBreak:"break-all",color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{bookingUrl}</code>
+              <button className="btn btn-ghost btn-sm" onClick={()=>navigator.clipboard?.writeText(bookingUrl).then(()=>alert("Link copied!"))}>📋 Copy</button>
+            </div>
+          </div>
+
+          {wsBookings.length===0
+            ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No bookings yet — share the link above with customers</div>
+            : wsBookings.map(b=>(
+              <div key={b.id} className="card" style={{marginBottom:12,padding:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:15}}>{b.customer_name}</div>
+                    <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{b.customer_phone}{b.customer_email?` · ${b.customer_email}`:""}</div>
+                  </div>
+                  <span className="badge" style={{background:statusColor(b.status),color:statusTextColor(b.status),fontSize:11,flexShrink:0,fontWeight:600}}>
+                    {statusLabel(b.status)}
+                  </span>
+                </div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8,fontSize:12}}>
+                  <span style={{fontFamily:"DM Mono,monospace",fontWeight:700,color:"var(--accent)"}}>{b.vehicle_reg}</span>
+                  {(b.vehicle_make||b.vehicle_model)&&<span style={{color:"var(--text2)"}}>{[b.vehicle_make,b.vehicle_model].filter(Boolean).join(" ")}</span>}
+                  {b.preferred_date&&<span style={{color:"var(--blue)"}}>📅 {b.preferred_date}</span>}
+                  <span style={{color:"var(--text3)",marginLeft:"auto"}}>{b.created_at?.slice(0,10)}</span>
+                </div>
+                {b.complaint&&<div style={{fontSize:13,color:"var(--text2)",padding:"8px 10px",background:"var(--surface2)",borderRadius:8,marginBottom:8}}>🔧 {b.complaint}</div>}
+                {b.status==="pending"&&(
+                  <div style={{display:"flex",gap:8}}>
+                    <button className="btn btn-success btn-sm" onClick={()=>onPatchWsBooking&&onPatchWsBooking(b.id,{status:"confirmed"})}>✅ Confirm</button>
+                    <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>onPatchWsBooking&&onPatchWsBooking(b.id,{status:"cancelled"})}>❌ Cancel</button>
+                  </div>
+                )}
+                {b.status==="confirmed"&&(
+                  <div style={{display:"flex",gap:8}}>
+                    <button className="btn btn-ghost btn-sm" style={{color:"var(--text3)"}} onClick={()=>onPatchWsBooking&&onPatchWsBooking(b.id,{status:"pending"})}>↩ Unconfirm</button>
+                  </div>
+                )}
+              </div>
+            ))
+          }
+        </>);
+      })()}
 
       {/* ══════════════ INVOICES TAB ══════════════ */}
       {wsTab==="invoices"&&(<>

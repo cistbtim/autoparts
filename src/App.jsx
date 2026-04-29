@@ -12,7 +12,7 @@ import { WorkshopProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubsc
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
-import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage } from "./pages/PublicPages.jsx";
+import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage } from "./pages/PublicPages.jsx";
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -52,6 +52,8 @@ export default function App() {
   if(wsqToken) return <QuoteConfirmPage token={wsqToken}/>;
   const wsSupReqToken = new URLSearchParams(window.location.search).get("ws_supreq");
   if(wsSupReqToken) return <WsSupplierQuoteReplyPage token={wsSupReqToken}/>;
+  const wsbooking = new URLSearchParams(window.location.search).get("wsbooking");
+  if(wsbooking) return <WorkshopBookingPage wsId={wsbooking}/>;
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
   if(!user) return <LoginPage onLogin={setUser} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={()=>setUser(null)} lang={lang}/>;
@@ -129,6 +131,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [wsPurchaseOrders,  setWsPurchaseOrders]  =useState([]);
   const [wsPoItems,         setWsPoItems]         =useState([]);
   const [wsLicenceRenewals, setWsLicenceRenewals] =useState([]);
+  const [wsBookings,        setWsBookings]        =useState([]);
   const [workshopDocuments,setWorkshopDocuments]=useState([]);
   const [workshopProfile,setWorkshopProfile]=useState({});
   const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
@@ -316,6 +319,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
       api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
+      api.get("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -357,6 +361,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setWsPurchaseOrders(Array.isArray(rest[24])?rest[24]:[]);
     setWsPoItems(Array.isArray(rest[25])?rest[25]:[]);
     setWsLicenceRenewals(Array.isArray(rest[26])?rest[26]:[]);
+    setWsBookings(Array.isArray(rest[27])?rest[27]:[]);
     // Load workshop profile for workshop role
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
@@ -414,16 +419,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setWsSupplierInvItems(Array.isArray(wsInvItems)?wsInvItems:[]);
     setWsSupplierPayments(Array.isArray(wsPayms)?wsPayms:[]);
     setWsSupplierReturns(Array.isArray(wsRets)?wsRets:[]);
-    const [sqReps,wsPOs,wsPOItems,wsLicRen]=await Promise.all([
+    const [sqReps,wsPOs,wsPOItems,wsLicRen,wsBk]=await Promise.all([
       api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
       api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
+      api.get("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
     ]);
     setWsSqReplies(Array.isArray(sqReps)?sqReps:[]);
     setWsPurchaseOrders(Array.isArray(wsPOs)?wsPOs:[]);
     setWsPoItems(Array.isArray(wsPOItems)?wsPOItems:[]);
     setWsLicenceRenewals(Array.isArray(wsLicRen)?wsLicRen:[]);
+    setWsBookings(Array.isArray(wsBk)?wsBk:[]);
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
@@ -1033,6 +1040,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const updateWsLicenceRenewal=async(id,patch)=>{
     await api.patch("ws_licence_renewals","id",id,patch).catch(e=>console.warn("Update renewal failed:",e));
     setWsLicenceRenewals(p=>p.map(r=>r.id===id?{...r,...patch}:r));
+  };
+
+  const patchWsBooking=async(id,patch)=>{
+    await api.patch("workshop_bookings","id",id,patch).catch(e=>console.warn("Patch booking failed:",e));
+    setWsBookings(p=>p.map(b=>b.id===id?{...b,...patch}:b));
   };
 
   // ── Workshop Supplier Invoices ────────────────────────────────
@@ -3170,6 +3182,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             wsLicenceRenewals={wsLicenceRenewals}
             onSaveWsLicenceRenewal={saveWsLicenceRenewal}
             onUpdateWsLicenceRenewal={updateWsLicenceRenewal}
+            wsBookings={wsBookings}
+            onPatchWsBooking={patchWsBooking}
             wsProfile={workshopProfile}
             t={t} lang={lang}/>
         )}

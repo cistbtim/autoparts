@@ -4,6 +4,7 @@ import { getSettings, curSym } from "../lib/settings.js";
 import { T } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ShopLogo, MHead, FG, FD, FL } from "../components/shared.jsx";
+import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
 export function RfqReplyPage({token,lang}) {
   const [inq,setInq]=useState(null);const [loaded,setLoaded]=useState(false);
@@ -955,6 +956,303 @@ export function WsSupplierQuoteReplyPage({token}) {
         </button>
         <div style={{textAlign:"center",fontSize:11,color:"#475569",marginTop:12}}>
           Powered by AutoParts Workshop
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Customer Online Booking Page (?wsbooking=WORKSHOP_ID) ─────────────────────
+export function WorkshopBookingPage({wsId}) {
+  const [step,       setStep]       = useState("scan"); // scan | details | done
+  const [shopInfo,   setShopInfo]   = useState(null);
+  const [shopLoading,setShopLoading]= useState(true);
+  const [capturedImg,setCapturedImg]= useState(null);
+  const [scanLoading,setScanLoading]= useState(false);
+  const [scanError,  setScanError]  = useState(null);
+  const [scanResult, setScanResult] = useState(null);
+  const [foundVehicle,setFoundVehicle]=useState(null);
+  const [history,    setHistory]    = useState([]);
+  const [name,      setName]      = useState("");
+  const [phone,     setPhone]     = useState("");
+  const [email,     setEmail]     = useState("");
+  const [complaint, setComplaint] = useState("");
+  const [prefDate,  setPrefDate]  = useState("");
+  const [submitting,setSubmitting]= useState(false);
+  const [bookingId, setBookingId] = useState(null);
+
+  const cameraRef  = useRef(null);
+  const galleryRef = useRef(null);
+
+  useEffect(()=>{
+    fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles?id=eq.${wsId}&select=id,name,phone,email`,
+      {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}})
+      .then(r=>r.json())
+      .then(rows=>{ if(rows?.[0]) setShopInfo(rows[0]); })
+      .catch(()=>{})
+      .finally(()=>setShopLoading(false));
+  },[wsId]);
+
+  const processImage=async(dataUrl)=>{
+    setScanLoading(true); setScanError(null);
+    try{
+      const raw=await decodePDF417fromImage(dataUrl);
+      const parsed=parseLicenceDisc(raw);
+      if(!parsed.reg) throw new Error("No registration number found on disc");
+      setScanResult(parsed);
+      const cleanReg=(parsed.reg||"").replace(/\s/g,"").toUpperCase();
+      const rows=await fetch(
+        `${SUPABASE_URL}/rest/v1/workshop_vehicles?workshop_id=eq.${wsId}&select=*`,
+        {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}}
+      ).then(r=>r.json()).catch(()=>[]);
+      const found=(Array.isArray(rows)?rows:[]).find(v=>(v.reg||"").replace(/\s/g,"").toUpperCase()===cleanReg);
+      setFoundVehicle(found||null);
+      if(found){
+        const jobs=await fetch(
+          `${SUPABASE_URL}/rest/v1/workshop_jobs?workshop_vehicle_id=eq.${found.id}&order=date_in.desc&limit=8&select=id,date_in,mileage,complaint,status`,
+          {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}}
+        ).then(r=>r.json()).catch(()=>[]);
+        setHistory(Array.isArray(jobs)?jobs:[]);
+        if(found.workshop_customer_id){
+          const custs=await fetch(
+            `${SUPABASE_URL}/rest/v1/workshop_customers?id=eq.${found.workshop_customer_id}&select=name,phone,email`,
+            {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}}
+          ).then(r=>r.json()).catch(()=>[]);
+          if(custs?.[0]){ setName(custs[0].name||""); setPhone(custs[0].phone||""); setEmail(custs[0].email||""); }
+        }
+      }
+      setScanLoading(false);
+      setStep("details");
+    }catch(e){
+      setScanError("Could not read licence disc — "+e.message+". Try a clearer, closer photo.");
+      setScanLoading(false);
+    }
+  };
+
+  const handleFile=(e)=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    e.target.value="";
+    const fr=new FileReader();
+    fr.onload=ev=>{ setCapturedImg(ev.target.result); processImage(ev.target.result); };
+    fr.readAsDataURL(file);
+  };
+
+  const submit=async()=>{
+    if(!name.trim()||!phone.trim()||!complaint.trim()){
+      alert("Please fill in your name, phone number, and describe the problem.");
+      return;
+    }
+    setSubmitting(true);
+    try{
+      const id="WB-"+Date.now()+"-"+Math.floor(Math.random()*9000+1000);
+      const resp=await fetch(`${SUPABASE_URL}/rest/v1/workshop_bookings`,{
+        method:"POST",
+        headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},
+        body:JSON.stringify({
+          id, workshop_id:wsId,
+          vehicle_reg:scanResult.reg,
+          vehicle_make:scanResult.make||foundVehicle?.make||"",
+          vehicle_model:scanResult.model||foundVehicle?.model||"",
+          vehicle_year:foundVehicle?.year||"",
+          vehicle_color:scanResult.color||foundVehicle?.color||"",
+          vin:scanResult.vin||foundVehicle?.vin||"",
+          engine_no:scanResult.engine_no||foundVehicle?.engine_no||"",
+          licence_disc_expiry:scanResult.expiry_date||"",
+          customer_name:name.trim(), customer_phone:phone.trim(),
+          customer_email:email.trim()||null,
+          complaint:complaint.trim(), preferred_date:prefDate||null,
+          status:"pending",
+          workshop_vehicle_id:foundVehicle?.id||null,
+          created_at:new Date().toISOString(),
+        })
+      });
+      if(!resp.ok){ const err=await resp.text(); throw new Error(err); }
+      setBookingId(id);
+      setStep("done");
+    }catch(e){ alert("Failed to submit: "+e.message); }
+    setSubmitting(false);
+  };
+
+  const CL={bg:"#0f172a",surf:"#1e293b",border:"#334155",accent:"#f97316",
+            text:"#f1f5f9",text2:"#94a3b8",text3:"#475569",
+            green:"#34d399",red:"#f87171",blue:"#38bdf8",yellow:"#fbbf24"};
+  const inp={width:"100%",background:"#0f172a",border:"1px solid #334155",borderRadius:8,
+             padding:"12px 14px",color:CL.text,fontSize:15,fontFamily:"inherit",boxSizing:"border-box",outline:"none"};
+  const mkBtn=(bg,col="#fff")=>({width:"100%",padding:"15px 0",borderRadius:10,border:"none",fontSize:15,fontWeight:700,cursor:"pointer",background:bg,color:col});
+  const card={background:CL.surf,borderRadius:12,padding:16,border:`1px solid ${CL.border}`,marginBottom:14};
+  const lbl={fontSize:12,fontWeight:700,color:CL.text2,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6,display:"block"};
+
+  const Header=()=>(
+    <div style={{background:CL.surf,borderBottom:`1px solid ${CL.border}`,padding:"16px 20px",marginBottom:20}}>
+      <div style={{fontWeight:700,fontSize:18,color:CL.text}}>{shopInfo?.name||"Workshop"}</div>
+      <div style={{color:CL.text2,fontSize:13,marginTop:2}}>Online Booking</div>
+    </div>
+  );
+
+  if(shopLoading) return(
+    <div style={{minHeight:"100vh",background:CL.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{color:CL.accent,fontSize:16,fontWeight:600}}>⏳ Loading…</div>
+    </div>
+  );
+
+  if(step==="done") return(
+    <div style={{minHeight:"100vh",background:CL.bg}}>
+      <Header/>
+      <div style={{maxWidth:460,margin:"0 auto",padding:"0 16px"}}>
+        <div style={{...card,textAlign:"center",padding:"36px 20px"}}>
+          <div style={{fontSize:52,marginBottom:14}}>✅</div>
+          <div style={{fontWeight:700,fontSize:20,color:CL.green,marginBottom:8}}>Booking Submitted!</div>
+          <div style={{color:CL.text2,fontSize:14,lineHeight:1.6,marginBottom:16}}>
+            We received your booking request for{" "}
+            <strong style={{color:CL.text}}>{scanResult?.reg}</strong>.<br/>
+            We will contact you to confirm the appointment.
+          </div>
+          {shopInfo?.phone&&(
+            <div style={{fontSize:13,color:CL.text2}}>
+              Questions? Call us: <strong style={{color:CL.text}}>{shopInfo.phone}</strong>
+            </div>
+          )}
+          <div style={{marginTop:14,fontSize:11,color:CL.text3,fontFamily:"monospace"}}>{bookingId}</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if(step==="scan") return(
+    <div style={{minHeight:"100vh",background:CL.bg,paddingBottom:40}}>
+      <Header/>
+      <div style={{maxWidth:460,margin:"0 auto",padding:"0 16px"}}>
+        <div style={card}>
+          <div style={{fontWeight:700,fontSize:16,color:CL.text,marginBottom:6}}>📷 Scan Your Licence Disc</div>
+          <div style={{fontSize:13,color:CL.text2,marginBottom:18,lineHeight:1.5}}>
+            Take or choose a photo of your vehicle's <strong style={{color:CL.text}}>licence disc</strong>.
+            We read the barcode to get your vehicle details automatically — no typing needed.
+          </div>
+
+          {!capturedImg&&!scanLoading&&(
+            <>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                <button style={{...mkBtn(CL.accent),display:"flex",flexDirection:"column",alignItems:"center",gap:10,padding:"24px 12px",fontSize:13}}
+                  onClick={()=>cameraRef.current?.click()}>
+                  <span style={{fontSize:36}}>📷</span>Take Photo
+                </button>
+                <button style={{...mkBtn(CL.border,CL.text),display:"flex",flexDirection:"column",alignItems:"center",gap:10,padding:"24px 12px",fontSize:13}}
+                  onClick={()=>galleryRef.current?.click()}>
+                  <span style={{fontSize:36}}>🖼️</span>Gallery / Files
+                </button>
+              </div>
+              <input ref={cameraRef}  type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFile}/>
+              <input ref={galleryRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile}/>
+            </>
+          )}
+
+          {capturedImg&&(
+            <div style={{marginBottom:12}}>
+              <img src={capturedImg} alt="disc" style={{width:"100%",maxHeight:200,objectFit:"contain",borderRadius:8,background:"#000"}}/>
+            </div>
+          )}
+
+          {scanLoading&&(
+            <div style={{textAlign:"center",padding:"20px 0",color:CL.blue,fontSize:14,fontWeight:600}}>
+              🔍 Reading barcode…
+            </div>
+          )}
+
+          {scanError&&(
+            <div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.3)",borderRadius:10,padding:14,marginTop:8}}>
+              <div style={{color:CL.red,fontWeight:600,fontSize:13,marginBottom:10}}>⚠️ {scanError}</div>
+              <button style={{...mkBtn(CL.border,CL.text),padding:"10px 0",fontSize:13}}
+                onClick={()=>{setCapturedImg(null);setScanError(null);}}>↺ Try Again</button>
+            </div>
+          )}
+
+          <div style={{marginTop:14,padding:"10px 12px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.25)",borderRadius:8,fontSize:12,color:CL.yellow,lineHeight:1.5}}>
+            💡 <strong>Tip:</strong> Lay the disc flat on a dark surface. Make sure the silver/white barcode square is fully in frame and in focus.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const expiryExpired=scanResult?.expiry_date&&new Date(scanResult.expiry_date)<new Date();
+  return(
+    <div style={{minHeight:"100vh",background:CL.bg,paddingBottom:40}}>
+      <Header/>
+      <div style={{maxWidth:460,margin:"0 auto",padding:"0 16px"}}>
+
+        <div style={{...card,borderColor:"rgba(249,115,22,.35)"}}>
+          <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+            <span style={{fontSize:30}}>🚗</span>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:18,color:CL.text,fontFamily:"monospace"}}>{scanResult?.reg}</div>
+              <div style={{fontSize:13,color:CL.text2,marginTop:2}}>
+                {[scanResult?.make,scanResult?.model,scanResult?.color].filter(Boolean).join(" · ")||"Vehicle"}
+              </div>
+              {scanResult?.expiry_date&&(
+                <div style={{fontSize:11,marginTop:3,color:expiryExpired?CL.red:CL.green}}>
+                  Disc: {scanResult.expiry_date} {expiryExpired?"⚠️ EXPIRED":"✅"}
+                </div>
+              )}
+              {foundVehicle&&<div style={{fontSize:11,marginTop:3,color:CL.blue}}>✓ Vehicle found in our records</div>}
+            </div>
+          </div>
+        </div>
+
+        {history.length>0&&(
+          <div style={card}>
+            <div style={{fontWeight:700,fontSize:12,color:CL.text2,textTransform:"uppercase",letterSpacing:".04em",marginBottom:12}}>
+              📋 Your Service History — {history.length} visit{history.length!==1?"s":""}
+            </div>
+            <div style={{maxHeight:200,overflowY:"auto"}}>
+              {history.map((j,i)=>(
+                <div key={j.id} style={{padding:"9px 0",borderBottom:i<history.length-1?`1px solid ${CL.border}`:undefined}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                    <span style={{fontSize:12,fontWeight:700,color:CL.text}}>{j.date_in}</span>
+                    <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:"rgba(56,189,248,.15)",color:CL.blue}}>{j.status}</span>
+                  </div>
+                  {j.mileage&&<div style={{fontSize:11,color:CL.text2}}>🛣️ {Number(j.mileage).toLocaleString()} km</div>}
+                  {j.complaint&&<div style={{fontSize:12,color:"#cbd5e1",marginTop:2}}>🔧 {j.complaint.slice(0,80)}{j.complaint.length>80?"…":""}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={card}>
+          <div style={{fontWeight:700,fontSize:15,color:CL.text,marginBottom:16}}>Your Details</div>
+          <div style={{marginBottom:14}}>
+            <label style={lbl}>Full Name *</label>
+            <input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Your full name"/>
+          </div>
+          <div style={{marginBottom:14}}>
+            <label style={lbl}>Phone Number *</label>
+            <input style={inp} type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+27 82 000 0000"/>
+          </div>
+          <div style={{marginBottom:14}}>
+            <label style={lbl}>Email (optional)</label>
+            <input style={inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com"/>
+          </div>
+          <div style={{marginBottom:14}}>
+            <label style={lbl}>What is the problem? *</label>
+            <textarea style={{...inp,minHeight:90,resize:"vertical"}} value={complaint}
+              onChange={e=>setComplaint(e.target.value)} placeholder="Describe the issue with your vehicle…"/>
+          </div>
+          <div style={{marginBottom:20}}>
+            <label style={lbl}>Preferred Date (optional)</label>
+            <input style={inp} type="date" value={prefDate} onChange={e=>setPrefDate(e.target.value)}
+              min={new Date().toISOString().slice(0,10)}/>
+          </div>
+          <button style={{...mkBtn(submitting?"#334155":CL.accent),opacity:submitting?0.7:1}}
+            onClick={submit} disabled={submitting}>
+            {submitting?"⏳ Submitting…":"📅 Submit Booking Request"}
+          </button>
+        </div>
+
+        <div style={{textAlign:"center",paddingBottom:20}}>
+          <button style={{background:"none",border:"none",color:CL.text3,cursor:"pointer",fontSize:12}}
+            onClick={()=>{setCapturedImg(null);setScanResult(null);setFoundVehicle(null);setHistory([]);setStep("scan");}}>
+            ← Scan a different disc
+          </button>
         </div>
       </div>
     </div>

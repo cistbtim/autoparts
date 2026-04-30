@@ -450,7 +450,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             const canInvoice= col.id==="done";
             return (
               <div className="card" style={{marginBottom:5,padding:0,overflow:"hidden"}}
-                onClick={()=>{setJobDetailTab("car");setActiveJob(job);setView("job");}}>
+                onClick={()=>{setJobDetailTab(col.id==="invoiced"||col.id==="paid"?"invoice":"car");setActiveJob(job);setView("job");}}>
                 <div style={{position:"relative",background:"var(--surface2)",minHeight:fp?undefined:0}}>
                   {fp&&<img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:80,objectFit:"contain",display:"block"}}
                     onError={e=>{e.target.style.display="none";}}/>}

@@ -365,7 +365,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                     {j.vehicle_year&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text3)",fontSize:11}}>{j.vehicle_year}</span>}
                   </div>
                   {j.return_reason&&<div style={{fontSize:11,color:"var(--yellow)",marginBottom:5}}>🔄 {j.return_reason.slice(0,50)}</div>}
-                  {j.complaint&&<div style={{fontSize:13,fontWeight:700,color:"#ef4444",marginBottom:6,lineHeight:1.5,background:"rgba(239,68,68,.15)",border:"1.5px solid rgba(239,68,68,.5)",borderRadius:7,padding:"6px 10px"}}>⚠️ {j.complaint}</div>}
+                  {j.complaint&&<div style={{fontSize:13,fontWeight:700,color:"#fff",marginBottom:6,lineHeight:1.5,background:"#ef4444",borderRadius:7,padding:"6px 10px"}}>⚠️ {j.complaint}</div>}
                   {!wsId&&j.workshop_id&&(
                     <div style={{fontSize:11,color:"var(--text3)",marginBottom:5,display:"flex",alignItems:"center",gap:4}}>
                       <span style={{background:"rgba(251,146,60,.12)",color:"#f97316",borderRadius:6,padding:"2px 7px",fontWeight:600,fontSize:11}}>🏪 {wsProfileMap[j.workshop_id]||j.workshop_id}</span>

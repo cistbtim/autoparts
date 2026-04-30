@@ -451,9 +451,9 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             return (
               <div className="card" style={{marginBottom:8,padding:0,overflow:"hidden"}}
                 onClick={()=>{setJobDetailTab("car");setActiveJob(job);setView("job");}}>
-                {fp&&<div style={{height:56,overflow:"hidden",flexShrink:0}}>
-                  <img src={toImgUrl(fp)} alt="car" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
-                    onError={e=>{e.target.style.display="none";}}/>
+                {fp&&<div style={{background:"var(--surface2)",flexShrink:0}}>
+                  <img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:120,objectFit:"contain",display:"block"}}
+                    onError={e=>{e.target.parentNode.style.display="none";}}/>
                 </div>}
                 <div style={{padding:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:4}}>
@@ -2939,6 +2939,48 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>{ if(wsProfile?.move_pin){setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}else{setMoveModal(true);} }}>🔀 {t.wsMove}</button>}
             {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
           </div>
+          {/* ── Profile Photos ── */}
+          <div style={{marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>📸 Profile Photos</div>
+              {vehicleRecord&&(
+                <button onClick={()=>setEditPhotos(p=>!p)}
+                  style={{fontSize:11,padding:"3px 10px",background:editPhotos?"var(--accent)":"var(--surface2)",color:editPhotos?"#fff":"var(--text2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",fontWeight:600}}>
+                  {editPhotos?"✓ Done":"✏️ Edit Photos"}
+                </button>
+              )}
+            </div>
+            {editPhotos&&vehicleRecord?(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,maxWidth:"50%"}}>
+                {[
+                  {field:"photo_front",key:"front",label:"Front"},
+                  {field:"photo_rear", key:"rear", label:"Rear"},
+                  {field:"photo_side", key:"side", label:"Side"},
+                ].map(({field,key,label})=>(
+                  <VehiclePhotoUploader key={field} label={label} url={vehiclePhotos[key]}
+                    vehicleId={vehicleRecord.id} make={vehicleRecord.make||"vehicle"}
+                    reg={vehicleRecord.reg||job.vehicle_reg} viewName={key}
+                    onChange={url=>handleVehiclePhotoChange(field,key,url)}/>
+                ))}
+              </div>
+            ):(()=>{
+              const allPhotos=[{url:vehiclePhotos.front,label:"Front"},{url:vehiclePhotos.rear,label:"Rear"},{url:vehiclePhotos.side,label:"Side"}];
+              const visible=allPhotos.filter(p=>p.url);
+              return visible.length>0?(
+                <div style={{display:"grid",gridTemplateColumns:`repeat(${visible.length},1fr)`,gap:6,maxWidth:"50%"}}>
+                  {visible.map(({url,label},i)=>(
+                    <div key={label} style={{position:"relative",borderRadius:7,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3",cursor:"zoom-in"}}
+                      onClick={()=>setPhotoLightbox(i)}>
+                      <DriveImg url={url} alt={label} style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}/>
+                      <div style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,.45)",color:"#fff",textAlign:"center",fontSize:9,padding:"2px 0",fontWeight:600}}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+              ):(
+                <div style={{fontSize:12,color:"var(--text3)"}}>No photos — tap Edit Photos to add</div>
+              );
+            })()}
+          </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:12}}>
             {[
               [`🚗 ${t.wsPlate}`,job.vehicle_reg],
@@ -3109,57 +3151,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             <div style={{fontSize:13,lineHeight:1.6,color:"var(--text2)"}}>{job.notes}</div>
           </div>}
 
-          {/* ── Profile Photos ── */}
-          <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>📸 Profile Photos</div>
-              {vehicleRecord&&(
-                <button onClick={()=>setEditPhotos(p=>!p)}
-                  style={{fontSize:11,padding:"3px 10px",background:editPhotos?"var(--accent)":"var(--surface2)",color:editPhotos?"#fff":"var(--text2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",fontWeight:600}}>
-                  {editPhotos?"✓ Done":"✏️ Edit Photos"}
-                </button>
-              )}
-            </div>
-            {editPhotos&&vehicleRecord?(
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-                {[
-                  {field:"photo_front",key:"front",label:"Front"},
-                  {field:"photo_rear", key:"rear", label:"Rear"},
-                  {field:"photo_side", key:"side", label:"Side"},
-                ].map(({field,key,label})=>(
-                  <VehiclePhotoUploader key={field} label={label} url={vehiclePhotos[key]}
-                    vehicleId={vehicleRecord.id} make={vehicleRecord.make||"vehicle"}
-                    reg={vehicleRecord.reg||job.vehicle_reg} viewName={key}
-                    onChange={url=>handleVehiclePhotoChange(field,key,url)}/>
-                ))}
-              </div>
-            ):(vehiclePhotos.front||vehiclePhotos.rear||vehiclePhotos.side)?(
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                {(()=>{
-                  const allPhotos=[
-                    {url:vehiclePhotos.front,label:"Front"},
-                    {url:vehiclePhotos.rear, label:"Rear"},
-                    {url:vehiclePhotos.side, label:"Side"},
-                  ];
-                  const visiblePhotos=allPhotos.filter(p=>p.url);
-                  return allPhotos.map(({url,label})=>(
-                  <div key={label} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface3)",aspectRatio:"4/3",cursor:url?"pointer":undefined}}
-                    onClick={url?()=>setPhotoLightbox(visiblePhotos.findIndex(p=>p.label===label)):undefined}>
-                    {url
-                      ?<DriveImg url={url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                      :<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text3)",fontSize:12}}>—</div>
-                    }
-                    <div style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,.45)",color:"#fff",textAlign:"center",fontSize:10,padding:"2px 0",fontWeight:600}}>{label}</div>
-                  </div>
-                  ));
-                })()}
-              </div>
-            ):(
-              <div style={{textAlign:"center",padding:12,background:"var(--surface2)",borderRadius:8,color:"var(--text3)",fontSize:12}}>
-                No profile photos — tap Edit Photos to add
-              </div>
-            )}
-          </div>
         </div>
       )}
 

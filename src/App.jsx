@@ -674,6 +674,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         status:d.status||"Pending",
         return_reason:str(d.return_reason),
         parent_job_id:d.parent_job_id||null,
+        is_problem:d.is_problem||false,
+        problem_prev_status:str(d.problem_prev_status),
       };
       let savedId=d.id;
       if(d.id){ chk(await api.patch("workshop_jobs","id",d.id,jobRow),"Update job"); }
@@ -3184,6 +3186,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             onPatchWsBooking={patchWsBooking}
             onDeleteWsBooking={deleteWsBooking}
             onRefreshBookings={refreshWsBookings}
+            onRefresh={refreshWorkshopData}
             wsProfile={workshopProfile}
             t={t} lang={lang}/>
         )}

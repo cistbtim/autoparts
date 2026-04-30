@@ -28,7 +28,7 @@ import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, Wor
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,wsProfile={},t,lang}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],customers,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},t,lang}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -58,6 +58,15 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [kanbanInvJob,    setKanbanInvJob]    = useState(null);
   const [kanbanInvOpen,   setKanbanInvOpen]   = useState(false);
   const kanbanInvPanelRef = useRef(null);
+  const [kanbanPayJob,    setKanbanPayJob]    = useState(null);
+
+  // Keep activeJob in sync when jobs array refreshes
+  useEffect(()=>{
+    if(activeJob){
+      const fresh=jobs.find(j=>j.id===activeJob.id);
+      if(fresh) setActiveJob(fresh);
+    }
+  },[jobs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh bookings every 30 s while on the bookings tab
   useEffect(()=>{
@@ -122,7 +131,22 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       vehicleId = makeId("WSV");
       await api.insert("workshop_vehicles",{id:vehicleId,workshop_id:wsId,workshop_customer_id:custId,reg:b.vehicle_reg||"",make:b.vehicle_make||"",model:b.vehicle_model||"",year:b.vehicle_year||"",color:b.vehicle_color||"",vin:b.vin||"",engine_no:b.engine_no||"",licence_disc_expiry:b.licence_disc_expiry||""}).catch(()=>{});
     }
-    await onPatchWsBooking(b.id,{status:"confirmed",workshop_vehicle_id:vehicleId});
+    const newJob = {
+      id:makeId("WSJ"), workshop_id:wsId,
+      customer_name:b.customer_name||"", customer_phone:b.customer_phone||"", customer_email:b.customer_email||"",
+      workshop_vehicle_id:vehicleId,
+      vehicle_reg:b.vehicle_reg||"", vehicle_make:b.vehicle_make||"", vehicle_model:b.vehicle_model||"",
+      vehicle_year:b.vehicle_year||"", vehicle_color:b.vehicle_color||"",
+      vin:b.vin||"", engine_no:b.engine_no||"",
+      complaint:b.complaint||"", mileage:b.mileage||"",
+      status:"Pending", date_in:today(),
+      diagnosis:"", mechanic:"", notes:"", date_out:"",
+    };
+    await onSaveJob(newJob);
+    await onPatchWsBooking(b.id,{status:"job_created",workshop_vehicle_id:vehicleId});
+    setJobDetailTab("car");
+    setActiveJob(newJob);
+    setView("job");
   };
 
   const flagProblem = async(job) => {
@@ -173,6 +197,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         wsId={wsId}
         wsProfile={wsProfile}
         initialTab={jobDetailTab}
+        onRefresh={onRefresh}
         t={t} lang={lang}/>
     );
   }
@@ -184,7 +209,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   ] : [
     ["jobs",       "🔧 Jobs",        jobs.length],
     ["customers",  "👥 Customers",   wsCustomers.length],
-    ["wsbookings", wsBookings.filter(b=>b.status==="pending").length>0?`🗓️ Bookings 🔔`:"🗓️ Bookings", wsBookings.length||null],
+    ["wsbookings", wsBookings.filter(b=>b.status==="pending").length>0?`🗓️ Bookings 🔔`:"🗓️ Bookings", wsBookings.filter(b=>b.status!=="deleted").length||null],
     ["quotations", quoteResponses>0?`📝 Quotations 🔔`:"📝 Quotations",  quotes.length],
     ["invoices",   "🧾 Invoices",    invoices.length],
     ["payments",   "💳 Payments",    invoices.filter(i=>(+i.paid_amount||0)>0).length],
@@ -435,7 +460,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                     <span style={{color:"var(--text3)"}}>Invoice</span>
                     <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
                   </div>}
-                  {(col.nextStatus||canInvoice||col.id==="wip")&&(
+                  {(col.nextStatus||canInvoice||col.id==="wip"||col.id==="invoiced")&&(
                     <div style={{marginTop:4}} onClick={e=>e.stopPropagation()}>
                       {col.id==="wip"&&(
                         <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:11,padding:"5px 0"}}
@@ -453,6 +478,10 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                       {canInvoice&&(
                         <button className="btn btn-xs btn-primary" style={{width:"100%",fontSize:11,padding:"5px 0"}}
                           onClick={()=>{ setKanbanInvJob(job); setTimeout(()=>kanbanInvPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),80); }}>🧾 Invoice</button>
+                      )}
+                      {col.id==="invoiced"&&wsRole!=="mechanic"&&(
+                        <button className="btn btn-xs btn-success" style={{width:"100%",fontSize:11,padding:"5px 0"}}
+                          onClick={()=>setKanbanPayJob(job)}>💳 Payment</button>
                       )}
                     </div>
                   )}
@@ -653,16 +682,19 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         const statusTextColor=(s)=>s==="pending"?"var(--yellow)":s==="confirmed"?"var(--green)":"var(--text3)";
         const statusLabel=(s)=>s==="pending"?"⏳ Pending":s==="confirmed"?"✅ Confirmed":s==="cancelled"?"❌ Cancelled":s;
 
+        const activeBookings = wsBookings.filter(b=>b.status!=="deleted");
+
         return(<>
           {/* Toolbar: title + refresh */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,gap:8}}>
-            <div style={{fontWeight:700,fontSize:15}}>🗓️ Bookings ({wsBookings.length})</div>
+            <div style={{fontWeight:700,fontSize:15}}>🗓️ Bookings ({activeBookings.length})</div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               {bookingsLastAt&&<span style={{fontSize:11,color:"var(--text3)"}}>Updated {bookingsLastAt.toLocaleTimeString()}</span>}
               <button className="btn btn-ghost btn-sm" disabled={bookingsRefreshing}
                 onClick={async()=>{ if(!onRefreshBookings)return; setBookingsRefreshing(true); await onRefreshBookings(); setBookingsRefreshing(false); setBookingsLastAt(new Date()); }}>
                 {bookingsRefreshing?"⏳":"🔄"} Refresh
               </button>
+              <button className="btn btn-primary btn-sm" onClick={()=>setWsTab("jobs")}>🔧 Jobs →</button>
             </div>
           </div>
 
@@ -682,9 +714,13 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             )}
           </div>
 
-          {(()=>{ const active=wsBookings.filter(b=>b.status!=="deleted"); return active.length===0
-            ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No bookings yet — share the link above with customers</div>
-            : active.map(b=>(
+          {activeBookings.length===0&&(
+            <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>
+              <div style={{marginBottom:12}}>No bookings yet — share the link above with customers</div>
+              <button className="btn btn-primary" onClick={()=>setWsTab("jobs")}>🔧 Go to Jobs →</button>
+            </div>
+          )}
+          {activeBookings.map(b=>(
               <div key={b.id} className="card" style={{marginBottom:12,padding:14}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
                   <div>
@@ -718,7 +754,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                 <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",marginLeft:"auto",display:"block",marginTop:6}}
                   onClick={()=>{ setBkDeleteModal({booking:b}); setBkDeleteReason(""); setBkDeleteBy(""); }}>🗑️ Delete</button>
               </div>
-            )); })()}
+            ))}
 
           {/* ── Deleted bookings section ── */}
           {(()=>{
@@ -1166,6 +1202,19 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             prefill={{invCust:kanbanInvJob.customer_name||"",invPhone:kanbanInvJob.customer_phone||"",invEmail:"",dueDate:"",notes:""}}
             onSave={async(inv)=>{ await onSaveInvoice(inv); setKanbanInvJob(null); setKanbanInvOpen(false); }}
             onClose={()=>setKanbanInvOpen(false)} t={t}/>
+        );
+      })()}
+
+      {/* ── Kanban: payment modal ── */}
+      {kanbanPayJob&&(()=>{
+        const payInv = jobInvoice(kanbanPayJob.id);
+        if(!payInv) return null;
+        return (
+          <WsPaymentModal
+            invoice={payInv}
+            settings={settings}
+            onSave={async(data)=>{ await onUpdateInvoice(payInv.id,data); setKanbanPayJob(null); }}
+            onClose={()=>setKanbanPayJob(null)}/>
         );
       })()}
 
@@ -2294,7 +2343,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},initialTab="car",t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},initialTab="car",onRefresh,t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -2334,6 +2383,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   const [savingPastRec, setSavingPastRec] = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
+  const [refreshing,    setRefreshing]    = useState(false);
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
   const vehicleHistory = jobs.filter(j=>{
@@ -2673,6 +2723,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
       {/* ── Header ── */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}>
         <button className="btn btn-ghost btn-sm" onClick={onBack}>{t.wsBack}</button>
+        {onRefresh&&(
+          <button className="btn btn-ghost btn-sm" disabled={refreshing}
+            onClick={async()=>{ setRefreshing(true); try{ await onRefresh(); }finally{ setRefreshing(false); } }}
+            style={{padding:"6px 10px",minWidth:32}}
+            title="Refresh">
+            <span style={{display:"inline-block",animation:refreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
+          </button>
+        )}
         <div style={{flex:1,minWidth:0}}>
           <h1 style={{fontSize:18,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name}</h1>
           <div style={{fontSize:12,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap",marginTop:2}}>
@@ -2686,30 +2744,80 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
         </span>
       </div>
 
-      {/* ── Status bar ── */}
-      <div className="card" style={{padding:"10px 14px",marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontSize:12,color:"var(--text3)",marginRight:2}}>{t.status}:</span>
-        {(wsRole==="mechanic"?["Pending","In Progress"]:JOB_STATUSES).map(s=>(
-          <button key={s} className={`btn btn-xs ${job.status===s?"btn-primary":"btn-ghost"}`}
-            onClick={()=>onSaveJob({...job,status:s})}>{tSt(s)}</button>
-        ))}
-        {(job.status==="Done"||job.status==="Delivered")&&(job.customer_phone||job.customer_name)&&(()=>{
-          const phone=(job.customer_phone||"").replace(/\D/g,"");
-          const name=job.customer_name||"there";
-          const reg=job.vehicle_reg?`your ${job.vehicle_make?`${job.vehicle_make} `:""}${job.vehicle_model?`${job.vehicle_model} `:""}(${job.vehicle_reg})`:"your vehicle";
-          const shopName=wsProfile?.name||settings?.shop_name||"Workshop";
-          const shopPhone=wsProfile?.phone||settings?.phone||"";
-          const msg=`Hi ${name}! 🎉 Great news — ${reg} is ready for collection at *${shopName}*.\n\nPlease contact us to arrange collection${shopPhone?` on ${shopPhone}`:""}.`;
-          if(!phone) return null;
-          return (
-            <a href={`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer"
-              className="btn btn-ghost btn-xs"
-              style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)",marginLeft:"auto",textDecoration:"none"}}>
-              📱 Car Ready — Notify Customer
-            </a>
-          );
-        })()}
-      </div>
+      {/* ── Status pipeline bar ── */}
+      {(()=>{
+        const isPaid = invoice?.status==="paid";
+        const isInvoiced = !!invoice;
+        const isProblem = !!job.is_problem;
+        const STAGES = [
+          {key:"Pending",         label:"⏳ Pending",          color:"#a78bfa", bg:"rgba(167,139,250,.18)", mechanic:true},
+          {key:"In Progress",     label:"⚙️ In Progress",      color:"#fbbf24", bg:"rgba(251,191,36,.18)",  mechanic:true},
+          {key:"Done",            label:"✅ Done",              color:"#34d399", bg:"rgba(52,211,153,.18)",  mechanic:false},
+          {key:"Invoiced",        label:"🧾 Invoiced",          color:"#f97316", bg:"rgba(249,115,22,.18)",  mechanic:false, derived:true},
+          {key:"Payment Received",label:"💚 Payment Received",  color:"#10b981", bg:"rgba(16,185,129,.18)",  mechanic:false, derived:true},
+        ];
+        const activeKey = isPaid?"Payment Received":isInvoiced?"Invoiced":job.status;
+        const visibleStages = wsRole==="mechanic" ? STAGES.filter(s=>s.mechanic) : STAGES;
+        const phone=(job.customer_phone||"").replace(/\D/g,"");
+        const showWa=(job.status==="Done"||job.status==="Delivered")&&phone;
+        return (
+          <div className="card" style={{padding:"10px 14px",marginBottom:12}}>
+            <div style={{display:"flex",gap:6,alignItems:"center",overflowX:"auto",flexWrap:"nowrap",paddingBottom:2,scrollbarWidth:"none"}}>
+              {visibleStages.map((s,i)=>{
+                const active = activeKey===s.key;
+                const clickable = !s.derived;
+                return (
+                  <span key={s.key} style={{display:"contents"}}>
+                    {i>0&&<span style={{color:"var(--text3)",fontSize:11,flexShrink:0}}>→</span>}
+                    <button
+                      disabled={!clickable}
+                      onClick={clickable?()=>onSaveJob({...job,status:s.key}):undefined}
+                      style={{
+                        border:`1.5px solid ${active?s.color:"var(--border)"}`,
+                        borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:600,cursor:clickable?"pointer":"default",
+                        background:active?s.bg:"transparent",
+                        color:active?s.color:"var(--text3)",
+                        fontFamily:"'DM Sans',sans-serif",flexShrink:0,
+                        transition:"all .15s",opacity:!clickable&&!active?0.5:1,
+                      }}
+                    >{s.label}</button>
+                  </span>
+                );
+              })}
+            </div>
+            {wsRole!=="mechanic"&&(
+              <div style={{marginTop:6}}>
+                <button
+                  onClick={()=>onSaveJob({...job,is_problem:!isProblem,problem_prev_status:!isProblem?job.status:job.problem_prev_status})}
+                  style={{
+                    border:`1.5px solid ${isProblem?"#f87171":"var(--border)"}`,
+                    borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:600,cursor:"pointer",
+                    background:isProblem?"rgba(248,113,113,.18)":"transparent",
+                    color:isProblem?"#f87171":"var(--text3)",
+                    fontFamily:"'DM Sans',sans-serif",transition:"all .15s",
+                  }}
+                >⚠️ Problem Job</button>
+              </div>
+            )}
+            {showWa&&(()=>{
+              const name=job.customer_name||"there";
+              const reg=job.vehicle_reg?`your ${job.vehicle_make?`${job.vehicle_make} `:""}${job.vehicle_model?`${job.vehicle_model} `:""}(${job.vehicle_reg})`:"your vehicle";
+              const shopName=wsProfile?.name||settings?.shop_name||"Workshop";
+              const shopPhone=wsProfile?.phone||settings?.phone||"";
+              const msg=`Hi ${name}! 🎉 Great news — ${reg} is ready for collection at *${shopName}*.\n\nPlease contact us to arrange collection${shopPhone?` on ${shopPhone}`:""}.`;
+              return (
+                <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid var(--border)"}}>
+                  <a href={`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer"
+                    className="btn btn-ghost btn-xs"
+                    style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)",textDecoration:"none"}}>
+                    📱 Car Ready — Notify Customer
+                  </a>
+                </div>
+              );
+            })()}
+          </div>
+        );
+      })()}
 
       {/* ── Tab bar ── */}
       {isMobile ? (

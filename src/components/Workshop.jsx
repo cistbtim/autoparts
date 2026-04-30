@@ -469,7 +469,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   </div>
                   <div style={{fontWeight:600,fontSize:13,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name||"—"}</div>
                   {(job.vehicle_make||job.vehicle_model)&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:3}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}</div>}
-                  {job.complaint&&<div style={{fontSize:11,color:"var(--text2)",marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{job.complaint}</div>}
+                  {job.complaint&&<div style={{fontSize:12,fontWeight:700,color:"#fff",marginBottom:6,lineHeight:1.4,background:"#ef4444",borderRadius:7,padding:"5px 10px"}}>⚠️ {job.complaint}</div>}
                   {inv&&wsRole!=="mechanic"&&<div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:6}}>
                     <span style={{color:"var(--text3)"}}>Invoice</span>
                     <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>

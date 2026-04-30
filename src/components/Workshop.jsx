@@ -3819,6 +3819,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           📝 Create Quotation for Customer
         </button>
       )}
+      {quote&&!["Done","Delivered"].includes(job.status)&&(
+        <button className="btn btn-success" style={{width:"100%",padding:11,fontSize:14,fontWeight:700,marginTop:4}}
+          onClick={()=>onSaveJob({...job,status:"Done"})}>
+          ✅ Mark Job as Done
+        </button>
+      )}
       </>)}
 
       {/* ══ INVOICE tab ══ */}

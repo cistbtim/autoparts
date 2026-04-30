@@ -1652,7 +1652,7 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
 
     setUploading(true); setError(null);
     try {
-      // ── Step 1: Resize to JPEG (matches uploadBookInPhoto approach) ──
+      // ── Step 1: Resize to PNG (same format as PartPhotoUploader) ──
       setStatus("Resizing image...");
       const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -1665,7 +1665,7 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
             if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
             canvas.width = w; canvas.height = h;
             canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL("image/jpeg", 0.88));
+            resolve(canvas.toDataURL("image/png"));
           };
           img.onerror = reject;
           img.src = ev.target.result;
@@ -1674,17 +1674,17 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
         reader.readAsDataURL(file);
       });
 
-      // ── Step 2: Upload (script handles folder creation internally) ──
+      // ── Step 2: Upload — same payload shape as PartPhotoUploader ──
       const _now=new Date(), _p=n=>String(n).padStart(2,"0");
       const _date=`${_now.getFullYear()}-${_p(_now.getMonth()+1)}-${_p(_now.getDate())}`;
       const _dt=`${_date.replace(/-/g,"")}_${_p(_now.getHours())}${_p(_now.getMinutes())}${_p(_now.getSeconds())}`;
       const _plate=String(reg||vehicleId||"vehicle").replace(/\s/g,"").toUpperCase();
       const folderPath = "Tim_Car_Phot/" + _plate + "/" + _date;
-      const filename = _dt + "_" + viewName + ".jpg";
+      const filename = _dt + "_" + viewName + ".png";
       setStatus("Uploading " + filename + "...");
       const uploadResp = await fetch(SCRIPT_URL, {
         method: "POST",
-        body: JSON.stringify({ action:"upload", image:base64, filename, mimeType:"image/jpeg", folderPath })
+        body: JSON.stringify({ image:base64, filename, mimeType:"image/png", folderPath })
       });
       const result = await uploadResp.json();
       if (result.success) {

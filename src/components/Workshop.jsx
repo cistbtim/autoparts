@@ -449,52 +449,52 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             const canUnflag = col.id==="problem";
             const canInvoice= col.id==="done";
             return (
-              <div className="card" style={{marginBottom:8,padding:0,overflow:"hidden"}}
+              <div className="card" style={{marginBottom:5,padding:0,overflow:"hidden"}}
                 onClick={()=>{setJobDetailTab("car");setActiveJob(job);setView("job");}}>
-                {fp&&<div style={{background:"var(--surface2)",flexShrink:0}}>
-                  <img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:120,objectFit:"contain",display:"block"}}
+                {fp&&<div style={{background:"var(--surface2)"}}>
+                  <img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:52,objectFit:"cover",display:"block"}}
                     onError={e=>{e.target.parentNode.style.display="none";}}/>
                 </div>}
-                <div style={{padding:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:4}}>
-                    <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13,color:"var(--accent)"}}>{job.vehicle_reg||"—"}</code>
+                <div style={{padding:"7px 8px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:4,marginBottom:2}}>
+                    <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12,color:"var(--accent)"}}>{job.vehicle_reg||"—"}</code>
                     {canFlag&&(
-                      <button title="Flag as Problem" style={{padding:"2px 5px",border:"1px solid rgba(248,113,113,.3)",background:"rgba(248,113,113,.08)",color:"#f87171",borderRadius:5,cursor:"pointer",fontSize:10,flexShrink:0,lineHeight:1}}
+                      <button title="Flag as Problem" style={{padding:"1px 4px",border:"1px solid rgba(248,113,113,.3)",background:"rgba(248,113,113,.08)",color:"#f87171",borderRadius:4,cursor:"pointer",fontSize:10,flexShrink:0,lineHeight:1}}
                         onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>
                     )}
                     {canUnflag&&(
-                      <button title="Return to previous stage" style={{padding:"2px 5px",border:"1px solid rgba(52,211,153,.3)",background:"rgba(52,211,153,.08)",color:"#34d399",borderRadius:5,cursor:"pointer",fontSize:10,flexShrink:0,lineHeight:1}}
-                        onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩ Return</button>
+                      <button title="Return to previous stage" style={{padding:"1px 4px",border:"1px solid rgba(52,211,153,.3)",background:"rgba(52,211,153,.08)",color:"#34d399",borderRadius:4,cursor:"pointer",fontSize:10,flexShrink:0,lineHeight:1}}
+                        onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>
                     )}
                   </div>
-                  <div style={{fontWeight:600,fontSize:13,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name||"—"}</div>
-                  {(job.vehicle_make||job.vehicle_model)&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:3}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}</div>}
-                  {job.complaint&&<div style={{fontSize:12,fontWeight:700,color:"#fff",marginBottom:6,lineHeight:1.4,background:"#ef4444",borderRadius:7,padding:"5px 10px"}}>⚠️ {job.complaint}</div>}
-                  {inv&&wsRole!=="mechanic"&&<div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:6}}>
+                  <div style={{fontWeight:600,fontSize:12,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name||"—"}</div>
+                  {(job.vehicle_make||job.vehicle_model)&&<div style={{fontSize:10,color:"var(--text3)",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}</div>}
+                  {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:3,background:"#ef4444",borderRadius:5,padding:"3px 7px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {job.complaint}</div>}
+                  {inv&&wsRole!=="mechanic"&&<div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:3}}>
                     <span style={{color:"var(--text3)"}}>Invoice</span>
                     <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
                   </div>}
                   {(col.nextStatus||canInvoice||col.id==="wip"||col.id==="invoiced")&&(
-                    <div style={{marginTop:4}} onClick={e=>e.stopPropagation()}>
+                    <div style={{marginTop:3}} onClick={e=>e.stopPropagation()}>
                       {col.id==="wip"&&(
-                        <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:11,padding:"5px 0"}}
+                        <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:10,padding:"4px 0"}}
                           onClick={()=>{ setJobDetailTab("quote"); setActiveJob(job); setView("job"); }}>📝 Quote</button>
                       )}
                       {col.nextStatus&&(()=>{
                         const hasQuote = col.id==="wip" ? !!jobQuote(job.id) : true;
                         return (<>
-                          <button className="btn btn-xs" style={{width:"100%",fontSize:11,padding:"5px 0",marginTop:col.id==="wip"?4:0,opacity:hasQuote?1:0.45,cursor:hasQuote?"pointer":"not-allowed"}}
+                          <button className="btn btn-xs" style={{width:"100%",fontSize:10,padding:"4px 0",marginTop:col.id==="wip"?3:0,opacity:hasQuote?1:0.45,cursor:hasQuote?"pointer":"not-allowed"}}
                             disabled={!hasQuote}
                             onClick={()=>hasQuote&&moveJobStatus(job,col.nextStatus)}>{col.nextLabel}</button>
-                          {!hasQuote&&<div style={{fontSize:10,color:"var(--yellow)",textAlign:"center",marginTop:3}}>⚠ Quote required first</div>}
+                          {!hasQuote&&<div style={{fontSize:9,color:"var(--yellow)",textAlign:"center",marginTop:2}}>⚠ Quote required</div>}
                         </>);
                       })()}
                       {canInvoice&&(
-                        <button className="btn btn-xs btn-primary" style={{width:"100%",fontSize:11,padding:"5px 0"}}
+                        <button className="btn btn-xs btn-primary" style={{width:"100%",fontSize:10,padding:"4px 0"}}
                           onClick={()=>{ setKanbanInvJob(job); setTimeout(()=>kanbanInvPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),80); }}>🧾 Invoice</button>
                       )}
                       {col.id==="invoiced"&&wsRole!=="mechanic"&&(
-                        <button className="btn btn-xs btn-success" style={{width:"100%",fontSize:11,padding:"5px 0"}}
+                        <button className="btn btn-xs btn-success" style={{width:"100%",fontSize:10,padding:"4px 0"}}
                           onClick={()=>setKanbanPayJob(job)}>💳 Payment</button>
                       )}
                     </div>
@@ -512,7 +512,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                     <span style={{fontWeight:700,fontSize:12}}>{col.label}</span>
                     <span style={{background:`${col.color}28`,color:col.color,borderRadius:10,padding:"1px 8px",fontSize:11,fontWeight:700}}>{col.items.length}</span>
                   </div>
-                  <div style={{background:"var(--surface2)",opacity:1,borderRadius:"0 0 10px 10px",padding:6,minHeight:120,maxHeight:"calc(100vh - 370px)",overflowY:"auto"}}>
+                  <div style={{background:"var(--surface2)",opacity:1,borderRadius:"0 0 10px 10px",padding:6,minHeight:120,maxHeight:"calc(100vh - 240px)",overflowY:"auto"}}>
                     {col.items.length===0&&<div style={{textAlign:"center",padding:"18px 4px",color:"var(--text3)",fontSize:11,fontStyle:"italic"}}>Empty</div>}
                     {col.type==="booking"&&col.items.map(b=><BkCard key={b.id} b={b}/>)}
                     {col.type==="job"&&col.items.map(j=><JobCard key={j.id} job={j} col={col}/>)}

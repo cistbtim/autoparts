@@ -2981,6 +2981,40 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
               );
             })()}
           </div>
+
+          {/* Complaint / Diagnosis / Return Reason / Notes */}
+          {job.complaint&&(
+            <div style={{marginBottom:12}}>
+              <style>{`@keyframes complaint-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.35)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}`}</style>
+              <div style={{
+                background:"rgba(239,68,68,.07)",
+                border:"2px solid rgba(239,68,68,.6)",
+                borderRadius:10,
+                padding:"10px 14px",
+                animation:"complaint-pulse 2.4s ease-in-out infinite",
+              }}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+                  <span style={{fontSize:16}}>⚠️</span>
+                  <span style={{fontSize:10,fontWeight:800,color:"#ef4444",textTransform:"uppercase",letterSpacing:".08em"}}>Customer Complaint</span>
+                </div>
+                <div style={{fontSize:15,fontWeight:700,color:"#ef4444",lineHeight:1.55}}>{job.complaint}</div>
+              </div>
+            </div>
+          )}
+          {job.diagnosis&&<div style={{marginBottom:10}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>🔍 Diagnosis</div>
+            <div style={{fontSize:13,lineHeight:1.6,color:"var(--blue)"}}>{job.diagnosis}</div>
+          </div>}
+          {job.return_reason&&<div style={{marginBottom:10,padding:"8px 12px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.25)",borderRadius:8}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>🔄 Return Reason</div>
+            <div style={{fontSize:13,color:"var(--yellow)"}}>{job.return_reason}</div>
+            {job.parent_job_id&&<div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Original job: <code style={{fontFamily:"DM Mono,monospace"}}>{job.parent_job_id}</code></div>}
+          </div>}
+          {job.notes&&<div style={{marginBottom:10}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>📝 Notes</div>
+            <div style={{fontSize:13,lineHeight:1.6,color:"var(--text2)"}}>{job.notes}</div>
+          </div>}
+
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:12}}>
             {[
               [`🚗 ${t.wsPlate}`,job.vehicle_reg],
@@ -3117,39 +3151,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
               </div>
             </div>
           )}
-
-          {/* Complaint / Diagnosis / Return Reason */}
-          {job.complaint&&(
-            <div style={{marginTop:12}}>
-              <style>{`@keyframes complaint-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.35)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}`}</style>
-              <div style={{
-                background:"rgba(239,68,68,.07)",
-                border:"2px solid rgba(239,68,68,.6)",
-                borderRadius:10,
-                padding:"10px 14px",
-                animation:"complaint-pulse 2.4s ease-in-out infinite",
-              }}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
-                  <span style={{fontSize:16}}>⚠️</span>
-                  <span style={{fontSize:10,fontWeight:800,color:"#ef4444",textTransform:"uppercase",letterSpacing:".08em"}}>Customer Complaint</span>
-                </div>
-                <div style={{fontSize:15,fontWeight:700,color:"#ef4444",lineHeight:1.55}}>{job.complaint}</div>
-              </div>
-            </div>
-          )}
-          {job.diagnosis&&<div style={{marginTop:10}}>
-            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>🔍 Diagnosis</div>
-            <div style={{fontSize:13,lineHeight:1.6,color:"var(--blue)"}}>{job.diagnosis}</div>
-          </div>}
-          {job.return_reason&&<div style={{marginTop:10,padding:"8px 12px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.25)",borderRadius:8}}>
-            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>🔄 Return Reason</div>
-            <div style={{fontSize:13,color:"var(--yellow)"}}>{job.return_reason}</div>
-            {job.parent_job_id&&<div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Original job: <code style={{fontFamily:"DM Mono,monospace"}}>{job.parent_job_id}</code></div>}
-          </div>}
-          {job.notes&&<div style={{marginTop:10}}>
-            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>📝 Notes</div>
-            <div style={{fontSize:13,lineHeight:1.6,color:"var(--text2)"}}>{job.notes}</div>
-          </div>}
 
         </div>
       )}

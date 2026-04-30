@@ -649,9 +649,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       // Auto-create workshop_vehicle if not linked yet, or if the linked ID no longer exists
       const vehicleExists=d.workshop_vehicle_id&&workshopVehicles.some(v=>v.id===d.workshop_vehicle_id);
       if(!vehicleExists && d.vehicle_reg?.trim()){
-        const vehId=makeId("WSV");
-        chk(await api.insert("workshop_vehicles",{id:vehId,workshop_customer_id:d.workshop_customer_id||null,reg:d.vehicle_reg.trim(),make:d.vehicle_make||"",model:d.vehicle_model||"",year:d.vehicle_year||"",color:d.vehicle_color||"",vin:d.vin||"",engine_no:d.engine_no||"",licence_disc_expiry:d.licence_disc_expiry||null,workshop_id:wsId||null}),"Save vehicle");
-        d.workshop_vehicle_id=vehId;
+        // Before creating, check if a vehicle with this plate already exists
+        const regNorm=d.vehicle_reg.trim().toUpperCase().replace(/\s/g,"");
+        const existingVeh=workshopVehicles.find(v=>v.reg?.trim().toUpperCase().replace(/\s/g,"")=== regNorm);
+        if(existingVeh){
+          // Reuse existing vehicle, update its customer link
+          d.workshop_vehicle_id=existingVeh.id;
+          await api.patch("workshop_vehicles","id",existingVeh.id,{workshop_customer_id:d.workshop_customer_id||null}).catch(()=>{});
+        } else {
+          const vehId=makeId("WSV");
+          chk(await api.insert("workshop_vehicles",{id:vehId,workshop_customer_id:d.workshop_customer_id||null,reg:d.vehicle_reg.trim(),make:d.vehicle_make||"",model:d.vehicle_model||"",year:d.vehicle_year||"",color:d.vehicle_color||"",vin:d.vin||"",engine_no:d.engine_no||"",licence_disc_expiry:d.licence_disc_expiry||null,workshop_id:wsId||null}),"Save vehicle");
+          d.workshop_vehicle_id=vehId;
+        }
       } else if(vehicleExists){
         // Keep vehicle's customer link in sync with the job's customer
         const vPatch={workshop_customer_id:d.workshop_customer_id||null};

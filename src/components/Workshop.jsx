@@ -451,22 +451,27 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             return (
               <div className="card" style={{marginBottom:5,padding:0,overflow:"hidden"}}
                 onClick={()=>{setJobDetailTab("car");setActiveJob(job);setView("job");}}>
-                {fp&&<div style={{background:"var(--surface2)"}}>
-                  <img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:80,objectFit:"contain",display:"block"}}
-                    onError={e=>{e.target.parentNode.style.display="none";}}/>
-                </div>}
-                <div style={{padding:"7px 8px"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:4,marginBottom:2}}>
-                    <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12,color:"var(--accent)"}}>{job.vehicle_reg||"—"}</code>
+                <div style={{position:"relative",background:"var(--surface2)",minHeight:fp?undefined:0}}>
+                  {fp&&<img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:80,objectFit:"contain",display:"block"}}
+                    onError={e=>{e.target.style.display="none";}}/>}
+                  {job.vehicle_reg&&(
+                    <div style={{position:"absolute",bottom:4,left:4,background:"rgba(0,0,0,.65)",backdropFilter:"blur(2px)",borderRadius:4,padding:"2px 7px"}}>
+                      <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:11,color:"#fff"}}>{job.vehicle_reg}</code>
+                    </div>
+                  )}
+                  <div style={{position:"absolute",top:4,right:4,display:"flex",gap:3}}>
                     {canFlag&&(
-                      <button title="Flag as Problem" style={{padding:"1px 4px",border:"1px solid rgba(248,113,113,.3)",background:"rgba(248,113,113,.08)",color:"#f87171",borderRadius:4,cursor:"pointer",fontSize:10,flexShrink:0,lineHeight:1}}
+                      <button title="Flag as Problem" style={{padding:"1px 4px",border:"1px solid rgba(248,113,113,.3)",background:"rgba(0,0,0,.5)",color:"#f87171",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1}}
                         onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>
                     )}
                     {canUnflag&&(
-                      <button title="Return to previous stage" style={{padding:"1px 4px",border:"1px solid rgba(52,211,153,.3)",background:"rgba(52,211,153,.08)",color:"#34d399",borderRadius:4,cursor:"pointer",fontSize:10,flexShrink:0,lineHeight:1}}
+                      <button title="Return to previous stage" style={{padding:"1px 4px",border:"1px solid rgba(52,211,153,.3)",background:"rgba(0,0,0,.5)",color:"#34d399",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1}}
                         onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>
                     )}
                   </div>
+                </div>
+                <div style={{padding:"7px 8px"}}>
+                  {!fp&&job.vehicle_reg&&<code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:11,color:"var(--accent)",display:"block",marginBottom:2}}>{job.vehicle_reg}</code>}
                   <div style={{fontWeight:600,fontSize:12,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name||"—"}</div>
                   {(job.vehicle_make||job.vehicle_model)&&<div style={{fontSize:10,color:"var(--text3)",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}</div>}
                   {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:3,background:"#ef4444",borderRadius:5,padding:"3px 7px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {job.complaint}</div>}

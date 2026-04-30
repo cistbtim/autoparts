@@ -475,6 +475,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   <div style={{fontWeight:600,fontSize:12,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name||"—"}</div>
                   {(job.vehicle_make||job.vehicle_model)&&<div style={{fontSize:10,color:"var(--text3)",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}</div>}
                   {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:3,background:"#ef4444",borderRadius:5,padding:"3px 7px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {job.complaint}</div>}
+                  {job.notes&&<div style={{fontSize:10,color:"var(--text2)",marginBottom:3,padding:"2px 6px",background:"var(--surface3)",borderRadius:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📝 {job.notes}</div>}
                   {inv&&wsRole!=="mechanic"&&<div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:3}}>
                     <span style={{color:"var(--text3)"}}>Invoice</span>
                     <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
@@ -2419,6 +2420,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
   const [refreshing,    setRefreshing]    = useState(false);
+  const [noteEdit,      setNoteEdit]      = useState(false);
+  const [noteVal,       setNoteVal]       = useState(job.notes||"");
+  const [savingNote,    setSavingNote]    = useState(false);
+  useEffect(()=>{ setNoteVal(job.notes||""); },[job.notes]);
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
   const vehicleHistory = jobs.filter(j=>{
@@ -3008,10 +3013,40 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             <div style={{fontSize:13,color:"var(--yellow)"}}>{job.return_reason}</div>
             {job.parent_job_id&&<div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Original job: <code style={{fontFamily:"DM Mono,monospace"}}>{job.parent_job_id}</code></div>}
           </div>}
-          {job.notes&&<div style={{marginBottom:10}}>
-            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>📝 Notes</div>
-            <div style={{fontSize:13,lineHeight:1.6,color:"var(--text2)"}}>{job.notes}</div>
-          </div>}
+          {/* ── Inline Remark / Note ── */}
+          <div style={{marginBottom:10,padding:"8px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:noteEdit?6:0}}>
+              <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em"}}>📝 Remark / Note</div>
+              {!noteEdit&&(
+                <button onClick={()=>setNoteEdit(true)}
+                  style={{fontSize:11,padding:"2px 8px",background:"var(--surface3)",border:"1px solid var(--border)",borderRadius:5,cursor:"pointer",color:"var(--text2)"}}>
+                  {noteVal?"✏️ Edit":"+ Add"}
+                </button>
+              )}
+            </div>
+            {noteEdit?(
+              <>
+                <textarea
+                  value={noteVal} onChange={e=>setNoteVal(e.target.value)}
+                  placeholder="Add a remark or internal note..."
+                  style={{width:"100%",fontSize:13,padding:"6px 8px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface)",color:"var(--text)",resize:"vertical",minHeight:64,fontFamily:"DM Sans,sans-serif",outline:"none",boxSizing:"border-box"}}
+                  autoFocus/>
+                <div style={{display:"flex",gap:6,marginTop:6}}>
+                  <button className="btn btn-primary btn-sm" style={{flex:1}} disabled={savingNote}
+                    onClick={async()=>{
+                      setSavingNote(true);
+                      await onSaveJob({...job,notes:noteVal.trim()||null});
+                      setSavingNote(false); setNoteEdit(false);
+                    }}>{savingNote?"Saving...":"💾 Save"}</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>{setNoteVal(job.notes||"");setNoteEdit(false);}}>Cancel</button>
+                </div>
+              </>
+            ):(
+              noteVal
+                ?<div style={{fontSize:13,lineHeight:1.55,color:"var(--text)",marginTop:4}}>{noteVal}</div>
+                :<div style={{fontSize:12,color:"var(--text3)",marginTop:2,fontStyle:"italic"}}>No remark yet</div>
+            )}
+          </div>
 
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:12}}>
             {[

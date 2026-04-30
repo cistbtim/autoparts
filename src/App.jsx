@@ -694,6 +694,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         parent_job_id:d.parent_job_id||null,
         is_problem:d.is_problem||false,
         problem_prev_status:str(d.problem_prev_status),
+        notes:str(d.notes),
       };
       let savedId=d.id;
       if(d.id){ chk(await api.patch("workshop_jobs","id",d.id,jobRow),"Update job"); }

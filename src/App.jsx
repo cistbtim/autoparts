@@ -1028,13 +1028,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   const deleteWsBooking=async(id,meta={})=>{
-    await api.patch("workshop_bookings","id",id,{status:"deleted"}).catch(e=>console.warn("Delete booking status failed:",e));
-    await api.patch("workshop_bookings","id",id,{
+    const patch={
+      status:"deleted",
       deleted_by:meta.deleted_by||"",
       deleted_reason:meta.deleted_reason||"",
       deleted_at:new Date().toISOString(),
-    }).catch(()=>{});
-    const patch={status:"deleted",deleted_by:meta.deleted_by||"",deleted_reason:meta.deleted_reason||"",deleted_at:new Date().toISOString()};
+    };
+    const res=await api.patch("workshop_bookings","id",id,patch).catch(e=>{console.error("Delete booking failed:",e);return null;});
+    if(res&&!Array.isArray(res)&&res.message) console.error("Delete booking DB error:",res.message);
     setWsBookings(p=>p.map(b=>b.id===id?{...b,...patch}:b));
   };
 

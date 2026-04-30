@@ -3420,6 +3420,46 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           const getSupCosts = (desc) => supCostMap[(desc||"").toLowerCase().trim()] || [];
 
           return (<>
+        {/* ── VIN & Search tools ── */}
+        {job.vin&&(
+          <div style={{marginBottom:12,padding:"10px 12px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>🔍 VIN</div>
+              <code style={{fontFamily:"DM Mono,monospace",fontSize:13,fontWeight:700,letterSpacing:"1px",background:"var(--surface)",padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",flex:1}}>{job.vin}</code>
+              <button onClick={()=>navigator.clipboard.writeText(job.vin).then(()=>alert("VIN copied!"))}
+                style={{fontSize:11,padding:"3px 8px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",color:"var(--text3)",flexShrink:0}}>📋</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+              {vinSearchLinks.slice(0,4).map(lk=>(
+                <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",
+                    background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:8,
+                    color:lk.color,textDecoration:"none",fontSize:10,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                  <span style={{fontSize:18}}>{lk.icon}</span>
+                  <span>{lk.label}</span>
+                </a>
+              ))}
+              <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open(`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`,"_blank");}}
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",
+                  background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:8,
+                  color:"#dc2626",cursor:"pointer",fontSize:10,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                <span style={{fontSize:18}}>🔴</span><span>AutoZone</span>
+              </button>
+              <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",
+                  background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:8,
+                  color:"#0ea5e9",cursor:"pointer",fontSize:10,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                <span style={{fontSize:18}}>🔧</span><span>Amayama</span>
+              </button>
+              <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied!\n\nPaste it into WolfOil's VIN field.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",
+                  background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:8,
+                  color:"#f97316",cursor:"pointer",fontSize:10,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                <span style={{fontSize:18}}>🛢️</span><span>WolfOil</span>
+              </button>
+            </div>
+          </div>
+        )}
         {/* ── Complaint & Notes summary ── */}
         {(job.complaint||job.notes)&&(
           <div style={{marginBottom:12,display:"flex",flexDirection:"column",gap:6}}>

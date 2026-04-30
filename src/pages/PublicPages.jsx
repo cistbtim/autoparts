@@ -981,20 +981,30 @@ export function WorkshopBookingPage({token}) {
   const [prefDate,  setPrefDate]  = useState("");
   const [submitting,setSubmitting]= useState(false);
   const [bookingId, setBookingId] = useState(null);
+  const [scriptUrl, setScriptUrl] = useState("");
+  const [problemPhotos, setProblemPhotos] = useState([null, null, null]);
 
   const cameraRef  = useRef(null);
   const galleryRef = useRef(null);
+  const photoRef0  = useRef(null);
+  const photoRef1  = useRef(null);
+  const photoRef2  = useRef(null);
+  const photoRefs  = [photoRef0, photoRef1, photoRef2];
 
   useEffect(()=>{
     // Look up workshop by opaque booking token — never expose the UUID in the URL
     fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles?booking_token=eq.${encodeURIComponent(token)}&select=id,name,phone,email`,
       {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}})
       .then(r=>r.json())
-      .then(rows=>{
-        if(rows?.[0]){ setShopInfo(rows[0]); setWsId(rows[0].id); }
-      })
+      .then(rows=>{ if(rows?.[0]){ setShopInfo(rows[0]); setWsId(rows[0].id); } })
       .catch(()=>{})
       .finally(()=>setShopLoading(false));
+    // Fetch Apps Script URL for Drive photo uploads
+    fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1&select=apps_script_url,vehicle_script_url`,
+      {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}})
+      .then(r=>r.json())
+      .then(rows=>{ const s=rows?.[0]; setScriptUrl(s?.vehicle_script_url?.trim()||s?.apps_script_url?.trim()||""); })
+      .catch(()=>{});
   },[token]);
 
   const processImage=async(dataUrl)=>{
@@ -1041,6 +1051,45 @@ export function WorkshopBookingPage({token}) {
     fr.readAsDataURL(file);
   };
 
+  const uploadProblemPhoto=async(slotIndex,dataUrl)=>{
+    const upd=extra=>setProblemPhotos(p=>{const n=[...p];n[slotIndex]={...(n[slotIndex]||{}),dataUrl,...extra};return n;});
+    if(!scriptUrl){upd({status:"error",error:"No script URL"});return;}
+    upd({status:"uploading",url:null,error:null});
+    try{
+      const base64=await new Promise((res,rej)=>{
+        const img=new Image();
+        img.onload=()=>{
+          const MAX=1200,canvas=document.createElement("canvas");
+          let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          canvas.width=w;canvas.height=h;canvas.getContext("2d").drawImage(img,0,0,w,h);
+          res(canvas.toDataURL("image/jpeg",0.85));
+        };
+        img.onerror=rej;img.src=dataUrl;
+      });
+      const reg=(scanResult?.reg||"BK").replace(/\s/g,"").toUpperCase();
+      const now=new Date();const pad2=n=>String(n).padStart(2,"0");
+      const dateStr=`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`;
+      const resp=await fetch(scriptUrl,{method:"POST",body:JSON.stringify({
+        action:"upload",image:base64,
+        filename:`${dateStr.replace(/-/g,"")}_${slotIndex+1}.jpg`,
+        mimeType:"image/jpeg",
+        folderPath:`Booking_Photos/${reg}/${dateStr}`,
+      })});
+      const result=await resp.json();
+      if(result.success){upd({status:"done",url:result.url});}
+      else throw new Error(result.error||"Upload failed");
+    }catch(e){upd({status:"error",error:e.message});}
+  };
+
+  const handleProblemPhoto=(e,slotIndex)=>{
+    const file=e.target.files?.[0];if(!file)return;
+    e.target.value="";
+    const fr=new FileReader();
+    fr.onload=ev=>uploadProblemPhoto(slotIndex,ev.target.result);
+    fr.readAsDataURL(file);
+  };
+
   const submit=async()=>{
     if(!name.trim()||!phone.trim()||!complaint.trim()){
       alert("Please fill in your name, phone number, and describe the problem.");
@@ -1067,6 +1116,9 @@ export function WorkshopBookingPage({token}) {
           complaint:complaint.trim(), preferred_date:prefDate||null,
           status:"pending",
           workshop_vehicle_id:foundVehicle?.id||null,
+          photo_1:problemPhotos[0]?.url||null,
+          photo_2:problemPhotos[1]?.url||null,
+          photo_3:problemPhotos[2]?.url||null,
           created_at:new Date().toISOString(),
         })
       });
@@ -1246,6 +1298,28 @@ export function WorkshopBookingPage({token}) {
             <textarea style={{...inp,minHeight:90,resize:"vertical"}} value={complaint}
               onChange={e=>setComplaint(e.target.value)} placeholder="Describe the issue with your vehicle…"/>
           </div>
+          <div style={{marginBottom:14}}>
+            <label style={lbl}>📷 Photos of the problem (optional)</label>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:6}}>
+              {[0,1,2].map(i=>{
+                const ph=problemPhotos[i];
+                return (
+                  <div key={i}
+                    style={{aspectRatio:"1",background:CL.bg,border:`2px dashed ${ph?.status==="done"?"transparent":CL.border}`,borderRadius:10,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",overflow:"hidden",position:"relative",cursor:"pointer"}}
+                    onClick={()=>photoRefs[i].current?.click()}>
+                    {ph?.status==="done"&&<img src={ph.dataUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>}
+                    {(!ph)&&<><span style={{fontSize:28}}>📷</span><span style={{fontSize:10,color:CL.text3,marginTop:4}}>Add photo</span></>}
+                    {ph?.status==="uploading"&&<div style={{color:CL.blue,fontSize:11,textAlign:"center",padding:4}}>⏳<br/>Uploading…</div>}
+                    {ph?.status==="error"&&<div style={{color:CL.red,fontSize:10,textAlign:"center",padding:4}}>❌ Failed<br/><span style={{fontSize:9}}>{ph.error?.slice(0,25)}</span></div>}
+                    {ph?.status==="done"&&<div style={{position:"absolute",top:4,right:4,background:"rgba(52,211,153,.9)",borderRadius:99,width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}}>✓</div>}
+                    <input ref={photoRefs[i]} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleProblemPhoto(e,i)}/>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontSize:11,color:CL.text3}}>Tap a slot to take or choose a photo (up to 3)</div>
+          </div>
+
           <div style={{marginBottom:20}}>
             <label style={lbl}>Preferred Date (optional)</label>
             <input style={inp} type="date" value={prefDate} onChange={e=>setPrefDate(e.target.value)}

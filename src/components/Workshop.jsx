@@ -143,6 +143,11 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       diagnosis:"", mechanic:"", notes:"", date_out:"",
     };
     await onSaveJob(newJob);
+    // Copy customer-uploaded booking photos into the job's photos tab
+    const photoUrls=[b.photo_1,b.photo_2,b.photo_3].filter(Boolean);
+    for(const url of photoUrls){
+      await api.insert("workshop_job_photos",{id:makeId("PH"),job_id:newJob.id,url,folder_path:"Booking_Photos"}).catch(()=>{});
+    }
     await onPatchWsBooking(b.id,{status:"job_created",workshop_vehicle_id:vehicleId});
     setJobDetailTab("car");
     setActiveJob(newJob);
@@ -423,6 +428,15 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
               <div style={{fontWeight:600,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.customer_name}</div>
               <div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>{b.customer_phone}</div>
               {b.complaint&&<div style={{fontSize:11,color:"var(--text2)",background:"var(--surface)",borderRadius:6,padding:"3px 7px",marginBottom:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🔧 {b.complaint}</div>}
+              {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).length>0&&(
+                <div style={{display:"flex",gap:4,marginBottom:7}}>
+                  {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).map((url,i)=>(
+                    <a key={i} href={url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+                      <img src={url} alt="" style={{width:40,height:40,objectFit:"cover",borderRadius:5,border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
+                    </a>
+                  ))}
+                </div>
+              )}
               <button className="btn btn-primary btn-sm" style={{width:"100%",fontSize:11,padding:"5px 0"}}
                 onClick={()=>confirmBooking(b)}>➕ Create Job</button>
             </div>
@@ -708,6 +722,12 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
               <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                 <code style={{fontSize:11,background:"var(--surface2)",padding:"6px 10px",borderRadius:6,flex:1,wordBreak:"break-all",color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{bookingUrl}</code>
                 <button className="btn btn-ghost btn-sm" onClick={()=>navigator.clipboard?.writeText(bookingUrl).then(()=>alert("Link copied!"))}>📋 Copy</button>
+                {navigator.share&&(
+                  <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}}
+                    onClick={()=>navigator.share({title:"Book your car service",text:"Book your vehicle service online — scan your licence disc to get started.",url:bookingUrl}).catch(()=>{})}>
+                    📤 Share
+                  </button>
+                )}
               </div>
             ) : (
               <button className="btn btn-primary btn-sm" onClick={genToken}>🔑 Generate Booking Link</button>
@@ -738,6 +758,16 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   <span style={{color:"var(--text3)",marginLeft:"auto"}}>{b.created_at?.slice(0,10)}</span>
                 </div>
                 {b.complaint&&<div style={{fontSize:13,color:"var(--text2)",padding:"8px 10px",background:"var(--surface2)",borderRadius:8,marginBottom:8}}>🔧 {b.complaint}</div>}
+                {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).length>0&&(
+                  <div style={{display:"flex",gap:6,marginBottom:8}}>
+                    {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).map((url,i)=>(
+                      <a key={i} href={url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+                        <img src={url} alt={`photo ${i+1}`} style={{width:60,height:60,objectFit:"cover",borderRadius:6,border:"1px solid var(--border)",cursor:"zoom-in"}}
+                          onError={e=>{e.target.style.display="none";}}/>
+                      </a>
+                    ))}
+                  </div>
+                )}
                 {b.status==="pending"&&(
                   <div style={{display:"flex",gap:8}}>
                     <button className="btn btn-success btn-sm" onClick={()=>confirmBooking(b)}>

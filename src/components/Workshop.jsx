@@ -2984,20 +2984,13 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
 
           {/* Complaint / Diagnosis / Return Reason / Notes */}
           {job.complaint&&(
-            <div style={{marginBottom:12}}>
-              <style>{`@keyframes complaint-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.35)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}`}</style>
-              <div style={{
-                background:"rgba(239,68,68,.07)",
-                border:"2px solid rgba(239,68,68,.6)",
-                borderRadius:10,
-                padding:"10px 14px",
-                animation:"complaint-pulse 2.4s ease-in-out infinite",
-              }}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
-                  <span style={{fontSize:16}}>⚠️</span>
-                  <span style={{fontSize:10,fontWeight:800,color:"#ef4444",textTransform:"uppercase",letterSpacing:".08em"}}>Customer Complaint</span>
-                </div>
-                <div style={{fontSize:15,fontWeight:700,color:"#ef4444",lineHeight:1.55}}>{job.complaint}</div>
+            <div style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:"2px solid #ef4444"}}>
+              <div style={{background:"#ef4444",padding:"5px 12px",display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:14}}>⚠️</span>
+                <span style={{fontSize:11,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".08em"}}>Customer Complaint</span>
+              </div>
+              <div style={{padding:"10px 12px",background:"var(--surface2)"}}>
+                <div style={{fontSize:15,fontWeight:600,color:"var(--text)",lineHeight:1.55}}>{job.complaint}</div>
               </div>
             </div>
           )}

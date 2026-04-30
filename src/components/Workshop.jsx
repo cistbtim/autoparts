@@ -416,19 +416,19 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   </div>}
                   {(col.nextStatus||canInvoice||col.id==="wip")&&(
                     <div style={{marginTop:4}} onClick={e=>e.stopPropagation()}>
+                      {col.id==="wip"&&(
+                        <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:11,padding:"5px 0"}}
+                          onClick={()=>{ setJobDetailTab("quote"); setActiveJob(job); setView("job"); }}>📝 Quote</button>
+                      )}
                       {col.nextStatus&&(()=>{
                         const hasQuote = col.id==="wip" ? !!jobQuote(job.id) : true;
                         return (<>
-                          <button className="btn btn-xs" style={{width:"100%",fontSize:11,padding:"5px 0",opacity:hasQuote?1:0.45,cursor:hasQuote?"pointer":"not-allowed"}}
+                          <button className="btn btn-xs" style={{width:"100%",fontSize:11,padding:"5px 0",marginTop:col.id==="wip"?4:0,opacity:hasQuote?1:0.45,cursor:hasQuote?"pointer":"not-allowed"}}
                             disabled={!hasQuote}
                             onClick={()=>hasQuote&&moveJobStatus(job,col.nextStatus)}>{col.nextLabel}</button>
                           {!hasQuote&&<div style={{fontSize:10,color:"var(--yellow)",textAlign:"center",marginTop:3}}>⚠ Quote required first</div>}
                         </>);
                       })()}
-                      {col.id==="wip"&&(
-                        <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:11,padding:"5px 0",marginTop:4}}
-                          onClick={()=>{ setJobDetailTab("quote"); setActiveJob(job); setView("job"); }}>📝 Quote</button>
-                      )}
                       {canInvoice&&(
                         <button className="btn btn-xs btn-primary" style={{width:"100%",fontSize:11,padding:"5px 0"}}
                           onClick={()=>{ setKanbanInvJob(job); setTimeout(()=>kanbanInvPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),80); }}>🧾 Invoice</button>

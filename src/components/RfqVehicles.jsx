@@ -1783,6 +1783,31 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
             <span style={{fontSize:15}}>☁️</span>
             <span>Drive</span>
           </button>
+          {/* Option 4 — Paste from clipboard */}
+          <button className="btn btn-ghost btn-xs"
+            style={{flex:1,padding:"5px 4px",fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}
+            title="Paste image from clipboard"
+            onClick={async e=>{
+              e.stopPropagation();
+              try{
+                const items = await navigator.clipboard.read();
+                for(const item of items){
+                  const imgType = item.types.find(t=>t.startsWith("image/"));
+                  if(imgType){
+                    const blob = await item.getType(imgType);
+                    const file = new File([blob], `${viewName||label||"photo"}.png`, {type:imgType});
+                    upload(file);
+                    return;
+                  }
+                }
+                alert("No image found in clipboard — copy an image first.");
+              }catch{
+                fileRef.current?.click();
+              }
+            }}>
+            <span style={{fontSize:15}}>📋</span>
+            <span>Paste</span>
+          </button>
           {/* Remove */}
           {url && (
             <button className="btn btn-ghost btn-xs"

@@ -71,6 +71,18 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
   const ST_BG    = {"Pending":"rgba(96,165,250,.12)","In Progress":"rgba(251,191,36,.12)","Done":"rgba(52,211,153,.12)","Delivered":"rgba(100,116,139,.12)"};
 
+  const kanbanSt = (job) => {
+    if (job.is_problem)                          return {label:"⚠️ Problem Job",       color:"#f87171", bg:"rgba(248,113,113,.15)"};
+    const inv = jobInvoice(job.id);
+    if (inv?.status==="paid")                    return {label:"💚 Payment Received",   color:"#10b981", bg:"rgba(16,185,129,.15)"};
+    if (inv)                                     return {label:"🧾 Invoiced",           color:"#f97316", bg:"rgba(249,115,22,.15)"};
+    if (job.status==="Pending")                  return {label:"⏳ Pending",            color:"#a78bfa", bg:"rgba(167,139,250,.15)"};
+    if (job.status==="In Progress")              return {label:"⚙️ In Progress",        color:"#fbbf24", bg:"rgba(251,191,36,.15)"};
+    if (job.status==="Done")                     return {label:"✅ Done",               color:"#34d399", bg:"rgba(52,211,153,.15)"};
+    if (job.status==="Delivered")                return {label:"🚗 Delivered",          color:"#94a3b8", bg:"rgba(148,163,184,.15)"};
+    return                                              {label:job.status,              color:"var(--text3)", bg:"var(--surface2)"};
+  };
+
   const wsProfileMap  = Object.fromEntries(wsProfiles.map(p=>[p.id, p.name||p.id]));
   const wsProfileMap2 = Object.fromEntries(wsProfiles.map(p=>[p.id, p]));
   const wsCities      = [...new Set(wsProfiles.map(p=>p.city).filter(Boolean))].sort();
@@ -294,8 +306,9 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             const jq=jobQuote(j.id);
             const total=jItems.reduce((s,i)=>s+(+i.total||0),0);
             const frontPhoto=wsVehicles.find(v=>v.id===j.workshop_vehicle_id)?.photo_front||"";
+            const kst = kanbanSt(j);
             return (
-              <div key={j.id} className="card card-hover" style={{padding:0,cursor:"pointer",borderLeft:`3px solid ${ST_COLOR[j.status]||"var(--border)"}`,overflow:"hidden",display:"flex",minHeight:110}}
+              <div key={j.id} className="card card-hover" style={{padding:0,cursor:"pointer",borderLeft:`3px solid ${kst.color}`,overflow:"hidden",display:"flex",minHeight:110}}
                 onClick={()=>{setJobDetailTab("car");setActiveJob(j);setView("job");}}>
                 {/* Front photo */}
                 <div style={{width:64,flexShrink:0,background:"var(--surface2)",position:"relative",overflow:"hidden"}}>
@@ -314,7 +327,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                       <div style={{fontWeight:700,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.customer_name||<span style={{color:"var(--text3)"}}>No name</span>}</div>
                       <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{j.customer_phone}</div>
                     </div>
-                    <span className="badge" style={{background:ST_BG[j.status],color:ST_COLOR[j.status],flexShrink:0,marginLeft:6}}>{j.status}</span>
+                    <span className="badge" style={{background:kst.bg,color:kst.color,flexShrink:0,marginLeft:6,fontWeight:600}}>{kst.label}</span>
                   </div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
                     {j.vehicle_reg&&<span className="badge" style={{background:"var(--surface2)",color:"var(--text)",fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700}}>🚗 {j.vehicle_reg}</span>}

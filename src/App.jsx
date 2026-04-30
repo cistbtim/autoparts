@@ -1036,6 +1036,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     };
     const res=await api.patch("workshop_bookings","id",id,patch).catch(e=>{console.error("Delete booking failed:",e);return null;});
     if(res&&!Array.isArray(res)&&res.message) console.error("Delete booking DB error:",res.message);
+    if(Array.isArray(res)&&res.length===0) console.warn("Delete booking: 0 rows updated — check Supabase RLS on workshop_bookings");
     setWsBookings(p=>p.map(b=>b.id===id?{...b,...patch}:b));
   };
 

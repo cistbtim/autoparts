@@ -452,7 +452,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
               <div className="card" style={{marginBottom:5,padding:0,overflow:"hidden"}}
                 onClick={()=>{setJobDetailTab("car");setActiveJob(job);setView("job");}}>
                 {fp&&<div style={{background:"var(--surface2)"}}>
-                  <img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:52,objectFit:"cover",display:"block"}}
+                  <img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:80,objectFit:"contain",display:"block"}}
                     onError={e=>{e.target.parentNode.style.display="none";}}/>
                 </div>}
                 <div style={{padding:"7px 8px"}}>

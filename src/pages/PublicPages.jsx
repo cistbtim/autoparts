@@ -1095,6 +1095,10 @@ export function WorkshopBookingPage({token}) {
       alert("Please fill in your name, phone number, and describe the problem.");
       return;
     }
+    if(problemPhotos.some(p=>p?.status==="uploading")){
+      alert("Please wait for photos to finish uploading.");
+      return;
+    }
     setSubmitting(true);
     try{
       const id="WB-"+Date.now()+"-"+Math.floor(Math.random()*9000+1000);
@@ -1325,10 +1329,12 @@ export function WorkshopBookingPage({token}) {
             <input style={inp} type="date" value={prefDate} onChange={e=>setPrefDate(e.target.value)}
               min={new Date().toISOString().slice(0,10)}/>
           </div>
-          <button style={{...mkBtn(submitting?"#334155":CL.accent),opacity:submitting?0.7:1}}
-            onClick={submit} disabled={submitting}>
-            {submitting?"⏳ Submitting…":"📅 Submit Booking Request"}
+          {(()=>{const photosUploading=problemPhotos.some(p=>p?.status==="uploading");return(
+          <button style={{...mkBtn((submitting||photosUploading)?"#334155":CL.accent),opacity:(submitting||photosUploading)?0.7:1}}
+            onClick={submit} disabled={submitting||photosUploading}>
+            {photosUploading?"📤 Uploading photos…":submitting?"⏳ Submitting…":"📅 Submit Booking Request"}
           </button>
+          );})()}
         </div>
 
         <div style={{textAlign:"center",paddingBottom:20}}>

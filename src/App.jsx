@@ -785,29 +785,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const saveWorkshopInvoice=async(inv)=>{
     const {id,...rest}=inv;
     const payload={...rest, id:id||makeId("WSI"), workshop_id:wsId||null};
-    console.log("[saveWorkshopInvoice] inserting:", payload);
-    let res;
-    try{
-      const r=await fetch(`${SUPABASE_URL}/rest/v1/workshop_invoices`,{
-        method:"POST",
-        headers:H({Prefer:"return=representation"}),
-        body:JSON.stringify(payload),
-      });
-      const text=await r.text();
-      console.log("[saveWorkshopInvoice] status:", r.status, "body:", text);
-      res=text?JSON.parse(text):null;
-      if(!r.ok){
-        const msg=res?.message||res?.error||text||`HTTP ${r.status}`;
-        const detail=res?.details?`\nDetails: ${res.details}`:"";
-        const hint=res?.hint?`\nHint: ${res.hint}`:"";
-        throw new Error(`${msg}${detail}${hint}`);
-      }
-    }catch(e){
-      if(e.message.startsWith("HTTP ")||e.message.includes("\n")||e.message.includes("Details")){
-        throw e;
-      }
-      throw new Error("Network/parse error: "+e.message);
-    }
+    const res=await api.insert("workshop_invoices",payload);
+    if(res&&!Array.isArray(res)&&(res.code||res.message))
+      throw new Error(res.message||res.hint||res.code);
     await api.patch("workshop_jobs","id",inv.job_id,{status:"Done"});
     await refreshWorkshopData(); showToast("Invoice created");
   };
@@ -1048,10 +1028,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   const deleteWsBooking=async(id,meta={})=>{
+    await api.patch("workshop_bookings","id",id,{status:"deleted"}).catch(e=>console.warn("Delete booking status failed:",e));
+    await api.patch("workshop_bookings","id",id,{
+      deleted_by:meta.deleted_by||"",
+      deleted_reason:meta.deleted_reason||"",
+      deleted_at:new Date().toISOString(),
+    }).catch(()=>{});
     const patch={status:"deleted",deleted_by:meta.deleted_by||"",deleted_reason:meta.deleted_reason||"",deleted_at:new Date().toISOString()};
-    await api.patch("workshop_bookings","id",id,patch).catch(e=>console.warn("Delete booking failed:",e));
-    setWsBookings(p=>p.map(b=>b.id===id?{...b,...patch}:b)); return;
-    setWsBookings(p=>p.filter(b=>b.id!==id));
+    setWsBookings(p=>p.map(b=>b.id===id?{...b,...patch}:b));
   };
 
   const refreshWsBookings=async()=>{

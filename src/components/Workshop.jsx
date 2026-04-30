@@ -221,7 +221,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         )}
       </div>
 
-      {/* ── Sub-navigation ── */}
+      {/* ── Sub-navigation (desktop) ── */}
       <div className="hide-mobile" style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
         {WS_TABS.map(([v,label,cnt])=>(
           <button key={v} onClick={()=>setWsTab(v)} style={{
@@ -234,6 +234,14 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             {label}{cnt!==null&&<span style={{marginLeft:5,opacity:.55,fontSize:11,fontWeight:400}}>{cnt}</span>}
           </button>
         ))}
+      </div>
+      {/* ── Sub-navigation (mobile dropdown) ── */}
+      <div className="show-mobile" style={{marginBottom:14}}>
+        <select className="inp" value={wsTab} onChange={e=>setWsTab(e.target.value)} style={{width:"100%",fontWeight:600}}>
+          {WS_TABS.map(([v,label,cnt])=>(
+            <option key={v} value={v}>{label}{cnt!=null?` (${cnt})`:""}</option>
+          ))}
+        </select>
       </div>
 
       {/* ══════════════ JOBS TAB ══════════════ */}

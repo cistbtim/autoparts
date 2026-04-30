@@ -53,12 +53,14 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface3);border:1px solid var(--border2);color:var(--text);padding:11px 22px;border-radius:99px;font-size:14px;font-weight:500;z-index:999;white-space:nowrap;box-shadow:var(--shadow-lg);animation:fadeUp .25s ease}
 /* landscape hint removed — app works in portrait mode */
 .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:6px 4px;z-index:100;gap:1px}
+.show-mobile{display:none}
 @media(max-width:767px){
   .mobile-nav{display:flex}.sidebar{display:none!important}
   .main-content{margin-left:0!important;padding:12px!important;padding-bottom:76px!important}
   .page-header{flex-direction:column;align-items:flex-start;gap:10px}
   .grid-4{grid-template-columns:1fr 1fr!important}
   .hide-mobile{display:none!important}
+  .show-mobile{display:block!important}
   .toast{bottom:80px}
   .modal{border-radius:var(--radius) var(--radius) 0 0;max-height:88vh}
   .tbl th,.tbl td{padding:9px 10px;font-size:13px}

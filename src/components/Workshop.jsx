@@ -451,12 +451,28 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             return (
               <div className="card" style={{marginBottom:5,padding:0,overflow:"hidden"}}
                 onClick={()=>{setJobDetailTab(col.id==="invoiced"||col.id==="paid"?"invoice":"car");setActiveJob(job);setView("job");}}>
-                <div style={{position:"relative",background:"var(--surface2)",minHeight:fp?undefined:0}}>
-                  {fp&&<img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:80,objectFit:"contain",display:"block"}}
-                    onError={e=>{e.target.style.display="none";}}/>}
+                <div style={{position:"relative",background:"var(--surface2)",minHeight:80}}>
+                  {fp
+                    ? <img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:80,objectFit:"contain",display:"block"}}
+                        onError={e=>{e.target.style.display="none";}}/>
+                    : <div style={{height:80,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2}}>
+                        <svg width="38" height="22" viewBox="0 0 38 22" fill="none" xmlns="http://www.w3.org/2000/svg" style={{opacity:.25}}>
+                          <rect x="1" y="9" width="36" height="11" rx="3" fill="currentColor"/>
+                          <path d="M7 9L11 2h16l4 7" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                          <circle cx="9" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
+                          <circle cx="29" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
+                        </svg>
+                        <span style={{fontSize:9,color:"var(--text3)",fontWeight:600,letterSpacing:".06em",textTransform:"uppercase",opacity:.6}}>No Photo</span>
+                      </div>
+                  }
                   {job.vehicle_reg&&(
                     <div style={{position:"absolute",bottom:4,left:4,background:"rgba(0,0,0,.65)",backdropFilter:"blur(2px)",borderRadius:4,padding:"2px 7px"}}>
                       <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:11,color:"#fff"}}>{job.vehicle_reg}</code>
+                    </div>
+                  )}
+                  {job.customer_name&&(
+                    <div style={{position:"absolute",bottom:4,right:4,background:"rgba(0,0,0,.65)",backdropFilter:"blur(2px)",borderRadius:4,padding:"2px 8px",maxWidth:"58%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      <span style={{fontFamily:"DM Sans,sans-serif",fontWeight:700,fontSize:11,color:"#fff"}}>{job.customer_name}</span>
                     </div>
                   )}
                   <div style={{position:"absolute",top:4,right:4,display:"flex",gap:3}}>
@@ -471,11 +487,15 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   </div>
                 </div>
                 <div style={{padding:"7px 8px"}}>
-                  {!fp&&job.vehicle_reg&&<code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:11,color:"var(--accent)",display:"block",marginBottom:2}}>{job.vehicle_reg}</code>}
-                  <div style={{fontWeight:600,fontSize:12,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name||"—"}</div>
-                  {(job.vehicle_make||job.vehicle_model)&&<div style={{fontSize:10,color:"var(--text3)",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}</div>}
+                  {(job.vehicle_make||job.vehicle_model||job.vehicle_year)&&(
+                    <div style={{textAlign:"center",marginBottom:5}}>
+                      <span style={{display:"inline-block",fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.22)",borderRadius:99,padding:"2px 10px",letterSpacing:".03em",textTransform:"uppercase",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        {[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}
+                      </span>
+                    </div>
+                  )}
                   {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:3,background:"#ef4444",borderRadius:5,padding:"3px 7px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {job.complaint}</div>}
-                  {job.notes&&<div style={{fontSize:10,color:"var(--text2)",marginBottom:3,padding:"2px 6px",background:"var(--surface3)",borderRadius:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📝 {job.notes}</div>}
+                  {job.notes&&<div style={{fontSize:10,color:"#b45309",fontWeight:700,fontStyle:"italic",marginBottom:3,padding:"2px 6px",background:"rgba(251,191,36,.18)",border:"1px solid rgba(251,191,36,.35)",borderRadius:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📝 {job.notes}</div>}
                   {inv&&wsRole!=="mechanic"&&<div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:3}}>
                     <span style={{color:"var(--text3)"}}>Invoice</span>
                     <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
@@ -3014,12 +3034,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             {job.parent_job_id&&<div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Original job: <code style={{fontFamily:"DM Mono,monospace"}}>{job.parent_job_id}</code></div>}
           </div>}
           {/* ── Inline Remark / Note ── */}
-          <div style={{marginBottom:10,padding:"8px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8}}>
+          <div style={{marginBottom:10,padding:"8px 10px",background:"rgba(251,191,36,.08)",border:"1.5px solid rgba(251,191,36,.4)",borderRadius:8}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:noteEdit?6:0}}>
-              <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em"}}>📝 Remark / Note</div>
+              <div style={{fontSize:10,fontWeight:700,color:"#b45309",textTransform:"uppercase",letterSpacing:".06em"}}>📝 Remark / Note</div>
               {!noteEdit&&(
                 <button onClick={()=>setNoteEdit(true)}
-                  style={{fontSize:11,padding:"2px 8px",background:"var(--surface3)",border:"1px solid var(--border)",borderRadius:5,cursor:"pointer",color:"var(--text2)"}}>
+                  style={{fontSize:11,padding:"2px 8px",background:"rgba(251,191,36,.15)",border:"1px solid rgba(251,191,36,.4)",borderRadius:5,cursor:"pointer",color:"#b45309",fontWeight:600}}>
                   {noteVal?"✏️ Edit":"+ Add"}
                 </button>
               )}
@@ -3029,10 +3049,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                 <textarea
                   value={noteVal} onChange={e=>setNoteVal(e.target.value)}
                   placeholder="Add a remark or internal note..."
-                  style={{width:"100%",fontSize:13,padding:"6px 8px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface)",color:"var(--text)",resize:"vertical",minHeight:64,fontFamily:"DM Sans,sans-serif",outline:"none",boxSizing:"border-box"}}
+                  style={{width:"100%",fontSize:13,padding:"6px 8px",borderRadius:6,border:"1px solid rgba(251,191,36,.6)",background:"var(--surface)",color:"var(--text)",resize:"vertical",minHeight:64,fontFamily:"DM Sans,sans-serif",outline:"none",boxSizing:"border-box"}}
                   autoFocus/>
                 <div style={{display:"flex",gap:6,marginTop:6}}>
-                  <button className="btn btn-primary btn-sm" style={{flex:1}} disabled={savingNote}
+                  <button className="btn btn-sm" style={{flex:1,background:"#f59e0b",color:"#fff",border:"none"}} disabled={savingNote}
                     onClick={async()=>{
                       setSavingNote(true);
                       await onSaveJob({...job,notes:noteVal.trim()||null});
@@ -3043,8 +3063,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
               </>
             ):(
               noteVal
-                ?<div style={{fontSize:13,lineHeight:1.55,color:"var(--text)",marginTop:4}}>{noteVal}</div>
-                :<div style={{fontSize:12,color:"var(--text3)",marginTop:2,fontStyle:"italic"}}>No remark yet</div>
+                ?<div style={{fontSize:13,lineHeight:1.55,color:"#b45309",marginTop:4,fontWeight:700,fontStyle:"italic"}}>{noteVal}</div>
+                :<div style={{fontSize:12,color:"#b45309",marginTop:2,fontStyle:"italic",opacity:.7}}>No remark yet</div>
             )}
           </div>
 

@@ -3420,6 +3420,26 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           const getSupCosts = (desc) => supCostMap[(desc||"").toLowerCase().trim()] || [];
 
           return (<>
+        {/* ── Complaint & Notes summary ── */}
+        {(job.complaint||job.notes)&&(
+          <div style={{marginBottom:12,display:"flex",flexDirection:"column",gap:6}}>
+            {job.complaint&&(
+              <div style={{borderRadius:8,overflow:"hidden",border:"2px solid #ef4444"}}>
+                <div style={{background:"#ef4444",padding:"4px 10px",display:"flex",alignItems:"center",gap:5}}>
+                  <span style={{fontSize:12}}>⚠️</span>
+                  <span style={{fontSize:10,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".07em"}}>Customer Complaint</span>
+                </div>
+                <div style={{padding:"8px 10px",background:"var(--surface2)",fontSize:13,fontWeight:600,color:"var(--text)",lineHeight:1.5}}>{job.complaint}</div>
+              </div>
+            )}
+            {job.notes&&(
+              <div style={{padding:"8px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8}}>
+                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:3}}>📝 Notes</div>
+                <div style={{fontSize:12,color:"var(--text2)",lineHeight:1.5}}>{job.notes}</div>
+              </div>
+            )}
+          </div>
+        )}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <div style={{fontWeight:700,fontSize:14}}>🔧 {t.wsqtPartsLabour}</div>
           <div style={{display:"flex",gap:6}}>

@@ -3859,11 +3859,35 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           📝 Create Quotation for Customer
         </button>
       )}
-      {quote&&!["Done","Delivered"].includes(job.status)&&(
-        <button className="btn btn-success" style={{width:"100%",padding:11,fontSize:14,fontWeight:700,marginTop:4}}
-          onClick={()=>onSaveJob({...job,status:"Done"})}>
-          ✅ Mark Job as Done
-        </button>
+      {quote&&(
+        <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:8}}>
+          {/* Step 1 — Done */}
+          {!["Done","Delivered"].includes(job.status)&&(
+            <button className="btn btn-success" style={{width:"100%",padding:11,fontSize:14,fontWeight:700}}
+              onClick={()=>onSaveJob({...job,status:"Done"})}>
+              ✅ Mark Job as Done
+            </button>
+          )}
+          {/* Step 2 — Create Invoice (job done, no invoice yet) */}
+          {["Done","Delivered"].includes(job.status)&&!invoice&&(
+            <button className="btn btn-primary" style={{width:"100%",padding:11,fontSize:14,fontWeight:700}}
+              onClick={()=>{ setQuoteSrcForInv(quote); setCreatingInv(true); }}>
+              🧾 Create Invoice
+            </button>
+          )}
+          {/* Step 3 — Payment (invoice exists and not fully paid) */}
+          {invoice&&invoice.status!=="paid"&&(
+            <button className="btn btn-success" style={{width:"100%",padding:11,fontSize:14,fontWeight:700}}
+              onClick={()=>setPaymentModal(true)}>
+              💳 Record Payment
+            </button>
+          )}
+          {invoice&&invoice.status==="paid"&&(
+            <div style={{textAlign:"center",padding:"10px",background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",borderRadius:8,fontSize:13,fontWeight:700,color:"var(--green)"}}>
+              ✅ Fully Paid
+            </div>
+          )}
+        </div>
       )}
       </>)}
 

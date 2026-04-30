@@ -634,11 +634,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const chk=(r,label)=>{ if(r&&!Array.isArray(r)&&r.message){ throw new Error(`${label}: ${r.message}`); } return r; };
     try {
       let d={...data};
-      // Auto-create workshop_customer if not linked yet
+      // Auto-create workshop_customer if not linked yet — dedup by name first
       if(!d.workshop_customer_id && d.customer_name?.trim()){
-        const custId=makeId("WSC");
-        chk(await api.insert("workshop_customers",{id:custId,name:d.customer_name.trim(),phone:d.customer_phone||"",email:d.customer_email||"",workshop_id:wsId||null}),"Save customer");
-        d.workshop_customer_id=custId;
+        const nameNorm=d.customer_name.trim().toLowerCase();
+        const existing=workshopCustomers.find(c=>c.name?.trim().toLowerCase()===nameNorm);
+        if(existing){
+          d.workshop_customer_id=existing.id;
+        } else {
+          const custId=makeId("WSC");
+          chk(await api.insert("workshop_customers",{id:custId,name:d.customer_name.trim(),phone:d.customer_phone||"",email:d.customer_email||"",workshop_id:wsId||null}),"Save customer");
+          d.workshop_customer_id=custId;
+        }
       }
       // Auto-create workshop_vehicle if not linked yet, or if the linked ID no longer exists
       const vehicleExists=d.workshop_vehicle_id&&workshopVehicles.some(v=>v.id===d.workshop_vehicle_id);
@@ -646,8 +652,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         const vehId=makeId("WSV");
         chk(await api.insert("workshop_vehicles",{id:vehId,workshop_customer_id:d.workshop_customer_id||null,reg:d.vehicle_reg.trim(),make:d.vehicle_make||"",model:d.vehicle_model||"",year:d.vehicle_year||"",color:d.vehicle_color||"",vin:d.vin||"",engine_no:d.engine_no||"",licence_disc_expiry:d.licence_disc_expiry||null,workshop_id:wsId||null}),"Save vehicle");
         d.workshop_vehicle_id=vehId;
-      } else if(d.workshop_vehicle_id && d.licence_disc_expiry) {
-        await api.patch("workshop_vehicles","id",d.workshop_vehicle_id,{licence_disc_expiry:d.licence_disc_expiry}).catch(()=>{});
+      } else if(vehicleExists){
+        // Keep vehicle's customer link in sync with the job's customer
+        const vPatch={workshop_customer_id:d.workshop_customer_id||null};
+        if(d.licence_disc_expiry) vPatch.licence_disc_expiry=d.licence_disc_expiry;
+        await api.patch("workshop_vehicles","id",d.workshop_vehicle_id,vPatch).catch(()=>{});
       }
       // Build job record — empty strings → null so Supabase doesn't choke on typed columns
       const str=v=>v?.toString().trim()||null;

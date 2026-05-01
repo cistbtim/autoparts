@@ -20,6 +20,8 @@ input,select,textarea{outline:none;font-family:'DM Sans',sans-serif}
 select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
 .card-hover:hover{border-color:var(--border2)}
+.kb-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:box-shadow .18s,transform .15s,border-color .18s}
+.kb-card:hover{box-shadow:0 8px 28px rgba(0,0,0,.4);transform:translateY(-2px);border-color:var(--border2)}
 .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
 .tbl{width:100%;border-collapse:collapse}
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;position:relative}

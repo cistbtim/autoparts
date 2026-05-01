@@ -474,35 +474,38 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           const probCol = jobs.filter(j=>j.is_problem);
 
           const COLS = [
-            {id:"booking",  label:"🗓️ Booking",          color:"#60a5fa", items:bkCol,   type:"booking"},
-            {id:"pending",  label:"⏳ Pending",            color:"#a78bfa", items:pendCol, type:"job", nextStatus:"In Progress", nextLabel:"▶ Start"},
-            {id:"wip",      label:"⚙️ In Progress",        color:"#fbbf24", items:wipCol,  type:"job", nextStatus:"Done",        nextLabel:"✅ Done"},
-            {id:"done",     label:"✅ Done",               color:"#34d399", items:doneCol, type:"job"},
-            {id:"invoiced", label:"🧾 Invoiced",            color:"#f97316", items:invCol,  type:"job"},
-            {id:"paid",     label:"💚 Payment Received",    color:"#10b981", items:paidCol, type:"job"},
-            {id:"problem",  label:"⚠️ Problem Job",         color:"#f87171", items:probCol, type:"job"},
+            {id:"booking",  label:"Booking",          color:"#60a5fa", items:bkCol,   type:"booking"},
+            {id:"pending",  label:"Pending",           color:"#a78bfa", items:pendCol, type:"job", nextStatus:"In Progress", nextLabel:"▶ Start"},
+            {id:"wip",      label:"In Progress",       color:"#fbbf24", items:wipCol,  type:"job", nextStatus:"Done",        nextLabel:"✓ Mark Done"},
+            {id:"done",     label:"Done",              color:"#34d399", items:doneCol, type:"job"},
+            {id:"invoiced", label:"Invoiced",          color:"#f97316", items:invCol,  type:"job"},
+            {id:"paid",     label:"Payment Received",  color:"#10b981", items:paidCol, type:"job"},
+            {id:"problem",  label:"Problem Job",       color:"#f87171", items:probCol, type:"job"},
           ];
 
           const BkCard = ({b}) => (
-            <div className="card" style={{marginBottom:8,padding:10,fontSize:13}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:5}}>
-                <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13,color:"var(--accent)"}}>{b.vehicle_reg||"—"}</code>
-                {b.preferred_date&&<span style={{fontSize:10,color:"#60a5fa",flexShrink:0}}>📅 {b.preferred_date}</span>}
-              </div>
-              <div style={{fontWeight:600,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.customer_name}</div>
-              <div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>{b.customer_phone}</div>
-              {b.complaint&&<div style={{fontSize:11,color:"var(--text2)",background:"var(--surface)",borderRadius:6,padding:"3px 7px",marginBottom:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🔧 {b.complaint}</div>}
-              {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).length>0&&(
-                <div style={{display:"flex",gap:4,marginBottom:7}}>
-                  {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).map((url,i)=>(
-                    <a key={i} href={url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-                      <img src={url} alt="" style={{width:40,height:40,objectFit:"cover",borderRadius:5,border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
-                    </a>
-                  ))}
+            <div className="kb-card" style={{marginBottom:8}}>
+              <div style={{height:3,background:"#60a5fa"}}/>
+              <div style={{padding:"10px 11px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:4,marginBottom:5}}>
+                  <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13,color:"#60a5fa"}}>{b.vehicle_reg||"—"}</code>
+                  {b.preferred_date&&<span style={{fontSize:10,color:"#60a5fa",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.22)",borderRadius:99,padding:"2px 7px",flexShrink:0,whiteSpace:"nowrap"}}>📅 {b.preferred_date}</span>}
                 </div>
-              )}
-              <button className="btn btn-primary btn-sm" style={{width:"100%",fontSize:11,padding:"5px 0"}}
-                onClick={()=>confirmBooking(b)}>➕ Create Job</button>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.customer_name}</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>{b.customer_phone}</div>
+                {b.complaint&&<div style={{fontSize:11,color:"var(--text2)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 8px",marginBottom:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🔧 {b.complaint}</div>}
+                {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).length>0&&(
+                  <div style={{display:"flex",gap:4,marginBottom:7}}>
+                    {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).map((url,i)=>(
+                      <a key={i} href={url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+                        <img src={url} alt="" style={{width:44,height:44,objectFit:"cover",borderRadius:7,border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
+                      </a>
+                    ))}
+                  </div>
+                )}
+                <button className="btn btn-primary btn-sm" style={{width:"100%",fontSize:11,padding:"5px 0"}}
+                  onClick={()=>confirmBooking(b)}>+ Create Job</button>
+              </div>
             </div>
           );
 
@@ -514,90 +517,94 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             const canUnflag = col.id==="problem";
             const canInvoice= col.id==="done";
             return (
-              <div className="card" style={{marginBottom:5,padding:0,overflow:"hidden"}}
+              <div className="kb-card"
                 onClick={()=>{setJobDetailTab(col.id==="invoiced"||col.id==="paid"?"invoice":"car");setActiveJob(job);setView("job");}}>
-                <div style={{position:"relative",background:"var(--surface2)",minHeight:80}}>
+                <div style={{height:3,background:col.color}}/>
+                <div style={{position:"relative",height:90,background:"var(--surface2)",overflow:"hidden"}}>
                   {fp
-                    ? <img src={toImgUrl(fp)} alt="car" style={{width:"100%",maxHeight:80,objectFit:"contain",display:"block"}}
-                        onError={e=>{e.target.style.display="none";}}/>
-                    : <div style={{height:80,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2}}>
-                        <svg width="38" height="22" viewBox="0 0 38 22" fill="none" xmlns="http://www.w3.org/2000/svg" style={{opacity:.25}}>
+                    ? <>
+                        <img src={toImgUrl(fp)} alt="car" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+                          onError={e=>{e.target.style.display="none";}}/>
+                        <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.72) 0%,rgba(0,0,0,.08) 55%,transparent 100%)"}}/>
+                      </>
+                    : <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"linear-gradient(135deg,var(--surface2) 0%,var(--surface3) 100%)"}}>
+                        <svg width="42" height="25" viewBox="0 0 38 22" fill="none" xmlns="http://www.w3.org/2000/svg" style={{opacity:.2}}>
                           <rect x="1" y="9" width="36" height="11" rx="3" fill="currentColor"/>
                           <path d="M7 9L11 2h16l4 7" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
                           <circle cx="9" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
                           <circle cx="29" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
                         </svg>
-                        <span style={{fontSize:9,color:"var(--text3)",fontWeight:600,letterSpacing:".06em",textTransform:"uppercase",opacity:.6}}>No Photo</span>
+                        <span style={{fontSize:9,color:"var(--text3)",fontWeight:600,letterSpacing:".08em",textTransform:"uppercase"}}>No Photo</span>
                       </div>
                   }
                   {job.vehicle_reg&&(
-                    <div style={{position:"absolute",bottom:4,left:4,background:"rgba(0,0,0,.65)",backdropFilter:"blur(2px)",borderRadius:4,padding:"2px 7px"}}>
+                    <div style={{position:"absolute",bottom:6,left:7,background:"rgba(0,0,0,.6)",backdropFilter:"blur(6px)",borderRadius:5,padding:"2px 8px",border:"1px solid rgba(255,255,255,.12)"}}>
                       <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:11,color:"#fff"}}>{job.vehicle_reg}</code>
                     </div>
                   )}
                   {job.customer_name&&(
-                    <div style={{position:"absolute",bottom:4,right:4,background:"rgba(0,0,0,.65)",backdropFilter:"blur(2px)",borderRadius:4,padding:"2px 8px",maxWidth:"58%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      <span style={{fontFamily:"DM Sans,sans-serif",fontWeight:700,fontSize:11,color:"#fff"}}>{job.customer_name}</span>
+                    <div style={{position:"absolute",bottom:6,right:7,background:"rgba(0,0,0,.6)",backdropFilter:"blur(6px)",borderRadius:5,padding:"2px 8px",maxWidth:"55%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",border:"1px solid rgba(255,255,255,.1)"}}>
+                      <span style={{fontWeight:700,fontSize:11,color:"#fff"}}>{job.customer_name}</span>
                     </div>
                   )}
-                  <div style={{position:"absolute",top:4,right:4,display:"flex",gap:3}}>
-                    {srcBk&&(
-                      <span style={{padding:"1px 5px",background:"rgba(96,165,250,.85)",color:"#fff",borderRadius:4,fontSize:9,fontWeight:700,letterSpacing:".04em"}}>🌐 Online</span>
-                    )}
+                  <div style={{position:"absolute",top:6,right:6,display:"flex",gap:3}} onClick={e=>e.stopPropagation()}>
+                    {srcBk&&<span style={{padding:"2px 6px",background:"rgba(96,165,250,.9)",color:"#fff",borderRadius:4,fontSize:9,fontWeight:700,letterSpacing:".04em",backdropFilter:"blur(4px)"}}>🌐 Online</span>}
                     {canFlag&&(
-                      <button title="Flag as Problem" style={{padding:"1px 4px",border:"1px solid rgba(248,113,113,.3)",background:"rgba(0,0,0,.5)",color:"#f87171",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1}}
+                      <button title="Flag as Problem" style={{padding:"2px 5px",border:"1px solid rgba(248,113,113,.35)",background:"rgba(0,0,0,.55)",color:"#f87171",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
                         onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>
                     )}
                     {canUnflag&&(
-                      <button title="Return to previous stage" style={{padding:"1px 4px",border:"1px solid rgba(52,211,153,.3)",background:"rgba(0,0,0,.5)",color:"#34d399",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1}}
+                      <button title="Return to previous stage" style={{padding:"2px 5px",border:"1px solid rgba(52,211,153,.35)",background:"rgba(0,0,0,.55)",color:"#34d399",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
                         onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>
                     )}
                   </div>
                 </div>
-                <div style={{padding:"7px 8px"}}>
+                <div style={{padding:"8px 10px"}}>
                   {(job.vehicle_make||job.vehicle_model||job.vehicle_year)&&(
-                    <div style={{textAlign:"center",marginBottom:5}}>
-                      <span style={{display:"inline-block",fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.22)",borderRadius:99,padding:"2px 10px",letterSpacing:".03em",textTransform:"uppercase",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    <div style={{textAlign:"center",marginBottom:6}}>
+                      <span style={{display:"inline-block",fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.2)",borderRadius:99,padding:"2px 10px",letterSpacing:".03em",textTransform:"uppercase",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                         {[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}
                       </span>
                     </div>
                   )}
-                  {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:3,background:"#ef4444",borderRadius:5,padding:"3px 7px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {job.complaint}</div>}
-                  {job.notes&&<div style={{fontSize:10,color:"#b45309",fontWeight:700,fontStyle:"italic",marginBottom:3,padding:"2px 6px",background:"rgba(251,191,36,.18)",border:"1px solid rgba(251,191,36,.35)",borderRadius:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📝 {job.notes}</div>}
+                  {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#ef4444",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {job.complaint}</div>}
+                  {job.notes&&<div style={{fontSize:10,color:"#b45309",fontWeight:700,fontStyle:"italic",marginBottom:4,padding:"3px 7px",background:"rgba(251,191,36,.18)",border:"1px solid rgba(251,191,36,.35)",borderRadius:5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📝 {job.notes}</div>}
                   {srcBk&&job.customer_phone&&(
-                    <div style={{display:"flex",gap:4,marginBottom:3}} onClick={e=>e.stopPropagation()}>
-                      <a href={`tel:${job.customer_phone}`} className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"3px 0",textDecoration:"none",textAlign:"center",color:"var(--blue)"}}>📞 Call</a>
+                    <div style={{display:"flex",gap:4,marginBottom:5}} onClick={e=>e.stopPropagation()}>
+                      <a href={`tel:${job.customer_phone}`} className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"4px 0",textDecoration:"none",textAlign:"center",color:"var(--blue)"}}>📞 Call</a>
                       <a href={`https://wa.me/${job.customer_phone.replace(/\D/g,"")}?text=${encodeURIComponent(`Hi ${(job.customer_name||"").split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}`}
-                        target="_blank" rel="noreferrer" className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"3px 0",textDecoration:"none",textAlign:"center",color:"#25D366"}}>
+                        target="_blank" rel="noreferrer" className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"4px 0",textDecoration:"none",textAlign:"center",color:"#25D366"}}>
                         📱 WhatsApp
                       </a>
                     </div>
                   )}
-                  {inv&&wsRole!=="mechanic"&&<div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:3}}>
-                    <span style={{color:"var(--text3)"}}>Invoice</span>
-                    <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
-                  </div>}
+                  {inv&&wsRole!=="mechanic"&&(
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,marginBottom:5,padding:"4px 8px",background:"var(--surface2)",borderRadius:6,border:"1px solid var(--border)"}}>
+                      <span style={{color:"var(--text3)",fontWeight:500}}>Invoice</span>
+                      <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
+                    </div>
+                  )}
                   {(col.nextStatus||canInvoice||col.id==="wip"||col.id==="invoiced")&&(
-                    <div style={{marginTop:3}} onClick={e=>e.stopPropagation()}>
+                    <div style={{marginTop:4}} onClick={e=>e.stopPropagation()}>
                       {col.id==="wip"&&(
-                        <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:10,padding:"4px 0"}}
+                        <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:10,padding:"5px 0",marginBottom:3}}
                           onClick={()=>{ setJobDetailTab("quote"); setActiveJob(job); setView("job"); }}>📝 Quote</button>
                       )}
                       {col.nextStatus&&(()=>{
                         const hasQuote = col.id==="wip" ? !!jobQuote(job.id) : true;
                         return (<>
-                          <button className="btn btn-xs" style={{width:"100%",fontSize:10,padding:"4px 0",marginTop:col.id==="wip"?3:0,opacity:hasQuote?1:0.45,cursor:hasQuote?"pointer":"not-allowed"}}
+                          <button className="btn btn-xs" style={{width:"100%",fontSize:10,padding:"5px 0",marginTop:col.id==="wip"?3:0,opacity:hasQuote?1:0.45,cursor:hasQuote?"pointer":"not-allowed"}}
                             disabled={!hasQuote}
                             onClick={()=>hasQuote&&moveJobStatus(job,col.nextStatus)}>{col.nextLabel}</button>
                           {!hasQuote&&<div style={{fontSize:9,color:"var(--yellow)",textAlign:"center",marginTop:2}}>⚠ Quote required</div>}
                         </>);
                       })()}
                       {canInvoice&&(
-                        <button className="btn btn-xs btn-primary" style={{width:"100%",fontSize:10,padding:"4px 0"}}
+                        <button className="btn btn-xs btn-primary" style={{width:"100%",fontSize:10,padding:"5px 0"}}
                           onClick={()=>{ setKanbanInvJob(job); setTimeout(()=>kanbanInvPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),80); }}>🧾 Invoice</button>
                       )}
                       {col.id==="invoiced"&&wsRole!=="mechanic"&&(
-                        <button className="btn btn-xs btn-success" style={{width:"100%",fontSize:10,padding:"4px 0"}}
+                        <button className="btn btn-xs btn-success" style={{width:"100%",fontSize:10,padding:"5px 0"}}
                           onClick={()=>setKanbanPayJob(job)}>💳 Payment</button>
                       )}
                     </div>
@@ -608,15 +615,23 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           };
 
           return (
-            <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:20,alignItems:"flex-start",marginLeft:-4,marginRight:-4,paddingLeft:4,paddingRight:4}}>
+            <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:24,alignItems:"flex-start",marginLeft:-4,marginRight:-4,paddingLeft:4,paddingRight:4}}>
               {COLS.map(col=>(
-                <div key={col.id} style={{minWidth:220,maxWidth:220,flexShrink:0,display:"flex",flexDirection:"column"}}>
-                  <div style={{borderRadius:"10px 10px 0 0",padding:"9px 12px",background:"var(--surface2)",borderTop:`3px solid ${col.color}`,display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:0}}>
-                    <span style={{fontWeight:700,fontSize:12}}>{col.label}</span>
-                    <span style={{background:`${col.color}28`,color:col.color,borderRadius:10,padding:"1px 8px",fontSize:11,fontWeight:700}}>{col.items.length}</span>
+                <div key={col.id} style={{minWidth:270,maxWidth:270,flexShrink:0,display:"flex",flexDirection:"column"}}>
+                  <div style={{borderRadius:"12px 12px 0 0",padding:"10px 14px",background:`linear-gradient(135deg,${col.color}1a 0%,${col.color}0a 100%)`,border:`1px solid ${col.color}35`,borderBottom:"none",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:col.color,boxShadow:`0 0 8px ${col.color}`,flexShrink:0}}/>
+                      <span style={{fontWeight:700,fontSize:12,letterSpacing:".01em"}}>{col.label}</span>
+                    </div>
+                    <span style={{background:`${col.color}22`,color:col.color,borderRadius:99,padding:"2px 9px",fontSize:11,fontWeight:700,minWidth:22,textAlign:"center"}}>{col.items.length}</span>
                   </div>
-                  <div style={{background:"var(--surface2)",opacity:1,borderRadius:"0 0 10px 10px",padding:6,minHeight:120,maxHeight:"calc(100vh - 240px)",overflowY:"auto"}}>
-                    {col.items.length===0&&<div style={{textAlign:"center",padding:"18px 4px",color:"var(--text3)",fontSize:11,fontStyle:"italic"}}>Empty</div>}
+                  <div style={{background:`${col.color}07`,border:`1px solid ${col.color}25`,borderTop:"none",borderRadius:"0 0 12px 12px",padding:"8px 7px",minHeight:160,maxHeight:"calc(100vh - 240px)",overflowY:"auto"}}>
+                    {col.items.length===0&&(
+                      <div style={{textAlign:"center",padding:"32px 10px",border:"1.5px dashed var(--border2)",borderRadius:10,margin:"2px 0"}}>
+                        <div style={{fontSize:24,marginBottom:6,opacity:.25}}>{col.id==="booking"?"🗓️":col.id==="paid"?"💳":col.id==="problem"?"⚠️":"📋"}</div>
+                        <div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic"}}>No items</div>
+                      </div>
+                    )}
                     {col.type==="booking"&&col.items.map(b=><BkCard key={b.id} b={b}/>)}
                     {col.type==="job"&&col.items.map(j=><JobCard key={j.id} job={j} col={col}/>)}
                   </div>
@@ -3002,27 +3017,49 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   return (
     <div className="fu">
       {/* ── Header ── */}
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}>
-        <button className="btn btn-ghost btn-sm" onClick={onBack}>{t.wsBack}</button>
-        {onRefresh&&(
-          <button className="btn btn-ghost btn-sm" disabled={refreshing}
-            onClick={async()=>{ setRefreshing(true); try{ await onRefresh(); }finally{ setRefreshing(false); } }}
-            style={{padding:"6px 10px",minWidth:32}}
-            title="Refresh">
-            <span style={{display:"inline-block",animation:refreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
-          </button>
-        )}
-        <div style={{flex:1,minWidth:0}}>
-          <h1 style={{fontSize:18,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name}</h1>
-          <div style={{fontSize:12,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap",marginTop:2}}>
-            <code style={{fontFamily:"DM Mono,monospace"}}>{job.id}</code>
-            <span>·</span><span>{job.date_in}</span>
-            {job.vehicle_reg&&<><span>·</span><strong>🚗 {job.vehicle_reg}</strong></>}
+      <div style={{marginBottom:12,borderRadius:12,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface)"}}>
+        {vehiclePhotos.front&&(
+          <div style={{position:"relative",height:110,overflow:"hidden"}}>
+            <img src={toImgUrl(vehiclePhotos.front)} alt="vehicle"
+              style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+              onError={e=>{e.target.style.display="none";}}/>
+            <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.18) 0%,rgba(0,0,0,.74) 100%)"}}/>
+            <div style={{position:"absolute",bottom:10,left:14,right:14,display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:8}}>
+              <div style={{minWidth:0}}>
+                {job.vehicle_reg&&<code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12,color:"rgba(255,255,255,.8)",display:"block",marginBottom:2}}>🚗 {job.vehicle_reg}</code>}
+                <h1 style={{fontSize:20,fontWeight:800,color:"#fff",margin:0,lineHeight:1.2,textShadow:"0 1px 6px rgba(0,0,0,.5)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name}</h1>
+              </div>
+              <span style={{background:ST_COLOR[job.status]||"var(--blue)",color:"#fff",borderRadius:8,padding:"4px 11px",fontSize:11,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",boxShadow:"0 2px 8px rgba(0,0,0,.35)"}}>
+                {tSt(job.status)}
+              </span>
+            </div>
           </div>
+        )}
+        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <button className="btn btn-ghost btn-sm" onClick={onBack}>{t.wsBack}</button>
+          {onRefresh&&(
+            <button className="btn btn-ghost btn-sm" disabled={refreshing}
+              onClick={async()=>{ setRefreshing(true); try{ await onRefresh(); }finally{ setRefreshing(false); } }}
+              style={{padding:"6px 10px",minWidth:32}} title="Refresh">
+              <span style={{display:"inline-block",animation:refreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
+            </button>
+          )}
+          <div style={{flex:1,minWidth:0}}>
+            {!vehiclePhotos.front&&<h1 style={{fontSize:18,fontWeight:800,margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>{job.customer_name}</h1>}
+            <div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
+              {!vehiclePhotos.front&&job.vehicle_reg&&(
+                <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12,color:"var(--accent)",background:"rgba(249,115,22,.1)",border:"1px solid rgba(249,115,22,.22)",borderRadius:6,padding:"2px 8px"}}>🚗 {job.vehicle_reg}</code>
+              )}
+              <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{job.id}</code>
+              <span style={{color:"var(--text3)",fontSize:11}}>· {job.date_in}</span>
+            </div>
+          </div>
+          {!vehiclePhotos.front&&(
+            <span style={{background:`${ST_COLOR[job.status]||"var(--blue)"}22`,color:ST_COLOR[job.status]||"var(--blue)",border:`1px solid ${ST_COLOR[job.status]||"var(--blue)"}44`,borderRadius:8,padding:"4px 11px",fontSize:12,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>
+              {tSt(job.status)}
+            </span>
+          )}
         </div>
-        <span className="badge" style={{background:"rgba(96,165,250,.12)",color:ST_COLOR[job.status]||"var(--blue)",fontSize:13,padding:"5px 12px",flexShrink:0}}>
-          {tSt(job.status)}
-        </span>
       </div>
 
       {/* ── Status pipeline bar ── */}
@@ -3043,25 +3080,38 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
         const showWa=(job.status==="Done"||job.status==="Delivered")&&phone;
         return (
           <div className="card" style={{padding:"10px 14px",marginBottom:12}}>
-            <div style={{display:"flex",gap:6,alignItems:"center",overflowX:"auto",flexWrap:"nowrap",paddingBottom:2,scrollbarWidth:"none"}}>
+            <div style={{display:"flex",alignItems:"flex-start",overflowX:"auto",scrollbarWidth:"none",gap:0,paddingBottom:6,paddingTop:2}}>
               {visibleStages.map((s,i)=>{
                 const active = activeKey===s.key;
+                const stageIdx = visibleStages.findIndex(st=>st.key===activeKey);
+                const done = i < stageIdx;
                 const clickable = !s.derived;
+                const short = s.key==="Payment Received"?"Paid":s.key==="In Progress"?"In Prog.":s.key;
                 return (
                   <span key={s.key} style={{display:"contents"}}>
-                    {i>0&&<span style={{color:"var(--text3)",fontSize:11,flexShrink:0}}>→</span>}
-                    <button
-                      disabled={!clickable}
-                      onClick={clickable?()=>onSaveJob({...job,status:s.key}):undefined}
-                      style={{
-                        border:`1.5px solid ${active?s.color:"var(--border)"}`,
-                        borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:600,cursor:clickable?"pointer":"default",
-                        background:active?s.bg:"transparent",
-                        color:active?s.color:"var(--text3)",
-                        fontFamily:"'DM Sans',sans-serif",flexShrink:0,
-                        transition:"all .15s",opacity:!clickable&&!active?0.5:1,
-                      }}
-                    >{s.label}</button>
+                    {i>0&&<div style={{flex:1,height:2,minWidth:8,maxWidth:32,marginTop:13,background:done?visibleStages[i-1].color:"var(--border)",transition:"background .3s",flexShrink:1,alignSelf:"flex-start"}}/>}
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flexShrink:0}}>
+                      <button
+                        disabled={!clickable}
+                        onClick={clickable?()=>onSaveJob({...job,status:s.key}):undefined}
+                        title={s.key}
+                        style={{
+                          width:28,height:28,borderRadius:"50%",padding:0,
+                          border:`2px solid ${active||done?s.color:"var(--border2)"}`,
+                          background:done?s.color:active?s.color:"var(--surface2)",
+                          color:done||active?"#fff":"var(--text3)",
+                          cursor:clickable?"pointer":"default",
+                          display:"flex",alignItems:"center",justifyContent:"center",
+                          fontSize:done?13:11,fontWeight:700,
+                          boxShadow:active?`0 0 14px ${s.color}80`:"none",
+                          transition:"all .2s",fontFamily:"DM Sans,sans-serif",flexShrink:0,
+                        }}>
+                        {done?"✓":i+1}
+                      </button>
+                      <span style={{fontSize:9,fontWeight:active?700:500,color:active?s.color:done?"var(--text2)":"var(--text3)",textAlign:"center",whiteSpace:"nowrap",maxWidth:54,overflow:"hidden",textOverflow:"ellipsis",lineHeight:1.2}}>
+                        {short}
+                      </span>
+                    </div>
                   </span>
                 );
               })}
@@ -3139,8 +3189,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           })}
         </div>
       ) : (
-        /* Desktop: underline tabs */
-        <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:14,overflowX:"auto",gap:0,scrollbarWidth:"none"}}>
+        /* Desktop: segmented pill tabs */
+        <div style={{display:"flex",background:"var(--surface2)",borderRadius:10,padding:3,gap:2,marginBottom:14,overflowX:"auto",scrollbarWidth:"none"}}>
           {[
             {id:"car",     label:`🚗 ${t.wsTabCar}`},
             ...(wsRole!=="mechanic"?[
@@ -3152,18 +3202,27 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             ...(wsRole!=="mechanic"?[
               {id:"invoice", label:`🧾 ${t.invoice}`, badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
             ]:[]),
-          ].map(tab=>(
-            <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
-              padding:"9px 13px",border:"none",background:"none",cursor:"pointer",flexShrink:0,
-              fontSize:13,fontWeight:jobTab===tab.id?700:400,
-              color:jobTab===tab.id?"var(--accent)":"var(--text2)",
-              borderBottom:jobTab===tab.id?"2px solid var(--accent)":"2px solid transparent",
-              marginBottom:-1,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,
-            }}>
-              {tab.label}
-              {tab.badge!=null&&<span style={{fontSize:10,fontWeight:600,opacity:.7,background:"var(--surface2)",borderRadius:99,padding:"1px 5px"}}>{tab.badge}</span>}
-            </button>
-          ))}
+          ].map(tab=>{
+            const active = jobTab===tab.id;
+            return (
+              <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
+                padding:"7px 13px",border:"none",borderRadius:8,cursor:"pointer",flexShrink:0,
+                fontSize:12,fontWeight:active?700:500,
+                color:active?"var(--accent)":"var(--text2)",
+                background:active?"var(--surface)":"transparent",
+                boxShadow:active?"0 1px 4px rgba(0,0,0,.25)":"none",
+                whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,
+                transition:"all .18s",
+              }}>
+                {tab.label}
+                {tab.badge!=null&&(
+                  <span style={{fontSize:10,fontWeight:700,background:active?"var(--accent)":"var(--surface3)",color:active?"#fff":"var(--text2)",borderRadius:99,padding:"1px 6px",lineHeight:1.4,minWidth:16,textAlign:"center"}}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -3330,50 +3389,49 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             )}
           </div>
 
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:12}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:12}}>
             {[
-              [`🚗 ${t.wsPlate}`,job.vehicle_reg],
-              [t.wsMakeModel,`${job.vehicle_make||""} ${job.vehicle_model||""}`.trim()||"—"],
-              [t.year,job.vehicle_year||"—"],
-              [t.vehicleColor,job.vehicle_color||"—"],
-              [t.mileage,job.mileage?`${job.mileage.toLocaleString()} km`:"—"],
-              [`👷 ${t.mechanic}`,job.mechanic||"—"],
-              [`📅 ${t.dateIn}`,job.date_in||"—"],
-              [`📅 ${t.dateOut}`,job.date_out||"—"],
-            ].map(([l,v])=>(
-              <div key={l}>
-                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>{l}</div>
-                <div style={{fontWeight:600,fontSize:13}}>{v||"—"}</div>
+              [`🚗 ${t.wsPlate}`, job.vehicle_reg, true],
+              [t.wsMakeModel, `${job.vehicle_make||""} ${job.vehicle_model||""}`.trim()||"—", false],
+              [t.year, job.vehicle_year||"—", false],
+              [t.vehicleColor, job.vehicle_color||"—", false],
+              [t.mileage, job.mileage?`${job.mileage.toLocaleString()} km`:"—", false],
+              [`👷 ${t.mechanic}`, job.mechanic||"—", false],
+              [`📅 ${t.dateIn}`, job.date_in||"—", false],
+              [`📅 ${t.dateOut}`, job.date_out||"—", false],
+            ].map(([l,v,mono])=>(
+              <div key={l} style={{background:"var(--surface2)",borderRadius:8,padding:"8px 10px",border:"1px solid var(--border)"}}>
+                <div style={{fontSize:9,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>{l}</div>
+                {mono
+                  ?<code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13,color:"var(--accent)"}}>{v||"—"}</code>
+                  :<div style={{fontWeight:600,fontSize:13,color:"var(--text)"}}>{v||"—"}</div>
+                }
               </div>
             ))}
             {job.engine_no&&(
-              <div>
-                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>{t.engine} No</div>
-                <code style={{fontWeight:600,fontSize:12,fontFamily:"DM Mono,monospace"}}>{job.engine_no}</code>
+              <div style={{background:"var(--surface2)",borderRadius:8,padding:"8px 10px",border:"1px solid var(--border)"}}>
+                <div style={{fontSize:9,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>{t.engine} No</div>
+                <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12,color:"var(--text)"}}>{job.engine_no}</code>
               </div>
             )}
-            {(vehicleRecord?.licence_disc_expiry||job?.licence_disc_expiry)&&(
-              <div style={{gridColumn:"1/-1"}}>
-                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>{t.wsLicenceExpiry}</div>
-                {(()=>{
-                  const exp = vehicleRecord?.licence_disc_expiry||job.licence_disc_expiry;
-                  const expired = new Date(exp)<new Date();
-                  return (
-                    <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                      <div style={{fontWeight:700,fontSize:13,color:expired?"var(--red)":"var(--green)"}}>
-                        {exp} {expired?`⚠️ ${t.wsExpired}`:"✅"}
-                      </div>
-                      {onSaveWsLicenceRenewal&&(
-                        <button onClick={()=>setRenewalModal(true)}
-                          style={{fontSize:11,padding:"4px 12px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.4)",borderRadius:12,cursor:"pointer",color:"#16a34a",fontWeight:600,whiteSpace:"nowrap"}}>
-                          🪪 {t.wsRequestRenewal}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
+            {(vehicleRecord?.licence_disc_expiry||job?.licence_disc_expiry)&&(()=>{
+              const exp = vehicleRecord?.licence_disc_expiry||job.licence_disc_expiry;
+              const expired = new Date(exp)<new Date();
+              return (
+                <div style={{gridColumn:"1/-1",background:expired?"rgba(248,113,113,.08)":"rgba(52,211,153,.06)",borderRadius:8,padding:"8px 12px",border:`1px solid ${expired?"rgba(248,113,113,.25)":"rgba(52,211,153,.2)"}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                  <div>
+                    <div style={{fontSize:9,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:3}}>{t.wsLicenceExpiry}</div>
+                    <div style={{fontWeight:700,fontSize:13,color:expired?"var(--red)":"var(--green)"}}>{exp} {expired?`⚠️ ${t.wsExpired}`:"✅"}</div>
+                  </div>
+                  {onSaveWsLicenceRenewal&&(
+                    <button onClick={()=>setRenewalModal(true)}
+                      style={{fontSize:11,padding:"5px 12px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.4)",borderRadius:8,cursor:"pointer",color:"#16a34a",fontWeight:600,whiteSpace:"nowrap"}}>
+                      🪪 {t.wsRequestRenewal}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* VIN + Search tools */}

@@ -53,6 +53,17 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [bkDeleting,      setBkDeleting]      = useState(false);
   const [bkShowDeleted,   setBkShowDeleted]   = useState(false);
   const [bkDeletedPeriod, setBkDeletedPeriod] = useState("week");
+  const [bkAvailOpen,     setBkAvailOpen]     = useState(false);
+  const [bkWorkDays,      setBkWorkDays]      = useState([1,2,3,4,5]);
+  const [bkHolidays,      setBkHolidays]      = useState([]);
+  const [bkClosedDates,   setBkClosedDates]   = useState([]);
+  const [bkAvailSaving,   setBkAvailSaving]   = useState(false);
+  const [bkNewHolDate,    setBkNewHolDate]    = useState("");
+  const [bkNewHolName,    setBkNewHolName]    = useState("");
+  const [bkNewClDate,     setBkNewClDate]     = useState("");
+  const [bkNewClReason,   setBkNewClReason]   = useState("");
+  const [bkCancelModal,   setBkCancelModal]   = useState(null);
+  const [bkCancelReason,  setBkCancelReason]  = useState("");
   const [kanbanView,      setKanbanView]      = useState(true);
   const [jobDetailTab,    setJobDetailTab]    = useState("car");
   const [kanbanInvJob,    setKanbanInvJob]    = useState(null);
@@ -75,6 +86,13 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
     const id=setInterval(run,30000);
     return()=>clearInterval(id);
   },[wsTab,onRefreshBookings]);
+
+  useEffect(()=>{
+    setBkWorkDays(wsProfile?.working_days||[1,2,3,4,5]);
+    setBkHolidays(wsProfile?.public_holidays||[]);
+    setBkClosedDates(wsProfile?.closed_dates||[]);
+  },[wsProfile]);
+
   const JOB_PAGE_SIZE = typeof window!=="undefined"&&window.innerWidth<=767 ? 5 : 20;
 
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
@@ -131,27 +149,71 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       vehicleId = makeId("WSV");
       await api.insert("workshop_vehicles",{id:vehicleId,workshop_id:wsId,workshop_customer_id:custId,reg:b.vehicle_reg||"",make:b.vehicle_make||"",model:b.vehicle_model||"",year:b.vehicle_year||"",color:b.vehicle_color||"",vin:b.vin||"",engine_no:b.engine_no||"",licence_disc_expiry:b.licence_disc_expiry||""}).catch(()=>{});
     }
+    const str = v => v?.toString().trim()||null;
+    const int = v => v ? parseInt(v,10)||null : null;
     const newJob = {
       id:makeId("WSJ"), workshop_id:wsId,
-      customer_name:b.customer_name||"", customer_phone:b.customer_phone||"", customer_email:b.customer_email||"",
+      customer_name:str(b.customer_name), customer_phone:str(b.customer_phone),
       workshop_vehicle_id:vehicleId,
-      vehicle_reg:b.vehicle_reg||"", vehicle_make:b.vehicle_make||"", vehicle_model:b.vehicle_model||"",
-      vehicle_year:b.vehicle_year||"", vehicle_color:b.vehicle_color||"",
-      vin:b.vin||"", engine_no:b.engine_no||"",
-      complaint:b.complaint||"", mileage:b.mileage||"",
+      vehicle_reg:str(b.vehicle_reg), vehicle_make:str(b.vehicle_make), vehicle_model:str(b.vehicle_model),
+      vehicle_year:int(b.vehicle_year), vehicle_color:str(b.vehicle_color),
+      vin:str(b.vin), engine_no:str(b.engine_no),
+      complaint:str(b.complaint), mileage:null,
       status:"Pending", date_in:today(),
-      diagnosis:"", mechanic:"", notes:"", date_out:"",
+      diagnosis:null, mechanic:null, notes:null, date_out:null,
     };
-    await onSaveJob(newJob);
-    // Copy customer-uploaded booking photos into the job's photos tab
+    // Use api.insert directly — onSaveJob does a PATCH when id is present, which is a no-op for a new row
+    const res = await api.insert("workshop_jobs", newJob).catch(e=>({message:e.message}));
+    if(!Array.isArray(res)){
+      alert("❌ Failed to create job: "+(res?.message||"Unknown error — check Supabase logs"));
+      return;
+    }
+    // Copy booking photos to job photos tab
     const photoUrls=[b.photo_1,b.photo_2,b.photo_3].filter(Boolean);
     for(const url of photoUrls){
       await api.insert("workshop_job_photos",{id:makeId("PH"),job_id:newJob.id,url,folder_path:"Booking_Photos"}).catch(()=>{});
     }
+    // Copy booking photos to vehicle photo slots so they show on the kanban card
+    const vehPhotoPatch={};
+    if(b.photo_1) vehPhotoPatch.photo_front=b.photo_1;
+    if(b.photo_2) vehPhotoPatch.photo_side=b.photo_2;
+    if(b.photo_3) vehPhotoPatch.photo_rear=b.photo_3;
+    if(Object.keys(vehPhotoPatch).length) await api.patch("workshop_vehicles","id",vehicleId,vehPhotoPatch).catch(()=>{});
     await onPatchWsBooking(b.id,{status:"job_created",workshop_vehicle_id:vehicleId});
+    await onRefresh(); // sync DB → jobs list includes the new job
     setJobDetailTab("car");
     setActiveJob(newJob);
+    setWsTab("jobs");  // take the user to the jobs tab
     setView("job");
+  };
+
+  const bkWaLink = (booking, type, reason="", overrideDate="") => {
+    const phone = (booking.customer_phone||"").replace(/\D/g,"");
+    if(!phone) return "#";
+    const shop = wsProfile?.name||"Workshop";
+    const n = (booking.customer_name||"").split(" ")[0]||"there";
+    const reg = booking.vehicle_reg||"";
+    const dt = overrideDate||booking.preferred_date||"";
+    const dtStr = dt ? ` on ${dt}` : "";
+    let msg = "";
+    if(type==="received") msg=`Hi ${n}, we received your booking request for ${reg}${dtStr}. We will contact you shortly to confirm. — ${shop}`;
+    if(type==="confirm")  msg=`Hi ${n}, your booking for ${reg}${dtStr} is CONFIRMED! We look forward to seeing you. — ${shop}`;
+    if(type==="cancel")   msg=`Hi ${n}, unfortunately we need to cancel your booking for ${reg}${dtStr}.${reason?` Reason: ${reason}`:""} Please contact us to reschedule. — ${shop}`;
+    if(type==="closure")  msg=`Hi ${n}, we regret to inform you that we will be closed on ${dt||"that date"}${reason?` (${reason})`:""}. Your booking for ${reg} will need to be rescheduled. Please contact us. — ${shop}`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  };
+
+  const saveAvailability = async () => {
+    setBkAvailSaving(true);
+    const res = await api.patch("workshop_profiles","id",wsId,{
+      working_days: bkWorkDays,
+      public_holidays: bkHolidays,
+      closed_dates: bkClosedDates,
+    }).catch(e=>({message:e.message}));
+    if(res&&!Array.isArray(res)&&res.message){
+      alert("❌ Save failed: "+res.message+"\n\nYou need to run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles\n  ADD COLUMN IF NOT EXISTS working_days jsonb DEFAULT '[1,2,3,4,5]'::jsonb,\n  ADD COLUMN IF NOT EXISTS public_holidays jsonb DEFAULT '[]'::jsonb,\n  ADD COLUMN IF NOT EXISTS closed_dates jsonb DEFAULT '[]'::jsonb;");
+    }
+    setBkAvailSaving(false);
   };
 
   const flagProblem = async(job) => {
@@ -401,7 +463,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         {/* ══════════════ KANBAN BOARD VIEW ══════════════ */}
         {kanbanView&&(()=>{
           const jInv = id => invoices.find(i=>i.job_id===id);
-          const bkCol   = wsBookings.filter(b=>b.status==="confirmed");
+          const bkCol   = wsBookings.filter(b=>b.status==="pending"||b.status==="confirmed");
           const pendCol = jobs.filter(j=>!j.is_problem&&j.status==="Pending");
           const wipCol  = jobs.filter(j=>!j.is_problem&&j.status==="In Progress");
           const doneCol = jobs.filter(j=>!j.is_problem&&j.status==="Done"&&!jInv(j.id));
@@ -760,6 +822,102 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             )}
           </div>
 
+          {/* ── Availability Settings ── */}
+          <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
+            <button style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"none",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"var(--text)",padding:0}}
+              onClick={()=>setBkAvailOpen(v=>!v)}>
+              <span>⚙️ Availability Settings</span>
+              <span style={{color:"var(--text3)"}}>{bkAvailOpen?"▲":"▼"}</span>
+            </button>
+            {bkAvailOpen&&(
+              <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:16}}>
+                {/* Working Days */}
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".04em",marginBottom:8}}>Working Days</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {[["Mon",1],["Tue",2],["Wed",3],["Thu",4],["Fri",5],["Sat",6],["Sun",7]].map(([label,num])=>(
+                      <button key={num} className={`btn btn-sm ${bkWorkDays.includes(num)?"btn-primary":"btn-ghost"}`}
+                        onClick={()=>setBkWorkDays(d=>d.includes(num)?d.filter(x=>x!==num):[...d,num].sort((a,b)=>a-b))}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Public Holidays */}
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".04em",marginBottom:8}}>Public Holidays</div>
+                  {bkHolidays.length===0&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>No holidays added</div>}
+                  {bkHolidays.map((h,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid var(--border)",fontSize:13}}>
+                      <span style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)",width:95,flexShrink:0}}>{h.date}</span>
+                      <span style={{flex:1,color:"var(--text2)"}}>{h.name||"—"}</span>
+                      <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}}
+                        onClick={()=>setBkHolidays(p=>p.filter((_,j)=>j!==i))}>×</button>
+                    </div>
+                  ))}
+                  <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+                    <input className="inp" type="date" style={{flex:"0 0 140px",fontSize:12,padding:"5px 8px"}} value={bkNewHolDate} onChange={e=>setBkNewHolDate(e.target.value)}/>
+                    <input className="inp" type="text" style={{flex:1,minWidth:100,fontSize:12,padding:"5px 8px"}} placeholder="Holiday name" value={bkNewHolName} onChange={e=>setBkNewHolName(e.target.value)}/>
+                    <button className="btn btn-ghost btn-sm" style={{flexShrink:0}}
+                      onClick={()=>{
+                        if(!bkNewHolDate.trim()) return;
+                        setBkHolidays(p=>[...p,{date:bkNewHolDate,name:bkNewHolName.trim()||"Public Holiday"}].sort((a,b)=>a.date.localeCompare(b.date)));
+                        setBkNewHolDate(""); setBkNewHolName("");
+                      }}>+ Add</button>
+                  </div>
+                </div>
+
+                {/* Emergency Closures */}
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".04em",marginBottom:4}}>Emergency Closures</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>Block specific dates — customers see a notice, and you can WhatsApp affected bookings in one tap.</div>
+                  {bkClosedDates.length===0&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>No closures added</div>}
+                  {bkClosedDates.map((c,i)=>{
+                    const affected=wsBookings.filter(b=>b.preferred_date===c.date&&b.status!=="cancelled"&&b.status!=="deleted"&&b.status!=="job_created");
+                    return(
+                      <div key={i} style={{padding:"8px 10px",background:"rgba(248,113,113,.06)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,marginBottom:6}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,fontSize:13}}>
+                          <span style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--red)",width:95,flexShrink:0}}>{c.date}</span>
+                          <span style={{flex:1,color:"var(--text2)"}}>{c.reason||"—"}</span>
+                          <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}}
+                            onClick={()=>setBkClosedDates(p=>p.filter((_,j)=>j!==i))}>×</button>
+                        </div>
+                        {affected.length>0&&(
+                          <div style={{marginTop:8,fontSize:12,color:"var(--yellow)"}}>
+                            ⚠️ {affected.length} booking{affected.length!==1?"s":""} on this date — notify them:
+                            <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+                              {affected.map(b=>(
+                                <a key={b.id} href={bkWaLink(b,"closure",c.reason,c.date)} target="_blank" rel="noreferrer"
+                                  style={{fontSize:11,background:"rgba(37,211,102,.15)",color:"#25D366",border:"1px solid rgba(37,211,102,.3)",borderRadius:6,padding:"3px 8px",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4}}>
+                                  📱 {b.customer_name}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+                    <input className="inp" type="date" style={{flex:"0 0 140px",fontSize:12,padding:"5px 8px"}} value={bkNewClDate} onChange={e=>setBkNewClDate(e.target.value)}/>
+                    <input className="inp" type="text" style={{flex:1,minWidth:100,fontSize:12,padding:"5px 8px"}} placeholder="Reason (e.g. power outage)" value={bkNewClReason} onChange={e=>setBkNewClReason(e.target.value)}/>
+                    <button className="btn btn-ghost btn-sm" style={{flexShrink:0}}
+                      onClick={()=>{
+                        if(!bkNewClDate.trim()) return;
+                        setBkClosedDates(p=>[...p,{date:bkNewClDate,reason:bkNewClReason.trim()||"Closed"}].sort((a,b)=>a.date.localeCompare(b.date)));
+                        setBkNewClDate(""); setBkNewClReason("");
+                      }}>+ Add</button>
+                  </div>
+                </div>
+
+                <button className="btn btn-primary btn-sm" style={{alignSelf:"flex-end"}} onClick={saveAvailability} disabled={bkAvailSaving}>
+                  {bkAvailSaving?"⏳ Saving…":"💾 Save Availability"}
+                </button>
+              </div>
+            )}
+          </div>
+
           {activeBookings.length===0&&(
             <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>
               <div style={{marginBottom:12}}>No bookings yet — share the link above with customers</div>
@@ -795,16 +953,26 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   </div>
                 )}
                 {b.status==="pending"&&(
-                  <div style={{display:"flex",gap:8}}>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                     <button className="btn btn-success btn-sm" onClick={()=>confirmBooking(b)}>
                       ✅ Confirm{!b.workshop_vehicle_id?" & Add to System":""}
                     </button>
-                    <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>onPatchWsBooking&&onPatchWsBooking(b.id,{status:"cancelled"})}>❌ Cancel</button>
+                    <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}}
+                      onClick={()=>{ setBkCancelModal({booking:b}); setBkCancelReason(""); }}>❌ Cancel</button>
+                    {b.customer_phone&&(
+                      <a href={bkWaLink(b,"received")} target="_blank" rel="noreferrer"
+                        className="btn btn-ghost btn-sm" style={{color:"#25D366",textDecoration:"none"}}>📱 WhatsApp</a>
+                    )}
                   </div>
                 )}
                 {b.status==="confirmed"&&(
-                  <div style={{display:"flex",gap:8}}>
-                    <button className="btn btn-ghost btn-sm" style={{color:"var(--text3)"}} onClick={()=>onPatchWsBooking&&onPatchWsBooking(b.id,{status:"pending"})}>↩ Unconfirm</button>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <button className="btn btn-ghost btn-sm" style={{color:"var(--text3)"}}
+                      onClick={()=>onPatchWsBooking&&onPatchWsBooking(b.id,{status:"pending"})}>↩ Unconfirm</button>
+                    {b.customer_phone&&(
+                      <a href={bkWaLink(b,"confirm")} target="_blank" rel="noreferrer"
+                        className="btn btn-ghost btn-sm" style={{color:"#25D366",textDecoration:"none"}}>📱 Confirm via WhatsApp</a>
+                    )}
                   </div>
                 )}
                 <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",marginLeft:"auto",display:"block",marginTop:6}}
@@ -1273,6 +1441,44 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             onClose={()=>setKanbanPayJob(null)}/>
         );
       })()}
+
+      {/* ── Booking cancel modal ── */}
+      {bkCancelModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div className="card" style={{width:"100%",maxWidth:400,padding:24,display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{fontWeight:700,fontSize:16}}>❌ Cancel Booking</div>
+            <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",fontSize:13}}>
+              <div><strong>{bkCancelModal.booking.vehicle_reg}</strong> — {bkCancelModal.booking.customer_name}</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{bkCancelModal.booking.customer_phone}</div>
+              {bkCancelModal.booking.preferred_date&&<div style={{fontSize:12,color:"var(--blue)",marginTop:2}}>📅 {bkCancelModal.booking.preferred_date}</div>}
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:600,color:"var(--text3)",marginBottom:5}}>REASON (optional — sent to customer via WhatsApp)</div>
+              <textarea className="inp" rows={2} placeholder="e.g. No availability on that date" value={bkCancelReason} onChange={e=>setBkCancelReason(e.target.value)} style={{resize:"vertical"}}/>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap"}}>
+              <button className="btn btn-ghost" style={{flex:"1 1 80px"}} onClick={()=>setBkCancelModal(null)}>Back</button>
+              <button className="btn" style={{flex:"1 1 120px",background:"rgba(248,113,113,.15)",color:"var(--red)",border:"1px solid rgba(248,113,113,.3)"}}
+                onClick={async()=>{
+                  await onPatchWsBooking(bkCancelModal.booking.id,{status:"cancelled"});
+                  setBkCancelModal(null);
+                }}>
+                ❌ Cancel Booking
+              </button>
+              {bkCancelModal.booking.customer_phone&&(
+                <a href={bkWaLink(bkCancelModal.booking,"cancel",bkCancelReason)} target="_blank" rel="noreferrer"
+                  className="btn" style={{flex:"1 1 160px",background:"rgba(37,211,102,.15)",color:"#25D366",border:"1px solid rgba(37,211,102,.3)",textDecoration:"none",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
+                  onClick={async()=>{
+                    await onPatchWsBooking(bkCancelModal.booking.id,{status:"cancelled"});
+                    setBkCancelModal(null);
+                  }}>
+                  📱 Cancel + WhatsApp
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Booking delete confirmation modal ── */}
       {bkDeleteModal&&(

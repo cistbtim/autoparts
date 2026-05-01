@@ -983,6 +983,7 @@ export function WorkshopBookingPage({token}) {
   const [bookingId, setBookingId] = useState(null);
   const [scriptUrl, setScriptUrl] = useState("");
   const [problemPhotos, setProblemPhotos] = useState([null, null, null]);
+  const [avail,        setAvail]        = useState(null);
 
   const cameraRef  = useRef(null);
   const galleryRef = useRef(null);
@@ -991,12 +992,37 @@ export function WorkshopBookingPage({token}) {
   const photoRef2  = useRef(null);
   const photoRefs  = [photoRef0, photoRef1, photoRef2];
 
+  const getDateUnavailableReason = (dateStr) => {
+    if(!dateStr||!avail) return null;
+    const d = new Date(dateStr+"T12:00:00");
+    const jsDay = d.getDay(); // 0=Sun
+    const isoDay = jsDay===0 ? 7 : jsDay; // 1=Mon…7=Sun
+    if(avail.working_days&&!avail.working_days.includes(isoDay)){
+      return `We are not open on ${d.toLocaleDateString("en-ZA",{weekday:"long"})}s`;
+    }
+    const hol = (avail.public_holidays||[]).find(h=>h.date===dateStr);
+    if(hol) return `Public holiday — ${hol.name||"Workshop closed"}`;
+    const cl = (avail.closed_dates||[]).find(c=>c.date===dateStr);
+    if(cl) return `Workshop closed — ${cl.reason||"Unavailable on this date"}`;
+    return null;
+  };
+
   useEffect(()=>{
     // Look up workshop by opaque booking token — never expose the UUID in the URL
-    fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles?booking_token=eq.${encodeURIComponent(token)}&select=id,name,phone,email`,
+    fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles?booking_token=eq.${encodeURIComponent(token)}&select=id,name,phone,email,working_days,public_holidays,closed_dates`,
       {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}})
       .then(r=>r.json())
-      .then(rows=>{ if(rows?.[0]){ setShopInfo(rows[0]); setWsId(rows[0].id); } })
+      .then(rows=>{
+        if(rows?.[0]){
+          setShopInfo(rows[0]);
+          setWsId(rows[0].id);
+          setAvail({
+            working_days:   rows[0].working_days   || [1,2,3,4,5],
+            public_holidays:rows[0].public_holidays|| [],
+            closed_dates:   rows[0].closed_dates   || [],
+          });
+        }
+      })
       .catch(()=>{})
       .finally(()=>setShopLoading(false));
     // Fetch Apps Script URL for Drive photo uploads
@@ -1098,6 +1124,10 @@ export function WorkshopBookingPage({token}) {
     if(problemPhotos.some(p=>p?.status==="uploading")){
       alert("Please wait for photos to finish uploading.");
       return;
+    }
+    if(prefDate){
+      const reason=getDateUnavailableReason(prefDate);
+      if(reason){ alert(`⚠️ ${reason}\n\nPlease choose a different date before submitting.`); return; }
     }
     setSubmitting(true);
     try{
@@ -1328,13 +1358,26 @@ export function WorkshopBookingPage({token}) {
             <label style={lbl}>Preferred Date (optional)</label>
             <input style={inp} type="date" value={prefDate} onChange={e=>setPrefDate(e.target.value)}
               min={new Date().toISOString().slice(0,10)}/>
+            {prefDate&&getDateUnavailableReason(prefDate)&&(
+              <div style={{marginTop:8,padding:"10px 12px",background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.3)",borderRadius:8,fontSize:13,color:"#f87171",lineHeight:1.4}}>
+                ⚠️ {getDateUnavailableReason(prefDate)} — please choose a different date.
+              </div>
+            )}
+            {prefDate&&!getDateUnavailableReason(prefDate)&&(
+              <div style={{marginTop:6,fontSize:12,color:CL.green}}>✓ This date looks good</div>
+            )}
           </div>
-          {(()=>{const photosUploading=problemPhotos.some(p=>p?.status==="uploading");return(
-          <button style={{...mkBtn((submitting||photosUploading)?"#334155":CL.accent),opacity:(submitting||photosUploading)?0.7:1}}
-            onClick={submit} disabled={submitting||photosUploading}>
-            {photosUploading?"📤 Uploading photos…":submitting?"⏳ Submitting…":"📅 Submit Booking Request"}
-          </button>
-          );})()}
+          {(()=>{
+            const photosUploading=problemPhotos.some(p=>p?.status==="uploading");
+            const dateBlocked=prefDate&&!!getDateUnavailableReason(prefDate);
+            if(dateBlocked) return null;
+            return(
+              <button style={{...mkBtn((submitting||photosUploading)?"#334155":CL.accent),opacity:(submitting||photosUploading)?0.7:1}}
+                onClick={submit} disabled={submitting||photosUploading}>
+                {photosUploading?"📤 Uploading photos…":submitting?"⏳ Submitting…":"📅 Submit Booking Request"}
+              </button>
+            );
+          })()}
         </div>
 
         <div style={{textAlign:"center",paddingBottom:20}}>

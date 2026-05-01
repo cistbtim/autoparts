@@ -152,7 +152,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
     const str = v => v?.toString().trim()||null;
     const int = v => v ? parseInt(v,10)||null : null;
     const newJob = {
-      id:makeId("WSJ"), workshop_id:wsId,
+      id:makeId("WSJ"), workshop_id:wsId, booking_id:b.id,
       customer_name:str(b.customer_name), customer_phone:str(b.customer_phone),
       workshop_vehicle_id:vehicleId,
       vehicle_reg:str(b.vehicle_reg), vehicle_make:str(b.vehicle_make), vehicle_model:str(b.vehicle_model),
@@ -263,6 +263,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
+        sourceBooking={wsBookings.find(bk=>bk.id===activeJob.booking_id)||null}
         initialTab={jobDetailTab}
         onRefresh={onRefresh}
         t={t} lang={lang}/>
@@ -508,6 +509,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           const JobCard = ({job, col}) => {
             const inv = jInv(job.id);
             const fp  = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)?.photo_front||"";
+            const srcBk = wsBookings.find(bk=>bk.id===job.booking_id);
             const canFlag   = col.id!=="paid"&&col.id!=="problem";
             const canUnflag = col.id==="problem";
             const canInvoice= col.id==="done";
@@ -539,6 +541,9 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                     </div>
                   )}
                   <div style={{position:"absolute",top:4,right:4,display:"flex",gap:3}}>
+                    {srcBk&&(
+                      <span style={{padding:"1px 5px",background:"rgba(96,165,250,.85)",color:"#fff",borderRadius:4,fontSize:9,fontWeight:700,letterSpacing:".04em"}}>🌐 Online</span>
+                    )}
                     {canFlag&&(
                       <button title="Flag as Problem" style={{padding:"1px 4px",border:"1px solid rgba(248,113,113,.3)",background:"rgba(0,0,0,.5)",color:"#f87171",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1}}
                         onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>
@@ -559,6 +564,15 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   )}
                   {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:3,background:"#ef4444",borderRadius:5,padding:"3px 7px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {job.complaint}</div>}
                   {job.notes&&<div style={{fontSize:10,color:"#b45309",fontWeight:700,fontStyle:"italic",marginBottom:3,padding:"2px 6px",background:"rgba(251,191,36,.18)",border:"1px solid rgba(251,191,36,.35)",borderRadius:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📝 {job.notes}</div>}
+                  {srcBk&&job.customer_phone&&(
+                    <div style={{display:"flex",gap:4,marginBottom:3}} onClick={e=>e.stopPropagation()}>
+                      <a href={`tel:${job.customer_phone}`} className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"3px 0",textDecoration:"none",textAlign:"center",color:"var(--blue)"}}>📞 Call</a>
+                      <a href={`https://wa.me/${job.customer_phone.replace(/\D/g,"")}?text=${encodeURIComponent(`Hi ${(job.customer_name||"").split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}`}
+                        target="_blank" rel="noreferrer" className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"3px 0",textDecoration:"none",textAlign:"center",color:"#25D366"}}>
+                        📱 WhatsApp
+                      </a>
+                    </div>
+                  )}
                   {inv&&wsRole!=="mechanic"&&<div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:3}}>
                     <span style={{color:"var(--text3)"}}>Invoice</span>
                     <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
@@ -2606,7 +2620,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},initialTab="car",onRefresh,t,lang}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[],vehicles=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],suppliers=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},sourceBooking=null,initialTab="car",onRefresh,t,lang}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -3176,6 +3190,47 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>{ if(wsProfile?.move_pin){setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}else{setMoveModal(true);} }}>🔀 {t.wsMove}</button>}
             {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
           </div>
+          {/* ── Online Booking Source ── */}
+          {sourceBooking&&(
+            <div style={{marginBottom:14,padding:"12px 14px",background:"rgba(96,165,250,.07)",border:"1px solid rgba(96,165,250,.25)",borderRadius:10}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--blue)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>🌐 Online Booking</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-start"}}>
+                <div style={{flex:1,minWidth:160}}>
+                  <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{sourceBooking.customer_name}</div>
+                  {sourceBooking.customer_phone&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:2}}>{sourceBooking.customer_phone}</div>}
+                  {sourceBooking.customer_email&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>{sourceBooking.customer_email}</div>}
+                  {sourceBooking.preferred_date&&<div style={{fontSize:12,color:"var(--blue)",marginTop:4}}>📅 Preferred: {sourceBooking.preferred_date}</div>}
+                  {sourceBooking.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>🔧 {sourceBooking.complaint}</div>}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+                  {sourceBooking.customer_phone&&(
+                    <a href={`tel:${sourceBooking.customer_phone}`}
+                      style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"rgba(96,165,250,.15)",border:"1px solid rgba(96,165,250,.3)",borderRadius:8,textDecoration:"none",color:"var(--blue)",fontWeight:600,fontSize:13}}>
+                      📞 Call
+                    </a>
+                  )}
+                  {sourceBooking.customer_phone&&(
+                    <a href={`https://wa.me/${sourceBooking.customer_phone.replace(/\D/g,"")}?text=${encodeURIComponent(`Hi ${(sourceBooking.customer_name||"").split(" ")[0]||"there"}, regarding your ${sourceBooking.vehicle_reg||job.vehicle_reg||"vehicle"} booking — `)}`}
+                      target="_blank" rel="noreferrer"
+                      style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,textDecoration:"none",color:"#25D366",fontWeight:600,fontSize:13}}>
+                      📱 WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+              {[sourceBooking.photo_1,sourceBooking.photo_2,sourceBooking.photo_3].filter(Boolean).length>0&&(
+                <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                  {[sourceBooking.photo_1,sourceBooking.photo_2,sourceBooking.photo_3].filter(Boolean).map((url,i)=>(
+                    <a key={i} href={url} target="_blank" rel="noreferrer">
+                      <img src={url} alt={`photo ${i+1}`} style={{width:64,height:64,objectFit:"cover",borderRadius:7,border:"1px solid var(--border)",cursor:"zoom-in"}}
+                        onError={e=>{e.target.style.display="none";}}/>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Profile Photos ── */}
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>

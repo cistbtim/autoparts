@@ -2701,6 +2701,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   const [noteVal,       setNoteVal]       = useState(job.notes||"");
   const [savingNote,    setSavingNote]    = useState(false);
   useEffect(()=>{ setNoteVal(job.notes||""); },[job.notes]);
+  const [pendingPayModal, setPendingPayModal] = useState(false);
+  useEffect(()=>{ if(pendingPayModal&&invoice){ setPendingPayModal(false); setPaymentModal(true); } },[invoice,pendingPayModal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
   const vehicleHistory = jobs.filter(j=>{
@@ -4278,10 +4280,18 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           </div>
         </div>
       ) : (
-        <button className="btn btn-ghost" style={{width:"100%",padding:12,fontSize:14,fontWeight:600,marginBottom:14,border:"2px dashed var(--border)"}}
-          onClick={()=>setQuoteModal(true)}>
-          📝 Create Quotation for Customer
-        </button>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+          <button className="btn btn-ghost" style={{width:"100%",padding:12,fontSize:14,fontWeight:600,border:"2px dashed var(--border)"}}
+            onClick={()=>setQuoteModal(true)}>
+            📝 Create Quotation for Customer
+          </button>
+          {items.length>0&&!invoice&&(
+            <button className="btn btn-success" style={{width:"100%",padding:11,fontSize:14,fontWeight:700}}
+              onClick={()=>{ onSaveJob({...job,status:"Done"}); setCreatingInv(true); }}>
+              ⚡ Quick Invoice (skip quote)
+            </button>
+          )}
+        </div>
       )}
       {quote&&(
         <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:8}}>
@@ -4496,11 +4506,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             dueDate:  quoteSrcForInv.valid_until||"",
             notes:    `Converted from Quote ${quoteSrcForInv.id}${quoteSrcForInv.notes?"\n"+quoteSrcForInv.notes:""}`,
           } : {}}
-          onSave={async(inv)=>{
+          onSave={async(inv, payNow=false)=>{
             await onSaveInvoice(inv);
             if(quoteSrcForInv) await onSaveQuote({...quoteSrcForInv, status:"converted"});
             setCreatingInv(false);
             setQuoteSrcForInv(null);
+            if(payNow) setPendingPayModal(true);
           }}
           onClose={()=>{ setCreatingInv(false); setQuoteSrcForInv(null); }} t={t}/>
       )}

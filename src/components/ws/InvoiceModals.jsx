@@ -13,7 +13,7 @@ export function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,wsS
     quote_customer:existing?.quote_customer||job.customer_name||"",
     quote_phone:existing?.quote_phone||job.customer_phone||"",
     quote_email:existing?.quote_email||job.customer_email||"",
-    quote_date:existing?.quote_date||new Date().toISOString().slice(0,10),
+    quote_date:existing?.quote_date||job.date_in||new Date().toISOString().slice(0,10),
     valid_until:existing?.valid_until||"",
     notes:existing?.notes||"",
     subtotal,tax,total,
@@ -347,7 +347,7 @@ export function WsStatementModal({invoice,job,items,settings,onClose,onPrint}) {
 }
 
 export function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSave,onClose,t,prefill={}}) {
-  const [invDate,  setInvDate]  = useState(new Date().toISOString().slice(0,10));
+  const [invDate,  setInvDate]  = useState(prefill.invDate||job.date_in||new Date().toISOString().slice(0,10));
   const [dueDate,  setDueDate]  = useState(prefill.dueDate||"");
   const [notes,    setNotes]    = useState(prefill.notes||"");
   const [saving,   setSaving]   = useState(false);
@@ -356,7 +356,7 @@ export function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSa
   const [invPhone, setInvPhone] = useState(prefill.invPhone||job.customer_phone||"");
   const [invEmail, setInvEmail] = useState(prefill.invEmail||job.customer_email||"");
 
-  const handleCreate=async()=>{
+  const handleCreate=async(payNow=false)=>{
     setSaving(true);
     try{
       await onSave({
@@ -365,7 +365,7 @@ export function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSa
         vehicle_reg:job.vehicle_reg||"",
         invoice_date:invDate, due_date:dueDate,
         subtotal, tax, total, status:"unpaid", notes,
-      });
+      }, payNow);
     }catch(e){ alert("Failed to create invoice: "+e.message); }
     finally{ setSaving(false); }
   };
@@ -430,10 +430,13 @@ export function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSa
         <div><FL label={t.dueDate}/><input className="inp" type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></div>
       </FG>
       <FD><FL label={t.notes}/><textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Payment instructions, warranty..." style={{minHeight:60}}/></FD>
-      <div style={{display:"flex",gap:10,marginTop:18}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={handleCreate} disabled={saving}>
+      <div style={{display:"flex",gap:8,marginTop:18,flexWrap:"wrap"}}>
+        <button className="btn btn-ghost" style={{flex:"1 1 80px"}} onClick={onClose}>{t.cancel}</button>
+        <button className="btn btn-primary" style={{flex:"1 1 120px"}} onClick={()=>handleCreate(false)} disabled={saving}>
           {saving?"Saving...":"💾 Create Invoice"}
+        </button>
+        <button className="btn btn-success" style={{flex:"2 1 160px",fontWeight:700}} onClick={()=>handleCreate(true)} disabled={saving}>
+          {saving?"Saving...":"💳 Save & Pay Now"}
         </button>
       </div>
     </Overlay>

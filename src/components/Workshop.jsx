@@ -3193,12 +3193,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
         const INFO_TABS = isMobile ? [
           {id:"car",     icon:"🚗", label:t.wsTabCar},
           {id:"inspect", icon:"✅", label:t.wsTabInspect, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
-          {id:"photos",  icon:"📷", label:t.wsTabPhotos,  badge:savedPhotos.length>0?savedPhotos.length:null},
           {id:"docs",    icon:"📎", label:t.wsTabDocs,    badge:jobDocs.length>0?jobDocs.length:null},
         ] : [
           {id:"car",     label:`🚗 ${t.wsTabCar}`},
           {id:"inspect", label:`✅ ${t.wsTabInspect}`, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
-          {id:"photos",  label:`📷 ${t.wsTabPhotos}`,  badge:savedPhotos.length>0?savedPhotos.length:null},
           {id:"docs",    label:`📎 ${t.wsTabDocs}`,     badge:jobDocs.length>0?jobDocs.length:null},
         ];
         const BILLING_TABS = wsRole==="mechanic" ? [] : isMobile ? [
@@ -3240,7 +3238,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
         return (<>
           {/* Row 1 — Job info */}
           {isMobile
-            ? <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,marginBottom:4}}>{INFO_TABS.map(mkBtn)}</div>
+            ? <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:4,marginBottom:4}}>{INFO_TABS.map(mkBtn)}</div>
             : <div style={{display:"flex",background:"var(--surface2)",borderRadius:10,padding:3,gap:2,marginBottom:4,overflowX:"auto",scrollbarWidth:"none"}}>{INFO_TABS.map(mkBtn)}</div>
           }
           {/* Row 2 — Billing (hidden for mechanic) */}

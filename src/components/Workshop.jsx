@@ -3039,50 +3039,64 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
 
   return (
     <div className="fu">
-      {/* ── Header ── */}
-      <div style={{marginBottom:12,borderRadius:12,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface)"}}>
-        {vehiclePhotos.front&&(
-          <div style={{position:"relative",height:110,overflow:"hidden"}}>
+      {/* ── Vehicle photo hero (always visible) ── */}
+      <div style={{position:"relative",height:155,borderRadius:"12px 12px 0 0",overflow:"hidden",border:"1px solid var(--border)",borderBottom:"none",background:"var(--surface2)"}}>
+        {vehiclePhotos.front ? (
+          <>
             <img src={toImgUrl(vehiclePhotos.front)} alt="vehicle"
               style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
               onError={e=>{e.target.style.display="none";}}/>
-            <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.18) 0%,rgba(0,0,0,.74) 100%)"}}/>
-            <div style={{position:"absolute",bottom:10,left:14,right:14,display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:8}}>
-              <div style={{minWidth:0}}>
-                {job.vehicle_reg&&<code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12,color:"rgba(255,255,255,.8)",display:"block",marginBottom:2}}>🚗 {job.vehicle_reg}</code>}
-                <h1 style={{fontSize:20,fontWeight:800,color:"#fff",margin:0,lineHeight:1.2,textShadow:"0 1px 6px rgba(0,0,0,.5)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.customer_name}</h1>
-              </div>
-              <span style={{background:ST_COLOR[job.status]||"var(--blue)",color:"#fff",borderRadius:8,padding:"4px 11px",fontSize:11,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",boxShadow:"0 2px 8px rgba(0,0,0,.35)"}}>
-                {tSt(job.status)}
-              </span>
-            </div>
+            <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.08) 0%,rgba(0,0,0,.72) 100%)"}}/>
+          </>
+        ) : (
+          <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:"linear-gradient(135deg,var(--surface2) 0%,var(--surface3) 100%)"}}>
+            <svg width="64" height="37" viewBox="0 0 38 22" fill="none" xmlns="http://www.w3.org/2000/svg" style={{opacity:.18}}>
+              <rect x="1" y="9" width="36" height="11" rx="3" fill="currentColor"/>
+              <path d="M7 9L11 2h16l4 7" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+              <circle cx="9" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
+              <circle cx="29" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
+            </svg>
+            <span style={{fontSize:11,color:"var(--text3)",fontWeight:600,letterSpacing:".07em",textTransform:"uppercase"}}>No Photo</span>
           </div>
         )}
-        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <button className="btn btn-ghost btn-sm" onClick={onBack}>{t.wsBack}</button>
-          {onRefresh&&(
-            <button className="btn btn-ghost btn-sm" disabled={refreshing}
-              onClick={async()=>{ setRefreshing(true); try{ await onRefresh(); }finally{ setRefreshing(false); } }}
-              style={{padding:"6px 10px",minWidth:32}} title="Refresh">
-              <span style={{display:"inline-block",animation:refreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
-            </button>
-          )}
-          <div style={{flex:1,minWidth:0}}>
-            {!vehiclePhotos.front&&<h1 style={{fontSize:18,fontWeight:800,margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>{job.customer_name}</h1>}
-            <div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
-              {!vehiclePhotos.front&&job.vehicle_reg&&(
-                <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12,color:"var(--accent)",background:"rgba(249,115,22,.1)",border:"1px solid rgba(249,115,22,.22)",borderRadius:6,padding:"2px 8px"}}>🚗 {job.vehicle_reg}</code>
-              )}
-              <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{job.id}</code>
-              <span style={{color:"var(--text3)",fontSize:11}}>· {job.date_in}</span>
-            </div>
-          </div>
-          {!vehiclePhotos.front&&(
-            <span style={{background:`${ST_COLOR[job.status]||"var(--blue)"}22`,color:ST_COLOR[job.status]||"var(--blue)",border:`1px solid ${ST_COLOR[job.status]||"var(--blue)"}44`,borderRadius:8,padding:"4px 11px",fontSize:12,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>
-              {tSt(job.status)}
+        {/* Vehicle make/model badge — top left */}
+        {(job.vehicle_make||job.vehicle_model||job.vehicle_year)&&(
+          <div style={{position:"absolute",top:10,left:12}}>
+            <span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,.9)",background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",padding:"2px 9px",borderRadius:99,border:"1px solid rgba(255,255,255,.14)"}}>
+              {[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}
             </span>
-          )}
-        </div>
+          </div>
+        )}
+        {/* Reg plate — bottom left */}
+        {job.vehicle_reg&&(
+          <div style={{position:"absolute",bottom:10,left:12}}>
+            <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:14,color:"#fff",background:"rgba(0,0,0,.6)",backdropFilter:"blur(6px)",padding:"3px 11px",borderRadius:7,border:"1px solid rgba(255,255,255,.15)"}}>🚗 {job.vehicle_reg}</code>
+          </div>
+        )}
+        {/* Customer name — bottom right */}
+        {job.customer_name&&(
+          <div style={{position:"absolute",bottom:10,right:12,maxWidth:"55%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            <span style={{fontWeight:700,fontSize:13,color:"#fff",background:"rgba(0,0,0,.55)",backdropFilter:"blur(6px)",padding:"3px 10px",borderRadius:7,border:"1px solid rgba(255,255,255,.12)"}}>{job.customer_name}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Back button / info strip ── */}
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",background:"var(--surface)",border:"1px solid var(--border)",borderTop:"none",borderRadius:"0 0 10px 10px",marginBottom:12,flexWrap:"wrap"}}>
+        <button className="btn btn-ghost btn-sm" onClick={onBack}>{t.wsBack}</button>
+        {onRefresh&&(
+          <button className="btn btn-ghost btn-sm" disabled={refreshing}
+            onClick={async()=>{ setRefreshing(true); try{await onRefresh();}finally{setRefreshing(false);} }}
+            style={{padding:"6px 10px",minWidth:32}} title="Refresh">
+            <span style={{display:"inline-block",animation:refreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
+          </button>
+        )}
+        <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{job.id}</code>
+        <span style={{color:"var(--text3)",fontSize:11}}>· {job.date_in}</span>
+        <div style={{flex:1}}/>
+        <span style={{background:`${ST_COLOR[job.status]||"var(--blue)"}22`,color:ST_COLOR[job.status]||"var(--blue)",border:`1px solid ${ST_COLOR[job.status]||"var(--blue)"}44`,borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>
+          {tSt(job.status)}
+        </span>
       </div>
 
       {/* ── Status pipeline bar ── */}
@@ -3173,81 +3187,69 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
         );
       })()}
 
-      {/* ── Tab bar ── */}
-      {isMobile ? (
-        /* Mobile: icon pill grid — all 6 fit on one row, no scrolling */
-        <div style={{display:"grid",gridTemplateColumns:`repeat(${wsRole==="mechanic"?4:6},1fr)`,gap:6,marginBottom:14}}>
-          {[
-            {id:"car",     icon:"🚗", label:t.wsTabCar},
-            ...(wsRole!=="mechanic"?[
-              {id:"quote",   icon:"📝", label:t.wsTabQuote,  badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
-            ]:[]),
-            {id:"inspect", icon:"✅", label:t.wsTabInspect, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
-            {id:"photos",  icon:"📷", label:t.wsTabPhotos,  badge:savedPhotos.length>0?savedPhotos.length:null},
-            {id:"docs",    icon:"📎", label:t.wsTabDocs,    badge:jobDocs.length>0?jobDocs.length:null},
-            ...(wsRole!=="mechanic"?[
-              {id:"invoice", icon:"🧾", label:t.invoice,     badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
-            ]:[]),
-          ].map(tab=>{
-            const active=jobTab===tab.id;
-            return (
-              <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
-                position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:2,
-                padding:"8px 4px",border:"none",borderRadius:10,cursor:"pointer",
-                background:active?"var(--accent)":"var(--surface2)",
-                color:active?"#fff":"var(--text3)",
-                transition:"background .15s",
-              }}>
-                <span style={{fontSize:20,lineHeight:1}}>{tab.icon}</span>
-                <span style={{fontSize:9,fontWeight:active?700:500,letterSpacing:".02em",lineHeight:1,whiteSpace:"nowrap"}}>{tab.label}</span>
-                {tab.badge!=null&&(
-                  <span style={{
-                    position:"absolute",top:4,right:6,fontSize:9,fontWeight:700,
-                    background:active?"rgba(255,255,255,.3)":"var(--accent)",
-                    color:active?"#fff":"#fff",borderRadius:99,padding:"1px 4px",lineHeight:1.4,minWidth:14,textAlign:"center"
-                  }}>{tab.badge}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        /* Desktop: segmented pill tabs */
-        <div style={{display:"flex",background:"var(--surface2)",borderRadius:10,padding:3,gap:2,marginBottom:14,overflowX:"auto",scrollbarWidth:"none"}}>
-          {[
-            {id:"car",     label:`🚗 ${t.wsTabCar}`},
-            ...(wsRole!=="mechanic"?[
-              {id:"quote",   label:`📝 ${t.wsTabQuote}`,   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
-            ]:[]),
-            {id:"inspect", label:`✅ ${t.wsTabInspect}`, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
-            {id:"photos",  label:`📷 ${t.wsTabPhotos}`,  badge:savedPhotos.length>0?savedPhotos.length:null},
-            {id:"docs",    label:`📎 ${t.wsTabDocs}`,     badge:jobDocs.length>0?jobDocs.length:null},
-            ...(wsRole!=="mechanic"?[
-              {id:"invoice", label:`🧾 ${t.invoice}`, badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
-            ]:[]),
-          ].map(tab=>{
-            const active = jobTab===tab.id;
-            return (
-              <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
-                padding:"7px 13px",border:"none",borderRadius:8,cursor:"pointer",flexShrink:0,
-                fontSize:12,fontWeight:active?700:500,
-                color:active?"var(--accent)":"var(--text2)",
-                background:active?"var(--surface)":"transparent",
-                boxShadow:active?"0 1px 4px rgba(0,0,0,.25)":"none",
-                whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,
-                transition:"all .18s",
-              }}>
-                {tab.label}
-                {tab.badge!=null&&(
-                  <span style={{fontSize:10,fontWeight:700,background:active?"var(--accent)":"var(--surface3)",color:active?"#fff":"var(--text2)",borderRadius:99,padding:"1px 6px",lineHeight:1.4,minWidth:16,textAlign:"center"}}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* ── Tab bars (two rows: job info + billing) ── */}
+      {(()=>{
+        const payBadge = invoice?.status==="paid"?"✓":invoice?.status==="partial"?"½":null;
+        const INFO_TABS = isMobile ? [
+          {id:"car",     icon:"🚗", label:t.wsTabCar},
+          {id:"inspect", icon:"✅", label:t.wsTabInspect, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
+          {id:"photos",  icon:"📷", label:t.wsTabPhotos,  badge:savedPhotos.length>0?savedPhotos.length:null},
+          {id:"docs",    icon:"📎", label:t.wsTabDocs,    badge:jobDocs.length>0?jobDocs.length:null},
+        ] : [
+          {id:"car",     label:`🚗 ${t.wsTabCar}`},
+          {id:"inspect", label:`✅ ${t.wsTabInspect}`, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
+          {id:"photos",  label:`📷 ${t.wsTabPhotos}`,  badge:savedPhotos.length>0?savedPhotos.length:null},
+          {id:"docs",    label:`📎 ${t.wsTabDocs}`,     badge:jobDocs.length>0?jobDocs.length:null},
+        ];
+        const BILLING_TABS = wsRole==="mechanic" ? [] : isMobile ? [
+          {id:"quote",   icon:"📝", label:t.wsTabQuote,  badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
+          {id:"invoice", icon:"🧾", label:t.invoice,     badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
+          {id:"payment", icon:"💳", label:"Payment",     badge:payBadge},
+        ] : [
+          {id:"quote",   label:`📝 ${t.wsTabQuote}`,   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
+          {id:"invoice", label:`🧾 ${t.invoice}`,       badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
+          {id:"payment", label:`💳 Payment`,             badge:payBadge},
+        ];
+        const mkBtn = (tab) => {
+          const active = jobTab===tab.id;
+          return isMobile ? (
+            <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
+              position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+              padding:"8px 4px",border:"none",borderRadius:10,cursor:"pointer",
+              background:active?"var(--accent)":"var(--surface2)",
+              color:active?"#fff":"var(--text3)",transition:"background .15s",
+            }}>
+              <span style={{fontSize:20,lineHeight:1}}>{tab.icon}</span>
+              <span style={{fontSize:9,fontWeight:active?700:500,letterSpacing:".02em",lineHeight:1,whiteSpace:"nowrap"}}>{tab.label}</span>
+              {tab.badge!=null&&<span style={{position:"absolute",top:4,right:6,fontSize:9,fontWeight:700,background:active?"rgba(255,255,255,.3)":"var(--accent)",color:"#fff",borderRadius:99,padding:"1px 4px",lineHeight:1.4,minWidth:14,textAlign:"center"}}>{tab.badge}</span>}
+            </button>
+          ) : (
+            <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
+              padding:"7px 13px",border:"none",borderRadius:8,cursor:"pointer",flexShrink:0,
+              fontSize:12,fontWeight:active?700:500,
+              color:active?"var(--accent)":"var(--text2)",
+              background:active?"var(--surface)":"transparent",
+              boxShadow:active?"0 1px 4px rgba(0,0,0,.25)":"none",
+              whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,transition:"all .18s",
+            }}>
+              {tab.label}
+              {tab.badge!=null&&<span style={{fontSize:10,fontWeight:700,background:active?"var(--accent)":"var(--surface3)",color:active?"#fff":"var(--text2)",borderRadius:99,padding:"1px 6px",lineHeight:1.4,minWidth:16,textAlign:"center"}}>{tab.badge}</span>}
+            </button>
+          );
+        };
+        return (<>
+          {/* Row 1 — Job info */}
+          {isMobile
+            ? <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,marginBottom:4}}>{INFO_TABS.map(mkBtn)}</div>
+            : <div style={{display:"flex",background:"var(--surface2)",borderRadius:10,padding:3,gap:2,marginBottom:4,overflowX:"auto",scrollbarWidth:"none"}}>{INFO_TABS.map(mkBtn)}</div>
+          }
+          {/* Row 2 — Billing (hidden for mechanic) */}
+          {BILLING_TABS.length>0&&(isMobile
+            ? <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:4,marginBottom:14}}>{BILLING_TABS.map(mkBtn)}</div>
+            : <div style={{display:"flex",background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.2)",borderRadius:10,padding:3,gap:2,marginBottom:14,overflowX:"auto",scrollbarWidth:"none"}}>{BILLING_TABS.map(mkBtn)}</div>
+          )}
+        </>);
+      })()}
 
       {/* ══ CAR INFO tab ══ */}
       {jobTab==="car"&&(
@@ -4414,6 +4416,63 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
               🧾 Create Workshop Invoice
             </button>
       )}
+      </>)}
+
+      {/* ══ PAYMENT tab ══ */}
+      {jobTab==="payment"&&wsRole!=="mechanic"&&(<>
+        {invoice ? (<>
+          <div className="card" style={{padding:16,marginBottom:12,borderLeft:`3px solid ${invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)"}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <div style={{fontWeight:700,fontSize:15}}>💳 Payment</div>
+              <span className="badge" style={{
+                background:invoice.status==="paid"?"rgba(52,211,153,.15)":invoice.status==="partial"?"rgba(251,191,36,.15)":"rgba(248,113,113,.15)",
+                color:invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)",
+                fontSize:12,padding:"4px 10px"
+              }}>
+                {invoice.status==="paid"?"✅ Paid":invoice.status==="partial"?"💛 Partial":"⏳ Unpaid"}
+              </span>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:14}}>
+                <span style={{color:"var(--text3)"}}>Invoice Total</span>
+                <strong style={{fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"var(--accent)"}}>{fmtAmt(invoice.total)}</strong>
+              </div>
+              {(+invoice.paid_amount||0)>0&&(
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
+                  <span style={{color:"var(--text3)"}}>Amount Paid</span>
+                  <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--green)"}}>{fmtAmt(invoice.paid_amount)}</span>
+                </div>
+              )}
+              {invoice.status!=="paid"&&(
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:14,paddingTop:7,borderTop:"1px solid var(--border)",marginTop:2}}>
+                  <span style={{fontWeight:600}}>Balance Due</span>
+                  <strong style={{fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"var(--red)"}}>{fmtAmt((+invoice.total||0)-(+invoice.paid_amount||0))}</strong>
+                </div>
+              )}
+            </div>
+            {(invoice.payment_method||invoice.payment_date)&&(
+              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)",fontSize:12,color:"var(--text3)"}}>
+                {invoice.payment_method&&<span style={{marginRight:8}}>💳 {invoice.payment_method}</span>}
+                {invoice.payment_date&&<span style={{marginRight:8}}>📅 {invoice.payment_date}</span>}
+                {invoice.payment_ref&&<span>Ref: {invoice.payment_ref}</span>}
+              </div>
+            )}
+          </div>
+          {invoice.status!=="paid"
+            ? <button className="btn btn-success" style={{width:"100%",padding:13,fontSize:15,fontWeight:700}} onClick={()=>setPaymentModal(true)}>💳 Record Payment</button>
+            : <div style={{textAlign:"center",padding:"14px",background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",borderRadius:10,fontSize:14,fontWeight:700,color:"var(--green)"}}>✅ Fully Paid{invoice.payment_date&&<span style={{fontSize:12,fontWeight:400,color:"var(--text3)",marginLeft:8}}>{invoice.payment_method} · {invoice.payment_date}</span>}</div>
+          }
+          <div style={{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setStatementModal(true)}>📋 Statement</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos)}>🖨️ Print</button>
+          </div>
+        </>) : (
+          <div style={{textAlign:"center",padding:"36px 16px",color:"var(--text3)"}}>
+            <div style={{fontSize:36,marginBottom:10}}>🧾</div>
+            <div style={{fontSize:14,marginBottom:14}}>No invoice yet — create one first</div>
+            <button className="btn btn-primary" onClick={()=>setJobTab("invoice")}>Go to Invoice →</button>
+          </div>
+        )}
       </>)}
 
       {/* Return Quote — supplier picker */}

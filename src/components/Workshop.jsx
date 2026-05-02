@@ -2691,6 +2691,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   const [photoLightbox,    setPhotoLightbox]    = useState(null); // null | index into visible photos
   const [renewalModal,  setRenewalModal]  = useState(false);
   const [serviceHistModal, setServiceHistModal] = useState(false);
+  const [showMoreActions,  setShowMoreActions]  = useState(false);
   const [addingPastRecord, setAddingPastRecord] = useState(false);
   const [pastRec, setPastRec] = useState({date_in:"",date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});
   const [savingPastRec, setSavingPastRec] = useState(false);
@@ -3258,22 +3259,27 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
             {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ {t.edit}</button>}
             <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardLabel(job,settings)}>🏷️ {t.wsLabel}</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 {t.wsCollect}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>setServiceHistModal(true)}>📋 History{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>{
-              const lines=["============================","  VEHICLE INFO","============================",
-                `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,
-                `Model    : ${job.vehicle_model||"—"}`,`Year     : ${job.vehicle_year||"—"}`,
-                `Color    : ${job.vehicle_color||"—"}`,`Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,
-                job.vin?`VIN      : ${job.vin}`:"",job.engine_no?`Engine No: ${job.engine_no}`:"",
-                "============================",].filter(Boolean).join("\r\n");
-              const a=document.createElement("a");
-              a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));
-              a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`; a.click();
-            }}>⬇️ {t.wsInfoBtn}</button>
             {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>{ if(wsProfile?.move_pin){setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}else{setMoveModal(true);} }}>🔀 {t.wsMove}</button>}
             {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
+            <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={()=>setShowMoreActions(p=>!p)} title="More actions">⋯</button>
           </div>
+          {showMoreActions&&(
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14,paddingTop:6,borderTop:"1px solid var(--border)"}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 {t.wsCollect}</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>{
+                const lines=["============================","  VEHICLE INFO","============================",
+                  `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,
+                  `Model    : ${job.vehicle_model||"—"}`,`Year     : ${job.vehicle_year||"—"}`,
+                  `Color    : ${job.vehicle_color||"—"}`,`Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,
+                  job.vin?`VIN      : ${job.vin}`:"",job.engine_no?`Engine No: ${job.engine_no}`:"",
+                  "============================",].filter(Boolean).join("\r\n");
+                const a=document.createElement("a");
+                a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));
+                a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`; a.click();
+              }}>⬇️ {t.wsInfoBtn}</button>
+            </div>
+          )}
           {/* ── Online Booking Source ── */}
           {sourceBooking&&(
             <div style={{marginBottom:14,padding:"12px 14px",background:"rgba(96,165,250,.07)",border:"1px solid rgba(96,165,250,.25)",borderRadius:10}}>
@@ -3870,41 +3876,26 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
         )}
         {/* ── VIN & Search tools ── */}
         {job.vin&&(
-          <div style={{marginBottom:12,padding:"10px 12px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)"}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>🔍 VIN</div>
-              <code style={{fontFamily:"DM Mono,monospace",fontSize:13,fontWeight:700,letterSpacing:"1px",background:"var(--surface)",padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",flex:1}}>{job.vin}</code>
+          <div style={{marginBottom:12,padding:"8px 10px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+              <span style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",flexShrink:0}}>🔍 VIN</span>
+              <code style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.vin}</code>
               <button onClick={()=>navigator.clipboard.writeText(job.vin).then(()=>alert("VIN copied!"))}
-                style={{fontSize:11,padding:"3px 8px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",color:"var(--text3)",flexShrink:0}}>📋</button>
+                style={{fontSize:10,padding:"2px 7px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:5,cursor:"pointer",color:"var(--text3)",flexShrink:0}}>📋</button>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
-              {vinSearchLinks.slice(0,4).map(lk=>(
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              {vinSearchLinks.map(lk=>(
                 <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
-                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",
-                    background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:8,
-                    color:lk.color,textDecoration:"none",fontSize:10,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
-                  <span style={{fontSize:18}}>{lk.icon}</span>
-                  <span>{lk.label}</span>
+                  style={{fontSize:10,fontWeight:600,color:lk.color,background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:99,padding:"2px 9px",textDecoration:"none",whiteSpace:"nowrap"}}>
+                  {lk.icon} {lk.label}
                 </a>
               ))}
               <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open(`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`,"_blank");}}
-                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",
-                  background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:8,
-                  color:"#dc2626",cursor:"pointer",fontSize:10,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
-                <span style={{fontSize:18}}>🔴</span><span>AutoZone</span>
-              </button>
+                style={{fontSize:10,fontWeight:600,color:"#dc2626",background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🔴 AutoZone</button>
               <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
-                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",
-                  background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:8,
-                  color:"#0ea5e9",cursor:"pointer",fontSize:10,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
-                <span style={{fontSize:18}}>🔧</span><span>Amayama</span>
-              </button>
+                style={{fontSize:10,fontWeight:600,color:"#0ea5e9",background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🔧 Amayama</button>
               <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied!\n\nPaste it into WolfOil's VIN field.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
-                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",
-                  background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:8,
-                  color:"#f97316",cursor:"pointer",fontSize:10,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
-                <span style={{fontSize:18}}>🛢️</span><span>WolfOil</span>
-              </button>
+                style={{fontSize:10,fontWeight:600,color:"#f97316",background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🛢️ WolfOil</button>
             </div>
           </div>
         )}

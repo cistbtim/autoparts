@@ -2692,6 +2692,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   const [renewalModal,  setRenewalModal]  = useState(false);
   const [serviceHistModal, setServiceHistModal] = useState(false);
   const [showMoreActions,  setShowMoreActions]  = useState(false);
+  const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [addingPastRecord, setAddingPastRecord] = useState(false);
   const [pastRec, setPastRec] = useState({date_in:"",date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});
   const [savingPastRec, setSavingPastRec] = useState(false);
@@ -3282,40 +3283,55 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           )}
           {/* ── Online Booking Source ── */}
           {sourceBooking&&(
-            <div style={{marginBottom:14,padding:"12px 14px",background:"rgba(96,165,250,.07)",border:"1px solid rgba(96,165,250,.25)",borderRadius:10}}>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--blue)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>🌐 Online Booking</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-start"}}>
-                <div style={{flex:1,minWidth:160}}>
-                  <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{sourceBooking.customer_name}</div>
-                  {sourceBooking.customer_phone&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:2}}>{sourceBooking.customer_phone}</div>}
-                  {sourceBooking.customer_email&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>{sourceBooking.customer_email}</div>}
-                  {sourceBooking.preferred_date&&<div style={{fontSize:12,color:"var(--blue)",marginTop:4}}>📅 Preferred: {sourceBooking.preferred_date}</div>}
-                  {sourceBooking.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>🔧 {sourceBooking.complaint}</div>}
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
-                  {sourceBooking.customer_phone&&(
-                    <a href={`tel:${sourceBooking.customer_phone}`}
-                      style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"rgba(96,165,250,.15)",border:"1px solid rgba(96,165,250,.3)",borderRadius:8,textDecoration:"none",color:"var(--blue)",fontWeight:600,fontSize:13}}>
-                      📞 Call
-                    </a>
+            <div style={{marginBottom:14}}>
+              {/* Collapsed pill */}
+              <button onClick={()=>setShowBookingDetails(p=>!p)}
+                style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 12px",background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.28)",borderRadius:8,cursor:"pointer",textAlign:"left"}}>
+                <span style={{fontSize:13}}>🌐</span>
+                <span style={{fontWeight:600,fontSize:12,color:"var(--blue)",flex:1}}>
+                  Online Booking
+                  {sourceBooking.customer_name&&<span style={{fontWeight:400,color:"var(--text2)",marginLeft:6}}>{sourceBooking.customer_name}</span>}
+                  {sourceBooking.preferred_date&&<span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>· 📅 {sourceBooking.preferred_date}</span>}
+                </span>
+                <span style={{fontSize:11,color:"var(--text3)"}}>{showBookingDetails?"▲":"▼"}</span>
+              </button>
+              {/* Expanded details */}
+              {showBookingDetails&&(
+                <div style={{marginTop:6,padding:"12px 14px",background:"rgba(96,165,250,.07)",border:"1px solid rgba(96,165,250,.25)",borderRadius:8}}>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-start"}}>
+                    <div style={{flex:1,minWidth:160}}>
+                      <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{sourceBooking.customer_name}</div>
+                      {sourceBooking.customer_phone&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:2}}>{sourceBooking.customer_phone}</div>}
+                      {sourceBooking.customer_email&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>{sourceBooking.customer_email}</div>}
+                      {sourceBooking.preferred_date&&<div style={{fontSize:12,color:"var(--blue)",marginTop:4}}>📅 Preferred: {sourceBooking.preferred_date}</div>}
+                      {sourceBooking.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>🔧 {sourceBooking.complaint}</div>}
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+                      {sourceBooking.customer_phone&&(
+                        <a href={`tel:${sourceBooking.customer_phone}`}
+                          style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"rgba(96,165,250,.15)",border:"1px solid rgba(96,165,250,.3)",borderRadius:8,textDecoration:"none",color:"var(--blue)",fontWeight:600,fontSize:13}}>
+                          📞 Call
+                        </a>
+                      )}
+                      {sourceBooking.customer_phone&&(
+                        <a href={`https://wa.me/${sourceBooking.customer_phone.replace(/\D/g,"")}?text=${encodeURIComponent(`Hi ${(sourceBooking.customer_name||"").split(" ")[0]||"there"}, regarding your ${sourceBooking.vehicle_reg||job.vehicle_reg||"vehicle"} booking — `)}`}
+                          target="_blank" rel="noreferrer"
+                          style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,textDecoration:"none",color:"#25D366",fontWeight:600,fontSize:13}}>
+                          📱 WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  {[sourceBooking.photo_1,sourceBooking.photo_2,sourceBooking.photo_3].filter(Boolean).length>0&&(
+                    <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                      {[sourceBooking.photo_1,sourceBooking.photo_2,sourceBooking.photo_3].filter(Boolean).map((url,i)=>(
+                        <a key={i} href={url} target="_blank" rel="noreferrer">
+                          <img src={url} alt={`photo ${i+1}`} style={{width:64,height:64,objectFit:"cover",borderRadius:7,border:"1px solid var(--border)",cursor:"zoom-in"}}
+                            onError={e=>{e.target.style.display="none";}}/>
+                        </a>
+                      ))}
+                    </div>
                   )}
-                  {sourceBooking.customer_phone&&(
-                    <a href={`https://wa.me/${sourceBooking.customer_phone.replace(/\D/g,"")}?text=${encodeURIComponent(`Hi ${(sourceBooking.customer_name||"").split(" ")[0]||"there"}, regarding your ${sourceBooking.vehicle_reg||job.vehicle_reg||"vehicle"} booking — `)}`}
-                      target="_blank" rel="noreferrer"
-                      style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,textDecoration:"none",color:"#25D366",fontWeight:600,fontSize:13}}>
-                      📱 WhatsApp
-                    </a>
-                  )}
-                </div>
-              </div>
-              {[sourceBooking.photo_1,sourceBooking.photo_2,sourceBooking.photo_3].filter(Boolean).length>0&&(
-                <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
-                  {[sourceBooking.photo_1,sourceBooking.photo_2,sourceBooking.photo_3].filter(Boolean).map((url,i)=>(
-                    <a key={i} href={url} target="_blank" rel="noreferrer">
-                      <img src={url} alt={`photo ${i+1}`} style={{width:64,height:64,objectFit:"cover",borderRadius:7,border:"1px solid var(--border)",cursor:"zoom-in"}}
-                        onError={e=>{e.target.style.display="none";}}/>
-                    </a>
-                  ))}
                 </div>
               )}
             </div>

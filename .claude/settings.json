@@ -37,7 +37,15 @@
       "Bash(cp /tmp/vehicle-filter-ford.png .gstack/qa-reports/screenshots/05-vehicle-filter-ford.png)",
       "Bash(~/.claude/skills/gstack/bin/gstack-learnings-log '{\"skill\":\"qa\",\"type\":\"operational\",\"key\":\"rfq-checkbox-stale-refs\",\"insight\":\"In the New RFQ wizard, React controlled checkboxes cause stale ref issues in the browse tool. Use JS click via Array.from\\(buttons\\).find\\(\\) pattern instead of checkbox refs. The underlying Select button in RFQ detail works fine with JS click.\",\"confidence\":7,\"source\":\"observed\",\"files\":[\"src/components/RfqVehicles.jsx\"]}')",
       "Bash(~/.claude/skills/gstack/bin/gstack-learnings-log '{\"skill\":\"qa\",\"type\":\"operational\",\"key\":\"app-focus-loadall\",\"insight\":\"App.jsx fires loadAll\\(\\) on window focus event \\(line 488-490\\). The headless browse tool may trigger focus events during JS evaluation, causing data refresh mid-test. Use JS clicks \\(not browser refs\\) for stable interaction with this app.\",\"confidence\":6,\"source\":\"observed\",\"files\":[\"src/App.jsx\"]}')",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "Bash(awk -F: '$2 > 4530 && $2 < 4875 {print}')",
+      "Bash(python -c ' *)",
+      "Bash(SUPABASE_URL=\"https://lskouiyvdngdzaquurhk.supabase.co\" SUPABASE_KEY=\"sb_publishable_De4neqOoFn1wFyiVzaNT0A_HzPAE3YW\" WORKSHOP_ID=\"9\" python import_firebase_vehicles.py)",
+      "Bash(python import_firebase_jobs.py)",
+      "Bash(node -e ' *)",
+      "Bash(python3)",
+      "Bash(grep -n \"WorkshopBookingPage\\\\|export function.*Booking\" c:\\\\\\\\Users\\\\\\\\Tim\\\\\\\\car-parts-app\\\\\\\\src\\\\\\\\pages\\\\\\\\PublicPages.jsx)",
+      "Bash(wc -l c:\\\\\\\\Users\\\\\\\\Tim\\\\\\\\car-parts-app\\\\\\\\src\\\\\\\\pages\\\\\\\\PublicPages.jsx)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory"

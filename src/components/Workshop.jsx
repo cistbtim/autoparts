@@ -350,6 +350,24 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         </select>
       </div>
 
+      {/* ── Resume Job banner (navigated away via Go to Stock / View POs) ── */}
+      {activeJob&&view==="list"&&(
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",marginBottom:14,background:"rgba(249,115,22,.1)",border:"1px solid rgba(249,115,22,.35)",borderRadius:10}}>
+          <span style={{fontSize:22,flexShrink:0}}>📋</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:1}}>Job in progress</div>
+            <div style={{fontSize:12,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{activeJob.id}</code>
+              {" · "}<strong>{activeJob.vehicle_reg||"—"}</strong>
+              {" · "}{activeJob.customer_name||""}
+              {activeJob.complaint&&<span style={{color:"var(--text3)"}}>{" · "}⚠️ {activeJob.complaint.slice(0,50)}{activeJob.complaint.length>50?"…":""}</span>}
+            </div>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={()=>setView("job")}>← Back to Job</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setActiveJob(null)} title="Dismiss">✕</button>
+        </div>
+      )}
+
       {/* ══════════════ JOBS TAB ══════════════ */}
       {wsTab==="jobs"&&(<>
         {!kanbanView&&(<>
@@ -474,13 +492,13 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           const probCol = jobs.filter(j=>j.is_problem);
 
           const COLS = [
-            {id:"booking",  label:"Booking",          color:"#60a5fa", items:bkCol,   type:"booking"},
-            {id:"pending",  label:"Pending",           color:"#a78bfa", items:pendCol, type:"job", nextStatus:"In Progress", nextLabel:"▶ Start"},
-            {id:"wip",      label:"In Progress",       color:"#fbbf24", items:wipCol,  type:"job", nextStatus:"Done",        nextLabel:"✓ Mark Done"},
-            {id:"done",     label:"Done",              color:"#34d399", items:doneCol, type:"job"},
-            {id:"invoiced", label:"Invoiced",          color:"#f97316", items:invCol,  type:"job"},
-            {id:"paid",     label:"Payment Received",  color:"#10b981", items:paidCol, type:"job"},
-            {id:"problem",  label:"Problem Job",       color:"#f87171", items:probCol, type:"job"},
+            {id:"booking",  label:"Booking",          hint:"Confirm & create job",   color:"#60a5fa", items:bkCol,   type:"booking"},
+            {id:"pending",  label:"Pending",           hint:"Waiting to start",       color:"#a78bfa", items:pendCol, type:"job", nextStatus:"In Progress", nextLabel:"▶ Start"},
+            {id:"wip",      label:"In Progress",       hint:"Add quote + do the work",color:"#fbbf24", items:wipCol,  type:"job", nextStatus:"Done",        nextLabel:"✓ Mark Done"},
+            {id:"done",     label:"Done",              hint:"Create invoice",          color:"#34d399", items:doneCol, type:"job"},
+            {id:"invoiced", label:"Invoiced",          hint:"Collect payment",         color:"#f97316", items:invCol,  type:"job"},
+            {id:"paid",     label:"Payment Received",  hint:"Job complete ✓",          color:"#10b981", items:paidCol, type:"job"},
+            {id:"problem",  label:"Problem Job",       hint:"Needs attention",         color:"#f87171", items:probCol, type:"job"},
           ];
 
           const BkCard = ({b}) => (
@@ -619,11 +637,14 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
               {COLS.map(col=>(
                 <div key={col.id} style={{minWidth:270,maxWidth:270,flexShrink:0,display:"flex",flexDirection:"column"}}>
                   <div style={{borderRadius:"12px 12px 0 0",padding:"10px 14px",background:`linear-gradient(135deg,${col.color}1a 0%,${col.color}0a 100%)`,border:`1px solid ${col.color}35`,borderBottom:"none",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
                       <div style={{width:8,height:8,borderRadius:"50%",background:col.color,boxShadow:`0 0 8px ${col.color}`,flexShrink:0}}/>
-                      <span style={{fontWeight:700,fontSize:12,letterSpacing:".01em"}}>{col.label}</span>
+                      <div style={{minWidth:0}}>
+                        <div style={{fontWeight:700,fontSize:12,letterSpacing:".01em"}}>{col.label}</div>
+                        {col.hint&&<div style={{fontSize:10,color:col.color,opacity:.75,marginTop:1,whiteSpace:"nowrap"}}>{col.hint}</div>}
+                      </div>
                     </div>
-                    <span style={{background:`${col.color}22`,color:col.color,borderRadius:99,padding:"2px 9px",fontSize:11,fontWeight:700,minWidth:22,textAlign:"center"}}>{col.items.length}</span>
+                    <span style={{background:`${col.color}22`,color:col.color,borderRadius:99,padding:"2px 9px",fontSize:11,fontWeight:700,minWidth:22,textAlign:"center",flexShrink:0}}>{col.items.length}</span>
                   </div>
                   <div style={{background:`${col.color}07`,border:`1px solid ${col.color}25`,borderTop:"none",borderRadius:"0 0 12px 12px",padding:"8px 7px",minHeight:160,maxHeight:"calc(100vh - 240px)",overflowY:"auto"}}>
                     {col.items.length===0&&(
@@ -3795,6 +3816,54 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           const getSupCosts = (desc) => supCostMap[(desc||"").toLowerCase().trim()] || [];
 
           return (<>
+        {/* ── Billing flow stepper ── */}
+        {(()=>{
+          const steps=[
+            {key:"quote",   label:"📝 Quote",   done:!!quote,   active:!!quote&&!invoice,   onClick:()=>{}},
+            {key:"invoice", label:"🧾 Invoice",  done:invoice?.status==="paid"||invoice?.status==="partial", active:!!invoice&&invoice?.status!=="paid", onClick:()=>invoice&&setJobTab("invoice")},
+            {key:"paid",    label:"💳 Paid",     done:invoice?.status==="paid",    active:invoice?.status==="paid",    onClick:()=>invoice&&setJobTab("invoice")},
+          ];
+          return (
+            <div style={{display:"flex",alignItems:"center",marginBottom:12,background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)",overflow:"hidden"}}>
+              {steps.map((s,i)=>(
+                <div key={s.key} style={{display:"contents"}}>
+                  <button onClick={s.onClick} style={{
+                    flex:1,padding:"8px 4px",border:"none",cursor:s.onClick&&(s.done||s.active)?"pointer":"default",
+                    background:s.active?"var(--accent)":s.done?"rgba(52,211,153,.12)":"transparent",
+                    color:s.active?"#fff":s.done?"#10b981":"var(--text3)",
+                    fontWeight:s.active||s.done?700:400,fontSize:12,textAlign:"center",
+                    display:"flex",alignItems:"center",justifyContent:"center",gap:4,
+                    borderRight:i<2?"1px solid var(--border)":"none",
+                  }}>
+                    {s.label}
+                    {s.done&&!s.active&&<span style={{fontSize:10,background:"rgba(16,185,129,.25)",color:"#10b981",borderRadius:99,padding:"0 5px",lineHeight:1.6}}>✓</span>}
+                  </button>
+                  {i<2&&<div style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>→</div>}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+        {/* ── Complaint & Notes summary (top of quote tab) ── */}
+        {(job.complaint||job.notes)&&(
+          <div style={{marginBottom:12,display:"flex",flexDirection:"column",gap:6}}>
+            {job.complaint&&(
+              <div style={{borderRadius:8,overflow:"hidden",border:"2px solid #ef4444"}}>
+                <div style={{background:"#ef4444",padding:"4px 10px",display:"flex",alignItems:"center",gap:5}}>
+                  <span style={{fontSize:12}}>⚠️</span>
+                  <span style={{fontSize:10,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".07em"}}>Customer Complaint</span>
+                </div>
+                <div style={{padding:"8px 10px",background:"var(--surface2)",fontSize:13,fontWeight:600,color:"var(--text)",lineHeight:1.5}}>{job.complaint}</div>
+              </div>
+            )}
+            {job.notes&&(
+              <div style={{padding:"8px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8}}>
+                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:3}}>📝 Notes</div>
+                <div style={{fontSize:12,color:"var(--text2)",lineHeight:1.5}}>{job.notes}</div>
+              </div>
+            )}
+          </div>
+        )}
         {/* ── VIN & Search tools ── */}
         {job.vin&&(
           <div style={{marginBottom:12,padding:"10px 12px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)"}}>
@@ -3833,26 +3902,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                 <span style={{fontSize:18}}>🛢️</span><span>WolfOil</span>
               </button>
             </div>
-          </div>
-        )}
-        {/* ── Complaint & Notes summary ── */}
-        {(job.complaint||job.notes)&&(
-          <div style={{marginBottom:12,display:"flex",flexDirection:"column",gap:6}}>
-            {job.complaint&&(
-              <div style={{borderRadius:8,overflow:"hidden",border:"2px solid #ef4444"}}>
-                <div style={{background:"#ef4444",padding:"4px 10px",display:"flex",alignItems:"center",gap:5}}>
-                  <span style={{fontSize:12}}>⚠️</span>
-                  <span style={{fontSize:10,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".07em"}}>Customer Complaint</span>
-                </div>
-                <div style={{padding:"8px 10px",background:"var(--surface2)",fontSize:13,fontWeight:600,color:"var(--text)",lineHeight:1.5}}>{job.complaint}</div>
-              </div>
-            )}
-            {job.notes&&(
-              <div style={{padding:"8px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8}}>
-                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:3}}>📝 Notes</div>
-                <div style={{fontSize:12,color:"var(--text2)",lineHeight:1.5}}>{job.notes}</div>
-              </div>
-            )}
           </div>
         )}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>

@@ -3436,6 +3436,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             )}
           </div>
 
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>🚗 Car Details</div>
+            {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"3px 10px"}} onClick={()=>setEditJob(true)}>✏️ Edit</button>}
+          </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:12}}>
             {[
               [`🚗 ${t.wsPlate}`, job.vehicle_reg, true],

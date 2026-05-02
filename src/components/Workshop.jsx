@@ -3260,13 +3260,13 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ {t.edit}</button>}
             <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardLabel(job,settings)}>🏷️ {t.wsLabel}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>setServiceHistModal(true)}>📋 History{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
-            {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>{ if(wsProfile?.move_pin){setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}else{setMoveModal(true);} }}>🔀 {t.wsMove}</button>}
             {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
             <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={()=>setShowMoreActions(p=>!p)} title="More actions">⋯</button>
           </div>
           {showMoreActions&&(
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14,paddingTop:6,borderTop:"1px solid var(--border)"}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 {t.wsCollect}</button>
+              {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>{ if(wsProfile?.move_pin){setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}else{setMoveModal(true);} }}>🔀 {t.wsMove}</button>}
               <button className="btn btn-ghost btn-sm" onClick={()=>{
                 const lines=["============================","  VEHICLE INFO","============================",
                   `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,

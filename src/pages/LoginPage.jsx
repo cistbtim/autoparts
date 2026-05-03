@@ -1,31 +1,65 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { api } from "../lib/api.js";
 import { getSettings } from "../lib/settings.js";
 import { CSS } from "../styles.js";
-import { ShopLogo, FL, FG } from "../components/shared.jsx";
+import { ShopLogo, FL } from "../components/shared.jsx";
 import { makeId, detectGeoLocation } from "../lib/helpers.js";
 
+const ErrBox = ({msg}) => (
+  <div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.25)",borderRadius:9,padding:"9px 13px",fontSize:13,color:"var(--red)",display:"flex",alignItems:"center",gap:7}}>
+    <span style={{flexShrink:0}}>⚠</span> {msg}
+  </div>
+);
+
+const Field = ({label, hint, children}) => (
+  <div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:5}}>
+      <label style={{fontSize:12,fontWeight:700,color:"var(--text3)",letterSpacing:".03em"}}>{label}</label>
+      {hint&&<span style={{fontSize:11,color:"var(--text3)"}}>{hint}</span>}
+    </div>
+    {children}
+  </div>
+);
+
 export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
-  const [authTab,setAuthTab] = useState("customer"); // customer | workshop | staff
-  const [user,setUser] = useState(""); const [pass,setPass] = useState("");
+  const [authTab,setAuthTab] = useState("workshop");
+  // staff
+  const [staffUser,setStaffUser] = useState(""); const [staffPass,setStaffPass] = useState("");
+  // workshop
+  const [wsCompany,setWsCompany] = useState("");
   const [wsUser,setWsUser] = useState(""); const [wsPass,setWsPass] = useState("");
-  const [custTab,setCustTab] = useState("login");
-  const [wsTab,setWsTab] = useState("login"); // login | signup
-  const [cName,setCName] = useState(""); const [cPhone,setCPhone] = useState("");
-  const [cEmail,setCEmail] = useState(""); const [cPass,setCPass] = useState(""); const [cPass2,setCPass2] = useState("");
+  const [wsTab,setWsTab] = useState("login");
   const [wsRegName,setWsRegName] = useState(""); const [wsRegUser,setWsRegUser] = useState("");
   const [wsRegPass,setWsRegPass] = useState(""); const [wsRegPass2,setWsRegPass2] = useState("");
   const [wsRegEmail,setWsRegEmail] = useState(""); const [wsRegPhone,setWsRegPhone] = useState("");
   const [wsRegCity,setWsRegCity] = useState(""); const [wsRegCountry,setWsRegCountry] = useState("");
+  // scrapyard
+  const [scrapCompany,setScrapCompany] = useState("");
+  const [scrapUser,setScrapUser] = useState(""); const [scrapPass,setScrapPass] = useState("");
+  const [scrapTab,setScrapTab] = useState("login");
+  const [scrapRegName,setScrapRegName] = useState(""); const [scrapRegUser,setScrapRegUser] = useState("");
+  const [scrapRegPass,setScrapRegPass] = useState(""); const [scrapRegPass2,setScrapRegPass2] = useState("");
+  const [scrapRegEmail,setScrapRegEmail] = useState(""); const [scrapRegPhone,setScrapRegPhone] = useState("");
+  const [scrapRegCity,setScrapRegCity] = useState(""); const [scrapRegCountry,setScrapRegCountry] = useState("");
+  // customer
+  const [custTab,setCustTab] = useState("login");
+  const [cName,setCName] = useState(""); const [cPhone,setCPhone] = useState("");
+  const [cEmail,setCEmail] = useState(""); const [cPass,setCPass] = useState(""); const [cPass2,setCPass2] = useState("");
+
   const [err,setErr] = useState(""); const [loading,setLoading] = useState(false);
   const [detectingLoc,setDetectingLoc] = useState(false);
 
-  const logLogin = async (u) => { try { const g=await(await fetch("https://ipapi.co/json/")).json(); await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:`${g.country_name||"?"} ${g.country_flag_emoji||""}`.trim(),city:g.city||"",device:navigator.userAgent.slice(0,100),status:"success"}); } catch{} };
+  const logLogin = async (u) => {
+    try {
+      const g = await (await fetch("https://ipapi.co/json/")).json();
+      await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:`${g.country_name||"?"} ${g.country_flag_emoji||""}`.trim(),city:g.city||"",device:navigator.userAgent.slice(0,100),status:"success"});
+    } catch {}
+  };
 
   const doStaffLogin = async () => {
-    if(!user||!pass){setErr(t.wrongPass);return;}
+    if(!staffUser||!staffPass){setErr(t.wrongPass);return;}
     setLoading(true);setErr("");
-    const res = await api.get("users",`username=eq.${encodeURIComponent(user)}&password=eq.${encodeURIComponent(pass)}&select=*`);
+    const res = await api.get("users",`username=eq.${encodeURIComponent(staffUser)}&password=eq.${encodeURIComponent(staffPass)}&select=*`);
     if(Array.isArray(res)&&res.length>0){await logLogin(res[0]);onLogin(res[0]);}
     else setErr(t.wrongPass);
     setLoading(false);
@@ -34,11 +68,19 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
   const doWorkshopLogin = async () => {
     if(!wsUser||!wsPass){setErr("Fill username & password");return;}
     setLoading(true);setErr("");
-    // Check main workshop account first — main always takes priority
-    const res = await api.get("users",`username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&role=eq.workshop&select=*`);
+    const company = wsCompany.trim();
+    // Check main workshop account
+    let q = `username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&role=eq.workshop&select=*`;
+    if(company) q += `&name=ilike.*${encodeURIComponent(company)}*`;
+    const res = await api.get("users", q);
     if(Array.isArray(res)&&res.length>0){await logLogin(res[0]);onLogin(res[0]);setLoading(false);return;}
-    // Check workshop sub-users (mechanics, managers)
-    const suRes = await api.get("workshop_users",`username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&is_active=eq.true&select=*`);
+    // Check workshop sub-users
+    let suQ = `username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&is_active=eq.true&select=*`;
+    if(company) {
+      const compRes = await api.get("users",`role=eq.workshop&name=ilike.*${encodeURIComponent(company)}*&select=id`);
+      if(Array.isArray(compRes)&&compRes.length>0) suQ += `&workshop_id=eq.${compRes[0].id}`;
+    }
+    const suRes = await api.get("workshop_users", suQ);
     if(Array.isArray(suRes)&&suRes.length>0){
       const wu=suRes[0];
       const mainRes=await api.get("users",`id=eq.${wu.workshop_id}&select=*`);
@@ -46,11 +88,22 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
         const userObj={...mainRes[0],wsRole:wu.ws_role,wsUsername:wu.username,name:wu.name||mainRes[0].name};
         await logLogin({...userObj,username:wu.username});
         onLogin(userObj);
-        setLoading(false);
-        return;
+        setLoading(false);return;
       }
     }
-    setErr("Invalid workshop username or password");
+    setErr("Invalid workshop credentials");
+    setLoading(false);
+  };
+
+  const doScrapyardLogin = async () => {
+    if(!scrapUser||!scrapPass){setErr(t.wrongPass);return;}
+    setLoading(true);setErr("");
+    const company = scrapCompany.trim();
+    let q = `username=eq.${encodeURIComponent(scrapUser)}&password=eq.${encodeURIComponent(scrapPass)}&role=eq.scrapyard&select=*`;
+    if(company) q += `&name=ilike.*${encodeURIComponent(company)}*`;
+    const res = await api.get("users", q);
+    if(Array.isArray(res)&&res.length>0){await logLogin(res[0]);onLogin(res[0]);}
+    else setErr(t.wrongPass);
     setLoading(false);
   };
 
@@ -59,18 +112,33 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
     if(wsRegPass!==wsRegPass2){setErr("Passwords don't match");return;}
     if(wsRegPass.length<4){setErr("Password must be at least 4 characters");return;}
     setLoading(true);setErr("");
-    // Check username uniqueness
     const ex=await api.get("users",`username=eq.${encodeURIComponent(wsRegUser)}&select=id`).catch(()=>[]);
     if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
-    // Create workshop user account
     const wsId=makeId("WS");
     const today=new Date().toISOString().slice(0,10);
     const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
     const newUser=await api.insert("users",{id:wsId,username:wsRegUser,password:wsRegPass,name:wsRegName,role:"workshop",phone:wsRegPhone||"",email:wsRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
     if(!newUser){setLoading(false);return;}
-    // Create workshop profile with trial
     await api.upsert("workshop_profiles",{id:wsId,name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>{});
-    // Auto-login
+    const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
+    if(loginUser){await logLogin({...loginUser});onLogin({...loginUser});}
+    else setErr("Account created — please log in");
+    setLoading(false);
+  };
+
+  const doScrapyardSignup = async () => {
+    if(!scrapRegName||!scrapRegUser||!scrapRegPass||!scrapRegCity||!scrapRegCountry){setErr("Scrapyard name, username, password, city and country are required");return;}
+    if(scrapRegPass!==scrapRegPass2){setErr("Passwords don't match");return;}
+    if(scrapRegPass.length<4){setErr("Password must be at least 4 characters");return;}
+    setLoading(true);setErr("");
+    const ex=await api.get("users",`username=eq.${encodeURIComponent(scrapRegUser)}&select=id`).catch(()=>[]);
+    if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
+    const scrapId=makeId("SY");
+    const today=new Date().toISOString().slice(0,10);
+    const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
+    const newUser=await api.insert("users",{id:scrapId,username:scrapRegUser,password:scrapRegPass,name:scrapRegName,role:"scrapyard",phone:scrapRegPhone||"",email:scrapRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
+    if(!newUser){setLoading(false);return;}
+    await api.upsert("workshop_profiles",{id:scrapId,name:scrapRegName,phone:scrapRegPhone||"",email:scrapRegEmail||"",city:scrapRegCity,country:scrapRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>{});
     const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
     if(loginUser){await logLogin({...loginUser});onLogin({...loginUser});}
     else setErr("Account created — please log in");
@@ -90,7 +158,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
     if(!cName||!cPhone||!cPass){setErr("Name, phone & password required");return;}
     if(cPass!==cPass2){setErr("Passwords don't match");return;}
     const digitsOnly=cPhone.replace(/[^0-9]/g,"");
-    if(digitsOnly.length<9){setErr("Phone number too short — please enter full number (min 9 digits)");return;}
+    if(digitsOnly.length<9){setErr("Phone number too short (min 9 digits)");return;}
     setLoading(true);setErr("");
     const ex = await api.get("customers",`phone=eq.${encodeURIComponent(cPhone)}&select=id`);
     if(Array.isArray(ex)&&ex.length>0){setErr("Phone already registered — login instead");setLoading(false);return;}
@@ -101,124 +169,351 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
     setLoading(false);
   };
 
+  const switchTab = (tab) => { setAuthTab(tab); setErr(""); };
+
+  const TAB_BTNS = [
+    {id:"workshop", icon:"🔧", label:"Workshop"},
+    {id:"scrapyard", icon:"🚗", label:"Scrapyard"},
+    {id:"customer", icon:"🛒", label:"Shop"},
+    {id:"staff", icon:"🏢", label:"Staff"},
+  ];
+
+  const inpStyle = {
+    width:"100%",padding:"11px 14px",borderRadius:9,border:"1.5px solid var(--border)",
+    background:"var(--surface2)",color:"var(--text)",fontSize:14,boxSizing:"border-box",
+    outline:"none",fontFamily:"inherit",transition:"border-color .15s",
+  };
+  const companyInpStyle = {...inpStyle, borderColor:"rgba(96,165,250,.35)", background:"rgba(96,165,250,.05)"};
+
   return (
-    <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
       <style>{CSS}</style>
-      <div style={{width:"100%",maxWidth:420}}>
-        <div style={{textAlign:"center",marginBottom:30}}>
-          <div style={{display:"flex",justifyContent:"center",marginBottom:4}}>
-            <div style={{maxWidth:"min(90vw, 400px)",width:"100%",display:"flex",justifyContent:"center"}}>
-              <ShopLogo settings={loadedSettings||getSettings()} size="lg"/>
+      <div style={{width:"100%",maxWidth:430}}>
+
+        {/* Logo + app subtitle */}
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:6}}>
+            <ShopLogo settings={loadedSettings||getSettings()} size="lg"/>
+          </div>
+          <div style={{color:"var(--text3)",fontSize:13}}>{t.appSub}</div>
+          {langs.length>1&&(
+            <div style={{display:"flex",justifyContent:"center",gap:5,marginTop:10,flexWrap:"wrap"}}>
+              {langs.map(l=>(
+                <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
+                  {l.flag||l.lang.toUpperCase()}
+                </button>
+              ))}
             </div>
-          </div>
-          <div style={{color:"var(--text3)",fontSize:13,marginTop:8}}>{t.appSub}</div>
-          <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:12,flexWrap:"wrap"}}>
-            {langs.map(l=>(
-              <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
-                {l.flag||l.lang.toUpperCase()}
-              </button>
-            ))}
-          </div>
+          )}
         </div>
+
         {/* Login type tabs */}
-        <div style={{display:"flex",borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",marginBottom:16}}>
-          {[["customer","🛒 "+t.loginShop],["workshop","🔧 "+t.loginWorkshop],["staff","🏢 "+t.loginStaff]].map(([id,lb])=>(
-            <button key={id} onClick={()=>{setAuthTab(id);setErr("");}}
-              style={{flex:1,padding:"9px 4px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",fontFamily:"DM Sans,sans-serif",
-                background:authTab===id?"var(--accent)":"var(--surface2)",
-                color:authTab===id?"#fff":"var(--text3)",
-                borderRight:id!=="staff"?"1px solid var(--border)":"none",transition:"all .15s"}}>
-              {lb}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5,marginBottom:14}}>
+          {TAB_BTNS.map(tb=>(
+            <button key={tb.id} onClick={()=>switchTab(tb.id)} style={{
+              padding:"10px 4px",borderRadius:11,border:"none",cursor:"pointer",
+              background:authTab===tb.id?"var(--accent)":"var(--surface2)",
+              color:authTab===tb.id?"#fff":"var(--text2)",
+              fontWeight:authTab===tb.id?700:500,
+              fontSize:10.5,letterSpacing:".01em",
+              display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+              boxShadow:authTab===tb.id?"0 3px 12px rgba(0,0,0,.18)":"none",
+              transition:"all .15s",
+            }}>
+              <span style={{fontSize:19}}>{tb.icon}</span>
+              <span>{tb.label}</span>
             </button>
           ))}
         </div>
-        <div className="card" style={{padding:26,boxShadow:"var(--shadow-lg)"}}>
-          {authTab==="staff"&&(
-            <div style={{display:"flex",flexDirection:"column",gap:13}}>
-              <div><FL label={t.username}/><input className="inp" type="text" value={user} onChange={e=>setUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doStaffLogin()} autoCapitalize="none"/></div>
-              <div><FL label={t.password}/><input className="inp" type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doStaffLogin()}/></div>
-              {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
-              <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doStaffLogin} disabled={loading}>{loading?t.connecting:t.login}</button>
-            </div>
-          )}
+
+        {/* Card */}
+        <div style={{background:"var(--surface)",borderRadius:16,border:"1px solid var(--border)",boxShadow:"0 8px 32px rgba(0,0,0,.12)",padding:"26px 24px",overflow:"hidden"}}>
+
+          {/* ── Workshop ── */}
           {authTab==="workshop"&&(
-            <div style={{display:"flex",flexDirection:"column",gap:13}}>
-              <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:4}}>
-                {[["login",t.signIn],["signup",t.registerWorkshop]].map(([id,lb])=>(
+            <div style={{display:"flex",flexDirection:"column",gap:0}}>
+              <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:18}}>
+                {[["login",t.signIn||"Sign In"],["signup",t.registerWorkshop||"Register"]].map(([id,lb])=>(
                   <button key={id} className={`auth-tab ${wsTab===id?"on":""}`} onClick={()=>{setWsTab(id);setErr("");}}>{lb}</button>
                 ))}
               </div>
-              {wsTab==="login"&&(<>
-                <div><FL label={t.username}/><input className="inp" type="text" value={wsUser} onChange={e=>setWsUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()} autoCapitalize="none" placeholder="Workshop username"/></div>
-                <div><FL label={t.password}/><input className="inp" type="password" value={wsPass} onChange={e=>setWsPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()}/></div>
-                {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
-                <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doWorkshopLogin} disabled={loading}>{loading?t.connecting:t.login}</button>
-              </>)}
-              {wsTab==="signup"&&(<>
-                <div style={{background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.2)",borderRadius:8,padding:"10px 13px",fontSize:12,color:"var(--green)",lineHeight:1.5}}>
-                  ✅ {t.freeTrial30}
-                </div>
-                <div><FL label={t.workshopNameField+" *"}/><input className="inp" value={wsRegName} onChange={e=>setWsRegName(e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
-                <div><FL label={t.username+" *"}/><input className="inp" value={wsRegUser} onChange={e=>setWsRegUser(e.target.value)} autoCapitalize="none" placeholder="Choose a login username"/></div>
-                <div><FL label={t.password+" *"}/><input className="inp" type="password" value={wsRegPass} onChange={e=>setWsRegPass(e.target.value)}/></div>
-                <div><FL label={t.confirmPwd+" *"}/><input className="inp" type="password" value={wsRegPass2} onChange={e=>setWsRegPass2(e.target.value)}/></div>
-                <div><FL label="Email"/><input className="inp" type="email" value={wsRegEmail} onChange={e=>setWsRegEmail(e.target.value)} placeholder="workshop@email.com"/></div>
-                <div><FL label="Phone"/><input className="inp" type="tel" value={wsRegPhone} onChange={e=>setWsRegPhone(e.target.value)} placeholder="+27..."/></div>
-                <div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                    <FL label="City & Country *"/>
-                    <button type="button" className="btn btn-ghost btn-xs" disabled={detectingLoc} onClick={async()=>{
-                      setDetectingLoc(true);
-                      try{const loc=await detectGeoLocation();setWsRegCity(loc.city);setWsRegCountry(loc.country);}catch{}
-                      setDetectingLoc(false);
-                    }} style={{fontSize:11,padding:"3px 9px"}}>
-                      {detectingLoc?t.detectingLoc:"📍 "+t.autoDetect}
-                    </button>
+
+              {wsTab==="login"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:13}}>
+                  <div style={{marginBottom:2}}>
+                    <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>🔧 Workshop Login</div>
+                    <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>Sign in to your workshop account</div>
                   </div>
-                  <div style={{display:"flex",gap:10}}>
-                    <input className="inp" value={wsRegCity} onChange={e=>setWsRegCity(e.target.value)} placeholder="City" style={{flex:1}}/>
-                    <input className="inp" value={wsRegCountry} onChange={e=>setWsRegCountry(e.target.value)} placeholder="Country" style={{flex:1}}/>
-                  </div>
+
+                  {/* Company name field */}
+                  <Field label="Company Name" hint="Optional">
+                    <div style={{position:"relative"}}>
+                      <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none",opacity:.6}}>🏢</span>
+                      <input
+                        style={{...companyInpStyle, paddingLeft:34}}
+                        type="text" value={wsCompany}
+                        onChange={e=>setWsCompany(e.target.value)}
+                        placeholder="e.g. ABC Auto Workshop"
+                        autoCapitalize="words"
+                      />
+                    </div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Helps identify your account if multiple workshops share a username</div>
+                  </Field>
+
+                  <Field label={t.username||"Username"}>
+                    <input style={inpStyle} type="text" value={wsUser} onChange={e=>setWsUser(e.target.value)}
+                      onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()} autoCapitalize="none" placeholder="Your login username"/>
+                  </Field>
+                  <Field label={t.password||"Password"}>
+                    <input style={inpStyle} type="password" value={wsPass} onChange={e=>setWsPass(e.target.value)}
+                      onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()}/>
+                  </Field>
+
+                  {err&&<ErrBox msg={err}/>}
+                  <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doWorkshopLogin} disabled={loading}>
+                    {loading?t.connecting||"Connecting…":"Sign In →"}
+                  </button>
                 </div>
-                {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
-                <button className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}} onClick={doWsSignup} disabled={loading}>{loading?t.connecting:"🚀 "+t.startFreeTrial}</button>
-                <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",marginTop:-4}}>{t.alreadyAccount} <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setWsTab("login");setErr("");}}>{t.signIn}</span></p>
-              </>)}
+              )}
+
+              {wsTab==="signup"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  <div style={{background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.2)",borderRadius:9,padding:"10px 13px",fontSize:12,color:"var(--green)",lineHeight:1.5}}>
+                    ✅ {t.freeTrial30||"30-day free trial — no credit card required"}
+                  </div>
+                  <Field label="Workshop Name *">
+                    <input style={inpStyle} value={wsRegName} onChange={e=>setWsRegName(e.target.value)} placeholder="e.g. ABC Auto Workshop"/>
+                  </Field>
+                  <Field label={(t.username||"Username")+" *"}>
+                    <input style={inpStyle} value={wsRegUser} onChange={e=>setWsRegUser(e.target.value)} autoCapitalize="none" placeholder="Choose a login username"/>
+                  </Field>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <Field label={(t.password||"Password")+" *"}>
+                      <input style={inpStyle} type="password" value={wsRegPass} onChange={e=>setWsRegPass(e.target.value)}/>
+                    </Field>
+                    <Field label={(t.confirmPwd||"Confirm")+" *"}>
+                      <input style={inpStyle} type="password" value={wsRegPass2} onChange={e=>setWsRegPass2(e.target.value)}/>
+                    </Field>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <Field label="Email">
+                      <input style={inpStyle} type="email" value={wsRegEmail} onChange={e=>setWsRegEmail(e.target.value)} placeholder="email@workshop.com"/>
+                    </Field>
+                    <Field label="Phone">
+                      <input style={inpStyle} type="tel" value={wsRegPhone} onChange={e=>setWsRegPhone(e.target.value)} placeholder="+27..."/>
+                    </Field>
+                  </div>
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                      <label style={{fontSize:12,fontWeight:700,color:"var(--text3)"}}>City &amp; Country *</label>
+                      <button type="button" className="btn btn-ghost btn-xs" disabled={detectingLoc} onClick={async()=>{
+                        setDetectingLoc(true);
+                        try{const loc=await detectGeoLocation();setWsRegCity(loc.city);setWsRegCountry(loc.country);}catch{}
+                        setDetectingLoc(false);
+                      }} style={{fontSize:11,padding:"3px 9px"}}>
+                        {detectingLoc?"Detecting…":"📍 Auto-detect"}
+                      </button>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <input style={inpStyle} value={wsRegCity} onChange={e=>setWsRegCity(e.target.value)} placeholder="City"/>
+                      <input style={inpStyle} value={wsRegCountry} onChange={e=>setWsRegCountry(e.target.value)} placeholder="Country"/>
+                    </div>
+                  </div>
+                  {err&&<ErrBox msg={err}/>}
+                  <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10}} onClick={doWsSignup} disabled={loading}>
+                    {loading?t.connecting||"Connecting…":"🚀 "+(t.startFreeTrial||"Start Free Trial")}
+                  </button>
+                  <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:0}}>
+                    Already have an account? <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setWsTab("login");setErr("");}}>Sign In</span>
+                  </p>
+                </div>
+              )}
             </div>
           )}
+
+          {/* ── Scrapyard ── */}
+          {authTab==="scrapyard"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:0}}>
+              <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:18}}>
+                {[["login",t.signIn||"Sign In"],["signup",t.registerScrapyard||"Register"]].map(([id,lb])=>(
+                  <button key={id} className={`auth-tab ${scrapTab===id?"on":""}`} onClick={()=>{setScrapTab(id);setErr("");}}>{lb}</button>
+                ))}
+              </div>
+
+              {scrapTab==="login"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:13}}>
+                  <div style={{marginBottom:2}}>
+                    <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>🚗 Scrapyard Login</div>
+                    <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>Sign in to your scrapyard account</div>
+                  </div>
+
+                  {/* Company name field */}
+                  <Field label="Company Name" hint="Optional">
+                    <div style={{position:"relative"}}>
+                      <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none",opacity:.6}}>🏢</span>
+                      <input
+                        style={{...companyInpStyle, paddingLeft:34}}
+                        type="text" value={scrapCompany}
+                        onChange={e=>setScrapCompany(e.target.value)}
+                        placeholder="e.g. City Scrapyard"
+                        autoCapitalize="words"
+                      />
+                    </div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Helps identify your account if multiple scrapyards share a username</div>
+                  </Field>
+
+                  <Field label={t.username||"Username"}>
+                    <input style={inpStyle} type="text" value={scrapUser} onChange={e=>setScrapUser(e.target.value)}
+                      onKeyDown={e=>e.key==="Enter"&&doScrapyardLogin()} autoCapitalize="none" placeholder="Your login username"/>
+                  </Field>
+                  <Field label={t.password||"Password"}>
+                    <input style={inpStyle} type="password" value={scrapPass} onChange={e=>setScrapPass(e.target.value)}
+                      onKeyDown={e=>e.key==="Enter"&&doScrapyardLogin()}/>
+                  </Field>
+
+                  {err&&<ErrBox msg={err}/>}
+                  <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doScrapyardLogin} disabled={loading}>
+                    {loading?t.connecting||"Connecting…":"Sign In →"}
+                  </button>
+                </div>
+              )}
+
+              {scrapTab==="signup"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  <div style={{background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.2)",borderRadius:9,padding:"10px 13px",fontSize:12,color:"var(--green)",lineHeight:1.5}}>
+                    ✅ {t.freeTrial30||"30-day free trial — no credit card required"}
+                  </div>
+                  <Field label="Scrapyard Name *">
+                    <input style={inpStyle} value={scrapRegName} onChange={e=>setScrapRegName(e.target.value)} placeholder="e.g. City Scrapyard"/>
+                  </Field>
+                  <Field label={(t.username||"Username")+" *"}>
+                    <input style={inpStyle} value={scrapRegUser} onChange={e=>setScrapRegUser(e.target.value)} autoCapitalize="none" placeholder="Choose a login username"/>
+                  </Field>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <Field label={(t.password||"Password")+" *"}>
+                      <input style={inpStyle} type="password" value={scrapRegPass} onChange={e=>setScrapRegPass(e.target.value)}/>
+                    </Field>
+                    <Field label={(t.confirmPwd||"Confirm")+" *"}>
+                      <input style={inpStyle} type="password" value={scrapRegPass2} onChange={e=>setScrapRegPass2(e.target.value)}/>
+                    </Field>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <Field label="Email">
+                      <input style={inpStyle} type="email" value={scrapRegEmail} onChange={e=>setScrapRegEmail(e.target.value)} placeholder="email@scrapyard.com"/>
+                    </Field>
+                    <Field label="Phone">
+                      <input style={inpStyle} type="tel" value={scrapRegPhone} onChange={e=>setScrapRegPhone(e.target.value)} placeholder="+27..."/>
+                    </Field>
+                  </div>
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                      <label style={{fontSize:12,fontWeight:700,color:"var(--text3)"}}>City &amp; Country *</label>
+                      <button type="button" className="btn btn-ghost btn-xs" disabled={detectingLoc} onClick={async()=>{
+                        setDetectingLoc(true);
+                        try{const loc=await detectGeoLocation();setScrapRegCity(loc.city);setScrapRegCountry(loc.country);}catch{}
+                        setDetectingLoc(false);
+                      }} style={{fontSize:11,padding:"3px 9px"}}>
+                        {detectingLoc?"Detecting…":"📍 Auto-detect"}
+                      </button>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <input style={inpStyle} value={scrapRegCity} onChange={e=>setScrapRegCity(e.target.value)} placeholder="City"/>
+                      <input style={inpStyle} value={scrapRegCountry} onChange={e=>setScrapRegCountry(e.target.value)} placeholder="Country"/>
+                    </div>
+                  </div>
+                  {err&&<ErrBox msg={err}/>}
+                  <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10}} onClick={doScrapyardSignup} disabled={loading}>
+                    {loading?t.connecting||"Connecting…":"🚗 Start Free Trial"}
+                  </button>
+                  <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:0}}>
+                    Already have an account? <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setScrapTab("login");setErr("");}}>Sign In</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Shop / Customer ── */}
           {authTab==="customer"&&(
-            <div>
-              <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:20}}>
-                {[["login",t.signIn],["register",t.registerNew]].map(([id,lb])=>(
+            <div style={{display:"flex",flexDirection:"column",gap:0}}>
+              <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:18}}>
+                {[["login",t.signIn||"Sign In"],["register",t.registerNew||"Register"]].map(([id,lb])=>(
                   <button key={id} className={`auth-tab ${custTab===id?"on":""}`} onClick={()=>{setCustTab(id);setErr("");}}>{lb}</button>
                 ))}
               </div>
+
               {custTab==="login"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:13}}>
-                  <div><FL label={t.phone}/><input className="inp" type="tel" value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="+27..."/></div>
-                  <div><FL label={t.password}/><input className="inp" type="password" value={cPass} onChange={e=>setCPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustLogin()}/></div>
-                  {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
-                  <button className="btn btn-primary" style={{width:"100%",padding:13}} onClick={doCustLogin} disabled={loading}>{loading?t.connecting:t.login}</button>
-                  <p style={{fontSize:13,color:"var(--text3)",textAlign:"center"}}>{t.noAccount} <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setCustTab("register");setErr("");}}>{t.registerNew}</span></p>
+                  <div style={{marginBottom:2}}>
+                    <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>🛒 Shop Login</div>
+                    <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>Browse and order parts</div>
+                  </div>
+                  <Field label={t.phone||"Phone"}>
+                    <input style={inpStyle} type="tel" value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="+27..."/>
+                  </Field>
+                  <Field label={t.password||"Password"}>
+                    <input style={inpStyle} type="password" value={cPass} onChange={e=>setCPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustLogin()}/>
+                  </Field>
+                  {err&&<ErrBox msg={err}/>}
+                  <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doCustLogin} disabled={loading}>
+                    {loading?t.connecting||"Connecting…":"Sign In →"}
+                  </button>
+                  <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:"4px 0 0"}}>
+                    {t.noAccount||"No account?"} <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setCustTab("register");setErr("");}}>{t.registerNew||"Register"}</span>
+                  </p>
                 </div>
               )}
+
               {custTab==="register"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                  <div><FL label={t.name+" *"}/><input className="inp" value={cName} onChange={e=>setCName(e.target.value)}/></div>
-                  <div>
-                    <FL label={t.phone+" *"}/>
-                    <input className="inp" type="tel" value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="+27..."/>
-                    <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Full number required (min 9 digits)</div>
+                  <Field label={(t.name||"Name")+" *"}>
+                    <input style={inpStyle} value={cName} onChange={e=>setCName(e.target.value)}/>
+                  </Field>
+                  <Field label={(t.phone||"Phone")+" *"} hint="Min 9 digits">
+                    <input style={inpStyle} type="tel" value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="+27..."/>
+                  </Field>
+                  <Field label="Email">
+                    <input style={inpStyle} type="email" value={cEmail} onChange={e=>setCEmail(e.target.value)}/>
+                  </Field>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <Field label={(t.password||"Password")+" *"}>
+                      <input style={inpStyle} type="password" value={cPass} onChange={e=>setCPass(e.target.value)}/>
+                    </Field>
+                    <Field label={(t.confirmPwd||"Confirm")+" *"}>
+                      <input style={inpStyle} type="password" value={cPass2} onChange={e=>setCPass2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustRegister()}/>
+                    </Field>
                   </div>
-                  <div><FL label="Email"/><input className="inp" type="email" value={cEmail} onChange={e=>setCEmail(e.target.value)}/></div>
-                  <div><FL label={t.password+" *"}/><input className="inp" type="password" value={cPass} onChange={e=>setCPass(e.target.value)}/></div>
-                  <div><FL label={t.confirmPwd+" *"}/><input className="inp" type="password" value={cPass2} onChange={e=>setCPass2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustRegister()}/></div>
-                  {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 13px",fontSize:13,color:"var(--red)"}}>⚠ {err}</div>}
-                  <button className="btn btn-primary" style={{width:"100%",padding:13}} onClick={doCustRegister} disabled={loading}>{loading?t.connecting:t.createAccount}</button>
+                  {err&&<ErrBox msg={err}/>}
+                  <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10}} onClick={doCustRegister} disabled={loading}>
+                    {loading?t.connecting||"Connecting…":t.createAccount||"Create Account"}
+                  </button>
                 </div>
               )}
             </div>
           )}
+
+          {/* ── Staff ── */}
+          {authTab==="staff"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:13}}>
+              <div style={{marginBottom:2}}>
+                <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>🏢 Staff Login</div>
+                <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>Admin, manager and fulfilment access</div>
+              </div>
+              <Field label={t.username||"Username"}>
+                <input style={inpStyle} type="text" value={staffUser} onChange={e=>setStaffUser(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&doStaffLogin()} autoCapitalize="none" placeholder="Username"/>
+              </Field>
+              <Field label={t.password||"Password"}>
+                <input style={inpStyle} type="password" value={staffPass} onChange={e=>setStaffPass(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&doStaffLogin()}/>
+              </Field>
+              {err&&<ErrBox msg={err}/>}
+              <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doStaffLogin} disabled={loading}>
+                {loading?t.connecting||"Connecting…":"Sign In →"}
+              </button>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

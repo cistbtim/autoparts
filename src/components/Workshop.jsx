@@ -2715,6 +2715,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   }).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
   const [localPhotoOverrides, setLocalPhotoOverrides] = useState({});
   const [editPhotos, setEditPhotos] = useState(false);
+  const [photoWarnOpen, setPhotoWarnOpen] = useState(false);
+  useEffect(()=>{
+    const vr=wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
+    if(vr&&!vr.photo_front&&!vr.photo_rear&&!vr.photo_side) setPhotoWarnOpen(true);
+  },[job.workshop_vehicle_id]);
   const vehiclePhotos = wsVehicles.reduce((acc,v)=>v.id===job.workshop_vehicle_id?{
     front: localPhotoOverrides.front!==undefined ? localPhotoOverrides.front : (v.photo_front||""),
     rear:  localPhotoOverrides.rear !==undefined ? localPhotoOverrides.rear  : (v.photo_rear ||""),
@@ -3267,7 +3272,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           {showMoreActions&&(
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14,paddingTop:6,borderTop:"1px solid var(--border)"}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 {t.wsCollect}</button>
-              {wsRole==="main"&&onMoveJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>{ if(wsProfile?.move_pin){setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}else{setMoveModal(true);} }}>🔀 {t.wsMove}</button>}
+              {wsRole==="main"&&onMoveJob&&wsProfile?.move_pin&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>{ setMovePinVal("");setMovePinErr("");setMovePinOpen(true); }}>🔀 {t.wsMove}</button>}
               <button className="btn btn-ghost btn-sm" onClick={()=>{
                 const lines=["============================","  VEHICLE INFO","============================",
                   `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,
@@ -3697,7 +3702,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           {loadingPhotos?(
             <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:12}}>Loading photos...</div>
           ):(savedPhotos.length===0&&uploadPhotos.length===0)?(
-            <div style={{textAlign:"center",padding:"32px 0",color:"var(--text3)",fontSize:13}}>No photos yet — tap Camera, Gallery or Paste</div>
+            <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:13}}>
+              <div style={{marginBottom:10}}>No photos yet — tap Camera, Gallery or Paste</div>
+              <button className="btn btn-ghost btn-sm" onClick={()=>{setJobTab("car");setEditPhotos(true);}}>📸 Add/Edit Car Photos</button>
+            </div>
           ):(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
               {savedPhotos.map(p=>{
@@ -4881,6 +4889,32 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           )}
           <button className="btn btn-ghost" style={{width:"100%",marginTop:16}} onClick={()=>{setServiceHistModal(false);setAddingPastRecord(false);}}>Close</button>
         </Overlay>
+      )}
+
+      {/* ── No vehicle photos warning popup ── */}
+      {photoWarnOpen&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div className="card" style={{width:"100%",maxWidth:360,padding:24,display:"flex",flexDirection:"column",gap:16}}>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:40,marginBottom:8}}>📸</div>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:6}}>No Vehicle Photos</div>
+              <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.55}}>
+                <strong>{job.vehicle_reg||"This vehicle"}</strong> has no profile photos on record.
+                Adding photos helps identify the vehicle and can be shared with the customer.
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:4}}>
+              <button className="btn btn-ghost" style={{flex:1}}
+                onClick={()=>setPhotoWarnOpen(false)}>
+                Later
+              </button>
+              <button className="btn btn-primary" style={{flex:2,fontWeight:700}}
+                onClick={()=>{setPhotoWarnOpen(false);setJobTab("car");setEditPhotos(true);}}>
+                📸 Add Photos Now
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

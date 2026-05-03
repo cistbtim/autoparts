@@ -2683,6 +2683,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   const [editQtyVal,    setEditQtyVal]    = useState("");
   const [editMarkupId,  setEditMarkupId]  = useState(null);
   const [editMarkupVal, setEditMarkupVal] = useState("");
+  const [pricePopup,    setPricePopup]    = useState(null); // {item, costs, markup, selIdx}
   const [returnQuoteOpen,  setReturnQuoteOpen]  = useState(false);
   const [returnQuoteTarget,setReturnQuoteTarget]= useState(null); // {request, existingQuote}
   const [movePinOpen,      setMovePinOpen]      = useState(false);
@@ -3854,6 +3855,71 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           const getSupCosts = (desc) => supCostMap[(desc||"").toLowerCase().trim()] || [];
 
           return (<>
+        {/* ── Supplier price popup ── */}
+        {pricePopup&&(
+          <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
+            onClick={()=>setPricePopup(null)}>
+            <div style={{background:"var(--surface)",borderRadius:16,width:"100%",maxWidth:420,padding:20,boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}
+              onClick={e=>e.stopPropagation()}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>Choose Supplier Price</div>
+                  <div style={{fontWeight:700,fontSize:15,marginTop:2}}>{pricePopup.item.description}</div>
+                </div>
+                <button onClick={()=>setPricePopup(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--text3)",padding:4}}>✕</button>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+                {pricePopup.costs.map((sc,i)=>{
+                  const markup=+pricePopup.markup||0;
+                  const sellP=+(sc.price*(1+markup/100)).toFixed(2);
+                  const isSel=pricePopup.selIdx===i;
+                  return (
+                    <div key={i} onClick={()=>setPricePopup(p=>({...p,selIdx:i}))}
+                      style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,cursor:"pointer",
+                        border:`2px solid ${isSel?"#f59e0b":"var(--border)"}`,
+                        background:isSel?"rgba(251,191,36,.1)":"var(--surface2)"}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>{sc.name}</div>
+                        <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:18,color:"#f59e0b"}}>
+                          {fmtAmt(sc.price)}<span style={{fontSize:11,color:"var(--text3)",marginLeft:4}}>cost</span>
+                        </div>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>+{markup}% = sell</div>
+                        <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:18,color:"var(--accent)"}}>{fmtAmt(sellP)}</div>
+                      </div>
+                      {isSel&&<span style={{color:"#f59e0b",fontSize:16}}>✓</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:"10px 12px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)"}}>
+                <span style={{fontSize:12,color:"var(--text3)",fontWeight:600,flex:1}}>Markup %</span>
+                <input type="number" min="0" step="0.1"
+                  value={pricePopup.markup}
+                  onChange={e=>setPricePopup(p=>({...p,markup:e.target.value}))}
+                  style={{width:80,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:16,fontWeight:700,padding:"4px 8px",borderRadius:8,border:"1px solid #f59e0b",background:"var(--surface)",color:"#f59e0b"}}/>
+                <span style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>%</span>
+              </div>
+              <button
+                disabled={pricePopup.selIdx===null}
+                onClick={async()=>{
+                  const sc=pricePopup.costs[pricePopup.selIdx];
+                  const markup=+pricePopup.markup||0;
+                  const sellP=+(sc.price*(1+markup/100)).toFixed(2);
+                  await onSaveItem({...pricePopup.item,cost_price:sc.price,markup_pct:markup,unit_price:sellP,total:sellP*(+pricePopup.item.qty||1)});
+                  setPricePopup(null);
+                }}
+                style={{width:"100%",padding:"10px",borderRadius:10,border:"none",
+                  cursor:pricePopup.selIdx===null?"not-allowed":"pointer",
+                  background:pricePopup.selIdx===null?"var(--border)":"#f59e0b",
+                  color:pricePopup.selIdx===null?"var(--text3)":"#000",
+                  fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif"}}>
+                Apply to Quote
+              </button>
+            </div>
+          </div>
+        )}
         {/* ── Billing flow stepper ── */}
         {(()=>{
           const steps=[
@@ -3966,9 +4032,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                           {supCosts.map((sc,i)=>{
                             const sellP = +(sc.price*(1+defaultMarkup/100)).toFixed(2);
                             return (
-                            <span key={i} onClick={async()=>{
-                                await onSaveItem({...item, cost_price:sc.price, markup_pct:defaultMarkup, unit_price:sellP, total:sellP*(+item.qty||1)});
-                              }}
+                            <span key={i} onClick={()=>setPricePopup({item, costs:getSupCosts(item.description), markup:String(defaultMarkup), selIdx:i})}
                               title={defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price"}
                               style={{fontSize:11,color:"#f59e0b",fontWeight:600,cursor:"pointer",background:"rgba(251,191,36,.1)",borderRadius:4,padding:"2px 8px",border:"1px solid rgba(251,191,36,.25)"}}>
                               💰 {sc.name}: {fmtAmt(sc.price)}
@@ -4061,7 +4125,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                               const sellP=+(sc.price*(1+defaultMarkup/100)).toFixed(2);
                               return (
                               <span key={i} title={defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price"}
-                                onClick={async()=>{ await onSaveItem({...item, cost_price:sc.price, markup_pct:defaultMarkup, unit_price:sellP, total:sellP*(+item.qty||1)}); }}
+                                onClick={()=>setPricePopup({item, costs:getSupCosts(item.description), markup:String(defaultMarkup), selIdx:i})}
                                 style={{fontSize:10,color:"#f59e0b",fontWeight:600,cursor:"pointer",background:"rgba(251,191,36,.1)",borderRadius:4,padding:"1px 6px",border:"1px solid rgba(251,191,36,.25)"}}>
                                 💰 {sc.name}: {fmtAmt(sc.price)}
                               </span>

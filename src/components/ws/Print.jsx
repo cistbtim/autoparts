@@ -150,54 +150,52 @@ export function printChecklistReport(job, checklist, settings) {
 export function printJobCardSheet(job, items=[], settings) {
   const shopName = settings?.shop_name||"Workshop";
   const now = new Date().toLocaleString();
-  const C = curSym(settings?.currency||"R");
-  const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+  const checkRow = (item) => `
+    <tr>
+      <td style="padding:6px 8px;font-size:12px">${item.icon} ${item.label}</td>
+      <td style="padding:6px 8px;text-align:center"><span style="display:inline-block;width:15px;height:15px;border:1.5px solid #444;border-radius:3px"></span></td>
+      <td style="padding:6px 8px;text-align:center"><span style="display:inline-block;width:15px;height:15px;border:1.5px solid #444;border-radius:3px"></span></td>
+      <td style="padding:6px 8px;text-align:center"><span style="display:inline-block;width:15px;height:15px;border:1.5px solid #444;border-radius:3px"></span></td>
+      <td style="padding:6px 8px"><div style="border-bottom:1px solid #aaa;min-height:18px;width:100%"></div></td>
+    </tr>`;
 
   const parts  = items.filter(i=>i.type==="part");
   const labour = items.filter(i=>i.type!=="part");
-
-  const itemRow = (item) => `
-    <tr>
-      <td style="padding:7px 8px;text-align:center">
-        <span style="display:inline-block;width:14px;height:14px;border:1.5px solid #888;border-radius:3px;vertical-align:middle"></span>
-      </td>
-      <td style="padding:7px 8px;font-size:12px;font-weight:600">${(item.description||"").replace(/</g,"&lt;")}${item.part_sku?`<div style="font-size:10px;color:#6b7280;font-weight:400;font-family:monospace">${item.part_sku}</div>`:""}</td>
-      <td style="padding:7px 8px;font-size:12px;text-align:center">${item.qty||1}</td>
-      <td style="padding:7px 8px;font-size:12px;text-align:right">${fmt(item.unit_price||0)}</td>
-      <td style="padding:7px 8px;font-size:12px;text-align:right;font-weight:700">${fmt(item.total||0)}</td>
-    </tr>`;
-
+  const C = curSym(settings?.currency||"R");
+  const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const taxAmt   = settings?.vat_number ? subtotal*(settings?.tax_rate||0)/100 : 0;
 
-  const w = window.open("","_blank","width=800,height=1000");
+  const workRow = (item) => `
+    <tr>
+      <td style="padding:6px 8px;text-align:center"><span style="display:inline-block;width:14px;height:14px;border:1.5px solid #888;border-radius:3px"></span></td>
+      <td style="padding:6px 8px;font-size:12px;font-weight:600">${(item.description||"").replace(/</g,"&lt;")}${item.part_sku?`<span style="font-size:10px;color:#6b7280;font-weight:400;font-family:monospace;margin-left:6px">${item.part_sku}</span>`:""}</td>
+      <td style="padding:6px 8px;font-size:12px;text-align:center">${item.qty||1}</td>
+    </tr>`;
+
+  const w = window.open("","_blank","width=820,height=1100");
   if(!w) return;
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Card</title>
   <style>
-    @page{size:A4;margin:14mm}
+    @page{size:A4;margin:12mm}
     @media print{body{margin:0}.no-print{display:none}}
     *{box-sizing:border-box}
-    body{font-family:Arial,sans-serif;color:#111;background:#fff;padding:20px;font-size:12px}
-    .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px}
+    body{font-family:Arial,sans-serif;color:#111;background:#fff;padding:18px;font-size:12px}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid #111;padding-bottom:10px;margin-bottom:12px}
     .shop-name{font-size:20px;font-weight:900;letter-spacing:.5px}
-    .doc-title{font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.08em;text-align:right}
-    .doc-id{font-size:11px;color:#6b7280;text-align:right;margin-top:3px;font-family:monospace}
-    .info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:12px}
-    .vf{font-size:10px;color:#6b7280;margin-bottom:2px}
-    .vv{font-size:13px;font-weight:700}
-    .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:4px;margin:12px 0 6px}
-    .complaint-box{border:1px solid #d1d5db;border-radius:6px;padding:10px 12px;min-height:48px;font-size:12px;line-height:1.5;background:#fff;margin-bottom:12px}
-    table{width:100%;border-collapse:collapse;margin-bottom:4px}
-    th{background:#f3f4f6;padding:7px 8px;text-align:left;font-size:11px;color:#374151;border-bottom:2px solid #d1d5db}
+    .info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;margin-bottom:10px}
+    .vf{font-size:9px;color:#6b7280;margin-bottom:1px;text-transform:uppercase;letter-spacing:.04em}
+    .vv{font-size:12px;font-weight:700}
+    .sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#374151;border-bottom:1.5px solid #111;padding-bottom:3px;margin:10px 0 5px}
+    .write-box{border:1px solid #d1d5db;border-radius:5px;padding:8px 10px;min-height:40px;font-size:12px;line-height:1.6;margin-bottom:8px}
+    table{width:100%;border-collapse:collapse;margin-bottom:6px}
+    th{background:#374151;color:#fff;padding:6px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
     tr:nth-child(even){background:#f9fafb}
     td{border-bottom:1px solid #e5e7eb;vertical-align:middle}
-    .type-badge{display:inline-block;padding:1px 7px;border-radius:12px;font-size:10px;font-weight:700}
-    .subtotal-row{background:#f9fafb!important;font-weight:700}
-    .total-row{background:#111!important;color:#fff!important;font-weight:900;font-size:13px}
-    .notes-box{border:1px solid #d1d5db;border-radius:6px;padding:8px 12px;min-height:40px;font-size:12px;line-height:1.5;margin-bottom:14px;background:#fff}
-    .sig{margin-top:28px;display:flex;gap:32px}
-    .sig-box{flex:1;border-top:1.5px solid #111;padding-top:6px;font-size:11px;color:#6b7280}
-    .print-btn{display:inline-block;margin-bottom:16px;padding:8px 20px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
+    .sig{margin-top:20px;display:flex;gap:28px}
+    .sig-box{flex:1;border-top:1.5px solid #111;padding-top:5px;font-size:10px;color:#6b7280}
+    .print-btn{display:inline-block;margin-bottom:14px;padding:7px 18px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
   </style></head>
   <body>
     <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
@@ -205,12 +203,12 @@ export function printJobCardSheet(job, items=[], settings) {
     <div class="hdr">
       <div>
         <div class="shop-name">🔧 ${shopName}</div>
-        <div style="font-size:11px;color:#6b7280;margin-top:3px">Job Card / Work Order</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:2px">Job Card / Work Sheet</div>
       </div>
-      <div>
-        <div class="doc-title">Job Card</div>
-        <div class="doc-id">Job #${job.id||"—"}</div>
-        <div style="font-size:10px;color:#9ca3af;text-align:right;margin-top:2px">Printed: ${now}</div>
+      <div style="text-align:right">
+        <div style="font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Job Card</div>
+        <div style="font-size:12px;font-weight:700;font-family:monospace;margin-top:2px">Job #${job.id||"—"}</div>
+        <div style="font-size:10px;color:#9ca3af;margin-top:2px">Printed: ${now}</div>
       </div>
     </div>
 
@@ -224,51 +222,42 @@ export function printJobCardSheet(job, items=[], settings) {
       <div><div class="vf">Date In</div><div class="vv">${job.date_in||"—"}</div></div>
       <div><div class="vf">Mechanic</div><div class="vv">${job.mechanic||"—"}</div></div>
       <div><div class="vf">Status</div><div class="vv">${job.status||"—"}</div></div>
-      ${job.vin?`<div style="grid-column:1/-1"><div class="vf">VIN</div><div class="vv" style="font-family:monospace;font-size:12px">${job.vin}</div></div>`:""}
+      ${job.vin?`<div style="grid-column:1/-1"><div class="vf">VIN</div><div class="vv" style="font-family:monospace;font-size:11px">${job.vin}</div></div>`:""}
     </div>
 
-    <div class="section-title">Complaint / Work Description</div>
-    <div class="complaint-box">${(job.complaint||"").replace(/</g,"&lt;").replace(/\n/g,"<br/>") || "&nbsp;"}</div>
+    <div class="sec">Complaint / Work Requested</div>
+    <div class="write-box">${(job.complaint||"").replace(/</g,"&lt;").replace(/\n/g,"<br/>") || "&nbsp;"}</div>
 
     ${items.length>0?`
-    <div class="section-title">Work Items</div>
-    ${parts.length>0?`
-    <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🔩 Parts</div>
+    <div class="sec">Work Items</div>
     <table>
       <thead><tr>
         <th style="width:5%">✓</th>
-        <th style="width:50%">Description / SKU</th>
-        <th style="width:10%;text-align:center">Qty</th>
-        <th style="width:17%;text-align:right">Unit Price</th>
-        <th style="width:18%;text-align:right">Total</th>
+        <th>Description${parts.length>0?" / SKU":""}</th>
+        <th style="width:8%;text-align:center">Qty</th>
       </tr></thead>
-      <tbody>${parts.map(itemRow).join("")}</tbody>
-    </table>`:""}
-
-    ${labour.length>0?`
-    <div style="font-size:10px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.06em;margin:10px 0 4px">👷 Labour / Services</div>
-    <table>
-      <thead><tr>
-        <th style="width:5%">✓</th>
-        <th style="width:50%">Description</th>
-        <th style="width:10%;text-align:center">Qty</th>
-        <th style="width:17%;text-align:right">Rate</th>
-        <th style="width:18%;text-align:right">Total</th>
-      </tr></thead>
-      <tbody>${labour.map(itemRow).join("")}</tbody>
-    </table>`:""}
-
-    <table style="margin-top:8px">
       <tbody>
-        <tr class="subtotal-row"><td colspan="4" style="padding:6px 8px;text-align:right;font-size:12px">Subtotal</td><td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:700">${fmt(subtotal)}</td></tr>
-        ${taxAmt>0?`<tr style="background:#f9fafb"><td colspan="4" style="padding:6px 8px;text-align:right;font-size:12px">VAT (${settings?.tax_rate||0}%)</td><td style="padding:6px 8px;text-align:right;font-size:12px">${fmt(taxAmt)}</td></tr>`:""}
-        <tr class="total-row"><td colspan="4" style="padding:8px;text-align:right">TOTAL</td><td style="padding:8px;text-align:right">${fmt(subtotal+taxAmt)}</td></tr>
+        ${parts.length>0?`<tr style="background:#dbeafe"><td colspan="3" style="padding:4px 8px;font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.05em">🔩 Parts</td></tr>${parts.map(workRow).join("")}`:""}
+        ${labour.length>0?`<tr style="background:#dcfce7"><td colspan="3" style="padding:4px 8px;font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em">👷 Labour / Services</td></tr>${labour.map(workRow).join("")}`:""}
+      </tbody>
+    </table>`:""}
+
+    <div class="sec">Vehicle Inspection Checklist</div>
+    <table>
+      <thead><tr>
+        <th style="width:38%">Item</th>
+        <th style="width:8%;text-align:center">OK</th>
+        <th style="width:10%;text-align:center">Issue</th>
+        <th style="width:8%;text-align:center">N/A</th>
+        <th>Notes / Comments</th>
+      </tr></thead>
+      <tbody>
+        ${CHECKLIST_ITEMS.map(checkRow).join("")}
       </tbody>
     </table>
-    `:""}
 
-    <div class="section-title">Diagnosis / Notes</div>
-    <div class="notes-box">${(job.diagnosis||"").replace(/</g,"&lt;").replace(/\n/g,"<br/>") || "&nbsp;"}${job.notes&&job.diagnosis?"<br/><br/>":""} ${(job.notes||"").replace(/</g,"&lt;").replace(/\n/g,"<br/>")}</div>
+    <div class="sec">Diagnosis / Findings</div>
+    <div class="write-box" style="min-height:50px">${(job.diagnosis||"").replace(/</g,"&lt;").replace(/\n/g,"<br/>")||"&nbsp;"}</div>
 
     <div class="sig">
       <div class="sig-box">Customer Signature</div>
@@ -339,7 +328,7 @@ export function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
     <div style="width:190px;flex-shrink:0">
       <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📸 Vehicle Photos</div>
       ${photoList.map(p=>`<div style="margin-bottom:6px">
-        <img src="${p.url}" style="width:100%;height:58px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
+        <img src="${toImgUrl(p.url)||p.url}" style="width:100%;height:58px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
         <div style="font-size:9px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.06em">${p.label}</div>
       </div>`).join("")}
     </div>` : "";
@@ -501,7 +490,7 @@ export function printWorkshopQuote(job, items, quote, settings, photos={}, share
     <div style="width:190px;flex-shrink:0">
       <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📸 Vehicle Photos</div>
       ${photoList.map(p=>`<div style="margin-bottom:6px">
-        <img src="${p.url}" style="width:100%;height:58px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
+        <img src="${toImgUrl(p.url)||p.url}" style="width:100%;height:58px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
         <div style="font-size:9px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.06em">${p.label}</div>
       </div>`).join("")}
     </div>` : "";
@@ -553,7 +542,7 @@ ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:
   <span style="color:#fff;font-weight:700;font-size:13px;flex:1">📄 ${shopName} — Quotation ${quote.id}</span>
   ${phone?`<a href="https://wa.me/${phone}?text=${encodeURIComponent(waMsg)}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;background:#25D366;color:#fff;border-radius:7px;font-size:13px;font-weight:700;text-decoration:none">📱 Send via WhatsApp</a>`:""}
   <button onclick="window.print()" style="padding:8px 18px;background:#2563eb;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Save as PDF</button>
-</div><div style="height:58px"></div>`:""}
+</div><div style="height:58px"></div>`:`<div class="no-print" style="margin-bottom:16px"><button onclick="window.print()" style="padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Print / Save PDF</button></div>`}
 
   <div class="header">
     <div>

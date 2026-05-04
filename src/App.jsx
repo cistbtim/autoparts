@@ -40,7 +40,7 @@ export default function App() {
       else if(storedLang!==lang){ setLang(storedLang); localStorage.setItem("ap_lang",storedLang); }
       setSettingsLoaded(true);
     };
-    init();
+    init().catch(()=>setSettingsLoaded(true));
   },[]);
 
   const rfqToken = new URLSearchParams(window.location.search).get("rfq");

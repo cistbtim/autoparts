@@ -9,7 +9,10 @@ const fetchAll = async (table, query = "") => {
   while (true) {
     const sep = query ? "&" : "";
     const url = `${SUPABASE_URL}/rest/v1/${table}?${query}${sep}limit=${PAGE}&offset=${offset}`;
-    const batch = await (await fetch(url, { headers: H() })).json();
+    const resp = await fetch(url, { headers: H() });
+    const text = await resp.text();
+    let batch;
+    try { batch = JSON.parse(text); } catch { break; }
     if (!Array.isArray(batch) || batch.length === 0) break;
     all = all.concat(batch);
     if (batch.length < PAGE) break;

@@ -11,7 +11,7 @@ import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg,
 import { WorkshopProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
-import { ScrapyardVehiclesPage, ScrapyardPartsPage } from "./components/Scrapyard.jsx";
+import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage } from "./pages/PublicPages.jsx";
 
@@ -139,6 +139,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [scrapVehicles,setScrapVehicles]=useState([]);
   const [scrapParts,setScrapParts]=useState([]);
   const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
+  const [allScrapVehicles,setAllScrapVehicles]=useState([]);
+  const [allScrapParts,setAllScrapParts]=useState([]);
+  const [allScrapProfiles,setAllScrapProfiles]=useState([]);
   const [showLocationSetup,setShowLocationSetup]=useState(false);
   const [subStatus,setSubStatus]=useState(null); // null | {status,daysLeft,expiresAt}
   const [completedDays,setCompletedDays]=useState(7); // filter completed orders to last N days
@@ -324,6 +327,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
       api.get("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
+      api.get("scrapyard_vehicles","select=*&order=created_at.desc").catch(()=>[]),
+      api.get("scrapyard_parts","select=*&order=created_at.desc").catch(()=>[]),
+      api.get("scrapyard_profiles","select=*&order=id.asc").catch(()=>[]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -366,6 +372,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setWsPoItems(Array.isArray(rest[25])?rest[25]:[]);
     setWsLicenceRenewals(Array.isArray(rest[26])?rest[26]:[]);
     setWsBookings(Array.isArray(rest[27])?rest[27]:[]);
+    setAllScrapVehicles(Array.isArray(rest[28])?rest[28]:[]);
+    setAllScrapParts(Array.isArray(rest[29])?rest[29]:[]);
+    setAllScrapProfiles(Array.isArray(rest[30])?rest[30]:[]);
     // Load workshop profile for workshop role
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
@@ -1740,6 +1749,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       ]
     },
     {
+      id:"grp_all_scraps", icon:"🚗", label:"Scrapyards", roles:["admin","manager"],
+      children:[
+        {id:"all_scrapyards",icon:"🚗",label:"All Vehicles",roles:["admin","manager"]},
+        {id:"all_scrap_parts",icon:"📦",label:"All Parts",roles:["admin","manager"]},
+      ]
+    },
+    {
       id:"grp_purchase", icon:"🏭", label:t.grpPurchase, roles:["admin"],
       badge: pendingInq,
       children:[
@@ -2547,6 +2563,46 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             vehicles={scrapVehicles}
             parts={scrapParts}
             onRefresh={refreshScrapyardData}
+          />
+        )}
+
+        {/* ── ALL SCRAPYARDS (admin/manager) ── */}
+        {tab==="all_scrapyards"&&(
+          <ScrapyardAdminPage
+            vehicles={allScrapVehicles}
+            parts={allScrapParts}
+            profiles={allScrapProfiles}
+            users={users}
+            onRefresh={async()=>{
+              const [v,p,pr]=await Promise.all([
+                api.get("scrapyard_vehicles","select=*&order=created_at.desc").catch(()=>[]),
+                api.get("scrapyard_parts","select=*&order=created_at.desc").catch(()=>[]),
+                api.get("scrapyard_profiles","select=*&order=id.asc").catch(()=>[]),
+              ]);
+              setAllScrapVehicles(Array.isArray(v)?v:[]);
+              setAllScrapParts(Array.isArray(p)?p:[]);
+              setAllScrapProfiles(Array.isArray(pr)?pr:[]);
+            }}
+          />
+        )}
+
+        {/* ── ALL SCRAPYARD PARTS (admin/manager) ── */}
+        {tab==="all_scrap_parts"&&(
+          <ScrapyardPartsAdminPage
+            vehicles={allScrapVehicles}
+            parts={allScrapParts}
+            profiles={allScrapProfiles}
+            users={users}
+            onRefresh={async()=>{
+              const [v,p,pr]=await Promise.all([
+                api.get("scrapyard_vehicles","select=*&order=created_at.desc").catch(()=>[]),
+                api.get("scrapyard_parts","select=*&order=created_at.desc").catch(()=>[]),
+                api.get("scrapyard_profiles","select=*&order=id.asc").catch(()=>[]),
+              ]);
+              setAllScrapVehicles(Array.isArray(v)?v:[]);
+              setAllScrapParts(Array.isArray(p)?p:[]);
+              setAllScrapProfiles(Array.isArray(pr)?pr:[]);
+            }}
           />
         )}
 

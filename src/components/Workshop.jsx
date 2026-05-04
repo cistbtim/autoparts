@@ -70,6 +70,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [kanbanInvOpen,   setKanbanInvOpen]   = useState(false);
   const kanbanInvPanelRef = useRef(null);
   const [kanbanPayJob,    setKanbanPayJob]    = useState(null);
+  const [jobsRefreshing,  setJobsRefreshing]  = useState(false);
 
   // Keep activeJob in sync when jobs array refreshes
   useEffect(()=>{
@@ -318,7 +319,11 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
               complaint:"",diagnosis:"",mechanic:"",date_in:new Date().toISOString().slice(0,10),
               date_out:"",notes:"",status:"Pending"
             })}>+ Manual</button>
-            <button className="btn btn-ghost" title="Refresh jobs" onClick={()=>onRefresh&&onRefresh()}>🔄</button>
+            <button className="btn btn-ghost" title="Refresh jobs" disabled={jobsRefreshing}
+              onClick={async()=>{if(!onRefresh)return;setJobsRefreshing(true);try{await onRefresh();}finally{setJobsRefreshing(false);}}}
+              style={{opacity:jobsRefreshing?.6:1}}>
+              <span style={{display:"inline-block",animation:jobsRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
+            </button>
             <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
               <button title="List view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:!kanbanView?"var(--accent)":"transparent",color:!kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(false)}>≡</button>
               <button title="Board view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:kanbanView?"var(--accent)":"transparent",color:kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(true)}>⬜</button>

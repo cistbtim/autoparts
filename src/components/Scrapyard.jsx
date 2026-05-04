@@ -573,15 +573,22 @@ function PartModal({p, scrapId, vehicles, defaultVehicleId, onSave, onClose}) {
   const save = async () => {
     if(!form.name){setErr("Part name required");return;}
     setLoading(true); setErr("");
-    // eslint-disable-next-line no-unused-vars
-    const {id:_id2, created_at:_ca2, ...formData2} = form;
     const payload = {
-      ...formData2, scrapyard_id:Number(scrapId),
-      quantity:   Number(form.quantity)||0,
-      min_qty:    Number(form.min_qty)||0,
-      price:      form.price!==""  ? Number(form.price)  : null,
-      cost:       form.cost!==""   ? Number(form.cost)   : null,
-      vehicle_id: form.vehicle_id  ? Number(form.vehicle_id) : null,
+      name:        form.name,
+      category:    form.category||null,
+      part_number: form.part_number||null,
+      condition:   form.condition||null,
+      location:    form.location||null,
+      notes:       form.notes||null,
+      photo_url:   form.photo_url||null,
+      scrapyard_id: Number(scrapId),
+      quantity:    Number(form.quantity)||0,
+      min_qty:     Number(form.min_qty)||0,
+      price:       form.price!==""  ? Number(form.price)  : null,
+      cost:        form.cost!==""   ? Number(form.cost)   : null,
+      vehicle_id:  form.vehicle_id  ? Number(form.vehicle_id) : null,
+      ...(form.photo_url_2 ? {photo_url_2: form.photo_url_2} : {}),
+      ...(form.photo_url_3 ? {photo_url_3: form.photo_url_3} : {}),
     };
     const res = p?.id
       ? await api.patch("scrapyard_parts","id",p.id,payload).catch(e=>({message:e.message}))
@@ -734,6 +741,39 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
         <div className="card" style={{padding:"10px 14px",marginBottom:12,fontSize:13,color:"var(--text2)"}}>{vehicle.notes}</div>
       )}
 
+      {/* ── Search tools ── */}
+      <div className="card" style={{marginBottom:12,padding:"10px 14px"}}>
+        <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:8}}>🔍 Search Tools</div>
+        {vehicle.vin&&(
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}>
+            <span style={{fontSize:11,color:"var(--text3)",fontWeight:600,flexShrink:0}}>VIN:</span>
+            <code style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{vehicle.vin}</code>
+            <button onClick={()=>navigator.clipboard.writeText(vehicle.vin).then(()=>alert("VIN copied!"))}
+              style={{fontSize:10,padding:"2px 7px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:5,cursor:"pointer",color:"var(--text3)",flexShrink:0}}>📋</button>
+          </div>
+        )}
+        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+          {vehicle.vin&&<>
+            <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent(vehicle.vin)}`} target="_blank" rel="noopener noreferrer"
+              style={{fontSize:11,fontWeight:600,color:"var(--blue)",background:"rgba(96,165,250,.13)",border:"1px solid rgba(96,165,250,.35)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🔩 PartsOuq</a>
+            <a href={`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(vehicle.vin)}`} target="_blank" rel="noopener noreferrer"
+              style={{fontSize:11,fontWeight:600,color:"var(--yellow)",background:"rgba(251,191,36,.13)",border:"1px solid rgba(251,191,36,.35)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🔎 VIN Decode</a>
+            <a href={`https://en.17vin.com/vin/${encodeURIComponent(vehicle.vin)}`} target="_blank" rel="noopener noreferrer"
+              style={{fontSize:11,fontWeight:600,color:"var(--text2)",background:"rgba(148,163,184,.13)",border:"1px solid rgba(148,163,184,.35)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🆔 17VIN</a>
+            <button onClick={()=>{navigator.clipboard.writeText(vehicle.vin);window.open(`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(vehicle.vin)}`,"_blank");}}
+              style={{fontSize:11,fontWeight:600,color:"#dc2626",background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:99,padding:"3px 10px",cursor:"pointer",whiteSpace:"nowrap"}}>🔴 AutoZone</button>
+          </>}
+          {vehicle.make&&(
+            <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent([vehicle.make,vehicle.model].filter(Boolean).join(" "))}`} target="_blank" rel="noopener noreferrer"
+              style={{fontSize:11,fontWeight:600,color:"var(--blue)",background:"rgba(96,165,250,.10)",border:"1px solid rgba(96,165,250,.25)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🔩 POuq (model)</a>
+          )}
+          <a href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent([vehicle.year,vehicle.make,vehicle.model,"parts"].filter(Boolean).join(" "))}`} target="_blank" rel="noopener noreferrer"
+            style={{fontSize:11,fontWeight:600,color:"#34d399",background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🌐 Google</a>
+          <button onClick={()=>{if(vehicle.vin)navigator.clipboard.writeText(vehicle.vin);window.open("https://www.amayama.com","_blank");}}
+            style={{fontSize:11,fontWeight:600,color:"#0ea5e9",background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:99,padding:"3px 10px",cursor:"pointer",whiteSpace:"nowrap"}}>🔧 Amayama</button>
+        </div>
+      </div>
+
       {/* ── Vehicle photos ── */}
       <div className="card" style={{marginBottom:14}}>
         <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -778,62 +818,70 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
         </div>
       </div>
 
-      {/* ── Parts table ── */}
-      <div className="card">
-        <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      {/* ── Parts cards ── */}
+      <div style={{marginBottom:14}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
           <b style={{fontSize:14}}>Parts ({parts.length})</b>
         </div>
         {parts.length===0 ? (
-          <div style={{padding:40,textAlign:"center",color:"var(--text3)"}}>
+          <div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>
             No parts added yet.{" "}
             <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>setAddPart(true)}>Add first part</span>
           </div>
         ) : (
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",minWidth:580}}>
-              <thead>
-                <tr style={{background:"var(--surface2)"}}>
-                  {["Part","Category","Condition","Qty","Price","Location",""].map(h=>(
-                    <th key={h} style={{padding:"8px 12px",textAlign:"left",fontSize:12,fontWeight:600,color:"var(--text3)"}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {parts.map(p=>{
-                  const isLow = p.quantity<=p.min_qty;
-                  const cc    = COND_COLORS[p.condition]||"#9ca3af";
-                  return (
-                    <tr key={p.id} style={{borderTop:"1px solid var(--border)"}}>
-                      <td style={{padding:"8px 12px"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          {p.photo_url&&<img src={p.photo_url} alt="" style={{width:36,height:36,objectFit:"cover",borderRadius:5,flexShrink:0,border:"1px solid var(--border)"}}/>}
-                          <div>
-                            <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
-                            {p.part_number&&<div style={{fontSize:11,color:"var(--text3)"}}>{p.part_number}</div>}
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{padding:"8px 12px",fontSize:13,color:"var(--text2)"}}>{p.category||"-"}</td>
-                      <td style={{padding:"8px 12px"}}>
-                        <span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:`${cc}20`,color:cc}}>{p.condition}</span>
-                      </td>
-                      <td style={{padding:"8px 12px",fontWeight:700,color:isLow?"#b45309":"var(--text)"}}>
-                        {p.quantity}{isLow&&<span style={{fontSize:10,marginLeft:4,color:"#b45309"}}>LOW</span>}
-                      </td>
-                      <td style={{padding:"8px 12px",fontSize:13}}>{p.price!=null?`R ${Number(p.price).toFixed(2)}`:"-"}</td>
-                      <td style={{padding:"8px 12px",fontSize:12,color:"var(--text3)"}}>{p.location||"-"}</td>
-                      <td style={{padding:"8px 12px"}}>
-                        <div style={{display:"flex",gap:4}}>
-                          <button className="btn btn-ghost btn-xs" title="Print label" onClick={()=>printPartLabel(p,vehicle)}>🏷️</button>
-                          <button className="btn btn-ghost btn-xs" onClick={()=>setEditPart(p)}>✏️</button>
-                          <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deletePart(p)}>🗑</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
+            {parts.map(p=>{
+              const isLow  = p.quantity<=p.min_qty;
+              const cc     = COND_COLORS[p.condition]||"#9ca3af";
+              const photos = [p.photo_url,p.photo_url_2,p.photo_url_3].filter(Boolean);
+              return (
+                <div key={p.id} className="card" style={{padding:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                  {/* Photo area */}
+                  <div style={{background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
+                    {photos.length>0 ? (
+                      <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,height:130}}>
+                        {photos.map((url,i)=>(
+                          <img key={i} src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{height:100,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        <span style={{fontSize:36,opacity:.15}}>🔩</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Details area */}
+                  <div style={{padding:"10px 12px",flex:1,display:"flex",flexDirection:"column",gap:6}}>
+                    <div style={{fontWeight:700,fontSize:13,lineHeight:1.3}}>{p.name}</div>
+                    {p.part_number&&<div style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{p.part_number}</div>}
+
+                    <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+                      {p.condition&&<span style={{fontSize:10,fontWeight:600,padding:"1px 6px",borderRadius:4,background:`${cc}20`,color:cc}}>{p.condition}</span>}
+                      {p.category&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"var(--surface2)",color:"var(--text3)",border:"1px solid var(--border)"}}>{p.category}</span>}
+                      {isLow&&<span style={{fontSize:10,fontWeight:700,padding:"1px 5px",borderRadius:4,background:"rgba(180,83,9,.15)",color:"#b45309"}}>LOW</span>}
+                    </div>
+
+                    <div style={{fontSize:12,color:"var(--text2)",display:"flex",gap:10,flexWrap:"wrap"}}>
+                      <span>Qty: <b style={{color:isLow?"#b45309":"var(--text)"}}>{p.quantity}</b></span>
+                      {p.price!=null&&<span><b>R {Number(p.price).toFixed(2)}</b></span>}
+                    </div>
+                    {p.location&&<div style={{fontSize:11,color:"var(--text3)"}}>📍 {p.location}</div>}
+
+                    <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:2}}>
+                      <button onClick={()=>window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.name+" "+[vehicle.make,vehicle.model].filter(Boolean).join(" "))}`,"_blank")}
+                        style={{fontSize:9,padding:"2px 6px",background:"rgba(52,211,153,.10)",border:"1px solid rgba(52,211,153,.25)",borderRadius:99,color:"#34d399",cursor:"pointer",fontWeight:600}}>🌐 Google</button>
+                    </div>
+
+                    <div style={{display:"flex",gap:5,marginTop:"auto",paddingTop:8,borderTop:"1px solid var(--border)"}}>
+                      <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>printPartLabel(p,vehicle)}>🏷️</button>
+                      <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setEditPart(p)}>✏️</button>
+                      <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deletePart(p)}>🗑</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1111,57 +1159,66 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
         {lowStock.length>0&&<span style={{color:"#b45309"}}>⚠ {lowStock.length} low stock</span>}
       </div>
 
-      <div className="card" style={{overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:680}}>
-          <thead>
-            <tr style={{background:"var(--surface2)"}}>
-              {["Part","Category","Condition","Vehicle","Qty","Price","Location",""].map(h=>(
-                <th key={h} style={{padding:"9px 12px",textAlign:"left",fontSize:12,fontWeight:600,color:"var(--text3)",whiteSpace:"nowrap"}}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length===0&&(
-              <tr><td colSpan={8} style={{padding:32,textAlign:"center",color:"var(--text3)"}}>No parts found.</td></tr>
-            )}
-            {filtered.map(p=>{
-              const isLow=p.quantity<=p.min_qty;
-              const veh  =p.vehicle_id?vehMap[p.vehicle_id]:null;
-              const cc   =COND_COLORS[p.condition]||"#9ca3af";
-              return(
-                <tr key={p.id} style={{borderTop:"1px solid var(--border)",background:isLow?"rgba(251,191,36,.04)":"transparent"}}>
-                  <td style={{padding:"8px 12px"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      {p.photo_url&&<img src={p.photo_url} alt="" style={{width:36,height:36,objectFit:"cover",borderRadius:5,flexShrink:0,border:"1px solid var(--border)"}}/>}
-                      <div>
-                        <div style={{fontWeight:600,fontSize:13}}>{p.name}{isLow&&<span style={{color:"#b45309",fontSize:10,marginLeft:5}}>LOW</span>}</div>
-                        {p.part_number&&<div style={{fontSize:11,color:"var(--text3)"}}>{p.part_number}</div>}
-                      </div>
+      {filtered.length===0 ? (
+        <div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>No parts found.</div>
+      ) : (
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
+          {filtered.map(p=>{
+            const isLow  = p.quantity<=p.min_qty;
+            const veh    = p.vehicle_id?vehMap[p.vehicle_id]:null;
+            const cc     = COND_COLORS[p.condition]||"#9ca3af";
+            const photos = [p.photo_url,p.photo_url_2,p.photo_url_3].filter(Boolean);
+            return (
+              <div key={p.id} className="card" style={{padding:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                {/* Photo area */}
+                <div style={{background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
+                  {photos.length>0 ? (
+                    <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,height:130}}>
+                      {photos.map((url,i)=>(
+                        <img key={i} src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
+                      ))}
                     </div>
-                  </td>
-                  <td style={{padding:"8px 12px",fontSize:13,color:"var(--text2)"}}>{p.category||"-"}</td>
-                  <td style={{padding:"8px 12px"}}>
-                    <span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:`${cc}20`,color:cc}}>{p.condition||"-"}</span>
-                  </td>
-                  <td style={{padding:"8px 12px",fontSize:12,color:"var(--text2)"}}>
-                    {veh?`${veh.year||""} ${veh.make} ${veh.model}`:"-"}
-                  </td>
-                  <td style={{padding:"8px 12px",fontWeight:700,color:isLow?"#b45309":"var(--text)"}}>{p.quantity}</td>
-                  <td style={{padding:"8px 12px",fontSize:13}}>{p.price!=null?`R ${Number(p.price).toFixed(2)}`:"-"}</td>
-                  <td style={{padding:"8px 12px",fontSize:12,color:"var(--text3)"}}>{p.location||"-"}</td>
-                  <td style={{padding:"8px 12px"}}>
-                    <div style={{display:"flex",gap:4}}>
-                      <button className="btn btn-ghost btn-xs" title="Print label" onClick={()=>printPartLabel(p, veh||null)}>🏷️</button>
-                      <button className="btn btn-ghost btn-xs" onClick={()=>setEditPart(p)}>✏️</button>
-                      <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deletePart(p)}>🗑</button>
+                  ) : (
+                    <div style={{height:100,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      <span style={{fontSize:36,opacity:.15}}>🔩</span>
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  )}
+                </div>
+
+                {/* Details area */}
+                <div style={{padding:"10px 12px",flex:1,display:"flex",flexDirection:"column",gap:6}}>
+                  <div style={{fontWeight:700,fontSize:13,lineHeight:1.3}}>{p.name}</div>
+                  {p.part_number&&<div style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{p.part_number}</div>}
+
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+                    {p.condition&&<span style={{fontSize:10,fontWeight:600,padding:"1px 6px",borderRadius:4,background:`${cc}20`,color:cc}}>{p.condition}</span>}
+                    {p.category&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"var(--surface2)",color:"var(--text3)",border:"1px solid var(--border)"}}>{p.category}</span>}
+                    {isLow&&<span style={{fontSize:10,fontWeight:700,padding:"1px 5px",borderRadius:4,background:"rgba(180,83,9,.15)",color:"#b45309"}}>LOW</span>}
+                  </div>
+
+                  <div style={{fontSize:12,color:"var(--text2)",display:"flex",gap:10,flexWrap:"wrap"}}>
+                    <span>Qty: <b style={{color:isLow?"#b45309":"var(--text)"}}>{p.quantity}</b></span>
+                    {p.price!=null&&<span><b>R {Number(p.price).toFixed(2)}</b></span>}
+                  </div>
+                  {p.location&&<div style={{fontSize:11,color:"var(--text3)"}}>📍 {p.location}</div>}
+                  {veh&&<div style={{fontSize:11,color:"var(--text3)"}}>🚗 {[veh.year,veh.make,veh.model].filter(Boolean).join(" ")}</div>}
+
+                  <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:2}}>
+                    <button onClick={()=>window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.name+(veh?` ${veh.make} ${veh.model}`:""))}`,"_blank")}
+                      style={{fontSize:9,padding:"2px 6px",background:"rgba(52,211,153,.10)",border:"1px solid rgba(52,211,153,.25)",borderRadius:99,color:"#34d399",cursor:"pointer",fontWeight:600}}>🌐 Google</button>
+                  </div>
+
+                  <div style={{display:"flex",gap:5,marginTop:"auto",paddingTop:8,borderTop:"1px solid var(--border)"}}>
+                    <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>printPartLabel(p,veh||null)}>🏷️</button>
+                    <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setEditPart(p)}>✏️</button>
+                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deletePart(p)}>🗑</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {(showAdd||editPart)&&(
         <PartModal
@@ -1179,6 +1236,349 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
           onFound={p=>{setShowScan(false);setEditPart(p);}}
           onClose={()=>setShowScan(false)}
         />
+      )}
+    </div>
+  );
+}
+
+// ── Admin: all scrapyards overview ─────────────────────────────────
+export function ScrapyardAdminPage({vehicles, parts, profiles, users, onRefresh}) {
+  const [search,       setSearch]       = useState("");
+  const [companyFilter,setCompanyFilter]= useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [selected,     setSelected]     = useState(null); // {vehicle, companyName}
+  const [refreshing,   setRefreshing]   = useState(false);
+
+  // Build company name lookup: profile.id → name, fallback to users table
+  const profileMap = Object.fromEntries(profiles.map(p=>[String(p.id), p.name||p.company_name||""]));
+  const userMap    = Object.fromEntries(users.map(u=>[String(u.id), u.name||u.username||""]));
+  const companyName = (scrapId) => {
+    const id = String(scrapId);
+    return profileMap[id] || userMap[id] || `Scrapyard #${scrapId}`;
+  };
+
+  const companies = ["All", ...Array.from(new Set(vehicles.map(v=>companyName(v.scrapyard_id)))).sort()];
+
+  const filtered = vehicles.filter(v=>{
+    if(companyFilter!=="All" && companyName(v.scrapyard_id)!==companyFilter) return false;
+    if(statusFilter!=="All" && v.status!==statusFilter) return false;
+    if(search.trim()){
+      const h=`${v.make} ${v.model} ${v.year||""} ${v.reg||""} ${v.vin||""} ${companyName(v.scrapyard_id)}`.toLowerCase();
+      if(!search.toLowerCase().split(/\s+/).every(w=>h.includes(w))) return false;
+    }
+    return true;
+  });
+
+  const doRefresh = async () => {
+    setRefreshing(true);
+    try { await onRefresh(); } finally { setRefreshing(false); }
+  };
+
+  if(selected) {
+    const vehParts = parts.filter(p=>String(p.vehicle_id)===String(selected.vehicle.id));
+    const photos   = PHOTO_SLOTS.map(s=>selected.vehicle[s.key]).filter(Boolean);
+    return (
+      <div className="fu">
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setSelected(null)}>← All Scrapyards</button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:17,fontWeight:700}}>{selected.vehicle.year} {selected.vehicle.make} {selected.vehicle.model}</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
+              <span style={{fontWeight:700,color:"var(--accent)"}}>{selected.companyName}</span>
+              {selected.vehicle.reg&&<span>{selected.vehicle.reg}</span>}
+              {selected.vehicle.vin&&<span>VIN: {selected.vehicle.vin}</span>}
+              <span style={{color:STATUS_COLORS[selected.vehicle.status]||"#9ca3af",fontWeight:600}}>{selected.vehicle.status}</span>
+            </div>
+          </div>
+        </div>
+
+        {photos.length>0&&(
+          <div className="card" style={{marginBottom:12,padding:0,overflow:"hidden"}}>
+            <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(photos.length,3)},1fr)`,height:140}}>
+              {photos.slice(0,3).map((url,i)=>(
+                <img key={i} src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<Math.min(photos.length,3)-1?"1px solid var(--border)":"none"}}/>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:10,marginBottom:10,flexWrap:"wrap",fontSize:12,color:"var(--text2)"}}>
+          {selected.vehicle.color&&<span>🎨 {selected.vehicle.color}</span>}
+          {selected.vehicle.engine_no&&<span>🔧 Engine: {selected.vehicle.engine_no}</span>}
+          {selected.vehicle.odometer&&<span>📍 {Number(selected.vehicle.odometer).toLocaleString()} km</span>}
+          {selected.vehicle.purchase_price&&<span>💰 R {Number(selected.vehicle.purchase_price).toFixed(2)}</span>}
+        </div>
+
+        <div style={{marginBottom:8,fontWeight:700,fontSize:14}}>Parts ({vehParts.length})</div>
+        {vehParts.length===0 ? (
+          <div className="card" style={{padding:32,textAlign:"center",color:"var(--text3)"}}>No parts recorded for this vehicle.</div>
+        ) : (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
+            {vehParts.map(p=>{
+              const cc     = COND_COLORS[p.condition]||"#9ca3af";
+              const photos2 = [p.photo_url,p.photo_url_2,p.photo_url_3].filter(Boolean);
+              return (
+                <div key={p.id} className="card" style={{padding:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                  <div style={{background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
+                    {photos2.length>0 ? (
+                      <div style={{display:"grid",gridTemplateColumns:`repeat(${photos2.length},1fr)`,height:110}}>
+                        {photos2.map((url,i)=>(
+                          <img key={i} src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos2.length-1?"1px solid var(--border)":"none"}}/>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{height:80,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        <span style={{fontSize:32,opacity:.15}}>🔩</span>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{padding:"10px 12px",flex:1,display:"flex",flexDirection:"column",gap:5}}>
+                    <div style={{fontWeight:700,fontSize:13}}>{p.name}</div>
+                    {p.part_number&&<div style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{p.part_number}</div>}
+                    <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                      {p.condition&&<span style={{fontSize:10,fontWeight:600,padding:"1px 6px",borderRadius:4,background:`${cc}20`,color:cc}}>{p.condition}</span>}
+                      {p.category&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"var(--surface2)",color:"var(--text3)",border:"1px solid var(--border)"}}>{p.category}</span>}
+                    </div>
+                    <div style={{fontSize:12,color:"var(--text2)",display:"flex",gap:10}}>
+                      <span>Qty: <b>{p.quantity}</b></span>
+                      {p.price!=null&&<span><b>R {Number(p.price).toFixed(2)}</b></span>}
+                    </div>
+                    {p.location&&<div style={{fontSize:11,color:"var(--text3)"}}>📍 {p.location}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Summary stats
+  const totalVehicles = vehicles.length;
+  const totalParts    = parts.length;
+  const stripping     = vehicles.filter(v=>v.status==="Stripping").length;
+  const stripped      = vehicles.filter(v=>v.status==="Stripped").length;
+  const companyCount  = new Set(vehicles.map(v=>String(v.scrapyard_id))).size;
+
+  const sel={padding:"8px 10px",borderRadius:8,border:"1.5px solid var(--border)",background:"var(--surface2)",color:"var(--text)",fontSize:13};
+
+  return (
+    <div className="fu">
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{flex:1}}>
+          <div style={{fontSize:18,fontWeight:800}}>🚗 All Scrapyards</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{companyCount} companies · {totalVehicles} vehicles · {totalParts} parts</div>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={doRefresh} disabled={refreshing}>{refreshing?"⏳":"🔄"} Refresh</button>
+      </div>
+
+      {/* Stats pills */}
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+        {[
+          {label:"Available", color:"#34d399", count:vehicles.filter(v=>v.status==="Available").length},
+          {label:"Stripping", color:"#fbbf24", count:stripping},
+          {label:"Stripped",  color:"#9ca3af", count:stripped},
+        ].map(s=>(
+          <div key={s.label} style={{padding:"6px 14px",borderRadius:99,background:`${s.color}18`,border:`1px solid ${s.color}44`,fontSize:12,fontWeight:600,color:s.color,cursor:"pointer"}}
+            onClick={()=>setStatusFilter(statusFilter===s.label?"All":s.label)}>
+            {s.label}: {s.count}
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+        <input style={{flex:1,minWidth:180,padding:"9px 12px",borderRadius:8,border:"1.5px solid var(--border)",background:"var(--surface2)",color:"var(--text)",fontSize:13,boxSizing:"border-box"}}
+          value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search make, model, VIN, reg…"/>
+        <select style={sel} value={companyFilter} onChange={e=>setCompanyFilter(e.target.value)}>
+          {companies.map(c=><option key={c}>{c}</option>)}
+        </select>
+        <select style={sel} value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
+          {["All","Available","Stripping","Stripped","Sold","Written Off"].map(s=><option key={s}>{s}</option>)}
+        </select>
+      </div>
+
+      {/* Vehicle grid */}
+      {filtered.length===0 ? (
+        <div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>No vehicles found.</div>
+      ) : (
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:14}}>
+          {filtered.map(v=>{
+            const color    = STATUS_COLORS[v.status]||"#9ca3af";
+            const photo    = PHOTO_SLOTS.map(s=>v[s.key]).find(Boolean);
+            const cn       = companyName(v.scrapyard_id);
+            const vehParts = parts.filter(p=>String(p.vehicle_id)===String(v.id));
+            return (
+              <div key={v.id} className="card" style={{padding:0,overflow:"hidden",cursor:"pointer"}} onClick={()=>setSelected({vehicle:v,companyName:cn})}>
+                {/* Photo */}
+                <div style={{height:130,background:"var(--surface2)",position:"relative",overflow:"hidden"}}>
+                  {photo ? (
+                    <img src={photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  ) : (
+                    <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:4}}>
+                      <svg width="48" height="28" viewBox="0 0 38 22" fill="none" style={{opacity:.15}}>
+                        <rect x="1" y="9" width="36" height="11" rx="3" fill="currentColor"/>
+                        <path d="M7 9L11 2h16l4 7" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                        <circle cx="9" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
+                        <circle cx="29" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
+                      </svg>
+                      <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:".07em"}}>No Photo</span>
+                    </div>
+                  )}
+                  {/* Company badge */}
+                  <div style={{position:"absolute",top:8,left:8}}>
+                    <span style={{fontSize:10,fontWeight:700,color:"#fff",background:"rgba(0,0,0,.6)",backdropFilter:"blur(4px)",padding:"2px 8px",borderRadius:99,border:"1px solid rgba(255,255,255,.15)"}}>🏢 {cn}</span>
+                  </div>
+                  {/* Status badge */}
+                  <div style={{position:"absolute",top:8,right:8}}>
+                    <span style={{fontSize:10,fontWeight:700,color:color,background:`${color}22`,border:`1px solid ${color}55`,padding:"2px 8px",borderRadius:99}}>{v.status}</span>
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div style={{padding:"10px 12px"}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{v.year} {v.make} {v.model}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {v.reg&&<span>{v.reg}</span>}
+                    {v.color&&<span>{v.color}</span>}
+                  </div>
+                  <div style={{marginTop:8,display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={{fontSize:11,color:"var(--text3)"}}>📦 {vehParts.length} part{vehParts.length!==1?"s":""}</span>
+                    {v.vin&&<span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>VIN: {v.vin}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Admin: all scrapyard parts overview ────────────────────────────
+export function ScrapyardPartsAdminPage({vehicles, parts, profiles, users, onRefresh}) {
+  const [search,       setSearch]       = useState("");
+  const [companyFilter,setCompanyFilter]= useState("All");
+  const [condFilter,   setCondFilter]   = useState("All");
+  const [catFilter,    setCatFilter]    = useState("All");
+  const [refreshing,   setRefreshing]   = useState(false);
+
+  const profileMap  = Object.fromEntries(profiles.map(p=>[String(p.id), p.name||p.company_name||""]));
+  const userMap     = Object.fromEntries(users.map(u=>[String(u.id), u.name||u.username||""]));
+  const companyName = (scrapId) => {
+    const id = String(scrapId);
+    return profileMap[id] || userMap[id] || `Scrapyard #${scrapId}`;
+  };
+  const vehMap = Object.fromEntries(vehicles.map(v=>[String(v.id), v]));
+
+  const companies = ["All", ...Array.from(new Set(parts.map(p=>companyName(p.scrapyard_id)))).sort()];
+  const conditions = ["All", ...CONDITION_OPTS];
+  const cats = ["All", ...Array.from(new Set(parts.map(p=>p.category).filter(Boolean))).sort()];
+
+  const filtered = parts.filter(p=>{
+    if(companyFilter!=="All" && companyName(p.scrapyard_id)!==companyFilter) return false;
+    if(condFilter!=="All" && p.condition!==condFilter) return false;
+    if(catFilter!=="All" && p.category!==catFilter) return false;
+    if(search.trim()){
+      const veh = vehMap[String(p.vehicle_id)];
+      const h=`${p.name} ${p.part_number||""} ${p.category||""} ${p.condition||""} ${companyName(p.scrapyard_id)} ${veh?`${veh.make} ${veh.model}`:""}`.toLowerCase();
+      if(!search.toLowerCase().split(/\s+/).every(w=>h.includes(w))) return false;
+    }
+    return true;
+  });
+
+  const doRefresh = async () => { setRefreshing(true); try{await onRefresh();}finally{setRefreshing(false);} };
+
+  const sel={padding:"8px 10px",borderRadius:8,border:"1.5px solid var(--border)",background:"var(--surface2)",color:"var(--text)",fontSize:13};
+
+  return (
+    <div className="fu">
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{flex:1}}>
+          <div style={{fontSize:18,fontWeight:800}}>📦 All Parts</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{parts.length} parts across {new Set(parts.map(p=>String(p.scrapyard_id))).size} companies</div>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={doRefresh} disabled={refreshing}>{refreshing?"⏳":"🔄"} Refresh</button>
+      </div>
+
+      {/* Filters */}
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+        <input style={{flex:1,minWidth:180,padding:"9px 12px",borderRadius:8,border:"1.5px solid var(--border)",background:"var(--surface2)",color:"var(--text)",fontSize:13,boxSizing:"border-box"}}
+          value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search part name, number, vehicle…"/>
+        <select style={sel} value={companyFilter} onChange={e=>setCompanyFilter(e.target.value)}>
+          {companies.map(c=><option key={c}>{c}</option>)}
+        </select>
+        <select style={sel} value={condFilter} onChange={e=>setCondFilter(e.target.value)}>
+          {conditions.map(c=><option key={c}>{c}</option>)}
+        </select>
+        <select style={sel} value={catFilter} onChange={e=>setCatFilter(e.target.value)}>
+          {cats.map(c=><option key={c}>{c}</option>)}
+        </select>
+      </div>
+
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>{filtered.length} result{filtered.length!==1?"s":""}</div>
+
+      {filtered.length===0 ? (
+        <div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>No parts found.</div>
+      ) : (
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
+          {filtered.map(p=>{
+            const cc     = COND_COLORS[p.condition]||"#9ca3af";
+            const photos = [p.photo_url,p.photo_url_2,p.photo_url_3].filter(Boolean);
+            const veh    = vehMap[String(p.vehicle_id)];
+            const cn     = companyName(p.scrapyard_id);
+            return (
+              <div key={p.id} className="card" style={{padding:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                {/* Photo area */}
+                <div style={{background:"var(--surface2)",borderBottom:"1px solid var(--border)",position:"relative"}}>
+                  {photos.length>0 ? (
+                    <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,height:120}}>
+                      {photos.map((url,i)=>(
+                        <img key={i} src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{height:90,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      <span style={{fontSize:32,opacity:.15}}>🔩</span>
+                    </div>
+                  )}
+                  {/* Company badge */}
+                  <div style={{position:"absolute",bottom:6,left:6}}>
+                    <span style={{fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,.65)",backdropFilter:"blur(4px)",padding:"2px 7px",borderRadius:99,border:"1px solid rgba(255,255,255,.15)"}}>🏢 {cn}</span>
+                  </div>
+                </div>
+
+                {/* Details area */}
+                <div style={{padding:"10px 12px",flex:1,display:"flex",flexDirection:"column",gap:5}}>
+                  <div style={{fontWeight:700,fontSize:13,lineHeight:1.3}}>{p.name}</div>
+                  {p.part_number&&<div style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{p.part_number}</div>}
+
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    {p.condition&&<span style={{fontSize:10,fontWeight:600,padding:"1px 6px",borderRadius:4,background:`${cc}20`,color:cc}}>{p.condition}</span>}
+                    {p.category&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"var(--surface2)",color:"var(--text3)",border:"1px solid var(--border)"}}>{p.category}</span>}
+                  </div>
+
+                  <div style={{fontSize:12,color:"var(--text2)",display:"flex",gap:10,flexWrap:"wrap"}}>
+                    <span>Qty: <b>{p.quantity}</b></span>
+                    {p.price!=null&&<span><b>R {Number(p.price).toFixed(2)}</b></span>}
+                  </div>
+
+                  {veh&&<div style={{fontSize:11,color:"var(--text3)"}}>🚗 {[veh.year,veh.make,veh.model].filter(Boolean).join(" ")}</div>}
+                  {p.location&&<div style={{fontSize:11,color:"var(--text3)"}}>📍 {p.location}</div>}
+
+                  <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:2}}>
+                    <button onClick={()=>window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.name+(veh?` ${veh.make} ${veh.model}`:""))}`,"_blank")}
+                      style={{fontSize:9,padding:"2px 6px",background:"rgba(52,211,153,.10)",border:"1px solid rgba(52,211,153,.25)",borderRadius:99,color:"#34d399",cursor:"pointer",fontWeight:600}}>🌐 Google</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

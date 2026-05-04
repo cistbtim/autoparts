@@ -39,11 +39,11 @@ function PartLabelModal({part, vehicle, onClose}) {
   const veh = vehicle ? `${vehicle.year||""} ${vehicle.make} ${vehicle.model}`.trim() : "";
 
   const handlePrint = () => {
-    const win = window.open("","_blank","width=400,height=350");
+    const win = window.open("","_blank","width=460,height=420");
     if(!win) return;
     win.document.write(`<!DOCTYPE html><html><head><title>Part Label</title><style>
       *{margin:0;padding:0;box-sizing:border-box}
-      body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;font-family:Arial,sans-serif}
+      body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#fff;font-family:Arial,sans-serif;gap:16px}
       .label{width:320px;border:2px solid #ccc;border-radius:8px;padding:10px 12px;display:flex;gap:12px;align-items:flex-start}
       .qr{width:88px;height:88px;flex-shrink:0}
       .num{font-size:19px;font-weight:900;letter-spacing:1px;margin-bottom:4px;font-family:monospace}
@@ -52,8 +52,10 @@ function PartLabelModal({part, vehicle, onClose}) {
       .tiny{font-size:9px;color:#555;margin-bottom:2px;font-family:monospace}
       .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
       .tag{border:1px solid #888;border-radius:3px;padding:1px 5px;font-size:9px}
-      @media print{body{min-height:auto}.label{border:2px solid #000}}
+      .print-btn{padding:8px 24px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}
+      @media print{body{min-height:auto;gap:0}.label{border:2px solid #000}.print-btn{display:none}}
     </style></head><body>
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
       <div class="label">
         <img class="qr" src="${qr}" alt="QR"/>
         <div style="flex:1;min-width:0">
@@ -69,7 +71,6 @@ function PartLabelModal({part, vehicle, onClose}) {
           </div>
         </div>
       </div>
-      <script>window.onload=function(){window.print();}<\/script>
     </body></html>`);
     win.document.close();
   };

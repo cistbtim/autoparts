@@ -5107,7 +5107,7 @@ function JobCardLabelModal({job, settings, onClose}) {
     if(!win) return;
     win.document.write(`<!DOCTYPE html><html><head><title>Job Card Label</title><style>
       *{margin:0;padding:0;box-sizing:border-box}
-      body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;font-family:Arial,sans-serif}
+      body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#fff;font-family:Arial,sans-serif;gap:16px}
       .label{width:340px;border:2px solid #000;border-radius:8px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start}
       .qr{width:88px;height:88px;flex-shrink:0}
       .reg{font-size:18px;font-weight:900;font-family:monospace;letter-spacing:2px;border:2px solid #000;padding:2px 8px;border-radius:4px;display:inline-block;margin-bottom:6px}
@@ -5117,8 +5117,10 @@ function JobCardLabelModal({job, settings, onClose}) {
       .lbl{color:#666;flex-shrink:0}
       .val{font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .complaint{font-size:10px;color:#333;margin-top:5px;border-top:1px dashed #ccc;padding-top:4px;overflow:hidden;max-height:24px;line-height:1.4}
-      @media print{body{min-height:auto}}
+      .print-btn{padding:8px 24px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}
+      @media print{body{min-height:auto;gap:0}.print-btn{display:none}}
     </style></head><body>
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
       <div class="label">
         <img class="qr" src="${qr}" alt="QR"/>
         <div style="flex:1;min-width:0">
@@ -5133,7 +5135,6 @@ function JobCardLabelModal({job, settings, onClose}) {
           ${job.complaint?`<div class="complaint">Complaint: ${(job.complaint||"").slice(0,100).replace(/</g,"&lt;")}</div>`:""}
         </div>
       </div>
-      <script>window.onload=function(){window.print();}<\/script>
     </body></html>`);
     win.document.close();
   };

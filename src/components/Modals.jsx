@@ -13,7 +13,9 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
   const [f,setF]=useState({
     name:"", vat_number:"", phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
-    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", default_markup_pct:0, move_pin:"", ...profile
+    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", default_markup_pct:0, move_pin:"",
+    label_width_mm:98, label_height_mm:45,
+    ...profile
   });
   const [saving,setSaving]=useState(false);
   const [detectingLoc,setDetectingLoc]=useState(false);
@@ -236,6 +238,26 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
           </div>
         </div>
 
+        {/* Label Size */}
+        <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🏷️ Label Size</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div>
+              <FL label="Label Width (mm)"/>
+              <input className="inp" type="number" min="50" max="200" step="1"
+                value={f.label_width_mm||98} onChange={e=>s("label_width_mm",Number(e.target.value)||98)}/>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Default: 98 mm</div>
+            </div>
+            <div>
+              <FL label="Label Height (mm)"/>
+              <input className="inp" type="number" min="20" max="120" step="1"
+                value={f.label_height_mm||45} onChange={e=>s("label_height_mm",Number(e.target.value)||45)}/>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Default: 45 mm</div>
+            </div>
+          </div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>Applies to all labels printed from this workshop. Standard thermal label: 98 × 45 mm.</div>
+        </div>
+
         {/* Licence Renewal Agent */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
           <div><FL label="🪪 Renewal Agent Name"/><input className="inp" value={f.licence_renewal_agent_name||""} onChange={e=>s("licence_renewal_agent_name",e.target.value)} placeholder="e.g. ABC Renewals"/></div>
@@ -276,6 +298,123 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
           {saving?"Saving...":"✅ Save Settings"}
         </button>
       </div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCRAPYARD PROFILE / SETTINGS PAGE
+// ═══════════════════════════════════════════════════════════════
+export function ScrapyardProfilePage({profile, onSave}) {
+  const [f, setF] = useState({
+    name:"", phone:"", email:"", address:"", website:"",
+    logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
+    label_width_mm:98, label_height_mm:45,
+    ...profile
+  });
+  const [saving, setSaving] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef(null);
+  const s = (k,v) => setF(p=>({...p,[k]:v}));
+
+  useEffect(()=>{ setF(p=>({...p,...profile})); },[profile]);
+
+  const handleFile = (file) => {
+    if(!file||!file.type.startsWith("image/")) return;
+    const MAX=800;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w=img.width, h=img.height;
+        if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+        canvas.width=w; canvas.height=h;
+        canvas.getContext("2d").drawImage(img,0,0,w,h);
+        s("logo_data", canvas.toDataURL("image/png",0.85));
+        s("logo_url","");
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    await onSave(f);
+    setSaving(false);
+  };
+
+  const logoSrc = f.logo_url || f.logo_data;
+
+  return (
+    <div className="fu" style={{maxWidth:560}}>
+      <h1 style={{fontSize:20,fontWeight:700,marginBottom:16}}>⚙️ Scrapyard Settings</h1>
+
+      <div className="card" style={{padding:20,display:"flex",flexDirection:"column",gap:14}}>
+        {/* Logo */}
+        <div>
+          <FL label="Scrapyard Logo"/>
+          <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+          <div style={{border:`2px dashed ${dragOver?"var(--accent)":"var(--border)"}`,borderRadius:10,padding:16,textAlign:"center",
+            cursor:"pointer",transition:"all .15s",background:dragOver?"rgba(251,146,60,.06)":"var(--surface2)",marginBottom:8}}
+            onClick={()=>fileRef.current?.click()}
+            onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+            onDragLeave={()=>setDragOver(false)}
+            onDrop={e=>{e.preventDefault();setDragOver(false);handleFile(e.dataTransfer.files[0]);}}>
+            {logoSrc
+              ? <img src={logoSrc} alt="logo" style={{maxHeight:70,maxWidth:220,objectFit:"contain"}}/>
+              : <div style={{color:"var(--text3)",fontSize:13}}>📁 Click or drag image to upload logo</div>}
+          </div>
+          {logoSrc&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{s("logo_data","");s("logo_url","");}}>✕ Remove</button>}
+          <div style={{marginTop:8}}>
+            <FL label="Or paste Google Drive / URL"/>
+            <input className="inp" value={f.logo_url} onChange={e=>{s("logo_url",e.target.value);s("logo_data","");}} placeholder="https://..."/>
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={{gridColumn:"1/-1"}}><FL label="Scrapyard Name *"/><input className="inp" value={f.name||""} onChange={e=>s("name",e.target.value)} placeholder="e.g. ABC Auto Salvage"/></div>
+          <div><FL label="Phone"/><input className="inp" value={f.phone||""} onChange={e=>s("phone",e.target.value)} placeholder="+27..."/></div>
+          <div><FL label="Email"/><input className="inp" type="email" value={f.email||""} onChange={e=>s("email",e.target.value)}/></div>
+          <div style={{gridColumn:"1/-1"}}><FL label="Website"/><input className="inp" value={f.website||""} onChange={e=>s("website",e.target.value)} placeholder="https://..."/></div>
+          <div style={{gridColumn:"1/-1"}}><FL label="Address"/><textarea className="inp" rows={2} value={f.address||""} onChange={e=>s("address",e.target.value)} style={{resize:"vertical"}}/></div>
+          <div><FL label="City"/><input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)}/></div>
+          <div><FL label="Country"/><input className="inp" value={f.country||""} onChange={e=>s("country",e.target.value)}/></div>
+          <div style={{gridColumn:"1/-1"}}>
+            <FL label="Currency"/>
+            <select className="inp" value={f.currency||"ZAR R"} onChange={e=>s("currency",e.target.value)}>
+              {["ZAR R","USD $","EUR €","GBP £","TWD NT$","CNY ¥","JPY ¥","AUD A$","CAD C$","SGD S$","MYR RM","THB ฿","INR ₹","AED د.إ","NGN ₦","KES KSh","GHS GH₵"].map(c=>(
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Label Size */}
+        <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🏷️ Label Size</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div>
+              <FL label="Label Width (mm)"/>
+              <input className="inp" type="number" min="50" max="200" step="1"
+                value={f.label_width_mm||98} onChange={e=>s("label_width_mm",Number(e.target.value)||98)}/>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Default: 98 mm</div>
+            </div>
+            <div>
+              <FL label="Label Height (mm)"/>
+              <input className="inp" type="number" min="20" max="120" step="1"
+                value={f.label_height_mm||45} onChange={e=>s("label_height_mm",Number(e.target.value)||45)}/>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Default: 45 mm</div>
+            </div>
+          </div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>Used for vehicle labels and stripping parts labels. Standard thermal label: 98 × 45 mm.</div>
+        </div>
+
+        <button className="btn btn-primary" style={{padding:13,fontSize:15}} onClick={save} disabled={saving}>
+          {saving?"Saving...":"✅ Save Settings"}
+        </button>
+      </div>
     </div>
   );
 }

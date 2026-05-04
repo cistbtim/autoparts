@@ -8,7 +8,7 @@ import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./l
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
@@ -257,6 +257,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     country:    workshopProfile.country   || "",
     licence_renewal_agent_name:  workshopProfile.licence_renewal_agent_name  || settings.licence_renewal_agent_name  || "",
     licence_renewal_agent_phone: workshopProfile.licence_renewal_agent_phone || settings.licence_renewal_agent_phone || "",
+    label_width_mm:  workshopProfile.label_width_mm  || 98,
+    label_height_mm: workshopProfile.label_height_mm || 45,
   } : settings;
 
   const logInv=async(part,before,after,action,reason="")=>{
@@ -400,6 +402,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       ]);
       const p=Array.isArray(prof)&&prof[0]?prof[0]:{};
       setWorkshopProfile(p);
+      if(p.label_width_mm||p.label_height_mm) updateSettings({label_width_mm:p.label_width_mm||98,label_height_mm:p.label_height_mm||45});
       setScrapVehicles(Array.isArray(veh)?veh:[]);
       setScrapParts(Array.isArray(prt)?prt:[]);
     }
@@ -1460,6 +1463,24 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setWorkshopProfile(p=>({...p,...data}));
     showToast("✅ Workshop profile saved");
   };
+
+  const saveScrapProfile=async(data)=>{
+    const payload={...data, id:scrapId};
+    const existing=await api.get("scrapyard_profiles",`id=eq.${scrapId}&select=id`).catch(()=>[]);
+    let res;
+    if(Array.isArray(existing)&&existing.length>0){
+      res=await api.patch("scrapyard_profiles","id",scrapId,payload);
+    } else {
+      res=await api.insert("scrapyard_profiles",payload);
+    }
+    if(res&&!Array.isArray(res)&&res.message){
+      showToast(`❌ Save failed: ${res.message}`,"err");
+      return;
+    }
+    setWorkshopProfile(p=>({...p,...data}));
+    if(data.label_width_mm||data.label_height_mm) updateSettings({label_width_mm:data.label_width_mm||98,label_height_mm:data.label_height_mm||45});
+    showToast("✅ Scrapyard settings saved");
+  };
   // ── RFQ functions ──────────────────────────────────────────
   const createRfqSession=async(name,deadline,selectedParts,selectedSuppliers)=>{
     const sid=makeId("RFQ");
@@ -1744,8 +1765,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     {
       id:"grp_scrapyard", icon:"🚗", label:"Scrapyard", roles:["scrapyard"],
       children:[
-        {id:"sy_vehicles",icon:"🚗",label:"Vehicles",roles:["scrapyard"]},
-        {id:"sy_parts",icon:"📦",label:"Parts",roles:["scrapyard"],badge:scrapLowStock.length},
+        {id:"sy_vehicles", icon:"🚗", label:"Vehicles", roles:["scrapyard"]},
+        {id:"sy_parts",    icon:"📦", label:"Parts",    roles:["scrapyard"], badge:scrapLowStock.length},
+        {id:"sy_settings", icon:"⚙️", label:"Settings", roles:["scrapyard"]},
       ]
     },
     {
@@ -1871,8 +1893,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"stockmove",icon:"🔀",label:t.stockMove},
     ];
     if(role==="scrapyard") return [
-      {id:"sy_vehicles",icon:"🚗",label:"Vehicles"},
-      {id:"sy_parts",icon:"📦",label:"Parts",badge:scrapLowStock.length},
+      {id:"sy_vehicles", icon:"🚗", label:"Vehicles"},
+      {id:"sy_parts",    icon:"📦", label:"Parts",     badge:scrapLowStock.length},
+      {id:"sy_settings", icon:"⚙️", label:"Settings"},
     ];
     if(role==="shipper") return [
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
@@ -2564,6 +2587,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             parts={scrapParts}
             onRefresh={refreshScrapyardData}
           />
+        )}
+
+        {/* ── SCRAPYARD SETTINGS ── */}
+        {tab==="sy_settings"&&role==="scrapyard"&&(
+          <ScrapyardProfilePage profile={workshopProfile} onSave={saveScrapProfile}/>
         )}
 
         {/* ── ALL SCRAPYARDS (admin/manager) ── */}

@@ -3284,8 +3284,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                 customerName: job.customer_name || "",
                 mechanic: job.mechanic || "",
                 complaint: job.complaint || "",
-                widthMm: 98,
-                heightMm: 45,
+                widthMm: settings?.label_width_mm || 98,
+                heightMm: settings?.label_height_mm || 45,
               });
             }}>🏷️ {t.wsLabel}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardSheet(job,items,settings)}>📄 Job Sheet</button>

@@ -18,6 +18,12 @@ const PHOTO_SLOTS = [
   { key:"photo_engine",   label:"Engine Bay" },
 ];
 
+const PART_PHOTO_SLOTS = [
+  { key:"photo_url",   label:"Photo 1" },
+  { key:"photo_url_2", label:"Photo 2" },
+  { key:"photo_url_3", label:"Photo 3" },
+];
+
 const Lbl = ({children}) => (
   <label style={{fontSize:12,fontWeight:700,color:"var(--text3)",display:"block",marginBottom:4}}>{children}</label>
 );
@@ -144,37 +150,49 @@ function ScrapVehiclePhotoSlot({label, url, vehicleId, vin, photoKey, onSaved}) 
   );
 }
 
-// ── Part photo — single drop zone like PartPhotoUploader ──────────
-function ScrapPartPhoto({url, partId, vin, onChange}) {
+// ── Single part photo slot ─────────────────────────────────────────
+function ScrapPartPhotoSlot({label, url, partId, vin, photoKey, onChange}) {
   const [uploading, setUploading] = useState(false);
+  const [status,    setStatus]    = useState("");
   const [dragOver,  setDragOver]  = useState(false);
   const [error,     setError]     = useState(null);
   const fileRef = useRef(null);
+  const camRef  = useRef(null);
 
   const upload = async (file) => {
     if(!file) return;
+    const isImg = file.type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|heic|bmp)$/i.test(file.name);
+    if(!isImg){ setError("Image files only"); return; }
     const SCRIPT = getScriptUrl();
     if(!SCRIPT){ setError("⚙️ Set Vehicle Script URL in Settings first"); return; }
-    if(!file.type.startsWith("image/")){ setError("Image files only"); return; }
     setUploading(true); setError(null);
     try {
+      setStatus("Resizing…");
       const base64 = await resizeB64(file);
-      const folderPath = `Scrapyard/${vin||"NO-VIN"}/Parts Photos`;
+      setStatus("Uploading…");
       const pad = n=>String(n).padStart(2,"0");
       const now = new Date();
       const ts  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-      const filename = `${ts}_part_${partId||"new"}.jpg`;
+      const folderPath = `Scrapyard/${vin||"NO-VIN"}/Parts Photos`;
+      const filename   = `${ts}_${label.replace(/\s/g,"_")}_part_${partId||"new"}.jpg`;
       const resp   = await fetch(SCRIPT,{method:"POST",body:JSON.stringify({image:base64,filename,mimeType:"image/jpeg",folderPath})});
       const result = await resp.json();
-      if(result.success){ onChange(result.url); setError(null); }
-      else throw new Error(result.error||"Upload failed");
-    } catch(e){ setError("Upload error: "+e.message); }
+      if(result.success){
+        if(partId){
+          setStatus("Saving…");
+          const dbRes = await api.patch("scrapyard_parts","id",partId,{[photoKey]:result.url});
+          if(dbRes?.code) throw new Error("DB save failed: "+dbRes.message);
+        }
+        onChange(result.url); setStatus(""); setError(null);
+      } else {
+        throw new Error(result.error||"Upload failed");
+      }
+    } catch(e){ setError("❌ "+e.message); setStatus(""); }
     setUploading(false);
   };
 
   return (
     <div>
-      <Lbl>📸 Part Photo</Lbl>
       <div
         onClick={()=>!uploading&&fileRef.current?.click()}
         onDragOver={e=>{e.preventDefault();setDragOver(true);}}
@@ -182,35 +200,70 @@ function ScrapPartPhoto({url, partId, vin, onChange}) {
         onDrop={e=>{e.preventDefault();setDragOver(false);upload(e.dataTransfer.files[0]);}}
         style={{
           border:`2px dashed ${dragOver?"var(--accent)":"var(--border)"}`,
-          borderRadius:10, padding:"16px", textAlign:"center",
-          cursor:uploading?"wait":"pointer",
+          borderRadius:10, cursor:uploading?"wait":"pointer",
           background:dragOver?"rgba(251,146,60,.06)":"var(--surface2)",
-          transition:"all .15s",
+          aspectRatio:"1/1", overflow:"hidden", position:"relative",
+          display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s",
         }}>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
-          onChange={e=>{upload(e.target.files[0]);e.target.value="";}}/>
+        <input ref={fileRef} type="file" style={{display:"none"}} onChange={e=>{upload(e.target.files[0]);e.target.value="";}}/>
+        <input ref={camRef}  type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{upload(e.target.files[0]);e.target.value="";}}/>
         {uploading ? (
-          <div style={{color:"var(--accent)",fontSize:14}}>
-            <div style={{width:24,height:24,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 8px"}}/>
-            Uploading…
+          <div style={{textAlign:"center",color:"var(--accent)",padding:8}}>
+            <div style={{width:20,height:20,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 4px"}}/>
+            <div style={{fontSize:10,lineHeight:1.3}}>{status||"Uploading…"}</div>
           </div>
         ) : url ? (
-          <div style={{display:"flex",alignItems:"center",gap:12,justifyContent:"center"}}>
-            <img src={url} alt="part" style={{width:80,height:80,objectFit:"contain",borderRadius:8,background:"var(--surface3)"}}/>
-            <div style={{textAlign:"left"}}>
-              <div style={{fontSize:13,fontWeight:600,color:"var(--green)"}}>✅ Photo uploaded</div>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Click to replace</div>
+          <>
+            <img src={url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0)",display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity .2s"}}
+              onMouseEnter={e=>e.currentTarget.style.opacity=1}
+              onMouseLeave={e=>e.currentTarget.style.opacity=0}>
+              <div style={{background:"rgba(0,0,0,.6)",color:"#fff",borderRadius:8,padding:"4px 8px",fontSize:11}}>🔄 Replace</div>
             </div>
-          </div>
+          </>
         ) : (
-          <div>
-            <div style={{fontSize:26,marginBottom:6}}>📷</div>
-            <div style={{fontSize:14,fontWeight:600}}>Drop or tap to upload photo</div>
-            <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>Saved to Google Drive</div>
+          <div style={{textAlign:"center",color:"var(--text3)",padding:6}}>
+            <div style={{fontSize:18,marginBottom:2}}>📷</div>
+            <div style={{fontSize:10,fontWeight:600}}>{label}</div>
           </div>
         )}
       </div>
-      {error&&<div style={{fontSize:11,color:"var(--red)",marginTop:6}}>{error}</div>}
+      <div style={{marginTop:5}}>
+        <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",marginBottom:4,textAlign:"center",textTransform:"uppercase",letterSpacing:".05em"}}>{label}</div>
+        <div style={{display:"flex",gap:4,justifyContent:"center"}}>
+          <button className="btn btn-ghost btn-xs" style={{flex:1,padding:"4px 2px",fontSize:10,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}
+            onClick={e=>{e.stopPropagation();camRef.current?.click();}}>
+            <span style={{fontSize:13}}>📷</span><span>Camera</span>
+          </button>
+          <button className="btn btn-ghost btn-xs" style={{flex:1,padding:"4px 2px",fontSize:10,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}
+            onClick={e=>{e.stopPropagation();fileRef.current?.click();}}>
+            <span style={{fontSize:13}}>🖼️</span><span>Files</span>
+          </button>
+        </div>
+        {error&&<div style={{fontSize:9,color:"var(--red)",marginTop:3,textAlign:"center",lineHeight:1.3}}>{error}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── 3-slot part photos ─────────────────────────────────────────────
+function ScrapPartPhotos({urls, partId, vin, onChange}) {
+  return (
+    <div>
+      <Lbl>📸 Part Photos</Lbl>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+        {PART_PHOTO_SLOTS.map(({key,label})=>(
+          <ScrapPartPhotoSlot
+            key={key}
+            label={label}
+            url={urls[key]||""}
+            partId={partId}
+            vin={vin}
+            photoKey={key}
+            onChange={url=>onChange(key,url)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -347,7 +400,7 @@ function VehicleModal({v, scrapId, onSave, onClose}) {
 
 // ── Part modal ─────────────────────────────────────────────────────
 function PartModal({p, scrapId, vehicles, defaultVehicleId, onSave, onClose}) {
-  const blank = {name:"",category:"",part_number:"",condition:"Used",vehicle_id:defaultVehicleId||"",quantity:1,min_qty:1,price:"",cost:"",location:"",notes:"",photo_url:""};
+  const blank = {name:"",category:"",part_number:"",condition:"Used",vehicle_id:defaultVehicleId||"",quantity:1,min_qty:1,price:"",cost:"",location:"",notes:"",photo_url:"",photo_url_2:"",photo_url_3:""};
   const [form, setForm] = useState(p?.id ? {...blank,...p, vehicle_id:p.vehicle_id||""} : blank);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -421,12 +474,11 @@ function PartModal({p, scrapId, vehicles, defaultVehicleId, onSave, onClose}) {
           </div>
           <div><Lbl>Notes</Lbl><textarea style={{...inp,resize:"vertical"}} rows={2} value={form.notes} onChange={e=>set("notes",e.target.value)}/></div>
 
-          {/* Part photo — only for existing parts (need an ID to name the file) */}
-          <ScrapPartPhoto
-            url={form.photo_url}
+          <ScrapPartPhotos
+            urls={{photo_url:form.photo_url, photo_url_2:form.photo_url_2, photo_url_3:form.photo_url_3}}
             partId={p?.id}
             vin={vehicleVin}
-            onChange={url=>set("photo_url",url)}
+            onChange={(key,url)=>set(key,url)}
           />
 
           {err&&<div style={{color:"var(--red)",fontSize:13}}>⚠ {err}</div>}

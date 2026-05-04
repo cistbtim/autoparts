@@ -3271,81 +3271,20 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           {/* Action buttons */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
             {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ {t.edit}</button>}
-            <button className="btn btn-ghost btn-sm" onClick={()=>setShowLabelModal(p=>!p)} style={showLabelModal?{background:"var(--surface3)",color:"var(--accent)"}:{}}>🏷️ {t.wsLabel}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{
+              const shopN=settings?.shop_name||"Workshop";
+              const qrU=`https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=${encodeURIComponent(String(job.id||""))}&format=png`;
+              const vehS=[job.vehicle_make,job.vehicle_model,job.vehicle_year].filter(Boolean).join(" ");
+              const win=window.open("","_blank","width=500,height=420");
+              if(!win) return;
+              win.document.write(`<!DOCTYPE html><html><head><title>Job Card Label</title><style>*{margin:0;padding:0;box-sizing:border-box}body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f3f4f6;font-family:Arial,sans-serif;gap:16px;padding:20px}.label{width:340px;border:2px solid #000;border-radius:8px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;background:#fff}.qr{width:88px;height:88px;flex-shrink:0}.reg{font-size:18px;font-weight:900;font-family:monospace;letter-spacing:2px;border:2px solid #000;padding:2px 8px;border-radius:4px;display:inline-block;margin-bottom:6px}.jobid{font-size:11px;font-family:monospace;color:#555;margin-bottom:2px}.shop{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:4px}.row{font-size:11px;margin-bottom:2px;display:flex;gap:6px}.lbl{color:#666;flex-shrink:0}.val{font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.complaint{font-size:10px;color:#333;margin-top:5px;border-top:1px dashed #ccc;padding-top:4px;overflow:hidden;max-height:24px;line-height:1.4}.print-btn{padding:10px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}@media print{body{background:#fff;min-height:auto;gap:0;padding:6mm}.print-btn{display:none}}</style></head><body><button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button><div class="label"><img class="qr" src="${qrU}" alt="QR"/><div style="flex:1;min-width:0"><div class="jobid">JOB #${job.id||""}</div><div class="shop">🔧 ${shopN}</div><div class="reg">${job.vehicle_reg||"—"}</div>${vehS?`<div class="row"><span class="lbl">Vehicle:</span><span class="val">${vehS}</span></div>`:""}<div class="row"><span class="lbl">Customer:</span><span class="val">${(job.customer_name||"—").replace(/</g,"&lt;")}</span></div><div class="row"><span class="lbl">Phone:</span><span class="val">${job.customer_phone||"—"}</span></div><div class="row"><span class="lbl">Date In:</span><span class="val">${job.date_in||"—"}</span></div>${job.mechanic?`<div class="row"><span class="lbl">Mechanic:</span><span class="val">${job.mechanic}</span></div>`:""}${job.complaint?`<div class="complaint">Complaint: ${(job.complaint||"").slice(0,100).replace(/</g,"&lt;")}</div>`:""}</div></div></body></html>`);
+              win.document.close();
+            }}>🏷️ {t.wsLabel}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardSheet(job,items,settings)}>📄 Job Sheet</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>setServiceHistModal(true)}>📋 History{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
             {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
             <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={()=>setShowMoreActions(p=>!p)} title="More actions">⋯</button>
           </div>
-
-          {/* Inline label frame */}
-          {showLabelModal&&(()=>{
-            const shopName2 = settings?.shop_name||"Workshop";
-            const qr2 = `https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=${encodeURIComponent(String(job.id||""))}&format=png`;
-            const veh2 = [job.vehicle_make,job.vehicle_model,job.vehicle_year].filter(Boolean).join(" ");
-            const doPrint = () => {
-              const win = window.open("","_blank","width=500,height=420");
-              if(!win) return;
-              win.document.write(`<!DOCTYPE html><html><head><title>Job Card Label</title><style>
-                *{margin:0;padding:0;box-sizing:border-box}
-                body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f3f4f6;font-family:Arial,sans-serif;gap:16px;padding:20px}
-                .label{width:340px;border:2px solid #000;border-radius:8px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;background:#fff}
-                .qr{width:88px;height:88px;flex-shrink:0}
-                .reg{font-size:18px;font-weight:900;font-family:monospace;letter-spacing:2px;border:2px solid #000;padding:2px 8px;border-radius:4px;display:inline-block;margin-bottom:6px}
-                .jobid{font-size:11px;font-family:monospace;color:#555;margin-bottom:2px}
-                .shop{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:4px}
-                .row{font-size:11px;margin-bottom:2px;display:flex;gap:6px}
-                .lbl{color:#666;flex-shrink:0}.val{font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-                .complaint{font-size:10px;color:#333;margin-top:5px;border-top:1px dashed #ccc;padding-top:4px;overflow:hidden;max-height:24px;line-height:1.4}
-                .print-btn{padding:10px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}
-                @media print{body{background:#fff;min-height:auto;gap:0;padding:6mm}.print-btn{display:none}}
-              </style></head><body>
-                <button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
-                <div class="label">
-                  <img class="qr" src="${qr2}" alt="QR"/>
-                  <div style="flex:1;min-width:0">
-                    <div class="jobid">JOB #${job.id||""}</div>
-                    <div class="shop">🔧 ${shopName2}</div>
-                    <div class="reg">${job.vehicle_reg||"—"}</div>
-                    ${veh2?`<div class="row"><span class="lbl">Vehicle:</span><span class="val">${veh2}</span></div>`:""}
-                    <div class="row"><span class="lbl">Customer:</span><span class="val">${(job.customer_name||"—").replace(/</g,"&lt;")}</span></div>
-                    <div class="row"><span class="lbl">Phone:</span><span class="val">${job.customer_phone||"—"}</span></div>
-                    <div class="row"><span class="lbl">Date In:</span><span class="val">${job.date_in||"—"}</span></div>
-                    ${job.mechanic?`<div class="row"><span class="lbl">Mechanic:</span><span class="val">${job.mechanic}</span></div>`:""}
-                    ${job.complaint?`<div class="complaint">Complaint: ${(job.complaint||"").slice(0,100).replace(/</g,"&lt;")}</div>`:""}
-                  </div>
-                </div>
-              </body></html>`);
-              win.document.close();
-            };
-            return (
-              <div style={{marginBottom:14,padding:16,background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                  <div style={{fontWeight:700,fontSize:13}}>🏷️ Job Card Label</div>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>setShowLabelModal(false)}>✕</button>
-                </div>
-                <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
-                  <div id="__job_label_print_root__" style={{width:340,border:"2px solid #000",borderRadius:8,padding:"12px 14px",display:"flex",gap:12,alignItems:"flex-start",background:"#fff",fontFamily:"Arial,sans-serif"}}>
-                    <img src={qr2} alt="QR" style={{width:88,height:88,flexShrink:0,display:"block"}}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:11,fontFamily:"monospace",color:"#555",marginBottom:2}}>JOB #{job.id||""}</div>
-                      <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:".08em",color:"#888",marginBottom:4}}>🔧 {shopName2}</div>
-                      <div style={{fontSize:18,fontWeight:900,fontFamily:"monospace",letterSpacing:2,border:"2px solid #000",padding:"2px 8px",borderRadius:4,display:"inline-block",marginBottom:6,color:"#000"}}>{job.vehicle_reg||"—"}</div>
-                      {veh2&&<div style={{fontSize:11,color:"#333",marginBottom:2}}><span style={{color:"#666"}}>Vehicle: </span><b>{veh2}</b></div>}
-                      <div style={{fontSize:11,color:"#333",marginBottom:2}}><span style={{color:"#666"}}>Customer: </span><b>{job.customer_name||"—"}</b></div>
-                      <div style={{fontSize:11,color:"#333",marginBottom:2}}><span style={{color:"#666"}}>Phone: </span><b>{job.customer_phone||"—"}</b></div>
-                      <div style={{fontSize:11,color:"#333",marginBottom:2}}><span style={{color:"#666"}}>Date In: </span><b>{job.date_in||"—"}</b></div>
-                      {job.mechanic&&<div style={{fontSize:11,color:"#333",marginBottom:2}}><span style={{color:"#666"}}>Mechanic: </span><b>{job.mechanic}</b></div>}
-                      {job.complaint&&<div style={{fontSize:10,color:"#333",marginTop:5,borderTop:"1px dashed #ccc",paddingTop:4,lineHeight:1.4,overflow:"hidden",maxHeight:28}}>Complaint: {(job.complaint||"").slice(0,100)}</div>}
-                    </div>
-                  </div>
-                </div>
-                <div style={{display:"flex",justifyContent:"flex-end"}}>
-                  <button className="btn btn-primary btn-sm" onClick={doPrint}>🖨️ Print / Save PDF</button>
-                </div>
-              </div>
-            );
-          })()}
 
           {showMoreActions&&(
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14,paddingTop:6,borderTop:"1px solid var(--border)"}}>

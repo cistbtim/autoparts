@@ -133,14 +133,15 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
     setLoading(true);setErr("");
     const ex=await api.get("users",`username=eq.${encodeURIComponent(scrapRegUser)}&select=id`).catch(()=>[]);
     if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
-    const scrapId=makeId("SY");
     const today=new Date().toISOString().slice(0,10);
     const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
-    const newUser=await api.insert("users",{id:scrapId,username:scrapRegUser,password:scrapRegPass,name:scrapRegName,role:"scrapyard",phone:scrapRegPhone||"",email:scrapRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
-    if(!newUser){setLoading(false);return;}
-    await api.upsert("workshop_profiles",{id:scrapId,name:scrapRegName,phone:scrapRegPhone||"",email:scrapRegEmail||"",city:scrapRegCity,country:scrapRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>{});
+    const newUser=await api.insert("users",{username:scrapRegUser,password:scrapRegPass,name:scrapRegName,role:"scrapyard",phone:scrapRegPhone||"",email:scrapRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
+    if(!newUser||newUser.code){setErr("Signup failed: "+(newUser?.message||"unknown error"));setLoading(false);return;}
     const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
-    if(loginUser){await logLogin({...loginUser});onLogin({...loginUser});}
+    if(!loginUser||loginUser.code){setErr("Signup failed");setLoading(false);return;}
+    const profRes=await api.upsert("scrapyard_profiles",{id:loginUser.id,name:scrapRegName,phone:scrapRegPhone||"",email:scrapRegEmail||"",city:scrapRegCity,country:scrapRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>null);
+    if(profRes?.code) setErr("Account created but profile save failed — "+(profRes.message||"check DB"));
+    if(!profRes?.code){await logLogin({...loginUser});onLogin({...loginUser});}
     else setErr("Account created — please log in");
     setLoading(false);
   };

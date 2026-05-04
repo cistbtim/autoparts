@@ -11,6 +11,7 @@ import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg,
 import { WorkshopProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
+import { ScrapyardVehiclesPage, ScrapyardPartsPage } from "./components/Scrapyard.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage } from "./pages/PublicPages.jsx";
 
@@ -68,9 +69,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const role = user.role;
   const wsRole = user.wsRole || "main"; // workshop sub-role: "main" | "manager" | "mechanic"
   // workshop_id scopes all workshop data to this user's own records
-  const wsId = role==="workshop" ? String(user.id) : null;
+  const wsId  = role==="workshop"  ? String(user.id) : null;
+  const scrapId = role==="scrapyard" ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="demo"?"inventory":"dashboard";
+  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_vehicles":role==="demo"?"inventory":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [parts,setParts]=useState([]);
@@ -134,6 +136,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [wsBookings,        setWsBookings]        =useState([]);
   const [workshopDocuments,setWorkshopDocuments]=useState([]);
   const [workshopProfile,setWorkshopProfile]=useState({});
+  const [scrapVehicles,setScrapVehicles]=useState([]);
+  const [scrapParts,setScrapParts]=useState([]);
   const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
   const [showLocationSetup,setShowLocationSetup]=useState(false);
   const [subStatus,setSubStatus]=useState(null); // null | {status,daysLeft,expiresAt}
@@ -378,6 +382,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       // Prompt for city/country if missing (main role only)
       if(wsRole==="main"&&(!p.city||!p.country)) setShowLocationSetup(true);
     }
+    // Load scrapyard profile + data
+    if(scrapId){
+      const [prof,veh,prt]=await Promise.all([
+        api.get("scrapyard_profiles",`id=eq.${scrapId}&select=*`).catch(()=>[]),
+        api.get("scrapyard_vehicles",`scrapyard_id=eq.${scrapId}&select=*&order=created_at.desc`).catch(()=>[]),
+        api.get("scrapyard_parts",`scrapyard_id=eq.${scrapId}&select=*&order=created_at.desc`).catch(()=>[]),
+      ]);
+      const p=Array.isArray(prof)&&prof[0]?prof[0]:{};
+      setWorkshopProfile(p);
+      setScrapVehicles(Array.isArray(veh)?veh:[]);
+      setScrapParts(Array.isArray(prt)?prt:[]);
+    }
   },[]);
 
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
@@ -437,6 +453,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     }
   },[]);
 
+  const refreshScrapyardData=useCallback(async()=>{
+    if(!scrapId) return;
+    const [veh,prt]=await Promise.all([
+      api.get("scrapyard_vehicles",`scrapyard_id=eq.${scrapId}&select=*&order=created_at.desc`).catch(()=>[]),
+      api.get("scrapyard_parts",`scrapyard_id=eq.${scrapId}&select=*&order=created_at.desc`).catch(()=>[]),
+    ]);
+    setScrapVehicles(Array.isArray(veh)?veh:[]);
+    setScrapParts(Array.isArray(prt)?prt:[]);
+  },[scrapId]);
+
   // Sync Apps Script URL to window whenever settings changes
   useEffect(()=>{ window._APPS_SCRIPT_URL = settings?.apps_script_url || ""; },[settings?.apps_script_url]);
   useEffect(()=>{
@@ -465,6 +491,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     tabRef.current === "picking" ||     // always pause when picking orders
     tabRef.current === "vehicles" ||    // always pause when managing vehicles
     tabRef.current === "workshop" ||    // always pause on workshop
+    tabRef.current === "sy_vehicles" || // always pause on scrapyard
+    tabRef.current === "sy_parts" ||
     tabRef.current === "wscustomers" ||
     tabRef.current === "wsquotations" ||
     tabRef.current === "wsinvoices" ||
@@ -1663,6 +1691,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const myO=orders.filter(o=>o.customer_phone===user.phone||o.customer_name===user.name);
   const fc=customers.filter(c=>c.name?.includes(searchCust)||c.phone?.includes(searchCust));
   const lowStock=parts.filter(p=>p.stock<=p.min_stock);
+  const scrapLowStock=scrapParts.filter(p=>p.quantity<=p.min_qty);
   const totalRev=orders.filter(o=>o.status==="Completed").reduce((s,o)=>s+(o.total||0),0);
   const pendingCnt=orders.filter(o=>o.status==="Processing"||o.status==="Ready to Ship").length;
   const pendingInq=inquiries.filter(i=>i.status==="pending").length;
@@ -1701,6 +1730,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"stocktake",icon:"🔢",label:t.stockTake,roles:["admin","manager","shipper","stockman"]},
         {id:"stockmove",icon:"🔀",label:t.stockMove,roles:["admin","manager","shipper","stockman"]},
         {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager"]},
+      ]
+    },
+    {
+      id:"grp_scrapyard", icon:"🚗", label:"Scrapyard", roles:["scrapyard"],
+      children:[
+        {id:"sy_vehicles",icon:"🚗",label:"Vehicles",roles:["scrapyard"]},
+        {id:"sy_parts",icon:"📦",label:"Parts",roles:["scrapyard"],badge:scrapLowStock.length},
       ]
     },
     {
@@ -1817,6 +1853,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"inventory",icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"stocktake",icon:"🔢",label:t.stockTake},
       {id:"stockmove",icon:"🔀",label:t.stockMove},
+    ];
+    if(role==="scrapyard") return [
+      {id:"sy_vehicles",icon:"🚗",label:"Vehicles"},
+      {id:"sy_parts",icon:"📦",label:"Parts",badge:scrapLowStock.length},
     ];
     if(role==="shipper") return [
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
@@ -2488,6 +2528,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               </div>
             )}
           </div>
+        )}
+
+        {/* ── SCRAPYARD VEHICLES ── */}
+        {tab==="sy_vehicles"&&(
+          <ScrapyardVehiclesPage
+            scrapId={scrapId}
+            vehicles={scrapVehicles}
+            parts={scrapParts}
+            onRefresh={refreshScrapyardData}
+          />
+        )}
+
+        {/* ── SCRAPYARD PARTS ── */}
+        {tab==="sy_parts"&&(
+          <ScrapyardPartsPage
+            scrapId={scrapId}
+            vehicles={scrapVehicles}
+            parts={scrapParts}
+            onRefresh={refreshScrapyardData}
+          />
         )}
 
         {/* ── RFQ ── */}

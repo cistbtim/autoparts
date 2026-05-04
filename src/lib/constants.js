@@ -6,6 +6,8 @@ export const ROLES = {
   shipper:  { color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  icon: "🚚" },
   stockman: { color: "#10b981", bg: "rgba(16,185,129,0.12)",  icon: "📦" },
   customer: { color: "#34d399", bg: "rgba(52,211,153,0.12)",  icon: "👤" },
+  workshop: { color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "🔧" },
+  scrapyard: { color: "#6b7280", bg: "rgba(107,114,128,0.12)", icon: "🚗" },
 };
 
 export const OC = { "Completed": "#34d399", "Ready to Ship": "#fbbf24", "Processing": "#60a5fa", "Cancelled": "#f87171", "已完成": "#34d399", "待出貨": "#fbbf24", "處理中": "#60a5fa", "已取消": "#f87171" };
@@ -68,6 +70,7 @@ export const canAccess = (u) => {
   if (u.role === "admin") return true;
   if (u.role === "demo") return true;
   if (u.role === "workshop") return true;
+  if (u.role === "scrapyard") return true;
   if (u._isCustomer) return true;
   const s = getSubInfo(u);
   return s.status === "active" || s.status === "trial";

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { api } from "../lib/api.js";
+import { useState, useEffect } from "react";
+import { api, SUPABASE_URL } from "../lib/api.js";
 import { getSettings } from "../lib/settings.js";
 import { CSS } from "../styles.js";
 import { ShopLogo, FL } from "../components/shared.jsx";
@@ -48,6 +48,13 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
 
   const [err,setErr] = useState(""); const [loading,setLoading] = useState(false);
   const [detectingLoc,setDetectingLoc] = useState(false);
+  const [dbStatus, setDbStatus] = useState("checking");
+
+  useEffect(()=>{
+    api.get("settings","id=eq.1&select=id")
+      .then(r=>setDbStatus(Array.isArray(r)&&r.length>0?"connected":"disconnected"))
+      .catch(()=>setDbStatus("disconnected"));
+  },[]);
 
   const logLogin = async (u) => {
     try {
@@ -206,6 +213,31 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
               ))}
             </div>
           )}
+
+          {/* DB status indicator */}
+          <div style={{display:"flex",justifyContent:"center",marginTop:12}}>
+            {dbStatus==="checking"&&(
+              <span style={{fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}>
+                <span style={{width:7,height:7,borderRadius:"50%",background:"var(--text3)",display:"inline-block",opacity:.5}}/>
+                Checking database…
+              </span>
+            )}
+            {dbStatus==="connected"&&(
+              <a href={SUPABASE_URL} target="_blank" rel="noreferrer"
+                style={{fontSize:11,fontWeight:600,color:"#34d399",textDecoration:"none",display:"flex",alignItems:"center",gap:5,
+                  padding:"4px 12px",borderRadius:20,background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)"}}>
+                <span style={{width:7,height:7,borderRadius:"50%",background:"#34d399",display:"inline-block",boxShadow:"0 0 7px #34d399"}}/>
+                Database Connected
+              </a>
+            )}
+            {dbStatus==="disconnected"&&(
+              <span style={{fontSize:11,fontWeight:600,color:"#f87171",display:"flex",alignItems:"center",gap:5,
+                padding:"4px 12px",borderRadius:20,background:"rgba(248,113,113,.12)",border:"1px solid rgba(248,113,113,.3)"}}>
+                <span style={{width:7,height:7,borderRadius:"50%",background:"#f87171",display:"inline-block"}}/>
+                Database Disconnected
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Login type tabs */}

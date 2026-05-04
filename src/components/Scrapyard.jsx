@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { api } from "../lib/api.js";
+import { toImgUrl } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
 const CONDITION_OPTS = ["New","Used","Refurbished"];
@@ -38,12 +39,39 @@ function PartLabelModal({part, vehicle, onClose}) {
   const veh = vehicle ? `${vehicle.year||""} ${vehicle.make} ${vehicle.model}`.trim() : "";
 
   const handlePrint = () => {
-    const style = document.createElement("style");
-    style.id = "__label_print_style__";
-    style.textContent = `@media print{body>*{display:none!important}#__label_print_root__{display:block!important;position:fixed;inset:0;z-index:99999;background:#fff;padding:6mm}}`;
-    document.head.appendChild(style);
-    window.print();
-    setTimeout(()=>{ document.getElementById("__label_print_style__")?.remove(); }, 2000);
+    const win = window.open("","_blank","width=400,height=350");
+    if(!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Part Label</title><style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;font-family:Arial,sans-serif}
+      .label{width:320px;border:2px solid #ccc;border-radius:8px;padding:10px 12px;display:flex;gap:12px;align-items:flex-start}
+      .qr{width:88px;height:88px;flex-shrink:0}
+      .num{font-size:19px;font-weight:900;letter-spacing:1px;margin-bottom:4px;font-family:monospace}
+      .name{font-size:12px;font-weight:bold;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .small{font-size:10px;color:#444;margin-bottom:1px}
+      .tiny{font-size:9px;color:#555;margin-bottom:2px;font-family:monospace}
+      .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+      .tag{border:1px solid #888;border-radius:3px;padding:1px 5px;font-size:9px}
+      @media print{body{min-height:auto}.label{border:2px solid #000}}
+    </style></head><body>
+      <div class="label">
+        <img class="qr" src="${qr}" alt="QR"/>
+        <div style="flex:1;min-width:0">
+          <div class="num">${num}</div>
+          <div class="name">${part.name}</div>
+          ${veh?`<div class="small">🚗 ${veh}</div>`:""}
+          ${vehicle?.vin?`<div class="tiny">VIN: ${vehicle.vin}</div>`:""}
+          <div class="tags">
+            ${part.condition?`<span class="tag">${part.condition}</span>`:""}
+            ${part.category?`<span class="tag">${part.category}</span>`:""}
+            ${part.location?`<span class="tag">📍 ${part.location}</span>`:""}
+            ${part.price!=null?`<span class="tag">R ${Number(part.price).toFixed(0)}</span>`:""}
+          </div>
+        </div>
+      </div>
+      <script>window.onload=function(){window.print();}<\/script>
+    </body></html>`);
+    win.document.close();
   };
 
   return (
@@ -275,7 +303,7 @@ function ScrapVehiclePhotoSlot({label, url, vehicleId, vin, photoKey, onSaved}) 
           </div>
         ) : url ? (
           <>
-            <img src={url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            <img src={toImgUrl(url)||url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
             <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0)",display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity .2s"}}
               onMouseEnter={e=>e.currentTarget.style.opacity=1}
               onMouseLeave={e=>e.currentTarget.style.opacity=0}>
@@ -376,7 +404,7 @@ function ScrapPartPhotoSlot({label, url, partId, vin, photoKey, onChange}) {
           </div>
         ) : url ? (
           <>
-            <img src={url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            <img src={toImgUrl(url)||url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
             <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0)",display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity .2s"}}
               onMouseEnter={e=>e.currentTarget.style.opacity=1}
               onMouseLeave={e=>e.currentTarget.style.opacity=0}>
@@ -851,7 +879,7 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
                     {photos.length>0 ? (
                       <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,height:130}}>
                         {photos.map((url,i)=>(
-                          <img key={i} src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
+                          <img key={i} src={toImgUrl(url)||url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
                         ))}
                       </div>
                     ) : (
@@ -1188,7 +1216,7 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
                   {photos.length>0 ? (
                     <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,height:130}}>
                       {photos.map((url,i)=>(
-                        <img key={i} src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
+                        <img key={i} src={toImgUrl(url)||url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
                       ))}
                     </div>
                   ) : (
@@ -1338,7 +1366,7 @@ export function ScrapyardAdminPage({vehicles, parts, profiles, users, onRefresh}
                     {photos2.length>0 ? (
                       <div style={{display:"grid",gridTemplateColumns:`repeat(${photos2.length},1fr)`,height:110}}>
                         {photos2.map((url,i)=>(
-                          <img key={i} src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos2.length-1?"1px solid var(--border)":"none"}}/>
+                          <img key={i} src={toImgUrl(url)||url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos2.length-1?"1px solid var(--border)":"none"}}/>
                         ))}
                       </div>
                     ) : (
@@ -1553,7 +1581,7 @@ export function ScrapyardPartsAdminPage({vehicles, parts, profiles, users, onRef
                   {photos.length>0 ? (
                     <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,height:120}}>
                       {photos.map((url,i)=>(
-                        <img key={i} src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
+                        <img key={i} src={toImgUrl(url)||url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
                       ))}
                     </div>
                   ) : (

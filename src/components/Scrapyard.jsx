@@ -587,7 +587,8 @@ function PartModal({p, scrapId, vehicles, defaultVehicleId, onSave, onClose}) {
       ? await api.patch("scrapyard_parts","id",p.id,payload).catch(e=>({message:e.message}))
       : await api.insert("scrapyard_parts",payload).catch(e=>({message:e.message}));
     if(res?.code||(!Array.isArray(res)&&!p?.id&&res?.message)){setErr(res?.message||"Save failed");setLoading(false);return;}
-    onSave(); setLoading(false);
+    const saved = Array.isArray(res)?res[0]:(res||null);
+    onSave(saved||{...payload, id:p?.id}); setLoading(false);
   };
 
   const inp = {width:"100%",padding:"9px 12px",borderRadius:8,border:"1.5px solid var(--border)",background:"var(--surface2)",color:"var(--text)",fontSize:13,boxSizing:"border-box",fontFamily:"inherit"};
@@ -653,11 +654,13 @@ function PartModal({p, scrapId, vehicles, defaultVehicleId, onSave, onClose}) {
 
 // ── Vehicle detail ─────────────────────────────────────────────────
 function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, onBack, onEditVehicle}) {
-  const [editPart,    setEditPart]    = useState(null);
-  const [addPart,     setAddPart]     = useState(false);
-  const [showScan,    setShowScan]    = useState(false);
-  const [editPhotos,  setEditPhotos]  = useState(false);
-  const [lightbox,    setLightbox]    = useState(null);
+  const [editPart,      setEditPart]      = useState(null);
+  const [addPart,       setAddPart]       = useState(false);
+  const [showScan,      setShowScan]      = useState(false);
+  const [editPhotos,    setEditPhotos]    = useState(false);
+  const [lightbox,      setLightbox]      = useState(null);
+  const [printPart,     setPrintPart]     = useState(null); // part to prompt label print after save
+  const [statusSaving,  setStatusSaving]  = useState(false);
   const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_SLOTS.map(s=>[s.key, vehicle[s.key]||""])));
 
   const deletePart = async (p) => {
@@ -666,6 +669,14 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
     onRefresh();
   };
 
+  const setVehicleStatus = async (status) => {
+    setStatusSaving(true);
+    await api.patch("scrapyard_vehicles","id",vehicle.id,{status}).catch(()=>{});
+    await onRefresh();
+    setStatusSaving(false);
+  };
+
+  const isStripping = vehicle.status === "Stripping";
   const color = STATUS_COLORS[vehicle.status]||"#9ca3af";
   const visiblePhotos = PHOTO_SLOTS.filter(s=>photos[s.key]);
 
@@ -687,8 +698,37 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
         </div>
         <button className="btn btn-ghost btn-sm" onClick={onEditVehicle}>✏️ Edit</button>
         <button className="btn btn-ghost btn-sm" onClick={()=>setShowScan(true)}>📷 Scan</button>
-        <button className="btn btn-primary btn-sm" onClick={()=>setAddPart(true)}>+ Add Part</button>
+        {vehicle.status==="Available"&&(
+          <button className="btn btn-sm" style={{background:"#fbbf24",color:"#000",fontWeight:700,border:"none",cursor:"pointer"}}
+            disabled={statusSaving} onClick={()=>setVehicleStatus("Stripping")}>
+            {statusSaving?"…":"▶ Start Stripping"}
+          </button>
+        )}
+        {isStripping&&(
+          <button className="btn btn-sm" style={{background:"#34d399",color:"#000",fontWeight:700,border:"none",cursor:"pointer"}}
+            disabled={statusSaving} onClick={()=>setVehicleStatus("Stripped")}>
+            {statusSaving?"…":"✅ Done Stripping"}
+          </button>
+        )}
+        {isStripping&&(
+          <button className="btn btn-primary btn-sm" onClick={()=>setAddPart(true)}>+ Add Part</button>
+        )}
+        {!isStripping&&(
+          <button className="btn btn-ghost btn-sm" onClick={()=>setAddPart(true)}>+ Add Part</button>
+        )}
       </div>
+
+      {/* Stripping mode banner */}
+      {isStripping&&(
+        <div style={{background:"rgba(251,191,36,.15)",border:"2px solid #fbbf24",borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:20}}>🔧</span>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:13,color:"#b45309"}}>Stripping Mode Active</div>
+            <div style={{fontSize:12,color:"#92400e"}}>Add parts as you remove them — each part gets an auto-number and a printable label.</div>
+          </div>
+          <button className="btn btn-primary btn-sm" style={{background:"#fbbf24",color:"#000",border:"none",fontWeight:700,flexShrink:0}} onClick={()=>setAddPart(true)}>+ Add Part</button>
+        </div>
+      )}
 
       {vehicle.notes&&(
         <div className="card" style={{padding:"10px 14px",marginBottom:12,fontSize:13,color:"var(--text2)"}}>{vehicle.notes}</div>
@@ -804,9 +844,36 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
           scrapId={scrapId}
           vehicles={vehicles}
           defaultVehicleId={vehicle.id}
-          onSave={()=>{setAddPart(false);setEditPart(null);onRefresh();}}
+          onSave={async(savedPart)=>{
+            setAddPart(false); setEditPart(null);
+            await onRefresh();
+            if(isStripping && savedPart) setPrintPart({part:savedPart, vehicle});
+          }}
           onClose={()=>{setAddPart(false);setEditPart(null);}}
         />
+      )}
+
+      {/* Label print prompt after adding a part during stripping */}
+      {printPart&&(
+        <div className="modal-overlay" onClick={()=>setPrintPart(null)}>
+          <div className="modal-box" style={{maxWidth:320,textAlign:"center"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:36,marginBottom:10}}>🏷️</div>
+            <div style={{fontWeight:700,fontSize:16,marginBottom:6}}>Part Added!</div>
+            <div style={{fontSize:13,color:"var(--text2)",marginBottom:4}}><b>{printPart.part.name}</b></div>
+            <div style={{fontSize:13,color:"var(--text3)",marginBottom:18}}>Part No: <b>{printPart.part.part_number||printPart.part.id}</b></div>
+            <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+              <button className="btn btn-primary" style={{minWidth:120}} onClick={()=>{printPartLabel(printPart.part,printPart.vehicle);setPrintPart(null);}}>
+                🖨️ Print Label
+              </button>
+              <button className="btn btn-ghost" onClick={()=>{setPrintPart(null);setAddPart(true);}}>
+                + Add Next Part
+              </button>
+              <button className="btn btn-ghost btn-sm" style={{width:"100%"}} onClick={()=>setPrintPart(null)}>
+                Skip
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showScan&&(
@@ -943,7 +1010,19 @@ export function ScrapyardVehiclesPage({scrapId, vehicles, parts, onRefresh}) {
                   {v.purchase_price&&<span>R {Number(v.purchase_price).toLocaleString()}</span>}
                 </div>
               </div>
-              <div style={{padding:"7px 14px",borderTop:"1px solid var(--border)",display:"flex",gap:6,justifyContent:"flex-end"}} onClick={e=>e.stopPropagation()}>
+              <div style={{padding:"7px 14px",borderTop:"1px solid var(--border)",display:"flex",gap:6,justifyContent:"flex-end",flexWrap:"wrap"}} onClick={e=>e.stopPropagation()}>
+                {v.status==="Available"&&(
+                  <button className="btn btn-xs" style={{background:"#fbbf24",color:"#000",fontWeight:700,border:"none",cursor:"pointer"}}
+                    onClick={async()=>{
+                      await api.patch("scrapyard_vehicles","id",v.id,{status:"Stripping"});
+                      onRefresh();
+                      setSelectedId(v.id);
+                    }}>▶ Strip</button>
+                )}
+                {v.status==="Stripping"&&(
+                  <button className="btn btn-xs" style={{background:"#fbbf24",color:"#000",fontWeight:700,border:"none",cursor:"pointer"}}
+                    onClick={()=>setSelectedId(v.id)}>🔧 Continue Stripping</button>
+                )}
                 <button className="btn btn-ghost btn-xs" onClick={()=>{setEditVeh(v);setSelectedId(null);}}>✏️ Edit</button>
                 <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} disabled={!!deleting} onClick={()=>deleteVehicle(v)}>🗑</button>
               </div>

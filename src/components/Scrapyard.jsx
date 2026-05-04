@@ -35,7 +35,7 @@ const getScriptUrl = () =>
 // ── Part label modal ───────────────────────────────────────────────
 function PartLabelModal({part, vehicle, onClose}) {
   const num = part.part_number || ("SP" + String(part.id).padStart(5,"0"));
-  const qr  = `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encodeURIComponent(num)}&choe=UTF-8`;
+  const qr  = `https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=${encodeURIComponent(num)}&format=png`;
   const veh = vehicle ? `${vehicle.year||""} ${vehicle.make} ${vehicle.model}`.trim() : "";
 
   const handlePrint = () => {

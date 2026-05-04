@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { api } from "../lib/api.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
@@ -30,6 +30,159 @@ const Lbl = ({children}) => (
 
 const getScriptUrl = () =>
   (window._VEHICLE_SCRIPT_URL?.trim()) || (window._APPS_SCRIPT_URL?.trim()) || "";
+
+// ── Print part label ───────────────────────────────────────────────
+function printPartLabel(part, vehicle) {
+  const num = part.part_number || ("SP" + String(part.id).padStart(5,"0"));
+  const qr  = `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encodeURIComponent(num)}&choe=UTF-8`;
+  const veh = vehicle ? `${vehicle.year||""} ${vehicle.make} ${vehicle.model}`.trim() : "";
+  const vin = vehicle?.vin || "";
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  @page { size: 90mm 50mm; margin: 3mm; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:Arial,sans-serif; width:84mm; height:44mm; display:flex; align-items:center; background:#fff; }
+  .wrap{ display:flex; gap:4mm; align-items:flex-start; width:100%; }
+  .qr{ width:30mm; height:30mm; flex-shrink:0; }
+  .info{ flex:1; min-width:0; }
+  .num{ font-size:16pt; font-weight:900; letter-spacing:1px; margin-bottom:2mm; }
+  .name{ font-size:10pt; font-weight:bold; margin-bottom:1mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .line{ font-size:7.5pt; color:#444; margin-bottom:0.5mm; }
+  .tags{ display:flex; gap:2mm; flex-wrap:wrap; margin-top:2mm; }
+  .tag{ border:1px solid #888; border-radius:2px; padding:0.5mm 2mm; font-size:7pt; }
+</style></head><body>
+<div class="wrap">
+  <img src="${qr}" class="qr"/>
+  <div class="info">
+    <div class="num">${num}</div>
+    <div class="name">${part.name}</div>
+    ${veh ? `<div class="line">🚗 ${veh}</div>` : ""}
+    ${vin  ? `<div class="line">VIN: ${vin}</div>` : ""}
+    <div class="tags">
+      ${part.condition ? `<span class="tag">${part.condition}</span>` : ""}
+      ${part.category  ? `<span class="tag">${part.category}</span>`  : ""}
+      ${part.location  ? `<span class="tag">📍 ${part.location}</span>` : ""}
+      ${part.price!=null ? `<span class="tag">R ${Number(part.price).toFixed(0)}</span>` : ""}
+    </div>
+  </div>
+</div>
+<script>window.onload=function(){setTimeout(function(){window.print();},500);window.onafterprint=function(){window.close();}}</script>
+</body></html>`;
+  const w = window.open("","_blank","width=520,height=340,menubar=no,toolbar=no");
+  if(w){ w.document.write(html); w.document.close(); }
+  else alert("Allow pop-ups for this site to print labels.");
+}
+
+// ── QR scan modal ──────────────────────────────────────────────────
+function QrScanModal({parts, onFound, onClose}) {
+  const [err,        setErr]        = useState("");
+  const [scanning,   setScanning]   = useState(false);
+  const [supported,  setSupported]  = useState(null);
+  const [manualNum,  setManualNum]  = useState("");
+  const videoRef  = useRef(null);
+  const streamRef = useRef(null);
+  const timerRef  = useRef(null);
+  const fileRef   = useRef(null);
+
+  const stopCamera = () => {
+    clearInterval(timerRef.current);
+    streamRef.current?.getTracks().forEach(t=>t.stop());
+    streamRef.current = null;
+    setScanning(false);
+  };
+
+  const handleScan = (value) => {
+    stopCamera();
+    const v = (value||"").trim();
+    const part = parts.find(p=>p.part_number===v || String(p.id)===v);
+    if(part) onFound(part);
+    else setErr(`No part found for: "${v}"`);
+  };
+
+  useEffect(()=>{
+    const ok = typeof BarcodeDetector !== "undefined";
+    setSupported(ok);
+    if(!ok) return;
+    (async()=>{
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+        streamRef.current = stream;
+        if(videoRef.current){ videoRef.current.srcObject=stream; await videoRef.current.play(); }
+        setScanning(true);
+        const detector = new BarcodeDetector({formats:["qr_code","code_128","code_39","ean_13"]});
+        timerRef.current = setInterval(async()=>{
+          if(!videoRef.current||videoRef.current.readyState<2) return;
+          try { const codes=await detector.detect(videoRef.current); if(codes.length>0) handleScan(codes[0].rawValue); } catch{}
+        },400);
+      } catch(e){ setErr("Camera error: "+e.message); }
+    })();
+    return ()=>stopCamera();
+  },[]);// eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleFile = async (e) => {
+    const file=e.target.files?.[0]; if(!file) return; e.target.value="";
+    try {
+      const bitmap = await createImageBitmap(file);
+      const detector = new BarcodeDetector({formats:["qr_code","code_128","code_39"]});
+      const codes = await detector.detect(bitmap);
+      if(codes.length>0) handleScan(codes[0].rawValue);
+      else setErr("No QR code found in image — try a clearer photo");
+    } catch(e2){ setErr("Scan failed: "+e2.message); }
+  };
+
+  const inp = {width:"100%",padding:"10px 12px",borderRadius:8,border:"1.5px solid var(--border)",background:"var(--surface2)",color:"var(--text)",fontSize:14,boxSizing:"border-box",fontFamily:"inherit"};
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{maxWidth:340}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-header">
+          <b>📷 Scan Part Label</b>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div style={{padding:"16px 20px 20px",display:"flex",flexDirection:"column",gap:12}}>
+
+          {supported!==false && (
+            <div style={{position:"relative",borderRadius:12,overflow:"hidden",background:"#000",aspectRatio:"1/1"}}>
+              <video ref={videoRef} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} playsInline muted/>
+              <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+                <div style={{width:170,height:170,border:"2.5px solid rgba(52,211,153,.9)",borderRadius:14,boxShadow:"0 0 0 9999px rgba(0,0,0,.38)"}}/>
+              </div>
+              <div style={{position:"absolute",bottom:8,left:0,right:0,textAlign:"center",color:"rgba(255,255,255,.8)",fontSize:11}}>
+                {scanning?"Point at QR code on the label":"Starting camera…"}
+              </div>
+            </div>
+          )}
+
+          {supported===false&&(
+            <div style={{fontSize:12,color:"var(--text3)",textAlign:"center",padding:"8px 0"}}>
+              QR scanning needs Chrome or Android browser.<br/>Upload a photo of the label instead.
+            </div>
+          )}
+
+          {err&&(
+            <div style={{color:"var(--red)",fontSize:12,textAlign:"center"}}>
+              {err}
+              <button className="btn btn-ghost btn-xs" style={{marginLeft:8}} onClick={()=>setErr("")}>Clear</button>
+            </div>
+          )}
+
+          <div style={{borderTop:"1px solid var(--border)",paddingTop:10,display:"flex",flexDirection:"column",gap:8}}>
+            <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile}/>
+            <button className="btn btn-ghost btn-sm" onClick={()=>fileRef.current?.click()}>🖼️ Photo of label</button>
+
+            <div style={{display:"flex",gap:6}}>
+              <input style={{...inp,fontSize:13}} value={manualNum} onChange={e=>setManualNum(e.target.value)}
+                placeholder="Type part number e.g. SP12345"
+                onKeyDown={e=>e.key==="Enter"&&handleScan(manualNum)}/>
+              <button className="btn btn-primary btn-sm" style={{flexShrink:0}} onClick={()=>handleScan(manualNum)}>Find</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const resizeB64 = (file, max=1200) => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -400,8 +553,11 @@ function VehicleModal({v, scrapId, onSave, onClose}) {
 
 // ── Part modal ─────────────────────────────────────────────────────
 function PartModal({p, scrapId, vehicles, defaultVehicleId, onSave, onClose}) {
-  const blank = {name:"",category:"",part_number:"",condition:"Used",vehicle_id:defaultVehicleId||"",quantity:1,min_qty:1,price:"",cost:"",location:"",notes:"",photo_url:"",photo_url_2:"",photo_url_3:""};
-  const [form, setForm] = useState(p?.id ? {...blank,...p, vehicle_id:p.vehicle_id||""} : blank);
+  const [form, setForm] = useState(()=>{
+    const autoNum = "SP" + String(Date.now() % 100000).padStart(5,"0");
+    const base = {name:"",category:"",part_number:p?.id?"":autoNum,condition:"Used",vehicle_id:defaultVehicleId||"",quantity:1,min_qty:1,price:"",cost:"",location:"",notes:"",photo_url:"",photo_url_2:"",photo_url_3:""};
+    return p?.id ? {...base,...p, vehicle_id:p.vehicle_id||""} : base;
+  });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const set = (k,val) => setForm(f=>({...f,[k]:val}));
@@ -492,9 +648,10 @@ function PartModal({p, scrapId, vehicles, defaultVehicleId, onSave, onClose}) {
 }
 
 // ── Vehicle detail ─────────────────────────────────────────────────
-function VehicleDetail({vehicle, parts, scrapId, vehicles, onRefresh, onBack, onEditVehicle}) {
+function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, onBack, onEditVehicle}) {
   const [editPart,    setEditPart]    = useState(null);
   const [addPart,     setAddPart]     = useState(false);
+  const [showScan,    setShowScan]    = useState(false);
   const [editPhotos,  setEditPhotos]  = useState(false);
   const [lightbox,    setLightbox]    = useState(null);
   const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_SLOTS.map(s=>[s.key, vehicle[s.key]||""])));
@@ -525,6 +682,7 @@ function VehicleDetail({vehicle, parts, scrapId, vehicles, onRefresh, onBack, on
           </div>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={onEditVehicle}>✏️ Edit</button>
+        <button className="btn btn-ghost btn-sm" onClick={()=>setShowScan(true)}>📷 Scan</button>
         <button className="btn btn-primary btn-sm" onClick={()=>setAddPart(true)}>+ Add Part</button>
       </div>
 
@@ -622,6 +780,7 @@ function VehicleDetail({vehicle, parts, scrapId, vehicles, onRefresh, onBack, on
                       <td style={{padding:"8px 12px",fontSize:12,color:"var(--text3)"}}>{p.location||"-"}</td>
                       <td style={{padding:"8px 12px"}}>
                         <div style={{display:"flex",gap:4}}>
+                          <button className="btn btn-ghost btn-xs" title="Print label" onClick={()=>printPartLabel(p,vehicle)}>🏷️</button>
                           <button className="btn btn-ghost btn-xs" onClick={()=>setEditPart(p)}>✏️</button>
                           <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deletePart(p)}>🗑</button>
                         </div>
@@ -643,6 +802,14 @@ function VehicleDetail({vehicle, parts, scrapId, vehicles, onRefresh, onBack, on
           defaultVehicleId={vehicle.id}
           onSave={()=>{setAddPart(false);setEditPart(null);onRefresh();}}
           onClose={()=>{setAddPart(false);setEditPart(null);}}
+        />
+      )}
+
+      {showScan&&(
+        <QrScanModal
+          parts={allParts||parts}
+          onFound={p=>{setShowScan(false);setEditPart(p);}}
+          onClose={()=>setShowScan(false)}
         />
       )}
 
@@ -690,6 +857,7 @@ export function ScrapyardVehiclesPage({scrapId, vehicles, parts, onRefresh}) {
       <VehicleDetail
         vehicle={veh}
         parts={partsForVeh(selectedId)}
+        allParts={parts}
         scrapId={scrapId}
         vehicles={vehicles}
         onRefresh={onRefresh}
@@ -801,6 +969,7 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
   const [editPart,   setEditPart]   = useState(null);
   const [showAdd,    setShowAdd]    = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showScan,   setShowScan]   = useState(false);
 
   const doRefresh = async () => { setRefreshing(true); await onRefresh(); setRefreshing(false); };
   const vehMap = useMemo(()=>Object.fromEntries(vehicles.map(v=>[v.id,v])),[vehicles]);
@@ -844,6 +1013,7 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
           <option value="">No Vehicle</option>
           {vehicles.map(v=><option key={v.id} value={String(v.id)}>{v.year} {v.make} {v.model}</option>)}
         </select>
+        <button className="btn btn-ghost btn-sm" onClick={()=>setShowScan(true)} title="Scan label">📷 Scan</button>
         <button className="btn btn-ghost btn-sm" onClick={doRefresh} disabled={refreshing} title="Refresh">{refreshing?"⏳":"🔄"}</button>
         <button className="btn btn-primary" onClick={()=>setShowAdd(true)}>+ Add Part</button>
       </div>
@@ -898,6 +1068,7 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
                   <td style={{padding:"8px 12px",fontSize:12,color:"var(--text3)"}}>{p.location||"-"}</td>
                   <td style={{padding:"8px 12px"}}>
                     <div style={{display:"flex",gap:4}}>
+                      <button className="btn btn-ghost btn-xs" title="Print label" onClick={()=>printPartLabel(p, veh||null)}>🏷️</button>
                       <button className="btn btn-ghost btn-xs" onClick={()=>setEditPart(p)}>✏️</button>
                       <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deletePart(p)}>🗑</button>
                     </div>
@@ -916,6 +1087,14 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
           vehicles={vehicles}
           onSave={()=>{setShowAdd(false);setEditPart(null);onRefresh();}}
           onClose={()=>{setShowAdd(false);setEditPart(null);}}
+        />
+      )}
+
+      {showScan&&(
+        <QrScanModal
+          parts={parts}
+          onFound={p=>{setShowScan(false);setEditPart(p);}}
+          onClose={()=>setShowScan(false)}
         />
       )}
     </div>

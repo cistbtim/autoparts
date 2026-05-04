@@ -31,46 +31,55 @@ const Lbl = ({children}) => (
 const getScriptUrl = () =>
   (window._VEHICLE_SCRIPT_URL?.trim()) || (window._APPS_SCRIPT_URL?.trim()) || "";
 
-// ── Print part label ───────────────────────────────────────────────
-function printPartLabel(part, vehicle) {
+// ── Part label modal ───────────────────────────────────────────────
+function PartLabelModal({part, vehicle, onClose}) {
   const num = part.part_number || ("SP" + String(part.id).padStart(5,"0"));
   const qr  = `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encodeURIComponent(num)}&choe=UTF-8`;
   const veh = vehicle ? `${vehicle.year||""} ${vehicle.make} ${vehicle.model}`.trim() : "";
-  const vin = vehicle?.vin || "";
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>
-  @page { size: 90mm 50mm; margin: 3mm; }
-  *{ box-sizing:border-box; margin:0; padding:0; }
-  body{ font-family:Arial,sans-serif; width:84mm; height:44mm; display:flex; align-items:center; background:#fff; }
-  .wrap{ display:flex; gap:4mm; align-items:flex-start; width:100%; }
-  .qr{ width:30mm; height:30mm; flex-shrink:0; }
-  .info{ flex:1; min-width:0; }
-  .num{ font-size:16pt; font-weight:900; letter-spacing:1px; margin-bottom:2mm; }
-  .name{ font-size:10pt; font-weight:bold; margin-bottom:1mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .line{ font-size:7.5pt; color:#444; margin-bottom:0.5mm; }
-  .tags{ display:flex; gap:2mm; flex-wrap:wrap; margin-top:2mm; }
-  .tag{ border:1px solid #888; border-radius:2px; padding:0.5mm 2mm; font-size:7pt; }
-</style></head><body>
-<div class="wrap">
-  <img src="${qr}" class="qr"/>
-  <div class="info">
-    <div class="num">${num}</div>
-    <div class="name">${part.name}</div>
-    ${veh ? `<div class="line">🚗 ${veh}</div>` : ""}
-    ${vin  ? `<div class="line">VIN: ${vin}</div>` : ""}
-    <div class="tags">
-      ${part.condition ? `<span class="tag">${part.condition}</span>` : ""}
-      ${part.category  ? `<span class="tag">${part.category}</span>`  : ""}
-      ${part.location  ? `<span class="tag">📍 ${part.location}</span>` : ""}
-      ${part.price!=null ? `<span class="tag">R ${Number(part.price).toFixed(0)}</span>` : ""}
+
+  const handlePrint = () => {
+    const style = document.createElement("style");
+    style.id = "__label_print_style__";
+    style.textContent = `@media print{body>*{display:none!important}#__label_print_root__{display:block!important;position:fixed;inset:0;z-index:99999;background:#fff;padding:6mm}}`;
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(()=>{ document.getElementById("__label_print_style__")?.remove(); }, 2000);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:400,padding:0,overflow:"hidden"}}>
+        <div style={{padding:"11px 16px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{fontWeight:700,fontSize:14}}>🏷️ Part Label</div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Label preview */}
+        <div style={{padding:20,display:"flex",justifyContent:"center",background:"var(--surface2)"}}>
+          <div id="__label_print_root__" style={{width:320,border:"2px solid #ccc",borderRadius:8,padding:"10px 12px",display:"flex",gap:12,alignItems:"flex-start",background:"#fff",fontFamily:"Arial,sans-serif"}}>
+            <img src={qr} alt="QR" style={{width:88,height:88,flexShrink:0,display:"block"}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:19,fontWeight:900,letterSpacing:1,marginBottom:4,color:"#000",fontFamily:"monospace"}}>{num}</div>
+              <div style={{fontSize:12,fontWeight:"bold",marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"#000"}}>{part.name}</div>
+              {veh&&<div style={{fontSize:10,color:"#444",marginBottom:1}}>🚗 {veh}</div>}
+              {vehicle?.vin&&<div style={{fontSize:9,color:"#555",marginBottom:2,fontFamily:"monospace"}}>VIN: {vehicle.vin}</div>}
+              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
+                {part.condition&&<span style={{border:"1px solid #888",borderRadius:3,padding:"1px 5px",fontSize:9,color:"#000"}}>{part.condition}</span>}
+                {part.category&&<span style={{border:"1px solid #888",borderRadius:3,padding:"1px 5px",fontSize:9,color:"#000"}}>{part.category}</span>}
+                {part.location&&<span style={{border:"1px solid #888",borderRadius:3,padding:"1px 5px",fontSize:9,color:"#000"}}>📍 {part.location}</span>}
+                {part.price!=null&&<span style={{border:"1px solid #888",borderRadius:3,padding:"1px 5px",fontSize:9,color:"#000"}}>R {Number(part.price).toFixed(0)}</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)",display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print / Save PDF</button>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
-<script>window.onload=function(){setTimeout(function(){window.print();},500);window.onafterprint=function(){window.close();}}</script>
-</body></html>`;
-  const w = window.open("","_blank","width=520,height=340,menubar=no,toolbar=no");
-  if(w){ w.document.write(html); w.document.close(); }
-  else alert("Allow pop-ups for this site to print labels.");
+  );
 }
 
 // ── QR scan modal ──────────────────────────────────────────────────
@@ -666,6 +675,7 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
   const [showScan,      setShowScan]      = useState(false);
   const [editPhotos,    setEditPhotos]    = useState(false);
   const [lightbox,      setLightbox]      = useState(null);
+  const [labelPart,     setLabelPart]     = useState(null); // {part, vehicle}
   const [printPart,     setPrintPart]     = useState(null); // part to prompt label print after save
   const [statusSaving,  setStatusSaving]  = useState(false);
   const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_SLOTS.map(s=>[s.key, vehicle[s.key]||""])));
@@ -874,7 +884,7 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
                     </div>
 
                     <div style={{display:"flex",gap:5,marginTop:"auto",paddingTop:8,borderTop:"1px solid var(--border)"}}>
-                      <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>printPartLabel(p,vehicle)}>🏷️</button>
+                      <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setLabelPart({part:p,vehicle})}>🏷️</button>
                       <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setEditPart(p)}>✏️</button>
                       <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deletePart(p)}>🗑</button>
                     </div>
@@ -910,8 +920,8 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
             <div style={{fontSize:13,color:"var(--text2)",marginBottom:4}}><b>{printPart.part.name}</b></div>
             <div style={{fontSize:13,color:"var(--text3)",marginBottom:18}}>Part No: <b>{printPart.part.part_number||printPart.part.id}</b></div>
             <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-              <button className="btn btn-primary" style={{minWidth:120}} onClick={()=>{printPartLabel(printPart.part,printPart.vehicle);setPrintPart(null);}}>
-                🖨️ Print Label
+              <button className="btn btn-primary" style={{minWidth:120}} onClick={()=>{setLabelPart({part:printPart.part,vehicle:printPart.vehicle});setPrintPart(null);}}>
+                🏷️ Print Label
               </button>
               <button className="btn btn-ghost" onClick={()=>{setPrintPart(null);setAddPart(true);}}>
                 + Add Next Part
@@ -939,6 +949,8 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
           <button style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,.15)",border:"none",borderRadius:6,color:"#fff",fontSize:22,cursor:"pointer",padding:"4px 10px"}} onClick={()=>setLightbox(null)}>✕</button>
         </div>
       )}
+
+      {labelPart&&<PartLabelModal part={labelPart.part} vehicle={labelPart.vehicle} onClose={()=>setLabelPart(null)}/>}
     </div>
   );
 }
@@ -1101,6 +1113,7 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
   const [showAdd,    setShowAdd]    = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showScan,   setShowScan]   = useState(false);
+  const [labelPart,  setLabelPart]  = useState(null);
 
   const doRefresh = async () => { setRefreshing(true); await onRefresh(); setRefreshing(false); };
   const vehMap = useMemo(()=>Object.fromEntries(vehicles.map(v=>[v.id,v])),[vehicles]);
@@ -1209,7 +1222,7 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
                   </div>
 
                   <div style={{display:"flex",gap:5,marginTop:"auto",paddingTop:8,borderTop:"1px solid var(--border)"}}>
-                    <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>printPartLabel(p,veh||null)}>🏷️</button>
+                    <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setLabelPart({part:p,vehicle:veh||null})}>🏷️</button>
                     <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setEditPart(p)}>✏️</button>
                     <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deletePart(p)}>🗑</button>
                   </div>
@@ -1237,6 +1250,8 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
           onClose={()=>setShowScan(false)}
         />
       )}
+
+      {labelPart&&<PartLabelModal part={labelPart.part} vehicle={labelPart.vehicle} onClose={()=>setLabelPart(null)}/>}
     </div>
   );
 }

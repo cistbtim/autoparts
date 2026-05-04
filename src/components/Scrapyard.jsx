@@ -41,7 +41,7 @@ function openPartLabel(part, vehicle) {
     part.condition,
     part.category,
     part.location ? `\u{1F4CD} ${part.location}` : null,
-    part.price != null ? `R${Number(part.price).toFixed(0)}` : null,
+    null, // price removed from label
   ].filter(Boolean);
   openLabelWindow({
     mode: "scrapyard",

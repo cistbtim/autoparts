@@ -147,7 +147,7 @@ export function openLabelWindow(data) {
     // customer / mechanic info (workshop)
     ".inf{font-size:9px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
     // complaint — workshop ×3 = 24px
-    ".cmp{font-size:24px;font-weight:bold;color:#333;border-top:1px dashed #ccc;margin-top:2px;padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+    ".cmp{font-size:12px;font-weight:bold;color:#333;border-top:1px dashed #ccc;margin-top:2px;padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
     // tags (scrapyard)
     ".tags{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}",
     `.tag{border:1px solid #666;border-radius:2px;padding:0 4px;font-size:${sc?14:7}px;font-weight:bold}`,

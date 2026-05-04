@@ -468,8 +468,10 @@ function VehicleModal({v, scrapId, onSave, onClose}) {
   const save = async () => {
     if(!form.make||!form.model){setErr("Make and model required");return;}
     setLoading(true); setErr("");
+    // eslint-disable-next-line no-unused-vars
+    const {id:_id, created_at:_ca, ...formData} = form;
     const payload = {
-      ...form, scrapyard_id:Number(scrapId),
+      ...formData, scrapyard_id:Number(scrapId),
       year:           form.year           ? Number(form.year)           : null,
       odometer:       form.odometer       ? Number(form.odometer)       : null,
       purchase_price: form.purchase_price ? Number(form.purchase_price) : null,
@@ -571,8 +573,10 @@ function PartModal({p, scrapId, vehicles, defaultVehicleId, onSave, onClose}) {
   const save = async () => {
     if(!form.name){setErr("Part name required");return;}
     setLoading(true); setErr("");
+    // eslint-disable-next-line no-unused-vars
+    const {id:_id2, created_at:_ca2, ...formData2} = form;
     const payload = {
-      ...form, scrapyard_id:Number(scrapId),
+      ...formData2, scrapyard_id:Number(scrapId),
       quantity:   Number(form.quantity)||0,
       min_qty:    Number(form.min_qty)||0,
       price:      form.price!==""  ? Number(form.price)  : null,

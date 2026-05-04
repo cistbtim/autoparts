@@ -147,6 +147,138 @@ export function printChecklistReport(job, checklist, settings) {
   w.document.close();
 }
 
+export function printJobCardSheet(job, items=[], settings) {
+  const shopName = settings?.shop_name||"Workshop";
+  const now = new Date().toLocaleString();
+  const C = curSym(settings?.currency||"R");
+  const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+  const parts  = items.filter(i=>i.type==="part");
+  const labour = items.filter(i=>i.type!=="part");
+
+  const itemRow = (item) => `
+    <tr>
+      <td style="padding:7px 8px;text-align:center">
+        <span style="display:inline-block;width:14px;height:14px;border:1.5px solid #888;border-radius:3px;vertical-align:middle"></span>
+      </td>
+      <td style="padding:7px 8px;font-size:12px;font-weight:600">${(item.description||"").replace(/</g,"&lt;")}${item.part_sku?`<div style="font-size:10px;color:#6b7280;font-weight:400;font-family:monospace">${item.part_sku}</div>`:""}</td>
+      <td style="padding:7px 8px;font-size:12px;text-align:center">${item.qty||1}</td>
+      <td style="padding:7px 8px;font-size:12px;text-align:right">${fmt(item.unit_price||0)}</td>
+      <td style="padding:7px 8px;font-size:12px;text-align:right;font-weight:700">${fmt(item.total||0)}</td>
+    </tr>`;
+
+  const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
+  const taxAmt   = settings?.vat_number ? subtotal*(settings?.tax_rate||0)/100 : 0;
+
+  const w = window.open("","_blank","width=800,height=1000");
+  if(!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Card</title>
+  <style>
+    @page{size:A4;margin:14mm}
+    @media print{body{margin:0}.no-print{display:none}}
+    *{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;color:#111;background:#fff;padding:20px;font-size:12px}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px}
+    .shop-name{font-size:20px;font-weight:900;letter-spacing:.5px}
+    .doc-title{font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.08em;text-align:right}
+    .doc-id{font-size:11px;color:#6b7280;text-align:right;margin-top:3px;font-family:monospace}
+    .info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:12px}
+    .vf{font-size:10px;color:#6b7280;margin-bottom:2px}
+    .vv{font-size:13px;font-weight:700}
+    .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:4px;margin:12px 0 6px}
+    .complaint-box{border:1px solid #d1d5db;border-radius:6px;padding:10px 12px;min-height:48px;font-size:12px;line-height:1.5;background:#fff;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse;margin-bottom:4px}
+    th{background:#f3f4f6;padding:7px 8px;text-align:left;font-size:11px;color:#374151;border-bottom:2px solid #d1d5db}
+    tr:nth-child(even){background:#f9fafb}
+    td{border-bottom:1px solid #e5e7eb;vertical-align:middle}
+    .type-badge{display:inline-block;padding:1px 7px;border-radius:12px;font-size:10px;font-weight:700}
+    .subtotal-row{background:#f9fafb!important;font-weight:700}
+    .total-row{background:#111!important;color:#fff!important;font-weight:900;font-size:13px}
+    .notes-box{border:1px solid #d1d5db;border-radius:6px;padding:8px 12px;min-height:40px;font-size:12px;line-height:1.5;margin-bottom:14px;background:#fff}
+    .sig{margin-top:28px;display:flex;gap:32px}
+    .sig-box{flex:1;border-top:1.5px solid #111;padding-top:6px;font-size:11px;color:#6b7280}
+    .print-btn{display:inline-block;margin-bottom:16px;padding:8px 20px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
+  </style></head>
+  <body>
+    <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+
+    <div class="hdr">
+      <div>
+        <div class="shop-name">🔧 ${shopName}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:3px">Job Card / Work Order</div>
+      </div>
+      <div>
+        <div class="doc-title">Job Card</div>
+        <div class="doc-id">Job #${job.id||"—"}</div>
+        <div style="font-size:10px;color:#9ca3af;text-align:right;margin-top:2px">Printed: ${now}</div>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div><div class="vf">Plate / Reg</div><div class="vv">${job.vehicle_reg||"—"}</div></div>
+      <div><div class="vf">Make / Model</div><div class="vv">${[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")||"—"}</div></div>
+      <div><div class="vf">Year / Color</div><div class="vv">${[job.vehicle_year,job.vehicle_color].filter(Boolean).join(" · ")||"—"}</div></div>
+      <div><div class="vf">Customer</div><div class="vv">${(job.customer_name||"—").replace(/</g,"&lt;")}</div></div>
+      <div><div class="vf">Phone</div><div class="vv">${job.customer_phone||"—"}</div></div>
+      <div><div class="vf">Mileage</div><div class="vv">${job.mileage?Number(job.mileage).toLocaleString()+" km":"—"}</div></div>
+      <div><div class="vf">Date In</div><div class="vv">${job.date_in||"—"}</div></div>
+      <div><div class="vf">Mechanic</div><div class="vv">${job.mechanic||"—"}</div></div>
+      <div><div class="vf">Status</div><div class="vv">${job.status||"—"}</div></div>
+      ${job.vin?`<div style="grid-column:1/-1"><div class="vf">VIN</div><div class="vv" style="font-family:monospace;font-size:12px">${job.vin}</div></div>`:""}
+    </div>
+
+    <div class="section-title">Complaint / Work Description</div>
+    <div class="complaint-box">${(job.complaint||"").replace(/</g,"&lt;").replace(/\n/g,"<br/>") || "&nbsp;"}</div>
+
+    ${items.length>0?`
+    <div class="section-title">Work Items</div>
+    ${parts.length>0?`
+    <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🔩 Parts</div>
+    <table>
+      <thead><tr>
+        <th style="width:5%">✓</th>
+        <th style="width:50%">Description / SKU</th>
+        <th style="width:10%;text-align:center">Qty</th>
+        <th style="width:17%;text-align:right">Unit Price</th>
+        <th style="width:18%;text-align:right">Total</th>
+      </tr></thead>
+      <tbody>${parts.map(itemRow).join("")}</tbody>
+    </table>`:""}
+
+    ${labour.length>0?`
+    <div style="font-size:10px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.06em;margin:10px 0 4px">👷 Labour / Services</div>
+    <table>
+      <thead><tr>
+        <th style="width:5%">✓</th>
+        <th style="width:50%">Description</th>
+        <th style="width:10%;text-align:center">Qty</th>
+        <th style="width:17%;text-align:right">Rate</th>
+        <th style="width:18%;text-align:right">Total</th>
+      </tr></thead>
+      <tbody>${labour.map(itemRow).join("")}</tbody>
+    </table>`:""}
+
+    <table style="margin-top:8px">
+      <tbody>
+        <tr class="subtotal-row"><td colspan="4" style="padding:6px 8px;text-align:right;font-size:12px">Subtotal</td><td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:700">${fmt(subtotal)}</td></tr>
+        ${taxAmt>0?`<tr style="background:#f9fafb"><td colspan="4" style="padding:6px 8px;text-align:right;font-size:12px">VAT (${settings?.tax_rate||0}%)</td><td style="padding:6px 8px;text-align:right;font-size:12px">${fmt(taxAmt)}</td></tr>`:""}
+        <tr class="total-row"><td colspan="4" style="padding:8px;text-align:right">TOTAL</td><td style="padding:8px;text-align:right">${fmt(subtotal+taxAmt)}</td></tr>
+      </tbody>
+    </table>
+    `:""}
+
+    <div class="section-title">Diagnosis / Notes</div>
+    <div class="notes-box">${(job.diagnosis||"").replace(/</g,"&lt;").replace(/\n/g,"<br/>") || "&nbsp;"}${job.notes&&job.diagnosis?"<br/><br/>":""} ${(job.notes||"").replace(/</g,"&lt;").replace(/\n/g,"<br/>")}</div>
+
+    <div class="sig">
+      <div class="sig-box">Customer Signature</div>
+      <div class="sig-box">Mechanic Signature</div>
+      <div class="sig-box">Date Completed</div>
+    </div>
+  </body></html>`);
+  w.document.close();
+}
+
 export function printJobCardLabel(job, settings) {
   const shopName = settings?.shop_name||"AutoParts";
   const w = window.open("","_blank","width=480,height=360");

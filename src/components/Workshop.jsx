@@ -13,7 +13,7 @@ import { WsServicesPage, WsServiceModal } from "./ws/Services.jsx";
 import { WsSuppliersPage, WsSupplierModal } from "./ws/WsSuppliers.jsx";
 import { WsTransferPage } from "./ws/Transfer.jsx";
 import { WsDocumentsPage } from "./ws/Documents.jsx";
-import { printStockLabel, printChecklistReport, printJobCardLabel, printWorkshopInvoice, printWorkshopQuote } from "./ws/Print.jsx";
+import { printStockLabel, printChecklistReport, printJobCardLabel, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote } from "./ws/Print.jsx";
 import { BookInModal } from "./ws/BookIn.jsx";
 import { WsCustomersPage, WsCustomerForm, WsVehicleForm, LicenceRenewalModal, WsLicenceRenewalsPage } from "./ws/Customers.jsx";
 import { WsSupplierInvoicesPage, WsSupInvoiceModal, WsSupInvoiceViewModal, WsSupPaymentModal, WsSupReturnModal } from "./ws/SupplierInvoices.jsx";
@@ -3272,6 +3272,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
             {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ {t.edit}</button>}
             <button className="btn btn-ghost btn-sm" onClick={()=>setShowLabelModal(true)}>🏷️ {t.wsLabel}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardSheet(job,items,settings)}>📄 Job Sheet</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>setServiceHistModal(true)}>📋 History{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
             {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
             <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={()=>setShowMoreActions(p=>!p)} title="More actions">⋯</button>

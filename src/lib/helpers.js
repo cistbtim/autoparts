@@ -122,6 +122,8 @@ export function openLabelWindow(data) {
        <div class="md">${e(model)}</div>
        ${tags.length ? `<div class="tags">${tags.map(t => `<span class="tag">${e(t)}</span>`).join("")}</div>` : ""}`;
 
+  const sc = mode === "scrapyard"; // scrapyard gets ×2 on all non-name/date elements
+
   const css = [
     "*{margin:0;padding:0;box-sizing:border-box}",
     "body{font-family:Arial,sans-serif;font-weight:bold;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#e5e7eb;gap:14px;padding:20px}",
@@ -131,16 +133,24 @@ export function openLabelWindow(data) {
     `.qr{width:${qrSz}px;height:${qrSz}px}`,
     ".din{font-size:21px;font-weight:bold;text-align:center;color:#222;line-height:1.2}",
     ".r{flex:1;padding:5px 8px;display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;overflow:hidden}",
-    ".sn{font-size:7px;font-weight:bold;text-transform:uppercase;letter-spacing:.07em;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
-    ".pid{font-size:13px;font-weight:900;font-family:monospace;letter-spacing:.8px;line-height:1.1}",
-    ".vreg{font-size:12px;font-weight:900;font-family:monospace;letter-spacing:2px;border:1.5px solid #111;padding:1px 5px;border-radius:3px;display:inline-block;margin:1px 0}",
-    ".mk{font-size:10px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-    ".md{font-size:10px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+    // shop name
+    `.sn{font-size:${sc?14:7}px;font-weight:bold;text-transform:uppercase;letter-spacing:.07em;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`,
+    // primary ID (part # or JOB #)
+    `.pid{font-size:${sc?26:13}px;font-weight:900;font-family:monospace;letter-spacing:.8px;line-height:1.1}`,
+    // plate number — workshop ×2 = 24px, scrapyard not used
+    `.vreg{font-size:24px;font-weight:900;font-family:monospace;letter-spacing:2px;border:1.5px solid #111;padding:1px 5px;border-radius:3px;display:inline-block;margin:1px 0}`,
+    // make / model
+    `.mk{font-size:${sc?20:10}px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
+    `.md{font-size:${sc?20:10}px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
+    // part name (scrapyard) — already ×2 at 22px
     ".pn{font-size:22px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+    // customer / mechanic info (workshop)
     ".inf{font-size:9px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-    ".cmp{font-size:8px;font-weight:bold;color:#333;border-top:1px dashed #ccc;margin-top:2px;padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+    // complaint — workshop ×3 = 24px
+    ".cmp{font-size:24px;font-weight:bold;color:#333;border-top:1px dashed #ccc;margin-top:2px;padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+    // tags (scrapyard)
     ".tags{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}",
-    ".tag{border:1px solid #666;border-radius:2px;padding:0 4px;font-size:7px;font-weight:bold}",
+    `.tag{border:1px solid #666;border-radius:2px;padding:0 4px;font-size:${sc?14:7}px;font-weight:bold}`,
     `@page{size:${widthMm}mm ${heightMm}mm;margin:1mm}`,
     `@media print{body{background:#fff;padding:0;gap:0;min-height:auto}.print-btn{display:none}.label{border:1.5px solid #000;width:${widthMm - 2}mm;height:${heightMm - 2}mm}}`,
   ].join("");

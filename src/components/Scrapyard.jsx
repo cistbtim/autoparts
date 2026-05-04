@@ -39,15 +39,40 @@ function PartLabelModal({part, vehicle, onClose}) {
   const veh = vehicle ? `${vehicle.year||""} ${vehicle.make} ${vehicle.model}`.trim() : "";
 
   const handlePrint = () => {
-    const id = "__label_print_root__";
-    const styleId = "__label_print_style__";
-    document.getElementById(styleId)?.remove();
-    const s = document.createElement("style");
-    s.id = styleId;
-    s.textContent = `@media print{body *{visibility:hidden}#${id},#${id} *{visibility:visible}#${id}{position:fixed;left:0;top:0;background:#fff;padding:8mm}}`;
-    document.head.appendChild(s);
-    window.print();
-    setTimeout(() => document.getElementById(styleId)?.remove(), 1500);
+    const win = window.open("","_blank","width=460,height=380");
+    if(!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Part Label</title><style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f3f4f6;font-family:Arial,sans-serif;gap:16px;padding:20px}
+      .label{width:320px;border:2px solid #ccc;border-radius:8px;padding:10px 12px;display:flex;gap:12px;align-items:flex-start;background:#fff}
+      .qr{width:88px;height:88px;flex-shrink:0}
+      .num{font-size:19px;font-weight:900;letter-spacing:1px;margin-bottom:4px;font-family:monospace}
+      .name{font-size:12px;font-weight:bold;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .small{font-size:10px;color:#444;margin-bottom:1px}
+      .tiny{font-size:9px;color:#555;margin-bottom:2px;font-family:monospace}
+      .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+      .tag{border:1px solid #888;border-radius:3px;padding:1px 5px;font-size:9px}
+      .print-btn{padding:10px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.02em}
+      @media print{body{background:#fff;min-height:auto;gap:0;padding:6mm}.label{border:2px solid #000}.print-btn{display:none}}
+    </style></head><body>
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
+      <div class="label">
+        <img class="qr" src="${qr}" alt="QR"/>
+        <div style="flex:1;min-width:0">
+          <div class="num">${num}</div>
+          <div class="name">${part.name}</div>
+          ${veh?`<div class="small">🚗 ${veh}</div>`:""}
+          ${vehicle?.vin?`<div class="tiny">VIN: ${vehicle.vin}</div>`:""}
+          <div class="tags">
+            ${part.condition?`<span class="tag">${part.condition}</span>`:""}
+            ${part.category?`<span class="tag">${part.category}</span>`:""}
+            ${part.location?`<span class="tag">📍 ${part.location}</span>`:""}
+            ${part.price!=null?`<span class="tag">R ${Number(part.price).toFixed(0)}</span>`:""}
+          </div>
+        </div>
+      </div>
+    </body></html>`);
+    win.document.close();
   };
 
   return (

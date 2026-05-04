@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { api } from "../lib/api.js";
-import { toImgUrl } from "../lib/helpers.js";
+import { toImgUrl, openLabelWindow } from "../lib/helpers.js";
+import { getSettings } from "../lib/settings.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
 const CONDITION_OPTS = ["New","Used","Refurbished"];
@@ -32,83 +33,29 @@ const Lbl = ({children}) => (
 const getScriptUrl = () =>
   (window._VEHICLE_SCRIPT_URL?.trim()) || (window._APPS_SCRIPT_URL?.trim()) || "";
 
-// ── Part label modal ───────────────────────────────────────────────
-function PartLabelModal({part, vehicle, onClose}) {
-  const num = part.part_number || ("SP" + String(part.id).padStart(5,"0"));
-  const qr  = `https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=${encodeURIComponent(num)}&format=png`;
-  const veh = vehicle ? `${vehicle.year||""} ${vehicle.make} ${vehicle.model}`.trim() : "";
-
-  const handlePrint = () => {
-    const win = window.open("","_blank","width=460,height=380");
-    if(!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Part Label</title><style>
-      *{margin:0;padding:0;box-sizing:border-box}
-      body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f3f4f6;font-family:Arial,sans-serif;gap:16px;padding:20px}
-      .label{width:320px;border:2px solid #ccc;border-radius:8px;padding:10px 12px;display:flex;gap:12px;align-items:flex-start;background:#fff}
-      .qr{width:88px;height:88px;flex-shrink:0}
-      .num{font-size:19px;font-weight:900;letter-spacing:1px;margin-bottom:4px;font-family:monospace}
-      .name{font-size:12px;font-weight:bold;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .small{font-size:10px;color:#444;margin-bottom:1px}
-      .tiny{font-size:9px;color:#555;margin-bottom:2px;font-family:monospace}
-      .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
-      .tag{border:1px solid #888;border-radius:3px;padding:1px 5px;font-size:9px}
-      .print-btn{padding:10px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.02em}
-      @media print{body{background:#fff;min-height:auto;gap:0;padding:6mm}.label{border:2px solid #000}.print-btn{display:none}}
-    </style></head><body>
-      <button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
-      <div class="label">
-        <img class="qr" src="${qr}" alt="QR"/>
-        <div style="flex:1;min-width:0">
-          <div class="num">${num}</div>
-          <div class="name">${part.name}</div>
-          ${veh?`<div class="small">🚗 ${veh}</div>`:""}
-          ${vehicle?.vin?`<div class="tiny">VIN: ${vehicle.vin}</div>`:""}
-          <div class="tags">
-            ${part.condition?`<span class="tag">${part.condition}</span>`:""}
-            ${part.category?`<span class="tag">${part.category}</span>`:""}
-            ${part.location?`<span class="tag">📍 ${part.location}</span>`:""}
-            ${part.price!=null?`<span class="tag">R ${Number(part.price).toFixed(0)}</span>`:""}
-          </div>
-        </div>
-      </div>
-    </body></html>`);
-    win.document.close();
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:400,padding:0,overflow:"hidden"}}>
-        <div style={{padding:"11px 16px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div style={{fontWeight:700,fontSize:14}}>🏷️ Part Label</div>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
-        </div>
-
-        {/* Label preview */}
-        <div style={{padding:20,display:"flex",justifyContent:"center",background:"var(--surface2)"}}>
-          <div id="__label_print_root__" style={{width:320,border:"2px solid #ccc",borderRadius:8,padding:"10px 12px",display:"flex",gap:12,alignItems:"flex-start",background:"#fff",fontFamily:"Arial,sans-serif"}}>
-            <img src={qr} alt="QR" style={{width:88,height:88,flexShrink:0,display:"block"}}/>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:19,fontWeight:900,letterSpacing:1,marginBottom:4,color:"#000",fontFamily:"monospace"}}>{num}</div>
-              <div style={{fontSize:12,fontWeight:"bold",marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"#000"}}>{part.name}</div>
-              {veh&&<div style={{fontSize:10,color:"#444",marginBottom:1}}>🚗 {veh}</div>}
-              {vehicle?.vin&&<div style={{fontSize:9,color:"#555",marginBottom:2,fontFamily:"monospace"}}>VIN: {vehicle.vin}</div>}
-              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
-                {part.condition&&<span style={{border:"1px solid #888",borderRadius:3,padding:"1px 5px",fontSize:9,color:"#000"}}>{part.condition}</span>}
-                {part.category&&<span style={{border:"1px solid #888",borderRadius:3,padding:"1px 5px",fontSize:9,color:"#000"}}>{part.category}</span>}
-                {part.location&&<span style={{border:"1px solid #888",borderRadius:3,padding:"1px 5px",fontSize:9,color:"#000"}}>📍 {part.location}</span>}
-                {part.price!=null&&<span style={{border:"1px solid #888",borderRadius:3,padding:"1px 5px",fontSize:9,color:"#000"}}>R {Number(part.price).toFixed(0)}</span>}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)",display:"flex",gap:8,justifyContent:"flex-end"}}>
-          <button className="btn btn-ghost" onClick={onClose}>Close</button>
-          <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print / Save PDF</button>
-        </div>
-      </div>
-    </div>
-  );
+// ── Open part label print window ────────────────────────────────────
+function openPartLabel(part, vehicle) {
+  const s = getSettings();
+  const num = part.part_number || ("SP" + String(part.id).padStart(5, "0"));
+  const tags = [
+    part.condition,
+    part.category,
+    part.location ? `\u{1F4CD} ${part.location}` : null,
+    part.price != null ? `R${Number(part.price).toFixed(0)}` : null,
+  ].filter(Boolean);
+  openLabelWindow({
+    mode: "scrapyard",
+    shopName: s.shop_name || "Scrapyard",
+    primaryId: num,
+    qrData: num,
+    make: vehicle?.make || "",
+    model: vehicle?.model || "",
+    dateIn: new Date().toLocaleDateString(),
+    partName: part.name || "",
+    tags,
+    widthMm: s.label_width_mm || 98,
+    heightMm: s.label_height_mm || 45,
+  });
 }
 
 // ── QR scan modal ──────────────────────────────────────────────────
@@ -704,7 +651,6 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
   const [showScan,      setShowScan]      = useState(false);
   const [editPhotos,    setEditPhotos]    = useState(false);
   const [lightbox,      setLightbox]      = useState(null);
-  const [labelPart,     setLabelPart]     = useState(null); // {part, vehicle}
   const [printPart,     setPrintPart]     = useState(null); // part to prompt label print after save
   const [statusSaving,  setStatusSaving]  = useState(false);
   const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_SLOTS.map(s=>[s.key, vehicle[s.key]||""])));
@@ -913,7 +859,7 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
                     </div>
 
                     <div style={{display:"flex",gap:5,marginTop:"auto",paddingTop:8,borderTop:"1px solid var(--border)"}}>
-                      <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setLabelPart({part:p,vehicle})}>🏷️</button>
+                      <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>openPartLabel(p,vehicle)}>🏷️</button>
                       <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setEditPart(p)}>✏️</button>
                       <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deletePart(p)}>🗑</button>
                     </div>
@@ -949,7 +895,7 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
             <div style={{fontSize:13,color:"var(--text2)",marginBottom:4}}><b>{printPart.part.name}</b></div>
             <div style={{fontSize:13,color:"var(--text3)",marginBottom:18}}>Part No: <b>{printPart.part.part_number||printPart.part.id}</b></div>
             <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-              <button className="btn btn-primary" style={{minWidth:120}} onClick={()=>{setLabelPart({part:printPart.part,vehicle:printPart.vehicle});setPrintPart(null);}}>
+              <button className="btn btn-primary" style={{minWidth:120}} onClick={()=>{openPartLabel(printPart.part,printPart.vehicle);setPrintPart(null);}}>
                 🏷️ Print Label
               </button>
               <button className="btn btn-ghost" onClick={()=>{setPrintPart(null);setAddPart(true);}}>
@@ -979,7 +925,6 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
         </div>
       )}
 
-      {labelPart&&<PartLabelModal part={labelPart.part} vehicle={labelPart.vehicle} onClose={()=>setLabelPart(null)}/>}
     </div>
   );
 }
@@ -1142,7 +1087,6 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
   const [showAdd,    setShowAdd]    = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showScan,   setShowScan]   = useState(false);
-  const [labelPart,  setLabelPart]  = useState(null);
 
   const doRefresh = async () => { setRefreshing(true); await onRefresh(); setRefreshing(false); };
   const vehMap = useMemo(()=>Object.fromEntries(vehicles.map(v=>[v.id,v])),[vehicles]);
@@ -1251,7 +1195,7 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
                   </div>
 
                   <div style={{display:"flex",gap:5,marginTop:"auto",paddingTop:8,borderTop:"1px solid var(--border)"}}>
-                    <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setLabelPart({part:p,vehicle:veh||null})}>🏷️</button>
+                    <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>openPartLabel(p,veh||null)}>🏷️</button>
                     <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setEditPart(p)}>✏️</button>
                     <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>deletePart(p)}>🗑</button>
                   </div>
@@ -1280,7 +1224,6 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
         />
       )}
 
-      {labelPart&&<PartLabelModal part={labelPart.part} vehicle={labelPart.vehicle} onClose={()=>setLabelPart(null)}/>}
     </div>
   );
 }

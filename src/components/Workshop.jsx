@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { getSettings, C, curSym, updateSettings } from "../lib/settings.js";
-import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, waLink, extractDriveId } from "../lib/helpers.js";
+import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, waLink, extractDriveId, openLabelWindow } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
@@ -3272,13 +3272,21 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
             {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ {t.edit}</button>}
             <button className="btn btn-ghost btn-sm" onClick={()=>{
-              const shopN=settings?.shop_name||"Workshop";
-              const qrU=`https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=${encodeURIComponent(String(job.id||""))}&format=png`;
-              const vehS=[job.vehicle_make,job.vehicle_model,job.vehicle_year].filter(Boolean).join(" ");
-              const win=window.open("","_blank","width=500,height=420");
-              if(!win) return;
-              win.document.write(`<!DOCTYPE html><html><head><title>Job Card Label</title><style>*{margin:0;padding:0;box-sizing:border-box}body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f3f4f6;font-family:Arial,sans-serif;gap:16px;padding:20px}.label{width:340px;border:2px solid #000;border-radius:8px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;background:#fff}.qr{width:88px;height:88px;flex-shrink:0}.reg{font-size:18px;font-weight:900;font-family:monospace;letter-spacing:2px;border:2px solid #000;padding:2px 8px;border-radius:4px;display:inline-block;margin-bottom:6px}.jobid{font-size:11px;font-family:monospace;color:#555;margin-bottom:2px}.shop{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:4px}.row{font-size:11px;margin-bottom:2px;display:flex;gap:6px}.lbl{color:#666;flex-shrink:0}.val{font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.complaint{font-size:10px;color:#333;margin-top:5px;border-top:1px dashed #ccc;padding-top:4px;overflow:hidden;max-height:24px;line-height:1.4}.print-btn{padding:10px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}@media print{body{background:#fff;min-height:auto;gap:0;padding:6mm}.print-btn{display:none}}</style></head><body><button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button><div class="label"><img class="qr" src="${qrU}" alt="QR"/><div style="flex:1;min-width:0"><div class="jobid">JOB #${job.id||""}</div><div class="shop">🔧 ${shopN}</div><div class="reg">${job.vehicle_reg||"—"}</div>${vehS?`<div class="row"><span class="lbl">Vehicle:</span><span class="val">${vehS}</span></div>`:""}<div class="row"><span class="lbl">Customer:</span><span class="val">${(job.customer_name||"—").replace(/</g,"&lt;")}</span></div><div class="row"><span class="lbl">Phone:</span><span class="val">${job.customer_phone||"—"}</span></div><div class="row"><span class="lbl">Date In:</span><span class="val">${job.date_in||"—"}</span></div>${job.mechanic?`<div class="row"><span class="lbl">Mechanic:</span><span class="val">${job.mechanic}</span></div>`:""}${job.complaint?`<div class="complaint">Complaint: ${(job.complaint||"").slice(0,100).replace(/</g,"&lt;")}</div>`:""}</div></div></body></html>`);
-              win.document.close();
+              openLabelWindow({
+                mode: "workshop",
+                shopName: settings?.shop_name || "Workshop",
+                primaryId: `JOB #${job.id || ""}`,
+                qrData: String(job.id || ""),
+                make: job.vehicle_make || "",
+                model: job.vehicle_model || "",
+                dateIn: job.date_in || new Date().toLocaleDateString(),
+                reg: job.vehicle_reg || "",
+                customerName: job.customer_name || "",
+                mechanic: job.mechanic || "",
+                complaint: job.complaint || "",
+                widthMm: 98,
+                heightMm: 45,
+              });
             }}>🏷️ {t.wsLabel}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardSheet(job,items,settings)}>📄 Job Sheet</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>setServiceHistModal(true)}>📋 History{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>

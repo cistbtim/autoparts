@@ -403,6 +403,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       const p=Array.isArray(prof)&&prof[0]?prof[0]:{};
       setWorkshopProfile(p);
       if(p.label_width_mm||p.label_height_mm) updateSettings({label_width_mm:p.label_width_mm||98,label_height_mm:p.label_height_mm||45});
+      if(p.name) updateSettings({scrapyard_name:p.name});
       setScrapVehicles(Array.isArray(veh)?veh:[]);
       setScrapParts(Array.isArray(prt)?prt:[]);
     }

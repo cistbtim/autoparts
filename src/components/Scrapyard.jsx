@@ -45,7 +45,7 @@ function openPartLabel(part, vehicle) {
   ].filter(Boolean);
   openLabelWindow({
     mode: "scrapyard",
-    shopName: s.shop_name || "Scrapyard",
+    shopName: s.scrapyard_name || s.shop_name || "Scrapyard",
     primaryId: num,
     qrData: num,
     make: vehicle?.make || "",

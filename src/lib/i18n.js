@@ -6,7 +6,7 @@ export const T = {
     lowStockAlert: "Low Stock", manage: "Manage", orderStatus: "Order Status",
     connected: "Connected", s_processing: "Processing", s_shipped: "Ready to Ship",
     s_done: "Completed", s_cancelled: "Cancelled",
-    shop: "Shop", orders: "Orders", myOrders: "My Orders", customers: "Customers",
+    shop: "Shop", orders: "Scrapyard Orders", myOrders: "My Orders", customers: "Customers",
     users: "Users", suppliers: "Suppliers", inquiries: "Inquiries", logs: "Stock Logs",
     loginLogs: "Login Logs", logout: "Sign Out", cart: "Cart", login: "Sign In",
     settings: "Settings", purchaseInvoices: "Purchase Invoices", supplierReturns: "Supplier Returns",

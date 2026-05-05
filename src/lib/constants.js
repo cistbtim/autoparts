@@ -10,7 +10,7 @@ export const ROLES = {
   scrapyard: { color: "#6b7280", bg: "rgba(107,114,128,0.12)", icon: "🚗" },
 };
 
-export const OC = { "Completed": "#34d399", "Ready to Ship": "#fbbf24", "Processing": "#60a5fa", "Cancelled": "#f87171", "已完成": "#34d399", "待出貨": "#fbbf24", "處理中": "#60a5fa", "已取消": "#f87171" };
+export const OC = { "Completed": "#34d399", "Ready to Ship": "#fbbf24", "Processing": "#60a5fa", "Cancelled": "#f87171", "Quoted": "#a855f7", "Invoiced": "#f97316", "Paid": "#10b981", "已完成": "#34d399", "待出貨": "#fbbf24", "處理中": "#60a5fa", "已取消": "#f87171" };
 
 export const CATS_EN = ["All", "Engine", "Brake", "Filter", "Electrical", "Suspension"];
 export const CATS_ZH = ["全部", "引擎", "煞車系統", "濾清系統", "電氣系統", "懸吊系統"];

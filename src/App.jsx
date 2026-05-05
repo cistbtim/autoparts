@@ -12,6 +12,7 @@ import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocat
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
+import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage } from "./components/ScrapyardSales.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage } from "./pages/PublicPages.jsx";
 
@@ -138,6 +139,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [workshopProfile,setWorkshopProfile]=useState({});
   const [scrapVehicles,setScrapVehicles]=useState([]);
   const [scrapParts,setScrapParts]=useState([]);
+  const [syCustomers,setSyCustomers]=useState([]);
+  const [syOrders,setSyOrders]=useState([]);
+  const [syInvoices,setSyInvoices]=useState([]);
+  const [syReturns,setSyReturns]=useState([]);
   const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
   const [allScrapVehicles,setAllScrapVehicles]=useState([]);
   const [allScrapParts,setAllScrapParts]=useState([]);
@@ -241,8 +246,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const isDemo = user?.role==="demo";
   setDemoMode(isDemo, ()=>showToast("🔒 Demo mode — sign up to save changes","err"));
 
-  // For workshop role: merge workshop profile over shop settings so logo/name/contacts show correctly
-  const wsDisplaySettings = wsId ? {
+  // For workshop/scrapyard roles: merge their profile over shop settings so logo/name/contacts show correctly
+  const wsDisplaySettings = (wsId || scrapId) ? {
     ...settings,
     shop_name:  workshopProfile.name      || settings.shop_name,
     logo_url:   workshopProfile.logo_url  || "",
@@ -395,10 +400,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     }
     // Load scrapyard profile + data
     if(scrapId){
-      const [prof,veh,prt]=await Promise.all([
+      const [prof,veh,prt,syC,syO,syI,syR]=await Promise.all([
         api.get("scrapyard_profiles",`id=eq.${scrapId}&select=*`).catch(()=>[]),
         api.get("scrapyard_vehicles",`scrapyard_id=eq.${scrapId}&select=*&order=created_at.desc`).catch(()=>[]),
         api.get("scrapyard_parts",`scrapyard_id=eq.${scrapId}&select=*&order=created_at.desc`).catch(()=>[]),
+        api.get("sy_customers",`scrapyard_id=eq.${scrapId}&select=*&order=name.asc`).catch(()=>[]),
+        api.get("sy_orders",`scrapyard_id=eq.${scrapId}&select=*&order=created_at.desc`).catch(()=>[]),
+        api.get("sy_invoices",`scrapyard_id=eq.${scrapId}&select=*&order=invoice_date.desc`).catch(()=>[]),
+        api.get("sy_returns",`scrapyard_id=eq.${scrapId}&select=*&order=return_date.desc`).catch(()=>[]),
       ]);
       const p=Array.isArray(prof)&&prof[0]?prof[0]:{};
       setWorkshopProfile(p);
@@ -406,6 +415,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       if(p.name) updateSettings({scrapyard_name:p.name});
       setScrapVehicles(Array.isArray(veh)?veh:[]);
       setScrapParts(Array.isArray(prt)?prt:[]);
+      setSyCustomers(Array.isArray(syC)?syC:[]);
+      setSyOrders(Array.isArray(syO)?syO:[]);
+      setSyInvoices(Array.isArray(syI)?syI:[]);
+      setSyReturns(Array.isArray(syR)?syR:[]);
     }
   },[]);
 
@@ -468,12 +481,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
   const refreshScrapyardData=useCallback(async()=>{
     if(!scrapId) return;
-    const [veh,prt]=await Promise.all([
+    const [veh,prt,syC,syO,syI,syR]=await Promise.all([
       api.get("scrapyard_vehicles",`scrapyard_id=eq.${scrapId}&select=*&order=created_at.desc`).catch(()=>[]),
       api.get("scrapyard_parts",`scrapyard_id=eq.${scrapId}&select=*&order=created_at.desc`).catch(()=>[]),
+      api.get("sy_customers",`scrapyard_id=eq.${scrapId}&select=*&order=name.asc`).catch(()=>[]),
+      api.get("sy_orders",`scrapyard_id=eq.${scrapId}&select=*&order=created_at.desc`).catch(()=>[]),
+      api.get("sy_invoices",`scrapyard_id=eq.${scrapId}&select=*&order=invoice_date.desc`).catch(()=>[]),
+      api.get("sy_returns",`scrapyard_id=eq.${scrapId}&select=*&order=return_date.desc`).catch(()=>[]),
     ]);
     setScrapVehicles(Array.isArray(veh)?veh:[]);
     setScrapParts(Array.isArray(prt)?prt:[]);
+    setSyCustomers(Array.isArray(syC)?syC:[]);
+    setSyOrders(Array.isArray(syO)?syO:[]);
+    setSyInvoices(Array.isArray(syI)?syI:[]);
+    setSyReturns(Array.isArray(syR)?syR:[]);
   },[scrapId]);
 
   // Sync Apps Script URL to window whenever settings changes
@@ -1413,11 +1434,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const saveCustomerInvoice=async(inv,items)=>{
     await api.upsert("customer_invoices",inv);
     for(const item of items) await api.insert("customer_invoice_items",{...item,invoice_id:inv.id});
-    // Auto-update linked order status to Completed
+    // Auto-update linked order status to Invoiced
     if(inv.order_id){
-      await api.patch("orders","id",inv.order_id,{status:"Completed"});
+      await api.patch("orders","id",inv.order_id,{status:"Invoiced"});
     }
-    await loadAll();closeM("customerInvoice");showToast("✅ Invoice created & order completed");
+    await loadAll();closeM("customerInvoice");showToast("✅ Invoice created — awaiting payment");
   };
 
   // Customer Returns
@@ -1680,6 +1701,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(data.reference_id){
       if(data.type==="receipt"){
         await api.patch("customer_invoices","id",data.reference_id,{status:"paid"});
+        // Also mark the linked order as Paid
+        const inv=customerInvoices.find(i=>i.id===data.reference_id);
+        if(inv?.order_id) await api.patch("orders","id",inv.order_id,{status:"Paid"});
       } else if(data.type==="payment"){
         await api.patch("supplier_invoices","id",data.reference_id,{status:"paid"});
       }
@@ -1739,7 +1763,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     : [
         ["__all__",     t.all],
         ["Processing",  tSt("Processing")],
+        ["Quoted",      "Quoted"],
         ["Ready to Ship", tSt("Ready to Ship")],
+        ["Invoiced",    "Invoiced"],
+        ["Paid",        "Paid"],
         ["Completed",   tSt("Completed")],
         ["Cancelled",   tSt("Cancelled")],
       ];
@@ -1769,6 +1796,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"sy_vehicles", icon:"🚗", label:"Vehicles", roles:["scrapyard"]},
         {id:"sy_parts",    icon:"📦", label:"Parts",    roles:["scrapyard"], badge:scrapLowStock.length},
         {id:"sy_settings", icon:"⚙️", label:"Settings", roles:["scrapyard"]},
+      ]
+    },
+    {
+      id:"grp_sy_sales", icon:"🛒", label:"Sales", roles:["scrapyard"],
+      badge: syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0,
+      children:[
+        {id:"sy_orders",    icon:"📋", label:"Orders",    roles:["scrapyard"], badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
+        {id:"sy_picking",   icon:"🔍", label:"Picking",   roles:["scrapyard"]},
+        {id:"sy_invoices",  icon:"🧾", label:"Invoices",  roles:["scrapyard"]},
+        {id:"sy_customers", icon:"👥", label:"Customers", roles:["scrapyard"]},
+        {id:"sy_returns",   icon:"↩️", label:"Returns",   roles:["scrapyard"]},
       ]
     },
     {
@@ -1895,7 +1933,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     ];
     if(role==="scrapyard") return [
       {id:"sy_vehicles", icon:"🚗", label:"Vehicles"},
-      {id:"sy_parts",    icon:"📦", label:"Parts",     badge:scrapLowStock.length},
+      {id:"sy_parts",    icon:"📦", label:"Parts",    badge:scrapLowStock.length},
+      {id:"sy_orders",   icon:"📋", label:"Orders",   badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
+      {id:"sy_invoices", icon:"🧾", label:"Invoices"},
       {id:"sy_settings", icon:"⚙️", label:"Settings"},
     ];
     if(role==="shipper") return [
@@ -2595,6 +2635,31 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           <ScrapyardProfilePage profile={workshopProfile} onSave={saveScrapProfile}/>
         )}
 
+        {/* ── SCRAPYARD ORDERS ── */}
+        {tab==="sy_orders"&&role==="scrapyard"&&(
+          <SyOrdersPage scrapId={scrapId} syOrders={syOrders} syCustomers={syCustomers} scrapParts={scrapParts} syInvoices={syInvoices} onRefresh={refreshScrapyardData} showToast={showToast} settings={wsDisplaySettings}/>
+        )}
+
+        {/* ── SCRAPYARD PICKING ── */}
+        {tab==="sy_picking"&&role==="scrapyard"&&(
+          <SyPickingPage scrapId={scrapId} syOrders={syOrders} scrapParts={scrapParts} onRefresh={refreshScrapyardData} showToast={showToast}/>
+        )}
+
+        {/* ── SCRAPYARD INVOICES ── */}
+        {tab==="sy_invoices"&&role==="scrapyard"&&(
+          <SyInvoicesPage scrapId={scrapId} syInvoices={syInvoices} syOrders={syOrders} onRefresh={refreshScrapyardData} showToast={showToast} settings={wsDisplaySettings}/>
+        )}
+
+        {/* ── SCRAPYARD CUSTOMERS ── */}
+        {tab==="sy_customers"&&role==="scrapyard"&&(
+          <SyCustomersPage scrapId={scrapId} syCustomers={syCustomers} onRefresh={refreshScrapyardData} showToast={showToast}/>
+        )}
+
+        {/* ── SCRAPYARD RETURNS ── */}
+        {tab==="sy_returns"&&role==="scrapyard"&&(
+          <SyReturnsPage scrapId={scrapId} syReturns={syReturns} syInvoices={syInvoices} onRefresh={refreshScrapyardData} showToast={showToast}/>
+        )}
+
         {/* ── ALL SCRAPYARDS (admin/manager) ── */}
         {tab==="all_scrapyards"&&(
           <ScrapyardAdminPage
@@ -2868,7 +2933,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               )}
             </div>
             <OrdersTable orders={fo} canEdit={role==="admin"||role==="manager"} canInvoice={role==="admin"||role==="manager"} onStatusChange={updateOrderStatus}
-              onCreateInvoice={(o)=>openM("customerInvoice",{order:o,isNew:true})}/>
+              onCreateInvoice={(o)=>openM("customerInvoice",{order:o,isNew:true})}
+              onSendQuote={(o)=>{updateOrderStatus(o.id,"Quoted");}}
+              onRecordPayment={(o)=>{
+                const inv=customerInvoices.find(i=>i.order_id===o.id);
+                if(inv) openM("addPayment",{prefill:{type:"receipt",reference_id:inv.id,party_name:inv.customer_name,amount:inv.total,payment_date:today()}});
+                else{showToast("Create an invoice for this order first","err");}
+              }}/>
           </div>
         )}
 

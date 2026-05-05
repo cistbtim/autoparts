@@ -309,6 +309,7 @@ export function ScrapyardProfilePage({profile, onSave}) {
   const [f, setF] = useState({
     name:"", phone:"", email:"", address:"", website:"",
     logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
+    vat_number:"", vat_rate:15,
     label_width_mm:98, label_height_mm:45,
     ...profile
   });
@@ -388,6 +389,28 @@ export function ScrapyardProfilePage({profile, onSave}) {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* VAT */}
+        <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🧾 VAT / Tax</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Enter your VAT registration number to enable VAT. All invoices will automatically show a VAT breakdown.</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div style={{gridColumn:"1/-1"}}>
+              <FL label="VAT Registration Number"/>
+              <input className="inp" value={f.vat_number||""} onChange={e=>s("vat_number",e.target.value)} placeholder="e.g. 4670123456 — leave blank to disable VAT"/>
+            </div>
+            <div>
+              <FL label="VAT Rate (%)"/>
+              <input className="inp" type="number" min="0" max="100" step="0.1"
+                value={f.vat_rate??15} onChange={e=>s("vat_rate",parseFloat(e.target.value)||0)}/>
+            </div>
+            <div style={{display:"flex",alignItems:"flex-end",paddingBottom:4}}>
+              {f.vat_number
+                ? <span style={{fontSize:12,color:"var(--green)",fontWeight:600}}>✅ VAT active — {f.vat_rate??15}% will be added to all invoices</span>
+                : <span style={{fontSize:12,color:"var(--text3)"}}>VAT disabled — enter a VAT number to enable</span>}
+            </div>
           </div>
         </div>
 
@@ -672,15 +695,28 @@ export function WsSubscriptionsPage({settings}) {
 // ═══════════════════════════════════════════════════════════════
 // SHARED TABLE
 // ═══════════════════════════════════════════════════════════════
-export function OrdersTable({orders,canEdit,canInvoice=true,shipperMode=false,onStatusChange,onCreateInvoice}) {
+export function OrdersTable({orders,canEdit,canInvoice=true,shipperMode=false,onStatusChange,onCreateInvoice,onSendQuote,onRecordPayment}) {
   if(orders.length===0) return <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No orders</div>;
+
+  const ALL_STATUSES=["Processing","Quoted","Ready to Ship","Invoiced","Paid","Completed","Cancelled"];
+
+  const getActionBtn=(o)=>{
+    if(!canEdit) return null;
+    if(o.status==="Processing"&&onSendQuote)
+      return <button className="btn btn-sm" style={{background:"rgba(168,85,247,.15)",color:"#a855f7",border:"1px solid rgba(168,85,247,.3)"}} onClick={()=>onSendQuote(o)}>📋 Send Quote</button>;
+    if((o.status==="Quoted"||o.status==="Ready to Ship")&&canInvoice)
+      return <button className="btn btn-info btn-sm" onClick={()=>onCreateInvoice(o)}>🧾 Invoice</button>;
+    if(o.status==="Invoiced"&&onRecordPayment)
+      return <button className="btn btn-success btn-sm" onClick={()=>onRecordPayment(o)}>💳 Record Payment</button>;
+    return null;
+  };
+
   return (
     <>
       {/* ── MOBILE CARDS ── */}
       <div className="mob-cards">
         {orders.map(o=>(
           <div key={o.id} className="card" style={{padding:16,borderLeft:`3px solid ${OC[o.status]||"var(--border)"}`}}>
-            {/* Header row */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
               <div>
                 <div style={{fontWeight:700,fontSize:15}}>{o.customer_name}</div>
@@ -693,7 +729,6 @@ export function OrdersTable({orders,canEdit,canInvoice=true,shipperMode=false,on
                 <div style={{fontSize:11,color:"var(--text3)"}}>{o.date}</div>
               </div>
             </div>
-            {/* Items */}
             <div style={{borderTop:"1px solid var(--border)",paddingTop:8,marginBottom:10}}>
               {Array.isArray(o.items)&&o.items.map((item,i)=>(
                 <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"3px 0"}}>
@@ -702,7 +737,6 @@ export function OrdersTable({orders,canEdit,canInvoice=true,shipperMode=false,on
                 </div>
               ))}
             </div>
-            {/* Actions */}
             {canEdit&&(
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 <select value={o.status} onChange={e=>onStatusChange(o.id,e.target.value)}
@@ -710,10 +744,10 @@ export function OrdersTable({orders,canEdit,canInvoice=true,shipperMode=false,on
                     color:"var(--text)",borderRadius:8,padding:"8px 10px",fontSize:13,cursor:"pointer"}}>
                   {(shipperMode
                     ? (o.status==="Processing"?["Processing","Ready to Ship"]:o.status==="Ready to Ship"?["Ready to Ship","Completed"]:[o.status])
-                    : ["Processing","Ready to Ship","Completed","Cancelled"]
+                    : ALL_STATUSES
                   ).map(s=><option key={s} value={s}>{tSt(s)}</option>)}
                 </select>
-                {canInvoice&&<button className="btn btn-info btn-sm" onClick={()=>onCreateInvoice(o)}>🧾</button>}
+                {getActionBtn(o)}
               </div>
             )}
           </div>
@@ -724,7 +758,7 @@ export function OrdersTable({orders,canEdit,canInvoice=true,shipperMode=false,on
       <div className="card desk-table" style={{overflow:"hidden"}}>
         <div className="tbl-wrap">
           <table className="tbl">
-            <thead><tr>{["Order","Customer","Date","Items","Total","Status",...(canEdit?["Update"]:[]),(canEdit&&canInvoice)?["Invoice"]:[]].flat().map(h=><th key={h}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Order","Customer","Date","Items","Total","Status",...(canEdit?["Update","Action"]:[])].map(h=><th key={h}>{h}</th>)}</tr></thead>
             <tbody>
               {orders.map(o=>(
                 <tr key={o.id}>
@@ -736,9 +770,9 @@ export function OrdersTable({orders,canEdit,canInvoice=true,shipperMode=false,on
                   <td><StatusBadge status={o.status}/></td>
                   {canEdit&&<td><select value={o.status} onChange={e=>onStatusChange(o.id,e.target.value)} style={{background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--text)",borderRadius:7,padding:"5px 9px",fontSize:13,fontFamily:"inherit",cursor:"pointer"}}>{(shipperMode
                             ? (o.status==="Processing"?["Processing","Ready to Ship"]:o.status==="Ready to Ship"?["Ready to Ship","Completed"]:[o.status])
-                            : ["Processing","Ready to Ship","Completed","Cancelled"]
+                            : ALL_STATUSES
                           ).map(s=><option key={s} value={s}>{tSt(s)}</option>)}</select></td>}
-                  {canEdit&&<td>{canInvoice&&<button className="btn btn-info btn-xs" onClick={()=>onCreateInvoice(o)}>🧾 Invoice</button>}</td>}
+                  {canEdit&&<td>{getActionBtn(o)}</td>}
                 </tr>
               ))}
             </tbody>

@@ -633,7 +633,18 @@ export function SyOrdersPage({scrapId, syOrders, syCustomers, scrapParts, syInvo
   const createInvoice = async (data) => {
     await api.insert("sy_invoices",data);
     await api.patch("sy_orders","id",data.order_id,{status:"Invoiced"});
-    showToast("Invoice created"); setInvoiceFor(null); onRefresh();
+    // Deduct stock for each item in the order
+    if (invoiceFor && Array.isArray(invoiceFor.items)) {
+      for (const item of invoiceFor.items) {
+        if (!item.partId) continue;
+        const res = await api.get("scrapyard_parts",`id=eq.${item.partId}&select=id,quantity`).catch(()=>[]);
+        const part = Array.isArray(res) ? res[0] : null;
+        if (part != null) {
+          await api.patch("scrapyard_parts","id",item.partId,{quantity:Math.max(0,(part.quantity||0)-(item.qty||1))});
+        }
+      }
+    }
+    showToast("✅ Invoice created — stock deducted"); setInvoiceFor(null); onRefresh();
   };
 
   const recordPayment = async ({invoiceId,orderId,amount,method}) => {
@@ -645,6 +656,15 @@ export function SyOrdersPage({scrapId, syOrders, syCustomers, scrapParts, syInvo
   const deleteOrder = async (o) => {
     if (!confirm(`Delete order ${o.id} and any linked invoice? This cannot be undone.`)) return;
     const linkedInv = syInvoices.find(i=>i.order_id===o.id);
+    // Restore stock only if invoice existed (stock was deducted at invoice creation)
+    if (linkedInv && Array.isArray(o.items)) {
+      for (const item of o.items) {
+        if (!item.partId) continue;
+        const res = await api.get("scrapyard_parts",`id=eq.${item.partId}&select=id,quantity`).catch(()=>[]);
+        const part = Array.isArray(res) ? res[0] : null;
+        if (part != null) await api.patch("scrapyard_parts","id",item.partId,{quantity:(part.quantity||0)+(item.qty||1)});
+      }
+    }
     if (linkedInv) await api.delete("sy_invoices","id",linkedInv.id);
     await api.delete("sy_orders","id",o.id);
     showToast("Deleted","err"); onRefresh();
@@ -703,6 +723,16 @@ export function SyInvoicesPage({scrapId, syInvoices, syOrders, onRefresh, showTo
 
   const deleteInvoiceAndOrder = async (inv) => {
     if (!confirm(`Delete invoice ${inv.id} and its linked order? This cannot be undone.`)) return;
+    // Restore stock for each item (stock was deducted when invoice was created)
+    const order = syOrders.find(o=>o.id===inv.order_id);
+    if (order && Array.isArray(order.items)) {
+      for (const item of order.items) {
+        if (!item.partId) continue;
+        const res = await api.get("scrapyard_parts",`id=eq.${item.partId}&select=id,quantity`).catch(()=>[]);
+        const part = Array.isArray(res) ? res[0] : null;
+        if (part != null) await api.patch("scrapyard_parts","id",item.partId,{quantity:(part.quantity||0)+(item.qty||1)});
+      }
+    }
     await api.delete("sy_invoices","id",inv.id);
     if (inv.order_id) await api.delete("sy_orders","id",inv.order_id);
     showToast("Deleted","err"); onRefresh();

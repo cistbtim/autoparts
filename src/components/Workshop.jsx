@@ -4029,7 +4029,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             ?<div style={{textAlign:"center",padding:24,color:"var(--text3)"}}>{t.wsqtNoItems}</div>
             : isMobile ? (
               /* ── Mobile card list ── */
-              <div style={{display:"flex",flexDirection:"column",gap:0}}>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {items.map((item,idx)=>{
                   const supCosts=getSupCosts(item.description);
                   const isEditingPrice=editPriceId===item.id;
@@ -4037,8 +4037,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                   const isEditing=isEditingPrice; // keep alias for price block
                   const displayQty=isEditingQty?(+editQtyVal||1):(+item.qty||1);
                   const rowTotal=isEditingPrice?(+editPriceVal||0)*displayQty:isEditingQty?(+item.unit_price||0)*displayQty:+item.total||0;
+                  const accentColor=item.type==="part"?"var(--blue)":"var(--green)";
+                  const accentBg=item.type==="part"?"rgba(96,165,250,.1)":"rgba(52,211,153,.1)";
+                  const accentBorder=item.type==="part"?"rgba(96,165,250,.3)":"rgba(52,211,153,.3)";
                   return (
-                    <div key={item.id} style={{padding:"12px 14px",borderBottom:idx<items.length-1?"1px solid var(--border)":undefined}}>
+                    <div key={item.id} style={{
+                      padding:"12px 14px",
+                      borderRadius:8,
+                      border:"1px solid var(--border)",
+                      borderLeft:`3px solid ${accentColor}`,
+                      background:idx%2===0?"var(--surface2)":"var(--surface)",
+                    }}>
                       {/* Top row: badge + name + delete */}
                       <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:6}}>
                         <span className="badge" style={{flexShrink:0,background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)",fontSize:11}}>
@@ -4066,40 +4075,40 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                         </div>
                       )}
                       {/* Qty × Price = Total row */}
-                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:"var(--surface2)",borderRadius:item.type==="part"?"8px 8px 0 0":"8px",padding:"8px 10px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:item.type==="part"?"8px 8px 0 0":"8px",padding:"8px 10px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:4}}>
-                          <span style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>{t.qty}</span>
+                          <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.qty}</span>
                           {isEditingQty
                             ? <input autoFocus type="number" min="1" step="1"
                                 value={editQtyVal}
                                 onChange={e=>setEditQtyVal(e.target.value)}
                                 onBlur={()=>commitQty(item)}
                                 onKeyDown={e=>{ if(e.key==="Enter") commitQty(item); if(e.key==="Escape") setEditQtyId(null); }}
-                                style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text1)"}}/>
+                                style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:`1px solid ${accentColor}`,background:"var(--surface2)",color:"var(--text1)"}}/>
                             : <span onClick={()=>{ setEditQtyId(item.id); setEditQtyVal(String(item.qty||1)); setEditPriceId(null); }}
-                                style={{fontWeight:700,fontSize:15,cursor:"pointer",borderBottom:"1px dashed var(--text3)",color:"var(--text)"}}>
+                                style={{fontWeight:700,fontSize:15,cursor:"pointer",borderBottom:`1px dashed ${accentColor}`,color:"var(--text)"}}>
                                 {item.qty}
                               </span>
                           }
                         </div>
-                        <span style={{color:"var(--text3)"}}>×</span>
+                        <span style={{color:accentColor,fontWeight:700,opacity:.6}}>×</span>
                         <div style={{display:"flex",alignItems:"center",gap:4}}>
-                          <span style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>{t.wsqtPrice}</span>
+                          <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.wsqtPrice}</span>
                           {isEditingPrice
                             ? <input autoFocus type="number" min="0" step="0.01"
                                 value={editPriceVal}
                                 onChange={e=>setEditPriceVal(e.target.value)}
                                 onBlur={()=>commitPrice(item)}
                                 onKeyDown={e=>{ if(e.key==="Enter") commitPrice(item); if(e.key==="Escape") setEditPriceId(null); }}
-                                style={{width:80,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text1)"}}/>
+                                style={{width:80,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:`1px solid ${accentColor}`,background:"var(--surface2)",color:"var(--text1)"}}/>
                             : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); setEditQtyId(null); setEditMarkupId(null); }}
-                                style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:"pointer",borderBottom:"1px dashed var(--text3)",color:"var(--text)"}}>
+                                style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:"pointer",borderBottom:`1px dashed ${accentColor}`,color:"var(--text)"}}>
                                 {fmtAmt(item.unit_price)}
                               </span>
                           }
                         </div>
-                        <span style={{color:"var(--text3)"}}>=</span>
-                        <span style={{fontWeight:700,fontSize:16,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",marginLeft:"auto"}}>
+                        <span style={{color:accentColor,fontWeight:700,opacity:.6}}>=</span>
+                        <span style={{fontWeight:800,fontSize:16,fontFamily:"Rajdhani,sans-serif",color:accentColor,marginLeft:"auto"}}>
                           {fmtAmt(rowTotal)}
                         </span>
                       </div>

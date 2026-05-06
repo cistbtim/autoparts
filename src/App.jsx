@@ -12,7 +12,7 @@ import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocat
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
-import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage } from "./components/ScrapyardSales.jsx";
+import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage } from "./pages/PublicPages.jsx";
 
@@ -73,7 +73,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const wsId  = role==="workshop"  ? String(user.id) : null;
   const scrapId = role==="scrapyard" ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_vehicles":role==="demo"?"inventory":"dashboard";
+  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_dashboard":role==="demo"?"inventory":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [parts,setParts]=useState([]);
@@ -1793,9 +1793,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     {
       id:"grp_scrapyard", icon:"🚗", label:"Scrapyard", roles:["scrapyard"],
       children:[
-        {id:"sy_vehicles", icon:"🚗", label:"Vehicles", roles:["scrapyard"]},
-        {id:"sy_parts",    icon:"📦", label:"Parts",    roles:["scrapyard"], badge:scrapLowStock.length},
-        {id:"sy_settings", icon:"⚙️", label:"Settings", roles:["scrapyard"]},
+        {id:"sy_dashboard",icon:"📊", label:"Dashboard", roles:["scrapyard"]},
+        {id:"sy_vehicles", icon:"🚗", label:"Vehicles",  roles:["scrapyard"]},
+        {id:"sy_parts",    icon:"📦", label:"Parts",     roles:["scrapyard"], badge:scrapLowStock.length},
+        {id:"sy_settings", icon:"⚙️", label:"Settings",  roles:["scrapyard"]},
       ]
     },
     {
@@ -1807,6 +1808,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"sy_invoices",  icon:"🧾", label:"Invoices",  roles:["scrapyard"]},
         {id:"sy_customers", icon:"👥", label:"Customers", roles:["scrapyard"]},
         {id:"sy_returns",   icon:"↩️", label:"Returns",   roles:["scrapyard"]},
+        {id:"sy_gate",      icon:"🛡️", label:"Gate Check",roles:["scrapyard"]},
       ]
     },
     {
@@ -1932,11 +1934,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"stockmove",icon:"🔀",label:t.stockMove},
     ];
     if(role==="scrapyard") return [
-      {id:"sy_vehicles", icon:"🚗", label:"Vehicles"},
+      {id:"sy_dashboard",icon:"📊", label:"Dashboard"},
       {id:"sy_parts",    icon:"📦", label:"Parts",    badge:scrapLowStock.length},
       {id:"sy_orders",   icon:"📋", label:"Orders",   badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
       {id:"sy_invoices", icon:"🧾", label:"Invoices"},
-      {id:"sy_settings", icon:"⚙️", label:"Settings"},
+      {id:"sy_gate",     icon:"🛡️", label:"Gate"},
     ];
     if(role==="shipper") return [
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
@@ -2610,6 +2612,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           </div>
         )}
 
+        {/* ── SCRAPYARD DASHBOARD ── */}
+        {tab==="sy_dashboard"&&role==="scrapyard"&&(
+          <SyDashboardPage
+            scrapVehicles={scrapVehicles}
+            scrapParts={scrapParts}
+            syOrders={syOrders}
+            syInvoices={syInvoices}
+            syCustomers={syCustomers}
+            syReturns={syReturns}
+            settings={wsDisplaySettings}
+            onNavigate={setTab}
+          />
+        )}
+
         {/* ── SCRAPYARD VEHICLES ── */}
         {tab==="sy_vehicles"&&(
           <ScrapyardVehiclesPage
@@ -2637,7 +2653,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
         {/* ── SCRAPYARD ORDERS ── */}
         {tab==="sy_orders"&&role==="scrapyard"&&(
-          <SyOrdersPage scrapId={scrapId} syOrders={syOrders} syCustomers={syCustomers} scrapParts={scrapParts} syInvoices={syInvoices} onRefresh={refreshScrapyardData} showToast={showToast} settings={wsDisplaySettings}/>
+          <SyOrdersPage scrapId={scrapId} syOrders={syOrders} syCustomers={syCustomers} scrapParts={scrapParts} scrapVehicles={scrapVehicles} syInvoices={syInvoices} onRefresh={refreshScrapyardData} showToast={showToast} settings={wsDisplaySettings}/>
         )}
 
         {/* ── SCRAPYARD PICKING ── */}
@@ -2657,7 +2673,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
         {/* ── SCRAPYARD RETURNS ── */}
         {tab==="sy_returns"&&role==="scrapyard"&&(
-          <SyReturnsPage scrapId={scrapId} syReturns={syReturns} syInvoices={syInvoices} onRefresh={refreshScrapyardData} showToast={showToast}/>
+          <SyReturnsPage scrapId={scrapId} syReturns={syReturns} syInvoices={syInvoices} syOrders={syOrders} onRefresh={refreshScrapyardData} showToast={showToast}/>
+        )}
+
+        {/* ── SCRAPYARD GATE CHECK ── */}
+        {tab==="sy_gate"&&role==="scrapyard"&&(
+          <SyGatePage scrapId={scrapId} syInvoices={syInvoices} syOrders={syOrders} onRefresh={refreshScrapyardData} showToast={showToast} settings={wsDisplaySettings}/>
         )}
 
         {/* ── ALL SCRAPYARDS (admin/manager) ── */}

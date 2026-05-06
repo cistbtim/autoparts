@@ -272,9 +272,17 @@ function SyOrderCard({o, settings, onStatusChange, onSendQuote, onCreateInvoice,
       </div>
       <div style={{borderTop:"1px solid var(--border)",paddingTop:8,marginBottom:10}}>
         {Array.isArray(o.items)&&o.items.map((item,i)=>(
-          <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"2px 0"}}>
-            <span style={{color:"var(--text2)"}}>{item.name}{item.location?<span style={{color:"var(--text3)",fontSize:11}}> · 📍{item.location}</span>:null}</span>
-            <span style={{fontWeight:600,color:"var(--accent)"}}>×{item.qty}</span>
+          <div key={i} style={{padding:"4px 0",borderBottom:"1px solid var(--border)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <span style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{item.name}</span>
+              <span style={{fontWeight:700,color:"var(--accent)",fontSize:13,flexShrink:0,marginLeft:8}}>×{item.qty}</span>
+            </div>
+            <div style={{fontSize:11,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap",marginTop:1}}>
+              {item.vehicle&&<span style={{color:"var(--blue)"}}>🚗 {item.vehicle}</span>}
+              {item.partNumber&&<span>#{item.partNumber}</span>}
+              {item.condition&&<span>{item.condition}</span>}
+              {item.location&&<span>📍 {item.location}</span>}
+            </div>
           </div>
         ))}
       </div>
@@ -293,27 +301,44 @@ function SyOrderCard({o, settings, onStatusChange, onSendQuote, onCreateInvoice,
 }
 
 // ── New Order Modal ───────────────────────────────────────────────
-function SyNewOrderModal({scrapId, syCustomers, scrapParts, settings, onSave, onClose}) {
+function SyNewOrderModal({scrapId, syCustomers, scrapParts, scrapVehicles, settings, onSave, onClose}) {
   const [custMode, setCustMode] = useState("select");
   const [custId, setCustId] = useState("");
   const [custName, setCustName] = useState("");
   const [custPhone, setCustPhone] = useState("");
   const [partSearch, setPartSearch] = useState("");
+  const [partPage, setPartPage] = useState(0);
   const [items, setItems] = useState([]);
   const [saving, setSaving] = useState(false);
 
   const selectedCust = syCustomers.find(c=>c.id===custId);
-  const filteredParts = scrapParts.filter(p=>
-    (p.quantity||0)>0 && (p.name||"").toLowerCase().includes(partSearch.toLowerCase())
-  );
+
+  const getVehicle = (p) => scrapVehicles.find(v=>v.id===p.vehicle_id);
+  const vehicleLabel = (p) => {
+    const v = getVehicle(p);
+    if (!v) return null;
+    return [v.year, v.make, v.model].filter(Boolean).join(" ");
+  };
+
+  const filteredParts = scrapParts.filter(p=>{
+    if ((p.quantity||0)<=0) return false;
+    if (!partSearch.trim()) return true;
+    const terms = partSearch.toLowerCase().trim().split(/\s+/);
+    const haystack = [p.name, p.part_number, p.category, p.condition, vehicleLabel(p)].filter(Boolean).join(" ").toLowerCase();
+    return terms.every(t => haystack.includes(t));
+  });
+
   const total = items.reduce((s,i)=>s+(i.price||0)*i.qty, 0);
   const vat = vatCalc(total, settings);
 
-  const addPart = (p) => setItems(prev=>{
-    const ex = prev.find(i=>i.partId===p.id);
-    if (ex) return prev.map(i=>i.partId===p.id?{...i,qty:i.qty+1}:i);
-    return [...prev,{partId:p.id,name:p.name,qty:1,price:p.price||0,location:p.location||""}];
-  });
+  const addPart = (p) => {
+    const vl = vehicleLabel(p);
+    setItems(prev=>{
+      const ex = prev.find(i=>i.partId===p.id);
+      if (ex) return prev.map(i=>i.partId===p.id?{...i,qty:i.qty+1}:i);
+      return [...prev,{partId:p.id,name:p.name,qty:1,price:p.price||0,location:p.location||"",vehicle:vl||"",partNumber:p.part_number||"",condition:p.condition||""}];
+    });
+  };
   const removeItem = (partId) => setItems(prev=>prev.filter(i=>i.partId!==partId));
   const changeQty = (partId,qty) => { if(qty<1)return; setItems(prev=>prev.map(i=>i.partId===partId?{...i,qty}:i)); };
 
@@ -329,7 +354,7 @@ function SyNewOrderModal({scrapId, syCustomers, scrapParts, settings, onSave, on
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal" style={{maxWidth:560,width:"95%",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <div className="modal" style={{maxWidth:600,width:"95%",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
           <h2 style={{fontSize:17,fontWeight:700}}>New Order</h2>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
@@ -355,21 +380,47 @@ function SyNewOrderModal({scrapId, syCustomers, scrapParts, settings, onSave, on
 
         <div style={{marginBottom:14}}>
           <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:6}}>ADD PARTS</div>
-          <input className="inp" placeholder="Search parts…" value={partSearch} onChange={e=>setPartSearch(e.target.value)} style={{marginBottom:8}}/>
-          <div style={{maxHeight:160,overflowY:"auto",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)"}}>
-            {filteredParts.slice(0,40).map(p=>(
-              <div key={p.id} onClick={()=>addPart(p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer"}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:600}}>{p.name}</div>
-                  <div style={{fontSize:11,color:"var(--text3)"}}>{p.location||"No location"} · Qty: {p.quantity}</div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"var(--accent)"}}>{fmtAmt(p.price||0)}</div>
-                  <div style={{fontSize:10,color:"var(--green)"}}>+ Add</div>
-                </div>
+          <input className="inp" placeholder="Search by name, part no., category, condition or vehicle… (separate words with space)" value={partSearch} onChange={e=>{setPartSearch(e.target.value);setPartPage(0);}} style={{marginBottom:8}}/>
+          <div style={{border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)"}}>
+            {filteredParts.length===0
+              ? <div style={{padding:20,textAlign:"center",color:"var(--text3)",fontSize:13}}>No parts in stock matching search</div>
+              : filteredParts.slice(partPage*20, partPage*20+20).map(p=>{
+                  const vl = vehicleLabel(p);
+                  const already = items.find(i=>i.partId===p.id);
+                  return (
+                    <div key={p.id} onClick={()=>addPart(p)}
+                      style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:already?"rgba(96,165,250,.07)":"transparent"}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:700,marginBottom:2}}>{p.name}</div>
+                        <div style={{fontSize:11,color:"var(--blue)",fontWeight:600,marginBottom:2}}>
+                          {vl ? `🚗 ${vl}` : "🚗 No vehicle linked"}
+                        </div>
+                        <div style={{fontSize:11,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap"}}>
+                          {p.part_number&&<span>#{p.part_number}</span>}
+                          {p.category&&<span>{p.category}</span>}
+                          {p.condition&&<span style={{color:p.condition==="New"?"var(--green)":p.condition==="Used"?"var(--yellow)":"var(--blue)"}}>{p.condition}</span>}
+                          {p.location&&<span>📍 {p.location}</span>}
+                          <span>Qty: <strong>{p.quantity}</strong></span>
+                        </div>
+                      </div>
+                      <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
+                        <div style={{fontSize:14,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(p.price||0)}</div>
+                        <div style={{fontSize:10,color:already?"var(--blue)":"var(--green)",marginTop:2}}>{already?"✓ In order":"+ Add"}</div>
+                      </div>
+                    </div>
+                  );
+                })
+            }
+            {/* Pagination bar */}
+            {filteredParts.length>20&&(
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",borderTop:"1px solid var(--border)",background:"var(--surface)"}}>
+                <button className="btn btn-ghost btn-xs" disabled={partPage===0} onClick={()=>setPartPage(p=>p-1)}>← Prev</button>
+                <span style={{fontSize:12,color:"var(--text3)"}}>
+                  {partPage*20+1}–{Math.min(partPage*20+20, filteredParts.length)} of {filteredParts.length}
+                </span>
+                <button className="btn btn-ghost btn-xs" disabled={(partPage+1)*20>=filteredParts.length} onClick={()=>setPartPage(p=>p+1)}>Next →</button>
               </div>
-            ))}
-            {filteredParts.length===0&&<div style={{padding:20,textAlign:"center",color:"var(--text3)",fontSize:13}}>No parts in stock matching search</div>}
+            )}
           </div>
         </div>
 
@@ -377,12 +428,20 @@ function SyNewOrderModal({scrapId, syCustomers, scrapParts, settings, onSave, on
           <div style={{marginBottom:14}}>
             <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:6}}>ORDER ITEMS</div>
             {items.map(item=>(
-              <div key={item.partId} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid var(--border)"}}>
-                <div style={{flex:1,fontSize:13}}>{item.name}</div>
+              <div key={item.partId} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid var(--border)"}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600}}>{item.name}</div>
+                  {item.vehicle&&<div style={{fontSize:11,color:"var(--blue)"}}>🚗 {item.vehicle}</div>}
+                  <div style={{fontSize:11,color:"var(--text3)",display:"flex",gap:6}}>
+                    {item.partNumber&&<span>#{item.partNumber}</span>}
+                    {item.condition&&<span>{item.condition}</span>}
+                    {item.location&&<span>📍 {item.location}</span>}
+                  </div>
+                </div>
                 <input type="number" min="1" value={item.qty} onChange={e=>changeQty(item.partId,+e.target.value)}
-                  style={{width:56,background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--text)",borderRadius:6,padding:"4px 8px",fontSize:13,textAlign:"center"}}/>
-                <div style={{width:80,textAlign:"right",fontSize:13,fontWeight:600,color:"var(--accent)"}}>{fmtAmt((item.price||0)*item.qty)}</div>
-                <button onClick={()=>removeItem(item.partId)} style={{background:"none",border:"none",color:"var(--red)",cursor:"pointer",fontSize:18,lineHeight:1}}>✕</button>
+                  style={{width:52,background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--text)",borderRadius:6,padding:"4px 8px",fontSize:13,textAlign:"center",flexShrink:0}}/>
+                <div style={{width:76,textAlign:"right",fontSize:13,fontWeight:600,color:"var(--accent)",flexShrink:0}}>{fmtAmt((item.price||0)*item.qty)}</div>
+                <button onClick={()=>removeItem(item.partId)} style={{background:"none",border:"none",color:"var(--red)",cursor:"pointer",fontSize:18,lineHeight:1,flexShrink:0}}>✕</button>
               </div>
             ))}
             <div style={{marginTop:8,textAlign:"right"}}>
@@ -518,6 +577,137 @@ function SyReturnModal({scrapId, syInvoices, onSave, onClose}) {
   );
 }
 
+// ── Process Return Modal ──────────────────────────────────────────
+function SyProcessReturnModal({ret, syOrders, syInvoices, onSave, onClose}) {
+  const inv = syInvoices.find(i => i.id === ret.invoice_id);
+  const order = inv ? syOrders.find(o => o.id === inv.order_id) : null;
+  const invItems = order && Array.isArray(order.items) ? order.items : [];
+
+  // If the invoice was never paid, no money goes back — stock only
+  const stockOnly = !!(inv && inv.status !== "paid");
+
+  const [selected, setSelected] = useState(
+    invItems.length > 0
+      ? Object.fromEntries(invItems.map((_,i) => [i, false]))
+      : {}
+  );
+  const [method, setMethod] = useState("Cash");
+  const [amount, setAmount] = useState(stockOnly ? "0" : String(ret.total || ""));
+  const [saving, setSaving] = useState(false);
+
+  const toggle = (i) => setSelected(prev => ({...prev, [i]: !prev[i]}));
+
+  const save = async () => {
+    if (!stockOnly && (!amount || isNaN(+amount))) { alert("ENTER REFUND AMOUNT"); return; }
+    setSaving(true);
+
+    const itemsReturned = [];
+    for (const [idx, ticked] of Object.entries(selected)) {
+      if (!ticked) continue;
+      const item = invItems[+idx];
+      if (!item?.partId) continue;
+      const res = await api.get("scrapyard_parts", `id=eq.${item.partId}&select=id,quantity`).catch(() => []);
+      const part = Array.isArray(res) ? res[0] : null;
+      if (part != null) {
+        await api.patch("scrapyard_parts", "id", item.partId, {quantity: (part.quantity||0) + (item.qty||1)});
+      }
+      itemsReturned.push({partId: item.partId, name: item.name, qty: item.qty||1});
+    }
+
+    await onSave({
+      refund_at: new Date().toISOString(),
+      refund_method: stockOnly ? null : method,
+      refund_amount: stockOnly ? 0 : +amount,
+      items_returned: itemsReturned.length > 0 ? itemsReturned : null,
+      status: "refunded",
+    });
+    setSaving(false);
+  };
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" style={{maxWidth:480,width:"95%",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+          <h2 style={{fontSize:17,fontWeight:700}}>{stockOnly?"Return Stock":"Process Return"}</h2>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Stock-only notice */}
+        {stockOnly && (
+          <div style={{background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.35)",borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:13}}>
+            <div style={{fontWeight:700,color:"var(--yellow)",marginBottom:2}}>⚠ Invoice not paid — stock return only</div>
+            <div style={{color:"var(--text2)"}}>Invoice <strong>{inv.id}</strong> is <strong>{inv.status}</strong>. No money was received, so no refund is issued. Parts will be returned to inventory only.</div>
+          </div>
+        )}
+
+        {/* Return summary */}
+        <div className="card" style={{padding:12,marginBottom:14,background:"var(--surface2)"}}>
+          <div style={{fontWeight:700}}>{ret.customer_name||"—"}</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>Reason: {ret.reason}</div>
+          {inv && <div style={{fontSize:12,color:"var(--text3)"}}>Invoice: {inv.id} · {fmtAmt(inv.total)} · <strong style={{color:inv.status==="paid"?"var(--green)":"var(--orange)"}}>{inv.status}</strong></div>}
+        </div>
+
+        {/* Items to restore */}
+        {invItems.length > 0 && (
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:6}}>SELECT PARTS BEING RETURNED (stock will be restored)</div>
+            <div className="card" style={{padding:0,overflow:"hidden"}}>
+              {invItems.map((item,i) => {
+                const on = !!selected[i];
+                return (
+                  <div key={i} onClick={()=>toggle(i)}
+                    style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:on?"rgba(52,211,153,.07)":"transparent"}}>
+                    <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${on?"var(--green)":"var(--border)"}`,background:on?"var(--green)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:13,flexShrink:0}}>
+                      {on?"✓":""}
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{item.name}</div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>Qty: {item.qty}{item.location?` · 📍 ${item.location}`:""}</div>
+                    </div>
+                    <div style={{fontSize:13,fontWeight:600,color:"var(--text2)"}}>{fmtAmt((item.price||0)*item.qty)}</div>
+                  </div>
+                );
+              })}
+            </div>
+            {Object.values(selected).some(Boolean) && (
+              <div style={{fontSize:12,color:"var(--green)",marginTop:5}}>
+                ✓ {Object.values(selected).filter(Boolean).length} part(s) will be restored to stock
+              </div>
+            )}
+          </div>
+        )}
+
+        {invItems.length === 0 && (
+          <div style={{padding:"10px 0",fontSize:13,color:"var(--text3)",marginBottom:10}}>
+            No linked invoice items — stock will not be automatically restored.
+          </div>
+        )}
+
+        {/* Money refund fields — only shown when invoice was paid */}
+        {!stockOnly && (
+          <>
+            <FG label="Refund Method">
+              <select className="inp" value={method} onChange={e=>setMethod(e.target.value)}>
+                {["Cash","Card","EFT","Other"].map(m=><option key={m}>{m}</option>)}
+              </select>
+            </FG>
+            <FG label="Refund Amount *">
+              <input className="inp" type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00"/>
+            </FG>
+          </>
+        )}
+
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-success" onClick={save} disabled={saving}>
+            {saving ? "Processing…" : stockOnly ? "📦 Return Stock to Inventory" : "✅ Process Refund"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Customer Modal ────────────────────────────────────────────────
 function SyCustomerModal({scrapId, customer, onSave, onClose}) {
   const [f, setF] = useState({name:"",phone:"",email:"",address:"",...(customer||{})});
@@ -612,7 +802,7 @@ export function SyCustomersPage({scrapId, syCustomers, onRefresh, showToast}) {
   );
 }
 
-export function SyOrdersPage({scrapId, syOrders, syCustomers, scrapParts, syInvoices, onRefresh, showToast, settings}) {
+export function SyOrdersPage({scrapId, syOrders, syCustomers, scrapParts, scrapVehicles, syInvoices, onRefresh, showToast, settings}) {
   const [filterStatus, setFilterStatus] = useState("__all__");
   const [showNew, setShowNew] = useState(false);
   const [invoiceFor, setInvoiceFor] = useState(null);
@@ -705,7 +895,7 @@ export function SyOrdersPage({scrapId, syOrders, syCustomers, scrapParts, syInvo
             ))}
           </div>
       }
-      {showNew&&<SyNewOrderModal scrapId={scrapId} syCustomers={syCustomers} scrapParts={scrapParts} settings={settings} onSave={placeOrder} onClose={()=>setShowNew(false)}/>}
+      {showNew&&<SyNewOrderModal scrapId={scrapId} syCustomers={syCustomers} scrapParts={scrapParts} scrapVehicles={scrapVehicles||[]} settings={settings} onSave={placeOrder} onClose={()=>setShowNew(false)}/>}
       {invoiceFor&&<SyInvoiceModal order={invoiceFor} scrapId={scrapId} settings={settings} onSave={createInvoice} onClose={()=>setInvoiceFor(null)}/>}
       {paymentFor&&<SyPaymentModal invoice={paymentFor} onSave={recordPayment} onClose={()=>setPaymentFor(null)}/>}
     </div>
@@ -863,44 +1053,644 @@ export function SyPickingPage({scrapId, syOrders, scrapParts, onRefresh, showToa
   );
 }
 
-export function SyReturnsPage({scrapId, syReturns, syInvoices, onRefresh, showToast}) {
+export function SyGatePage({scrapId, syInvoices, syOrders, onRefresh, showToast, settings}) {
+  const [search, setSearch] = useState("");
+  const [selectedInv, setSelectedInv] = useState(null);
+  const [checked, setChecked] = useState({});
+  const [photo, setPhoto] = useState(null);
+  const [notes, setNotes] = useState("");
+  const [scanInput, setScanInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const pending = syInvoices.filter(inv => !inv.gate_checked_at);
+  const recent  = syInvoices.filter(inv =>  inv.gate_checked_at).slice(0,20);
+
+  const filteredPending = pending.filter(inv => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (inv.id||"").toLowerCase().includes(s)
+      || (inv.customer_name||"").toLowerCase().includes(s)
+      || (inv.customer_phone||"").includes(search);
+  });
+
+  const selectInv = (inv) => { setSelectedInv(inv); setChecked({}); setPhoto(null); setNotes(""); setScanInput(""); };
+
+  const getItems = (inv) => {
+    if (!inv) return [];
+    const order = syOrders.find(o => o.id === inv.order_id);
+    return order && Array.isArray(order.items) ? order.items : [];
+  };
+
+  const handlePhoto = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhoto(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleScan = (e) => {
+    if (e.key !== "Enter") return;
+    const val = scanInput.trim();
+    if (!val || !selectedInv) return;
+    const items = getItems(selectedInv);
+    const idx = items.findIndex(it =>
+      (it.partId||"").toLowerCase() === val.toLowerCase() ||
+      (it.name||"").toLowerCase() === val.toLowerCase()
+    );
+    if (idx >= 0) {
+      setChecked(prev => ({...prev, [idx]: true}));
+      showToast(`✅ ${items[idx].name} verified`);
+    } else {
+      showToast("Part not on this invoice","err");
+    }
+    setScanInput("");
+  };
+
+  const clearForExit = async () => {
+    if (!selectedInv) return;
+    setSaving(true);
+    await api.patch("sy_invoices","id",selectedInv.id,{
+      gate_checked_at: new Date().toISOString(),
+      gate_photo: photo || null,
+      gate_notes: notes || null,
+    });
+    showToast("✅ Gate check complete — cleared for exit");
+    setSaving(false);
+    setSelectedInv(null);
+    onRefresh();
+  };
+
+  const cur = curSym(settings?.currency||"ZAR R");
+  const fmt = n => `${cur}${(n||0).toLocaleString()}`;
+
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>🛡️ Security Gate Check</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{pending.length} pending</p>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={onRefresh}>🔄</button>
+      </div>
+
+      {!selectedInv ? (
+        <>
+          <input className="inp" placeholder="Search invoice ID, customer name or phone…"
+            value={search} onChange={e=>setSearch(e.target.value)} style={{marginBottom:16}}/>
+
+          {filteredPending.length===0
+            ? <div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>
+                {search?"No invoices match your search":"No pending gate checks"}
+              </div>
+            : <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {filteredPending.map(inv=>(
+                  <div key={inv.id} className="card"
+                    style={{padding:14,cursor:"pointer",borderLeft:`3px solid ${inv.status==="paid"?"var(--green)":"var(--accent)"}`}}
+                    onClick={()=>selectInv(inv)}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:15}}>{inv.customer_name}</div>
+                        <div style={{fontSize:12,color:"var(--text3)"}}>{inv.customer_phone}</div>
+                        <code style={{fontSize:10,color:"var(--text3)"}}>{inv.id}</code>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontWeight:800,fontSize:16,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.total)}</div>
+                        <StatusBadge status={inv.status}/>
+                        <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>{inv.invoice_date}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+          }
+
+          {recent.length>0&&(
+            <div style={{marginTop:28}}>
+              <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:10}}>RECENTLY CLEARED</div>
+              <div className="card" style={{overflow:"hidden"}}>
+                <div className="tbl-wrap">
+                  <table className="tbl">
+                    <thead><tr>{["Customer","Invoice #","Cleared At","Photo","Notes"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {recent.map(inv=>(
+                        <tr key={inv.id}>
+                          <td style={{fontWeight:600}}>{inv.customer_name}</td>
+                          <td><code style={{fontSize:11,color:"var(--text3)"}}>{inv.id}</code></td>
+                          <td style={{color:"var(--text3)",fontSize:12,whiteSpace:"nowrap"}}>{inv.gate_checked_at?new Date(inv.gate_checked_at).toLocaleString():"—"}</td>
+                          <td>{inv.gate_photo
+                            ? <img src={inv.gate_photo} alt="" style={{width:48,height:36,objectFit:"cover",borderRadius:4,cursor:"pointer"}} onClick={()=>window.open(inv.gate_photo,"_blank")}/>
+                            : <span style={{color:"var(--text3)",fontSize:12}}>—</span>}
+                          </td>
+                          <td style={{color:"var(--text2)",fontSize:12}}>{inv.gate_notes||"—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <button className="btn btn-ghost btn-sm" style={{marginBottom:14}} onClick={()=>setSelectedInv(null)}>← Back to list</button>
+
+          {/* Invoice summary */}
+          <div className="card" style={{padding:16,marginBottom:14,borderLeft:"3px solid var(--accent)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div>
+                <div style={{fontWeight:800,fontSize:17}}>{selectedInv.customer_name}</div>
+                <div style={{fontSize:13,color:"var(--text3)"}}>{selectedInv.customer_phone}</div>
+                <code style={{fontSize:11,color:"var(--text3)"}}>{selectedInv.id} · {selectedInv.invoice_date}</code>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontWeight:800,fontSize:20,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(selectedInv.total)}</div>
+                <StatusBadge status={selectedInv.status}/>
+              </div>
+            </div>
+          </div>
+
+          {/* Barcode / QR scan */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:6}}>SCAN PART QR / BARCODE</div>
+            <input className="inp" autoFocus
+              placeholder="Scan QR or type part name, then press Enter…"
+              value={scanInput} onChange={e=>setScanInput(e.target.value)} onKeyDown={handleScan}
+              style={{fontFamily:"DM Mono,monospace"}}/>
+          </div>
+
+          {/* Items checklist */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:6}}>VERIFY ITEMS</div>
+            <div className="card" style={{padding:0,overflow:"hidden"}}>
+              {getItems(selectedInv).length===0
+                ? <div style={{padding:20,textAlign:"center",color:"var(--text3)",fontSize:13}}>No items on this invoice</div>
+                : getItems(selectedInv).map((item,i)=>{
+                    const done = !!checked[i];
+                    return (
+                      <div key={i} onClick={()=>setChecked(prev=>({...prev,[i]:!done}))}
+                        style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:done?"rgba(52,211,153,.07)":"transparent"}}>
+                        <div style={{width:24,height:24,borderRadius:6,border:`2px solid ${done?"var(--green)":"var(--border)"}`,background:done?"var(--green)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,flexShrink:0}}>
+                          {done?"✓":""}
+                        </div>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:14,fontWeight:600,textDecoration:done?"line-through":"none",color:done?"var(--text3)":"var(--text)"}}>{item.name}</div>
+                          <div style={{fontSize:11,color:"var(--text3)"}}>Qty: {item.qty}{item.location?` · 📍 ${item.location}`:""}</div>
+                        </div>
+                        <div style={{fontSize:13,fontWeight:700,color:done?"var(--green)":"var(--text2)"}}>{fmt((item.price||0)*item.qty)}</div>
+                      </div>
+                    );
+                  })
+              }
+            </div>
+            <div style={{marginTop:6,textAlign:"right",fontSize:12,color:"var(--text3)"}}>
+              {Object.values(checked).filter(Boolean).length} / {getItems(selectedInv).length} items verified
+            </div>
+          </div>
+
+          {/* Photo capture */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:6}}>GATE PHOTO <span style={{color:"var(--red)",fontWeight:700}}>*</span></div>
+            {photo
+              ? <div style={{position:"relative",display:"inline-block"}}>
+                  <img src={photo} alt="Gate check" style={{maxWidth:"100%",maxHeight:260,borderRadius:8,border:"2px solid var(--green)"}}/>
+                  <button onClick={()=>setPhoto(null)} style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.6)",border:"none",color:"#fff",borderRadius:20,width:26,height:26,cursor:"pointer",fontSize:13}}>✕</button>
+                </div>
+              : <label style={{display:"flex",alignItems:"center",gap:12,padding:"16px 18px",border:"2px dashed var(--border)",borderRadius:8,cursor:"pointer",background:"var(--surface2)"}}>
+                  <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{display:"none"}}/>
+                  <span style={{fontSize:32}}>📷</span>
+                  <div>
+                    <div style={{fontWeight:600,fontSize:14}}>Take Gate Photo</div>
+                    <div style={{fontSize:12,color:"var(--text3)"}}>Capture goods / vehicle being released</div>
+                  </div>
+                </label>
+            }
+          </div>
+
+          {/* Guard notes */}
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:6}}>GUARD NOTES (optional)</div>
+            <textarea className="inp" rows={2} value={notes} onChange={e=>setNotes(e.target.value)}
+              placeholder="Guard name, vehicle reg, remarks…" style={{width:"100%"}}/>
+          </div>
+
+          <button className="btn btn-primary" disabled={saving||!photo} onClick={clearForExit}
+            style={{width:"100%",fontSize:16,fontWeight:800,padding:14,background:photo?"var(--green)":undefined}}>
+            {saving?"Saving…":`🛡️ CLEAR FOR EXIT${!photo?" (photo required)":""}`}
+          </button>
+          {getItems(selectedInv).length>0&&Object.values(checked).filter(Boolean).length<getItems(selectedInv).length&&(
+            <div style={{textAlign:"center",fontSize:12,color:"var(--orange)",marginTop:6}}>
+              ⚠️ Not all items ticked — review before clearing
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+export function SyReturnsPage({scrapId, syReturns, syInvoices, syOrders, onRefresh, showToast}) {
   const [showNew, setShowNew] = useState(false);
+  const [processRet, setProcessRet] = useState(null);
+
+  const pending   = syReturns.filter(r => r.status === "pending");
+  const refunded  = syReturns.filter(r => r.status === "refunded");
 
   const saveReturn = async (data) => {
-    await api.insert("sy_returns",data);
+    await api.insert("sy_returns", data);
     showToast("Return logged"); setShowNew(false); onRefresh();
+  };
+
+  const processRefund = async (updates) => {
+    await api.patch("sy_returns", "id", processRet.id, updates);
+    const stockMsg = updates.items_returned?.length > 0
+      ? ` · ${updates.items_returned.length} part(s) restored to stock` : "";
+    const moneyMsg = updates.refund_amount > 0 ? ` · ${fmtAmt(updates.refund_amount)} refunded` : "";
+    showToast(`✅ Return processed${moneyMsg}${stockMsg}`);
+    setProcessRet(null); onRefresh();
+  };
+
+  const ReturnRow = ({r}) => {
+    const linkedInv = syInvoices.find(i => i.id === r.invoice_id);
+    const isStockOnly = linkedInv && linkedInv.status !== "paid";
+    return (
+      <tr>
+        <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{r.id}</code></td>
+        <td style={{fontWeight:600}}>{r.customer_name||"—"}</td>
+        <td style={{color:"var(--text3)",whiteSpace:"nowrap"}}>{r.return_date}</td>
+        <td style={{fontSize:12,color:"var(--text3)"}}>{r.invoice_id||"—"}</td>
+        <td style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:15,color:"var(--accent)"}}>{fmtAmt(r.total||0)}</td>
+        <td style={{color:"var(--text2)",fontSize:13}}>{r.reason||"—"}</td>
+        <td>
+          {r.status==="refunded"
+            ? <div>
+                <StatusBadge status={r.refund_amount > 0 ? "refunded" : "stock returned"}/>
+                {r.refund_amount > 0
+                  ? <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>{r.refund_method} · {fmtAmt(r.refund_amount)}</div>
+                  : <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>No money — invoice unpaid</div>
+                }
+                {r.refund_at&&<div style={{fontSize:10,color:"var(--text3)"}}>{new Date(r.refund_at).toLocaleDateString()}</div>}
+                {Array.isArray(r.items_returned)&&r.items_returned.length>0&&(
+                  <div style={{fontSize:10,color:"var(--green)",marginTop:2}}>↑ {r.items_returned.length} part(s) restocked</div>
+                )}
+              </div>
+            : <button className="btn btn-success btn-xs" onClick={()=>setProcessRet(r)}>
+                {isStockOnly ? "📦 Return Stock" : "💳 Process Refund"}
+              </button>
+          }
+        </td>
+      </tr>
+    );
   };
 
   return (
     <div className="fu">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-        <div><h1 style={{fontSize:20,fontWeight:700}}>↩️ Returns</h1><p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{syReturns.length} returns</p></div>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>↩️ Returns</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
+            {pending.length} pending · {refunded.length} refunded
+          </p>
+        </div>
         <button className="btn btn-primary" onClick={()=>setShowNew(true)}>+ Log Return</button>
       </div>
-      {syReturns.length===0
-        ? <div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>No returns logged</div>
-        : <div className="card" style={{overflow:"hidden"}}>
+
+      {pending.length > 0 && (
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:12,fontWeight:700,color:"var(--orange)",marginBottom:8}}>⏳ PENDING REFUNDS ({pending.length})</div>
+          <div className="card" style={{overflow:"hidden"}}>
             <div className="tbl-wrap">
               <table className="tbl">
-                <thead><tr>{["Return #","Customer","Date","Invoice","Amount","Reason","Status"].map(h=><th key={h}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {syReturns.map(r=>(
-                    <tr key={r.id}>
-                      <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{r.id}</code></td>
-                      <td style={{fontWeight:600}}>{r.customer_name||"—"}</td>
-                      <td style={{color:"var(--text3)"}}>{r.return_date}</td>
-                      <td style={{fontSize:12,color:"var(--text3)"}}>{r.invoice_id||"—"}</td>
-                      <td style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:15,color:"var(--accent)"}}>{fmtAmt(r.total||0)}</td>
-                      <td style={{color:"var(--text2)",fontSize:13}}>{r.reason||"—"}</td>
-                      <td><StatusBadge status={r.status}/></td>
-                    </tr>
-                  ))}
-                </tbody>
+                <thead><tr>{["Return #","Customer","Date","Invoice","Amount","Reason","Action"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <tbody>{pending.map(r=><ReturnRow key={r.id} r={r}/>)}</tbody>
               </table>
             </div>
           </div>
-      }
-      {showNew&&<SyReturnModal scrapId={scrapId} syInvoices={syInvoices} onSave={saveReturn} onClose={()=>setShowNew(false)}/>}
+        </div>
+      )}
+
+      {refunded.length > 0 && (
+        <div>
+          <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:8}}>✅ COMPLETED REFUNDS ({refunded.length})</div>
+          <div className="card" style={{overflow:"hidden"}}>
+            <div className="tbl-wrap">
+              <table className="tbl">
+                <thead><tr>{["Return #","Customer","Date","Invoice","Amount","Reason","Refund Info"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <tbody>{refunded.map(r=><ReturnRow key={r.id} r={r}/>)}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {syReturns.length === 0 && (
+        <div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>No returns logged</div>
+      )}
+
+      {showNew && <SyReturnModal scrapId={scrapId} syInvoices={syInvoices} onSave={saveReturn} onClose={()=>setShowNew(false)}/>}
+      {processRet && <SyProcessReturnModal ret={processRet} syOrders={syOrders} syInvoices={syInvoices} onSave={processRefund} onClose={()=>setProcessRet(null)}/>}
+    </div>
+  );
+}
+
+// ── Shared stat card for dashboard ───────────────────────────────
+function SC({label, value, icon, color, sub, onClick}) {
+  return (
+    <div className="stat-card card card-hover" style={{"--gc":color+"20",cursor:onClick?"pointer":"default"}} onClick={onClick}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>{label}</div>
+          <div style={{fontSize:26,fontWeight:700,color,fontFamily:"Rajdhani,sans-serif",lineHeight:1}}>{value}</div>
+          {sub&&<div style={{fontSize:11,color:"var(--text3)",marginTop:5}}>{sub}</div>}
+        </div>
+        <div style={{fontSize:28,opacity:.75}}>{icon}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Scrapyard Dashboard ───────────────────────────────────────────
+export function SyDashboardPage({scrapVehicles, scrapParts, syOrders, syInvoices, syCustomers, syReturns, settings, onNavigate}) {
+  const todayStr  = today();
+  const monthStr  = todayStr.slice(0,7);
+  const cur = curSym(settings?.currency||"ZAR R");
+  const fmt = n => `${cur}${(n||0).toLocaleString()}`;
+
+  // ── KPI calculations ──────────────────────────────────────────
+  const paidInvoices   = syInvoices.filter(i=>i.status==="paid");
+  const unpaidInvoices = syInvoices.filter(i=>i.status==="unpaid");
+
+  const completedRefunds = syReturns.filter(r=>r.status==="refunded");
+
+  const refundAmt = (prefix) =>
+    completedRefunds
+      .filter(r=>(r.refund_at||"").startsWith(prefix))
+      .reduce((s,r)=>s+(r.refund_amount||r.total||0),0);
+
+  const monthRev   = paidInvoices
+    .filter(i=>(i.invoice_date||"").startsWith(monthStr))
+    .reduce((s,i)=>s+(i.paid_amount??i.total??0),0)
+    - refundAmt(monthStr);
+
+  const todayRev   = paidInvoices
+    .filter(i=>(i.paid_at||i.invoice_date||"").startsWith(todayStr))
+    .reduce((s,i)=>s+(i.paid_amount??i.total??0),0)
+    - refundAmt(todayStr);
+
+  const outstanding = unpaidInvoices.reduce((s,i)=>s+(i.total||0),0);
+  const totalRev    = paidInvoices.reduce((s,i)=>s+(i.paid_amount??i.total??0),0)
+    - completedRefunds.reduce((s,r)=>s+(r.refund_amount||r.total||0),0);
+
+  const pendingOrders  = syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted");
+  const readyToShip    = syOrders.filter(o=>o.status==="Ready to Ship");
+  const partsInStock   = scrapParts.filter(p=>(p.quantity||0)>0);
+  const lowStock       = scrapParts.filter(p=>(p.quantity||0)<=(p.min_qty||1));
+
+  // Only returns where the invoice was actually paid — unpaid invoice returns are stock-only, no money owed
+  const pendingRefunds = syReturns.filter(r => {
+    if (r.status !== "pending") return false;
+    if (!r.invoice_id) return true;
+    const inv = syInvoices.find(i => i.id === r.invoice_id);
+    return !inv || inv.status === "paid";
+  });
+  const pendingStockOnly = syReturns.filter(r => {
+    if (r.status !== "pending") return false;
+    if (!r.invoice_id) return false;
+    const inv = syInvoices.find(i => i.id === r.invoice_id);
+    return inv && inv.status !== "paid";
+  });
+
+  // ── 6-month revenue bar chart (net of refunds) ───────────────
+  const months6 = Array.from({length:6},(_,i)=>{
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth()-5+i);
+    const ms = d.toISOString().slice(0,7);
+    const gross = paidInvoices
+      .filter(inv=>(inv.invoice_date||"").startsWith(ms))
+      .reduce((s,inv)=>s+(inv.paid_amount??inv.total??0),0);
+    const refunds = refundAmt(ms);
+    return {label:d.toLocaleString("default",{month:"short"}), ms, rev: Math.max(0, gross - refunds)};
+  });
+  const maxRev = Math.max(...months6.map(m=>m.rev), 1);
+
+  // ── Vehicle status config ─────────────────────────────────────
+  const vStatuses = [
+    {s:"Available",  color:"var(--green)",  icon:"🟢"},
+    {s:"Stripping",  color:"var(--yellow)", icon:"🔧"},
+    {s:"Stripped",   color:"var(--blue)",   icon:"📦"},
+    {s:"Sold",       color:"var(--accent)", icon:"✅"},
+  ];
+
+  const orderPipeline = ["Processing","Quoted","Ready to Ship","Invoiced","Paid","Completed"];
+
+  const shopName = settings?.scrapyard_name||settings?.shop_name||"Scrapyard";
+
+  return (
+    <div className="fu">
+
+      {/* ── Header ── */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,flexWrap:"wrap",gap:10}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>📊 Dashboard</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{shopName} · {todayStr}</p>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {pendingOrders.length>0&&(
+            <div onClick={()=>onNavigate("sy_orders")} style={{background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:700,color:"var(--blue)"}}>
+              ⏳ {pendingOrders.length} pending order{pendingOrders.length!==1?"s":""}
+            </div>
+          )}
+          {pendingRefunds.length>0&&(
+            <div onClick={()=>onNavigate("sy_returns")} style={{background:"rgba(248,113,113,.12)",border:"1px solid rgba(248,113,113,.3)",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:700,color:"var(--red)"}}>
+              ↩️ {pendingRefunds.length} refund{pendingRefunds.length!==1?"s":""} pending
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Row 1: Primary KPIs ── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:14}}>
+        <SC label="Month Revenue"   value={fmt(monthRev)}         icon="💰" color="var(--green)"  sub={`Total all-time: ${fmt(totalRev)}`}/>
+        <SC label="Today's Sales"   value={fmt(todayRev)}         icon="🌅" color="var(--accent)" onClick={()=>onNavigate("sy_invoices")}/>
+        <SC label="Outstanding"     value={fmt(outstanding)}      icon="🧾" color="var(--yellow)" sub={`${unpaidInvoices.length} unpaid invoice${unpaidInvoices.length!==1?"s":""}`} onClick={()=>onNavigate("sy_invoices")}/>
+        <SC label="Pending Refunds" value={pendingRefunds.length} icon="💳" color={pendingRefunds.length>0?"var(--red)":"var(--text3)"} sub={pendingRefunds.length>0?`${fmt(pendingRefunds.reduce((s,r)=>s+(r.total||0),0))} to pay back`:pendingStockOnly.length>0?`${pendingStockOnly.length} stock-only pending`:"All clear"} onClick={()=>onNavigate("sy_returns")}/>
+      </div>
+
+      {/* ── Row 2: Operational KPIs ── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
+        <SC label="Pending Orders"  value={pendingOrders.length}  icon="⏳" color={pendingOrders.length>0?"var(--blue)":"var(--text3)"}  onClick={()=>onNavigate("sy_orders")}/>
+        <SC label="Ready to Ship"   value={readyToShip.length}    icon="🚚" color={readyToShip.length>0?"var(--green)":"var(--text3)"}   onClick={()=>onNavigate("sy_picking")}/>
+        <SC label="Parts In Stock"  value={partsInStock.length}   icon="📦" color="var(--blue)"  sub={`${scrapParts.length} total SKUs`} onClick={()=>onNavigate("sy_parts")}/>
+        <SC label="Low Stock"       value={lowStock.length}        icon="⚠️" color={lowStock.length>0?"var(--red)":"var(--green)"}        onClick={()=>onNavigate("sy_parts")}/>
+      </div>
+
+      {/* ── Row 3: Recent Invoices + Low Stock ── */}
+      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:16,marginBottom:16}}>
+
+        {/* Recent invoices */}
+        <div className="card" style={{padding:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em"}}>🧾 Recent Invoices</h3>
+            <button className="btn btn-ghost btn-xs" onClick={()=>onNavigate("sy_invoices")}>View all →</button>
+          </div>
+          {syInvoices.length===0
+            ? <p style={{color:"var(--text3)",fontSize:13}}>No invoices yet</p>
+            : syInvoices.slice(0,6).map(inv=>(
+                <div key={inv.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid var(--border)"}}>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:600}}>{inv.customer_name}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{inv.invoice_date} · <code style={{fontSize:10,opacity:.7}}>{inv.id}</code></div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <StatusBadge status={inv.status}/>
+                    <div style={{fontSize:14,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginTop:2}}>{fmt(inv.total)}</div>
+                  </div>
+                </div>
+              ))
+          }
+        </div>
+
+        {/* Right column: Low Stock + Pending Refunds stacked */}
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+
+          {/* Low stock */}
+          <div className="card" style={{padding:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}>
+              <h3 style={{fontSize:13,fontWeight:700,color:"var(--red)",textTransform:"uppercase",letterSpacing:".05em"}}>⚠ Low Stock</h3>
+              <button className="btn btn-ghost btn-xs" onClick={()=>onNavigate("sy_parts")}>Manage</button>
+            </div>
+            {lowStock.length===0
+              ? <p style={{color:"var(--green)",fontSize:13}}>✅ All stock levels OK</p>
+              : lowStock.slice(0,6).map(p=>(
+                  <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--border)"}}>
+                    <div style={{fontSize:13,fontWeight:500,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                    <span className="badge" style={{background:"rgba(248,113,113,.12)",color:"var(--red)",marginLeft:8,flexShrink:0}}>{p.quantity}</span>
+                  </div>
+                ))
+            }
+          </div>
+
+          {/* Pending refunds — money owed */}
+          <div className="card" style={{padding:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}>
+              <h3 style={{fontSize:13,fontWeight:700,color:"var(--orange)",textTransform:"uppercase",letterSpacing:".05em"}}>💳 Pending Refunds</h3>
+              <button className="btn btn-ghost btn-xs" onClick={()=>onNavigate("sy_returns")}>Process →</button>
+            </div>
+            {pendingRefunds.length===0
+              ? <p style={{color:"var(--green)",fontSize:13}}>✅ No money refunds outstanding</p>
+              : <>
+                  {pendingRefunds.slice(0,5).map(r=>(
+                    <div key={r.id} style={{padding:"8px 0",borderBottom:"1px solid var(--border)"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div style={{fontSize:13,fontWeight:600,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.customer_name||"—"}</div>
+                        <span style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:14,color:"var(--red)",marginLeft:8,flexShrink:0}}>{fmt(r.total||0)}</span>
+                      </div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{r.reason} · {r.return_date}</div>
+                    </div>
+                  ))}
+                  <div style={{marginTop:10,display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:8,borderTop:"1px solid var(--border)"}}>
+                    <span style={{fontSize:12,color:"var(--text3)"}}>Total to refund</span>
+                    <span style={{fontWeight:800,fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"var(--red)"}}>
+                      {fmt(pendingRefunds.reduce((s,r)=>s+(r.total||0),0))}
+                    </span>
+                  </div>
+                </>
+            }
+            {pendingStockOnly.length>0&&(
+              <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid var(--border)"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:6}}>📦 STOCK RETURNS ONLY ({pendingStockOnly.length})</div>
+                {pendingStockOnly.map(r=>(
+                  <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",fontSize:12}}>
+                    <span style={{color:"var(--text2)"}}>{r.customer_name||"—"}</span>
+                    <span style={{color:"var(--text3)"}}>No refund · invoice unpaid</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── Row 4: Vehicle Status + Order Pipeline ── */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+
+        {/* Vehicle status */}
+        <div className="card" style={{padding:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em"}}>🚗 Vehicle Status</h3>
+            <button className="btn btn-ghost btn-xs" onClick={()=>onNavigate("sy_vehicles")}>View all →</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {vStatuses.map(({s,color,icon})=>{
+              const cnt = scrapVehicles.filter(v=>v.status===s).length;
+              return (
+                <div key={s} onClick={()=>onNavigate("sy_vehicles")}
+                  style={{background:"var(--surface2)",borderRadius:10,padding:"14px 16px",border:`1px solid ${color}33`,cursor:"pointer"}}>
+                  <div style={{fontSize:24,fontWeight:700,color,fontFamily:"Rajdhani,sans-serif",lineHeight:1}}>{cnt}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>{icon} {s}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{marginTop:12,fontSize:12,color:"var(--text3)",textAlign:"right"}}>{scrapVehicles.length} total vehicles · {syCustomers.length} customers</div>
+        </div>
+
+        {/* Order pipeline */}
+        <div className="card" style={{padding:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em"}}>📋 Order Pipeline</h3>
+            <button className="btn btn-ghost btn-xs" onClick={()=>onNavigate("sy_orders")}>View all →</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+            {orderPipeline.map(s=>{
+              const cnt = syOrders.filter(o=>o.status===s).length;
+              return (
+                <div key={s} onClick={()=>onNavigate("sy_orders")}
+                  style={{background:"var(--surface2)",borderRadius:10,padding:"12px 8px",border:`1px solid ${OC[s]||"#64748b"}33`,cursor:"pointer",textAlign:"center"}}>
+                  <div style={{fontSize:22,fontWeight:700,color:OC[s]||"var(--text)",fontFamily:"Rajdhani,sans-serif",lineHeight:1}}>{cnt}</div>
+                  <div style={{fontSize:10,color:"var(--text3)",marginTop:4,lineHeight:1.3}}>{s}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{marginTop:12,fontSize:12,color:"var(--text3)",textAlign:"right"}}>{syOrders.length} total orders</div>
+        </div>
+      </div>
+
+      {/* ── Row 5: 6-month revenue bar chart ── */}
+      <div className="card" style={{padding:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em"}}>📈 Monthly Revenue</h3>
+          <span style={{fontSize:12,color:"var(--text3)"}}>Last 6 months</span>
+        </div>
+        <div style={{display:"flex",alignItems:"flex-end",gap:8,height:110}}>
+          {months6.map(m=>{
+            const barH = m.rev > 0 ? Math.max(8, Math.round((m.rev/maxRev)*84)) : 3;
+            const isCurrent = m.ms === monthStr;
+            return (
+              <div key={m.ms} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
+                <div style={{fontSize:10,color:isCurrent?"var(--accent)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:isCurrent?700:400,whiteSpace:"nowrap"}}>
+                  {m.rev>0?fmt(m.rev):""}
+                </div>
+                <div style={{
+                  width:"100%", height:barH,
+                  background: isCurrent ? "var(--accent)" : "var(--surface2)",
+                  border: `1px solid ${isCurrent?"var(--accent)":"var(--border)"}`,
+                  borderRadius:"5px 5px 0 0",
+                }}/>
+                <div style={{fontSize:11,color:isCurrent?"var(--accent)":"var(--text3)",fontWeight:isCurrent?700:400}}>{m.label}</div>
+              </div>
+            );
+          })}
+        </div>
+        {months6.every(m=>m.rev===0)&&(
+          <p style={{textAlign:"center",color:"var(--text3)",fontSize:13,marginTop:8}}>No paid invoices yet — data will appear here as you record payments</p>
+        )}
+      </div>
+
     </div>
   );
 }

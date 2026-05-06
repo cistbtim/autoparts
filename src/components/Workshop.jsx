@@ -2711,6 +2711,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   useEffect(()=>{ setNoteVal(job.notes||""); },[job.notes]);
   const [pendingPayModal, setPendingPayModal] = useState(false);
   const [showLabelModal,  setShowLabelModal]  = useState(false);
+  const [quoteExcluded,   setQuoteExcluded]   = useState(()=>new Set());
   useEffect(()=>{ if(pendingPayModal&&invoice){ setPendingPayModal(false); setPaymentModal(true); } },[invoice,pendingPayModal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
@@ -3024,6 +3025,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const tax      = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
   const total    = subtotal+tax;
+  const quoteItems    = items.filter(i=>!quoteExcluded.has(i.id));
+  const quoteSubtotal = quoteItems.reduce((s,i)=>s+(+i.total||0),0);
+  const quoteTax      = settings.vat_number ? quoteSubtotal*(settings.tax_rate||0)/100 : 0;
+  const quoteTotal    = quoteSubtotal+quoteTax;
 
   const JOB_STATUSES = ["Pending","In Progress","Done","Delivered"];
   const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
@@ -4018,7 +4023,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
           </div>
         )}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <div style={{fontWeight:700,fontSize:14}}>🔧 {t.wsqtPartsLabour}</div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{fontWeight:700,fontSize:14}}>🔧 {t.wsqtPartsLabour}</div>
+            {items.length>0&&(
+              <span style={{fontSize:11,color:"var(--text3)"}}>
+                ({quoteItems.length}/{items.length} for quote
+                {quoteExcluded.size>0&&<>
+                  {" · "}<span onClick={()=>setQuoteExcluded(new Set())} style={{color:"var(--accent)",cursor:"pointer",textDecoration:"underline"}}>select all</span>
+                </>})
+              </span>
+            )}
+          </div>
           <div style={{display:"flex",gap:6}}>
             <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ {t.wsqtPart}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ {t.wsqtLabour}</button>
@@ -4048,8 +4063,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                       borderLeft:`3px solid ${accentColor}`,
                       background:idx%2===0?"var(--surface2)":"var(--surface)",
                     }}>
-                      {/* Top row: badge + name + delete */}
+                      {/* Top row: checkbox + badge + name + delete */}
                       <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:6}}>
+                        <input type="checkbox" checked={!quoteExcluded.has(item.id)}
+                          onChange={()=>setQuoteExcluded(prev=>{const n=new Set(prev);n.has(item.id)?n.delete(item.id):n.add(item.id);return n;})}
+                          style={{marginTop:3,flexShrink:0,accentColor:accentColor,width:15,height:15,cursor:"pointer"}}/>
                         <span className="badge" style={{flexShrink:0,background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)",fontSize:11}}>
                           {item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}
                         </span>
@@ -4142,13 +4160,18 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
             ) : (
               /* ── Desktop table ── */
               <table className="tbl" style={{width:"100%"}}>
-                <thead><tr>{[t.wsqtType,t.wsqPdfDescription,t.qty,t.unitPrice,t.total,""].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{["",t.wsqtType,t.wsqPdfDescription,t.qty,t.unitPrice,t.total,""].map(h=><th key={h}>{h}</th>)}</tr></thead>
                 <tbody>
                   {items.map(item=>{
                     const supCosts = getSupCosts(item.description);
                     const isEditing = editPriceId === item.id;
                     return (
-                    <tr key={item.id}>
+                    <tr key={item.id} style={{opacity:quoteExcluded.has(item.id)?0.5:1}}>
+                      <td style={{width:32,textAlign:"center"}}>
+                        <input type="checkbox" checked={!quoteExcluded.has(item.id)}
+                          onChange={()=>setQuoteExcluded(prev=>{const n=new Set(prev);n.has(item.id)?n.delete(item.id):n.add(item.id);return n;})}
+                          style={{cursor:"pointer",accentColor:item.type==="part"?"var(--blue)":"var(--green)"}}/>
+                      </td>
                       <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}</span></td>
                       <td style={{fontWeight:500}}>
                         {item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
@@ -4719,7 +4742,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
       {/* Create/Edit quote modal */}
       {quoteModal&&(
         <WsQuoteModal
-          job={job} items={items} subtotal={subtotal} tax={tax} total={total}
+          job={job} items={quoteItems} subtotal={quoteSubtotal} tax={quoteTax} total={quoteTotal}
           existing={quote} settings={settings}
           wsSupplierQuotes={wsSupplierQuotes}
           onSave={async(q)=>{ await onSaveQuote(q); setQuoteModal(false); }}

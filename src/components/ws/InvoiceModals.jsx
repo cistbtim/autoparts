@@ -4,9 +4,15 @@ import { fmtAmt } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 import { printWorkshopInvoice, printWorkshopQuote } from "./Print.jsx";
 
-export function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,wsSupplierQuotes=[],onSave,onClose}) {
+export function WsQuoteModal({job,items,subtotal:_subtotal,tax:_tax,total:_total,existing,settings,wsSupplierQuotes=[],onSave,onClose}) {
   const C=curSym(settings.currency||getSettings().currency);
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const [selectedIds,setSelectedIds]=useState(()=>new Set(items.map(i=>i.id)));
+  const toggleItem=id=>setSelectedIds(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
+  const selItems=items.filter(i=>selectedIds.has(i.id));
+  const selSubtotal=selItems.reduce((s,i)=>s+(+i.total||0),0);
+  const selTax=settings.vat_number?selSubtotal*(settings.tax_rate||0)/100:0;
+  const selTotal=selSubtotal+selTax;
   const [f,setF]=useState({
     id:existing?.id||null,
     job_id:job.id,
@@ -16,7 +22,6 @@ export function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,wsS
     quote_date:existing?.quote_date||job.date_in||new Date().toISOString().slice(0,10),
     valid_until:existing?.valid_until||"",
     notes:existing?.notes||"",
-    subtotal,tax,total,
     status:existing?.status||"draft",
   });
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -88,25 +93,34 @@ export function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,wsS
 
       {/* Items summary */}
       <div className="card" style={{padding:14,marginBottom:14,background:"var(--surface2)"}}>
-        <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>🔧 {job.vehicle_reg} · {items.length} item{items.length!==1?"s":""}</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+          <div style={{fontWeight:700,fontSize:13}}>🔧 {job.vehicle_reg} · {selItems.length}/{items.length} item{items.length!==1?"s":""}</div>
+          {selItems.length<items.length&&(
+            <button className="btn btn-ghost btn-xs" onClick={()=>setSelectedIds(new Set(items.map(i=>i.id)))}>select all</button>
+          )}
+        </div>
         <table className="tbl" style={{width:"100%"}}>
-          <thead><tr>{["Type","Description","Qty","Price","Total"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <thead><tr><th style={{width:28}}></th>{["Type","Description","Qty","Price","Total"].map(h=><th key={h}>{h}</th>)}</tr></thead>
           <tbody>
-            {items.map(i=>(
-              <tr key={i.id}>
-                <td><span className="badge" style={{background:i.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:i.type==="part"?"var(--blue)":"var(--green)",fontSize:10}}>{i.type==="part"?"🔩":"👷"}</span></td>
-                <td>{i.description}</td>
-                <td style={{textAlign:"right"}}>{i.qty}</td>
-                <td style={{textAlign:"right"}}>{fmt(i.unit_price)}</td>
-                <td style={{textAlign:"right",fontWeight:700}}>{fmt(i.total)}</td>
-              </tr>
-            ))}
+            {items.map(i=>{
+              const checked=selectedIds.has(i.id);
+              return (
+                <tr key={i.id} style={{opacity:checked?1:0.4,cursor:"pointer"}} onClick={()=>toggleItem(i.id)}>
+                  <td><input type="checkbox" checked={checked} onChange={()=>toggleItem(i.id)} onClick={e=>e.stopPropagation()} style={{cursor:"pointer"}}/></td>
+                  <td><span className="badge" style={{background:i.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:i.type==="part"?"var(--blue)":"var(--green)",fontSize:10}}>{i.type==="part"?"🔩":"👷"}</span></td>
+                  <td style={{textDecoration:checked?"none":"line-through"}}>{i.description}</td>
+                  <td style={{textAlign:"right"}}>{i.qty}</td>
+                  <td style={{textAlign:"right"}}>{fmt(i.unit_price)}</td>
+                  <td style={{textAlign:"right",fontWeight:700}}>{fmt(i.total)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
-          <div style={{fontSize:13,color:"var(--text3)"}}>Subtotal: <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(subtotal)}</strong></div>
-          {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(tax)}</strong></div>}
-          <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>Total: {fmt(total)}</div>
+          <div style={{fontSize:13,color:"var(--text3)"}}>Subtotal: <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(selSubtotal)}</strong></div>
+          {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(selTax)}</strong></div>}
+          <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>Total: {fmt(selTotal)}</div>
         </div>
       </div>
 
@@ -118,18 +132,19 @@ export function WsQuoteModal({job,items,subtotal,tax,total,existing,settings,wsS
 
       <div style={{display:"flex",gap:10,marginTop:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-        <button className="btn btn-ghost" style={{flex:1}} disabled={saving||items.length===0} onClick={async()=>{
+        <button className="btn btn-ghost" style={{flex:1}} disabled={saving||selItems.length===0} onClick={async()=>{
           setSaving(true);
-          try{ await onSave({...f}); printWorkshopQuote(job,items,{...f},settings); }catch(e){alert(e.message);}
+          const q={...f,subtotal:selSubtotal,tax:selTax,total:selTotal};
+          try{ await onSave(q); printWorkshopQuote(job,selItems,q,settings); }catch(e){alert(e.message);}
           finally{setSaving(false);}
         }}>💾 Save &amp; Print</button>
-        <button className="btn btn-primary" style={{flex:1}} disabled={saving||items.length===0} onClick={async()=>{
+        <button className="btn btn-primary" style={{flex:1}} disabled={saving||selItems.length===0} onClick={async()=>{
           setSaving(true);
-          try{ await onSave({...f}); }catch(e){alert(e.message);}
+          try{ await onSave({...f,subtotal:selSubtotal,tax:selTax,total:selTotal}); }catch(e){alert(e.message);}
           finally{setSaving(false);}
         }}>{saving?"Saving...":(existing?"💾 Save":"📝 Create Quote")}</button>
       </div>
-      {items.length===0&&<p style={{color:"var(--red)",fontSize:12,marginTop:8,textAlign:"center"}}>Add parts or labour items before creating a quote.</p>}
+      {selItems.length===0&&<p style={{color:"var(--red)",fontSize:12,marginTop:8,textAlign:"center"}}>{items.length===0?"Add parts or labour items before creating a quote.":"Select at least one item to include in the quote."}</p>}
     </Overlay>
   );
 }

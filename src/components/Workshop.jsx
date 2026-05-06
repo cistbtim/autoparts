@@ -2952,7 +2952,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
       if(result.success){
         // Save URL to DB
         const rec={id:makeId("PH"),job_id:job.id,url:result.url,folder_path:folderPath};
-        await api.insert("workshop_job_photos",rec);
+        const dbRes=await api.insert("workshop_job_photos",rec);
+        if(dbRes&&!Array.isArray(dbRes)&&dbRes.code){
+          throw new Error(`DB save failed: ${dbRes.message||dbRes.code}`);
+        }
         setSavedPhotos(p=>[...p,rec]);
         setUploadStatus("done",{url:result.url});
       } else {

@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session Start Rule
+
+**At the very start of every new conversation, always run `git pull` automatically before doing anything else — even if the user has not asked for it.**
+
 ## Commands
 
 ```bash

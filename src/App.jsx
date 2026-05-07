@@ -2093,22 +2093,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   if(loading) return (
     <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <style>{CSS}</style>
-      <div style={{textAlign:"center",minWidth:320}}>
-        <div style={{fontSize:32,animation:"spin 1s linear infinite",display:"inline-block",marginBottom:12}}>⚙</div>
-        <div style={{color:"var(--accent)",fontSize:15,fontWeight:700,marginBottom:18}}>{t.connecting}</div>
-        <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 18px",border:"1px solid var(--border)",textAlign:"left"}}>
-          {loadingItems.map(item=>(
-            <div key={item.label} style={{display:"flex",alignItems:"center",gap:10,padding:"4px 0",fontFamily:"DM Mono,monospace",fontSize:12}}>
-              <span style={{fontSize:14,width:18,textAlign:"center"}}>
-                {item.status==='loading'?'⏳':item.status==='cached'?'⚡':'✅'}
-              </span>
-              <span style={{flex:1,color:"var(--text2)"}}>{item.label}</span>
-              {item.ms!=null&&<span style={{color:item.status==='cached'?"var(--green)":item.ms>1000?"var(--red)":item.ms>300?"var(--yellow)":"var(--text3)",fontWeight:600}}>{item.ms}ms</span>}
-              {item.rows!=null&&<span style={{color:"var(--text3)",marginLeft:4}}>{item.rows.toLocaleString()} rows</span>}
-            </div>
-          ))}
-          {loadingItems.length===0&&<div style={{color:"var(--text3)",fontSize:12}}>Connecting…</div>}
+      <div style={{textAlign:"center"}}>
+        {/* Racing track */}
+        <div style={{position:"relative",width:260,height:64,margin:"0 auto 22px",overflow:"hidden"}}>
+          {/* Road */}
+          <div style={{position:"absolute",bottom:0,left:0,right:0,height:28,background:"#1c1c2e",borderRadius:8}}/>
+          {/* Scrolling dashes */}
+          <div style={{position:"absolute",bottom:11,left:0,display:"flex",gap:10,animation:"roadScroll .6s linear infinite"}}>
+            {Array.from({length:9}).map((_,i)=>(
+              <div key={i} style={{width:22,height:5,background:"rgba(255,255,255,.22)",borderRadius:2,flexShrink:0}}/>
+            ))}
+          </div>
+          {/* Racing car */}
+          <div style={{position:"absolute",bottom:20,left:0,fontSize:30,animation:"raceCar 1.4s linear infinite",lineHeight:1}}>🏎️</div>
         </div>
+        <div style={{color:"var(--accent)",fontSize:15,fontWeight:700,letterSpacing:.3}}>{t.connecting}</div>
       </div>
     </div>
   );
@@ -2391,11 +2390,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
       {/* MAIN CONTENT */}
       <main className="main-content" style={{marginLeft:240,padding:26,minHeight:"100vh"}}>
-        {/* Background loading banner — shows which tables are still fetching */}
-        {bgLoading>0&&<div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.25)",borderRadius:8,padding:"7px 14px",marginBottom:14,fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--blue)"}}>
-          <span style={{animation:"spin 1s linear infinite",display:"inline-block"}}>⚙</span>
-          <span>Loading background data: <strong>{bgLoading}</strong> tables remaining…</span>
-        </div>}
 
         {/* ── DASHBOARD ── */}
         {tab==="dashboard"&&role==="admin"&&(

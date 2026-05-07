@@ -94,6 +94,8 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 @keyframes slideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
 
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes raceCar{0%{transform:translateX(-60px)}100%{transform:translateX(300px)}}
+@keyframes roadScroll{from{transform:translateX(0)}to{transform:translateX(-56px)}}
 .fu{animation:fadeUp .2s ease}
 .cp-btn{background:none;border:1px solid var(--border);border-radius:5px;color:var(--text3);cursor:pointer;font-size:11px;padding:2px 7px;font-family:"DM Sans",sans-serif;transition:all .18s;white-space:nowrap;flex-shrink:0}
 .cp-btn:hover{background:var(--surface3);color:var(--text)}

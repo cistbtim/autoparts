@@ -105,6 +105,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [loading,setLoading]=useState(true);
   const [loadingItems,setLoadingItems]=useState([]);  // per-table timing for loading screen
   const [bgLoading,setBgLoading]=useState(0);         // count of background tables still fetching
+  const [partsLoading,setPartsLoading]=useState(false); // true while background-fetching remaining parts pages
   const [cart,setCart]=useState([]);
   // Filters
   const [searchPart,setSearchPart]=useState("");
@@ -329,12 +330,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
     // Background load remaining parts pages (only when cache was cold)
     if(!cachedParts){
+      setPartsLoading(true);
       api.loadRest("parts",PARTS_Q,partsFirst.length,(extra)=>{
         setParts([...partsFirst,...extra]);
       }).then(extra=>{
         const full=[...partsFirst,...extra];
         setParts(full);
         api.cacheSet("parts",PARTS_Q,full); // cache full dataset for next load
+        setPartsLoading(false);
       });
     }
 
@@ -473,13 +476,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
   // Lazy load part_suppliers — only when inventory or suppliers tab is opened
   const psLoadedRef=useRef(false);
+  const [psLoading,setPsLoading]=useState(false);
   const loadPartSuppliers=useCallback(async()=>{
+    if(psLoadedRef.current) return;
+    setPsLoading(true);
     const data=await api.get("part_suppliers","select=*");
     setPartSuppliers(Array.isArray(data)?data:[]);
     psLoadedRef.current=true;
+    setPsLoading(false);
   },[]);
   useEffect(()=>{
-    if((tab==="inventory"||tab==="suppliers")&&!psLoadedRef.current) loadPartSuppliers();
+    if(tab==="inventory"||tab==="suppliers") loadPartSuppliers();
   },[tab,loadPartSuppliers]);
 
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
@@ -595,6 +602,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     tabRef.current === "wsstatement" ||
     tabRef.current === "wsreport" ||
     tabRef.current === "suppliers" ||   // always pause on suppliers
+    tabRef.current === "shop" ||        // manual refresh only on shop
+    tabRef.current === "inventory" ||   // manual refresh only on inventory
     tabRef.current === "settings" ||    // always pause on settings page
     tabRef.current === "wsprofile" ||   // always pause on workshop profile/settings
     (Date.now() - lastActivityRef.current) < 8000;
@@ -668,6 +677,27 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   // Orders
   const placeOrder=async(form)=>{
     if(!form.name||!form.phone){showToast("Fill name & phone","err");return;}
+
+    // Check latest stock & price before confirming
+    const ids=cart.map(i=>i.id).join(",");
+    const freshParts=await api.getFirst("parts",`id=in.(${ids})&select=id,name,price,stock`,500);
+    if(Array.isArray(freshParts)&&freshParts.length>0){
+      const stockIssues=[];
+      const priceChanges=[];
+      for(const item of cart){
+        const fp=freshParts.find(p=>String(p.id)===String(item.id));
+        if(!fp) continue;
+        if((fp.stock??0)<item.qty) stockIssues.push(`${item.name} (only ${fp.stock??0} left)`);
+        else if(fp.price!==item.price) priceChanges.push({id:item.id,newPrice:fp.price,name:item.name,oldPrice:item.price});
+      }
+      if(stockIssues.length>0){showToast(`Not enough stock: ${stockIssues.join("; ")}`,"err");return;}
+      if(priceChanges.length>0){
+        setCart(prev=>prev.map(i=>{const ch=priceChanges.find(c=>String(c.id)===String(i.id));return ch?{...i,price:ch.newPrice}:i;}));
+        showToast(`Prices updated — please review and confirm`,"err");
+        return;
+      }
+    }
+
     const oid=makeId("ORD");
     const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",items:cart.map(i=>({partId:i.id,qty:i.qty,name:i.name,price:i.price})),total:cartTotal};
     await api.upsert("orders",orderObj);
@@ -2444,13 +2474,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               </div>
             )}
             <PH title={t.inventory} subtitle={`${parts.length} parts · ${lowStock.length} low`}
-              action={role==="admin"&&<button className="btn btn-primary" onClick={()=>openM("editPart")}>+ {t.addPart}</button>}/>
+              action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <button className="btn btn-ghost btn-sm" onClick={loadAll} title="Refresh inventory">↻ Refresh</button>
+                {role==="admin"&&<button className="btn btn-primary" onClick={()=>openM("editPart")}>+ {t.addPart}</button>}
+              </div>}/>
+            {partsLoading&&<div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.3)",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:"var(--yellow)"}}>
+              <span style={{animation:"spin 1s linear infinite",display:"inline-block",fontSize:14}}>⟳</span>
+              <span>Loading full inventory… showing first {parts.length} parts. Search is limited until complete.</span>
+            </div>}
             <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
               <div style={{position:"relative",flex:"1 1 220px",maxWidth:340}}>
                 <input className="inp" type="text"
-                  placeholder="Search SKU, name, make, OE... (multi-word OK)"
-                  value={searchPart} onChange={e=>setSearchPart(e.target.value)}
-                  style={{paddingRight:searchPart?34:14}}/>
+                  placeholder={partsLoading?"Loading inventory — search available shortly…":"Search SKU, name, make, OE... (multi-word OK)"}
+                  value={searchPart} onChange={e=>{ if(!partsLoading) setSearchPart(e.target.value); }}
+                  disabled={partsLoading}
+                  style={{paddingRight:searchPart?34:14,opacity:partsLoading?0.5:1,cursor:partsLoading?"not-allowed":"text"}}/>
                 {searchPart&&(
                   <button onClick={()=>setSearchPart("")}
                     style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",
@@ -2894,10 +2932,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               marginLeft:-26, marginRight:-26, paddingLeft:26, paddingRight:26,
               borderBottom:"1px solid var(--border)",
             }}>
+              {partsLoading&&<div style={{width:"100%",display:"flex",alignItems:"center",gap:8,background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.35)",borderRadius:7,padding:"6px 12px",marginBottom:6,fontSize:12,color:"var(--yellow)"}}>
+                <span style={{animation:"spin 1s linear infinite",display:"inline-block"}}>⟳</span>
+                <span>Loading full catalogue… {parts.length} parts so far. Search available shortly.</span>
+              </div>}
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 <div style={{position:"relative",flex:"1 1 180px",maxWidth:280}}>
-                  <input className="inp" type="text" placeholder="Search parts..." value={searchPart} onChange={e=>setSearchPart(e.target.value)} style={{paddingRight:36}}/>
-                  {searchPart&&<button onClick={()=>setSearchPart("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16,lineHeight:1,padding:2}}>✕</button>}
+                  <input className="inp" type="text"
+                    placeholder={partsLoading?"Loading…":"Search parts..."}
+                    value={searchPart}
+                    onChange={e=>{ if(!partsLoading) setSearchPart(e.target.value); }}
+                    disabled={partsLoading}
+                    style={{paddingRight:36,opacity:partsLoading?0.5:1,cursor:partsLoading?"not-allowed":"text"}}/>
+                  {searchPart&&!partsLoading&&<button onClick={()=>setSearchPart("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16,lineHeight:1,padding:2}}>✕</button>}
                 </div>
                 <select className="inp" value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{width:140}}>
                   <option value="__all__">All Categories</option>
@@ -2906,6 +2953,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 {(searchPart||filterCat!=="__all__")&&(
                   <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");}} style={{color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear</button>
                 )}
+                <button className="btn btn-ghost btn-sm" onClick={loadAll} title="Refresh stock & prices" style={{flexShrink:0}}>↻</button>
                 {isDemo
                   ? <span style={{marginLeft:"auto",flexShrink:0,fontSize:12,color:"var(--text3)",padding:"6px 12px",border:"1px solid var(--border)",borderRadius:8}}>🔒 Demo — orders disabled</span>
                   : <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}}
@@ -3207,14 +3255,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                   <div key={s.id} className="card card-hover" style={{padding:20}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
                       <div><div style={{fontSize:15,fontWeight:700}}>{s.name}</div><div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>📍 {s.country||"—"}</div></div>
-                      <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",cursor:"pointer"}} onClick={()=>openM("supplierParts",s)}>{linked.length} parts</span>
+                      <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",cursor:psLoading?"wait":"pointer"}} onClick={async()=>{await loadPartSuppliers();openM("supplierParts",s);}}>{psLoading?"…":linked.length} parts</span>
                     </div>
                     {s.contact_person&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:2}}>👤 {s.contact_person}</div>}
                     {s.email&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:2}}>✉ {s.email}</div>}
                     {s.phone&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:12}}>📞 {s.phone}</div>}
                     <div style={{display:"flex",gap:7,marginTop:6}}>
                       <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>openM("editSupplier",s)}>{t.edit}</button>
-                      <button className="btn btn-danger btn-sm" disabled={linked.length>0} title={linked.length>0?"Remove all linked parts first":undefined} onClick={()=>deleteSupplier(s.id)}>{t.delete}</button>
+                      <button className="btn btn-danger btn-sm" disabled={psLoading||linked.length>0} title={psLoading?"Loading parts…":linked.length>0?"Remove all linked parts first":undefined} onClick={()=>deleteSupplier(s.id)}>{t.delete}</button>
                     </div>
                   </div>
                 );

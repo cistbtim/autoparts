@@ -4079,7 +4079,10 @@ Current: ${item.system_qty}`,item.system_qty));if(!isNaN(n)&&n>=0){onAdjustItem(
   );
 }
 
-export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMany, onClose }) {
+export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMany, onGoInventory, onClose }) {
+  // Snapshot on mount so background loadAll() refreshes don't disturb the list while browsing
+  const [rows] = useState(() => partSuppliers);
+  const [partsSnap] = useState(() => parts);
   const [selected, setSelected] = useState(new Set());
   const [loading, setLoading] = useState(false);
 
@@ -4089,7 +4092,7 @@ export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMan
     return s;
   });
 
-  const allIds = partSuppliers.map(ps => ps.id);
+  const allIds = rows.map(ps => ps.id);
   const allChecked = allIds.length > 0 && allIds.every(id => selected.has(id));
 
   const handleDelete = async () => {
@@ -4102,8 +4105,8 @@ export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMan
 
   return (
     <Overlay onClose={onClose} wide>
-      <MHead title={`🏭 ${supplier?.name}`} sub={`${partSuppliers.length} linked part${partSuppliers.length!==1?"s":""}`} onClose={onClose}/>
-      {partSuppliers.length === 0 ? (
+      <MHead title={`🏭 ${supplier?.name}`} sub={`${rows.length} linked part${rows.length!==1?"s":""}`} onClose={onClose}/>
+      {rows.length === 0 ? (
         <p style={{color:"var(--text3)",textAlign:"center",padding:36}}>No parts linked to this supplier.</p>
       ) : (
         <>
@@ -4113,8 +4116,8 @@ export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMan
             {selected.size>0&&<span style={{fontSize:12,color:"var(--red)",marginLeft:"auto",fontWeight:700}}>{selected.size} selected</span>}
           </div>
           <div style={{maxHeight:420,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
-            {partSuppliers.map(ps=>{
-              const part=parts.find(p=>p.id===ps.part_id);
+            {rows.map(ps=>{
+              const part=partsSnap.find(p=>p.id===ps.part_id);
               const isSel=selected.has(ps.id);
               return (
                 <div key={ps.id} onClick={()=>toggle(ps.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:isSel?"rgba(239,68,68,.08)":"var(--surface2)",border:`1px solid ${isSel?"rgba(239,68,68,.35)":"var(--border)"}`,cursor:"pointer",transition:"background .15s,border .15s"}}>
@@ -4124,6 +4127,7 @@ export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMan
                     <div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{part?.sku||""}{ps.supplier_part_no?` · Supp#: ${ps.supplier_part_no}`:""}</div>
                   </div>
                   {ps.supplier_price!=null&&<div style={{fontSize:13,fontWeight:700,color:"var(--green)",flexShrink:0}}>{ps.supplier_price}</div>}
+                  {part&&<button className="btn btn-ghost btn-sm" style={{flexShrink:0,fontSize:11,padding:"2px 8px"}} onClick={e=>{e.stopPropagation();onGoInventory(part);}} title="Open in Inventory">✏️</button>}
                 </div>
               );
             })}

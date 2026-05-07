@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../lib/api.js";
 import { getSettings, C, curSym, updateSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
@@ -1877,9 +1878,14 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
   const [menuPos,setMenuPos] = useState({top:0,left:0});
   const ref = useRef(null);
   const btnRef = useRef(null);
+  const menuRef = useRef(null);
 
   useEffect(()=>{
-    const handler=(e)=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); };
+    const handler=(e)=>{
+      if(btnRef.current&&btnRef.current.contains(e.target)) return;
+      if(menuRef.current&&menuRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener("mousedown",handler);
     return()=>document.removeEventListener("mousedown",handler);
   },[]);
@@ -1914,8 +1920,8 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
         onClick={handleOpen}
         title="Actions"
       >•••</button>
-      {open&&(
-        <div style={{
+      {open&&createPortal(
+        <div ref={menuRef} style={{
           position:"fixed",top:menuPos.top,left:menuPos.left,
           background:"var(--surface2)",border:"1px solid var(--border2)",
           borderRadius:10,padding:6,zIndex:9999,
@@ -1936,7 +1942,8 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
               onMouseLeave={e=>e.currentTarget.style.background="none"}
             >{a.label}</button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

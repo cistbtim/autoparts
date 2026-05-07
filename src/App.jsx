@@ -759,13 +759,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       }
       if(ep.stock!==d2.stock)await logInv({...ep,...d2},ep.stock,d2.stock,"Edit Part","Admin edit");
       showToast("Part updated");
+      // Update local parts state — no full reload needed
+      const updated={...ep,...d2};
+      setParts(prev=>prev.map(p=>String(p.id)===String(ep.id)?updated:p));
       if(!keepOpen) await releaseLock("part",ep.id);
-      await loadAll();
       if(keepOpen){
-        // Close and reopen so form reinitialises with fresh saved data
-        const fresh = {...ep, ...d2};
         closeM("editPart");
-        setTimeout(()=>openM("editPart", fresh), 0);
+        setTimeout(()=>openM("editPart",updated),0);
       } else {
         closeM("editPart");
         setTimeout(()=>{
@@ -776,9 +776,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     } else {
       const d2={...data,image_url:toSaveUrl(data.image_url)};
       const r=await api.upsert("parts",d2);
-      await logInv(Array.isArray(r)?r[0]:d2,0,d2.stock,"New Part","Added");
+      const newPart=Array.isArray(r)&&r[0]?r[0]:d2;
+      await logInv(newPart,0,d2.stock,"New Part","Added");
       showToast("Part added");
-      await loadAll();
+      setParts(prev=>[...prev,newPart]);
       if(!keepOpen) closeM("editPart");
     }
   };
@@ -1359,12 +1360,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   const saveFitment=async(partId,vehicleId,notes="")=>{
-    await api.upsert("part_fitments",{part_id:partId,vehicle_id:vehicleId,notes});
-    await loadAll(); showToast("Vehicle linked");
+    const r=await api.upsert("part_fitments",{part_id:partId,vehicle_id:vehicleId,notes});
+    const row=Array.isArray(r)&&r[0]?r[0]:{part_id:partId,vehicle_id:vehicleId,notes};
+    setPartFitments(prev=>{
+      const exists=prev.find(f=>String(f.part_id)===String(partId)&&String(f.vehicle_id)===String(vehicleId));
+      return exists?prev.map(f=>(String(f.part_id)===String(partId)&&String(f.vehicle_id)===String(vehicleId))?{...f,...row}:f):[...prev,row];
+    });
+    showToast("Vehicle linked");
   };
   const deleteFitment=async(id)=>{
     await api.delete("part_fitments","id",id);
-    await loadAll(); showToast("Removed","err");
+    setPartFitments(prev=>prev.filter(f=>String(f.id)!==String(id)));
+    showToast("Removed","err");
   };
   const saveVehicle=async(v)=>{
     const {id, ...data} = v;
@@ -3832,6 +3839,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {isOpen("editPart")&&<PartModal part={mData("editPart")} vehicles={vehicles} partFitments={partFitments} onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart} onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}} inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions} onClose={()=>{
   const ep=mData("editPart"); if(ep?.id) releaseLock("part",ep.id);
   closeM("editPart");
+  loadAll();
 }} t={t}/>}
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}
       {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}

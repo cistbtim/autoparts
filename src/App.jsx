@@ -103,6 +103,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   // Sync settings state from _settings cache after it loads from DB
   useEffect(()=>{ setSettings({...getSettings()}); },[]);
   const [loading,setLoading]=useState(true);
+  const [loadingItems,setLoadingItems]=useState([]);  // per-table timing for loading screen
+  const [bgLoading,setBgLoading]=useState(0);         // count of background tables still fetching
   const [cart,setCart]=useState([]);
   // Filters
   const [searchPart,setSearchPart]=useState("");
@@ -272,13 +274,30 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
   const loadAll=useCallback(async()=>{
     setLoading(true);
+    setLoadingItems([]);
+
+    // Wrap a get call with per-table timing tracking
+    const track=(label,promise)=>{
+      const t0=Date.now();
+      setLoadingItems(prev=>[...prev,{label,status:'loading',ms:null,rows:null}]);
+      return promise.then(data=>{
+        const ms=Date.now()-t0;
+        const rows=Array.isArray(data)?data.length:1;
+        const cached=ms<15; // heuristic: <15ms = served from localStorage cache
+        setLoadingItems(prev=>prev.map(item=>
+          item.label===label?{label,status:cached?'cached':'done',ms,rows}:item
+        ));
+        return data;
+      });
+    };
+
     // FAST: load critical data first so UI shows quickly
     const [p,o,s,ps,st]=await Promise.all([
-      api.get("parts","select=*&order=id.asc"),
-      api.get("orders","select=*&order=created_at.desc"),
-      api.get("suppliers","select=*&order=name.asc"),
-      api.get("part_suppliers","select=*"),
-      api.get("settings","id=eq.1&select=*"),
+      track('parts',       api.get("parts","select=*&order=id.asc")),
+      track('orders',      api.get("orders","select=*&order=created_at.desc")),
+      track('suppliers',   api.get("suppliers","select=*&order=name.asc")),
+      track('part_suppliers', api.get("part_suppliers","select=*")),
+      track('settings',    api.get("settings","id=eq.1&select=*")),
     ]);
     setParts(Array.isArray(p)?p:[]);
     setOrders(Array.isArray(o)?o:[]);
@@ -293,6 +312,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setLoading(false); // ← show UI immediately after critical data
 
     // LAZY: load secondary data in background
+    const BG_TABLES=["customers","users","inventory_logs","login_logs","inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","vehicles","part_fitments","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes","workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes","workshop_customers","workshop_vehicles","customer_queries","workshop_stock","workshop_services","workshop_documents","workshop_profiles","workshop_suppliers","ws_supplier_requests","ws_supplier_quotes","ws_supplier_invoices","ws_supplier_invoice_items","ws_supplier_payments","ws_supplier_returns","ws_sq_replies","ws_purchase_orders","ws_po_items","ws_licence_renewals","workshop_bookings","scrapyard_vehicles","scrapyard_parts","scrapyard_profiles"];
+    setBgLoading(BG_TABLES.length);
     const [c,u,l,ll,inq,si,ci,sr,cr,veh,fit,py,...rest]=await Promise.all([
       api.get("customers","select=*&order=total_spent.desc"),
       api.get("users","select=*&order=id.asc"),
@@ -382,6 +403,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setAllScrapVehicles(Array.isArray(rest[28])?rest[28]:[]);
     setAllScrapParts(Array.isArray(rest[29])?rest[29]:[]);
     setAllScrapProfiles(Array.isArray(rest[30])?rest[30]:[]);
+    setBgLoading(0); // all background tables done
     // Load workshop profile for workshop role
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
@@ -2000,7 +2022,28 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
   const navItems=navGroups.flatMap(g=>g.children); // for compatibility
 
-  if(loading) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{textAlign:"center"}}><div style={{fontSize:36,animation:"spin 1s linear infinite",display:"inline-block",marginBottom:14}}>⚙</div><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>{t.connecting}</div></div></div>;
+  if(loading) return (
+    <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <style>{CSS}</style>
+      <div style={{textAlign:"center",minWidth:320}}>
+        <div style={{fontSize:32,animation:"spin 1s linear infinite",display:"inline-block",marginBottom:12}}>⚙</div>
+        <div style={{color:"var(--accent)",fontSize:15,fontWeight:700,marginBottom:18}}>{t.connecting}</div>
+        <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 18px",border:"1px solid var(--border)",textAlign:"left"}}>
+          {loadingItems.map(item=>(
+            <div key={item.label} style={{display:"flex",alignItems:"center",gap:10,padding:"4px 0",fontFamily:"DM Mono,monospace",fontSize:12}}>
+              <span style={{fontSize:14,width:18,textAlign:"center"}}>
+                {item.status==='loading'?'⏳':item.status==='cached'?'⚡':'✅'}
+              </span>
+              <span style={{flex:1,color:"var(--text2)"}}>{item.label}</span>
+              {item.ms!=null&&<span style={{color:item.status==='cached'?"var(--green)":item.ms>1000?"var(--red)":item.ms>300?"var(--yellow)":"var(--text3)",fontWeight:600}}>{item.ms}ms</span>}
+              {item.rows!=null&&<span style={{color:"var(--text3)",marginLeft:4}}>{item.rows.toLocaleString()} rows</span>}
+            </div>
+          ))}
+          {loadingItems.length===0&&<div style={{color:"var(--text3)",fontSize:12}}>Connecting…</div>}
+        </div>
+      </div>
+    </div>
+  );
 
   const PH=({title,subtitle,action})=>(
     <div className="page-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
@@ -2280,6 +2323,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
       {/* MAIN CONTENT */}
       <main className="main-content" style={{marginLeft:240,padding:26,minHeight:"100vh"}}>
+        {/* Background loading banner — shows which tables are still fetching */}
+        {bgLoading>0&&<div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.25)",borderRadius:8,padding:"7px 14px",marginBottom:14,fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--blue)"}}>
+          <span style={{animation:"spin 1s linear infinite",display:"inline-block"}}>⚙</span>
+          <span>Loading background data: <strong>{bgLoading}</strong> tables remaining…</span>
+        </div>}
 
         {/* ── DASHBOARD ── */}
         {tab==="dashboard"&&role==="admin"&&(

@@ -2095,17 +2095,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       <style>{CSS}</style>
       <div style={{textAlign:"center"}}>
         {/* Racing track */}
-        <div style={{position:"relative",width:260,height:64,margin:"0 auto 22px",overflow:"hidden"}}>
+        <div style={{position:"relative",width:340,height:100,margin:"0 auto 22px",overflow:"hidden"}}>
           {/* Road */}
-          <div style={{position:"absolute",bottom:0,left:0,right:0,height:28,background:"#1c1c2e",borderRadius:8}}/>
+          <div style={{position:"absolute",bottom:0,left:0,right:0,height:40,background:"#1c1c2e",borderRadius:10}}/>
           {/* Scrolling dashes */}
-          <div style={{position:"absolute",bottom:11,left:0,display:"flex",gap:10,animation:"roadScroll .6s linear infinite"}}>
-            {Array.from({length:9}).map((_,i)=>(
-              <div key={i} style={{width:22,height:5,background:"rgba(255,255,255,.22)",borderRadius:2,flexShrink:0}}/>
+          <div style={{position:"absolute",bottom:17,left:0,display:"flex",gap:12,animation:"roadScroll .6s linear infinite"}}>
+            {Array.from({length:10}).map((_,i)=>(
+              <div key={i} style={{width:28,height:6,background:"rgba(255,255,255,.22)",borderRadius:2,flexShrink:0}}/>
             ))}
           </div>
           {/* Racing car */}
-          <div style={{position:"absolute",bottom:20,left:0,fontSize:30,animation:"raceCar 1.4s linear infinite",lineHeight:1}}>🏎️</div>
+          <div style={{position:"absolute",bottom:28,left:0,fontSize:56,animation:"raceCar 1.4s linear infinite",lineHeight:1}}>🏎️</div>
         </div>
         <div style={{color:"var(--accent)",fontSize:15,fontWeight:700,letterSpacing:.3}}>{t.connecting}</div>
       </div>

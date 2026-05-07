@@ -292,13 +292,31 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     };
 
     // FAST: load critical data first so UI shows quickly
-    const [p,o,s,st]=await Promise.all([
-      track('parts',     api.get("parts","select=*&order=id.asc")),
+    // Parts uses first-page-fast: show first 200 rows immediately, load rest in background
+    const PARTS_Q="select=*&order=id.asc";
+    const cachedParts=api.cacheGet("parts",PARTS_Q);
+
+    let partsFirst;
+    if(cachedParts){
+      // Full dataset already cached — instant
+      setLoadingItems(prev=>[...prev,{label:'parts',status:'cached',ms:1,rows:cachedParts.length}]);
+      partsFirst=cachedParts;
+    } else {
+      // Cache miss — fetch first 200 rows only so loading screen clears fast
+      const t0p=Date.now();
+      setLoadingItems(prev=>[...prev,{label:'parts (first 200)',status:'loading',ms:null,rows:null}]);
+      partsFirst=await api.getFirst("parts",PARTS_Q,200);
+      const msp=Date.now()-t0p;
+      setLoadingItems(prev=>prev.map(i=>i.label==='parts (first 200)'
+        ?{label:'parts (first 200)',status:'done',ms:msp,rows:Array.isArray(partsFirst)?partsFirst.length:0}:i));
+    }
+    setParts(Array.isArray(partsFirst)?partsFirst:[]);
+
+    const [o,s,st]=await Promise.all([
       track('orders',    api.get("orders","select=*&order=created_at.desc")),
       track('suppliers', api.get("suppliers","select=*&order=name.asc")),
       track('settings',  api.get("settings","id=eq.1&select=*")),
     ]);
-    setParts(Array.isArray(p)?p:[]);
     setOrders(Array.isArray(o)?o:[]);
     setSuppliers(Array.isArray(s)?s:[]);
     if(Array.isArray(st)&&st[0]){
@@ -308,6 +326,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       try{ if(st[0].categories){ const c=typeof st[0].categories==="string"?JSON.parse(st[0].categories):st[0].categories; if(Array.isArray(c)&&c.length) updateSettings({categories:st[0].categories}); } }catch{}
     }
     setLoading(false); // ← show UI immediately after critical data
+
+    // Background load remaining parts pages (only when cache was cold)
+    if(!cachedParts){
+      api.loadRest("parts",PARTS_Q,partsFirst.length,(extra)=>{
+        setParts([...partsFirst,...extra]);
+      }).then(extra=>{
+        const full=[...partsFirst,...extra];
+        setParts(full);
+        api.cacheSet("parts",PARTS_Q,full); // cache full dataset for next load
+      });
+    }
 
     // LAZY: load secondary data in background
     const BG_TABLES=["customers","users","inventory_logs","login_logs","inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","vehicles","part_fitments","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes","workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes","workshop_customers","workshop_vehicles","customer_queries","workshop_stock","workshop_services","workshop_documents","workshop_profiles","workshop_suppliers","ws_supplier_requests","ws_supplier_quotes","ws_supplier_invoices","ws_supplier_invoice_items","ws_supplier_payments","ws_supplier_returns","ws_sq_replies","ws_purchase_orders","ws_po_items","ws_licence_renewals","workshop_bookings","scrapyard_vehicles","scrapyard_parts","scrapyard_profiles"];

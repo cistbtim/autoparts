@@ -4,10 +4,10 @@ export const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY || "";
 const H = (x = {}) => ({ apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", ...x });
 
 // ── localStorage SWR cache ────────────────────────────────────────────────────
-const CACHE_TTL   = 5 * 60 * 1000;   // 5 minutes
-const CACHE_PFX   = "swr__";
+const CACHE_TTL = 5 * 60 * 1000;   // 5 minutes
+const CACHE_PFX = "swr__";
 
-const _cKey  = (t, q) => `${CACHE_PFX}${t}__${q}`;
+const _cKey = (t, q) => `${CACHE_PFX}${t}__${q}`;
 
 const _cRead = (key) => {
   try {
@@ -22,17 +22,14 @@ const _cWrite = (key, data) => {
   try {
     localStorage.setItem(key, JSON.stringify({ d: data, ts: Date.now() }));
   } catch {
-    // Quota exceeded (large tables like parts) — silently skip caching
+    // Quota exceeded (large tables like parts) — silently skip
   }
 };
 
-// Remove every cached entry for a given table (called after any write)
 const _cInvalidate = (table) => {
   try {
     const prefix = `${CACHE_PFX}${table}__`;
-    Object.keys(localStorage)
-      .filter(k => k.startsWith(prefix))
-      .forEach(k => localStorage.removeItem(k));
+    Object.keys(localStorage).filter(k => k.startsWith(prefix)).forEach(k => localStorage.removeItem(k));
   } catch {}
 };
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,7 +62,7 @@ export const setDemoMode = (isDemo, onBlock) => {
 };
 
 export const api = {
-  // Cache-first GET: returns cached data instantly if fresh, else fetches and caches
+  // Cache-first GET: instant if cached, else fetch all pages and cache result
   get: async (t, q = "") => {
     const key = _cKey(t, q);
     const cached = _cRead(key);
@@ -74,6 +71,40 @@ export const api = {
     _cWrite(key, fresh);
     return fresh;
   },
+
+  // Single-page fetch — no loop, no cache. Used for first-paint of large tables.
+  getFirst: async (t, q = "", limit = 200) => {
+    const sep = q ? "&" : "";
+    const url = `${SUPABASE_URL}/rest/v1/${t}?${q}${sep}limit=${limit}&offset=0`;
+    const resp = await fetch(url, { headers: H() });
+    try { return JSON.parse(await resp.text()); } catch { return []; }
+  },
+
+  // Fetch remaining pages starting from startOffset.
+  // Calls onPage(allExtraRowsSoFar) after each page arrives.
+  // Returns all extra rows when done.
+  loadRest: async (t, q = "", startOffset = 200, onPage = () => {}) => {
+    const PAGE = 1000;
+    let offset = startOffset;
+    let extra = [];
+    while (true) {
+      const sep = q ? "&" : "";
+      const url = `${SUPABASE_URL}/rest/v1/${t}?${q}${sep}limit=${PAGE}&offset=${offset}`;
+      const resp = await fetch(url, { headers: H() });
+      let batch;
+      try { batch = JSON.parse(await resp.text()); } catch { break; }
+      if (!Array.isArray(batch) || batch.length === 0) break;
+      extra = extra.concat(batch);
+      onPage(extra);
+      if (batch.length < PAGE) break;
+      offset += PAGE;
+    }
+    return extra;
+  },
+
+  // Cache read/write — lets callers prime or read the cache directly
+  cacheGet: (t, q) => _cRead(_cKey(t, q)),
+  cacheSet: (t, q, data) => _cWrite(_cKey(t, q), data),
 
   upsert: async (t, d) => {
     if (_demoMode) return _demoBlock();

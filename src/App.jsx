@@ -292,17 +292,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     };
 
     // FAST: load critical data first so UI shows quickly
-    const [p,o,s,ps,st]=await Promise.all([
-      track('parts',       api.get("parts","select=*&order=id.asc")),
-      track('orders',      api.get("orders","select=*&order=created_at.desc")),
-      track('suppliers',   api.get("suppliers","select=*&order=name.asc")),
-      track('part_suppliers', api.get("part_suppliers","select=*")),
-      track('settings',    api.get("settings","id=eq.1&select=*")),
+    const [p,o,s,st]=await Promise.all([
+      track('parts',     api.get("parts","select=*&order=id.asc")),
+      track('orders',    api.get("orders","select=*&order=created_at.desc")),
+      track('suppliers', api.get("suppliers","select=*&order=name.asc")),
+      track('settings',  api.get("settings","id=eq.1&select=*")),
     ]);
     setParts(Array.isArray(p)?p:[]);
     setOrders(Array.isArray(o)?o:[]);
     setSuppliers(Array.isArray(s)?s:[]);
-    setPartSuppliers(Array.isArray(ps)?ps:[]);
     if(Array.isArray(st)&&st[0]){
       updateSettings(st[0]); // update global cache — used by ShopLogo on login page
       setSettings(getSettings());
@@ -443,6 +441,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       setSyReturns(Array.isArray(syR)?syR:[]);
     }
   },[]);
+
+  // Lazy load part_suppliers — only when inventory or suppliers tab is opened
+  const psLoadedRef=useRef(false);
+  const loadPartSuppliers=useCallback(async()=>{
+    const data=await api.get("part_suppliers","select=*");
+    setPartSuppliers(Array.isArray(data)?data:[]);
+    psLoadedRef.current=true;
+  },[]);
+  useEffect(()=>{
+    if((tab==="inventory"||tab==="suppliers")&&!psLoadedRef.current) loadPartSuppliers();
+  },[tab,loadPartSuppliers]);
 
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
   const refreshWorkshopData=useCallback(async()=>{
@@ -1329,15 +1338,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       showToast(`Error saving: ${res.message||res.code}`, "err");
       return;
     }
-    await loadAll();showToast("Supplier linked!");
+    await loadPartSuppliers();showToast("Supplier linked!");
   };
   const updatePartSupplier=async(id,data)=>{
     const res = await api.patch("part_suppliers","id",id,data);
     if(res?.code) { showToast(`Error: ${res.message||res.code}`,"err"); return; }
-    await loadAll();showToast("Updated!");
+    await loadPartSuppliers();showToast("Updated!");
   };
-  const deletePartSupplier=async(id)=>{await api.delete("part_suppliers","id",id);await loadAll();showToast("Removed","err");};
-  const deletePartSupplierMany=async(ids)=>{for(const id of ids)await api.delete("part_suppliers","id",id);await loadAll();showToast(`Removed ${ids.length} link${ids.length>1?"s":""}`, "err");};
+  const deletePartSupplier=async(id)=>{await api.delete("part_suppliers","id",id);await loadPartSuppliers();showToast("Removed","err");};
+  const deletePartSupplierMany=async(ids)=>{for(const id of ids)await api.delete("part_suppliers","id",id);await loadPartSuppliers();showToast(`Removed ${ids.length} link${ids.length>1?"s":""}`, "err");};
 
   // Inquiries
   const sendInquiry=async(data)=>{

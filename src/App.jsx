@@ -2094,18 +2094,77 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <style>{CSS}</style>
       <div style={{textAlign:"center"}}>
-        {/* Racing track */}
-        <div style={{position:"relative",width:340,height:100,margin:"0 auto 22px",overflow:"hidden"}}>
-          {/* Road */}
-          <div style={{position:"absolute",bottom:0,left:0,right:0,height:40,background:"#1c1c2e",borderRadius:10}}/>
+        <div style={{position:"relative",width:400,height:120,margin:"0 auto 20px",overflow:"hidden"}}>
+          {/* Road surface */}
+          <div style={{position:"absolute",bottom:0,left:0,right:0,height:46,background:"#16162a",borderRadius:12,boxShadow:"inset 0 2px 8px rgba(0,0,0,.5)"}}/>
+          {/* Road edge line */}
+          <div style={{position:"absolute",bottom:44,left:0,right:0,height:2,background:"rgba(255,220,0,.5)"}}/>
           {/* Scrolling dashes */}
-          <div style={{position:"absolute",bottom:17,left:0,display:"flex",gap:12,animation:"roadScroll .6s linear infinite"}}>
-            {Array.from({length:10}).map((_,i)=>(
-              <div key={i} style={{width:28,height:6,background:"rgba(255,255,255,.22)",borderRadius:2,flexShrink:0}}/>
+          <div style={{position:"absolute",bottom:20,left:0,display:"flex",gap:10,animation:"roadScroll .45s linear infinite"}}>
+            {Array.from({length:14}).map((_,i)=>(
+              <div key={i} style={{width:30,height:6,background:"rgba(255,255,255,.25)",borderRadius:2,flexShrink:0}}/>
             ))}
           </div>
-          {/* Racing car */}
-          <div style={{position:"absolute",bottom:28,left:0,fontSize:56,animation:"raceCar 1.4s linear infinite",lineHeight:1}}>🏎️</div>
+          {/* SVG Race Car */}
+          <div style={{position:"absolute",bottom:34,left:0,animation:"raceCar 1.6s linear infinite"}}>
+            <svg width="170" height="80" viewBox="0 0 170 80" xmlns="http://www.w3.org/2000/svg">
+              {/* Rear spoiler post */}
+              <rect x="9" y="26" width="5" height="14" rx="2" fill="#8a0e0e"/>
+              {/* Rear spoiler wing */}
+              <rect x="2" y="22" width="20" height="5" rx="2.5" fill="#cc1212"/>
+              {/* Main body */}
+              <path d="M18 50 Q16 36 20 34 L146 34 Q152 36 152 44 L152 54 Q152 60 145 60 L25 60 Q18 60 18 54 Z" fill="#cc1212"/>
+              {/* White stripe */}
+              <rect x="18" y="47" width="134" height="5" fill="white"/>
+              {/* Blue stripe */}
+              <rect x="18" y="52" width="134" height="8" fill="#1a3ec7"/>
+              {/* Cab */}
+              <path d="M36 34 Q38 12 54 10 L116 10 Q130 12 132 34 Z" fill="#aa0f0f"/>
+              {/* Rear window */}
+              <path d="M40 34 Q42 15 56 13 L80 13 Q82 15 80 34 Z" fill="#a8d8f0" opacity="0.88"/>
+              {/* Windscreen */}
+              <path d="M84 34 Q86 15 102 13 L128 13 Q130 15 128 34 Z" fill="#a8d8f0" opacity="0.88"/>
+              {/* B-pillar */}
+              <rect x="80" y="10" width="5" height="24" fill="#8a0e0e"/>
+              {/* Taillight */}
+              <rect x="12" y="37" width="8" height="14" rx="3" fill="#ff3333"/>
+              {/* Headlight */}
+              <polygon points="144,37 158,40 158,48 144,48" fill="#ffe566"/>
+              <rect x="156" y="40" width="6" height="8" rx="2" fill="#fff7aa"/>
+              {/* Rear bumper */}
+              <rect x="11" y="51" width="10" height="7" rx="2" fill="#666"/>
+              {/* Front bumper */}
+              <rect x="148" y="51" width="14" height="7" rx="2" fill="#666"/>
+              {/* Wheel arches */}
+              <ellipse cx="46" cy="60" rx="21" ry="14" fill="#aa0f0f"/>
+              <ellipse cx="122" cy="60" rx="21" ry="14" fill="#aa0f0f"/>
+              {/* Rear tyre */}
+              <circle cx="46" cy="62" r="16" fill="#0a0a0a"/>
+              {/* Rear rim (spinning) */}
+              <g><animateTransform attributeName="transform" type="rotate" from="0 46 62" to="360 46 62" dur="0.5s" repeatCount="indefinite"/>
+                <circle cx="46" cy="62" r="10" fill="#2c2c2c"/>
+                <circle cx="46" cy="62" r="4"  fill="#888"/>
+                <rect x="45" y="52" width="2" height="20" fill="#555"/>
+                <rect x="36" y="61" width="20" height="2"  fill="#555"/>
+              </g>
+              {/* Front tyre */}
+              <circle cx="122" cy="62" r="16" fill="#0a0a0a"/>
+              {/* Front rim (spinning) */}
+              <g><animateTransform attributeName="transform" type="rotate" from="0 122 62" to="360 122 62" dur="0.5s" repeatCount="indefinite"/>
+                <circle cx="122" cy="62" r="10" fill="#2c2c2c"/>
+                <circle cx="122" cy="62" r="4"  fill="#888"/>
+                <rect x="121" y="52" width="2" height="20" fill="#555"/>
+                <rect x="112" y="61" width="20" height="2"  fill="#555"/>
+              </g>
+              {/* Racing number roundel */}
+              <circle cx="86" cy="45" r="12" fill="white"/>
+              <text x="86" y="49" fontSize="13" fill="#cc1212" fontWeight="bold" textAnchor="middle" fontFamily="Arial,sans-serif">17</text>
+              {/* Speed lines */}
+              <rect x="0" y="42" width="12" height="2" rx="1" fill="rgba(255,255,255,.3)"/>
+              <rect x="0" y="46" width="8"  height="2" rx="1" fill="rgba(255,255,255,.2)"/>
+              <rect x="0" y="50" width="14" height="2" rx="1" fill="rgba(255,255,255,.15)"/>
+            </svg>
+          </div>
         </div>
         <div style={{color:"var(--accent)",fontSize:15,fontWeight:700,letterSpacing:.3}}>{t.connecting}</div>
       </div>

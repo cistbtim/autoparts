@@ -4078,3 +4078,64 @@ Current: ${item.system_qty}`,item.system_qty));if(!isNaN(n)&&n>=0){onAdjustItem(
     </div>
   );
 }
+
+export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMany, onClose }) {
+  const [selected, setSelected] = useState(new Set());
+  const [loading, setLoading] = useState(false);
+
+  const toggle = (id) => setSelected(prev => {
+    const s = new Set(prev);
+    s.has(id) ? s.delete(id) : s.add(id);
+    return s;
+  });
+
+  const allIds = partSuppliers.map(ps => ps.id);
+  const allChecked = allIds.length > 0 && allIds.every(id => selected.has(id));
+
+  const handleDelete = async () => {
+    if (!selected.size) return;
+    setLoading(true);
+    await onDeleteMany([...selected]);
+    setLoading(false);
+    onClose();
+  };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title={`🏭 ${supplier?.name}`} sub={`${partSuppliers.length} linked part${partSuppliers.length!==1?"s":""}`} onClose={onClose}/>
+      {partSuppliers.length === 0 ? (
+        <p style={{color:"var(--text3)",textAlign:"center",padding:36}}>No parts linked to this supplier.</p>
+      ) : (
+        <>
+          <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid var(--border)",marginBottom:8}}>
+            <input type="checkbox" checked={allChecked} onChange={()=>allChecked?setSelected(new Set()):setSelected(new Set(allIds))} style={{width:16,height:16,cursor:"pointer"}}/>
+            <span style={{fontSize:13,color:"var(--text2)",fontWeight:600}}>Select All ({allIds.length})</span>
+            {selected.size>0&&<span style={{fontSize:12,color:"var(--red)",marginLeft:"auto",fontWeight:700}}>{selected.size} selected</span>}
+          </div>
+          <div style={{maxHeight:420,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
+            {partSuppliers.map(ps=>{
+              const part=parts.find(p=>p.id===ps.part_id);
+              const isSel=selected.has(ps.id);
+              return (
+                <div key={ps.id} onClick={()=>toggle(ps.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:isSel?"rgba(239,68,68,.08)":"var(--surface2)",border:`1px solid ${isSel?"rgba(239,68,68,.35)":"var(--border)"}`,cursor:"pointer",transition:"background .15s,border .15s"}}>
+                  <input type="checkbox" checked={isSel} onChange={()=>toggle(ps.id)} onClick={e=>e.stopPropagation()} style={{width:16,height:16,cursor:"pointer",flexShrink:0}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:600,fontSize:14,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{part?.name||"Unknown Part"}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{part?.sku||""}{ps.supplier_part_no?` · Supp#: ${ps.supplier_part_no}`:""}</div>
+                  </div>
+                  {ps.supplier_price!=null&&<div style={{fontSize:13,fontWeight:700,color:"var(--green)",flexShrink:0}}>{ps.supplier_price}</div>}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",gap:10,marginTop:14}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+            <button className="btn btn-danger" style={{flex:2}} disabled={!selected.size||loading} onClick={handleDelete}>
+              {loading?"Deleting…":`🗑 Delete Selected (${selected.size})`}
+            </button>
+          </div>
+        </>
+      )}
+    </Overlay>
+  );
+}

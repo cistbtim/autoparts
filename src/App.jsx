@@ -1384,7 +1384,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     await loadAll(); showToast("Deleted","err");
   };
   const deletePart=async(id)=>{const p=parts.find(p=>p.id===id);if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await api.delete("parts","id",id);await loadAll();showToast("Deleted","err");};
-  const applyAdjust=async(part,nq,reason)=>{await api.patch("parts","id",part.id,{stock:nq});await logInv(part,part.stock,nq,"Manual Adj.",reason||"Manual");await loadAll();closeM("adjust");showToast(`Stock → ${nq}`);};
+  const applyAdjust=async(part,nq,reason)=>{
+    await api.patch("parts","id",part.id,{stock:nq});
+    await logInv(part,part.stock,nq,"Manual Adj.",reason||"Manual");
+    setParts(prev=>prev.map(p=>String(p.id)===String(part.id)?{...p,stock:nq}:p));
+    closeM("adjust");
+    showToast(`Stock → ${nq}`);
+  };
 
   // Suppliers
   const saveSupplier=async(data)=>{const es=mData("editSupplier");if(es)await api.patch("suppliers","id",es.id,data);else await api.upsert("suppliers",data);await loadAll();closeM("editSupplier");showToast(es?"Supplier updated":"Supplier added");};
@@ -3839,7 +3845,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {isOpen("editPart")&&<PartModal part={mData("editPart")} vehicles={vehicles} partFitments={partFitments} onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart} onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}} inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions} onClose={()=>{
   const ep=mData("editPart"); if(ep?.id) releaseLock("part",ep.id);
   closeM("editPart");
-  loadAll();
 }} t={t}/>}
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}
       {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}

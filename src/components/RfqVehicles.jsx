@@ -1260,7 +1260,18 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t}) {
 
   // Derived lists
   const makes   = [...new Set(vehicles.map(v => v.make))].sort();
-  const models  = [...new Set(vehicles.filter(v => !selMake || v.make === selMake).map(v => v.model))].sort();
+  const models  = (() => {
+    const filtered = vehicles.filter(v => !selMake || v.make === selMake);
+    const map = {};
+    for (const v of filtered) {
+      if (!map[v.model]) map[v.model] = { yearFrom: v.year_from, yearTo: v.year_to };
+      else {
+        if (v.year_from && (!map[v.model].yearFrom || v.year_from < map[v.model].yearFrom)) map[v.model].yearFrom = v.year_from;
+        if (!v.year_to || !map[v.model].yearTo || v.year_to > map[v.model].yearTo) map[v.model].yearTo = v.year_to;
+      }
+    }
+    return Object.entries(map).map(([model, {yearFrom, yearTo}]) => ({model, yearFrom, yearTo})).sort((a,b)=>a.model.localeCompare(b.model));
+  })();
   const engines = [...new Set(
     vehicles
       .filter(v => (!selMake || v.make === selMake) && (!selModel || v.model === selModel))
@@ -1305,11 +1316,15 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t}) {
         </select>
 
         {/* Model */}
-        <select className="inp" value={selModel} style={{flex:"1 1 120px",minWidth:100}}
+        <select className="inp" value={selModel} style={{flex:"1 1 160px",minWidth:130}}
           disabled={!selMake}
           onChange={e=>{ const v=e.target.value; setSelModel(v); setSelEngine(""); applyFilter(selMake,v,""); }}>
           <option value="">{t.selectModel||"Select Model"}</option>
-          {models.map(m=><option key={m}>{m}</option>)}
+          {models.map(({model, yearFrom, yearTo})=>(
+            <option key={model} value={model}>
+              {model}{yearFrom ? ` (${yearFrom}–${yearTo||"present"})` : ""}
+            </option>
+          ))}
         </select>
 
         {/* Engine */}
@@ -1328,6 +1343,10 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t}) {
           (!selModel||v.model===selModel) &&
           (!selEngine||v.engine===selEngine)
         );
+        const variants = [...new Set(matchV.map(v=>v.variant).filter(Boolean))];
+        const variantLabel = variants.length === 1 ? variants[0] : "";
+        const codes = [...new Set(matchV.map(v=>v.code).filter(Boolean))];
+        const codeLabel = codes.length === 1 ? codes[0] : codes.length > 1 ? codes.join("/") : "";
         const photos = matchV.find(v=>v.photo_front||v.photo_rear||v.photo_side) || matchV[0];
         return (
           <div style={{marginTop:10}}>
@@ -1355,7 +1374,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t}) {
               </div>
             )}
             <div style={{fontSize:12,color:"var(--blue)",fontWeight:600,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span>🔍 {selMake} {selModel} {selEngine}</span>
+              <span>🔍 {codeLabel ? `${codeLabel} · ` : ""}{selMake} {selModel}{variantLabel ? ` ${variantLabel}` : ""}{selEngine ? ` · ${selEngine}` : ""}</span>
               <button className="btn btn-ghost btn-xs" style={{color:"var(--text3)"}} onClick={clear}>✕ Show all parts</button>
             </div>
           </div>
@@ -1465,6 +1484,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, t}) {
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:15}}>{v.make} {v.model}</div>
+                    {v.code&&<div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--accent)",fontWeight:700,marginTop:1}}>{v.code}</div>}
                     <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
                       {v.year_from}–{v.year_to||"present"}
                       {v.engine&&<span style={{marginLeft:8,color:"var(--blue)"}}>🔧 {v.engine}</span>}
@@ -1508,6 +1528,7 @@ function VehicleModal({vehicle, onSave, onClose, t}) {
     id:          vehicle.id||null,
     make:        vehicle.make||"GWM",
     model:       vehicle.model||"",
+    code:        vehicle.code||"",
     year_from:   vehicle.year_from||new Date().getFullYear()-2,
     year_to:     vehicle.year_to||new Date().getFullYear(),
     engine:      vehicle.engine||"",
@@ -1560,14 +1581,21 @@ function VehicleModal({vehicle, onSave, onClose, t}) {
       </FG>
       <FG>
         <div>
-          <FL label="Engine"/>
-          <input className="inp" value={f.engine} onChange={e=>s("engine",e.target.value)}
-            placeholder="2.0TD, 1.5T, 2.8GD6..."/>
+          <FL label="Model Code"/>
+          <input className="inp" value={f.code} onChange={e=>s("code",e.target.value)}
+            placeholder="FD50A, BA3, GJ..."/>
         </div>
         <div>
           <FL label="Variant"/>
           <input className="inp" value={f.variant} onChange={e=>s("variant",e.target.value)}
             placeholder="SX 4x4, Double-Cab, LT..."/>
+        </div>
+      </FG>
+      <FG>
+        <div>
+          <FL label="Engine"/>
+          <input className="inp" value={f.engine} onChange={e=>s("engine",e.target.value)}
+            placeholder="2.0TD, 1.5T, 2.8GD6..."/>
         </div>
       </FG>
       {/* Photos — drag & drop upload */}

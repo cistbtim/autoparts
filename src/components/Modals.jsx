@@ -2061,6 +2061,11 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
               <FL label={`${t.name} *`}/>
               <div style={{display:"flex",gap:6}}>
+                {f.name&&f.name.startsWith("=")&&(
+                  <button type="button" className="cp-btn" style={{color:"var(--green)",borderColor:"rgba(34,197,94,.4)"}}
+                    title="Remove leading = (Excel formula prefix)"
+                    onClick={()=>{s("name",f.name.slice(1));setErrors(p=>({...p,name:""}));}}>✂ Fix =</button>
+                )}
                 {f.oe_number&&<button type="button" className="cp-btn" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)"}}
                   onClick={()=>window.open(`https://www.google.com/search?q=${encodeURIComponent(f.oe_number)}`,"_blank","noopener,noreferrer")}>🔍 Google</button>}
                 {f.name&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.name)}>📋</button>}

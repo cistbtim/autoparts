@@ -1950,7 +1950,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[]}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -1962,7 +1962,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", bin_location:"",
   };
   const [f,setF]=useState(()=>makeF(part));
-  const [ptab, setPtab] = useState("info");
+  const [ptab, setPtab] = useState(initialTab||"info");
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -2385,7 +2385,7 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
   );
 }
 
-export function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,onUpdate,onClose,t}) {
+export function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,onUpdate,onClose,onEditPart,t}) {
   const [suppId,setSuppId]=useState("");
   const [price,setPrice]=useState("");
   const [lead,setLead]=useState("");
@@ -2400,6 +2400,12 @@ export function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,
   return (
     <Overlay onClose={onClose} wide>
       <MHead title={`🏭 Suppliers — ${part.name}`} sub={`${part.sku}${part.oe_number?" · OE: "+part.oe_number:""}`} onClose={onClose}/>
+      {onEditPart&&(
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <button className="btn btn-ghost btn-sm" onClick={()=>onEditPart(part,"info")}>✏️ Edit Part</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>onEditPart(part,"photo")}>📸 Photos</button>
+        </div>
+      )}
 
       {/* Linked suppliers */}
       {partSuppliers.length>0&&(

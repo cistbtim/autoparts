@@ -3607,7 +3607,13 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts,partFitments=[
                     onClick={()=>{ if(oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
                     disabled={!oeSearch.trim()}
                     style={{padding:"6px 14px",borderRadius:7,border:"none",background:"var(--accent)",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
-                    Search
+                    Goldwagen
+                  </button>
+                  <button
+                    onClick={()=>{ if(oeSearch.trim()) window.open(`https://www.autodoc.co.uk/spares-search?keyword=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
+                    disabled={!oeSearch.trim()}
+                    style={{padding:"6px 14px",borderRadius:7,border:"none",background:"#e63946",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
+                    AutoDoc
                   </button>
                 </div>
               </div>

@@ -1950,7 +1950,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -2279,6 +2279,12 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
           )}
           <div style={{display:"flex",gap:10,marginTop:10}}>
             <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{t.cancel}</button>
+            {part&&onGoSupplier&&(
+              <button className="btn btn-ghost" style={{flexShrink:0,borderColor:"var(--blue)",color:"var(--blue)"}}
+                onClick={()=>onGoSupplier(part)}>
+                🏭 Suppliers
+              </button>
+            )}
             <button className="btn btn-primary" style={{flex:2,position:"relative",
               boxShadow:dirty?"0 0 0 3px rgba(251,146,60,.4)":undefined,
               animation:dirty?"pulse-ring 1.5s ease infinite":undefined}}

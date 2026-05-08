@@ -205,7 +205,7 @@ def main():
 
     if new_vehicles:
         print(f"\n→ Inserting {len(new_vehicles)} vehicles …")
-        batch_upsert("vehicles", new_vehicles, "code")
+        batch_insert("vehicles", new_vehicles)
 
     if SKIP_FITMENTS:
         print("\n[--skip-fitments] Fitment linking skipped.")

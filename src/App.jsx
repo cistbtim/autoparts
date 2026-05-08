@@ -3938,7 +3938,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       </main>
 
       {/* ════ MODALS ════ */}
-      {isOpen("editPart")&&<PartModal part={mData("editPart")} initialTab={mData("editPart")?._tab} vehicles={vehicles} partFitments={partFitments} onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart} onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}} onGoSupplier={async(p)=>{closeM("editPart");await loadPartSuppliers();openM("partSupplier",p);}} inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions} onClose={()=>{
+      {isOpen("editPart")&&<PartModal part={mData("editPart")} initialTab={mData("editPart")?._tab} vehicles={vehicles} partFitments={partFitments} onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart} onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}} onGoSupplier={async(p)=>{closeM("editPart");await loadPartSuppliers();openM("partSupplier",p);}} onGoToPart={(sku)=>{const target=parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase());if(target){const ep=mData("editPart");if(ep?.id)releaseLock("part",ep.id);closeM("editPart");openM("editPart",target);}else showToast(`Part SKU "${sku}" not found`,"err");}} inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions} onClose={()=>{
   const ep=mData("editPart"); if(ep?.id) releaseLock("part",ep.id);
   closeM("editPart");
 }} t={t}/>}

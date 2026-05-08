@@ -1423,6 +1423,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
   const deletePartSupplier=async(id)=>{await api.delete("part_suppliers","id",id);await reloadPartSuppliers();showToast("Removed","err");};
   const deletePartSupplierMany=async(ids)=>{for(const id of ids)await api.delete("part_suppliers","id",id);await reloadPartSuppliers();showToast(`Removed ${ids.length} link${ids.length>1?"s":""}`, "err");};
+  const mergePart=async(sourceId,targetId)=>{
+    // Move supplier links — skip if target already has same supplier
+    const sourcePSs=partSuppliers.filter(ps=>String(ps.part_id)===String(sourceId));
+    const targetSupIds=new Set(partSuppliers.filter(ps=>String(ps.part_id)===String(targetId)).map(ps=>ps.supplier_id));
+    for(const ps of sourcePSs){
+      if(targetSupIds.has(ps.supplier_id)) await api.delete("part_suppliers","id",ps.id);
+      else await api.patch("part_suppliers","id",ps.id,{part_id:+targetId});
+    }
+    // Move inventory logs
+    await api.patch("inventory_logs","part_id",sourceId,{part_id:+targetId});
+    // Delete source part
+    await api.delete("parts","id",sourceId);
+    await loadAll();
+    closeM("partSupplier");
+    showToast("Merged & deleted!");
+  };
 
   // Inquiries
   const sendInquiry=async(data)=>{
@@ -3860,7 +3876,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}
       {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}
-      {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} onEditPart={(p,tab)=>{closeM("partSupplier");openM("editPart",{...p,_tab:tab||"info"});}} t={t}/>}
+      {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} onEditPart={(p,tab)=>{closeM("partSupplier");openM("editPart",{...p,_tab:tab||"info"});}} onMergePart={mergePart} t={t}/>}
       {isOpen("inquiry")&&<InquiryModal part={mData("inquiry")} suppliers={suppliers} partSuppliers={getPartSupps(mData("inquiry")?.id)} onSend={sendInquiry} onClose={()=>closeM("inquiry")} t={t}/>}
       {isOpen("inquiryDetail")&&<InquiryDetailModal inquiry={mData("inquiryDetail")} onUpdate={updateInquiry} onAccept={async(inq)=>{closeM("inquiryDetail");await acceptInquiry(inq);}} onClose={()=>closeM("inquiryDetail")} settings={settings} t={t}/>}
       {isOpen("editCustomer")&&<CustomerModal customer={mData("editCustomer")} onSave={saveCustomer} onClose={()=>closeM("editCustomer")} t={t}/>}

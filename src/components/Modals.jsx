@@ -2385,15 +2385,29 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
   );
 }
 
-export function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,onUpdate,onClose,onEditPart,t}) {
+export function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,onUpdate,onClose,onEditPart,onMergePart,t}) {
   const [suppId,setSuppId]=useState("");
   const [price,setPrice]=useState("");
   const [lead,setLead]=useState("");
   const [minOrd,setMinOrd]=useState(1);
   const [newPartNo,setNewPartNo]=useState("");
-  // editing supplier_part_no inline
   const [editingId,setEditingId]=useState(null);
   const [editPartNo,setEditPartNo]=useState("");
+  // merge state
+  const [mergeOpen,setMergeOpen]=useState(false);
+  const [mergeTargetId,setMergeTargetId]=useState("");
+  const [mergeTarget,setMergeTarget]=useState(null);
+  const [mergeLooking,setMergeLooking]=useState(false);
+  const [mergeConfirm,setMergeConfirm]=useState(false);
+  const lookupTarget=async()=>{
+    const id=mergeTargetId.trim();
+    if(!id){setMergeTarget(null);return;}
+    setMergeLooking(true);
+    const res=await api.get("parts",`id=eq.${id}&select=id,name,sku`);
+    setMergeTarget(Array.isArray(res)&&res[0]?res[0]:null);
+    setMergeLooking(false);
+    setMergeConfirm(false);
+  };
   if(!part)return null;
   const avail=suppliers.filter(s=>!partSuppliers.find(ps=>ps.supplier_id===s.id));
 
@@ -2500,6 +2514,55 @@ export function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,
         </div>
       )}
       {avail.length===0&&partSuppliers.length===0&&<p style={{color:"var(--text3)",textAlign:"center",padding:20}}>No suppliers yet — add them in the Suppliers section first.</p>}
+
+      {/* Merge & Delete */}
+      {onMergePart&&(
+        <div style={{marginTop:18,borderTop:"2px solid var(--border)",paddingTop:14}}>
+          <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",width:"100%",justifyContent:"flex-start"}}
+            onClick={()=>{setMergeOpen(o=>!o);setMergeTarget(null);setMergeTargetId("");setMergeConfirm(false);}}>
+            ⚠️ {mergeOpen?"Hide":"Merge & Delete this part…"}
+          </button>
+          {mergeOpen&&(
+            <div style={{marginTop:10,background:"rgba(239,68,68,.06)",border:"1px solid rgba(239,68,68,.25)",borderRadius:10,padding:14}}>
+              <div style={{fontSize:12,color:"var(--red)",fontWeight:700,marginBottom:8}}>MERGE "{part.name}" INTO ANOTHER PART</div>
+              <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>All supplier links and inventory logs will be moved to the target part, then this part will be deleted.</div>
+              <div style={{display:"flex",gap:6,marginBottom:10}}>
+                <input className="inp" style={{flex:1,fontFamily:"DM Mono,monospace",fontSize:13}}
+                  value={mergeTargetId} onChange={e=>{setMergeTargetId(e.target.value);setMergeTarget(null);setMergeConfirm(false);}}
+                  onKeyDown={e=>e.key==="Enter"&&lookupTarget()}
+                  placeholder="Enter target Part ID…"/>
+                <button className="btn btn-ghost btn-sm" onClick={lookupTarget} disabled={!mergeTargetId.trim()||mergeLooking}>
+                  {mergeLooking?"…":"Check"}
+                </button>
+              </div>
+              {mergeTarget&&(
+                <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:13}}>
+                  <div style={{fontWeight:700,marginBottom:2}}>✓ Target: {mergeTarget.name}</div>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>SKU: {mergeTarget.sku} · ID: #{mergeTarget.id}</div>
+                  <div style={{fontSize:11,color:"var(--text2)",marginTop:6}}>
+                    Will transfer: <strong>{partSuppliers.length} supplier link{partSuppliers.length!==1?"s":""}</strong> + all inventory logs
+                  </div>
+                  {!mergeConfirm
+                    ? <button className="btn btn-danger btn-sm" style={{marginTop:10,width:"100%"}} onClick={()=>setMergeConfirm(true)}>
+                        Merge &amp; Delete Part #{part.id}
+                      </button>
+                    : <div style={{marginTop:10}}>
+                        <div style={{fontSize:12,color:"var(--red)",fontWeight:700,marginBottom:8}}>⚠️ This cannot be undone. Are you sure?</div>
+                        <div style={{display:"flex",gap:8}}>
+                          <button className="btn btn-danger" style={{flex:1}} onClick={()=>onMergePart(part.id,mergeTarget.id)}>
+                            Yes, Merge &amp; Delete
+                          </button>
+                          <button className="btn btn-ghost btn-sm" onClick={()=>setMergeConfirm(false)}>Cancel</button>
+                        </div>
+                      </div>
+                  }
+                </div>
+              )}
+              {mergeTargetId.trim()&&!mergeTarget&&!mergeLooking&&<div style={{fontSize:12,color:"var(--red)"}}>No part found with ID #{mergeTargetId}</div>}
+            </div>
+          )}
+        </div>
+      )}
     </Overlay>
   );
 }

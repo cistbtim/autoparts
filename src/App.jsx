@@ -2677,7 +2677,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                     {role==="admin"&&(
                       <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
                         <button className="btn btn-ghost btn-xs" onClick={()=>openM("adjust",p)}>± Adj</button>
-                        <button className="btn btn-ghost btn-xs" onClick={async()=>{const ok=await acquireLock("part",p.id);if(ok)openM("editPart",p);}}>✏️ Edit</button>
+                        <button className="btn btn-ghost btn-xs" onClick={async()=>{const ok=await acquireLock("part",p.id);if(!ok)return;const fresh=await api.get("parts",`id=eq.${p.id}&select=*`);openM("editPart",Array.isArray(fresh)&&fresh[0]?fresh[0]:p);}}>✏️ Edit</button>
                         <button className="btn btn-ghost btn-xs" onClick={()=>openM("stockMove",p)}>🔀 Move</button>
                         <button className="btn btn-ghost btn-xs" onClick={()=>openM("partSupplier",p)}>🏭 Supp</button>
                         <button className="btn btn-ghost btn-xs" onClick={()=>{setLogSearch(p.sku||"");setTab("logs");}}>📝 Logs</button>
@@ -2773,7 +2773,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                                 ):(
                                   <PartActionsMenu
                                     onAdjust={()=>openM("adjust",p)}
-                                    onEdit={async()=>{ const ok=await acquireLock("part",p.id); if(ok) openM("editPart",p); }}
+                                    onEdit={async()=>{ const ok=await acquireLock("part",p.id); if(!ok)return; const fresh=await api.get("parts",`id=eq.${p.id}&select=*`); openM("editPart",Array.isArray(fresh)&&fresh[0]?fresh[0]:p); }}
                                     onMove={()=>openM("stockMove",p)}
                                     onSupplier={()=>openM("partSupplier",p)}
                                     onRfq={()=>openM("inquiry",p)}

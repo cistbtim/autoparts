@@ -2657,6 +2657,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                         {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{p.chinese_desc}</div>}
                         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:5,alignItems:"center"}}>
                           <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{p.sku}</code>
+                          <span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)",opacity:.55}}>#{p.id}</span>
                           {p.bin_location&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)",background:"rgba(96,165,250,.1)",padding:"1px 7px",borderRadius:5}}>📦 {p.bin_location}</span>}
                           {p.category&&<span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:10}}>{p.category}</span>}
                         </div>
@@ -2712,7 +2713,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                                   onError={e=>{e.target.style.display="none";e.target.nextSibling&&(e.target.nextSibling.style.display="flex");}}/>
                               : <div className="part-emoji">{p.image||"🔩"}</div>}
                           </td>
-                          <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)"}}>{p.sku}</code></td>
+                          <td>
+                            <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)"}}>{p.sku}</code>
+                            <div style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)",opacity:.55,marginTop:1}}>#{p.id}</div>
+                          </td>
                           <td>
                             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
                               <div style={{flex:1,minWidth:0}}>

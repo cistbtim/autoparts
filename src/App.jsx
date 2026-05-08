@@ -3136,13 +3136,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 const img=toImgUrl(p.image_url);
                 return (
                   <div key={p.id} className="card card-hover" style={{padding:16,borderColor:inCart?"var(--accent)":"var(--border)",boxShadow:inCart?"var(--glow)":"none",display:"flex",flexDirection:"column"}}>
-                    {/* Image */}
+                    {/* Image — admin: click to edit; others: click to zoom */}
                     {img
-                      ? <img src={img} alt={p.name}
-                          style={{width:"100%",height:120,objectFit:"contain",background:"#fff",borderRadius:9,marginBottom:12,cursor:"zoom-in",flexShrink:0}}
-                          onClick={()=>setLightbox({url:toFullUrl(p.image_url),name:p.name})}
-                          onError={e=>e.target.style.display="none"}/>
-                      : <div style={{width:"100%",height:90,background:"var(--surface2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:38,marginBottom:12,flexShrink:0}}>{p.image||"🔩"}</div>}
+                      ? <div style={{position:"relative",marginBottom:12,flexShrink:0}}>
+                          <img src={img} alt={p.name}
+                            style={{width:"100%",height:120,objectFit:"contain",background:"#fff",borderRadius:9,cursor:role==="admin"?"pointer":"zoom-in",display:"block"}}
+                            onClick={()=>role==="admin"?openM("editPart",p):setLightbox({url:toFullUrl(p.image_url),name:p.name})}
+                            onError={e=>e.target.parentNode.style.display="none"}/>
+                          {role==="admin"&&<div style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.55)",color:"#fff",fontSize:11,borderRadius:5,padding:"2px 7px",pointerEvents:"none"}}>✏️ Edit</div>}
+                        </div>
+                      : <div style={{width:"100%",height:90,background:"var(--surface2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:38,marginBottom:12,flexShrink:0,cursor:role==="admin"?"pointer":"default"}}
+                          onClick={()=>role==="admin"&&openM("editPart",p)}>{p.image||"🔩"}</div>}
                     {/* Content — flex:1 pushes button to bottom */}
                     <div style={{flex:1}}>
                       <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{p.sku} · {p.brand}</div>

@@ -1825,6 +1825,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const CATS=lang==="en"?CATS_EN:CATS_ZH;
   const allCat="__all__",allOS="__all__";
   // Multi-word search using DEBOUNCED value — fast typing won't lag UI
+  const suppNoByPart={};
+  partSuppliers.forEach(ps=>{if(ps.supplier_part_no)suppNoByPart[ps.part_id]=(suppNoByPart[ps.part_id]||[]).concat(ps.supplier_part_no.toLowerCase());});
   const fp=parts.filter(p=>{
     if(isDemo&&!(p.image_url||p.image_data))return false; // demo: only parts with photos
     if(filterLow&&p.stock>p.min_stock)return false;
@@ -1838,7 +1840,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const words=searchDebounced.trim().toLowerCase().split(" ").filter(Boolean);
     const fields=[
       p.name, p.chinese_desc, p.sku, p.brand,
-      p.make, p.model, p.year_range, p.oe_number, p.category
+      p.make, p.model, p.year_range, p.oe_number, p.category,
+      ...(suppNoByPart[p.id]||[])
     ].map(v=>(v||"").toLowerCase()).join(" ");
     return words.every(w=>fields.includes(w));
   });

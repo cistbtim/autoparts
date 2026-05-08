@@ -485,6 +485,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     psLoadedRef.current=true;
     setPsLoading(false);
   },[]);
+  const reloadPartSuppliers=useCallback(async()=>{
+    const data=await api.get("part_suppliers","select=*");
+    setPartSuppliers(Array.isArray(data)?data:[]);
+  },[]);
   useEffect(()=>{
     if(tab==="inventory"||tab==="suppliers") loadPartSuppliers();
   },[tab,loadPartSuppliers]);
@@ -1410,15 +1414,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       showToast(`Error saving: ${res.message||res.code}`, "err");
       return;
     }
-    await loadPartSuppliers();showToast("Supplier linked!");
+    await reloadPartSuppliers();showToast("Supplier linked!");
   };
   const updatePartSupplier=async(id,data)=>{
     const res = await api.patch("part_suppliers","id",id,data);
     if(res?.code) { showToast(`Error: ${res.message||res.code}`,"err"); return; }
-    await loadPartSuppliers();showToast("Updated!");
+    await reloadPartSuppliers();showToast("Updated!");
   };
-  const deletePartSupplier=async(id)=>{await api.delete("part_suppliers","id",id);await loadPartSuppliers();showToast("Removed","err");};
-  const deletePartSupplierMany=async(ids)=>{for(const id of ids)await api.delete("part_suppliers","id",id);await loadPartSuppliers();showToast(`Removed ${ids.length} link${ids.length>1?"s":""}`, "err");};
+  const deletePartSupplier=async(id)=>{await api.delete("part_suppliers","id",id);await reloadPartSuppliers();showToast("Removed","err");};
+  const deletePartSupplierMany=async(ids)=>{for(const id of ids)await api.delete("part_suppliers","id",id);await reloadPartSuppliers();showToast(`Removed ${ids.length} link${ids.length>1?"s":""}`, "err");};
 
   // Inquiries
   const sendInquiry=async(data)=>{

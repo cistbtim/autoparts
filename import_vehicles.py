@@ -184,11 +184,20 @@ def main():
             print(f"  … and {len(vehicle_rows)-5} more")
         return
 
-    # 2. Fetch existing vehicles to avoid duplicates
-    print("\n→ Fetching existing vehicles …")
-    existing = get_all("vehicles", "id,code")
-    existing_codes = {v["code"] for v in existing if v.get("code")}
-    print(f"  {len(existing_codes)} vehicles already in DB")
+    # 2. Check that the `code` column exists
+    print("\n→ Checking vehicles table …")
+    probe = get_all("vehicles", "id,code")
+    if probe is None:
+        print("\nERROR: Could not read the `code` column from the vehicles table.")
+        print("  Run this SQL in Supabase first, then re-run this script:")
+        print()
+        print("    ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS code TEXT;")
+        print("    CREATE INDEX IF NOT EXISTS idx_vehicles_code ON vehicles(code);")
+        print()
+        sys.exit(1)
+
+    existing_codes = {v["code"] for v in probe if v.get("code")}
+    print(f"  {len(existing_codes)} vehicles with codes already in DB")
 
     new_vehicles = [v for v in vehicle_rows if v["code"] not in existing_codes]
     skipped = len(vehicle_rows) - len(new_vehicles)
@@ -207,6 +216,11 @@ def main():
     all_vehicles = get_all("vehicles", "id,code")
     code_to_id = {v["code"]: v["id"] for v in all_vehicles if v.get("code")}
     print(f"  {len(code_to_id)} vehicles with codes loaded")
+
+    if len(code_to_id) == 0:
+        print("\nERROR: No vehicles have a code value — the `code` column may be empty.")
+        print("  Make sure you ran the ALTER TABLE SQL and re-run this script.")
+        sys.exit(1)
 
     # 4. Fetch all parts (id + sku only)
     print("\n→ Fetching parts …")

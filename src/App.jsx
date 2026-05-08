@@ -342,13 +342,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     }
 
     // LAZY: load secondary data in background
-    const BG_TABLES=["customers","users","inventory_logs","login_logs","inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","vehicles","part_fitments","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes","workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes","workshop_customers","workshop_vehicles","customer_queries","workshop_stock","workshop_services","workshop_documents","workshop_profiles","workshop_suppliers","ws_supplier_requests","ws_supplier_quotes","ws_supplier_invoices","ws_supplier_invoice_items","ws_supplier_payments","ws_supplier_returns","ws_sq_replies","ws_purchase_orders","ws_po_items","ws_licence_renewals","workshop_bookings","scrapyard_vehicles","scrapyard_parts","scrapyard_profiles"];
+    // Role-scoped: skip tables the current role will never use
+    const needsWs  = role==="admin"||role==="manager"||role==="workshop"||role==="demo";
+    const needsScrap = role==="admin"||role==="scrapyard"||role==="demo";
+    const needsAdmin = role==="admin"||role==="demo";
+    const BG_TABLES=["customers","users","inventory_logs",needsAdmin?"login_logs":null,"inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","vehicles","part_fitments","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes",needsWs?"workshop_jobs":null,needsWs?"workshop_job_items":null,needsWs?"workshop_invoices":null,needsWs?"workshop_quotes":null,needsWs?"workshop_customers":null,needsWs?"workshop_vehicles":null,"customer_queries",needsWs?"workshop_stock":null,needsWs?"workshop_services":null,needsWs?"workshop_documents":null,needsWs?"workshop_profiles":null,needsWs?"workshop_suppliers":null,needsWs?"ws_supplier_requests":null,needsWs?"ws_supplier_quotes":null,needsWs?"ws_supplier_invoices":null,needsWs?"ws_supplier_invoice_items":null,needsWs?"ws_supplier_payments":null,needsWs?"ws_supplier_returns":null,needsWs?"ws_sq_replies":null,needsWs?"ws_purchase_orders":null,needsWs?"ws_po_items":null,needsWs?"ws_licence_renewals":null,needsWs?"workshop_bookings":null,needsScrap?"scrapyard_vehicles":null,needsScrap?"scrapyard_parts":null,needsScrap?"scrapyard_profiles":null].filter(Boolean);
     setBgLoading(BG_TABLES.length);
     const [c,u,l,ll,inq,si,ci,sr,cr,veh,fit,py,...rest]=await Promise.all([
       api.get("customers","select=*&order=total_spent.desc"),
       api.get("users","select=*&order=id.asc"),
       api.get("inventory_logs","select=*&order=created_at.desc&limit=200"),
-      api.get("login_logs","select=*&order=created_at.desc&limit=200"),
+      needsAdmin ? api.get("login_logs","select=*&order=created_at.desc&limit=200") : Promise.resolve([]),
       api.get("inquiries","select=*&order=created_at.desc"),
       api.get("supplier_invoices","select=*&order=created_at.desc"),
       api.get("customer_invoices","select=*&order=created_at.desc"),
@@ -362,32 +366,32 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       api.get("rfq_quotes","select=*&order=created_at.desc").catch(()=>[]),
       api.get("stock_moves","select=*&order=moved_at.desc&limit=200").catch(()=>[]),
       api.get("stock_takes","select=*&order=created_at.desc").catch(()=>[]),
-      api.get("workshop_jobs",`select=*&order=date_in.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_job_items",`select=*${wsF}`).catch(()=>[]),
-      api.get("workshop_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_quotes",`select=*&order=quote_date.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_customers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
-      api.get("workshop_vehicles",`select=*&order=reg.asc${wsF}`).catch(()=>[]),
+      needsWs ? api.get("workshop_jobs",`select=*&order=date_in.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_job_items",`select=*${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_quotes",`select=*&order=quote_date.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_customers",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_vehicles",`select=*&order=reg.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       api.get("customer_queries","select=*&order=created_at.desc").catch(()=>[]),
-      api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]),
-      api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]),
-      api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_profiles","select=id,name,city,country&order=name.asc").catch(()=>[]),
-      api.get("workshop_suppliers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_requests",`select=*&order=sent_at.desc${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_quotes",`select=*&order=quoted_at.desc${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_invoice_items",`select=*${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_payments",`select=*&order=payment_date.desc${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_returns",`select=*&order=return_date.desc${wsF}`).catch(()=>[]),
-      api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
-      api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
-      api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
-      api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
-      api.get("scrapyard_vehicles","select=*&order=created_at.desc").catch(()=>[]),
-      api.get("scrapyard_parts","select=*&order=created_at.desc").catch(()=>[]),
-      api.get("scrapyard_profiles","select=*&order=id.asc").catch(()=>[]),
+      needsWs ? api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_profiles","select=id,name,city,country&order=name.asc").catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_suppliers",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("ws_supplier_requests",`select=*&order=sent_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("ws_supplier_quotes",`select=*&order=quoted_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("ws_supplier_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("ws_supplier_invoice_items",`select=*${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("ws_supplier_payments",`select=*&order=payment_date.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("ws_supplier_returns",`select=*&order=return_date.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsScrap ? api.get("scrapyard_vehicles","select=*&order=created_at.desc").catch(()=>[]) : Promise.resolve([]),
+      needsScrap ? api.get("scrapyard_parts","select=*&order=created_at.desc").catch(()=>[]) : Promise.resolve([]),
+      needsScrap ? api.get("scrapyard_profiles","select=*&order=id.asc").catch(()=>[]) : Promise.resolve([]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -472,6 +476,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       setSyInvoices(Array.isArray(syI)?syI:[]);
       setSyReturns(Array.isArray(syR)?syR:[]);
     }
+    lastLoadRef.current = Date.now();
   },[]);
 
   // Lazy load part_suppliers — only when inventory or suppliers tab is opened
@@ -492,6 +497,59 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   useEffect(()=>{
     if(tab==="inventory"||tab==="suppliers") loadPartSuppliers();
   },[tab,loadPartSuppliers]);
+
+  // Targeted refresh — fetch only the tables that a mutation actually dirtied.
+  // Cuts ~40-table loadAll() down to 1-4 requests per save operation.
+  const refreshTables=useCallback(async(...names)=>{
+    const D={
+      parts:                    ["select=*&order=id.asc",                            d=>setParts(Array.isArray(d)?d:[])],
+      orders:                   ["select=*&order=created_at.desc",                   d=>setOrders(Array.isArray(d)?d:[])],
+      suppliers:                ["select=*&order=name.asc",                          d=>setSuppliers(Array.isArray(d)?d:[])],
+      customers:                ["select=*&order=total_spent.desc",                  d=>setCustomers(Array.isArray(d)?d:[])],
+      users:                    ["select=*&order=id.asc",                            d=>setUsers(Array.isArray(d)?d:[])],
+      inventory_logs:           ["select=*&order=created_at.desc&limit=200",         d=>setLogs(Array.isArray(d)?d:[])],
+      inquiries:                ["select=*&order=created_at.desc",                   d=>setInquiries(Array.isArray(d)?d:[])],
+      supplier_invoices:        ["select=*&order=created_at.desc",                   d=>setSupplierInvoices(Array.isArray(d)?d:[])],
+      customer_invoices:        ["select=*&order=created_at.desc",                   d=>setCustomerInvoices(Array.isArray(d)?d:[])],
+      supplier_returns:         ["select=*&order=created_at.desc",                   d=>setSupplierReturns(Array.isArray(d)?d:[])],
+      customer_returns:         ["select=*&order=created_at.desc",                   d=>setCustomerReturns(Array.isArray(d)?d:[])],
+      vehicles:                 ["select=*&order=make.asc,model.asc,year_from.asc",  d=>setVehicles(Array.isArray(d)?d:[])],
+      part_fitments:            ["select=*",                                          d=>setPartFitments(Array.isArray(d)?d:[])],
+      payments:                 ["select=*&order=payment_date.desc",                 d=>setPayments(Array.isArray(d)?d:[])],
+      rfq_sessions:             ["select=*&order=created_at.desc",                   d=>setRfqSessions(Array.isArray(d)?d:[])],
+      rfq_items:                ["select=*",                                          d=>setRfqItems(Array.isArray(d)?d:[])],
+      rfq_quotes:               ["select=*&order=created_at.desc",                   d=>setRfqQuotes(Array.isArray(d)?d:[])],
+      stock_moves:              ["select=*&order=moved_at.desc&limit=200",            d=>setStockMoves(Array.isArray(d)?d:[])],
+      stock_takes:              ["select=*&order=created_at.desc",                   d=>setStockTakes(Array.isArray(d)?d:[])],
+      workshop_jobs:            [`select=*&order=date_in.desc${wsF}`,                d=>setWorkshopJobs(Array.isArray(d)?d:[])],
+      workshop_job_items:       [`select=*${wsF}`,                                   d=>setWorkshopJobItems(Array.isArray(d)?d:[])],
+      workshop_invoices:        [`select=*&order=invoice_date.desc${wsF}`,           d=>setWorkshopInvoices(Array.isArray(d)?d:[])],
+      workshop_quotes:          [`select=*&order=quote_date.desc${wsF}`,             d=>setWorkshopQuotes(Array.isArray(d)?d:[])],
+      workshop_customers:       [`select=*&order=name.asc${wsF}`,                    d=>setWorkshopCustomers(Array.isArray(d)?d:[])],
+      workshop_vehicles:        [`select=*&order=reg.asc${wsF}`,                     d=>setWorkshopVehicles(Array.isArray(d)?d:[])],
+      customer_queries:         ["select=*&order=created_at.desc",                   d=>setCustomerQueries(Array.isArray(d)?d:[])],
+      workshop_stock:           [`select=*&order=name.asc${wsF}`,                    d=>setWorkshopStock(Array.isArray(d)?d:[])],
+      workshop_services:        [`select=*&order=name.asc${wsF}`,                    d=>setWorkshopServices(Array.isArray(d)?d:[])],
+      workshop_documents:       [`select=*&order=uploaded_at.desc${wsF}`,            d=>setWorkshopDocuments(Array.isArray(d)?d:[])],
+      workshop_suppliers:       [`select=*&order=name.asc${wsF}`,                    d=>setWorkshopSuppliers(Array.isArray(d)?d:[])],
+      ws_supplier_requests:     [`select=*&order=sent_at.desc${wsF}`,                d=>setWsSupplierRequests(Array.isArray(d)?d:[])],
+      ws_supplier_quotes:       [`select=*&order=quoted_at.desc${wsF}`,              d=>setWsSupplierQuotes(Array.isArray(d)?d:[])],
+      ws_supplier_invoices:     [`select=*&order=invoice_date.desc${wsF}`,           d=>setWsSupplierInvoices(Array.isArray(d)?d:[])],
+      ws_supplier_invoice_items:[`select=*${wsF}`,                                   d=>setWsSupplierInvItems(Array.isArray(d)?d:[])],
+      ws_supplier_payments:     [`select=*&order=payment_date.desc${wsF}`,           d=>setWsSupplierPayments(Array.isArray(d)?d:[])],
+      ws_supplier_returns:      [`select=*&order=return_date.desc${wsF}`,            d=>setWsSupplierReturns(Array.isArray(d)?d:[])],
+      ws_sq_replies:            [`select=*${wsF}`,                                   d=>setWsSqReplies(Array.isArray(d)?d:[])],
+      ws_purchase_orders:       [`select=*&order=created_at.desc${wsF}`,             d=>setWsPurchaseOrders(Array.isArray(d)?d:[])],
+      ws_po_items:              [`select=*${wsF}`,                                   d=>setWsPoItems(Array.isArray(d)?d:[])],
+      ws_licence_renewals:      [`select=*&order=submitted_at.desc${wsF}`,           d=>setWsLicenceRenewals(Array.isArray(d)?d:[])],
+      workshop_bookings:        [`select=*&order=created_at.desc${wsF}`,             d=>setWsBookings(Array.isArray(d)?d:[])],
+    };
+    await Promise.all(names.map(async name=>{
+      const def=D[name]; if(!def) return;
+      const data=await api.get(name,def[0]).catch(()=>[]);
+      def[1](data);
+    }));
+  },[]);
 
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
   const refreshWorkshopData=useCallback(async()=>{
@@ -585,6 +643,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
   // Track last user interaction time
   const lastActivityRef = useRef(Date.now());
+  const lastLoadRef = useRef(0); // timestamp of last full loadAll — used to skip redundant focus refreshes
   // Track current tab — pause refresh during stock count
   const tabRef = useRef(tab);
   useEffect(()=>{ tabRef.current = tab; },[tab]);
@@ -621,22 +680,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       document.addEventListener(e, onActivity, {passive:true})
     );
 
-    // Auto-refresh every 60s — only when user is idle AND no modal open
+    // Auto-refresh every 5 minutes — only when user is idle AND no modal open
     const interval = setInterval(()=>{
       if(isBusy()) return;
       loadAll();
-    }, 60000);
+    }, 300000);
 
-    // On tab/window focus — only refresh if user was away AND not busy
+    // On tab/window focus — skip if last full load was less than 5 minutes ago
     const onFocus = () => {
-      if(isBusy()) return; // editing — don't interrupt
+      if(isBusy()) return;
+      if(Date.now()-lastLoadRef.current < 300000) return;
       loadAll();
     };
     window.addEventListener("focus", onFocus);
 
-    // On visibility change (phone wake, alt+tab back)
+    // On visibility change (phone wake, alt+tab back) — same 5-minute gate
     const onVisible = () => {
-      if(document.visibilityState==="visible" && !isBusy()) loadAll();
+      if(document.visibilityState==="visible" && !isBusy() && Date.now()-lastLoadRef.current >= 300000) loadAll();
     };
     document.addEventListener("visibilitychange", onVisible);
 
@@ -709,7 +769,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const ex=customers.find(c=>c.phone===form.phone);
     if(ex) await api.patch("customers","phone",form.phone,{orders:ex.orders+1,total_spent:ex.total_spent+cartTotal});
     else await api.upsert("customers",{name:form.name,phone:form.phone,email:form.email||"",address:form.address||"",orders:1,total_spent:cartTotal});
-    await loadAll();setCart([]);closeM("checkout");
+    await refreshTables("orders","customers");setCart([]);closeM("checkout");
     openM("orderConfirm",{order:orderObj,phone:form.phone,email:form.email||""});
     setTab(role==="customer"?"myorders":"orders");
   };
@@ -744,7 +804,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     }
     else showToast("Status updated");
 
-    await api.patch("orders","id",id,{status:ns});await loadAll();
+    await api.patch("orders","id",id,{status:ns});await refreshTables("orders","parts","inventory_logs");
   };
 
   // Parts
@@ -1359,7 +1419,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         });
       }
     }
-    await refreshWorkshopData(); await loadAll();
+    await Promise.all([refreshWorkshopData(), refreshTables("parts","stock_moves","inventory_logs")]);
     showToast("Transfer completed ✅");
   };
 
@@ -1381,13 +1441,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const {id, ...data} = v;
     if(id) await api.patch("vehicles","id",id,data);
     else await api.insert("vehicles",data);
-    await loadAll(); showToast("Vehicle saved");
+    await refreshTables("vehicles"); showToast("Vehicle saved");
   };
   const deleteVehicle=async(id)=>{
     await api.delete("vehicles","id",id);
-    await loadAll(); showToast("Deleted","err");
+    await refreshTables("vehicles"); showToast("Deleted","err");
   };
-  const deletePart=async(id)=>{const p=parts.find(p=>p.id===id);if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await api.delete("parts","id",id);await loadAll();showToast("Deleted","err");};
+  const deletePart=async(id)=>{const p=parts.find(p=>p.id===id);if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await api.delete("parts","id",id);await refreshTables("parts","inventory_logs");showToast("Deleted","err");};
   const applyAdjust=async(part,nq,reason)=>{
     await api.patch("parts","id",part.id,{stock:nq});
     await logInv(part,part.stock,nq,"Manual Adj.",reason||"Manual");
@@ -1397,8 +1457,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   // Suppliers
-  const saveSupplier=async(data)=>{const es=mData("editSupplier");if(es)await api.patch("suppliers","id",es.id,data);else await api.upsert("suppliers",data);await loadAll();closeM("editSupplier");showToast(es?"Supplier updated":"Supplier added");};
-  const deleteSupplier=async(id)=>{await api.delete("suppliers","id",id);await loadAll();showToast("Deleted","err");};
+  const saveSupplier=async(data)=>{const es=mData("editSupplier");if(es)await api.patch("suppliers","id",es.id,data);else await api.upsert("suppliers",data);await refreshTables("suppliers");closeM("editSupplier");showToast(es?"Supplier updated":"Supplier added");};
+  const deleteSupplier=async(id)=>{await api.delete("suppliers","id",id);await refreshTables("suppliers");showToast("Deleted","err");};
   const savePartSupplier=async(data)=>{
     // Only save columns that exist — supplier_part_no is safe after SQL migration
     const record = {
@@ -1435,7 +1495,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     await api.patch("inventory_logs","part_id",sourceId,{part_id:+targetId});
     // Delete source part
     await api.delete("parts","id",sourceId);
-    await loadAll();
+    await refreshTables("parts","inventory_logs");
     closeM("partSupplier");
     showToast("Merged & deleted!");
   };
@@ -1471,9 +1531,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       showToast(`Error: ${res.message||res.code}`, "err");
       return;
     }
-    await loadAll();closeM("inquiry");openM("rfqSend",{...data,token});
+    await refreshTables("inquiries");closeM("inquiry");openM("rfqSend",{...data,token});
   };
-  const updateInquiry=async(id,data)=>{await api.patch("inquiries","id",id,data);await loadAll();showToast("Updated");};
+  const updateInquiry=async(id,data)=>{await api.patch("inquiries","id",id,data);await refreshTables("inquiries");showToast("Updated");};
 
   const acceptInquiry=async(inq)=>{
     if(!inq.reply_price) return;
@@ -1500,7 +1560,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       await logInv(part,part.stock,ns,"Stock In",`RFQ Accept ${inq.id}`);
     }
     await api.patch("inquiries","id",inq.id,{status:"ordered"});
-    await loadAll();
+    await refreshTables("inquiries","supplier_invoices","parts","inventory_logs");
     showToast(`✅ PO ${invId} created`);
     setTab("purchaseInvoices");
   };
@@ -1535,13 +1595,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         if(part){const ns=part.stock+item.qty;await api.patch("parts","id",item.part_id,{stock:ns});await logInv(part,part.stock,ns,"Stock In",`Invoice ${inv.id}`);}
       }
     }
-    await loadAll();closeM("supplierInvoice");showToast(isNew?"Invoice saved & stock updated":"Invoice updated");
+    await refreshTables("supplier_invoices","parts","inventory_logs");closeM("supplierInvoice");showToast(isNew?"Invoice saved & stock updated":"Invoice updated");
   };
   const deleteSupplierInvoice=async(id)=>{
     if(!window.confirm("Delete this empty invoice?")) return;
     await api.delete("supplier_invoice_items","invoice_id",id);
     await api.delete("supplier_invoices","id",id);
-    await loadAll();showToast("Invoice deleted","err");
+    await refreshTables("supplier_invoices");showToast("Invoice deleted","err");
   };
 
   // Supplier Returns
@@ -1552,7 +1612,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       const part=parts.find(p=>p.id===item.part_id);
       if(part){const ns=Math.max(0,part.stock-item.qty);await api.patch("parts","id",item.part_id,{stock:ns});await logInv(part,part.stock,ns,"Stock Out",`Return ${data.id}`);}
     }
-    await loadAll();closeM("supplierReturn");showToast("Return recorded & stock adjusted");
+    await refreshTables("supplier_returns","parts","inventory_logs");closeM("supplierReturn");showToast("Return recorded & stock adjusted");
   };
 
   // Customer Invoices
@@ -1563,7 +1623,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(inv.order_id){
       await api.patch("orders","id",inv.order_id,{status:"Invoiced"});
     }
-    await loadAll();closeM("customerInvoice");showToast("✅ Invoice created — awaiting payment");
+    await refreshTables("customer_invoices","orders");closeM("customerInvoice");showToast("✅ Invoice created — awaiting payment");
   };
 
   // Customer Returns
@@ -1574,14 +1634,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       const part=parts.find(p=>p.id===item.part_id);
       if(part){const ns=part.stock+item.qty;await api.patch("parts","id",item.part_id,{stock:ns});await logInv(part,part.stock,ns,"Return In",`Customer Return ${data.id}`);}
     }
-    await loadAll();closeM("customerReturn");showToast("Return recorded & stock restored");
+    await refreshTables("customer_returns","parts","inventory_logs");closeM("customerReturn");showToast("Return recorded & stock restored");
   };
 
   // Customers / Users
-  const saveCustomer=async(data)=>{const ec=mData("editCustomer");if(ec)await api.patch("customers","id",ec.id,data);else await api.upsert("customers",{...data,orders:0,total_spent:0});await loadAll();closeM("editCustomer");showToast(ec?"Updated":"Added");};
-  const deleteCustomer=async(id)=>{await api.delete("customers","id",id);await loadAll();showToast("Deleted","err");};
-  const saveUser=async(data)=>{const eu=mData("editUser");if(eu?.id)await api.patch("users","id",eu.id,data);else await api.upsert("users",data);await loadAll();closeM("editUser");showToast(eu?.id?"Updated":"Added");};
-  const deleteUser=async(id)=>{if(id===user.id){showToast("Cannot delete yourself","err");return;}await api.delete("users","id",id);await loadAll();showToast("Deleted","err");};
+  const saveCustomer=async(data)=>{const ec=mData("editCustomer");if(ec)await api.patch("customers","id",ec.id,data);else await api.upsert("customers",{...data,orders:0,total_spent:0});await refreshTables("customers");closeM("editCustomer");showToast(ec?"Updated":"Added");};
+  const deleteCustomer=async(id)=>{await api.delete("customers","id",id);await refreshTables("customers");showToast("Deleted","err");};
+  const saveUser=async(data)=>{const eu=mData("editUser");if(eu?.id)await api.patch("users","id",eu.id,data);else await api.upsert("users",data);await refreshTables("users");closeM("editUser");showToast(eu?.id?"Updated":"Added");};
+  const deleteUser=async(id)=>{if(id===user.id){showToast("Cannot delete yourself","err");return;}await api.delete("users","id",id);await refreshTables("users");showToast("Deleted","err");};
   const saveSettings=async(data)=>{
     // Include id:1 so upsert creates row if missing
     const merged = {...getSettings(),...settings,...data, id:1};
@@ -1657,14 +1717,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       }
     }
     for(const q of quotes) await api.insert("rfq_quotes",q);
-    await loadAll();
+    await refreshTables("rfq_sessions","rfq_items","rfq_quotes");
     showToast(`✅ RFQ created — ${items.length} parts × ${selectedSuppliers.length} suppliers`);
     return sid;
   };
 
   const updateRfqStatus=async(sid,status)=>{
     await api.patch("rfq_sessions","id",sid,{status});
-    await loadAll();
+    await refreshTables("rfq_sessions");
   };
 
   const selectRfqQuote=async(quoteId,rfqItemId)=>{
@@ -1725,7 +1785,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       }
     }
     await api.patch("rfq_sessions","id",sid,{status:"ordered"});
-    await loadAll();
+    await refreshTables("rfq_sessions","supplier_invoices","parts","inventory_logs");
     showToast(`✅ ${Object.keys(bySupplier).length} Purchase Order(s) created`);
     setTab("purchaseInvoices");
   };
@@ -1737,7 +1797,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(data.to_bin&&data.part_id){
       await api.patch("parts","id",data.part_id,{bin_location:data.to_bin});
     }
-    await loadAll(); closeM("stockMove"); showToast("✅ Stock moved");
+    await refreshTables("stock_moves","parts"); closeM("stockMove"); showToast("✅ Stock moved");
   };
 
   const startStockTake=async(name, selectedPartIds)=>{
@@ -1772,7 +1832,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         console.error("Insert error:",item.id,e);
       }
     }
-    await loadAll();
+    await refreshTables("stock_takes","parts");
     showToast(`✅ Stock take started — ${inserted} items`);
     return stId;
   };
@@ -1811,12 +1871,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       await api.patch("stock_takes","id",stId,{status:"Counted"});
       showToast("📦 Count submitted — awaiting manager approval");
     }
-    await loadAll();
+    await refreshTables("stock_takes","parts","inventory_logs");
   };
 
   const reopenStockTake=async(stId)=>{
     await api.patch("stock_takes","id",stId,{status:"open"});
-    await loadAll();
+    await refreshTables("stock_takes");
     showToast("🔄 Stock take reopened for double check");
   };
 
@@ -1833,9 +1893,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         await api.patch("supplier_invoices","id",data.reference_id,{status:"paid"});
       }
     }
-    await loadAll();closeM("addPayment");showToast("✅ Payment recorded & invoice marked paid");
+    await refreshTables("payments","customer_invoices","supplier_invoices","orders");closeM("addPayment");showToast("✅ Payment recorded & invoice marked paid");
   };
-  const deletePayment=async(id)=>{await api.delete("payments","id",id);await loadAll();showToast("Deleted","err");};
+  const deletePayment=async(id)=>{await api.delete("payments","id",id);await refreshTables("payments");showToast("Deleted","err");};
 
   // Derived
   const CATS=lang==="en"?CATS_EN:CATS_ZH;

@@ -1385,133 +1385,124 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// VEHICLES MANAGEMENT PAGE
+// VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
 export function VehiclesPage({vehicles, partFitments, onSave, onDelete, t}) {
-  const [search, setSearch]   = useState("");
-  const [editV,  setEditV]    = useState(null);  // null=closed, {}=new, {...}=edit
-  const [filterMake, setFilterMake] = useState("__all__");
-
-  const makes = ["__all__", ...[...new Set(vehicles.map(v=>v.make))].sort()];
-
-  const filtered = vehicles.filter(v => {
-    if(filterMake !== "__all__" && v.make !== filterMake) return false;
-    if(!search.trim()) return true;
-    const s = search.toLowerCase();
-    return `${v.make} ${v.model} ${v.variant||""} ${v.engine||""} ${v.year_from||""} ${v.year_to|""}`.toLowerCase().includes(s);
-  });
+  const [selMake, setSelMake] = useState(null);  // null = makes level
+  const [search,  setSearch]  = useState("");
+  const [editV,   setEditV]   = useState(null);
 
   const fitCount = (vid) => partFitments.filter(f=>String(f.vehicle_id)===String(vid)).length;
+
+  // ── Level 1: makes summary ──────────────────────────────────
+  const makeStats = [...new Set(vehicles.map(v=>v.make))].sort().map(make=>{
+    const mvs   = vehicles.filter(v=>v.make===make);
+    const links = partFitments.filter(f=>mvs.some(v=>String(v.id)===String(f.vehicle_id))).length;
+    return { make, count: mvs.length, links };
+  });
+
+  // ── Level 2: models for selected make (with optional search) ─
+  const inMake = selMake ? vehicles.filter(v=>v.make===selMake) : [];
+  const filtered = inMake.filter(v=>{
+    if(!search.trim()) return true;
+    const s=search.toLowerCase();
+    return `${v.model} ${v.variant||""} ${v.code||""} ${v.engine||""} ${v.year_from||""} ${v.year_to||""}`.toLowerCase().includes(s);
+  });
+
+  const newVehicleDefaults = { make: selMake||"GWM", model:"", code:"", year_from:"", year_to:"", engine:"", variant:"" };
 
   return (
   <>
     <div className="fu">
-      {/* Header */}
+
+      {/* ── Header ── */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
-        <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>🚗 {t.vehicleMgmt||"Vehicle Management"}</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{vehicles.length} vehicles · {partFitments.length} fitment links</p>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {selMake&&(
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setSelMake(null);setSearch("");}}>
+              ← Back
+            </button>
+          )}
+          <div>
+            <h1 style={{fontSize:20,fontWeight:700}}>
+              🚗 {selMake ? selMake : (t.vehicleMgmt||"Vehicle Management")}
+            </h1>
+            <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
+              {selMake
+                ? `${inMake.length} model${inMake.length!==1?"s":""}`
+                : `${makeStats.length} makes · ${vehicles.length} vehicles`}
+            </p>
+          </div>
         </div>
-        <button className="btn btn-primary" onClick={()=>setEditV({make:"GWM",model:"",year_from:"",year_to:"",engine:"",variant:""})}>
+        <button className="btn btn-primary" onClick={()=>setEditV(newVehicleDefaults)}>
           + {t.addVehicle||"Add Vehicle"}
         </button>
       </div>
 
-      {/* Filters */}
-      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
-        <div style={{position:"relative",flex:"1 1 200px"}}>
+      {/* ── Level 1: Makes grid ── */}
+      {!selMake&&(
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:12}}>
+          {makeStats.map(({make,count,links})=>(
+            <div key={make} className="card card-hover" style={{padding:"16px 18px",cursor:"pointer"}}
+              onClick={()=>{setSelMake(make);setSearch("");}}>
+              <div style={{fontSize:16,fontWeight:700,marginBottom:4}}>{make}</div>
+              <div style={{fontSize:12,color:"var(--text3)"}}>{count} model{count!==1?"s":""}</div>
+              <div style={{fontSize:12,color:"var(--blue)",marginTop:2}}>🔗 {links} fitments</div>
+            </div>
+          ))}
+          {makeStats.length===0&&(
+            <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)",gridColumn:"1/-1"}}>
+              No vehicles yet — add one to get started
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Level 2: Models for selected make ── */}
+      {selMake&&(<>
+        {/* Search within make */}
+        <div style={{position:"relative",marginBottom:16}}>
           <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
-            placeholder="Search make, model, engine..."/>
+            placeholder={`Search in ${selMake}...`}/>
           {search&&<button onClick={()=>setSearch("")}
             style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16}}>✕</button>}
         </div>
-        <select className="inp" value={filterMake} onChange={e=>{setFilterMake(e.target.value);setSearch("");}} style={{width:150}}>
-          {makes.map(m=><option key={m} value={m}>{m==="__all__"?"All Makes":m}</option>)}
-        </select>
-      </div>
 
-      {/* Stats by make */}
-      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
-        {[...new Set(vehicles.map(v=>v.make))].sort().map(make=>{
-          const cnt = vehicles.filter(v=>v.make===make).length;
-          const links = partFitments.filter(f=>vehicles.find(v=>v.make===make&&String(v.id)===String(f.vehicle_id))).length;
-          return (
-            <div key={make} className="card" style={{padding:"8px 14px",cursor:"pointer",
-              borderColor:filterMake===make?"var(--accent)":"var(--border)"}}
-              onClick={()=>{setFilterMake(filterMake===make?"__all__":make);setSearch("");}}>
-              <div style={{fontWeight:700,fontSize:13}}>{make}</div>
-              <div style={{fontSize:11,color:"var(--text3)"}}>{cnt} models · {links} links</div>
-            </div>
-          );
-        })}
-      </div>
+        {filtered.length===0&&(
+          <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No vehicles found</div>
+        )}
 
-      {/* Vehicle list — card grid (both mobile and desktop) */}
-      {filtered.length===0&&(
-        <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No vehicles found</div>
-      )}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
-        {filtered.map(v=>{
-          const hasPhotos = v.photo_front||v.photo_rear||v.photo_side;
-          return (
-            <div key={v.id} className="card" style={{padding:0,overflow:"hidden"}}>
-              {/* 3 photos row */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",height:110,background:"var(--surface2)"}}>
-                {[
-                  {url:v.photo_front, label:"Front"},
-                  {url:v.photo_rear,  label:"Rear"},
-                  {url:v.photo_side,  label:"Side"},
-                ].map(({url,label})=>(
-                  <div key={label} style={{position:"relative",overflow:"hidden",borderRight:"1px solid var(--border)"}}>
-                    {url
-                      ? <DriveImg url={url} alt={label}
-                          style={{width:"100%",height:"100%",objectFit:"cover",cursor:"zoom-in"}}
-                          onClick={()=>window.open(toFullUrl(url),"_blank")}/>
-                      : <div style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",
-                          alignItems:"center",justifyContent:"center",color:"var(--text3)"}}>
-                          <div style={{fontSize:20,marginBottom:2}}>📷</div>
-                          <div style={{fontSize:10}}>{label}</div>
-                        </div>}
-                    <div style={{position:"absolute",bottom:0,left:0,right:0,
-                      background:"rgba(0,0,0,.45)",color:"#fff",fontSize:10,
-                      textAlign:"center",padding:"2px 0",fontWeight:600}}>{label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Info */}
-              <div style={{padding:12}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                  <div>
-                    <div style={{fontWeight:700,fontSize:15}}>{v.make} {v.model}</div>
-                    {v.code&&<div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--accent)",fontWeight:700,marginTop:1}}>{v.code}</div>}
-                    <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
-                      {v.year_from}–{v.year_to||"present"}
-                      {v.engine&&<span style={{marginLeft:8,color:"var(--blue)"}}>🔧 {v.engine}</span>}
-                    </div>
-                    {v.variant&&<div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{v.variant}</div>}
-                  </div>
-                  <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",flexShrink:0}}>
-                    {fitCount(v.id)} parts
-                  </span>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",
-                    background:"var(--surface2)",padding:"2px 8px",borderRadius:4}}>ID: {v.id}</code>
-                  <div style={{display:"flex",gap:6}}>
-                    <button className="btn btn-ghost btn-xs" onClick={()=>setEditV({...v})}>✏️ Edit</button>
-                    <button className="btn btn-danger btn-xs"
-                      onClick={()=>{if(window.confirm(`Delete ${v.make} ${v.model}?`))onDelete(v.id);}}>🗑</button>
-                  </div>
+        {/* Compact list — no photos */}
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {filtered.map(v=>(
+            <div key={v.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              {/* Main info */}
+              <div style={{flex:1,minWidth:180}}>
+                <div style={{fontWeight:700,fontSize:14}}>{v.model}</div>
+                {v.code&&<div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--accent)",fontWeight:700}}>{v.code}</div>}
+                <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
+                  {v.year_from}–{v.year_to||"present"}
+                  {v.engine&&<span style={{marginLeft:8,color:"var(--blue)"}}>🔧 {v.engine}</span>}
+                  {v.variant&&<span style={{marginLeft:8,color:"var(--text3)"}}>{v.variant}</span>}
                 </div>
               </div>
+              {/* Fitment count */}
+              <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",flexShrink:0}}>
+                🔗 {fitCount(v.id)} parts
+              </span>
+              {/* Actions */}
+              <div style={{display:"flex",gap:6,flexShrink:0}}>
+                <button className="btn btn-ghost btn-xs" onClick={()=>setEditV({...v})}>✏️ Edit</button>
+                <button className="btn btn-danger btn-xs"
+                  onClick={()=>{if(window.confirm(`Delete ${v.make} ${v.model}?`))onDelete(v.id);}}>🗑</button>
+              </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      </>)}
 
     </div>
-    {/* Modal outside .fu so position:fixed isn't trapped by the animation stacking context */}
+
     {editV&&(
       <ErrorBoundary name="VehicleModal">
         <VehicleModal vehicle={editV} onSave={async(data)=>{ await onSave(data); setEditV(null); }}

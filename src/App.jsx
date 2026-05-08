@@ -118,6 +118,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const PAGE_SIZE=20;
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
+  const [shopVehicleFilter,setShopVehicleFilter]=useState({make:"",model:""});
   const [workshopJobs,setWorkshopJobs]=useState([]);
   const [workshopJobItems,setWorkshopJobItems]=useState([]);
   const [workshopInvoices,setWorkshopInvoices]=useState([]);
@@ -3118,9 +3119,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             </div>
             {/* 🚗 Vehicle Search Bar */}
             <VehicleSearchBar
+              key={shopVehicleFilter.make+"|"+shopVehicleFilter.model}
               vehicles={vehicles}
               partFitments={partFitments}
               parts={parts}
+              initialMake={shopVehicleFilter.make}
+              initialModel={shopVehicleFilter.model}
               onFilter={(ids)=>{setVehicleFilterIds(ids);setShopPage(0);}}
               t={t}/>
 
@@ -3741,7 +3745,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         )}
 
         {tab==="vehicles"&&role==="admin"&&(
-          <VehiclesPage vehicles={vehicles} partFitments={partFitments} onSave={saveVehicle} onDelete={deleteVehicle} t={t}/>
+          <VehiclesPage vehicles={vehicles} partFitments={partFitments} onSave={saveVehicle} onDelete={deleteVehicle}
+            onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}} t={t}/>
         )}
 
         {tab==="settings"&&role==="admin"&&(

@@ -1252,11 +1252,17 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 // ═══════════════════════════════════════════════════════════════
 // VEHICLE SEARCH BAR — in Shop for customers
 // ═══════════════════════════════════════════════════════════════
-export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t}) {
-  const [selMake,   setSelMake]   = useState("");
-  const [selModel,  setSelModel]  = useState("");
+export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, initialMake="", initialModel=""}) {
+  const [selMake,   setSelMake]   = useState(initialMake);
+  const [selModel,  setSelModel]  = useState(initialModel);
   const [selEngine, setSelEngine] = useState("");
   const [active,    setActive]    = useState(false);
+
+  // Auto-apply filter when pre-populated from vehicle management
+  useEffect(()=>{
+    if(initialMake && vehicles.length > 0) applyFilter(initialMake, initialModel, "");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[vehicles.length > 0]);
 
   // Derived lists
   const makes   = [...new Set(vehicles.map(v => v.make))].sort();
@@ -1387,7 +1393,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t}) {
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, onSave, onDelete, t}) {
+export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, t}) {
   const [selMake, setSelMake] = useState(null);  // null = makes level
   const [search,  setSearch]  = useState("");
   const [editV,   setEditV]   = useState(null);
@@ -1486,12 +1492,17 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, t}) {
                   {v.variant&&<span style={{marginLeft:8,color:"var(--text3)"}}>{v.variant}</span>}
                 </div>
               </div>
-              {/* Fitment count */}
-              <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",flexShrink:0}}>
+              {/* Fitment count — click to view in shop */}
+              <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",flexShrink:0,
+                cursor:onViewInShop?"pointer":"default"}}
+                onClick={()=>onViewInShop&&onViewInShop(v.make,v.model)}
+                title="View linked parts in shop">
                 🔗 {fitCount(v.id)} parts
               </span>
               {/* Actions */}
               <div style={{display:"flex",gap:6,flexShrink:0}}>
+                {onViewInShop&&<button className="btn btn-ghost btn-xs" style={{color:"var(--green)",borderColor:"var(--green)"}}
+                  onClick={()=>onViewInShop(v.make,v.model)}>🛒 Shop</button>}
                 <button className="btn btn-ghost btn-xs" onClick={()=>setEditV({...v})}>✏️ Edit</button>
                 <button className="btn btn-danger btn-xs"
                   onClick={()=>{if(window.confirm(`Delete ${v.make} ${v.model}?`))onDelete(v.id);}}>🗑</button>

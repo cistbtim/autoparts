@@ -84,16 +84,32 @@ def encode_image(path: Path) -> str:
 
 # ── Google Drive upload ───────────────────────────────────────────────────────
 
-def upload_to_gdrive(script_url: str, b64: str, filename: str) -> str:
+def upload_to_gdrive(script_url: str, b64: str, filename: str,
+                     retries: int = 3, retry_wait: int = 8) -> str:
+    """Upload and return URL. Retries up to `retries` times if no valid URL comes back."""
     payload = json.dumps({"image": b64, "filename": filename, "mimeType": "image/png"}).encode()
-    req = urllib.request.Request(script_url, data=payload, method="POST", headers={
-        "Content-Type": "application/json",
-    })
-    with urllib.request.urlopen(req, timeout=60) as r:
-        result = json.loads(r.read())
-    if not result.get("success"):
-        raise RuntimeError(result.get("error", "Upload failed (no success flag)"))
-    return result["url"]
+    for attempt in range(1, retries + 1):
+        try:
+            req = urllib.request.Request(script_url, data=payload, method="POST", headers={
+                "Content-Type": "application/json",
+            })
+            with urllib.request.urlopen(req, timeout=120) as r:
+                result = json.loads(r.read())
+
+            url = result.get("url", "").strip()
+            if result.get("success") and url:
+                return url
+
+            err = result.get("error", "no success flag or empty URL")
+            print(f"  Attempt {attempt}/{retries} — bad response: {err}")
+        except Exception as e:
+            print(f"  Attempt {attempt}/{retries} — error: {e}")
+
+        if attempt < retries:
+            print(f"  Waiting {retry_wait}s before retry…")
+            time.sleep(retry_wait)
+
+    raise RuntimeError(f"Upload failed after {retries} attempts")
 
 # ── Filename parser ───────────────────────────────────────────────────────────
 
@@ -227,7 +243,7 @@ def main():
             continue
 
         if i < len(valid):
-            time.sleep(0.3)
+            time.sleep(2)
 
     print(f"\n── Result ────────────────────────────")
     print(f"  Updated : {ok}")

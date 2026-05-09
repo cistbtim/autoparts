@@ -3960,8 +3960,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               const cur=mData("editPart");
               if(cur?.id)releaseLock("part",cur.id);
               closeM("editPart");
-              // extract vehicle code from target SKU (e.g. "VW23D" from "VW23D-261AM")
-              const fitSearch=(sku.split(/[-\s]/)[0]||"").toUpperCase();
+              // extract vehicle code from CURRENT part's SKU (e.g. "VW18D" from "VW18D-261AM")
+              const fitSearch=(cur?.sku?.split(/[-\s]/)[0]||"").toUpperCase();
               setTimeout(()=>openM("editPart",{...target,_tab:"fitment",_fitSearch:fitSearch}),0);
             }else showToast(`Part SKU "${sku}" not found`,"err");
           }}

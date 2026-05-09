@@ -2394,7 +2394,7 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
       <FG><div><FL label={t.country}/><input className="inp" value={f.country} onChange={e=>s("country",e.target.value)} placeholder="Taiwan, Japan..."/></div><div><FL label={t.contactPerson}/><input className="inp" value={f.contact_person} onChange={e=>s("contact_person",e.target.value)}/></div></FG>
       <FG><div><FL label={t.email}/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div><div><FL label={t.phone}/><input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div></FG>
       <FD>
-        <FL label="Part Search URL" sub="Use {sku} as placeholder — e.g. https://supplier.com/search?q={sku}"/>
+        <FL label="Part Search URL" sub="Placeholders: {sku} = supplier/our part no · {vehicle_code} = car model code (e.g. VW18D)"/>
         <input className="inp" value={f.search_url} onChange={e=>s("search_url",e.target.value)}
           placeholder="https://www.supplier.com/search?partno={sku}"/>
         {f.search_url&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>
@@ -2407,7 +2407,7 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
   );
 }
 
-export function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,onUpdate,onClose,onEditPart,onMergePart,t}) {
+export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],partFitments=[],onSave,onDelete,onUpdate,onClose,onEditPart,onMergePart,t}) {
   const [suppId,setSuppId]=useState("");
   const [price,setPrice]=useState("");
   const [lead,setLead]=useState("");
@@ -2432,6 +2432,12 @@ export function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,
   };
   if(!part)return null;
   const avail=suppliers.filter(s=>!partSuppliers.find(ps=>ps.supplier_id===s.id));
+  // Derive vehicle codes linked to this part via fitments
+  const vehicleCodes=partFitments
+    .filter(f=>String(f.part_id)===String(part.id))
+    .map(f=>vehicles.find(v=>String(v.id)===String(f.vehicle_id))?.code)
+    .filter(Boolean)
+    .filter((c,i,a)=>a.indexOf(c)===i); // unique
 
   return (
     <Overlay onClose={onClose} wide>
@@ -2488,8 +2494,21 @@ export function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,
                       <span style={{fontSize:12,color:"var(--yellow)",flex:1}}>⚠ Unknown — click to add</span>
                     )}
                     {ps.supplier?.search_url&&(()=>{
+                      const tpl=ps.supplier.search_url;
+                      const isVehicleSearch=/\{vehicle_code\}/i.test(tpl);
+                      if(isVehicleSearch){
+                        // one button per linked vehicle code
+                        return vehicleCodes.length>0?vehicleCodes.map(code=>(
+                          <a key={code} href={tpl.replace(/\{vehicle_code\}/gi,encodeURIComponent(code))} target="_blank" rel="noopener noreferrer"
+                            className="btn btn-ghost btn-xs"
+                            style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.4)",textDecoration:"none"}}
+                            title={`Search ${ps.supplier.name} for vehicle ${code}`}>
+                            🔍 {code}
+                          </a>
+                        )):<span style={{fontSize:11,color:"var(--text3)"}}>No vehicle linked</span>;
+                      }
                       const searchTerm=ps.supplier_part_no||part.sku||"";
-                      const url=ps.supplier.search_url.replace(/\{sku\}/gi,encodeURIComponent(searchTerm));
+                      const url=tpl.replace(/\{sku\}/gi,encodeURIComponent(searchTerm));
                       return searchTerm?(
                         <a href={url} target="_blank" rel="noopener noreferrer"
                           className="btn btn-ghost btn-xs"

@@ -157,6 +157,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [searchCust,setSearchCust]=useState("");
   const [inqFilter,setInqFilter]=useState("all");
   const [toast,setToast]=useState(null);
+  const [busyMsg,setBusyMsg]=useState(null); // full-screen blocking spinner
   const [lightbox,setLightbox]=useState(null);
   const [drawerOpen,setDrawerOpen]=useState(false);
   const [wsMoreOpen,setWsMoreOpen]=useState(false);
@@ -1448,7 +1449,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     await api.delete("vehicles","id",id);
     await refreshTables("vehicles"); showToast("Deleted","err");
   };
-  const deletePart=async(id)=>{const p=parts.find(p=>p.id===id);if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await api.delete("parts","id",id);await refreshTables("parts","inventory_logs");showToast("Deleted","err");};
+  const deletePart=async(id)=>{const p=parts.find(pt=>pt.id===id);setBusyMsg(`Deleting ${p?.sku||""}${p?.name?" · "+p.name:""}`);try{if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await api.delete("parts","id",id);await refreshTables("parts","inventory_logs");showToast("Deleted","err");}finally{setBusyMsg(null);}};
   const applyAdjust=async(part,nq,reason)=>{
     await api.patch("parts","id",part.id,{stock:nq});
     await logInv(part,part.stock,nq,"Manual Adj.",reason||"Manual");
@@ -4081,6 +4082,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
       {toast&&<div className="toast" style={{borderColor:toast.type==="err"?"rgba(248,113,113,.3)":"var(--border2)",color:toast.type==="err"?"var(--red)":"var(--green)"}}>
         {toast.type==="err"?"⚠":"✓"} {toast.msg}
+      </div>}
+
+      {busyMsg&&<div style={{position:"fixed",inset:0,zIndex:999999,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(2px)"}}>
+        <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:16,padding:"28px 36px",display:"flex",flexDirection:"column",alignItems:"center",gap:16,maxWidth:340,textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}>
+          <div style={{width:44,height:44,border:"4px solid var(--border)",borderTop:"4px solid var(--accent)",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+          <div style={{fontWeight:700,fontSize:15,color:"var(--text1)"}}>{busyMsg}</div>
+          <div style={{fontSize:12,color:"var(--text3)"}}>Please wait…</div>
+        </div>
       </div>}
 
       {isDemo&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9999,background:"linear-gradient(90deg,#f59e0b,#f97316)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>

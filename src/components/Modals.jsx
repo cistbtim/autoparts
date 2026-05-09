@@ -1950,7 +1950,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -2049,7 +2049,13 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
                 <FL label={`${t.sku} *`}/>
-                {f.sku&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.sku)}>📋</button>}
+                <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                  {prevPart&&onGoToPart&&<button className="cp-btn" title={`‹ ${prevPart.sku}`}
+                    onClick={()=>onGoToPart(prevPart.sku)}>‹ {prevPart.sku}</button>}
+                  {nextPart&&onGoToPart&&<button className="cp-btn" title={`${nextPart.sku} ›`}
+                    onClick={()=>onGoToPart(nextPart.sku)}>{nextPart.sku} ›</button>}
+                  {f.sku&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.sku)}>📋</button>}
+                </div>
               </div>
               <input className="inp" value={f.sku} onChange={e=>{s("sku",e.target.value);setErrors(p=>({...p,sku:""}));}}
                 placeholder="GP00001" style={{borderColor:errors.sku?"var(--red)":undefined}}/>
@@ -2163,6 +2169,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
           onAdd={onSaveFitment}
           onDelete={onDeleteFitment}
           onGoVehicles={onGoVehicles}
+          initialSearch={initialFitSearch}
           t={t}/>
       )}
       {ptab==="fitment"&&!part&&(

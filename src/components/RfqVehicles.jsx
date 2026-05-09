@@ -1063,8 +1063,8 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
 // ═══════════════════════════════════════════════════════════════
 // VEHICLE FITMENT TAB — inside PartModal
 // ═══════════════════════════════════════════════════════════════
-export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, t}) {
-  const [search,  setSearch]  = useState("");
+export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, initialSearch="", t}) {
+  const [search,  setSearch]  = useState(initialSearch);
   const [pending, setPending] = useState(new Set()); // selected but not yet saved
   const [saving,  setSaving]  = useState(false);
   const [toDelete,setToDelete]= useState(new Set()); // marked for removal
@@ -1077,7 +1077,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
     if(pending.has(String(v.id))) return false;    // already selected
     if(!search.trim()) return true;
     const s = search.toLowerCase();
-    return `${v.make} ${v.model} ${v.variant||""} ${v.engine||""} ${v.year_from} ${v.year_to|""}`.toLowerCase().includes(s);
+    return `${v.make} ${v.model} ${v.variant||""} ${v.engine||""} ${v.year_from} ${v.year_to||""} ${v.code||""}`.toLowerCase().includes(s);
   });
 
   const toggle = (vid) => {
@@ -1161,6 +1161,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
               border: `1px solid ${marked ? "rgba(248,113,113,.3)" : "rgba(52,211,153,.2)"}`,
               opacity: marked ? 0.6 : 1}}>
               <div>
+                {v.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",marginRight:6}}>{v.code}</span>}
                 <span style={{fontWeight:600,fontSize:13,textDecoration:marked?"line-through":"none"}}>{v.make} {v.model}</span>
                 <span style={{fontSize:12,color:"var(--text3)",marginLeft:8}}>{v.year_from}–{v.year_to||"now"}</span>
                 {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
@@ -1220,6 +1221,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             onMouseEnter={e=>e.currentTarget.style.borderColor="var(--accent)"}
             onMouseLeave={e=>e.currentTarget.style.borderColor="var(--border)"}>
             <div>
+              {v.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",marginRight:6}}>{v.code}</span>}
               <span style={{fontWeight:600,fontSize:13}}>{v.make} {v.model}</span>
               <span style={{fontSize:12,color:"var(--text3)",marginLeft:8}}>{v.year_from}–{v.year_to||"now"}</span>
               {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}

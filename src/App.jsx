@@ -3938,10 +3938,37 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       </main>
 
       {/* ════ MODALS ════ */}
-      {isOpen("editPart")&&<PartModal part={mData("editPart")} initialTab={mData("editPart")?._tab} vehicles={vehicles} partFitments={partFitments} onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart} onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}} onGoSupplier={async(p)=>{closeM("editPart");await loadPartSuppliers();openM("partSupplier",p);}} onGoToPart={(sku)=>{const target=parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase());if(target){const ep=mData("editPart");if(ep?.id)releaseLock("part",ep.id);closeM("editPart");setTimeout(()=>openM("editPart",target),0);}else showToast(`Part SKU "${sku}" not found`,"err");}} inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions} onClose={()=>{
-  const ep=mData("editPart"); if(ep?.id) releaseLock("part",ep.id);
-  closeM("editPart");
-}} t={t}/>}
+      {(()=>{
+        const ep=mData("editPart");
+        const sortedBySku=[...parts].sort((a,b)=>(a.sku||"").localeCompare(b.sku||""));
+        const idx=ep?.id?sortedBySku.findIndex(p=>p.id===ep.id):-1;
+        const prevPart=idx>0?sortedBySku[idx-1]:null;
+        const nextPart=idx>=0&&idx<sortedBySku.length-1?sortedBySku[idx+1]:null;
+        return isOpen("editPart")&&<PartModal
+          part={ep}
+          initialTab={ep?._tab}
+          initialFitSearch={ep?._fitSearch||""}
+          prevPart={prevPart}
+          nextPart={nextPart}
+          vehicles={vehicles} partFitments={partFitments}
+          onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart}
+          onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}}
+          onGoSupplier={async(p)=>{closeM("editPart");await loadPartSuppliers();openM("partSupplier",p);}}
+          onGoToPart={(sku)=>{
+            const target=parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase());
+            if(target){
+              const cur=mData("editPart");
+              if(cur?.id)releaseLock("part",cur.id);
+              closeM("editPart");
+              // extract vehicle code from target SKU (e.g. "VW23D" from "VW23D-261AM")
+              const fitSearch=(sku.split(/[-\s]/)[0]||"").toUpperCase();
+              setTimeout(()=>openM("editPart",{...target,_tab:"fitment",_fitSearch:fitSearch}),0);
+            }else showToast(`Part SKU "${sku}" not found`,"err");
+          }}
+          inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions}
+          onClose={()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);closeM("editPart");}}
+          t={t}/>;
+      })()}
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}
       {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}

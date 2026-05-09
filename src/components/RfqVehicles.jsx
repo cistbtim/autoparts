@@ -1397,6 +1397,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
   const [selMake, setSelMake] = useState(null);  // null = makes level
   const [search,  setSearch]  = useState("");
   const [editV,   setEditV]   = useState(null);
+  const [lightbox, setLightbox] = useState(null); // {urls,labels,idx}
 
   const fitCount = (vid) => partFitments.filter(f=>String(f.vehicle_id)===String(vid)).length;
 
@@ -1413,12 +1414,29 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
     if(!search.trim()) return true;
     const s=search.toLowerCase();
     return `${v.model} ${v.variant||""} ${v.code||""} ${v.engine||""} ${v.year_from||""} ${v.year_to||""}`.toLowerCase().includes(s);
-  });
+  }).sort((a,b)=>(a.code||"￿").localeCompare(b.code||"￿")||(a.model||"").localeCompare(b.model||""));
 
   const newVehicleDefaults = { make: selMake||"GWM", model:"", code:"", year_from:"", year_to:"", engine:"", variant:"" };
 
+  const openVehicleLightbox = (v, startKey) => {
+    const entries = [
+      {key:"photo_front", label:"Front"},
+      {key:"photo_rear",  label:"Rear"},
+      {key:"photo_side",  label:"Side"},
+    ].filter(e=>v[e.key]);
+    if(!entries.length) return;
+    const startIdx = Math.max(0, entries.findIndex(e=>e.key===startKey));
+    setLightbox({
+      urls:   entries.map(e=>toFullUrl(v[e.key])),
+      labels: entries.map(e=>e.label),
+      idx:    startIdx,
+    });
+  };
+
   return (
   <>
+    {lightbox&&<ImgLightbox urls={lightbox.urls} labels={lightbox.labels} startIdx={lightbox.idx}
+      onClose={()=>setLightbox(null)}/>}
     <div className="fu">
 
       {/* ── Header ── */}
@@ -1478,12 +1496,25 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
           <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No vehicles found</div>
         )}
 
-        {/* Compact list — no photos */}
+        {/* Model list with thumbnails */}
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {filtered.map(v=>(
+          {filtered.map(v=>{
+            const thumb = v.photo_front||v.photo_rear||v.photo_side;
+            const thumbUrl = thumb ? toImgUrl(thumb) : null;
+            const hasPhotos = !!(v.photo_front||v.photo_rear||v.photo_side);
+            return (
             <div key={v.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              {/* Photo thumbnail */}
+              <div style={{flexShrink:0,width:64,height:64,borderRadius:8,overflow:"hidden",
+                background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",
+                cursor:hasPhotos?"zoom-in":"default"}}
+                onClick={()=>hasPhotos&&openVehicleLightbox(v,"photo_front")}>
+                {thumbUrl
+                  ? <img src={thumbUrl} alt="vehicle" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  : <span style={{fontSize:24,opacity:.3}}>🚗</span>}
+              </div>
               {/* Main info */}
-              <div style={{flex:1,minWidth:180}}>
+              <div style={{flex:1,minWidth:140}}>
                 <div style={{fontWeight:700,fontSize:14}}>{v.model}</div>
                 {v.code&&<div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--accent)",fontWeight:700}}>{v.code}</div>}
                 <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
@@ -1508,7 +1539,8 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
                   onClick={()=>{if(window.confirm(`Delete ${v.make} ${v.model}?`))onDelete(v.id);}}>🗑</button>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </>)}
 

@@ -134,7 +134,12 @@ export function ImgPreview({src}) {
   );
 }
 
-export function ImgLightbox({url, onClose}) {
+export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
+  // Multi-photo mode when `urls` array provided; else single `url` fallback
+  const list  = urls && urls.length ? urls : (url ? [url] : []);
+  const [idx, setIdx]   = useState(Math.min(startIdx, Math.max(list.length-1,0)));
+  const currentUrl      = list[idx] || "";
+
   const getSizes = (u) => {
     if(!u) return [u];
     const m = u.match(/thumbnail[?]id=([^&]+)/);
@@ -145,10 +150,16 @@ export function ImgLightbox({url, onClose}) {
     ];
     return [u];
   };
-  const sizes = getSizes(url);
+  const sizes = getSizes(currentUrl);
   const [tryIdx, setTryIdx] = useState(0);
   const [status, setStatus] = useState("loading");
-  const src = sizes[tryIdx] || url;
+  const src = sizes[tryIdx] || currentUrl;
+
+  const goTo = (newIdx) => {
+    setIdx(newIdx);
+    setTryIdx(0);
+    setStatus("loading");
+  };
 
   const handleError = () => {
     if(tryIdx < sizes.length-1){
@@ -157,6 +168,12 @@ export function ImgLightbox({url, onClose}) {
       setStatus("error");
     }
   };
+
+  const btnStyle = {position:"fixed",top:"50%",transform:"translateY(-50%)",
+    background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",
+    color:"#fff",borderRadius:"50%",width:44,height:44,display:"flex",
+    alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:22,
+    zIndex:100000};
 
   return (
     <div onClick={onClose}
@@ -177,16 +194,34 @@ export function ImgLightbox({url, onClose}) {
         <div style={{textAlign:"center",color:"#fff",padding:30}}>
           <div style={{fontSize:36,marginBottom:12}}>⚠️</div>
           <div style={{fontSize:15,marginBottom:8}}>Failed to load image</div>
-          <div style={{fontSize:11,opacity:.4,wordBreak:"break-all",maxWidth:360}}>{url}</div>
+          <div style={{fontSize:11,opacity:.4,wordBreak:"break-all",maxWidth:360}}>{currentUrl}</div>
         </div>
       )}
 
-      <img key={src} src={src} alt="part photo"
+      <img key={src} src={src} alt="photo"
         style={{maxWidth:"90%",maxHeight:"90%",objectFit:"contain",
           display:status==="ok"?"block":"none",borderRadius:8}}
         onLoad={()=>setStatus("ok")}
         onError={handleError}
         onClick={e=>e.stopPropagation()}/>
+
+      {/* Prev / Next arrows */}
+      {list.length>1&&idx>0&&(
+        <div style={{...btnStyle,left:14}} onClick={e=>{e.stopPropagation();goTo(idx-1);}}>‹</div>
+      )}
+      {list.length>1&&idx<list.length-1&&(
+        <div style={{...btnStyle,right:58}} onClick={e=>{e.stopPropagation();goTo(idx+1);}}>›</div>
+      )}
+
+      {/* Label + counter */}
+      {list.length>1&&(
+        <div style={{position:"fixed",bottom:20,left:"50%",transform:"translateX(-50%)",
+          background:"rgba(0,0,0,.6)",color:"#fff",borderRadius:20,padding:"4px 16px",
+          fontSize:13,display:"flex",gap:12,alignItems:"center",zIndex:100000}}>
+          {labels&&labels[idx]&&<span style={{opacity:.8}}>{labels[idx]}</span>}
+          <span style={{opacity:.5}}>{idx+1} / {list.length}</span>
+        </div>
+      )}
 
       <div onClick={e=>{e.stopPropagation();onClose();}}
         style={{position:"fixed",top:14,right:14,background:"rgba(255,255,255,.15)",

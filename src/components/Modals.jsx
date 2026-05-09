@@ -2385,7 +2385,7 @@ export function CheckoutModal({cart,customers,cartTotal,role,currentUser,onPlace
 }
 
 export function SupplierModal({supplier,onSave,onClose,t}) {
-  const [f,setF]=useState(supplier?{name:supplier.name,email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||""}:{name:"",email:"",phone:"",country:"",contact_person:"",notes:""});
+  const [f,setF]=useState(supplier?{name:supplier.name,email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||""}:{name:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:""});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   return (
     <Overlay onClose={onClose}>
@@ -2393,6 +2393,14 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
       <FD><FL label={`${t.supplierName} *`}/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)}/></FD>
       <FG><div><FL label={t.country}/><input className="inp" value={f.country} onChange={e=>s("country",e.target.value)} placeholder="Taiwan, Japan..."/></div><div><FL label={t.contactPerson}/><input className="inp" value={f.contact_person} onChange={e=>s("contact_person",e.target.value)}/></div></FG>
       <FG><div><FL label={t.email}/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div><div><FL label={t.phone}/><input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div></FG>
+      <FD>
+        <FL label="Part Search URL" sub="Use {sku} as placeholder — e.g. https://supplier.com/search?q={sku}"/>
+        <input className="inp" value={f.search_url} onChange={e=>s("search_url",e.target.value)}
+          placeholder="https://www.supplier.com/search?partno={sku}"/>
+        {f.search_url&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>
+          Preview: {f.search_url.replace("{sku}","ABC-001")}
+        </div>}
+      </FD>
       <FD><FL label={t.notes}/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)}/></FD>
       <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.name)return;onSave(f);}}>{t.save}</button></div>
     </Overlay>
@@ -2479,6 +2487,18 @@ export function PartSupplierModal({part,partSuppliers,suppliers,onSave,onDelete,
                     ) : (
                       <span style={{fontSize:12,color:"var(--yellow)",flex:1}}>⚠ Unknown — click to add</span>
                     )}
+                    {ps.supplier?.search_url&&(()=>{
+                      const searchTerm=ps.supplier_part_no||part.sku||"";
+                      const url=ps.supplier.search_url.replace(/\{sku\}/gi,encodeURIComponent(searchTerm));
+                      return searchTerm?(
+                        <a href={url} target="_blank" rel="noopener noreferrer"
+                          className="btn btn-ghost btn-xs"
+                          style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.4)",textDecoration:"none"}}
+                          title={`Search ${ps.supplier.name} for ${searchTerm}`}>
+                          🔍 Search
+                        </a>
+                      ):null;
+                    })()}
                     <button className="btn btn-ghost btn-xs" style={{color:"var(--accent)"}}
                       onClick={()=>{setEditingId(ps.id);setEditPartNo(ps.supplier_part_no||"");}}>
                       ✏️ Edit

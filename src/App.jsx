@@ -814,7 +814,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const ep=mData("editPart");
     if(ep){
       const d2={...data,image_url:toSaveUrl(data.image_url)};
-      const result=await api.patch("parts","id",ep.id,d2);
+      setBusyMsg(`Saving ${d2.sku||ep.sku||"part"}…`);
+      const result=await api.patch("parts","id",ep.id,d2).finally(()=>setBusyMsg(null));
       if(!Array.isArray(result)){
         showToast(`Save failed: ${result?.message||"Unknown error"}`,"err");
         return false;
@@ -841,12 +842,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       }
     } else {
       const d2={...data,image_url:toSaveUrl(data.image_url)};
-      const r=await api.upsert("parts",d2);
-      const newPart=Array.isArray(r)&&r[0]?r[0]:d2;
-      await logInv(newPart,0,d2.stock,"New Part","Added");
-      showToast("Part added");
-      setParts(prev=>[...prev,newPart]);
-      if(!keepOpen) closeM("editPart");
+      setBusyMsg(`Saving ${d2.sku||"new part"}…`);
+      try {
+        const r=await api.upsert("parts",d2);
+        const newPart=Array.isArray(r)&&r[0]?r[0]:d2;
+        await logInv(newPart,0,d2.stock,"New Part","Added");
+        setParts(prev=>[...prev,newPart]);
+        closeM("editPart");
+        // Navigate to inventory, filter to new SKU, then re-open for photo + fitment editing
+        setTab("inventory");
+        setSearchPart(newPart.sku||d2.sku||"");
+        setSearchDebounced(newPart.sku||d2.sku||"");
+        showToast(`✅ ${d2.sku} added — add photos & vehicle fits`);
+        setTimeout(()=>openM("editPart",{...newPart,_tab:"photo"}),300);
+      } finally {
+        setBusyMsg(null);
+      }
     }
   };
   // ── Workshop ──

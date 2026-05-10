@@ -341,7 +341,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                       <label style={{fontSize:12,fontWeight:700,color:"var(--text3)"}}>City &amp; Country *</label>
                       <button type="button" className="btn btn-ghost btn-xs" disabled={detectingLoc} onClick={async()=>{
                         setDetectingLoc(true);
-                        try{const loc=await detectGeoLocation();setWsRegCity(loc.city);setWsRegCountry(loc.country);}catch{}
+                        try{const loc=await detectGeoLocation();setWsRegCity(loc.city);setWsRegCountry(loc.country);}catch(e){/* ignore geolocation failures */}
                         setDetectingLoc(false);
                       }} style={{fontSize:11,padding:"3px 9px"}}>
                         {detectingLoc?"Detecting…":"📍 Auto-detect"}
@@ -443,7 +443,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                       <label style={{fontSize:12,fontWeight:700,color:"var(--text3)"}}>City &amp; Country *</label>
                       <button type="button" className="btn btn-ghost btn-xs" disabled={detectingLoc} onClick={async()=>{
                         setDetectingLoc(true);
-                        try{const loc=await detectGeoLocation();setScrapRegCity(loc.city);setScrapRegCountry(loc.country);}catch{}
+                        try{const loc=await detectGeoLocation();setScrapRegCity(loc.city);setScrapRegCountry(loc.country);}catch(e){/* ignore geolocation failures */}
                         setDetectingLoc(false);
                       }} style={{fontSize:11,padding:"3px 9px"}}>
                         {detectingLoc?"Detecting…":"📍 Auto-detect"}

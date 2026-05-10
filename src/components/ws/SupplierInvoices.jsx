@@ -2,7 +2,7 @@ import { useState } from "react";
 import { getSettings, curSym } from "../../lib/settings.js";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 
-export function WsSupplierInvoicesPage({invoices=[],invItems=[],payments=[],returns=[],wsSuppliers=[],wsStock=[],settings,onSaveInvoice,onDeleteInvoice,onSavePayment,onDeletePayment,onSaveReturn}) {
+export function WsSupplierInvoicesPage({invoices=[],invItems=[],payments=[],returns=[],wsSuppliers=[],wsStock=[],settings,onSaveInvoice,onDeleteInvoice,onSavePayment,onSaveReturn}) {
   const C = curSym(settings?.currency||getSettings().currency);
   const fmt = v=>`${C}${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [modal,setModal]=useState(null); // null | {mode:"add"|"edit"|"view"|"pay"|"return", item?}
@@ -357,7 +357,7 @@ export function WsSupInvoiceViewModal({invoice,items=[],payments=[],returns=[],f
 }
 
 // ── Payment Modal ───────────────────────────────────────────────
-export function WsSupPaymentModal({invoice,settings,fmt,onSave,onClose}) {
+export function WsSupPaymentModal({invoice,fmt,onSave,onClose}) {
   const owing=Math.max(0,(+invoice.total||0)-(+invoice.paid_amount||0));
   const [amount,setAmount]=useState(String(owing||""));
   const [date,setDate]=useState(new Date().toISOString().slice(0,10));
@@ -405,7 +405,7 @@ export function WsSupPaymentModal({invoice,settings,fmt,onSave,onClose}) {
 }
 
 // ── Return Modal ────────────────────────────────────────────────
-export function WsSupReturnModal({invoice,items=[],wsStock=[],fmt,onSave,onClose}) {
+export function WsSupReturnModal({invoice,items=[],fmt,onSave,onClose}) {
   const [lines,setLines]=useState(items.map(it=>({...it,return_qty:0,selected:false})));
   const [date,setDate]=useState(new Date().toISOString().slice(0,10));
   const [reason,setReason]=useState("");

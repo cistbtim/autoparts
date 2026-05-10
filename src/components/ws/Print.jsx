@@ -160,25 +160,16 @@ export function printJobCardSheet(job, items=[], settings) {
       <td style="padding:6px 8px"><div style="border-bottom:1px solid #aaa;min-height:18px;width:100%"></div></td>
     </tr>`;
 
-  const parts  = items.filter(i=>i.type==="part");
-  const labour = items.filter(i=>i.type!=="part");
-  const C = curSym(settings?.currency||"R");
-  const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-  const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
-  const taxAmt   = settings?.vat_number ? subtotal*(settings?.tax_rate||0)/100 : 0;
-
   const workRow = (item) => `
     <tr>
-      <td style="padding:6px 8px;text-align:center"><span style="display:inline-block;width:14px;height:14px;border:1.5px solid #888;border-radius:3px"></span></td>
-      <td style="padding:6px 8px;font-size:12px;font-weight:600">${(item.description||"").replace(/</g,"&lt;")}${item.part_sku?`<span style="font-size:10px;color:#6b7280;font-weight:400;font-family:monospace;margin-left:6px">${item.part_sku}</span>`:""}</td>
-      <td style="padding:6px 8px;font-size:12px;text-align:center">${item.qty||1}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb">${item.description||""}${item.part_sku?`<br/><span style="font-size:11px;color:#888;font-family:monospace">${item.part_sku}</span>`:""}</td>
+      <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #e5e7eb">${item.qty||1}</td>
     </tr>`;
 
-  const w = window.open("","_blank","width=820,height=1100");
-  if(!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Card</title>
-  <style>
-    @page{size:A4;margin:12mm}
+  const parts  = items.filter(i=>i.type==="part");
+  const labour = items.filter(i=>i.type!="part");
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Card</title>
+    <style>
     @media print{body{margin:0}.no-print{display:none}}
     *{box-sizing:border-box}
     body{font-family:Arial,sans-serif;color:#111;background:#fff;padding:18px;font-size:12px}
@@ -264,7 +255,10 @@ export function printJobCardSheet(job, items=[], settings) {
       <div class="sig-box">Mechanic Signature</div>
       <div class="sig-box">Date Completed</div>
     </div>
-  </body></html>`);
+  </body></html>`;
+  const w = window.open("","_blank","width=820,height=1100");
+  if(!w) return;
+  w.document.write(html);
   w.document.close();
 }
 
@@ -317,9 +311,7 @@ export function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
   const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
-  const total    = subtotal+taxAmt;
-  const parts    = items.filter(i=>i.type==="part");
-  const labour   = items.filter(i=>i.type==="labour");
+  const total    = subtotal + taxAmt;
   const shopName = settings.shop_name||"Auto Workshop";
   const logoSrc = settings.logo_data || settings.logo_url || "";
   const logoHtml = logoSrc ? `<img src="${logoSrc}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";

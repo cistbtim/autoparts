@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fmtAmt } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 
-export function WsServicesPage({wsServices=[],settings,onSave,onDelete}) {
+export function WsServicesPage({wsServices=[],onSave,onDelete}) {
   const [modal,setModal]=useState(null);
   const [search,setSearch]=useState("");
 

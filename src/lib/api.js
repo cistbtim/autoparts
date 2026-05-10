@@ -30,7 +30,9 @@ const _cInvalidate = (table) => {
   try {
     const prefix = `${CACHE_PFX}${table}__`;
     Object.keys(localStorage).filter(k => k.startsWith(prefix)).forEach(k => localStorage.removeItem(k));
-  } catch {}
+  } catch (e) {
+    /* ignore storage cleanup failures */
+  }
 };
 // ─────────────────────────────────────────────────────────────────────────────
 

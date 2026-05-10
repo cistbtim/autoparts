@@ -2,9 +2,9 @@ import { useState } from "react";
 import { getSettings, curSym } from "../../lib/settings.js";
 import { fmtAmt } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
-import { printWorkshopInvoice, printWorkshopQuote } from "./Print.jsx";
+import { printWorkshopQuote } from "./Print.jsx";
 
-export function WsQuoteModal({job,items,subtotal:_subtotal,tax:_tax,total:_total,existing,settings,wsSupplierQuotes=[],onSave,onClose}) {
+export function WsQuoteModal({job,items,existing,settings,wsSupplierQuotes=[],onSave,onClose}) {
   const C=curSym(settings.currency||getSettings().currency);
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [selectedIds,setSelectedIds]=useState(()=>new Set(items.map(i=>i.id)));

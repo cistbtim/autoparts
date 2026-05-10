@@ -5,7 +5,7 @@ import { decodePDF417fromImage, parseLicenceDisc } from "../../lib/barcode.js";
 import { Overlay, MHead, FL } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 
-export function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],settings,onSaveJob,onReopenJob,onClose,t}) {
+export function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],onSaveJob,onReopenJob,onClose}) {
   const [step,setStep]=useState("scan");
   const [plate,setPlate]=useState("");
   const [scanLoading,setScanLoading]=useState(false);

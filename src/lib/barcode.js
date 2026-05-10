@@ -16,8 +16,9 @@ export async function getDynamsoftReader() {
   // v7 API: window.Dynamsoft.BarcodeReader (not Dynamsoft.DBR)
   const BR = window.Dynamsoft.BarcodeReader;
   // engineResourcePath cannot be set after WASM loads — ignore if it throws
-  try { BR.engineResourcePath = DYNAMSOFT_CDN; } catch {}
+  try { BR.engineResourcePath = DYNAMSOFT_CDN; } catch (e) { /* ignore engine path if WASM already loaded */ }
   window._dbrInstance = await BR.createInstance();
+  const { Dynamsoft } = window;
   const settings = await window._dbrInstance.getRuntimeSettings();
   settings.barcodeFormatIds = Dynamsoft.EnumBarcodeFormat.BF_PDF417;
   settings.deblurLevel = 9;
@@ -42,7 +43,7 @@ export async function decodePDF417fromImage(dataUrl) {
         const val = codes[0].rawValue;
         if (val.includes("***")) return val;
       }
-    } catch {}
+    } catch (e) { /* ignore native BarcodeDetector failures */ }
   }
 
   const reader = await getDynamsoftReader();

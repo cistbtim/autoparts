@@ -271,7 +271,7 @@ export function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[
       const po=purchaseOrders.find(p=>p.id===initialViewPoId);
       if(po){ setModal({mode:"view",po}); onClearInitialView?.(); }
     }
-  },[initialViewPoId,purchaseOrders]);
+  },[initialViewPoId,onClearInitialView,purchaseOrders]);
 
   const STATUS_COLOR={draft:"var(--text3)",sent:"var(--blue)",partial:"var(--yellow)",received:"var(--green)",cancelled:"var(--red)"};
   const STATUS_BG={draft:"var(--surface3)",sent:"rgba(96,165,250,.12)",partial:"rgba(251,191,36,.12)",received:"rgba(52,211,153,.12)",cancelled:"rgba(248,113,113,.12)"};
@@ -320,8 +320,6 @@ export function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[
         :<div style={{display:"flex",flexDirection:"column",gap:8}}>
           {filtered.map(po=>{
             const items=poItems.filter(i=>i.po_id===po.id);
-            const received=items.every(i=>(+i.received_qty||0)>=(+i.qty||0));
-            const partial=items.some(i=>(+i.received_qty||0)>0)&&!received;
             return (
               <div key={po.id} className="card" style={{padding:"12px 14px",cursor:"pointer"}} onClick={()=>setModal({mode:"view",po})}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:6}}>
@@ -699,9 +697,8 @@ export function WsReceiveGoodsModal({po,poItems=[],wsStock=[],settings,onReceive
         <>
           <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Pending Items</div>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
-            {outstanding.map((r,idx)=>{
+            {outstanding.map((r)=>{
               const globalIdx=rows.indexOf(r);
-              const stockMatch=wsStock.filter(w=>w.sku&&r.sku&&w.sku===r.sku);
               return (
                 <div key={r.po_item_id} style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",border:"1px solid var(--border)"}}>
                   <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>{r.description}{r.sku&&<span style={{color:"var(--text3)",fontFamily:"monospace",fontSize:10,marginLeft:6}}>{r.sku}</span>}</div>

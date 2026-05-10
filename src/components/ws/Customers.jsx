@@ -5,7 +5,7 @@ import { makeId } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, DriveImg } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 
-export function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,onDeleteCustomer,onSaveVehicle,onDeleteVehicle,onOpenJob,t,lang}) {
+export function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,onDeleteCustomer,onSaveVehicle,onDeleteVehicle,onOpenJob,t}) {
   const [view,setView]=useState("list"); // list | customer
   const [activeCust,setActiveCust]=useState(null);
   const [editCust,setEditCust]=useState(null);
@@ -26,7 +26,7 @@ export function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCust
     api.get("workshop_documents",`customer_id=eq.${activeCust.id}&order=uploaded_at.desc`)
       .then(r=>setCustDocs(Array.isArray(r)?r:[]))
       .catch(()=>setCustDocs([]));
-  },[activeCust?.id]);
+  },[activeCust]);
 
   const handleCdFile=e=>{
     const f=e.target.files?.[0]; if(!f) return;

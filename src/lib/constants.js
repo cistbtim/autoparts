@@ -49,7 +49,7 @@ export const getCategories = () => {
     const c = getSettings().categories;
     if (c && typeof c === "string" && c.trim()) return JSON.parse(c);
     if (Array.isArray(c) && c.length) return c;
-  } catch {}
+  } catch (e) { /* ignore malformed categories */ }
   return DEFAULT_CATS;
 };
 

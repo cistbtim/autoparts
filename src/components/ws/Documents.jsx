@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { FL, FD } from "../shared.jsx";
 
-export function WsDocumentsPage({docs=[],settings,onSave,onDelete}) {
+export function WsDocumentsPage({docs=[],onSave,onDelete}) {
   // ── Upload section state ──────────────────────────────────────
   const [name,setName]=useState("");
   const [notes,setNotes]=useState("");

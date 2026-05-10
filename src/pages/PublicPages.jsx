@@ -29,7 +29,7 @@ export function RfqReplyPage({token,lang}) {
             if(Array.isArray(ps)&&ps[0]?.supplier_part_no){
               setSupplierPartNo(ps[0].supplier_part_no);
             }
-          } catch{}
+          } catch(e){/* ignore JSON parse failures */}
         }
       } else setErr("Inquiry not found or expired");
       setLoaded(true);

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fmtAmt } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 
-export function WsStockPage({wsStock=[],settings,onSave,onDelete,onAdjust}) {
+export function WsStockPage({wsStock=[],onSave,onDelete,onAdjust}) {
   const [search,setSearch]=useState("");
   const [modal,setModal]=useState(null); // null | {mode:"add"|"edit"|"adjust", item?}
 

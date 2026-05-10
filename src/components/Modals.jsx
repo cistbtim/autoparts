@@ -1,13 +1,15 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api.js";
-import { getSettings, C, curSym, updateSettings } from "../lib/settings.js";
+import { C, curSym, getSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
-import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, toLogoUrl, extractDriveId } from "../lib/helpers.js";
-import { CAR_MAKES, getCategories, DEFAULT_CATS } from "../lib/constants.js";
+import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation } from "../lib/helpers.js";
+import { CAR_MAKES, getCategories, DEFAULT_CATS, OC } from "../lib/constants.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
+
+const FormError = ({errors,k}) => errors[k] ? <div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {errors[k]}</div> : null;
 
 export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
   const [pTab,setPTab]=useState("profile"); // "profile" | "users"
@@ -31,14 +33,14 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
 
   useEffect(()=>{ setF(p=>({...p,...profile})); },[profile]);
 
-  const loadWsUsers=async()=>{
+  const loadWsUsers=useCallback(async()=>{
     if(!wsId) return;
     setLoadingUsers(true);
     const res=await api.get("workshop_users",`workshop_id=eq.${wsId}&order=id.asc&select=*`);
     setWsUsers(Array.isArray(res)?res:[]);
     setLoadingUsers(false);
-  };
-  useEffect(()=>{ if(pTab==="users"&&wsRole==="main") loadWsUsers(); },[pTab]);
+  },[wsId]);
+  useEffect(()=>{ if(pTab==="users"&&wsRole==="main") loadWsUsers(); },[pTab, wsRole, loadWsUsers]);
 
   const saveWsUser=async()=>{
     if(!userForm?.username||!userForm?.ws_role){setUserErr("Username and role required");return;}
@@ -208,7 +210,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
               <FL label="City & Country"/>
               <button type="button" className="btn btn-ghost btn-xs" disabled={detectingLoc} onClick={async()=>{
                 setDetectingLoc(true);
-                try{const loc=await detectGeoLocation();s("city",loc.city);s("country",loc.country);}catch{}
+                try{const loc=await detectGeoLocation();s("city",loc.city);s("country",loc.country);}catch{/* ignore geo detection errors */}
                 setDetectingLoc(false);
               }} style={{fontSize:11,padding:"3px 9px"}}>
                 {detectingLoc?"Detecting...":"📍 Auto-detect"}
@@ -520,7 +522,7 @@ export function WsLocationSetupModal({profile,onSave,onClose}) {
         <div style={{display:"flex",flexDirection:"column",gap:13}}>
           <button type="button" className="btn btn-ghost" disabled={detecting} onClick={async()=>{
             setDetecting(true);
-            try{const loc=await detectGeoLocation();setCity(loc.city);setCountry(loc.country);}catch{}
+            try{const loc=await detectGeoLocation();setCity(loc.city);setCountry(loc.country);}catch{/* ignore geolocation failures */}
             setDetecting(false);
           }} style={{width:"100%",fontSize:13}}>
             {detecting?"📡 Detecting your location...":"📍 Auto-detect my City & Country"}
@@ -545,7 +547,8 @@ export function WsLocationSetupModal({profile,onSave,onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP SUBSCRIPTION EXPIRED PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WsSubscriptionExpiredPage({expiresAt,onLogout,settings}) {
+export function WsSubscriptionExpiredPage({expiresAt,onLogout}) {
+  const settings = getSettings();
   return (
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"60vh",padding:24}}>
       <div style={{maxWidth:480,width:"100%",textAlign:"center"}}>
@@ -1229,7 +1232,7 @@ export function SettingsPage({settings,onSave,t}) {
                 <button className="cp-btn"
                   disabled={!!f.logo_data}
                   style={{opacity:f.logo_data?0.4:1}}
-                  onClick={async()=>{if(f.logo_data){alert("Remove the uploaded logo first.");return;}try{const txt=await navigator.clipboard.readText();s("logo_url",txt);}catch{}}}>📥 Paste</button>
+                  onClick={async()=>{if(f.logo_data){alert("Remove the uploaded logo first.");return;}try{const txt=await navigator.clipboard.readText();s("logo_url",txt);}catch{/* ignore clipboard failures */}}}>📥 Paste</button>
               </div>
               <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>
                 💡 <strong style={{color:"var(--text)"}}>Upload</strong> = stored in DB &nbsp;·&nbsp;
@@ -1549,7 +1552,7 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onClose,t,sett
 // VIEW SUPPLIER INVOICE
 export function ViewSupplierInvoiceModal({inv,onClose,settings}) {
   const [items,setItems]=useState([]);
-  useEffect(()=>{api.get("supplier_invoice_items",`invoice_id=eq.${inv.id}&select=*`).then(r=>setItems(Array.isArray(r)?r:[]));},[]); 
+  useEffect(()=>{api.get("supplier_invoice_items",`invoice_id=eq.${inv.id}&select=*`).then(r=>setItems(Array.isArray(r)?r:[]));},[inv.id]); 
   return (
     <Overlay onClose={onClose} wide>
       <MHead title={`🧾 Invoice ${inv.id}`} sub={`${inv.supplier_name} · ${inv.invoice_date}`} onClose={onClose}/>
@@ -1569,7 +1572,7 @@ export function ViewSupplierInvoiceModal({inv,onClose,settings}) {
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER RETURN MODAL
 // ═══════════════════════════════════════════════════════════════
-export function SupplierReturnModal({data,suppliers,parts,supplierInvoices,onSave,onClose,t,settings}) {
+export function SupplierReturnModal({suppliers,supplierInvoices,onSave,onClose,t,settings}) {
   const [suppId,setSuppId]=useState("");
   const [origInv,setOrigInv]=useState("");
   const [returnDate,setReturnDate]=useState(today());
@@ -1667,7 +1670,7 @@ export function SupplierReturnModal({data,suppliers,parts,supplierInvoices,onSav
 // ═══════════════════════════════════════════════════════════════
 // CUSTOMER INVOICE MODAL
 // ═══════════════════════════════════════════════════════════════
-export function CustomerInvoiceModal({data,customers,parts,orders,onSave,onClose,t,settings}) {
+export function CustomerInvoiceModal({data,customers,parts,onSave,onClose,t,settings}) {
   const prefillOrder=data?.order;
   const [custPhone,setCustPhone]=useState(prefillOrder?.customer_phone||"");
   const [custName,setCustName]=useState(prefillOrder?.customer_name||"");
@@ -1732,7 +1735,7 @@ export function CustomerInvoiceModal({data,customers,parts,orders,onSave,onClose
 // VIEW CUSTOMER INVOICE
 export function ViewCustomerInvoiceModal({inv,onClose,settings}) {
   const [items,setItems]=useState([]);
-  useEffect(()=>{api.get("customer_invoice_items",`invoice_id=eq.${inv.id}&select=*`).then(r=>setItems(Array.isArray(r)?r:[]));},[]); 
+  useEffect(()=>{api.get("customer_invoice_items",`invoice_id=eq.${inv.id}&select=*`).then(r=>setItems(Array.isArray(r)?r:[]));},[inv.id]); 
   return (
     <Overlay onClose={onClose} wide>
       <MHead title={`🧾 Invoice ${inv.id}`} sub={`${inv.customer_name} · ${inv.invoice_date}`} onClose={onClose}/>
@@ -1757,7 +1760,7 @@ export function ViewCustomerInvoiceModal({inv,onClose,settings}) {
 // ═══════════════════════════════════════════════════════════════
 // CUSTOMER RETURN MODAL
 // ═══════════════════════════════════════════════════════════════
-export function CustomerReturnModal({data,customers,parts,customerInvoices,onSave,onClose,t,settings}) {
+export function CustomerReturnModal({data,customerInvoices,onSave,onClose,t,settings}) {
   const prefillInv=data?.invoice;
   const [custPhone,setCustPhone]=useState(prefillInv?.customer_phone||"");
   const [custName,setCustName]=useState(prefillInv?.customer_name||"");
@@ -1781,9 +1784,6 @@ export function CustomerReturnModal({data,customers,parts,customerInvoices,onSav
       setLoadingInv(false);
     });
   },[invId]);
-
-  // If prefilled from invoice, load items immediately
-  useEffect(()=>{if(prefillInv?.id){};},[]);
 
   const selectedItems=invItems.filter(i=>returnQtys[i.id]>0);
   const sub=selectedItems.reduce((s,i)=>s+(returnQtys[i.id]||0)*i.unit_price,0);
@@ -2018,10 +2018,6 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     {id:"rfq",     label:`📩 ${t.pmTabRfq}${rfqTotal>0?" ("+rfqTotal+")":""}`},
   ];
 
-  const Err = ({k}) => errors[k]
-    ? <div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {errors[k]}</div>
-    : null;
-
   return (
     <Overlay onClose={handleClose} wide>
       <MHead title={part?`✏️ ${t.pmEditPart}`:`+ ${t.pmNewPart}`} onClose={handleClose}/>
@@ -2059,7 +2055,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
               </div>
               <input className="inp" value={f.sku} onChange={e=>{s("sku",e.target.value);setErrors(p=>({...p,sku:""}));}}
                 placeholder="GP00001" style={{borderColor:errors.sku?"var(--red)":undefined}}/>
-              <Err k="sku"/>
+              <FormError errors={errors} k="sku"/>
             </div>
             <div><FL label={t.brand}/><input className="inp" value={f.brand} onChange={e=>s("brand",e.target.value)} placeholder="GWM"/></div>
           </FG>
@@ -2082,7 +2078,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             </div>
             <input className="inp" value={f.name} onChange={e=>{s("name",e.target.value);setErrors(p=>({...p,name:""}));}}
               placeholder="Engine Mount - Left" style={{borderColor:errors.name?"var(--red)":undefined}}/>
-            <Err k="name"/>
+            <FormError errors={errors} k="name"/>
           </FD>
           <FD>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
@@ -2111,7 +2107,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
               <FL label={`${t.price} * (Selling)`}/>
               <input className="inp" type="number" value={f.price} onChange={e=>{s("price",e.target.value);setErrors(p=>({...p,price:""}));}}
                 placeholder="0.00" style={{borderColor:errors.price?"var(--red)":undefined}}/>
-              <Err k="price"/>
+              <FormError errors={errors} k="price"/>
             </div>
             <div>
               <FL label={`💰 ${t.costPrice}`}/>
@@ -2146,7 +2142,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
                 <FL label={t.model}/>
-                <button className="cp-btn" onClick={async()=>{try{const txt=await navigator.clipboard.readText();s("model",txt);}catch{}}}>📥 Paste</button>
+                <button className="cp-btn" onClick={async()=>{try{const txt=await navigator.clipboard.readText();s("model",txt);}catch{/* ignore clipboard failures */}}}>📥 Paste</button>
               </div>
               <input className="inp" value={f.model} onChange={e=>s("model",e.target.value)} placeholder="P-Series, H6..."/>
             </div>
@@ -2759,13 +2755,10 @@ export function CustomerQueryReplyModal({query,onReply,onClose,t,settings,onGoIn
 }
 
 export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t}) {
-  if(!part)return null;
-  const [selectedSuppliers,setSelectedSuppliers]=useState([]);
-  const [qty,setQty]=useState(10);
-
   // Build professional RFQ message — each field on its own clear line
   // buildMsg now accepts optional supplierPartNo from part_suppliers record
   const buildMsg = (supplierName, qtyVal, supplierPartNo="") => {
+    if(!part) return "";
     const lines = [];
     lines.push(`Dear ${supplierName},`);
     lines.push("");
@@ -2801,7 +2794,11 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t}) {
     return lines.join("\n");
   };
 
+  const [selectedSuppliers,setSelectedSuppliers]=useState([]);
+  const [qty,setQty]=useState(10);
   const [msg,setMsg]=useState(()=>buildMsg("Supplier", 10, ""));
+
+  if(!part) return null;
 
   const toggleSupplier=(s)=>setSelectedSuppliers(p=>p.find(x=>x.id===s.id)?p.filter(x=>x.id!==s.id):[...p,s]);
 
@@ -2899,7 +2896,7 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t}) {
   );
 }
 
-export function InquiryDetailModal({inquiry,onUpdate,onAccept,onClose,t,settings}) {
+export function InquiryDetailModal({inquiry,onUpdate,onAccept,onClose}) {
   const [rp,setRp]=useState(inquiry?.reply_price||"");
   const [rs,setRs]=useState(inquiry?.reply_stock||"");
   const [rn,setRn]=useState(inquiry?.reply_notes||"");

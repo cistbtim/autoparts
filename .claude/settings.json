@@ -45,10 +45,28 @@
       "Bash(node -e ' *)",
       "Bash(python3)",
       "Bash(grep -n \"WorkshopBookingPage\\\\|export function.*Booking\" c:\\\\\\\\Users\\\\\\\\Tim\\\\\\\\car-parts-app\\\\\\\\src\\\\\\\\pages\\\\\\\\PublicPages.jsx)",
-      "Bash(wc -l c:\\\\\\\\Users\\\\\\\\Tim\\\\\\\\car-parts-app\\\\\\\\src\\\\\\\\pages\\\\\\\\PublicPages.jsx)"
+      "Bash(wc -l c:\\\\\\\\Users\\\\\\\\Tim\\\\\\\\car-parts-app\\\\\\\\src\\\\\\\\pages\\\\\\\\PublicPages.jsx)",
+      "Skill(ship)",
+      "Skill(ship:*)",
+      "Skill(context-restore)",
+      "Skill(context-restore:*)",
+      "Bash(gh run *)",
+      "Bash(netlify deploy *)",
+      "Bash(npx netlify-cli *)",
+      "PowerShell($env:NETLIFY_AUTH_TOKEN)",
+      "Bash(Get-ChildItem \"c:\\\\Users\\\\Tim\\\\car-parts-app\\\\src\")",
+      "Bash(Select-Object Name)",
+      "Bash(git pull *)",
+      "Bash(python import_speedgrand.py --dry-run)",
+      "Bash(python -X utf8 import_speedgrand.py --dry-run)",
+      "Bash(python -X utf8 import_speedgrand.py)",
+      "Bash(./setup)",
+      "Bash(git remote *)",
+      "Bash(git restore *)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory"
+      "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory",
+      "C:\\Users\\Tim\\.gstack\\projects\\cistbtim-autoparts"
     ]
   }
 }

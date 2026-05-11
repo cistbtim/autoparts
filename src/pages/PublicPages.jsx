@@ -1390,3 +1390,194 @@ export function WorkshopBookingPage({token}) {
     </div>
   );
 }
+
+// ─── Branch Registration Page (?branch_reg=1) ────────────────────────────────
+export function BranchRegPage() {
+  const settings = getSettings();
+  const [f, setF] = useState({name:"", city:"", address:"", phone:"", contact_name:"", email:""});
+  const [step, setStep] = useState("form"); // form | submitting | done | error
+  const [errMsg, setErrMsg] = useState("");
+  const s = (k, v) => setF(p => ({...p, [k]: v}));
+
+  const submit = async () => {
+    if (!f.name.trim())    return setErrMsg("Shop name is required");
+    if (!f.city.trim())    return setErrMsg("City is required");
+    if (!f.phone.trim())   return setErrMsg("Phone is required");
+    setErrMsg("");
+    setStep("submitting");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/branches`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${SUPABASE_KEY}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({
+          name: f.name.trim(),
+          city: f.city.trim(),
+          address: f.address.trim(),
+          phone: f.phone.trim(),
+          contact_name: f.contact_name.trim(),
+          email: f.email.trim(),
+          status: "pending",
+          is_main: false,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setStep("done");
+    } catch(e) {
+      setErrMsg(e.message || "Submission failed. Please try again.");
+      setStep("form");
+    }
+  };
+
+  return (
+    <div style={{fontFamily:"'DM Sans',sans-serif",background:"var(--bg)",minHeight:"100vh",color:"var(--text)",display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 16px"}}>
+      <style>{CSS}</style>
+      <div style={{width:"100%",maxWidth:480}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <ShopLogo settings={settings} size="md"/>
+          <div style={{fontSize:22,fontWeight:800,marginTop:14}}>Branch Registration</div>
+          <div style={{fontSize:14,color:"var(--text3)",marginTop:6}}>Fill in your shop details to apply for a branch account. We'll review and activate it shortly.</div>
+        </div>
+
+        {step==="done" ? (
+          <div style={{background:"rgba(34,197,94,.1)",border:"1px solid rgba(34,197,94,.3)",borderRadius:14,padding:"32px 24px",textAlign:"center"}}>
+            <div style={{fontSize:40,marginBottom:12}}>✅</div>
+            <div style={{fontSize:18,fontWeight:700,color:"var(--green)",marginBottom:8}}>Application Submitted!</div>
+            <div style={{fontSize:14,color:"var(--text2)"}}>
+              Your branch <strong>{f.name}</strong> has been registered and is pending approval.<br/><br/>
+              We'll contact you at <strong>{f.email||f.phone}</strong> once your account is activated.
+            </div>
+          </div>
+        ) : (
+          <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:"24px 20px"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div>
+                <FL label="Shop Name *"/>
+                <input className="inp" value={f.name} onChange={e=>s("name",e.target.value)} placeholder="Cape Town Spare Parts"/>
+              </div>
+              <div>
+                <FL label="City *"/>
+                <input className="inp" value={f.city} onChange={e=>s("city",e.target.value)} placeholder="Cape Town"/>
+              </div>
+              <div>
+                <FL label="Address"/>
+                <input className="inp" value={f.address} onChange={e=>s("address",e.target.value)} placeholder="123 Main Road, Cape Town"/>
+              </div>
+              <div>
+                <FL label="Phone *"/>
+                <input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)} placeholder="+27 21 000 0000"/>
+              </div>
+              <div>
+                <FL label="Contact Person"/>
+                <input className="inp" value={f.contact_name} onChange={e=>s("contact_name",e.target.value)} placeholder="Your name"/>
+              </div>
+              <div>
+                <FL label="Email"/>
+                <input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)} placeholder="shop@example.com"/>
+              </div>
+              {errMsg && <div style={{color:"var(--red)",fontSize:13,background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.3)",borderRadius:8,padding:"8px 12px"}}>{errMsg}</div>}
+              <button className="btn btn-primary" onClick={submit} disabled={step==="submitting"} style={{marginTop:4,height:44,fontSize:15,fontWeight:700}}>
+                {step==="submitting" ? "Submitting…" : "Submit Application"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Branch Activation Page ───────────────────────────────────────────────────
+export function BranchActivatePage() {
+  const [settings,setSettings]=useState({});
+  const [code,setCode]=useState("");
+  const [step,setStep]=useState("form"); // form | loading | done
+  const [errMsg,setErrMsg]=useState("");
+  const [branchName,setBranchName]=useState("");
+
+  useEffect(()=>{
+    fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1&select=shop_name,logo_url,logo_drive_id`,{
+      headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}
+    }).then(r=>r.json()).then(r=>{if(r[0])setSettings(r[0]);}).catch(()=>{});
+  },[]);
+
+  const submit=async()=>{
+    const c=code.trim().toUpperCase();
+    if(c.length!==6){setErrMsg("Please enter the 6-character activation code.");return;}
+    setStep("loading");setErrMsg("");
+    try{
+      const rows=await fetch(
+        `${SUPABASE_URL}/rest/v1/branches?activation_code=eq.${c}&status=eq.suspended&select=id,name,activation_code_expires_at`,
+        {headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}}
+      ).then(r=>r.json());
+      if(!Array.isArray(rows)||rows.length===0){
+        setErrMsg("Invalid code or branch not found. Please check and try again.");
+        setStep("form");return;
+      }
+      const branch=rows[0];
+      if(branch.activation_code_expires_at&&new Date(branch.activation_code_expires_at)<new Date()){
+        setErrMsg("This activation code has expired. Contact the administrator for a new code.");
+        setStep("form");return;
+      }
+      await fetch(`${SUPABASE_URL}/rest/v1/branches?id=eq.${branch.id}`,{
+        method:"PATCH",
+        headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json",Prefer:"return=minimal"},
+        body:JSON.stringify({status:"active",activation_code:null,activation_code_expires_at:null})
+      });
+      setBranchName(branch.name);
+      setStep("done");
+    }catch{
+      setErrMsg("Activation failed. Please try again.");
+      setStep("form");
+    }
+  };
+
+  return (
+    <div style={{fontFamily:"'DM Sans',sans-serif",background:"var(--bg)",minHeight:"100vh",color:"var(--text)",display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 16px"}}>
+      <style>{CSS}</style>
+      <div style={{width:"100%",maxWidth:440}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <ShopLogo settings={settings} size="md"/>
+          <div style={{fontSize:22,fontWeight:800,marginTop:14}}>Branch Activation</div>
+          <div style={{fontSize:14,color:"var(--text3)",marginTop:6}}>Enter your activation code to reactivate your branch account.</div>
+        </div>
+        {step==="done"?(
+          <div style={{background:"rgba(34,197,94,.1)",border:"1px solid rgba(34,197,94,.3)",borderRadius:14,padding:"32px 24px",textAlign:"center"}}>
+            <div style={{fontSize:40,marginBottom:12}}>✅</div>
+            <div style={{fontSize:18,fontWeight:700,color:"var(--green)",marginBottom:8}}>Branch Reactivated!</div>
+            <div style={{fontSize:14,color:"var(--text2)",marginBottom:20}}>
+              <strong>{branchName}</strong> is now active. You can now log in to your account.
+            </div>
+            <a href={window.location.origin+window.location.pathname} style={{display:"inline-block",background:"var(--accent)",color:"#fff",borderRadius:9,padding:"11px 28px",fontSize:15,fontWeight:700,textDecoration:"none"}}>
+              Go to Login
+            </a>
+          </div>
+        ):(
+          <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:"24px 20px"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div>
+                <FL label="Activation Code"/>
+                <input
+                  className="inp"
+                  value={code}
+                  onChange={e=>setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").substring(0,6))}
+                  placeholder="ABC123"
+                  style={{fontFamily:"monospace",letterSpacing:6,fontSize:22,textAlign:"center",fontWeight:800}}
+                  maxLength={6}
+                />
+              </div>
+              {errMsg&&<div style={{color:"var(--red)",fontSize:13,background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.3)",borderRadius:8,padding:"8px 12px"}}>{errMsg}</div>}
+              <button className="btn btn-primary" onClick={submit} disabled={step==="loading"} style={{marginTop:4,height:44,fontSize:15,fontWeight:700}}>
+                {step==="loading"?"Activating…":"Activate Branch"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

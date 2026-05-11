@@ -8,13 +8,13 @@ import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./l
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
-import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage } from "./pages/PublicPages.jsx";
+import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage } from "./pages/PublicPages.jsx";
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -56,6 +56,10 @@ export default function App() {
   if(wsSupReqToken) return <WsSupplierQuoteReplyPage token={wsSupReqToken}/>;
   const wsbooking = new URLSearchParams(window.location.search).get("wsbooking");
   if(wsbooking) return <WorkshopBookingPage token={wsbooking}/>;
+  const branchReg = new URLSearchParams(window.location.search).get("branch_reg");
+  if(branchReg) return <BranchRegPage/>;
+  const activateBranch = new URLSearchParams(window.location.search).get("activate_branch");
+  if(activateBranch) return <BranchActivatePage/>;
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
   if(!user) return <LoginPage onLogin={setUser} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={()=>setUser(null)} lang={lang}/>;
@@ -73,7 +77,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const wsId  = role==="workshop"  ? String(user.id) : null;
   const scrapId = role==="scrapyard" ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_dashboard":role==="demo"?"inventory":"dashboard";
+  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_dashboard":role==="branch_admin"?"inventory":role==="demo"?"inventory":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [parts,setParts]=useState([]);
@@ -100,6 +104,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [stockMoves,setStockMoves]=useState([]);
   const [stockTakes,setStockTakes]=useState([]);
   const [settings,setSettings]=useState(getSettings());
+  const [branches,setBranches]=useState([]);
+  const [currentBranch,setCurrentBranch]=useState(null); // null = all branches (admin); object = active branch
+  const [partRequests,setPartRequests]=useState([]);
+  const [branchStock,setBranchStock]=useState([]);
   // Sync settings state from _settings cache after it loads from DB
   useEffect(()=>{ setSettings({...getSettings()}); },[]);
   const [loading,setLoading]=useState(true);
@@ -160,6 +168,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [busyMsg,setBusyMsg]=useState(null); // full-screen blocking spinner
   const [lightbox,setLightbox]=useState(null);
   const [drawerOpen,setDrawerOpen]=useState(false);
+  const [crossBranchSearch,setCrossBranchSearch]=useState("");
+  const [showCrossBranch,setShowCrossBranch]=useState(false);
   const [wsMoreOpen,setWsMoreOpen]=useState(false);
 
   // Debounce search input — only filter after 250ms of no typing
@@ -269,13 +279,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     licence_renewal_agent_phone: workshopProfile.licence_renewal_agent_phone || settings.licence_renewal_agent_phone || "",
     label_width_mm:  workshopProfile.label_width_mm  || 98,
     label_height_mm: workshopProfile.label_height_mm || 45,
+  } : role==="branch_admin"&&currentBranch ? {
+    ...settings,
+    shop_name: currentBranch.shop_name || currentBranch.name || settings.shop_name,
+    logo_url:  currentBranch.logo_url  || "",
+    logo_data: currentBranch.logo_data || "",
+    phone:     currentBranch.phone     || settings.phone,
+    email:     currentBranch.email     || settings.email,
+    address:   currentBranch.address   || settings.address,
+    currency:  currentBranch.currency  || settings.currency || "ZAR R",
   } : settings;
 
+  const _bId=role==="branch_admin"?user.branch_id||null:null; // branch_id for save-side isolation
   const logInv=async(part,before,after,action,reason="")=>{
-    await api.upsert("inventory_logs",{part_id:part.id,part_name:part.name,part_sku:part.sku,action,qty_before:before,qty_after:after,changed_by:user.name||user.username,reason});
+    await api.upsert("inventory_logs",{part_id:part.id,part_name:part.name,part_sku:part.sku,action,qty_before:before,qty_after:after,changed_by:user.name||user.username,reason,...(_bId?{branch_id:_bId}:{})});
   };
 
   const loadAll=useCallback(async()=>{
+    // Branch filter prefix — limits fetch to this branch's records for branch_admin
+    const bF=role==="branch_admin"&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
     setLoading(true);
     setLoadingItems([]);
 
@@ -315,13 +337,32 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     }
     setParts(Array.isArray(partsFirst)?partsFirst:[]);
 
-    const [o,s,st]=await Promise.all([
+    const [o,s,st,br]=await Promise.all([
       track('orders',    api.get("orders","select=*&order=created_at.desc")),
       track('suppliers', api.get("suppliers","select=*&order=name.asc")),
       track('settings',  api.get("settings","id=eq.1&select=*")),
+      track('branches',  api.get("branches","select=*&order=is_main.desc,name.asc").catch(()=>[])),
     ]);
     setOrders(Array.isArray(o)?o:[]);
     setSuppliers(Array.isArray(s)?s:[]);
+    if(Array.isArray(br)&&br.length){
+      setBranches(br);
+      setCurrentBranch(prev=>{
+        // Non-admin users locked to their branch — always sync fresh data so suspend/reactivate takes effect immediately
+        if(role!=="admin"&&user.branch_id) return br.find(b=>b.id===user.branch_id)||br.find(b=>b.is_main)||br[0];
+        if(prev) return prev; // admin: keep their manual selection
+        // admin defaults to main branch (can switch to null for all)
+        return br.find(b=>b.is_main)||br[0];
+      });
+      // On first login, redirect admin to Branches if there are pending registrations
+      if(!firstLoadDoneRef.current && role==="admin"){
+        const hasPending=br.some(b=>b.status==="pending");
+        if(hasPending) setTab("branches");
+        firstLoadDoneRef.current=true;
+      }
+    } else if(!firstLoadDoneRef.current){
+      firstLoadDoneRef.current=true;
+    }
     if(Array.isArray(st)&&st[0]){
       updateSettings(st[0]); // update global cache — used by ShopLogo on login page
       setSettings(getSettings());
@@ -353,21 +394,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const [c,u,l,ll,inq,si,ci,sr,cr,veh,fit,py,...rest]=await Promise.all([
       api.get("customers","select=*&order=total_spent.desc"),
       api.get("users","select=*&order=id.asc"),
-      api.get("inventory_logs","select=*&order=created_at.desc&limit=200"),
+      api.get("inventory_logs",`${bF}select=*&order=created_at.desc&limit=200`),
       needsAdmin ? api.get("login_logs","select=*&order=created_at.desc&limit=200") : Promise.resolve([]),
-      api.get("inquiries","select=*&order=created_at.desc"),
-      api.get("supplier_invoices","select=*&order=created_at.desc"),
-      api.get("customer_invoices","select=*&order=created_at.desc"),
-      api.get("supplier_returns","select=*&order=created_at.desc"),
-      api.get("customer_returns","select=*&order=created_at.desc"),
+      api.get("inquiries",`${bF}select=*&order=created_at.desc`),
+      api.get("supplier_invoices",`${bF}select=*&order=created_at.desc`),
+      api.get("customer_invoices",`${bF}select=*&order=created_at.desc`),
+      api.get("supplier_returns",`${bF}select=*&order=created_at.desc`),
+      api.get("customer_returns",`${bF}select=*&order=created_at.desc`),
       api.get("vehicles","select=*&order=make.asc,model.asc,year_from.asc").catch(()=>[]),
       api.get("part_fitments","select=*").catch(()=>[]),
-      api.get("payments","select=*&order=payment_date.desc").catch(()=>[]),
-      api.get("rfq_sessions","select=*&order=created_at.desc").catch(()=>[]),
+      api.get("payments",`${bF}select=*&order=payment_date.desc`).catch(()=>[]),
+      api.get("rfq_sessions",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
       api.get("rfq_items","select=*").catch(()=>[]),
       api.get("rfq_quotes","select=*&order=created_at.desc").catch(()=>[]),
-      api.get("stock_moves","select=*&order=moved_at.desc&limit=200").catch(()=>[]),
-      api.get("stock_takes","select=*&order=created_at.desc").catch(()=>[]),
+      api.get("stock_moves",`${bF}select=*&order=moved_at.desc&limit=200`).catch(()=>[]),
+      api.get("stock_takes",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
       needsWs ? api.get("workshop_jobs",`select=*&order=date_in.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_job_items",`select=*${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
@@ -440,6 +481,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setAllScrapParts(Array.isArray(rest[29])?rest[29]:[]);
     setAllScrapProfiles(Array.isArray(rest[30])?rest[30]:[]);
     setBgLoading(0); // all background tables done
+    // Part requests: admin sees all, branch_admin sees their own
+    if(role==="admin"||role==="branch_admin"){
+      const prF=role==="branch_admin"&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
+      api.get("part_requests",`${prF}select=*&order=created_at.desc`).catch(()=>[]).then(r=>{if(Array.isArray(r))setPartRequests(r);});
+    }
+    // Branch stock: per-branch qty/price/bin overlay (branch_admin only)
+    if(role==="branch_admin"&&user.branch_id){
+      api.get("branch_stock",`branch_id=eq.${user.branch_id}&select=*`).catch(()=>[]).then(r=>{if(Array.isArray(r))setBranchStock(r);});
+    }
     // Load workshop profile for workshop role
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
@@ -503,26 +553,29 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   // Targeted refresh — fetch only the tables that a mutation actually dirtied.
   // Cuts ~40-table loadAll() down to 1-4 requests per save operation.
   const refreshTables=useCallback(async(...names)=>{
+    const bF=role==="branch_admin"&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
     const D={
-      parts:                    ["select=*&order=id.asc",                            d=>setParts(Array.isArray(d)?d:[])],
-      orders:                   ["select=*&order=created_at.desc",                   d=>setOrders(Array.isArray(d)?d:[])],
-      suppliers:                ["select=*&order=name.asc",                          d=>setSuppliers(Array.isArray(d)?d:[])],
-      customers:                ["select=*&order=total_spent.desc",                  d=>setCustomers(Array.isArray(d)?d:[])],
-      users:                    ["select=*&order=id.asc",                            d=>setUsers(Array.isArray(d)?d:[])],
-      inventory_logs:           ["select=*&order=created_at.desc&limit=200",         d=>setLogs(Array.isArray(d)?d:[])],
-      inquiries:                ["select=*&order=created_at.desc",                   d=>setInquiries(Array.isArray(d)?d:[])],
-      supplier_invoices:        ["select=*&order=created_at.desc",                   d=>setSupplierInvoices(Array.isArray(d)?d:[])],
-      customer_invoices:        ["select=*&order=created_at.desc",                   d=>setCustomerInvoices(Array.isArray(d)?d:[])],
-      supplier_returns:         ["select=*&order=created_at.desc",                   d=>setSupplierReturns(Array.isArray(d)?d:[])],
-      customer_returns:         ["select=*&order=created_at.desc",                   d=>setCustomerReturns(Array.isArray(d)?d:[])],
-      vehicles:                 ["select=*&order=make.asc,model.asc,year_from.asc",  d=>setVehicles(Array.isArray(d)?d:[])],
-      part_fitments:            ["select=*",                                          d=>setPartFitments(Array.isArray(d)?d:[])],
-      payments:                 ["select=*&order=payment_date.desc",                 d=>setPayments(Array.isArray(d)?d:[])],
-      rfq_sessions:             ["select=*&order=created_at.desc",                   d=>setRfqSessions(Array.isArray(d)?d:[])],
-      rfq_items:                ["select=*",                                          d=>setRfqItems(Array.isArray(d)?d:[])],
-      rfq_quotes:               ["select=*&order=created_at.desc",                   d=>setRfqQuotes(Array.isArray(d)?d:[])],
-      stock_moves:              ["select=*&order=moved_at.desc&limit=200",            d=>setStockMoves(Array.isArray(d)?d:[])],
+      parts:                    ["select=*&order=id.asc",                                         d=>setParts(Array.isArray(d)?d:[])],
+      orders:                   ["select=*&order=created_at.desc",                                d=>setOrders(Array.isArray(d)?d:[])],
+      suppliers:                ["select=*&order=name.asc",                                       d=>setSuppliers(Array.isArray(d)?d:[])],
+      customers:                ["select=*&order=total_spent.desc",                               d=>setCustomers(Array.isArray(d)?d:[])],
+      users:                    ["select=*&order=id.asc",                                         d=>setUsers(Array.isArray(d)?d:[])],
+      inventory_logs:           [`${bF}select=*&order=created_at.desc&limit=200`,                 d=>setLogs(Array.isArray(d)?d:[])],
+      inquiries:                [`${bF}select=*&order=created_at.desc`,                           d=>setInquiries(Array.isArray(d)?d:[])],
+      supplier_invoices:        [`${bF}select=*&order=created_at.desc`,                           d=>setSupplierInvoices(Array.isArray(d)?d:[])],
+      customer_invoices:        [`${bF}select=*&order=created_at.desc`,                           d=>setCustomerInvoices(Array.isArray(d)?d:[])],
+      supplier_returns:         [`${bF}select=*&order=created_at.desc`,                           d=>setSupplierReturns(Array.isArray(d)?d:[])],
+      customer_returns:         [`${bF}select=*&order=created_at.desc`,                           d=>setCustomerReturns(Array.isArray(d)?d:[])],
+      vehicles:                 ["select=*&order=make.asc,model.asc,year_from.asc",               d=>setVehicles(Array.isArray(d)?d:[])],
+      part_fitments:            ["select=*",                                                       d=>setPartFitments(Array.isArray(d)?d:[])],
+      payments:                 [`${bF}select=*&order=payment_date.desc`,                         d=>setPayments(Array.isArray(d)?d:[])],
+      rfq_sessions:             [`${bF}select=*&order=created_at.desc`,                           d=>setRfqSessions(Array.isArray(d)?d:[])],
+      rfq_items:                ["select=*",                                                       d=>setRfqItems(Array.isArray(d)?d:[])],
+      rfq_quotes:               ["select=*&order=created_at.desc",                                d=>setRfqQuotes(Array.isArray(d)?d:[])],
+      stock_moves:              [`${bF}select=*&order=moved_at.desc&limit=200`,                   d=>setStockMoves(Array.isArray(d)?d:[])],
       stock_takes:              ["select=*&order=created_at.desc",                   d=>setStockTakes(Array.isArray(d)?d:[])],
+      part_requests:            [role==="branch_admin"&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setPartRequests(Array.isArray(d)?d:[])],
+      branch_stock:             [role==="branch_admin"&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*`:"select=*", d=>setBranchStock(Array.isArray(d)?d:[])],
       workshop_jobs:            [`select=*&order=date_in.desc${wsF}`,                d=>setWorkshopJobs(Array.isArray(d)?d:[])],
       workshop_job_items:       [`select=*${wsF}`,                                   d=>setWorkshopJobItems(Array.isArray(d)?d:[])],
       workshop_invoices:        [`select=*&order=invoice_date.desc${wsF}`,           d=>setWorkshopInvoices(Array.isArray(d)?d:[])],
@@ -646,6 +699,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   // Track last user interaction time
   const lastActivityRef = useRef(Date.now());
   const lastLoadRef = useRef(0); // timestamp of last full loadAll — used to skip redundant focus refreshes
+  const firstLoadDoneRef = useRef(false); // true after initial loadAll — prevents repeat auto-redirects
   // Track current tab — pause refresh during stock count
   const tabRef = useRef(tab);
   useEffect(()=>{ tabRef.current = tab; },[tab]);
@@ -765,12 +819,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     }
 
     const oid=makeId("ORD");
-    const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",items:cart.map(i=>({partId:i.id,qty:i.qty,name:i.name,price:i.price})),total:cartTotal};
+    const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",items:cart.map(i=>({partId:i.id,qty:i.qty,name:i.name,price:i.price})),total:cartTotal,branch_id:currentBranch?.id||null};
     await api.upsert("orders",orderObj);
     // NO stock deduction on order — stock deducted when shipper sets 待出貨
     const ex=customers.find(c=>c.phone===form.phone);
     if(ex) await api.patch("customers","phone",form.phone,{orders:ex.orders+1,total_spent:ex.total_spent+cartTotal});
-    else await api.upsert("customers",{name:form.name,phone:form.phone,email:form.email||"",address:form.address||"",orders:1,total_spent:cartTotal});
+    else await api.upsert("customers",{name:form.name,phone:form.phone,email:form.email||"",address:form.address||"",orders:1,total_spent:cartTotal,branch_id:currentBranch?.id||null});
     await refreshTables("orders","customers");setCart([]);closeM("checkout");
     openM("orderConfirm",{order:orderObj,phone:form.phone,email:form.email||""});
     setTab(role==="customer"?"myorders":"orders");
@@ -841,7 +895,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         },300);
       }
     } else {
-      const d2={...data,image_url:toSaveUrl(data.image_url)};
+      const d2={...data,image_url:toSaveUrl(data.image_url),branch_id:currentBranch?.id||null};
       setBusyMsg(`Saving ${d2.sku||"new part"}…`);
       try {
         const r=await api.upsert("parts",d2);
@@ -1529,6 +1583,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       rfq_token:token,
       created_by:user.name||user.username,
       status:"pending",
+      ...(_bId?{branch_id:_bId}:{}),
       part_id, part_name, part_sku,
       part_oe_number:part_oe_number||"",
       part_make:part_make||"",
@@ -1561,7 +1616,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const inv={
       id:invId, supplier_id:+inq.supplier_id||null, supplier_name:inq.supplier_name,
       invoice_date:today(), status:"unpaid",
-      total:lineItem.total, notes:`From RFQ ${inq.id}`
+      total:lineItem.total, notes:`From RFQ ${inq.id}`,...(_bId?{branch_id:_bId}:{})
     };
     await api.insert("supplier_invoices",inv);
     await api.insert("supplier_invoice_items",lineItem);
@@ -1599,7 +1654,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
   // Supplier Invoices
   const saveSupplierInvoice=async(data,items)=>{
-    const {inv,isNew}=data;
+    const {inv:invRaw,isNew}=data;
+    const inv={...invRaw,...(_bId?{branch_id:_bId}:{})};
     await api.upsert("supplier_invoices",inv);
     if(isNew){
       for(const item of items){
@@ -1619,7 +1675,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
   // Supplier Returns
   const saveSupplierReturn=async(data,items)=>{
-    await api.upsert("supplier_returns",data);
+    await api.upsert("supplier_returns",{...data,...(_bId?{branch_id:_bId}:{})});
     for(const item of items){
       await api.insert("supplier_return_items",{...item,return_id:data.id});
       const part=parts.find(p=>p.id===item.part_id);
@@ -1630,7 +1686,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
   // Customer Invoices
   const saveCustomerInvoice=async(inv,items)=>{
-    await api.upsert("customer_invoices",inv);
+    await api.upsert("customer_invoices",{...inv,...(_bId?{branch_id:_bId}:{})});
     for(const item of items) await api.insert("customer_invoice_items",{...item,invoice_id:inv.id});
     // Auto-update linked order status to Invoiced
     if(inv.order_id){
@@ -1641,7 +1697,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
   // Customer Returns
   const saveCustomerReturn=async(data,items)=>{
-    await api.upsert("customer_returns",data);
+    await api.upsert("customer_returns",{...data,...(_bId?{branch_id:_bId}:{})});
     for(const item of items){
       await api.insert("customer_return_items",{...item,return_id:data.id});
       const part=parts.find(p=>p.id===item.part_id);
@@ -1651,7 +1707,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   // Customers / Users
-  const saveCustomer=async(data)=>{const ec=mData("editCustomer");if(ec)await api.patch("customers","id",ec.id,data);else await api.upsert("customers",{...data,orders:0,total_spent:0});await refreshTables("customers");closeM("editCustomer");showToast(ec?"Updated":"Added");};
+  const saveCustomer=async(data)=>{const ec=mData("editCustomer");if(ec)await api.patch("customers","id",ec.id,data);else await api.upsert("customers",{...data,orders:0,total_spent:0,branch_id:currentBranch?.id||null});await refreshTables("customers");closeM("editCustomer");showToast(ec?"Updated":"Added");};
   const deleteCustomer=async(id)=>{await api.delete("customers","id",id);await refreshTables("customers");showToast("Deleted","err");};
   const saveUser=async(data)=>{const eu=mData("editUser");if(eu?.id)await api.patch("users","id",eu.id,data);else await api.upsert("users",data);await refreshTables("users");closeM("editUser");showToast(eu?.id?"Updated":"Added");};
   const deleteUser=async(id)=>{if(id===user.id){showToast("Cannot delete yourself","err");return;}await api.delete("users","id",id);await refreshTables("users");showToast("Deleted","err");};
@@ -1706,7 +1762,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const sid=makeId("RFQ");
     await api.insert("rfq_sessions",{
       id:sid, name, status:"draft", deadline:deadline||"",
-      created_by:user.name||user.username, created_at:new Date().toISOString()
+      created_by:user.name||user.username, created_at:new Date().toISOString(),
+      ...(_bId?{branch_id:_bId}:{})
     });
     // Create items
     const items=selectedParts.map(p=>({
@@ -1787,7 +1844,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       const inv={
         id:invId, supplier_id:+sid2, supplier_name:data.supplier_name,
         invoice_date:new Date().toISOString().slice(0,10),
-        status:"unpaid", total, notes:`From RFQ ${sid}`
+        status:"unpaid", total, notes:`From RFQ ${sid}`,...(_bId?{branch_id:_bId}:{})
       };
       await api.insert("supplier_invoices",inv);
       for(const li of lineItems) await api.insert("supplier_invoice_items",li);
@@ -1804,7 +1861,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   const saveStockMove=async(data)=>{
-    const mv={...data, id:makeId("MV"), moved_by:user.name||user.username, moved_at:new Date().toISOString()};
+    const mv={...data, id:makeId("MV"), moved_by:user.name||user.username, moved_at:new Date().toISOString(),...(_bId?{branch_id:_bId}:{})};
     await api.insert("stock_moves", mv);
     // Update part bin_location if specified
     if(data.to_bin&&data.part_id){
@@ -1820,7 +1877,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const stId=makeId("ST");
     const st={
       id:stId, name:name||`Stock Take ${today()}`, status:"open",
-      created_by:user.name||user.username, created_at:new Date().toISOString()
+      created_by:user.name||user.username, created_at:new Date().toISOString(),
+      ...(_bId?{branch_id:_bId}:{})
     };
     const stResult=await api.insert("stock_takes",st);
     if(stResult&&stResult.code){showToast("❌ "+stResult.message,"err");return null;}
@@ -1894,7 +1952,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   const savePayment=async(data)=>{
-    await api.upsert("payments",{...data,id:data.id||makeId("PAY"),created_by:user.name||user.username});
+    await api.upsert("payments",{...data,id:data.id||makeId("PAY"),created_by:user.name||user.username,...(_bId?{branch_id:_bId}:{})});
     // Auto-update linked invoice status to paid
     if(data.reference_id){
       if(data.type==="receipt"){
@@ -1913,10 +1971,40 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   // Derived
   const CATS=lang==="en"?CATS_EN:CATS_ZH;
   const allCat="__all__",allOS="__all__";
+  const branchId=currentBranch?.id||null; // null = all branches (admin only)
+  const mainBranchId=branches.find(b=>b.is_main)?.id||null;
+  // branch_admin can only edit parts they own — not main catalog parts
+  const canEditPart=(p)=>role==="admin"||(role==="branch_admin"&&p.branch_id===branchId);
+  // branch_stock overlay — merge per-branch qty/price/bin over main catalog for branch_admin display
+  const branchStockMap=Object.fromEntries(branchStock.map(bs=>[String(bs.part_id),bs]));
+  const displayParts=role==="branch_admin"
+    ?parts.map(p=>{
+        const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
+        if(!isMainCatalog)return p; // branch's own part — use as-is
+        const bs=branchStockMap[String(p.id)];
+        // Always replace stock & bin with branch values (0/blank until set)
+        return{...p,
+          stock:     bs ? bs.stock             : 0,
+          bin_location: bs?.bin_location        ?? null,
+          price:     bs?.price                  ?? p.price,
+          cost_price:bs?.cost_price             ?? p.cost_price,
+          min_stock: bs ? bs.min_stock          : 0,
+          _bsId:     bs?.id,
+          _bsSet:    !!bs, // false = branch_stock not yet configured for this part
+        };
+      })
+    :parts;
+  const pendingPartRequests=partRequests.filter(r=>r.status==="pending").length||0;
   // Multi-word search using DEBOUNCED value — fast typing won't lag UI
   const suppNoByPart={};
   partSuppliers.forEach(ps=>{if(ps.supplier_part_no)suppNoByPart[ps.part_id]=(suppNoByPart[ps.part_id]||[]).concat(ps.supplier_part_no.toLowerCase());});
-  const fp=parts.filter(p=>{
+  const fp=displayParts.filter(p=>{
+    // branch_admin sees main catalog (null or main branch_id) + their own branch parts
+    if(role==="branch_admin"){
+      const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
+      const isOwnBranch=p.branch_id===branchId;
+      if(!isMainCatalog&&!isOwnBranch)return false;
+    } else if(branchId&&p.branch_id!==branchId)return false;
     if(isDemo&&!(p.image_url||p.image_data))return false; // demo: only parts with photos
     if(filterLow&&p.stock>p.min_stock)return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
@@ -1935,6 +2023,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     return words.every(w=>fields.includes(w));
   });
   const fo=orders.filter(o=>{
+    if(branchId&&o.branch_id!==branchId)return false;
     if(filterOS==="__all__") return true;
     if(filterOS==="__active__") return o.status==="Processing"||o.status==="Ready to Ship";
     if(filterOS==="Completed"&&completedDays>0){
@@ -1945,11 +2034,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     return o.status===filterOS;
   });
   const myO=orders.filter(o=>o.customer_phone===user.phone||o.customer_name===user.name);
-  const fc=customers.filter(c=>c.name?.includes(searchCust)||c.phone?.includes(searchCust));
-  const lowStock=parts.filter(p=>p.stock<=p.min_stock);
+  const fc=customers.filter(c=>{
+    if(branchId&&c.branch_id!==branchId)return false;
+    return c.name?.includes(searchCust)||c.phone?.includes(searchCust);
+  });
+  const lowStock=displayParts.filter(p=>{
+    if(role==="branch_admin"){const isMain=!p.branch_id||p.branch_id===mainBranchId;const isOwn=p.branch_id===branchId;return (isMain||isOwn)&&p.stock<=p.min_stock;}
+    return (branchId?p.branch_id===branchId:true)&&p.stock<=p.min_stock;
+  });
   const scrapLowStock=scrapParts.filter(p=>p.quantity<=p.min_qty);
-  const totalRev=orders.filter(o=>o.status==="Completed").reduce((s,o)=>s+(o.total||0),0);
-  const pendingCnt=orders.filter(o=>o.status==="Processing"||o.status==="Ready to Ship").length;
+  const branchOrders=branchId?orders.filter(o=>o.branch_id===branchId):orders;
+  const totalRev=branchOrders.filter(o=>o.status==="Completed").reduce((s,o)=>s+(o.total||0),0);
+  const pendingCnt=branchOrders.filter(o=>o.status==="Processing"||o.status==="Ready to Ship").length;
   const pendingInq=inquiries.filter(i=>i.status==="pending").length;
   const pendingCQ=customerQueries.filter(q=>q.status==="pending").length;
   const getPartSupps=(pid)=>partSuppliers.filter(ps=>ps.part_id===pid).map(ps=>({...ps,supplier:suppliers.find(s=>s.id===ps.supplier_id)}));
@@ -1989,6 +2085,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"stocktake",icon:"🔢",label:t.stockTake,roles:["admin","manager","shipper","stockman"]},
         {id:"stockmove",icon:"🔀",label:t.stockMove,roles:["admin","manager","shipper","stockman"]},
         {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager"]},
+        {id:"partRequests",icon:"📬",label:"Part Requests",roles:["admin"],badge:pendingPartRequests},
       ]
     },
     {
@@ -2113,13 +2210,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       id:"grp_system", icon:"⚙️", label:t.grpSystem, roles:["admin"],
       children:[
         {id:"vehicles",icon:"🚗",label:t.vehicleMgmt||"Vehicles",roles:["admin"]},
+        {id:"branches",icon:"🏢",label:t.branchMgmt||"Branches",roles:["admin"],badge:branches.filter(b=>b.status==="pending").length||0},
         {id:"settings",icon:"⚙️",label:t.settings,roles:["admin"]},
         {id:"users",icon:"🔑",label:t.users,roles:["admin"]},
+        {id:"branchProfile",icon:"🏢",label:"My Branch",roles:["admin"],branchAdminOnly:true},
       ]
     },
-  ].filter(g=>g.roles.includes(role)).map(g=>({
+  ].filter(g=>g.roles.includes(role)||(role==="branch_admin"&&g.roles.includes("admin")&&g.id!=="grp_workshop"&&g.id!=="grp_all_scraps")).map(g=>({
     ...g,
-    children:g.children.filter(c=>c.roles.includes(role)&&(!c.wsRoles||role!=="workshop"||c.wsRoles.includes(wsRole)))
+    children:g.children.filter(c=>{
+      if(role==="branch_admin"){
+        // branch_admin sees all admin tabs except system-admin-only ones
+        const BA_HIDE=new Set(["dashboard","loginlogs","branches","settings","users","wssubscriptions"]);
+        return c.roles.includes("admin")&&!BA_HIDE.has(c.id);
+      }
+      if(c.branchAdminOnly) return false;
+      return c.roles.includes(role)&&(!c.wsRoles||role!=="workshop"||c.wsRoles.includes(wsRole));
+    })
   })).filter(g=>g.children.length>0);
 
   // Flat list for mobile nav — role-based
@@ -2161,6 +2268,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"wsquotations",icon:"📝",label:"Quotations"},
       {id:"wsinvoices",  icon:"🧾",label:"Invoices"},
       {id:"wspayments",  icon:"💳",label:"Payments"},
+    ];
+    if(role==="branch_admin") return [
+      {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
+      {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
+      {id:"customers", icon:"👥",label:t.customers},
+      {id:"reports",   icon:"📊",label:t.reports},
+      {id:"suppliers", icon:"🏭",label:t.suppliers},
     ];
     // admin — show most used
     return [
@@ -2280,6 +2394,32 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     </div>
   );
 
+  // Branch suspended: block non-admin users if their branch is suspended
+  if(role!=="admin"&&currentBranch?.status==="suspended"){
+    const activateUrl=`${window.location.origin}${window.location.pathname}?activate_branch=1`;
+    return (
+      <div style={{fontFamily:"'DM Sans',sans-serif",background:"var(--bg)",minHeight:"100vh",color:"var(--text)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 16px"}}>
+        <style>{CSS}</style>
+        <ShopLogo settings={settings} size="md"/>
+        <div style={{marginTop:24,textAlign:"center",maxWidth:440}}>
+          <div style={{fontSize:48,marginBottom:12}}>⏸</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:8}}>Branch Suspended</div>
+          <div style={{fontSize:14,color:"var(--text3)",marginBottom:24,lineHeight:1.6}}>
+            <strong>{currentBranch?.name}</strong> has been suspended.<br/>
+            Please contact the administrator to settle your account.<br/>
+            Once you receive your activation code, click below to reactivate.
+          </div>
+          <a href={activateUrl} style={{display:"block",background:"var(--accent)",color:"#fff",borderRadius:10,padding:"13px",fontSize:15,fontWeight:700,textDecoration:"none",textAlign:"center",marginBottom:12}}>
+            🔑 Enter Activation Code
+          </a>
+          <button onClick={onLogout} style={{background:"none",border:"1px solid var(--border)",borderRadius:8,padding:"9px 20px",color:"var(--text3)",cursor:"pointer",fontSize:13,width:"100%"}}>
+            Log Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const PH=({title,subtitle,action})=>(
     <div className="page-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
       <div><h1 style={{fontSize:20,fontWeight:700,lineHeight:1.2}}>{title}</h1>{subtitle&&<p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{subtitle}</p>}</div>
@@ -2322,6 +2462,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           </div>
           {role!=="admin"&&<div style={{marginTop:7,background:sub.color+"18",borderRadius:6,padding:"3px 9px",fontSize:11,color:sub.color,fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
         </div>
+        {branches.length>0&&(
+          <div style={{margin:"0 10px 8px"}}>
+            {role==="admin"?(
+              <select value={currentBranch?.id||"__all__"} onChange={e=>{
+                if(e.target.value==="__all__") setCurrentBranch(null);
+                else setCurrentBranch(branches.find(b=>b.id===e.target.value)||null);
+              }} style={{width:"100%",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"5px 8px",fontSize:12,color:"var(--text)",cursor:"pointer"}}>
+                <option value="__all__">🏢 {t.branchAllBranches}</option>
+                {branches.map(b=><option key={b.id} value={b.id}>{b.is_main?"🏠":""} {b.name}</option>)}
+              </select>
+            ):(
+              <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"5px 8px",fontSize:12,color:"var(--text3)",textAlign:"center"}}>
+                🏢 {currentBranch?.name||"—"}
+              </div>
+            )}
+          </div>
+        )}
         <nav style={{padding:"0 7px",flex:1,overflowY:"auto",paddingBottom:6}}>
           {navGroups.map(g=>{
             const isExpanded=expandedGroups[g.id];
@@ -2638,8 +2795,44 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             <PH title={t.inventory} subtitle={`${parts.length} parts · ${lowStock.length} low`}
               action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <button className="btn btn-ghost btn-sm" onClick={loadAll} title="Refresh inventory">↻ Refresh</button>
-                {role==="admin"&&<button className="btn btn-primary" onClick={()=>openM("editPart")}>+ {t.addPart}</button>}
+                {role==="admin"&&branches.length>1&&<button className={`btn btn-sm ${showCrossBranch?"btn-primary":"btn-ghost"}`} onClick={()=>setShowCrossBranch(v=>!v)} title="Cross-branch stock search">🏢 {t.branchCrossBtn}</button>}
+                {(role==="admin"||role==="branch_admin")&&<button className="btn btn-primary" onClick={()=>openM("editPart")}>+ {t.addPart}</button>}
               </div>}/>
+            {showCrossBranch&&branches.length>1&&(
+              <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:12,padding:16,marginBottom:16}}>
+                <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>🏢 {t.branchCrossTitle}</div>
+                <input className="inp" placeholder={t.branchCrossPlaceholder} value={crossBranchSearch} onChange={e=>setCrossBranchSearch(e.target.value)} style={{marginBottom:12}}/>
+                {crossBranchSearch.trim()&&(()=>{
+                  const q=crossBranchSearch.trim().toLowerCase();
+                  const hits=parts.filter(p=>(p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q));
+                  if(!hits.length) return <div style={{color:"var(--text3)",fontSize:13,textAlign:"center",padding:"12px 0"}}>{t.branchCrossNoResults}</div>;
+                  const byBranch={};
+                  hits.forEach(p=>{
+                    const bid=p.branch_id||"__none__";
+                    if(!byBranch[bid]) byBranch[bid]=[];
+                    byBranch[bid].push(p);
+                  });
+                  return Object.entries(byBranch).map(([bid,bParts])=>{
+                    const br=branches.find(b=>b.id===bid);
+                    return (
+                      <div key={bid} style={{marginBottom:12}}>
+                        <div style={{fontWeight:600,fontSize:12,color:"var(--text3)",marginBottom:6,paddingBottom:4,borderBottom:"1px solid var(--border)"}}>
+                          {br?`${br.is_main?"🏠 ":"🏢 "}${br.name}`:t.branchUnassigned}
+                        </div>
+                        {bParts.map(p=>(
+                          <div key={p.id} style={{display:"flex",alignItems:"center",gap:12,padding:"5px 0",borderBottom:"1px solid var(--surface3)",fontSize:13}}>
+                            <span style={{fontWeight:600,minWidth:100,color:"var(--accent)"}}>{p.sku}</span>
+                            <span style={{flex:1,color:"var(--text)"}}>{p.name}</span>
+                            <span style={{minWidth:60,textAlign:"right",color:p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--green)",fontWeight:600}}>{p.stock} in stock</span>
+                            <span style={{minWidth:80,textAlign:"right",color:"var(--text2)"}}>{C()}{(p.price||0).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
             {partsLoading&&<div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.3)",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:"var(--yellow)"}}>
               <span style={{animation:"spin 1s linear infinite",display:"inline-block",fontSize:14}}>⟳</span>
               <span>Loading full inventory… showing first {parts.length} parts. Search is limited until complete.</span>
@@ -2729,7 +2922,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 const ps=getPartSupps(p.id);
                 return (
                   <div key={p.id} id={`part-row-${p.id}`} className="card" style={{padding:14,
-                    borderLeft:`3px solid ${p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--border)"}`}}>
+                    borderLeft:`3px solid ${(role==="branch_admin"&&!p._bsSet)?"var(--border)":p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--border)"}`}}>
                     <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                       {/* Photo */}
                       {img
@@ -2741,7 +2934,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6}}>
                           <div style={{fontWeight:600,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{p.name}</div>
                           <span style={{fontWeight:800,fontSize:18,fontFamily:"Rajdhani,sans-serif",flexShrink:0,
-                            color:p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--green)"}}>{p.stock}</span>
+                            color:(role==="branch_admin"&&!p._bsSet)?"var(--text3)":p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--green)"}}>
+                            {(role==="branch_admin"&&!p._bsSet)?"—":p.stock}
+                          </span>
                         </div>
                         {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{p.chinese_desc}</div>}
                         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:5,alignItems:"center"}}>
@@ -2754,24 +2949,34 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                           <span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16}}>{fmtAmt(p.price)}</span>
                           <div style={{display:"flex",gap:5,alignItems:"center"}}>
                             {(()=>{const cnt=partFitments.filter(f=>String(f.part_id)===String(p.id)).length;return cnt>0?<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{cnt} 🚗</span>:null;})()}
-                            {p.stock===0
-                              ? <span className="badge" style={{background:"rgba(248,113,113,.12)",color:"var(--red)"}}>Out</span>
-                              : p.stock<=p.min_stock
-                                ? <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)"}}>Low</span>
-                                : <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)"}}>In Stock</span>}
+                            {(role==="branch_admin"&&!p._bsSet)
+                              ? <span className="badge" style={{background:"var(--surface3)",color:"var(--text3)"}}>Not set</span>
+                              : p.stock===0
+                                ? <span className="badge" style={{background:"rgba(248,113,113,.12)",color:"var(--red)"}}>Out</span>
+                                : p.stock<=p.min_stock
+                                  ? <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)"}}>Low</span>
+                                  : <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)"}}>In Stock</span>}
                           </div>
                         </div>
                       </div>
                     </div>
-                    {/* Action buttons for admin */}
-                    {role==="admin"&&(
+                    {/* Action buttons — edit only allowed on parts the user owns */}
+                    {(role==="admin"||role==="branch_admin")&&(
                       <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
-                        <button className="btn btn-ghost btn-xs" onClick={()=>openM("adjust",p)}>± Adj</button>
-                        <button className="btn btn-ghost btn-xs" onClick={async()=>{const ok=await acquireLock("part",p.id);if(!ok)return;const fresh=await api.get("parts",`id=eq.${p.id}&select=*`);openM("editPart",Array.isArray(fresh)&&fresh[0]?fresh[0]:p);}}>✏️ Edit</button>
-                        <button className="btn btn-ghost btn-xs" onClick={()=>openM("stockMove",p)}>🔀 Move</button>
-                        <button className="btn btn-ghost btn-xs" onClick={()=>openM("partSupplier",p)}>🏭 Supp</button>
-                        <button className="btn btn-ghost btn-xs" onClick={()=>{setLogSearch(p.sku||"");setTab("logs");}}>📝 Logs</button>
-                        <button className="btn btn-danger btn-xs" onClick={()=>deletePart(p.id)}>🗑</button>
+                        {canEditPart(p)?(
+                          <>
+                            <button className="btn btn-ghost btn-xs" onClick={()=>openM("adjust",p)}>± Adj</button>
+                            <button className="btn btn-ghost btn-xs" onClick={async()=>{const ok=await acquireLock("part",p.id);if(!ok)return;const fresh=await api.get("parts",`id=eq.${p.id}&select=*`);openM("editPart",Array.isArray(fresh)&&fresh[0]?fresh[0]:p);}}>✏️ Edit</button>
+                            <button className="btn btn-ghost btn-xs" onClick={()=>openM("stockMove",p)}>🔀 Move</button>
+                            <button className="btn btn-ghost btn-xs" onClick={()=>openM("partSupplier",p)}>🏭 Supp</button>
+                            <button className="btn btn-ghost btn-xs" onClick={()=>{setLogSearch(p.sku||"");setTab("logs");}}>📝 Logs</button>
+                            <button className="btn btn-danger btn-xs" onClick={()=>deletePart(p.id)}>🗑</button>
+                          </>
+                        ):(
+                          <button className="btn btn-ghost btn-xs" onClick={()=>openM("branchStock",{part:p,existing:branchStockMap[String(p.id)]||null})}>
+                            {branchStockMap[String(p.id)]?"✏️ Edit Stock":"📦 Set Stock"}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2787,7 +2992,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                   <thead><tr>
                     {["",t.sku,`${t.name} / ${t.chineseDesc}`,"Bin",t.make,t.model,t.yearRange,t.oeNumber,t.category,t.price,"Cost","St"].map(h=><th key={h}>{h}</th>)}
                     <th style={{textAlign:"center",whiteSpace:"nowrap"}}>🚗</th>
-                    {role==="admin"&&<th style={{position:"sticky",right:0,background:"var(--surface2)",zIndex:2,boxShadow:"-2px 0 8px rgba(0,0,0,.3)"}}>Actions</th>}
+                    {(role==="admin"||role==="branch_admin")&&<th style={{position:"sticky",right:0,background:"var(--surface2)",zIndex:2,boxShadow:"-2px 0 8px rgba(0,0,0,.3)"}}>Actions</th>}
                   </tr></thead>
                   <tbody>
                     {fp.slice(invPage*PAGE_SIZE,(invPage+1)*PAGE_SIZE).map(p=>{
@@ -2819,10 +3024,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                               <div style={{flexShrink:0,textAlign:"right"}}>
                                 <span style={{
                                   fontWeight:800, fontFamily:"Rajdhani,sans-serif", fontSize:17,
-                                  color:p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--green)"
-                                }}>{p.stock}</span>
-                                {p.stock<=p.min_stock&&p.stock>0&&<div style={{fontSize:9,color:"var(--yellow)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",lineHeight:1}}>LOW</div>}
-                                {p.stock===0&&<div style={{fontSize:9,color:"var(--red)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",lineHeight:1}}>OUT</div>}
+                                  color:(role==="branch_admin"&&!p._bsSet)?"var(--text3)":p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--green)"
+                                }}>{(role==="branch_admin"&&!p._bsSet)?"—":p.stock}</span>
+                                {!(role==="branch_admin"&&!p._bsSet)&&p.stock<=p.min_stock&&p.stock>0&&<div style={{fontSize:9,color:"var(--yellow)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",lineHeight:1}}>LOW</div>}
+                                {!(role==="branch_admin"&&!p._bsSet)&&p.stock===0&&<div style={{fontSize:9,color:"var(--red)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",lineHeight:1}}>OUT</div>}
                               </div>
                             </div>
                           </td>
@@ -2847,11 +3052,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                           <td><span className="badge" style={{background:"var(--surface3)",color:"var(--text2)"}}>{p.category}</span></td>
                           <td style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:15,color:"var(--accent)"}}>{fmtAmt(p.price)}</td>
                           <td style={{fontFamily:"Rajdhani,sans-serif",fontSize:13,color:"var(--text3)"}}>{p.cost_price>0?fmtAmt(p.cost_price):"—"}</td>
-                          <td style={{textAlign:"center",fontSize:16}} title={p.stock===0?"Out of Stock":p.stock<=p.min_stock?"Low Stock":"In Stock"}>{p.stock===0?"🔴":p.stock<=p.min_stock?"🟡":"🟢"}</td>
+                          <td style={{textAlign:"center",fontSize:16}} title={(role==="branch_admin"&&!p._bsSet)?"Not configured":p.stock===0?"Out of Stock":p.stock<=p.min_stock?"Low Stock":"In Stock"}>
+                            {(role==="branch_admin"&&!p._bsSet)?"⚪":p.stock===0?"🔴":p.stock<=p.min_stock?"🟡":"🟢"}
+                          </td>
                           <td style={{textAlign:"center"}}>
                             {(()=>{const cnt=partFitments.filter(f=>String(f.part_id)===String(p.id)).length;return cnt>0?<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{cnt} 🚗</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>;})()}
                           </td>
-                          {role==="admin"&&(()=>{
+                          {(role==="admin"||role==="branch_admin")&&(()=>{
+                            if(!canEditPart(p)) return (
+                              <td style={{position:"sticky",right:0,background:"var(--surface)",zIndex:1,boxShadow:"-2px 0 8px rgba(0,0,0,.2)",padding:"0 8px",whiteSpace:"nowrap"}}>
+                                <button className="btn btn-ghost btn-xs" onClick={()=>openM("branchStock",{part:p,existing:branchStockMap[String(p.id)]||null})}>
+                                  {branchStockMap[String(p.id)]?"✏️ Edit Stock":"📦 Set Stock"}
+                                </button>
+                              </td>
+                            );
                             const lock=isLocked("part",p.id);
                             return (
                               <td style={{position:"sticky",right:0,background:"var(--surface)",zIndex:1,boxShadow:"-2px 0 8px rgba(0,0,0,.2)",padding:"0 8px"}}>
@@ -3417,7 +3631,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         )}
 
         {/* ── SUPPLIERS ── */}
-        {tab==="suppliers"&&role==="admin"&&(
+        {tab==="suppliers"&&(role==="admin"||role==="branch_admin")&&(
           <div className="fu">
             <PH title={`🏭 ${t.suppliers}`} subtitle={`${suppliers.length} suppliers`}
               action={<button className="btn btn-primary" onClick={()=>openM("editSupplier")}>+ {t.addSupplier}</button>}/>
@@ -3445,7 +3659,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         )}
 
         {/* ── INQUIRIES ── */}
-        {tab==="inquiries"&&role==="admin"&&(()=>{
+        {tab==="inquiries"&&(role==="admin"||role==="branch_admin")&&(()=>{
           const inqReplied=inquiries.filter(i=>i.status==="replied").length;
           const inqOrdered=inquiries.filter(i=>i.status==="ordered").length;
           const filteredInq=inqFilter==="all"?inquiries:inquiries.filter(i=>i.status===inqFilter);
@@ -3511,7 +3725,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         })()}
 
         {/* ── CUSTOMERS ── */}
-        {tab==="customers"&&role==="admin"&&(
+        {tab==="customers"&&(role==="admin"||role==="branch_admin")&&(
           <div className="fu">
             <PH title={t.customers} subtitle={`${customers.length} customers`}
               action={<button className="btn btn-primary" onClick={()=>openM("editCustomer")}>+ Add</button>}/>
@@ -3756,9 +3970,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             t={t} lang={lang}/>
         )}
 
-        {tab==="vehicles"&&role==="admin"&&(
+        {tab==="vehicles"&&(role==="admin"||role==="branch_admin")&&(
           <VehiclesPage vehicles={vehicles} partFitments={partFitments} onSave={saveVehicle} onDelete={deleteVehicle}
             onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}} t={t}/>
+        )}
+
+        {tab==="branches"&&role==="admin"&&(
+          <BranchesPage branches={branches} onRefresh={loadAll} t={t}/>
+        )}
+
+        {tab==="branchProfile"&&role==="branch_admin"&&(
+          <BranchProfilePage branch={currentBranch} user={user} onSave={async(data)=>{
+            await api.patch("branches","id",user.branch_id,data);
+            await loadAll();
+            showToast("✅ Branch profile saved");
+          }} t={t}/>
+        )}
+
+        {tab==="partRequests"&&(role==="admin"||role==="branch_admin")&&(
+          <PartRequestsPage partRequests={partRequests} branches={branches} parts={parts} user={user} role={role} currentBranch={currentBranch} onRefresh={()=>refreshTables("part_requests")} t={t}/>
         )}
 
         {tab==="settings"&&role==="admin"&&(
@@ -3766,14 +3996,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         )}
 
         {/* ── REPORTS ── */}
-        {tab==="reports"&&role==="admin"&&(
+        {tab==="reports"&&(role==="admin"||role==="branch_admin")&&(
           <ReportsPage orders={orders} parts={parts} customers={customers}
             supplierInvoices={supplierInvoices} payments={payments}
             settings={settings} t={t} lang={lang}/>
         )}
 
         {/* ── PAYMENTS ── */}
-        {tab==="payments"&&role==="admin"&&(
+        {tab==="payments"&&(role==="admin"||role==="branch_admin")&&(
           <div className="fu">
             <PH title={`💳 ${t.payments}`} subtitle={`${payments.length} records`}
               action={<button className="btn btn-primary" onClick={()=>openM("addPayment")}>+ {t.addPayment}</button>}/>
@@ -3978,10 +4208,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             }else showToast(`Part SKU "${sku}" not found`,"err");
           }}
           inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions}
+          branches={branches} currentBranch={currentBranch} allParts={parts}
+          onRequestNewPart={role==="branch_admin"?()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);closeM("editPart");openM("partRequest");}:null}
           onClose={()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);closeM("editPart");}}
           t={t}/>;
       })()}
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}
+      {isOpen("partRequest")&&<PartRequestModal currentBranch={currentBranch} user={user} onClose={()=>closeM("partRequest")} onSave={async()=>{await refreshTables("part_requests");closeM("partRequest");showToast("Part request submitted ✅");}} t={t}/>}
+      {isOpen("branchStock")&&<BranchStockModal part={mData("branchStock")?.part} existing={mData("branchStock")?.existing} branchId={branchId} onClose={()=>closeM("branchStock")} onSave={async()=>{await refreshTables("branch_stock");closeM("branchStock");showToast("Stock updated ✅");}} t={t}/>}
       {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}
       {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} vehicles={vehicles} partFitments={partFitments} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} onEditPart={(p,tab)=>{closeM("partSupplier");openM("editPart",{...p,_tab:tab||"info"});}} onMergePart={mergePart} t={t}/>}

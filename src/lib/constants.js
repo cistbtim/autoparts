@@ -1,13 +1,14 @@
 import { getSettings } from "./settings.js";
 
 export const ROLES = {
-  admin:    { color: "#f97316", bg: "rgba(249,115,22,0.12)",  icon: "👑" },
-  manager:  { color: "#8b5cf6", bg: "rgba(139,92,246,0.12)",  icon: "👔" },
-  shipper:  { color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  icon: "🚚" },
-  stockman: { color: "#10b981", bg: "rgba(16,185,129,0.12)",  icon: "📦" },
-  customer: { color: "#34d399", bg: "rgba(52,211,153,0.12)",  icon: "👤" },
-  workshop: { color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "🔧" },
-  scrapyard: { color: "#6b7280", bg: "rgba(107,114,128,0.12)", icon: "🚗" },
+  admin:        { color: "#f97316", bg: "rgba(249,115,22,0.12)",  icon: "👑" },
+  branch_admin: { color: "#0ea5e9", bg: "rgba(14,165,233,0.12)",  icon: "🏢" },
+  manager:      { color: "#8b5cf6", bg: "rgba(139,92,246,0.12)",  icon: "👔" },
+  shipper:      { color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  icon: "🚚" },
+  stockman:     { color: "#10b981", bg: "rgba(16,185,129,0.12)",  icon: "📦" },
+  customer:     { color: "#34d399", bg: "rgba(52,211,153,0.12)",  icon: "👤" },
+  workshop:     { color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "🔧" },
+  scrapyard:    { color: "#6b7280", bg: "rgba(107,114,128,0.12)", icon: "🚗" },
 };
 
 export const OC = { "Completed": "#34d399", "Ready to Ship": "#fbbf24", "Processing": "#60a5fa", "Cancelled": "#f87171", "Quoted": "#a855f7", "Invoiced": "#f97316", "Paid": "#10b981", "已完成": "#34d399", "待出貨": "#fbbf24", "處理中": "#60a5fa", "已取消": "#f87171" };
@@ -57,6 +58,7 @@ export const TRIAL_DAYS = 30;
 
 export const getSubInfo = (u) => {
   if (!u || u.role === "admin") return { status: "admin", label: "Admin", color: "#f97316" };
+  if (u.role === "branch_admin") return { status: "admin", label: "Branch Admin", color: "#0ea5e9" };
   const s = u.subscription_status || "trial";
   if (s === "active") return { status: "active", label: "✅ Active", color: "#34d399" };
   if (s === "blocked" || s === "expired") return { status: s, label: s === "blocked" ? "🚫 Blocked" : "⏰ Expired", color: "#f87171" };
@@ -68,6 +70,7 @@ export const getSubInfo = (u) => {
 export const canAccess = (u) => {
   if (!u) return false;
   if (u.role === "admin") return true;
+  if (u.role === "branch_admin") return true;
   if (u.role === "demo") return true;
   if (u.role === "workshop") return true;
   if (u.role === "scrapyard") return true;

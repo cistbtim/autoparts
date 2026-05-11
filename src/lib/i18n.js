@@ -221,6 +221,18 @@ export const T = {
     wsiPayDate: "Pay Date",
     wsiReference: "Reference",
     wsiInvTotal: "Invoice Total",
+    // Branch UI
+    branchAllBranches: "All Branches",
+    branchCrossBtn: "Cross-Branch",
+    branchCrossTitle: "Cross-Branch Stock Search",
+    branchCrossPlaceholder: "Search SKU or part name across all branches…",
+    branchCrossNoResults: "No parts found",
+    branchUnassigned: "Unassigned",
+    branchCopyTitle: "Copy from Main Catalog",
+    branchCopyPlaceholder: "Search main catalog by SKU or name…",
+    branchCopyNoResults: "No parts found in main catalog",
+    branchCopyMain: "Main",
+    branchCopySuggested: "Suggested",
   },
 };
 

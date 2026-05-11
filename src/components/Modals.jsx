@@ -1950,7 +1950,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -1967,6 +1967,9 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
+  const [catalogSearch,setCatalogSearch]=useState("");
+  const mainBranch=branches.find(b=>b.is_main);
+  const isNonMainBranch=!part&&currentBranch&&mainBranch&&currentBranch.id!==mainBranch.id;
 
   const buildPayload=(fv)=>({
     sku:fv.sku.trim(), name:fv.name.trim(), category:fv.category, brand:fv.brand,
@@ -2021,6 +2024,45 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
   return (
     <Overlay onClose={handleClose} wide>
       <MHead title={part?`✏️ ${t.pmEditPart}`:`+ ${t.pmNewPart}`} onClose={handleClose}/>
+
+      {/* Copy from main catalog — shown only when adding a new part at a branch */}
+      {isNonMainBranch&&(
+        <div style={{background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.25)",borderRadius:10,padding:12,marginBottom:14}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:"var(--blue)"}}>🏠 {t.branchCopyTitle||"Copy from Main Catalog"}</div>
+          <input className="inp" placeholder={t.branchCopyPlaceholder||"Search main catalog by SKU or name…"} value={catalogSearch} onChange={e=>setCatalogSearch(e.target.value)} style={{marginBottom:catalogSearch.trim()?8:0}}/>
+          {catalogSearch.trim()&&(()=>{
+            const q=catalogSearch.trim().toLowerCase();
+            const hits=allParts.filter(p=>p.branch_id===mainBranch.id&&((p.sku||"").toLowerCase().includes(q)||(p.name||"").toLowerCase().includes(q))).slice(0,8);
+            if(!hits.length) return (
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 0",gap:8}}>
+                <div style={{color:"var(--text3)",fontSize:12}}>{t.branchCopyNoResults||"No parts found in main catalog"}</div>
+                {onRequestNewPart&&<button className="btn btn-ghost btn-sm" style={{fontSize:11,color:"var(--accent)",whiteSpace:"nowrap",flexShrink:0}} onClick={onRequestNewPart}>📬 Request New Part →</button>}
+              </div>
+            );
+            return hits.map(p=>{
+              const delFee=currentBranch.default_delivery_fee||0;
+              const delPct=currentBranch.default_delivery_pct||0;
+              const suggestedPrice=delPct>0?+(p.price*(1+delPct/100)+delFee).toFixed(2):+(p.price+delFee).toFixed(2);
+              return (
+                <div key={p.id} onClick={()=>{
+                  setF({sku:p.sku||"",name:p.name||"",category:p.category||"Engine",brand:p.brand||"",
+                    price:suggestedPrice,cost_price:p.price,stock:0,minStock:p.min_stock??0,
+                    image_url:p.image_url||"",chinese_desc:p.chinese_desc||"",
+                    make:p.make||"",model:p.model||"",year_range:p.year_range||"",oe_number:p.oe_number||"",
+                    bin_location:""});
+                  setDirty(true);setCatalogSearch("");
+                }} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 8px",borderRadius:7,cursor:"pointer",border:"1px solid var(--border)",background:"var(--surface)",marginBottom:4,transition:"background .12s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
+                  onMouseLeave={e=>e.currentTarget.style.background="var(--surface)"}>
+                  <span style={{fontWeight:700,color:"var(--accent)",minWidth:90,fontSize:12}}>{p.sku}</span>
+                  <span style={{flex:1,fontSize:12}}>{p.name}</span>
+                  <span style={{fontSize:11,color:"var(--text3)"}}>{t.branchCopyMain||"Main"}: {p.price} → {t.branchCopySuggested||"Suggested"}: {suggestedPrice}</span>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="tabs" style={{marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
@@ -3047,7 +3089,7 @@ export function UserModal({user,onSave,onClose,t}) {
     <Overlay onClose={onClose}>
       <MHead title={isEdit?"Edit User":f.role==="workshop"?"🔧 Add Workshop":"Add User"} onClose={onClose}/>
       <FG><div><FL label="Username *"/><input className="inp" value={f.username} onChange={e=>s("username",e.target.value)} disabled={isEdit}/></div><div><FL label={isEdit?"New password (blank=keep)":"Password *"}/><input className="inp" type="password" value={f.password} onChange={e=>s("password",e.target.value)} placeholder="••••••"/></div></FG>
-      <FD><FL label={t.role}/><select className="inp" value={f.role} onChange={e=>s("role",e.target.value)}><option value="admin">👑 Admin</option><option value="manager">👔 Manager</option><option value="workshop">🔧 Workshop</option><option value="shipper">🚚 Shipper</option><option value="stockman">📦 Stockman</option><option value="customer">👤 Customer</option><option value="demo">🔒 Demo</option></select></FD>
+      <FD><FL label={t.role}/><select className="inp" value={f.role} onChange={e=>s("role",e.target.value)}><option value="admin">👑 Admin</option><option value="branch_admin">🏢 Branch Admin</option><option value="manager">👔 Manager</option><option value="workshop">🔧 Workshop</option><option value="shipper">🚚 Shipper</option><option value="stockman">📦 Stockman</option><option value="customer">👤 Customer</option><option value="demo">🔒 Demo</option></select></FD>
       <FG><div><FL label={t.name}/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)}/></div><div><FL label={t.phone}/><input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div></FG>
       <FD><FL label={t.email}/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></FD>
       <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.username||(!isEdit&&!f.password))return;const d={username:f.username,role:f.role,name:f.name,phone:f.phone,email:f.email};if(f.password)d.password=f.password;onSave(d);}}>{t.save}</button></div>
@@ -4274,5 +4316,658 @@ export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMan
         </>
       )}
     </Overlay>
+  );
+}
+
+// ─── Branches Management Page ────────────────────────────────────────────────
+export function BranchesPage({branches:propBranches=[], onRefresh, _t={}}) {
+  const regLink = `${window.location.origin}${window.location.pathname}?branch_reg=1`;
+  const [copied,       setCopied]       = useState(false);
+  const [busy,         setBusy]         = useState(null);
+  const [showAdd,      setShowAdd]      = useState(false);
+  const [addF,         setAddF]         = useState({name:"",city:"",address:"",phone:"",contact_name:"",email:""});
+  const [addErr,       setAddErr]       = useState("");
+  const [branches,     setBranches]     = useState(propBranches);
+  const [refreshing,   setRefreshing]   = useState(false);
+  const [approving,       setApproving]       = useState(null);
+  const [creatingUserFor, setCreatingUserFor] = useState(null); // active branch getting a new user
+  const [userF,           setUserF]           = useState({username:"",password:"",role:"branch_admin",name:""});
+  const [userErr,         setUserErr]         = useState("");
+  const [doneApproved,    setDoneApproved]    = useState(null);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    const rows = await api.get("branches","select=*&order=is_main.desc,name.asc").catch(()=>[]);
+    if(Array.isArray(rows)) setBranches(rows);
+    setRefreshing(false);
+    onRefresh();
+  };
+
+  useEffect(()=>{ refresh(); },[]);
+
+  const copyLink = () => { navigator.clipboard.writeText(regLink); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+
+  const startApprove = (b) => {
+    setApproving(b);
+    setUserF({username:b.contact_name?b.contact_name.toLowerCase().replace(/\s+/g,""):"",password:"",role:"branch_admin",name:b.contact_name||""});
+    setUserErr(""); setDoneApproved(null);
+  };
+
+  const confirmApproveWithUser = async () => {
+    if(!userF.username.trim()) return setUserErr("Username is required");
+    if(!userF.password.trim()) return setUserErr("Password is required");
+    setBusy(approving.id);
+    await api.patch("branches","id",approving.id,{status:"active"});
+    await api.upsert("users",{username:userF.username.trim(),password:userF.password.trim(),role:userF.role,name:userF.name.trim()||approving.name,phone:approving.phone||"",email:approving.email||"",branch_id:approving.id});
+    setDoneApproved({branch:approving,username:userF.username.trim(),password:userF.password.trim()});
+    setApproving(null);
+    await refresh();
+    setBusy(null);
+  };
+
+  const confirmApproveSkipUser = async () => {
+    setBusy(approving.id);
+    await api.patch("branches","id",approving.id,{status:"active"});
+    setApproving(null);
+    await refresh();
+    setBusy(null);
+  };
+
+  const suspend = async (b) => {
+    if(!window.confirm(`Suspend "${b.name}"? Their login will be blocked until reactivated.`)) return;
+    setBusy(b.id);
+    await api.patch("branches","id",b.id,{status:"suspended",activation_code:null,activation_code_expires_at:null});
+    await refresh();
+    setBusy(null);
+  };
+
+  const generateCode = async (b) => {
+    const code = Math.random().toString(36).substring(2,8).toUpperCase();
+    const expires = new Date(Date.now()+7*24*60*60*1000).toISOString();
+    setBusy(b.id);
+    await api.patch("branches","id",b.id,{activation_code:code,activation_code_expires_at:expires});
+    await refresh();
+    setBusy(null);
+  };
+
+  const startCreateUser = (b) => {
+    setCreatingUserFor(b);
+    setUserF({username:b.contact_name?b.contact_name.toLowerCase().replace(/\s+/g,""):"",password:"",role:"branch_admin",name:b.contact_name||""});
+    setUserErr("");
+  };
+
+  const confirmCreateUser = async () => {
+    if(!userF.username.trim()) return setUserErr("Username is required");
+    if(!userF.password.trim()) return setUserErr("Password is required");
+    setBusy(creatingUserFor.id);
+    await api.upsert("users",{username:userF.username.trim(),password:userF.password.trim(),role:userF.role,name:userF.name.trim()||creatingUserFor.name,phone:creatingUserFor.phone||"",email:creatingUserFor.email||"",branch_id:creatingUserFor.id});
+    setDoneApproved({branch:creatingUserFor,username:userF.username.trim(),password:userF.password.trim()});
+    setCreatingUserFor(null);
+    setBusy(null);
+  };
+
+  const reject = async (b) => {
+    if(!window.confirm(`Reject "${b.name}"? This will delete the registration.`)) return;
+    setBusy(b.id);
+    await api.delete("branches","id",b.id);
+    await refresh();
+    setBusy(null);
+  };
+
+  const saveNew = async () => {
+    if(!addF.name.trim()) return setAddErr("Shop name is required");
+    setAddErr(""); setBusy("new");
+    await api.insert("branches",{...addF,status:"active",is_main:false});
+    setAddF({name:"",city:"",address:"",phone:"",contact_name:"",email:""});
+    setShowAdd(false);
+    await refresh();
+    setBusy(null);
+  };
+
+  const pending    = branches.filter(b=>b.status==="pending");
+  const active     = branches.filter(b=>b.status==="active"||b.is_main);
+  const suspended  = branches.filter(b=>b.status==="suspended");
+
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <div style={{fontSize:20,fontWeight:800}}>🏢 Branches</div>
+          <div style={{fontSize:13,color:"var(--text3)",marginTop:2}}>{active.length} active · {pending.length} pending</div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-ghost btn-sm" onClick={refresh} disabled={refreshing}>{refreshing?"…":"↻ Refresh"}</button>
+          <button className="btn btn-primary" onClick={()=>setShowAdd(v=>!v)}>+ Add Branch</button>
+        </div>
+      </div>
+
+      {/* Registration Link */}
+      <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:12,padding:"14px 16px",marginBottom:20}}>
+        <div style={{fontSize:13,fontWeight:700,marginBottom:8}}>📎 Registration Link</div>
+        <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Share this link with new branches so they can self-register. You will see them below as pending.</div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <input className="inp" readOnly value={regLink} style={{flex:1,fontSize:12}}/>
+          <button className="btn btn-primary btn-sm" onClick={copyLink} style={{whiteSpace:"nowrap"}}>{copied?"✓ Copied!":"📋 Copy"}</button>
+        </div>
+      </div>
+
+      {/* Success banner */}
+      {doneApproved&&(
+        <div style={{background:"rgba(34,197,94,.1)",border:"1px solid rgba(34,197,94,.3)",borderRadius:12,padding:"14px 16px",marginBottom:20}}>
+          <div style={{fontWeight:700,color:"var(--green)",marginBottom:6}}>✅ {doneApproved.branch.name} approved!</div>
+          <div style={{fontSize:13,color:"var(--text2)",marginBottom:8}}>Send these credentials to the branch manager:</div>
+          <div style={{fontFamily:"monospace",fontSize:13,background:"var(--surface)",borderRadius:8,padding:"10px 14px",display:"inline-block",lineHeight:1.8}}>
+            Username: <strong>{doneApproved.username}</strong><br/>
+            Password: <strong>{doneApproved.password}</strong>
+          </div>
+          <div style={{marginTop:10,display:"flex",gap:8}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>navigator.clipboard.writeText(`Username: ${doneApproved.username}\nPassword: ${doneApproved.password}`)}>📋 Copy credentials</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setDoneApproved(null)}>Dismiss</button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Branch Form */}
+      {showAdd&&(
+        <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:12,padding:"16px",marginBottom:20}}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>+ New Branch</div>
+          <FG>
+            <div><FL label="Shop Name *"/><input className="inp" value={addF.name} onChange={e=>setAddF(p=>({...p,name:e.target.value}))} placeholder="Cape Town Branch"/></div>
+            <div><FL label="City"/><input className="inp" value={addF.city} onChange={e=>setAddF(p=>({...p,city:e.target.value}))} placeholder="Cape Town"/></div>
+          </FG>
+          <FG>
+            <div><FL label="Phone"/><input className="inp" value={addF.phone} onChange={e=>setAddF(p=>({...p,phone:e.target.value}))} placeholder="+27 21 000 0000"/></div>
+            <div><FL label="Contact Person"/><input className="inp" value={addF.contact_name} onChange={e=>setAddF(p=>({...p,contact_name:e.target.value}))} placeholder="Name"/></div>
+          </FG>
+          <FG>
+            <div><FL label="Address"/><input className="inp" value={addF.address} onChange={e=>setAddF(p=>({...p,address:e.target.value}))} placeholder="123 Main Rd"/></div>
+            <div><FL label="Email"/><input className="inp" value={addF.email} onChange={e=>setAddF(p=>({...p,email:e.target.value}))} placeholder="shop@example.com"/></div>
+          </FG>
+          {addErr&&<div style={{color:"var(--red)",fontSize:13,marginBottom:8}}>{addErr}</div>}
+          <div style={{display:"flex",gap:8,marginTop:4}}>
+            <button className="btn btn-primary" onClick={saveNew} disabled={busy==="new"}>{busy==="new"?"Saving…":"Save"}</button>
+            <button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Approvals */}
+      {pending.length>0&&(
+        <div style={{marginBottom:24}}>
+          <div style={{fontSize:14,fontWeight:700,color:"var(--yellow)",marginBottom:10}}>⏳ Pending Approval ({pending.length})</div>
+          {pending.map(b=>(
+            <div key={b.id} style={{marginBottom:10}}>
+              <div style={{background:"rgba(251,191,36,.07)",border:`1px solid ${approving?.id===b.id?"var(--accent)":"rgba(251,191,36,.3)"}`,borderRadius:10,padding:"12px 14px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:160}}>
+                    <div style={{fontWeight:700,fontSize:14}}>{b.name}</div>
+                    <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{[b.city,b.address].filter(Boolean).join(" · ")}</div>
+                    {b.phone&&<div style={{fontSize:12,color:"var(--text3)"}}>{b.phone}{b.contact_name?` — ${b.contact_name}`:""}</div>}
+                    {b.email&&<div style={{fontSize:12,color:"var(--text3)"}}>{b.email}</div>}
+                  </div>
+                  {approving?.id!==b.id&&(
+                    <div style={{display:"flex",gap:8}}>
+                      <button className="btn btn-primary btn-sm" onClick={()=>startApprove(b)} disabled={!!busy}>✓ Approve</button>
+                      <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>reject(b)} disabled={!!busy}>✕ Reject</button>
+                    </div>
+                  )}
+                </div>
+                {approving?.id===b.id&&(
+                  <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid var(--border)"}}>
+                    <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:"var(--accent)"}}>🔑 Create login for this branch</div>
+                    <FG>
+                      <div><FL label="Username *"/><input className="inp" value={userF.username} onChange={e=>setUserF(p=>({...p,username:e.target.value}))} placeholder="capetown"/></div>
+                      <div><FL label="Password *"/><input className="inp" type="password" value={userF.password} onChange={e=>setUserF(p=>({...p,password:e.target.value}))} placeholder="••••••"/></div>
+                    </FG>
+                    <FG>
+                      <div>
+                        <FL label="Role"/>
+                        <select className="inp" value={userF.role} onChange={e=>setUserF(p=>({...p,role:e.target.value}))}>
+                          <option value="branch_admin">🏢 Branch Admin</option>
+                          <option value="manager">👔 Manager</option>
+                          <option value="shipper">🚚 Shipper</option>
+                          <option value="stockman">📦 Stockman</option>
+                        </select>
+                      </div>
+                      <div><FL label="Display Name"/><input className="inp" value={userF.name} onChange={e=>setUserF(p=>({...p,name:e.target.value}))} placeholder={b.contact_name||b.name}/></div>
+                    </FG>
+                    {userErr&&<div style={{color:"var(--red)",fontSize:13,marginBottom:8}}>{userErr}</div>}
+                    <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap"}}>
+                      <button className="btn btn-primary" style={{flex:2}} onClick={confirmApproveWithUser} disabled={busy===b.id}>{busy===b.id?"Saving…":"✓ Approve & Create User"}</button>
+                      <button className="btn btn-ghost" onClick={confirmApproveSkipUser} disabled={busy===b.id}>Approve without user</button>
+                      <button className="btn btn-ghost" onClick={()=>setApproving(null)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Active Branches */}
+      <div style={{marginBottom:suspended.length>0?24:0}}>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:10}}>✅ Active Branches ({active.length})</div>
+        {active.map(b=>(
+          <div key={b.id} style={{background:"var(--surface)",border:`1px solid ${creatingUserFor?.id===b.id?"var(--accent)":"var(--border)"}`,borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              <div style={{width:32,height:32,borderRadius:"50%",background:"var(--surface2)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+                {b.is_main?"🏠":"🏢"}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:14}}>{b.name}{b.is_main&&<span style={{fontSize:11,background:"var(--accent)",color:"#fff",borderRadius:99,padding:"1px 8px",marginLeft:6}}>Main</span>}</div>
+                <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{[b.city,b.address].filter(Boolean).join(" · ")}{b.phone?` · ${b.phone}`:""}</div>
+              </div>
+              {b.code&&<span style={{fontSize:11,color:"var(--text3)",background:"var(--surface2)",padding:"2px 8px",borderRadius:6}}>{b.code}</span>}
+              {!b.is_main&&creatingUserFor?.id!==b.id&&(
+                <div style={{display:"flex",gap:6}}>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>startCreateUser(b)} disabled={!!busy}>🔑 Create User</button>
+                  <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>suspend(b)} disabled={!!busy}>⏸ Suspend</button>
+                </div>
+              )}
+            </div>
+            {creatingUserFor?.id===b.id&&(
+              <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid var(--border)"}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:"var(--accent)"}}>🔑 Create login for {b.name}</div>
+                <FG>
+                  <div><FL label="Username *"/><input className="inp" value={userF.username} onChange={e=>setUserF(p=>({...p,username:e.target.value}))} placeholder="capetown"/></div>
+                  <div><FL label="Password *"/><input className="inp" type="password" value={userF.password} onChange={e=>setUserF(p=>({...p,password:e.target.value}))} placeholder="••••••"/></div>
+                </FG>
+                <FG>
+                  <div>
+                    <FL label="Role"/>
+                    <select className="inp" value={userF.role} onChange={e=>setUserF(p=>({...p,role:e.target.value}))}>
+                      <option value="branch_admin">🏢 Branch Admin</option>
+                      <option value="manager">👔 Manager</option>
+                      <option value="shipper">🚚 Shipper</option>
+                      <option value="stockman">📦 Stockman</option>
+                    </select>
+                  </div>
+                  <div><FL label="Display Name"/><input className="inp" value={userF.name} onChange={e=>setUserF(p=>({...p,name:e.target.value}))} placeholder={b.contact_name||b.name}/></div>
+                </FG>
+                {userErr&&<div style={{color:"var(--red)",fontSize:13,marginBottom:8}}>{userErr}</div>}
+                <div style={{display:"flex",gap:8,marginTop:4}}>
+                  <button className="btn btn-primary" style={{flex:2}} onClick={confirmCreateUser} disabled={busy===b.id}>{busy===b.id?"Saving…":"✓ Create User"}</button>
+                  <button className="btn btn-ghost" onClick={()=>setCreatingUserFor(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Suspended Branches */}
+      {suspended.length>0&&(
+        <div>
+          <div style={{fontSize:14,fontWeight:700,color:"var(--red)",marginBottom:10}}>⏸ Suspended ({suspended.length})</div>
+          {suspended.map(b=>(
+            <div key={b.id} style={{background:"rgba(248,113,113,.06)",border:"1px solid rgba(248,113,113,.25)",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14,color:"var(--text)"}}>{b.name}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{[b.city,b.address].filter(Boolean).join(" · ")}{b.phone?` · ${b.phone}`:""}</div>
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <button className="btn btn-ghost btn-sm" style={{color:"var(--green)"}} onClick={()=>api.patch("branches","id",b.id,{status:"active"}).then(refresh)} disabled={busy===b.id}>▶ Reinstate</button>
+                  <button className="btn btn-primary btn-sm" onClick={()=>generateCode(b)} disabled={busy===b.id}>{busy===b.id?"…":"🔑 Generate Code"}</button>
+                </div>
+              </div>
+              {b.activation_code&&(
+                <div style={{marginTop:10,padding:"10px 12px",background:"var(--surface)",borderRadius:8,border:"1px solid var(--border)"}}>
+                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>Activation code (expires {new Date(b.activation_code_expires_at).toLocaleDateString()}):</div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <code style={{fontSize:22,fontWeight:800,letterSpacing:4,color:"var(--accent)",fontFamily:"monospace"}}>{b.activation_code}</code>
+                    <button className="btn btn-ghost btn-sm" onClick={()=>navigator.clipboard.writeText(b.activation_code)}>📋 Copy</button>
+                  </div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>Send this code to the branch. They enter it at: <code style={{fontSize:11}}>{window.location.origin}{window.location.pathname}?activate_branch=1</code></div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Part Request Modal (branch submits a new-part request to head office) ────
+export function PartRequestModal({currentBranch, user, onClose, onSave, t={}}) {
+  const CATS=getCategories();
+  const MAKES=Object.keys(CAR_MAKES);
+  const branchCode=(currentBranch?.name||"BR").substring(0,4).toUpperCase().replace(/\s/g,"");
+  const tempSku=`TMP-${branchCode}-${Math.random().toString(36).substring(2,6).toUpperCase()}`;
+  const [f,setF]=useState({name:"",category:CATS[0]||"Engine",oe_number:"",vehicle_make:"",vehicle_model:"",year_from:"",year_to:"",notes:"",image_url:"",suggested_price:""});
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const [saving,setSaving]=useState(false);
+  const [err,setErr]=useState("");
+
+  const submit=async()=>{
+    if(!f.name.trim())return setErr("Part name / description is required");
+    if(!f.oe_number.trim())return setErr("OE number is required — this helps head office identify the part");
+    setSaving(true);setErr("");
+    try{
+      await api.insert("part_requests",{
+        branch_id:currentBranch?.id,
+        requested_by:user.id,
+        name:f.name.trim(),
+        description:f.name.trim(),
+        category:f.category,
+        oe_number:f.oe_number.trim(),
+        vehicle_make:f.vehicle_make||null,
+        vehicle_model:f.vehicle_model||null,
+        year_from:f.year_from?parseInt(f.year_from):null,
+        year_to:f.year_to?parseInt(f.year_to):null,
+        notes:f.notes||null,
+        image_url:f.image_url||null,
+        suggested_price:f.suggested_price?parseFloat(f.suggested_price):null,
+        temp_sku:tempSku,
+        status:"pending",
+      });
+      onSave();
+    }catch(e){
+      setErr("Submit failed: "+e.message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="📬 Request New Part" onClose={onClose}/>
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <div style={{background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.25)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"var(--text2)",lineHeight:1.5}}>
+          Part not in main catalog? Fill in the OE number and photo so head office can create the SKU and link it back to you.
+        </div>
+        <FG>
+          <div><FL label="Part Name / Description *"/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)} placeholder="e.g. Water Pump — Toyota Corolla"/></div>
+          <div><FL label="Category"/><select className="inp" value={f.category} onChange={e=>s("category",e.target.value)}>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+        </FG>
+        <FD><FL label="OE / OEM Reference Number *"/><input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)} placeholder="e.g. 16100-29085" style={{fontFamily:"monospace",letterSpacing:1}}/></FD>
+        <div style={{fontWeight:600,fontSize:12,color:"var(--text3)"}}>Vehicle Fitment</div>
+        <FG>
+          <div>
+            <FL label="Make"/>
+            <select className="inp" value={f.vehicle_make} onChange={e=>s("vehicle_make",e.target.value)}>
+              <option value="">— Select Make —</option>
+              {MAKES.map(m=><option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <div><FL label="Model"/><input className="inp" value={f.vehicle_model} onChange={e=>s("vehicle_model",e.target.value)} placeholder="e.g. Corolla"/></div>
+        </FG>
+        <FG>
+          <div><FL label="Year From"/><input className="inp" type="number" value={f.year_from} onChange={e=>s("year_from",e.target.value)} placeholder="2010" min={1990} max={2030}/></div>
+          <div><FL label="Year To"/><input className="inp" type="number" value={f.year_to} onChange={e=>s("year_to",e.target.value)} placeholder="2020" min={1990} max={2030}/></div>
+        </FG>
+        <FD>
+          <FL label="Part Photo URL"/>
+          <input className="inp" value={f.image_url} onChange={e=>s("image_url",e.target.value)} placeholder="Paste Google Drive or image link"/>
+        </FD>
+        {f.image_url&&<div style={{textAlign:"center"}}><img src={toImgUrl(f.image_url)} alt="" style={{maxHeight:120,maxWidth:"100%",borderRadius:8,border:"1px solid var(--border)"}} onError={e=>e.target.style.display="none"}/></div>}
+        <FD><FL label="Your Suggested Selling Price"/><input className="inp" type="number" value={f.suggested_price} onChange={e=>s("suggested_price",e.target.value)} placeholder="0.00"/></FD>
+        <FD><FL label="Notes for Head Office"/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} rows={2} placeholder="Where you sourced this, urgency, any other info…"/></FD>
+        <div style={{fontSize:11,color:"var(--text3)"}}>Temp reference: <code style={{fontFamily:"monospace"}}>{tempSku}</code></div>
+        {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,padding:"9px 12px",fontSize:13,color:"var(--red)"}}>{err}</div>}
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" style={{flex:2}} onClick={submit} disabled={saving}>{saving?"Submitting…":"📬 Submit Request"}</button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+// ─── Part Requests Page (admin reviews + approves; branch tracks status) ──────
+export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role,currentBranch,onRefresh,t={}}) {
+  const [linkingId,setLinkingId]=useState(null);
+  const [linkSearch,setLinkSearch]=useState("");
+  const [rejectingId,setRejectingId]=useState(null);
+  const [rejectReason,setRejectReason]=useState("");
+  const [busy,setBusy]=useState(null);
+
+  const isAdmin=role==="admin";
+  const myReqs=isAdmin?partRequests:partRequests.filter(r=>r.branch_id===currentBranch?.id);
+  const pending=myReqs.filter(r=>r.status==="pending");
+  const done=myReqs.filter(r=>r.status==="approved"||r.status==="rejected");
+
+  const branchName=id=>branches.find(b=>b.id===id)?.name||"Unknown Branch";
+
+  const linkPart=async(reqId,part)=>{
+    setBusy(reqId);
+    await api.patch("part_requests","id",reqId,{
+      part_id:part.id,
+      status:"approved",
+      approved_by:user.id,
+      approved_at:new Date().toISOString(),
+    });
+    setLinkingId(null);setLinkSearch("");
+    await onRefresh();
+    setBusy(null);
+  };
+
+  const reject=async(reqId)=>{
+    if(!rejectReason.trim())return;
+    setBusy(reqId);
+    await api.patch("part_requests","id",reqId,{status:"rejected",rejection_reason:rejectReason});
+    setRejectingId(null);setRejectReason("");
+    await onRefresh();
+    setBusy(null);
+  };
+
+  const ReqCard=({r})=>{
+    const linked=r.part_id?parts.find(p=>p.id===r.part_id):null;
+    const isLinking=linkingId===r.id;
+    const isRejecting=rejectingId===r.id;
+    const linkHits=isLinking&&linkSearch.trim()?parts.filter(p=>p.is_main!==false&&((p.sku||"").toLowerCase().includes(linkSearch.toLowerCase())||(p.name||"").toLowerCase().includes(linkSearch.toLowerCase()))).slice(0,6):[];
+    return (
+      <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+          {r.image_url&&<img src={toImgUrl(r.image_url)} alt="" style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",flexShrink:0}} onError={e=>e.target.style.display="none"}/>}
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+              <span style={{fontWeight:700,fontSize:13}}>{r.name}</span>
+              <span style={{fontSize:11,fontFamily:"monospace",color:"var(--text3)",background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>{r.temp_sku}</span>
+              <span style={{fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:600,background:r.status==="pending"?"rgba(251,191,36,.15)":r.status==="approved"?"rgba(34,197,94,.12)":"rgba(248,113,113,.12)",color:r.status==="pending"?"var(--yellow)":r.status==="approved"?"var(--green)":"var(--red)"}}>
+                {r.status==="pending"?"⏳ Pending":r.status==="approved"?"✅ Approved":"❌ Rejected"}
+              </span>
+            </div>
+            {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>🏢 {branchName(r.branch_id)}</div>}
+            <div style={{fontSize:12,display:"flex",gap:12,flexWrap:"wrap"}}>
+              {r.oe_number&&<span style={{fontFamily:"monospace",color:"var(--accent)"}}>{r.oe_number}</span>}
+              {r.category&&<span style={{color:"var(--text3)"}}>{r.category}</span>}
+              {r.vehicle_make&&<span style={{color:"var(--text3)"}}>{r.vehicle_make}{r.vehicle_model?" — "+r.vehicle_model:""}{r.year_from?" ("+r.year_from+(r.year_to?"–"+r.year_to:"+")+")":""}</span>}
+            </div>
+            {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
+            {r.suggested_price&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Suggested price: <strong>{C()}{(+r.suggested_price).toFixed(2)}</strong></div>}
+            {r.status==="approved"&&linked&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:7,fontSize:12}}>✅ Linked to <strong>{linked.sku}</strong> — {linked.name}</div>}
+            {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
+          </div>
+        </div>
+
+        {/* Admin actions */}
+        {isAdmin&&r.status==="pending"&&(
+          <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+            {!isLinking&&!isRejecting&&(
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn btn-primary btn-sm" onClick={()=>{setLinkingId(r.id);setRejectingId(null);setLinkSearch("");}}>🔗 Link to Part</button>
+                <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setRejectingId(r.id);setLinkingId(null);}}>❌ Reject</button>
+              </div>
+            )}
+            {isLinking&&(
+              <div>
+                <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>Search main catalog to link:</div>
+                <input className="inp" value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="SKU or part name…" autoFocus/>
+                {linkHits.map(p=>(
+                  <div key={p.id} onClick={()=>linkPart(r.id,p)} style={{display:"flex",gap:10,padding:"6px 8px",borderRadius:7,cursor:"pointer",border:"1px solid var(--border)",background:"var(--surface2)",marginTop:4}}
+                    onMouseEnter={e=>e.currentTarget.style.background="var(--surface3)"} onMouseLeave={e=>e.currentTarget.style.background="var(--surface2)"}>
+                    <span style={{fontWeight:700,color:"var(--accent)",minWidth:80,fontSize:12}}>{p.sku}</span>
+                    <span style={{flex:1,fontSize:12}}>{p.name}</span>
+                    <span style={{fontSize:11,color:"var(--text3)"}}>{C()}{p.price}</span>
+                  </div>
+                ))}
+                {linkSearch.trim()&&!linkHits.length&&<div style={{fontSize:12,color:"var(--text3)",padding:"6px 0"}}>No parts found — go to Inventory to create it first, then come back to link.</div>}
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>{setLinkingId(null);setLinkSearch("");}}>Cancel</button>
+                </div>
+              </div>
+            )}
+            {isRejecting&&(
+              <div>
+                <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>Rejection reason:</div>
+                <input className="inp" value={rejectReason} onChange={e=>setRejectReason(e.target.value)} placeholder="e.g. Duplicate of SKU-1234 / Not approved" autoFocus/>
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <button className="btn btn-primary btn-sm" style={{background:"var(--red)"}} onClick={()=>reject(r.id)} disabled={busy===r.id||!rejectReason.trim()}>{busy===r.id?"…":"Confirm Reject"}</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>{setRejectingId(null);setRejectReason("");}}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{padding:"0 0 40px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>📬 Part Requests</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:2}}>{isAdmin?"Review new-part requests from all branches":"Track your part requests to head office"}</p>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={onRefresh}>↻ Refresh</button>
+      </div>
+
+      {pending.length===0&&done.length===0&&(
+        <div style={{textAlign:"center",padding:"60px 20px",color:"var(--text3)"}}>
+          <div style={{fontSize:32,marginBottom:8}}>📭</div>
+          <div>{isAdmin?"No part requests yet":"You haven't submitted any part requests yet"}</div>
+        </div>
+      )}
+
+      {pending.length>0&&(
+        <div style={{marginBottom:24}}>
+          <div style={{fontSize:14,fontWeight:700,marginBottom:10,color:"var(--yellow)"}}>⏳ Pending ({pending.length})</div>
+          {pending.map(r=><ReqCard key={r.id} r={r}/>)}
+        </div>
+      )}
+
+      {done.length>0&&(
+        <div>
+          <div style={{fontSize:14,fontWeight:700,marginBottom:10,color:"var(--text3)"}}>History ({done.length})</div>
+          {done.map(r=><ReqCard key={r.id} r={r}/>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function BranchProfilePage({branch,user,onSave,t={}}) {
+  const [f,setF]=useState({
+    shop_name: branch?.shop_name||branch?.name||"",
+    phone:     branch?.phone||"",
+    email:     branch?.email||"",
+    address:   branch?.address||"",
+    logo_url:  branch?.logo_url||"",
+    logo_data: branch?.logo_data||"",
+    currency:  branch?.currency||getSettings().currency||"ZAR R",
+  });
+  const [busy,setBusy]=useState(false);
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const save=async()=>{
+    setBusy(true);
+    try{ await onSave(f); } finally{ setBusy(false); }
+  };
+  return (
+    <div style={{maxWidth:600,margin:"0 auto",padding:"24px 16px"}}>
+      <h2 style={{fontWeight:700,fontSize:18,marginBottom:20}}>🏢 Branch Profile</h2>
+      <div style={{background:"var(--surface)",borderRadius:12,padding:20,marginBottom:16}}>
+        <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:14}}>Shop Info</h3>
+        <FG>
+          <div><FL label="Shop Name"/><input className="inp" value={f.shop_name} onChange={e=>s("shop_name",e.target.value)}/></div>
+          <div><FL label="Currency"/><input className="inp" value={f.currency} placeholder="e.g. ZAR R" onChange={e=>s("currency",e.target.value)}/></div>
+        </FG>
+        <FG>
+          <div><FL label="Phone"/><input className="inp" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div>
+          <div><FL label="Email"/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div>
+        </FG>
+        <div><FL label="Address"/><textarea className="inp" rows={2} value={f.address} onChange={e=>s("address",e.target.value)} style={{resize:"vertical"}}/></div>
+      </div>
+      <div style={{background:"var(--surface)",borderRadius:12,padding:20,marginBottom:20}}>
+        <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:14}}>Logo</h3>
+        <LogoUploader f={f} s={s}/>
+      </div>
+      <button className="btn btn-primary" onClick={save} disabled={busy} style={{width:"100%"}}>
+        {busy?"Saving…":"💾 Save Branch Profile"}
+      </button>
+    </div>
+  );
+}
+
+export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
+  const [f,setF]=useState({
+    stock:   existing?.stock   ?? part?.stock   ?? 0,
+    price:   existing?.price   ?? part?.price   ?? "",
+    cost_price: existing?.cost_price ?? part?.cost_price ?? "",
+    min_stock:  existing?.min_stock  ?? part?.min_stock  ?? 0,
+    bin_location: existing?.bin_location ?? part?.bin_location ?? "",
+  });
+  const [busy,setBusy]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const save=async()=>{
+    if(!part||!branchId) return;
+    setBusy(true);
+    try{
+      const payload={
+        branch_id:branchId,
+        part_id:part.id,
+        stock:parseInt(f.stock)||0,
+        price:parseFloat(f.price)||null,
+        cost_price:parseFloat(f.cost_price)||null,
+        min_stock:parseInt(f.min_stock)||0,
+        bin_location:f.bin_location||null,
+        updated_at:new Date().toISOString(),
+      };
+      if(existing?.id){
+        await api.patch("branch_stock","id",existing.id,payload);
+      } else {
+        await api.insert("branch_stock",payload);
+      }
+      await onSave();
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
+        <MHead title={existing?"✏️ Edit Branch Stock":"📦 Set Branch Stock"} onClose={onClose}/>
+        <div style={{padding:"12px 0 4px",marginBottom:10}}>
+          <div style={{fontWeight:700,fontSize:15}}>{part?.name}</div>
+          <div style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2}}>{part?.sku}</div>
+        </div>
+        <FG>
+          <div><FL label="Stock Qty"/><input className="inp" type="number" min={0} value={f.stock} onChange={e=>set("stock",e.target.value)} autoFocus/></div>
+          <div><FL label="Min Stock"/><input className="inp" type="number" min={0} value={f.min_stock} onChange={e=>set("min_stock",e.target.value)}/></div>
+        </FG>
+        {(()=>{
+          const pr=parseFloat(f.price);const co=parseFloat(f.cost_price);
+          const margin=(pr>0&&co>0)?((pr-co)/pr*100):null;
+          const markup=(pr>0&&co>0)?((pr-co)/co*100):null;
+          return(
+            <FG>
+              <div><FL label="Selling Price"/><input className="inp" type="number" step="0.01" min={0} value={f.price} placeholder="Catalog default" onChange={e=>set("price",e.target.value)}/></div>
+              <div>
+                <FL label="Cost Price"/>
+                <input className="inp" type="number" step="0.01" min={0} value={f.cost_price} placeholder="Catalog default" onChange={e=>set("cost_price",e.target.value)}/>
+                {margin!==null&&<div style={{fontSize:11,marginTop:4,color:margin>=0?"var(--green)":"var(--red)"}}>
+                  Margin {margin.toFixed(1)}% · Markup {markup.toFixed(1)}%
+                </div>}
+              </div>
+            </FG>
+          );
+        })()}
+        <div><FL label="Bin Location"/><input className="inp" value={f.bin_location} placeholder="e.g. A1-03" onChange={e=>set("bin_location",e.target.value)}/></div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:16}}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={busy}>{busy?"Saving…":"Save Stock"}</button>
+        </div>
+      </div>
+    </div>
   );
 }

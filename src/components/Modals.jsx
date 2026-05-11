@@ -4882,7 +4882,11 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
         <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:14}}>Shop Info</h3>
         <FG>
           <div><FL label="Shop Name"/><input className="inp" value={f.shop_name} onChange={e=>s("shop_name",e.target.value)}/></div>
-          <div><FL label="Currency"/><input className="inp" value={f.currency} placeholder="e.g. ZAR R" onChange={e=>s("currency",e.target.value)}/></div>
+          <div><FL label="Currency"/><select className="inp" value={f.currency||"ZAR R"} onChange={e=>s("currency",e.target.value)}>
+            {["ZAR R","USD $","EUR €","GBP £","TWD NT$","CNY ¥","JPY ¥","AUD A$","CAD C$","SGD S$","MYR RM","THB ฿","INR ₹","AED د.إ","NGN ₦","KES KSh","GHS GH₵"].map(c=>(
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select></div>
         </FG>
         <FG>
           <div><FL label="Phone"/><input className="inp" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div>

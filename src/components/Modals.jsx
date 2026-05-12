@@ -1950,7 +1950,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,branchSkuPrefix=""}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -1958,7 +1958,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     make:p.make||"", model:p.model||"", year_range:p.year_range||"", oe_number:p.oe_number||"",
     bin_location:p.bin_location||"",
   }:{
-    sku:"", name:"", category:"Engine", brand:"", price:"", cost_price:"", stock:"", minStock:"",
+    sku:branchSkuPrefix?branchSkuPrefix+"-":"", name:"", category:"Engine", brand:"", price:"", cost_price:"", stock:"", minStock:"",
     image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", bin_location:"",
   };
   const [f,setF]=useState(()=>makeF(part));
@@ -2096,8 +2096,11 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                 </div>
               </div>
               <input className="inp" value={f.sku} onChange={e=>{s("sku",e.target.value);setErrors(p=>({...p,sku:""}));}}
-                placeholder="GP00001" style={{borderColor:errors.sku?"var(--red)":undefined}}/>
+                placeholder={branchSkuPrefix?`${branchSkuPrefix}-001`:"GP00001"} style={{borderColor:errors.sku?"var(--red)":undefined}}/>
               <FormError errors={errors} k="sku"/>
+              {branchSkuPrefix&&!part&&<div style={{fontSize:11,color:"var(--accent)",marginTop:3}}>
+                Branch prefix: <strong>{branchSkuPrefix}-</strong> — keeps your SKUs separate from other branches
+              </div>}
             </div>
             <div><FL label={t.brand}/><input className="inp" value={f.brand} onChange={e=>s("brand",e.target.value)} placeholder="GWM"/></div>
           </FG>
@@ -4861,13 +4864,14 @@ export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role
 
 export function BranchProfilePage({branch,user,onSave,t={}}) {
   const [f,setF]=useState({
-    shop_name: branch?.shop_name||branch?.name||"",
-    phone:     branch?.phone||"",
-    email:     branch?.email||"",
-    address:   branch?.address||"",
-    logo_url:  branch?.logo_url||"",
-    logo_data: branch?.logo_data||"",
-    currency:  branch?.currency||getSettings().currency||"ZAR R",
+    shop_name:  branch?.shop_name||branch?.name||"",
+    phone:      branch?.phone||"",
+    email:      branch?.email||"",
+    address:    branch?.address||"",
+    logo_url:   branch?.logo_url||"",
+    logo_data:  branch?.logo_data||"",
+    currency:   branch?.currency||getSettings().currency||"ZAR R",
+    sku_prefix: branch?.sku_prefix||"",
   });
   const [busy,setBusy]=useState(false);
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -4887,6 +4891,20 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
               <option key={c} value={c}>{c}</option>
             ))}
           </select></div>
+        </FG>
+        <FG>
+          <div>
+            <FL label="SKU Prefix"/>
+            <input className="inp" value={f.sku_prefix} onChange={e=>s("sku_prefix",e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""))} placeholder="e.g. NB" maxLength={6}/>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>
+              2–6 uppercase letters/numbers. New parts will auto-start with <strong>{f.sku_prefix||"XX"}-</strong>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"flex-end",paddingBottom:6}}>
+            {f.sku_prefix&&<div style={{background:"rgba(99,102,241,.12)",border:"1px solid rgba(99,102,241,.3)",borderRadius:8,padding:"6px 14px",fontSize:13,fontWeight:700,color:"var(--accent)",fontFamily:"DM Mono,monospace"}}>
+              {f.sku_prefix}-001, {f.sku_prefix}-002…
+            </div>}
+          </div>
         </FG>
         <FG>
           <div><FL label="Phone"/><input className="inp" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div>

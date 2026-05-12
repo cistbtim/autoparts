@@ -417,7 +417,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       needsWs ? api.get("workshop_quotes",`select=*&order=quote_date.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_customers",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_vehicles",`select=*&order=reg.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
-      api.get("customer_queries","select=*&order=created_at.desc").catch(()=>[]),
+      api.get("customer_queries",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
       needsWs ? api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
@@ -584,7 +584,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       workshop_quotes:          [`select=*&order=quote_date.desc${wsF}`,             d=>setWorkshopQuotes(Array.isArray(d)?d:[])],
       workshop_customers:       [`select=*&order=name.asc${wsF}`,                    d=>setWorkshopCustomers(Array.isArray(d)?d:[])],
       workshop_vehicles:        [`select=*&order=reg.asc${wsF}`,                     d=>setWorkshopVehicles(Array.isArray(d)?d:[])],
-      customer_queries:         ["select=*&order=created_at.desc",                   d=>setCustomerQueries(Array.isArray(d)?d:[])],
+      customer_queries:         [`${isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:""}select=*&order=created_at.desc`, d=>setCustomerQueries(Array.isArray(d)?d:[])],
       workshop_stock:           [`select=*&order=name.asc${wsF}`,                    d=>setWorkshopStock(Array.isArray(d)?d:[])],
       workshop_services:        [`select=*&order=name.asc${wsF}`,                    d=>setWorkshopServices(Array.isArray(d)?d:[])],
       workshop_documents:       [`select=*&order=uploaded_at.desc${wsF}`,            d=>setWorkshopDocuments(Array.isArray(d)?d:[])],
@@ -1668,8 +1668,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
   // Customer Queries
   const submitCustomerQuery=async(data)=>{
-    await api.insert("customer_queries",data);
-    const q=await api.get("customer_queries","select=*&order=created_at.desc").catch(()=>[]);
+    await api.insert("customer_queries",{...data,...(_bId?{branch_id:_bId}:{})});
+    const q=await api.get("customer_queries",`${_bId?`branch_id=eq.${_bId}&`:""}select=*&order=created_at.desc`).catch(()=>[]);
     setCustomerQueries(Array.isArray(q)?q:[]);
     showToast("✅ Query submitted! We'll reply soon.");
   };

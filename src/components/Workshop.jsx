@@ -6173,8 +6173,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // ═══════════════════════════════════════════════════════════════
 const WS_SHOP_PAGE_SIZE=20;
 function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,vehicles=[],partFitments=[]}) {
-  const canSeeSku=!!linkedBranch?.show_supplier_sku;
-  const [showSku,setShowSku]=useState(false);
+  const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
   const [placing,setPlacing]=useState(false);
@@ -6271,11 +6270,6 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <button onClick={()=>{setStockOnly(false);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:!stockOnly?700:400,background:!stockOnly?"var(--accent)":"transparent",color:!stockOnly?"#fff":"var(--text2)"}}>All</button>
             <button onClick={()=>{setStockOnly(true);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:stockOnly?700:400,background:stockOnly?"var(--accent)":"transparent",color:stockOnly?"#fff":"var(--text2)"}}>In Stock</button>
           </div>
-          {canSeeSku&&(
-            <button onClick={()=>setShowSku(v=>!v)} style={{display:"flex",alignItems:"center",gap:5,padding:"7px 12px",border:`1.5px solid ${showSku?"var(--purple)":"var(--border)"}`,borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,background:showSku?"rgba(167,139,250,.15)":"transparent",color:showSku?"var(--purple)":"var(--text3)",flexShrink:0,fontFamily:"DM Sans,sans-serif",transition:"all .18s"}}>
-              {showSku?"🔓":"🔒"} Supplier Code
-            </button>
-          )}
           <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}} onClick={placeOrder} disabled={placing||!cart.length}>
             🛒 {cartCount>0?`(${cartCount}) `:""}Checkout
           </button>

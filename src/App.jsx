@@ -172,6 +172,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [drawerOpen,setDrawerOpen]=useState(false);
   const [crossBranchSearch,setCrossBranchSearch]=useState("");
   const [showCrossBranch,setShowCrossBranch]=useState(false);
+  const [showSupplierCodes,setShowSupplierCodes]=useState(false);
   const [wsMoreOpen,setWsMoreOpen]=useState(false);
 
   // Debounce search input — only filter after 250ms of no typing
@@ -2867,6 +2868,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <button className="btn btn-ghost btn-sm" onClick={loadAll} title="Refresh inventory">↻ Refresh</button>
                 {role==="admin"&&branches.length>1&&<button className={`btn btn-sm ${showCrossBranch?"btn-primary":"btn-ghost"}`} onClick={()=>setShowCrossBranch(v=>!v)} title="Cross-branch stock search">🏢 {t.branchCrossBtn}</button>}
+                {(isBranchUser&&currentBranch?.show_supplier_sku)||(role==="admin"||role==="branch_admin")?(<button onClick={()=>setShowSupplierCodes(v=>!v)} style={{padding:"7px 12px",border:`1.5px solid ${showSupplierCodes?"var(--purple)":"var(--border)"}`,borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,background:showSupplierCodes?"rgba(167,139,250,.15)":"transparent",color:showSupplierCodes?"var(--purple)":"var(--text3)",fontFamily:"DM Sans,sans-serif",transition:"all .18s",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>{showSupplierCodes?"🔓":"🔒"} Supplier Code</button>):null}
                 {(role==="admin"||role==="branch_admin")&&<button className="btn btn-primary" onClick={()=>openM("editPart")}>+ {t.addPart}</button>}
               </div>}/>
             {showCrossBranch&&branches.length>1&&(
@@ -3036,6 +3038,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                           {p.bin_location&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)",background:"rgba(96,165,250,.1)",padding:"1px 7px",borderRadius:5}}>📦 {p.bin_location}</span>}
                           {p.category&&<span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:10}}>{p.category}</span>}
                         </div>
+                        {showSupplierCodes&&(()=>{const ps=getPartSupps(p.id);return ps.length>0?(
+                          <div style={{marginTop:6,display:"flex",flexDirection:"column",gap:4}}>
+                            {ps.map(s=>{
+                              const url=s.supplier?.search_url&&s.supplier_part_no?s.supplier.search_url.replace(/\{sku\}/gi,encodeURIComponent(s.supplier_part_no)):null;
+                              return (
+                                <div key={s.id} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(167,139,250,.08)",border:"1px solid rgba(167,139,250,.2)",borderRadius:6,padding:"3px 8px"}}>
+                                  <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>{s.supplier?.name||"Supplier"}</span>
+                                  <span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--purple)",fontWeight:600}}>{s.supplier_part_no||"—"}</span>
+                                  {url&&<a href={url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:"var(--blue)",textDecoration:"none",marginLeft:"auto"}}>🔗</a>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ):null;})()}
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
                           <span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16}}>{fmtAmt(p.price)}</span>
                           <div style={{display:"flex",gap:5,alignItems:"center"}}>
@@ -3109,7 +3125,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                                   {p.name}
                                   {p.chinese_desc&&<span style={{color:"var(--text2)",fontWeight:400}}> / {p.chinese_desc}</span>}
                                 </div>
-                                {ps.length>0&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>🏭 {ps.length} supplier{ps.length>1?"s":""}</div>}
+                                {!showSupplierCodes&&ps.length>0&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>🏭 {ps.length} supplier{ps.length>1?"s":""}</div>}
+                                {showSupplierCodes&&ps.map(s=>{
+                                  const url=s.supplier?.search_url&&s.supplier_part_no?s.supplier.search_url.replace(/\{sku\}/gi,encodeURIComponent(s.supplier_part_no)):null;
+                                  return (
+                                    <div key={s.id} style={{display:"flex",alignItems:"center",gap:5,marginTop:2}}>
+                                      <span style={{fontSize:10,color:"var(--text3)"}}>{s.supplier?.name||"?"}</span>
+                                      <span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--purple)",fontWeight:600}}>{s.supplier_part_no||"—"}</span>
+                                      {url&&<a href={url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:"var(--blue)",textDecoration:"none"}}>🔗</a>}
+                                    </div>
+                                  );
+                                })}
                               </div>
                               {/* Stock qty badge — always visible */}
                               <div style={{flexShrink:0,textAlign:"right"}}>

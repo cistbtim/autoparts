@@ -3984,16 +3984,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           <WsSubscriptionExpiredPage expiresAt={subStatus.expiresAt} onLogout={()=>{setUser(null);setTab("workshop");setSubStatus(null);}} settings={wsDisplaySettings}/>
         )}
         {tab==="wsprofile"&&role==="workshop"&&!subStatus?.expired&&(
-          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId}/>
+          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId} branches={branches}/>
         )}
         {tab==="wssubscriptions"&&role==="admin"&&(
           <WsSubscriptionsPage settings={settings}/>
         )}
 
-        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport"].includes(tab)&&(role==="admin"||role==="manager"||(role==="workshop"&&!subStatus?.expired))&&(
+        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop"].includes(tab)&&(role==="admin"||role==="manager"||(role==="workshop"&&!subStatus?.expired))&&(
           <WorkshopPage
             key={tab}
-            initialTab={tab==="workshop"?"wsbookings":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":"report"}
+            initialTab={tab==="workshop"?"wsbookings":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":"report"}
             jobs={workshopJobs}
             jobItems={workshopJobItems}
             invoices={workshopInvoices}
@@ -4070,6 +4070,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             onRefreshBookings={refreshWsBookings}
             onRefresh={refreshWorkshopData}
             wsProfile={workshopProfile}
+            branches={branches}
+            onPlaceShopOrder={async(cartItems,linkedBranchId)=>{
+              const oid=makeId("ORD");
+              const today=new Date().toISOString().slice(0,10);
+              const total=cartItems.reduce((s,i)=>s+i.price*i.qty,0);
+              const orderObj={id:oid,customer_name:workshopProfile.name||"Workshop Order",customer_phone:workshopProfile.phone||"",customer_email:workshopProfile.email||"",date:today,status:"Processing",items:cartItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,price:i.price})),total,branch_id:linkedBranchId,workshop_source_id:wsId||null};
+              await api.upsert("orders",orderObj);
+              await refreshTables("orders");
+              showToast("✅ Order placed — branch will process it");
+            }}
             t={t} lang={lang}/>
         )}
 

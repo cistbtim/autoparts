@@ -11,13 +11,13 @@ import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 
 const FormError = ({errors,k}) => errors[k] ? <div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {errors[k]}</div> : null;
 
-export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
+export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=[]}) {
   const [pTab,setPTab]=useState("profile"); // "profile" | "users"
   const [f,setF]=useState({
     name:"", vat_number:"", phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
     licence_renewal_agent_name:"", licence_renewal_agent_phone:"", default_markup_pct:0, move_pin:"",
-    label_width_mm:98, label_height_mm:45,
+    label_width_mm:98, label_height_mm:45, linked_branch_id:"",
     ...profile
   });
   const [saving,setSaving]=useState(false);
@@ -296,6 +296,20 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId}) {
             </div>
           );
         })()}
+
+        {branches.length>0&&(
+          <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🏪 Linked Spare Parts Shop</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>Link to a spare parts branch so your workshop can browse their stock and place orders directly.</div>
+            <select className="inp" value={f.linked_branch_id||""} onChange={e=>s("linked_branch_id",e.target.value)}>
+              <option value="">— Not linked —</option>
+              {branches.map(b=>(
+                <option key={b.id} value={b.id}>{b.name}{b.is_main?" (Main)":""}</option>
+              ))}
+            </select>
+            {f.linked_branch_id&&<div style={{fontSize:11,color:"var(--green)",marginTop:4}}>✓ Linked to {branches.find(b=>b.id===f.linked_branch_id)?.name||f.linked_branch_id}</div>}
+          </div>
+        )}
 
         <button className="btn btn-primary" style={{padding:13,fontSize:15}} onClick={save} disabled={saving}>
           {saving?"Saving...":"✅ Save Settings"}

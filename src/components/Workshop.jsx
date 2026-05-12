@@ -27,7 +27,7 @@ import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, Wor
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},t,lang}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},branches=[],onPlaceShopOrder,t,lang}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -287,6 +287,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
     ["wssuporders",  "📋 Purchase Orders", wsPurchaseOrders.length],
     ["wssupinv",     "🧾 Supplier Inv",wsSupplierInvoices.length],
     ["wstransfer",   "🔄 Transfer",    null],
+    ...(wsProfile?.linked_branch_id?[["spareshop","🏪 Spare Shop",null]]:[]),
     ["wsdocs",     "📎 Documents",   wsDocs.length],
     ["wslicencerenewal", "🪪 Licence Renewals", wsLicenceRenewals.length||null],
     ["statement",  "📋 Statement",   null],
@@ -1228,6 +1229,20 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         <WsTransferPage parts={parts} wsStock={wsStock} settings={settings}
           onSave={onSaveWsTransfer}/>
       )}
+
+      {/* ══════════════ SPARE SHOP TAB ══════════════ */}
+      {wsTab==="spareshop"&&(()=>{
+        const linkedBranchId=wsProfile?.linked_branch_id;
+        const linkedBranch=branches.find(b=>b.id===linkedBranchId);
+        if(!linkedBranchId) return (
+          <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
+            <div style={{fontSize:32,marginBottom:12}}>🏪</div>
+            <div style={{fontWeight:600,marginBottom:6}}>No spare shop linked</div>
+            <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
+          </div>
+        );
+        return <WsSpareShopTab parts={parts} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder}/>;
+      })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
       {wsTab==="wsdocs"&&(
@@ -5938,3 +5953,110 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // ═══════════════════════════════════════════════════════════════
 // WS SUPPLIER INVOICES PAGE
 // ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+// WS SPARE SHOP TAB
+// ═══════════════════════════════════════════════════════════════
+function WsSpareShopTab({parts=[],linkedBranch,linkedBranchId,settings,onPlaceShopOrder}) {
+  const [search,setSearch]=useState("");
+  const [cart,setCart]=useState([]); // [{id,sku,name,price,qty}]
+  const [placing,setPlacing]=useState(false);
+  const [placed,setPlaced]=useState(false);
+  const C=curSym(settings?.currency||"ZAR R");
+
+  const shopParts=parts.filter(p=>{
+    if(p.branch_id!==linkedBranchId)return false;
+    if(!search.trim())return true;
+    const q=search.trim().toLowerCase();
+    return (p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q);
+  });
+
+  const addToCart=(p)=>{
+    setCart(prev=>{
+      const ex=prev.find(i=>i.id===p.id);
+      if(ex) return prev.map(i=>i.id===p.id?{...i,qty:i.qty+1}:i);
+      return [...prev,{id:p.id,sku:p.sku,name:p.name,price:+p.price||0,qty:1}];
+    });
+  };
+  const removeFromCart=(id)=>setCart(prev=>prev.filter(i=>i.id!==id));
+  const qtyCart=(id,qty)=>setCart(prev=>prev.map(i=>i.id===id?{...i,qty:Math.max(1,+qty||1)}:i));
+  const cartTotal=cart.reduce((s,i)=>s+i.price*i.qty,0);
+
+  const placeOrder=async()=>{
+    if(!cart.length)return;
+    setPlacing(true);
+    await onPlaceShopOrder?.(cart,linkedBranchId);
+    setCart([]);
+    setPlaced(true);
+    setTimeout(()=>setPlaced(false),4000);
+    setPlacing(false);
+  };
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
+        <div>
+          <h2 style={{fontSize:18,fontWeight:700}}>🏪 {linkedBranch?.name||"Spare Shop"}</h2>
+          <p style={{fontSize:12,color:"var(--text3)",marginTop:2}}>Browse stock and place an order — will appear in the branch Orders page</p>
+        </div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 340px",gap:18,alignItems:"start"}}>
+        {/* Parts list */}
+        <div>
+          <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="Search SKU, name, brand…" style={{marginBottom:12}}/>
+          {shopParts.length===0
+            ? <div style={{textAlign:"center",padding:30,color:"var(--text3)",fontSize:13}}>{search?"No parts matching search":"No parts found for this branch"}</div>
+            : shopParts.map(p=>(
+              <div key={p.id} className="card" style={{padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                  <div style={{display:"flex",gap:8,marginTop:3,fontSize:11,color:"var(--text3)"}}>
+                    <code style={{fontFamily:"DM Mono,monospace"}}>{p.sku}</code>
+                    {p.brand&&<span>{p.brand}</span>}
+                    <span style={{color:p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--green)",fontWeight:600}}>Qty: {p.stock}</span>
+                  </div>
+                </div>
+                <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16,flexShrink:0}}>{C}{(+p.price||0).toFixed(2)}</div>
+                <button className="btn btn-primary btn-sm" style={{flexShrink:0}} onClick={()=>addToCart(p)} disabled={p.stock===0}>
+                  {p.stock===0?"Out":"+ Add"}
+                </button>
+              </div>
+            ))
+          }
+        </div>
+
+        {/* Cart */}
+        <div className="card" style={{padding:16,position:"sticky",top:16}}>
+          <div style={{fontWeight:700,fontSize:15,marginBottom:12}}>🛒 Order Cart</div>
+          {cart.length===0
+            ? <div style={{textAlign:"center",padding:20,color:"var(--text3)",fontSize:13}}>No items yet — add parts from the list</div>
+            : <>
+              {cart.map(i=>(
+                <div key={i.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingBottom:10,borderBottom:"1px solid var(--border)"}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.name}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{i.sku}</div>
+                  </div>
+                  <input type="number" min="1" className="inp" value={i.qty} onChange={e=>qtyCart(i.id,e.target.value)}
+                    style={{width:52,padding:"4px 6px",textAlign:"center",fontSize:13}}/>
+                  <div style={{fontWeight:700,color:"var(--accent)",fontSize:13,width:64,textAlign:"right",flexShrink:0}}>{C}{(i.price*i.qty).toFixed(2)}</div>
+                  <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}} onClick={()=>removeFromCart(i.id)}>✕</button>
+                </div>
+              ))}
+              <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:15,margin:"10px 0"}}>
+                <span>Total</span>
+                <span style={{color:"var(--accent)"}}>{C}{cartTotal.toFixed(2)}</span>
+              </div>
+              {placed&&<div style={{background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)",borderRadius:8,padding:"8px 12px",fontSize:13,color:"var(--green)",marginBottom:10,textAlign:"center"}}>✅ Order placed successfully!</div>}
+              <button className="btn btn-primary" style={{width:"100%",padding:11}} onClick={placeOrder} disabled={placing||!cart.length}>
+                {placing?"Placing order…":"📦 Place Order"}
+              </button>
+            </>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}

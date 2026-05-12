@@ -2711,6 +2711,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
   const [serviceHistModal, setServiceHistModal] = useState(false);
   const [showMoreActions,  setShowMoreActions]  = useState(false);
   const [showJobMenu,      setShowJobMenu]      = useState(false);
+  const [showPrintMenu,    setShowPrintMenu]    = useState(false);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [addingPastRecord, setAddingPastRecord] = useState(false);
   const [pastRec, setPastRec] = useState({date_in:"",date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});
@@ -3252,33 +3253,23 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
           const allFlatTabs = [...INFO_TABS,...BILLING_TABS];
           return (
             <div style={{marginBottom:10}}>
-              <div style={{display:"flex",gap:5,marginBottom:6,alignItems:"stretch"}}>
-                <div style={{display:"grid",gridTemplateColumns:`repeat(${CHAPTERS.length},1fr)`,gap:5,flex:1}}>
-                  {CHAPTERS.map(ch=>{
-                    const isActive = ch.tabs.includes(jobTab);
-                    return (
-                      <button key={ch.id} onClick={()=>setJobTab(ch.tabs[0])} style={{
-                        display:"flex",flexDirection:"column",alignItems:"center",gap:3,
-                        padding:"10px 2px",border:"none",borderRadius:12,cursor:"pointer",
-                        background:isActive?ch.color:"var(--surface2)",
-                        color:isActive?"#fff":"var(--text3)",
-                        transition:"all .15s",
-                        boxShadow:isActive?"0 2px 8px rgba(0,0,0,.18)":"none",
-                      }}>
-                        <span style={{fontSize:22,lineHeight:1}}>{ch.icon}</span>
-                        <span style={{fontSize:8,fontWeight:700,lineHeight:1.2,textAlign:"center",letterSpacing:".01em"}}>{ch.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                  <button onClick={()=>printJobCardSheet(job,items,settings)} title={t.wsJobSheet||"Job Sheet"} style={{flex:1,minWidth:38,border:"none",borderRadius:10,cursor:"pointer",background:"var(--surface2)",color:"var(--text2)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"4px 6px",fontSize:18}}>
-                    <span>📄</span><span style={{fontSize:7,fontWeight:700,letterSpacing:".01em"}}>Print</span>
-                  </button>
-                  <button onClick={()=>openLabelWindow({mode:"workshop",shopName:settings?.shop_name||"Workshop",primaryId:`JOB #${job.id||""}`,qrData:String(job.id||""),make:job.vehicle_make||"",model:job.vehicle_model||"",dateIn:job.date_in||new Date().toLocaleDateString(),reg:job.vehicle_reg||"",customerName:job.customer_name||"",mechanic:job.mechanic||"",complaint:job.complaint||"",widthMm:settings?.label_width_mm||98,heightMm:settings?.label_height_mm||45})} title={t.wsLabel||"Label"} style={{flex:1,minWidth:38,border:"none",borderRadius:10,cursor:"pointer",background:"var(--surface2)",color:"var(--text2)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"4px 6px",fontSize:18}}>
-                    <span>🏷️</span><span style={{fontSize:7,fontWeight:700,letterSpacing:".01em"}}>Label</span>
-                  </button>
-                </div>
+              <div style={{display:"grid",gridTemplateColumns:`repeat(${CHAPTERS.length},1fr)`,gap:5,marginBottom:6}}>
+                {CHAPTERS.map(ch=>{
+                  const isActive = ch.tabs.includes(jobTab);
+                  return (
+                    <button key={ch.id} onClick={()=>setJobTab(ch.tabs[0])} style={{
+                      display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+                      padding:"10px 2px",border:"none",borderRadius:12,cursor:"pointer",
+                      background:isActive?ch.color:"var(--surface2)",
+                      color:isActive?"#fff":"var(--text3)",
+                      transition:"all .15s",
+                      boxShadow:isActive?"0 2px 8px rgba(0,0,0,.18)":"none",
+                    }}>
+                      <span style={{fontSize:22,lineHeight:1}}>{ch.icon}</span>
+                      <span style={{fontSize:8,fontWeight:700,lineHeight:1.2,textAlign:"center",letterSpacing:".01em"}}>{ch.label}</span>
+                    </button>
+                  );
+                })}
               </div>
               {activeChapter&&activeChapter.tabs.length>1&&(
                 <div style={{display:"flex",gap:4,marginBottom:8}}>
@@ -3319,33 +3310,23 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
         const allFlatTabsD = [...INFO_TABS,...BILLING_TABS];
         return (
           <div style={{marginBottom:10}}>
-            <div style={{display:"flex",gap:8,marginBottom:6,alignItems:"stretch"}}>
-              <div style={{display:"grid",gridTemplateColumns:`repeat(${CHAPTERS_D.length},1fr)`,gap:8,flex:1}}>
-                {CHAPTERS_D.map(ch=>{
-                  const isActive = ch.tabs.includes(jobTab);
-                  return (
-                    <button key={ch.id} onClick={()=>setJobTab(ch.tabs[0])} style={{
-                      display:"flex",flexDirection:"column",alignItems:"center",gap:5,
-                      padding:"14px 8px",border:"none",borderRadius:12,cursor:"pointer",
-                      background:isActive?ch.color:"var(--surface2)",
-                      color:isActive?"#fff":"var(--text3)",
-                      transition:"all .15s",
-                      boxShadow:isActive?"0 2px 10px rgba(0,0,0,.2)":"none",
-                    }}>
-                      <span style={{fontSize:28,lineHeight:1}}>{ch.icon}</span>
-                      <span style={{fontSize:11,fontWeight:700,lineHeight:1.2,textAlign:"center"}}>{ch.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <button onClick={()=>printJobCardSheet(job,items,settings)} title={t.wsJobSheet||"Job Sheet"} style={{flex:1,minWidth:52,border:"none",borderRadius:12,cursor:"pointer",background:"var(--surface2)",color:"var(--text2)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"6px 10px",fontSize:22}}>
-                  <span>📄</span><span style={{fontSize:9,fontWeight:700}}>Print</span>
-                </button>
-                <button onClick={()=>openLabelWindow({mode:"workshop",shopName:settings?.shop_name||"Workshop",primaryId:`JOB #${job.id||""}`,qrData:String(job.id||""),make:job.vehicle_make||"",model:job.vehicle_model||"",dateIn:job.date_in||new Date().toLocaleDateString(),reg:job.vehicle_reg||"",customerName:job.customer_name||"",mechanic:job.mechanic||"",complaint:job.complaint||"",widthMm:settings?.label_width_mm||98,heightMm:settings?.label_height_mm||45})} title={t.wsLabel||"Label"} style={{flex:1,minWidth:52,border:"none",borderRadius:12,cursor:"pointer",background:"var(--surface2)",color:"var(--text2)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"6px 10px",fontSize:22}}>
-                  <span>🏷️</span><span style={{fontSize:9,fontWeight:700}}>Label</span>
-                </button>
-              </div>
+            <div style={{display:"grid",gridTemplateColumns:`repeat(${CHAPTERS_D.length},1fr)`,gap:8,marginBottom:6}}>
+              {CHAPTERS_D.map(ch=>{
+                const isActive = ch.tabs.includes(jobTab);
+                return (
+                  <button key={ch.id} onClick={()=>setJobTab(ch.tabs[0])} style={{
+                    display:"flex",flexDirection:"column",alignItems:"center",gap:5,
+                    padding:"14px 8px",border:"none",borderRadius:12,cursor:"pointer",
+                    background:isActive?ch.color:"var(--surface2)",
+                    color:isActive?"#fff":"var(--text3)",
+                    transition:"all .15s",
+                    boxShadow:isActive?"0 2px 10px rgba(0,0,0,.2)":"none",
+                  }}>
+                    <span style={{fontSize:28,lineHeight:1}}>{ch.icon}</span>
+                    <span style={{fontSize:11,fontWeight:700,lineHeight:1.2,textAlign:"center"}}>{ch.label}</span>
+                  </button>
+                );
+              })}
             </div>
             {activeChapterD&&activeChapterD.tabs.length>1&&(
               <div style={{display:"flex",gap:6,marginBottom:10}}>
@@ -3378,13 +3359,24 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
           {/* Action buttons */}
           <div style={{position:"relative",display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
             {wsRole!=="mechanic"&&<button className="btn" onClick={()=>setEditJob(true)} style={{flex:1,background:"linear-gradient(135deg,#fbbf24 0%,#f97316 55%,#ef4444 100%)",color:"#fff",padding:"13px 20px",fontSize:15,fontWeight:700,letterSpacing:"0.4px",borderRadius:12,boxShadow:"0 4px 24px rgba(249,115,22,0.55),inset 0 1px 0 rgba(255,255,255,0.18)",textShadow:"0 1px 3px rgba(0,0,0,0.25)",border:"none"}}>✏️ {t.edit}</button>}
-            <button className="btn btn-ghost btn-sm" onClick={()=>setShowJobMenu(p=>!p)} style={{minWidth:44,fontSize:20,padding:"6px 14px",borderRadius:12,border:"1px solid var(--border2)"}}>⋯</button>
+            {/* Print dropdown */}
+            <div style={{position:"relative"}}>
+              <button className="btn" onClick={()=>{setShowPrintMenu(p=>!p);setShowJobMenu(false);}} style={{background:"linear-gradient(135deg,#1d4ed8,#7c3aed)",color:"#fff",padding:"13px 16px",fontSize:15,fontWeight:700,borderRadius:12,boxShadow:"0 4px 20px rgba(99,102,241,0.45),inset 0 1px 0 rgba(255,255,255,0.15)",border:"none",gap:6,display:"flex",alignItems:"center"}}>🖨️ <span style={{fontSize:12}}>▾</span></button>
+              {showPrintMenu&&(
+                <>
+                  <div style={{position:"fixed",inset:0,zIndex:199}} onClick={()=>setShowPrintMenu(false)}/>
+                  <div style={{position:"absolute",top:"110%",left:0,zIndex:200,background:"var(--surface2)",border:"1px solid var(--border2)",borderRadius:14,padding:"6px 4px",display:"flex",flexDirection:"column",gap:2,minWidth:180,boxShadow:"var(--shadow-lg)"}}>
+                    <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowPrintMenu(false);printJobCardSheet(job,items,settings);}}>📄 {t.wsJobSheet||"Job Sheet"}</button>
+                    <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowPrintMenu(false);openLabelWindow({mode:"workshop",shopName:settings?.shop_name||"Workshop",primaryId:`JOB #${job.id||""}`,qrData:String(job.id||""),make:job.vehicle_make||"",model:job.vehicle_model||"",dateIn:job.date_in||new Date().toLocaleDateString(),reg:job.vehicle_reg||"",customerName:job.customer_name||"",mechanic:job.mechanic||"",complaint:job.complaint||"",widthMm:settings?.label_width_mm||98,heightMm:settings?.label_height_mm||45});}}>🏷️ {t.wsLabel||"Label"}</button>
+                  </div>
+                </>
+              )}
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setShowJobMenu(p=>!p);setShowPrintMenu(false);}} style={{minWidth:44,fontSize:20,padding:"6px 14px",borderRadius:12,border:"1px solid var(--border2)"}}>⋯</button>
             {showJobMenu&&(
               <>
                 <div style={{position:"fixed",inset:0,zIndex:199}} onClick={()=>setShowJobMenu(false)}/>
                 <div style={{position:"absolute",top:"110%",right:0,zIndex:200,background:"var(--surface2)",border:"1px solid var(--border2)",borderRadius:14,padding:"6px 4px",display:"flex",flexDirection:"column",gap:2,minWidth:200,boxShadow:"var(--shadow-lg)"}}>
-                  <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);openLabelWindow({mode:"workshop",shopName:settings?.shop_name||"Workshop",primaryId:`JOB #${job.id||""}`,qrData:String(job.id||""),make:job.vehicle_make||"",model:job.vehicle_model||"",dateIn:job.date_in||new Date().toLocaleDateString(),reg:job.vehicle_reg||"",customerName:job.customer_name||"",mechanic:job.mechanic||"",complaint:job.complaint||"",widthMm:settings?.label_width_mm||98,heightMm:settings?.label_height_mm||45});}}>🏷️ {t.wsLabel}</button>
-                  <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);printJobCardSheet(job,items,settings);}}>📄 {t.wsJobSheet||"Job Sheet"}</button>
                   <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);setServiceHistModal(true);}}>📋 {t.wsHistory||"History"}{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
                   <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);setDeliveryModal(true);}}>🚗 {t.wsCollect}</button>
                   {wsRole==="main"&&onMoveJob&&wsProfile?.move_pin&&<button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--yellow)"}} onClick={()=>{setShowJobMenu(false);setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}}>🔀 {t.wsMove}</button>}

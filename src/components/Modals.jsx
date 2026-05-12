@@ -2664,12 +2664,19 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
   );
 }
 
-export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],partFitments=[],onSave,onDelete,onUpdate,onClose,onEditPart,onMergePart,t}) {
+export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],partFitments=[],onSave,onDelete,onUpdate,onClose,onEditPart,onMergePart,branches=[],allParts=[],onGoToMainPart,t}) {
   const [suppId,setSuppId]=useState("");
   const [price,setPrice]=useState("");
   const [lead,setLead]=useState("");
   const [minOrd,setMinOrd]=useState(1);
   const [newPartNo,setNewPartNo]=useState("");
+  const [suppDupLinks,setSuppDupLinks]=useState([]);
+  useEffect(()=>{
+    if(!suppId){setSuppDupLinks([]);return;}
+    api.get("part_suppliers",`supplier_id=eq.${suppId}&select=*`)
+      .then(d=>setSuppDupLinks(Array.isArray(d)?d:[]))
+      .catch(()=>{});
+  },[suppId]);
   const [editingId,setEditingId]=useState(null);
   const [editPartNo,setEditPartNo]=useState("");
   // merge state
@@ -2788,41 +2795,74 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
       )}
 
       {/* Link new supplier */}
-      {avail.length>0&&(
-        <div>
-          <FL label="Link New Supplier"/>
-          <div style={{background:"var(--surface2)",borderRadius:11,padding:15,border:"1px solid var(--border)"}}>
-            <FD>
-              <FL label="Supplier *"/>
-              <select className="inp" value={suppId} onChange={e=>setSuppId(e.target.value)}>
-                <option value="">Select supplier...</option>
-                {avail.map(s=>(
-                  <option key={s.id} value={s.id}>
-                    {s.name}{s.country?" ("+s.country+")":""}{s.phone?" · "+s.phone:""}
-                  </option>
-                ))}
-              </select>
-            </FD>
-            <FD>
-              <FL label="Supplier Part No. (if known)"/>
-              <input className="inp" value={newPartNo} onChange={e=>setNewPartNo(e.target.value)}
-                placeholder="Their part number — leave blank if unknown"
-                style={{fontFamily:"DM Mono,monospace"}}/>
-              {!newPartNo&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>💡 Leave blank — you can add it later or let supplier fill via RFQ</div>}
-            </FD>
-            <FG cols="1fr 1fr 1fr">
-              <div><FL label={t.supplier_price}/><input className="inp" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0"/></div>
-              <div><FL label={t.lead_time}/><input className="inp" value={lead} onChange={e=>setLead(e.target.value)} placeholder="7 days"/></div>
-              <div><FL label={t.min_order}/><input className="inp" type="number" value={minOrd} onChange={e=>setMinOrd(e.target.value)}/></div>
-            </FG>
-            <button className="btn btn-primary" style={{width:"100%"}} onClick={()=>{
-              if(!suppId)return;
-              onSave({part_id:part.id,supplier_id:+suppId,supplier_part_no:newPartNo||"",supplier_price:price?+price:null,lead_time:lead,min_order:+minOrd});
-              setSuppId("");setNewPartNo("");setPrice("");setLead("");setMinOrd(1);
-            }}>Link Supplier</button>
+      {avail.length>0&&(()=>{
+        const mainBId=branches.find(b=>b.is_main)?.id;
+        const q=(newPartNo||"").trim().toLowerCase();
+        const dupMatch=suppId&&q?(()=>{
+          const hit=suppDupLinks.find(ps=>
+            (ps.supplier_part_no||"").trim().toLowerCase()===q&&
+            String(ps.part_id)!==String(part?.id)
+          );
+          if(!hit)return null;
+          const hitPart=allParts.find(ap=>String(ap.id)===String(hit.part_id));
+          if(!hitPart)return null;
+          return(!hitPart.branch_id||hitPart.branch_id===mainBId)?hitPart:null;
+        })():null;
+        return (
+          <div>
+            <FL label="Link New Supplier"/>
+            <div style={{background:"var(--surface2)",borderRadius:11,padding:15,border:"1px solid var(--border)"}}>
+              <FD>
+                <FL label="Supplier *"/>
+                <select className="inp" value={suppId} onChange={e=>setSuppId(e.target.value)}>
+                  <option value="">Select supplier...</option>
+                  {avail.map(s=>(
+                    <option key={s.id} value={s.id}>
+                      {s.name}{s.country?" ("+s.country+")":""}{s.phone?" · "+s.phone:""}
+                    </option>
+                  ))}
+                </select>
+              </FD>
+              <FD>
+                <FL label="Supplier Part No. (if known)"/>
+                <input className="inp" value={newPartNo} onChange={e=>setNewPartNo(e.target.value)}
+                  placeholder="Their part number — leave blank if unknown"
+                  style={{fontFamily:"DM Mono,monospace",borderColor:dupMatch?"var(--accent)":undefined}}/>
+                {!newPartNo&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>💡 Leave blank — you can add it later or let supplier fill via RFQ</div>}
+                {dupMatch&&(
+                  <div style={{marginTop:8,background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.4)",borderRadius:8,padding:"12px 14px"}}>
+                    <div style={{fontWeight:700,color:"var(--red)",fontSize:13,marginBottom:4}}>🚫 Already linked in main branch</div>
+                    <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>
+                      This supplier code belongs to <strong style={{fontFamily:"DM Mono,monospace",color:"var(--accent)"}}>{dupMatch.sku}</strong> — {dupMatch.name}.<br/>
+                      Use that part instead of creating a duplicate.
+                    </div>
+                    {onGoToMainPart&&(
+                      <button type="button" className="btn btn-primary btn-sm" style={{background:"var(--accent)",fontSize:13,padding:"8px 16px"}}
+                        onClick={(e)=>{e.stopPropagation();onGoToMainPart(dupMatch);}}>
+                        📦 Go to {dupMatch.sku} in Inventory
+                      </button>
+                    )}
+                  </div>
+                )}
+              </FD>
+              {!dupMatch&&(
+                <>
+                  <FG cols="1fr 1fr 1fr">
+                    <div><FL label={t.supplier_price}/><input className="inp" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0"/></div>
+                    <div><FL label={t.lead_time}/><input className="inp" value={lead} onChange={e=>setLead(e.target.value)} placeholder="7 days"/></div>
+                    <div><FL label={t.min_order}/><input className="inp" type="number" value={minOrd} onChange={e=>setMinOrd(e.target.value)}/></div>
+                  </FG>
+                  <button className="btn btn-primary" style={{width:"100%"}} onClick={()=>{
+                    if(!suppId)return;
+                    onSave({part_id:part.id,supplier_id:+suppId,supplier_part_no:newPartNo||"",supplier_price:price?+price:null,lead_time:lead,min_order:+minOrd});
+                    setSuppId("");setNewPartNo("");setPrice("");setLead("");setMinOrd(1);
+                  }}>Link Supplier</button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {avail.length===0&&partSuppliers.length===0&&<p style={{color:"var(--text3)",textAlign:"center",padding:20}}>No suppliers yet — add them in the Suppliers section first.</p>}
 
       {/* Merge & Delete */}

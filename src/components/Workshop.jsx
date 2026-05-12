@@ -4150,29 +4150,31 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
             )}
           </div>
         )}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{fontWeight:700,fontSize:14}}>🔧 {t.wsqtPartsLabour}</div>
-            {items.length>0&&(
-              <span style={{fontSize:11,color:"var(--text3)"}}>
-                ({quoteItems.length}/{items.length} for quote
-                {quoteExcluded.size>0&&<>
-                  {" · "}<span onClick={()=>setQuoteExcluded(new Set())} style={{color:"var(--accent)",cursor:"pointer",textDecoration:"underline"}}>select all</span>
-                </>})
-              </span>
-            )}
+        <div style={{marginBottom:14,borderRadius:14,overflow:"hidden",boxShadow:"0 4px 24px rgba(0,0,0,.18)",border:"1px solid var(--border2)"}}>
+          {/* Card header */}
+          <div style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:16}}>🔧</span>
+              <span style={{fontSize:13,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".08em"}}>{t.wsqtPartsLabour}</span>
+              {items.length>0&&(
+                <span style={{fontSize:11,color:"rgba(255,255,255,.6)",fontWeight:600}}>
+                  {quoteItems.length}/{items.length}
+                  {quoteExcluded.size>0&&<span onClick={()=>setQuoteExcluded(new Set())} style={{color:"#fbbf24",cursor:"pointer",marginLeft:6,textDecoration:"underline"}}>select all</span>}
+                </span>
+              )}
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <button className="btn btn-sm" onClick={()=>setAddingItem("part")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtPart}</button>
+              <button className="btn btn-sm" onClick={()=>setAddingItem("labour")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtLabour}</button>
+            </div>
           </div>
-          <div style={{display:"flex",gap:6}}>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ {t.wsqtPart}</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ {t.wsqtLabour}</button>
-          </div>
-        </div>
-        <div className="card" style={{overflow:"hidden",marginBottom:14}}>
+          {/* Items body */}
+          <div style={{background:"var(--surface)"}}>
           {items.length===0
-            ?<div style={{textAlign:"center",padding:24,color:"var(--text3)"}}>{t.wsqtNoItems}</div>
+            ?<div style={{textAlign:"center",padding:32,color:"var(--text3)",fontSize:14}}>{t.wsqtNoItems}</div>
             : isMobile ? (
               /* ── Mobile card list ── */
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{display:"flex",flexDirection:"column"}}>
                 {items.map((item,idx)=>{
                   const supCosts=getSupCosts(item.description);
                   const isEditingPrice=editPriceId===item.id;
@@ -4185,29 +4187,28 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
                   const accentBorder=item.type==="part"?"rgba(96,165,250,.3)":"rgba(52,211,153,.3)";
                   return (
                     <div key={item.id} style={{
-                      padding:"12px 14px",
-                      borderRadius:8,
-                      border:"1px solid var(--border)",
-                      borderLeft:`3px solid ${accentColor}`,
+                      padding:"14px 16px",
+                      borderLeft:`4px solid ${accentColor}`,
                       background:idx%2===0?"var(--surface2)":"var(--surface)",
+                      borderBottom:`1px solid var(--border2)`,
                     }}>
                       {/* Top row: checkbox + badge + name + delete */}
-                      <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:6}}>
+                      <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:8}}>
                         <input type="checkbox" checked={!quoteExcluded.has(item.id)}
                           onChange={()=>setQuoteExcluded(prev=>{const n=new Set(prev);n.has(item.id)?n.delete(item.id):n.add(item.id);return n;})}
-                          style={{marginTop:3,flexShrink:0,accentColor:accentColor,width:15,height:15,cursor:"pointer"}}/>
-                        <span className="badge" style={{flexShrink:0,background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)",fontSize:11}}>
+                          style={{marginTop:4,flexShrink:0,accentColor:accentColor,width:18,height:18,cursor:"pointer"}}/>
+                        <span style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:99,background:item.type==="part"?"rgba(96,165,250,.15)":"rgba(52,211,153,.15)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>
                           {item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}
                         </span>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontWeight:600,fontSize:14,lineHeight:1.3}}>{item.description}</div>
-                          {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{item.part_sku}</code>}
+                          <div style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)"}}>{item.description}</div>
+                          {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2,display:"block"}}>{item.part_sku}</code>}
                         </div>
-                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
+                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0,fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
                       </div>
                       {/* Supplier cost badges */}
                       {supCosts.length>0&&(
-                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
                           {supCosts.map((sc,i)=>{
                             const sellP = +(sc.price*(1+defaultMarkup/100)).toFixed(2);
                             return (
@@ -4440,7 +4441,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
               </div>
             )}
           </div>
-        </div>
+          </div>{/* end items-body */}
+        </div>{/* end outer card */}
           </>);
         })()}
         {/* Quote */}

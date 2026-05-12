@@ -17,7 +17,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
     name:"", vat_number:"", phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
     licence_renewal_agent_name:"", licence_renewal_agent_phone:"", default_markup_pct:0, move_pin:"",
-    label_width_mm:98, label_height_mm:45, linked_branch_id:"",
+    label_width_mm:98, label_height_mm:45, linked_branch_id:"", show_supplier_sku:false,
     ...profile
   });
   const [saving,setSaving]=useState(false);
@@ -308,6 +308,16 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
               ))}
             </select>
             {f.linked_branch_id&&<div style={{fontSize:11,color:"var(--green)",marginTop:4}}>✓ Linked to {branches.find(b=>b.id===f.linked_branch_id)?.name||f.linked_branch_id}</div>}
+            {f.linked_branch_id&&(
+              <label style={{display:"flex",alignItems:"center",gap:10,marginTop:12,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)",cursor:"pointer"}}>
+                <input type="checkbox" checked={!!f.show_supplier_sku} onChange={e=>s("show_supplier_sku",e.target.checked)}
+                  style={{width:17,height:17,cursor:"pointer",accentColor:"var(--accent)",flexShrink:0}}/>
+                <div>
+                  <div style={{fontWeight:700,fontSize:13}}>Allow branch to view supplier code / SKU</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Branch users can see the part SKU and OE number in the spare shop (read-only). If something is wrong, they should report to the main branch.</div>
+                </div>
+              </label>
+            )}
           </div>
         )}
 

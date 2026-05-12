@@ -1242,7 +1242,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
           </div>
         );
-        return <WsSpareShopTab linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder} vehicles={vehicles} partFitments={partFitments}/>;
+        return <WsSpareShopTab linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} wsProfile={wsProfile} onPlaceShopOrder={onPlaceShopOrder} vehicles={vehicles} partFitments={partFitments}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
@@ -6172,7 +6172,8 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // WS SPARE SHOP TAB
 // ═══════════════════════════════════════════════════════════════
 const WS_SHOP_PAGE_SIZE=20;
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,vehicles=[],partFitments=[]}) {
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,wsProfile,onPlaceShopOrder,vehicles=[],partFitments=[]}) {
+  const showSku=!!wsProfile?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
   const [placing,setPlacing]=useState(false);
@@ -6312,11 +6313,12 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                         {p._source==="local"?"🏪 Local":"🏬 Main Store"}
                       </span>
                     </div>
-                    <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{p.sku} · {p.brand}</div>
+                    {showSku&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2,fontFamily:"DM Mono,monospace"}}>{p.sku}{p.brand?` · ${p.brand}`:""}</div>}
+                    {!showSku&&p.brand&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{p.brand}</div>}
                     <div style={{fontSize:14,fontWeight:700,marginBottom:2,lineHeight:1.3}}>{p.name}</div>
                     {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:2}}>{p.chinese_desc}</div>}
                     {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>🚗 {[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
-                    {p.oe_number&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace"}}>OE: {p.oe_number}</div>}
+                    {showSku&&p.oe_number&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace"}}>OE: {p.oe_number}</div>}
                   </div>
                   <div style={{marginTop:8}}>
                     <div style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)",marginBottom:10}}>{p.stock>0?`${p.stock} in stock`:"Out of Stock"}</div>

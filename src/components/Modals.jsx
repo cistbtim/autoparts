@@ -1976,6 +1976,14 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
   const [suppPartNoErr,setSuppPartNoErr]=useState("");
   const [editingPsId,setEditingPsId]=useState(null);
   const [editPsPartNo,setEditPsPartNo]=useState("");
+  // Live-fetched links for the selected supplier — used for duplicate detection
+  const [suppDupLinks,setSuppDupLinks]=useState([]);
+  useEffect(()=>{
+    if(!suppId){setSuppDupLinks([]);return;}
+    api.get("part_suppliers",`supplier_id=eq.${suppId}&select=*`)
+      .then(d=>setSuppDupLinks(Array.isArray(d)?d:[]))
+      .catch(()=>{});
+  },[suppId]);
   const mainBranch=branches.find(b=>b.is_main);
   const isNonMainBranch=!part&&currentBranch&&mainBranch&&currentBranch.id!==mainBranch.id;
 
@@ -2434,9 +2442,9 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             if(avail.length>0){
               const mainBId=branches.find(b=>b.is_main)?.id;
               const q=(suppPartNo||"").trim().toLowerCase();
+              // suppDupLinks is live-fetched for the selected supplier — no stale-cache risk
               const dupMatch=suppId&&q?(()=>{
-                const hit=allPartSuppliers.find(ps=>
-                  ps.supplier_id===+suppId&&
+                const hit=suppDupLinks.find(ps=>
                   (ps.supplier_part_no||"").trim().toLowerCase()===q&&
                   String(ps.part_id)!==String(part?.id)
                 );

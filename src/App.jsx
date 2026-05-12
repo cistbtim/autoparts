@@ -1543,6 +1543,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     await api.delete("suppliers","id",id);await refreshTables("suppliers");showToast("Deleted","err");
   };
   const savePartSupplier=async(data)=>{
+    // Save-time duplicate guard: check live DB for same supplier + part no on a different main-branch part
+    if(data.supplier_part_no&&isBranchUser){
+      const existing=await api.get("part_suppliers",`supplier_id=eq.${data.supplier_id}&supplier_part_no=eq.${encodeURIComponent(data.supplier_part_no)}`);
+      if(Array.isArray(existing)){
+        const mainBranchId=branches.find(b=>b.is_main)?.id;
+        const conflict=existing.find(ps=>{
+          if(String(ps.part_id)===String(data.part_id)) return false;
+          const p=parts.find(x=>String(x.id)===String(ps.part_id));
+          return p&&(!p.branch_id||p.branch_id===mainBranchId);
+        });
+        if(conflict){
+          const cp=parts.find(x=>String(x.id)===String(conflict.part_id));
+          const msg=cp?`This supplier part no. is already linked to ${cp.sku} — ${cp.name} in the main branch.\n\nLink anyway?`:`This supplier part no. is already linked to a main branch part.\n\nLink anyway?`;
+          if(!window.confirm(msg)) return;
+        }
+      }
+    }
     // Only save columns that exist — supplier_part_no is safe after SQL migration
     const record = {
       part_id: data.part_id,

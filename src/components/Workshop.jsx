@@ -2710,6 +2710,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
   const [renewalModal,  setRenewalModal]  = useState(false);
   const [serviceHistModal, setServiceHistModal] = useState(false);
   const [showMoreActions,  setShowMoreActions]  = useState(false);
+  const [showJobMenu,      setShowJobMenu]      = useState(false);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [addingPastRecord, setAddingPastRecord] = useState(false);
   const [pastRec, setPastRec] = useState({date_in:"",date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});
@@ -3355,48 +3356,24 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
       {jobTab==="car"&&(
         <div className="card" style={{padding:16,marginBottom:14}}>
           {/* Action buttons */}
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-            {wsRole!=="mechanic"&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditJob(true)}>✏️ {t.edit}</button>}
-            <button className="btn btn-ghost btn-sm" onClick={()=>{
-              openLabelWindow({
-                mode: "workshop",
-                shopName: settings?.shop_name || "Workshop",
-                primaryId: `JOB #${job.id || ""}`,
-                qrData: String(job.id || ""),
-                make: job.vehicle_make || "",
-                model: job.vehicle_model || "",
-                dateIn: job.date_in || new Date().toLocaleDateString(),
-                reg: job.vehicle_reg || "",
-                customerName: job.customer_name || "",
-                mechanic: job.mechanic || "",
-                complaint: job.complaint || "",
-                widthMm: settings?.label_width_mm || 98,
-                heightMm: settings?.label_height_mm || 45,
-              });
-            }}>🏷️ {t.wsLabel}</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardSheet(job,items,settings)}>📄 {t.wsJobSheet||"Job Sheet"}</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setServiceHistModal(true)}>📋 {t.wsHistory||"History"}{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
-            {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
-            <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={()=>setShowMoreActions(p=>!p)} title="More actions">⋯</button>
+          <div style={{position:"relative",display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
+            {wsRole!=="mechanic"&&<button className="btn btn-primary btn-sm" onClick={()=>setEditJob(true)} style={{flex:1}}>✏️ {t.edit}</button>}
+            <button className="btn btn-ghost btn-sm" onClick={()=>setShowJobMenu(p=>!p)} style={{minWidth:44,fontSize:20,padding:"6px 12px"}}>⋯</button>
+            {showJobMenu&&(
+              <>
+                <div style={{position:"fixed",inset:0,zIndex:199}} onClick={()=>setShowJobMenu(false)}/>
+                <div style={{position:"absolute",top:"110%",right:0,zIndex:200,background:"var(--surface2)",border:"1px solid var(--border2)",borderRadius:14,padding:"6px 4px",display:"flex",flexDirection:"column",gap:2,minWidth:200,boxShadow:"var(--shadow-lg)"}}>
+                  <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);openLabelWindow({mode:"workshop",shopName:settings?.shop_name||"Workshop",primaryId:`JOB #${job.id||""}`,qrData:String(job.id||""),make:job.vehicle_make||"",model:job.vehicle_model||"",dateIn:job.date_in||new Date().toLocaleDateString(),reg:job.vehicle_reg||"",customerName:job.customer_name||"",mechanic:job.mechanic||"",complaint:job.complaint||"",widthMm:settings?.label_width_mm||98,heightMm:settings?.label_height_mm||45});}}>🏷️ {t.wsLabel}</button>
+                  <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);printJobCardSheet(job,items,settings);}}>📄 {t.wsJobSheet||"Job Sheet"}</button>
+                  <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);setServiceHistModal(true);}}>📋 {t.wsHistory||"History"}{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
+                  <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);setDeliveryModal(true);}}>🚗 {t.wsCollect}</button>
+                  {wsRole==="main"&&onMoveJob&&wsProfile?.move_pin&&<button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--yellow)"}} onClick={()=>{setShowJobMenu(false);setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}}>🔀 {t.wsMove}</button>}
+                  <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);const lines=["============================","  VEHICLE INFO","============================",`Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,`Model    : ${job.vehicle_model||"—"}`,`Year     : ${job.vehicle_year||"—"}`,`Color    : ${job.vehicle_color||"—"}`,`Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,job.vin?`VIN      : ${job.vin}`:"",job.engine_no?`Engine No: ${job.engine_no}`:"","============================"].filter(Boolean).join("\r\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`;a.click();}}>⬇️ {t.wsInfoBtn}</button>
+                  {wsRole==="main"&&onDeleteJob&&<><div style={{height:1,background:"var(--border)",margin:"4px 8px"}}/><button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--red)"}} onClick={()=>{setShowJobMenu(false);if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button></>}
+                </div>
+              </>
+            )}
           </div>
-
-          {showMoreActions&&(
-            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14,paddingTop:6,borderTop:"1px solid var(--border)"}}>
-              <button className="btn btn-ghost btn-sm" onClick={()=>setDeliveryModal(true)}>🚗 {t.wsCollect}</button>
-              {wsRole==="main"&&onMoveJob&&wsProfile?.move_pin&&<button className="btn btn-ghost btn-sm" style={{color:"var(--yellow)"}} onClick={()=>{ setMovePinVal("");setMovePinErr("");setMovePinOpen(true); }}>🔀 {t.wsMove}</button>}
-              <button className="btn btn-ghost btn-sm" onClick={()=>{
-                const lines=["============================","  VEHICLE INFO","============================",
-                  `Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,
-                  `Model    : ${job.vehicle_model||"—"}`,`Year     : ${job.vehicle_year||"—"}`,
-                  `Color    : ${job.vehicle_color||"—"}`,`Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,
-                  job.vin?`VIN      : ${job.vin}`:"",job.engine_no?`Engine No: ${job.engine_no}`:"",
-                  "============================",].filter(Boolean).join("\r\n");
-                const a=document.createElement("a");
-                a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));
-                a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`; a.click();
-              }}>⬇️ {t.wsInfoBtn}</button>
-            </div>
-          )}
           {/* ── Online Booking Source ── */}
           {sourceBooking&&(
             <div style={{marginBottom:14}}>

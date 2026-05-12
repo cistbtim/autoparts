@@ -3361,7 +3361,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
             {wsRole!=="mechanic"&&<button className="btn" onClick={()=>setEditJob(true)} style={{flex:1,background:"linear-gradient(135deg,#fbbf24 0%,#f97316 55%,#ef4444 100%)",color:"#fff",padding:"13px 20px",fontSize:15,fontWeight:700,letterSpacing:"0.4px",borderRadius:12,boxShadow:"0 4px 24px rgba(249,115,22,0.55),inset 0 1px 0 rgba(255,255,255,0.18)",textShadow:"0 1px 3px rgba(0,0,0,0.25)",border:"none"}}>✏️ {t.edit}</button>}
             {/* Print dropdown */}
             <div style={{position:"relative"}}>
-              <button className="btn" onClick={()=>{setShowPrintMenu(p=>!p);setShowJobMenu(false);}} style={{background:"linear-gradient(135deg,#1d4ed8,#7c3aed)",color:"#fff",padding:"13px 16px",fontSize:15,fontWeight:700,borderRadius:12,boxShadow:"0 4px 20px rgba(99,102,241,0.45),inset 0 1px 0 rgba(255,255,255,0.15)",border:"none",gap:6,display:"flex",alignItems:"center"}}>🖨️ <span style={{fontSize:12}}>▾</span></button>
+              <button className="btn" onClick={()=>{setShowPrintMenu(p=>!p);setShowJobMenu(false);}} style={{background:"linear-gradient(135deg,#1d4ed8,#7c3aed)",color:"#fff",padding:"13px 16px",fontSize:15,fontWeight:700,borderRadius:12,boxShadow:"0 4px 20px rgba(99,102,241,0.45),inset 0 1px 0 rgba(255,255,255,0.15)",border:"none",gap:6,display:"flex",alignItems:"center"}}>🖨️ Print <span style={{fontSize:12}}>▾</span></button>
               {showPrintMenu&&(
                 <>
                   <div style={{position:"fixed",inset:0,zIndex:199}} onClick={()=>setShowPrintMenu(false)}/>

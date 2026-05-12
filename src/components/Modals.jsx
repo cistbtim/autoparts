@@ -17,7 +17,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
     name:"", vat_number:"", phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
     licence_renewal_agent_name:"", licence_renewal_agent_phone:"", default_markup_pct:0, move_pin:"",
-    label_width_mm:98, label_height_mm:45, linked_branch_id:"", show_supplier_sku:false,
+    label_width_mm:98, label_height_mm:45, linked_branch_id:"",
     ...profile
   });
   const [saving,setSaving]=useState(false);
@@ -308,16 +308,6 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
               ))}
             </select>
             {f.linked_branch_id&&<div style={{fontSize:11,color:"var(--green)",marginTop:4}}>✓ Linked to {branches.find(b=>b.id===f.linked_branch_id)?.name||f.linked_branch_id}</div>}
-            {f.linked_branch_id&&(
-              <label style={{display:"flex",alignItems:"center",gap:10,marginTop:12,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)",cursor:"pointer"}}>
-                <input type="checkbox" checked={!!f.show_supplier_sku} onChange={e=>s("show_supplier_sku",e.target.checked)}
-                  style={{width:17,height:17,cursor:"pointer",accentColor:"var(--accent)",flexShrink:0}}/>
-                <div>
-                  <div style={{fontWeight:700,fontSize:13}}>Allow branch to view supplier code / SKU</div>
-                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Branch users can see the part SKU and OE number in the spare shop (read-only). If something is wrong, they should report to the main branch.</div>
-                </div>
-              </label>
-            )}
           </div>
         )}
 
@@ -4690,6 +4680,12 @@ export function BranchesPage({branches:propBranches=[], onRefresh, _t={}}) {
     setBusy(null);
   };
 
+  const toggleSupplierSku = async (b) => {
+    const next = !b.show_supplier_sku;
+    setBranches(prev=>prev.map(x=>x.id===b.id?{...x,show_supplier_sku:next}:x));
+    await api.patch("branches","id",b.id,{show_supplier_sku:next});
+  };
+
   const saveNew = async () => {
     if(!addF.name.trim()) return setAddErr("Shop name is required");
     setAddErr(""); setBusy("new");
@@ -4842,6 +4838,18 @@ export function BranchesPage({branches:propBranches=[], onRefresh, _t={}}) {
                 </div>
               )}
             </div>
+            {!b.is_main&&(
+              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+                <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
+                  <input type="checkbox" checked={!!b.show_supplier_sku} onChange={()=>toggleSupplierSku(b)}
+                    style={{width:16,height:16,cursor:"pointer",accentColor:"var(--accent)",flexShrink:0}}/>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600}}>Allow branch to view supplier code / SKU</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>Branch users can see SKU &amp; OE number in the spare shop (read-only). If incorrect, they should report to main branch.</div>
+                  </div>
+                </label>
+              </div>
+            )}
             {creatingUserFor?.id===b.id&&(
               <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid var(--border)"}}>
                 <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:"var(--accent)"}}>🔑 Create login for {b.name}</div>

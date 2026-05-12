@@ -1242,7 +1242,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
           </div>
         );
-        return <WsSpareShopTab linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} wsProfile={wsProfile} onPlaceShopOrder={onPlaceShopOrder} vehicles={vehicles} partFitments={partFitments}/>;
+        return <WsSpareShopTab linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder} vehicles={vehicles} partFitments={partFitments}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
@@ -6172,8 +6172,8 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // WS SPARE SHOP TAB
 // ═══════════════════════════════════════════════════════════════
 const WS_SHOP_PAGE_SIZE=20;
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,wsProfile,onPlaceShopOrder,vehicles=[],partFitments=[]}) {
-  const showSku=!!wsProfile?.show_supplier_sku;
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,vehicles=[],partFitments=[]}) {
+  const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
   const [placing,setPlacing]=useState(false);

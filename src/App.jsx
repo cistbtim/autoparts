@@ -1555,8 +1555,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         });
         if(conflict){
           const cp=parts.find(x=>String(x.id)===String(conflict.part_id));
-          const msg=cp?`This supplier part no. is already linked to ${cp.sku} — ${cp.name} in the main branch.\n\nLink anyway?`:`This supplier part no. is already linked to a main branch part.\n\nLink anyway?`;
-          if(!window.confirm(msg)) return;
+          showToast(cp?`🚫 Already linked to ${cp.sku} in main branch — use that part`:`🚫 Supplier code already linked to a main branch part`,"err");
+          return;
         }
       }
     }

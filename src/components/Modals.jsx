@@ -2476,30 +2476,34 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                         style={{fontFamily:"DM Mono,monospace",borderColor:suppPartNoErr?"var(--red)":dupMatch?"var(--accent)":undefined}}/>
                       {suppPartNoErr&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {suppPartNoErr}</div>}
                       {dupMatch&&(
-                        <div style={{marginTop:8,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.35)",borderRadius:8,padding:"10px 13px"}}>
-                          <div style={{fontWeight:700,color:"var(--accent)",fontSize:12,marginBottom:4}}>⚠ This supplier code already exists in main branch</div>
-                          <div style={{fontSize:12,color:"var(--text2)",marginBottom:8}}>
-                            Linked to: <strong style={{fontFamily:"DM Mono,monospace",color:"var(--accent)"}}>{dupMatch.sku}</strong> — {dupMatch.name}
+                        <div style={{marginTop:8,background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.4)",borderRadius:8,padding:"12px 14px"}}>
+                          <div style={{fontWeight:700,color:"var(--red)",fontSize:13,marginBottom:4}}>🚫 Already linked in main branch</div>
+                          <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>
+                            This supplier code belongs to <strong style={{fontFamily:"DM Mono,monospace",color:"var(--accent)"}}>{dupMatch.sku}</strong> — {dupMatch.name}.<br/>
+                            Use that part instead of creating a duplicate.
                           </div>
-                          <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(249,115,22,.4)"}}
+                          <button className="btn btn-primary btn-sm" style={{background:"var(--accent)"}}
                             onClick={()=>onGoToPart?.(dupMatch.sku)}>
-                            → Go to {dupMatch.sku}
+                            → Open {dupMatch.sku}
                           </button>
                         </div>
                       )}
                     </FD>
-                    <FG cols="1fr 1fr 1fr">
-                      <div><FL label={t.supplier_price}/><input className="inp" type="number" value={suppPrice} onChange={e=>setSuppPrice(e.target.value)} placeholder="0"/></div>
-                      <div><FL label={t.lead_time}/><input className="inp" value={suppLead} onChange={e=>setSuppLead(e.target.value)} placeholder="7 days"/></div>
-                      <div><FL label={t.min_order}/><input className="inp" type="number" value={suppMinOrd} onChange={e=>setSuppMinOrd(e.target.value)}/></div>
-                    </FG>
-                    <button className="btn btn-primary" style={{width:"100%",opacity:dupMatch?0.6:1}} onClick={()=>{
-                      if(!suppId) return;
-                      if(!suppPartNo.trim()){setSuppPartNoErr("Supplier part number is required");return;}
-                      if(dupMatch){if(!window.confirm(`This supplier code is already linked to ${dupMatch.sku} in the main branch. Link anyway?`))return;}
-                      onSavePartSupplier?.({part_id:part.id,supplier_id:+suppId,supplier_part_no:suppPartNo.trim(),supplier_price:suppPrice?+suppPrice:null,lead_time:suppLead,min_order:+suppMinOrd});
-                      setSuppId("");setSuppPartNo("");setSuppPrice("");setSuppLead("");setSuppMinOrd(1);setSuppPartNoErr("");
-                    }}>Link Supplier</button>
+                    {!dupMatch&&(
+                      <>
+                        <FG cols="1fr 1fr 1fr">
+                          <div><FL label={t.supplier_price}/><input className="inp" type="number" value={suppPrice} onChange={e=>setSuppPrice(e.target.value)} placeholder="0"/></div>
+                          <div><FL label={t.lead_time}/><input className="inp" value={suppLead} onChange={e=>setSuppLead(e.target.value)} placeholder="7 days"/></div>
+                          <div><FL label={t.min_order}/><input className="inp" type="number" value={suppMinOrd} onChange={e=>setSuppMinOrd(e.target.value)}/></div>
+                        </FG>
+                        <button className="btn btn-primary" style={{width:"100%"}} onClick={()=>{
+                          if(!suppId) return;
+                          if(!suppPartNo.trim()){setSuppPartNoErr("Supplier part number is required");return;}
+                          onSavePartSupplier?.({part_id:part.id,supplier_id:+suppId,supplier_part_no:suppPartNo.trim(),supplier_price:suppPrice?+suppPrice:null,lead_time:suppLead,min_order:+suppMinOrd});
+                          setSuppId("");setSuppPartNo("");setSuppPrice("");setSuppLead("");setSuppMinOrd(1);setSuppPartNoErr("");
+                        }}>Link Supplier</button>
+                      </>
+                    )}
                   </div>
                 </div>
               );

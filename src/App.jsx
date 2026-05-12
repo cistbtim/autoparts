@@ -4311,6 +4311,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               setTimeout(()=>openM("editPart",{...target,_tab:"fitment",_fitSearch:fitSearch}),0);
             }else showToast(`Part SKU "${sku}" not found`,"err");
           }}
+          onGoToMainPart={(targetPart)=>{
+            const cur=mData("editPart");
+            if(cur?.id)releaseLock("part",cur.id);
+            closeM("editPart");
+            setTab("inventory");
+            setTimeout(()=>openM("editPart",{...targetPart,_tab:"supplier"}),80);
+          }}
           inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions}
           branches={branches} currentBranch={currentBranch} allParts={parts}
           branchSkuPrefix={currentBranch?.sku_prefix||""}

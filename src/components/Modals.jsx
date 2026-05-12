@@ -1950,7 +1950,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -2482,9 +2482,9 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                             This supplier code belongs to <strong style={{fontFamily:"DM Mono,monospace",color:"var(--accent)"}}>{dupMatch.sku}</strong> — {dupMatch.name}.<br/>
                             Use that part instead of creating a duplicate.
                           </div>
-                          <button className="btn btn-primary btn-sm" style={{background:"var(--accent)"}}
-                            onClick={()=>onGoToPart?.(dupMatch.sku)}>
-                            → Open {dupMatch.sku}
+                          <button className="btn btn-primary btn-sm" style={{background:"var(--accent)",fontSize:13,padding:"8px 16px"}}
+                            onClick={()=>onGoToMainPart?.(dupMatch)}>
+                            📦 Go to {dupMatch.sku} in Inventory
                           </button>
                         </div>
                       )}

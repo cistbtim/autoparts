@@ -340,7 +340,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
     const [o,s,st,br]=await Promise.all([
       track('orders',    api.get("orders","select=*&order=created_at.desc")),
-      track('suppliers', api.get("suppliers","select=*&order=name.asc")),
+      track('suppliers', api.get("suppliers",isBranchUser&&user.branch_id?`or=(branch_id.is.null,branch_id.eq.${user.branch_id})&order=name.asc`:"select=*&order=name.asc")),
       track('settings',  api.get("settings","id=eq.1&select=*")),
       track('branches',  api.get("branches","select=*&order=is_main.desc,name.asc").catch(()=>[])),
     ]);
@@ -558,7 +558,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const D={
       parts:                    ["select=*&order=id.asc",                                         d=>setParts(Array.isArray(d)?d:[])],
       orders:                   ["select=*&order=created_at.desc",                                d=>setOrders(Array.isArray(d)?d:[])],
-      suppliers:                ["select=*&order=name.asc",                                       d=>setSuppliers(Array.isArray(d)?d:[])],
+      suppliers:                [isBranchUser&&user.branch_id?`or=(branch_id.is.null,branch_id.eq.${user.branch_id})&order=name.asc`:"select=*&order=name.asc", d=>setSuppliers(Array.isArray(d)?d:[])],
       customers:                ["select=*&order=total_spent.desc",                               d=>setCustomers(Array.isArray(d)?d:[])],
       users:                    ["select=*&order=id.asc",                                         d=>setUsers(Array.isArray(d)?d:[])],
       inventory_logs:           [`${bF}select=*&order=created_at.desc&limit=200`,                 d=>setLogs(Array.isArray(d)?d:[])],
@@ -1525,8 +1525,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   // Suppliers
-  const saveSupplier=async(data)=>{const es=mData("editSupplier");if(es)await api.patch("suppliers","id",es.id,data);else await api.upsert("suppliers",data);await refreshTables("suppliers");closeM("editSupplier");showToast(es?"Supplier updated":"Supplier added");};
-  const deleteSupplier=async(id)=>{await api.delete("suppliers","id",id);await refreshTables("suppliers");showToast("Deleted","err");};
+  const saveSupplier=async(data)=>{
+    const es=mData("editSupplier");
+    if(es){
+      // only allow editing branch-owned suppliers (or admin editing any)
+      if(role!=="admin"&&es.branch_id!==user.branch_id)return showToast("Cannot edit a global supplier","err");
+      await api.patch("suppliers","id",es.id,data);
+    } else {
+      await api.upsert("suppliers",{...data,...(isBranchUser?{branch_id:user.branch_id}:{})});
+    }
+    await refreshTables("suppliers");closeM("editSupplier");showToast(es?"Supplier updated":"Supplier added");
+  };
+  const deleteSupplier=async(id)=>{
+    const s=suppliers.find(x=>x.id===id);
+    if(s&&role!=="admin"&&s.branch_id!==user.branch_id)return showToast("Cannot delete a global supplier","err");
+    await api.delete("suppliers","id",id);await refreshTables("suppliers");showToast("Deleted","err");
+  };
   const savePartSupplier=async(data)=>{
     // Only save columns that exist — supplier_part_no is safe after SQL migration
     const record = {
@@ -3658,25 +3672,38 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         )}
 
         {/* ── SUPPLIERS ── */}
-        {tab==="suppliers"&&(role==="admin"||role==="branch_admin")&&(
+        {tab==="suppliers"&&(role==="admin"||isBranchUser)&&(
           <div className="fu">
             <PH title={`🏭 ${t.suppliers}`} subtitle={`${suppliers.length} suppliers`}
               action={<button className="btn btn-primary" onClick={()=>openM("editSupplier")}>+ {t.addSupplier}</button>}/>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
               {suppliers.map(s=>{
                 const linked=partSuppliers.filter(ps=>ps.supplier_id===s.id);
+                const isGlobal=!s.branch_id;
+                const isOwn=s.branch_id===user.branch_id;
+                const canEdit=role==="admin"||isOwn;
                 return (
                   <div key={s.id} className="card card-hover" style={{padding:20}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
-                      <div><div style={{fontSize:15,fontWeight:700}}>{s.name}</div><div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>📍 {s.country||"—"}</div></div>
+                      <div>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                          <div style={{fontSize:15,fontWeight:700}}>{s.name}</div>
+                          {isGlobal
+                            ?<span style={{fontSize:10,fontWeight:700,background:"rgba(99,102,241,.12)",color:"#818cf8",borderRadius:4,padding:"1px 6px"}}>GLOBAL</span>
+                            :<span style={{fontSize:10,fontWeight:700,background:"rgba(52,211,153,.12)",color:"var(--green)",borderRadius:4,padding:"1px 6px"}}>MY BRANCH</span>
+                          }
+                        </div>
+                        <div style={{fontSize:12,color:"var(--text3)"}}>📍 {s.country||"—"}</div>
+                      </div>
                       <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",cursor:psLoading?"wait":"pointer"}} onClick={async()=>{await loadPartSuppliers();openM("supplierParts",s);}}>{psLoading?"…":linked.length} parts</span>
                     </div>
+                    {s.account_number&&<div style={{fontSize:12,fontWeight:700,color:"var(--accent)",background:"rgba(96,165,250,.08)",borderRadius:6,padding:"4px 9px",marginBottom:8,fontFamily:"DM Mono,monospace"}}>Acct: {s.account_number}</div>}
                     {s.contact_person&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:2}}>👤 {s.contact_person}</div>}
                     {s.email&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:2}}>✉ {s.email}</div>}
                     {s.phone&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:12}}>📞 {s.phone}</div>}
                     <div style={{display:"flex",gap:7,marginTop:6}}>
-                      <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>openM("editSupplier",s)}>{t.edit}</button>
-                      <button className="btn btn-danger btn-sm" disabled={psLoading||linked.length>0} title={psLoading?"Loading parts…":linked.length>0?"Remove all linked parts first":undefined} onClick={()=>deleteSupplier(s.id)}>{t.delete}</button>
+                      <button className="btn btn-ghost btn-sm" style={{flex:1}} disabled={!canEdit} title={!canEdit?"Global supplier — cannot edit":undefined} onClick={()=>canEdit&&openM("editSupplier",s)}>{t.edit}</button>
+                      <button className="btn btn-danger btn-sm" disabled={!canEdit||psLoading||linked.length>0} title={!canEdit?"Global supplier — cannot delete":psLoading?"Loading parts…":linked.length>0?"Remove all linked parts first":undefined} onClick={()=>deleteSupplier(s.id)}>{t.delete}</button>
                     </div>
                   </div>
                 );

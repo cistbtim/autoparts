@@ -2433,14 +2433,21 @@ export function CheckoutModal({cart,customers,cartTotal,role,currentUser,onPlace
 }
 
 export function SupplierModal({supplier,onSave,onClose,t}) {
-  const [f,setF]=useState(supplier?{name:supplier.name,email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||""}:{name:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:""});
+  const [f,setF]=useState(supplier?{name:supplier.name,email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||"",account_number:supplier.account_number||""}:{name:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:"",account_number:""});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   return (
     <Overlay onClose={onClose}>
       <MHead title={supplier?"Edit Supplier":"Add Supplier"} onClose={onClose}/>
-      <FD><FL label={`${t.supplierName} *`}/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)}/></FD>
-      <FG><div><FL label={t.country}/><input className="inp" value={f.country} onChange={e=>s("country",e.target.value)} placeholder="Taiwan, Japan..."/></div><div><FL label={t.contactPerson}/><input className="inp" value={f.contact_person} onChange={e=>s("contact_person",e.target.value)}/></div></FG>
-      <FG><div><FL label={t.email}/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div><div><FL label={t.phone}/><input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div></FG>
+      <FD><FL label={`${t.supplierName||"Supplier Name"} *`}/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)}/></FD>
+      <FG><div><FL label={t.country||"Country"}/><input className="inp" value={f.country} onChange={e=>s("country",e.target.value)} placeholder="Taiwan, Japan..."/></div><div><FL label={t.contactPerson||"Contact Person"}/><input className="inp" value={f.contact_person} onChange={e=>s("contact_person",e.target.value)}/></div></FG>
+      <FG><div><FL label={t.email||"Email"}/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div><div><FL label={t.phone||"Phone"}/><input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div></FG>
+      <FG>
+        <div>
+          <FL label="Account Number" sub="Your branch's account number with this supplier"/>
+          <input className="inp" value={f.account_number} onChange={e=>s("account_number",e.target.value)} placeholder="e.g. ACC-00123"/>
+        </div>
+        <div/>
+      </FG>
       <FD>
         <FL label="Part Search URL" sub="Placeholders: {sku} = supplier/our part no · {vehicle_code} = car model code (e.g. VW18D)"/>
         <input className="inp" value={f.search_url} onChange={e=>s("search_url",e.target.value)}
@@ -2449,8 +2456,8 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
           Preview: {f.search_url.replace("{sku}","ABC-001")}
         </div>}
       </FD>
-      <FD><FL label={t.notes}/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)}/></FD>
-      <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.name)return;onSave(f);}}>{t.save}</button></div>
+      <FD><FL label={t.notes||"Notes"}/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)}/></FD>
+      <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel||"Cancel"}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.name)return;onSave(f);}}>{t.save||"Save"}</button></div>
     </Overlay>
   );
 }

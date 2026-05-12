@@ -4316,7 +4316,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             if(cur?.id)releaseLock("part",cur.id);
             closeM("editPart");
             setTab("inventory");
-            setTimeout(()=>openM("editPart",{...targetPart,_tab:"supplier"}),80);
+            setFilterBranch("__all__");
+            setSearchPart(targetPart.sku||"");
           }}
           inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions}
           branches={branches} currentBranch={currentBranch} allParts={parts}

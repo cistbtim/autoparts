@@ -122,6 +122,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [filterCat,setFilterCat]=useState("__all__");
   const [filterLow,setFilterLow]=useState(false);
   const [filterFits,setFilterFits]=useState("__all__"); // __all__ | none | has
+  const [filterBranch,setFilterBranch]=useState("__all__"); // __all__ | "main" | branch_id
   const [invPage,setInvPage]=useState(0);   // inventory page
   const [shopPage,setShopPage]=useState(0); // shop page
   const PAGE_SIZE=20;
@@ -2014,12 +2015,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const suppNoByPart={};
   partSuppliers.forEach(ps=>{if(ps.supplier_part_no)suppNoByPart[ps.part_id]=(suppNoByPart[ps.part_id]||[]).concat(ps.supplier_part_no.toLowerCase());});
   const fp=displayParts.filter(p=>{
-    // branch_admin sees main catalog (null or main branch_id) + their own branch parts
+    // role-based access filter
     if(role==="branch_admin"){
       const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
       const isOwnBranch=p.branch_id===branchId;
       if(!isMainCatalog&&!isOwnBranch)return false;
     } else if(branchId&&p.branch_id!==branchId)return false;
+    // user-chosen branch sub-filter
+    if(filterBranch!=="__all__"){
+      if(filterBranch==="main"){
+        if(p.branch_id&&p.branch_id!==mainBranchId)return false;
+      } else {
+        if(p.branch_id!==filterBranch)return false;
+      }
+    }
     if(isDemo&&!(p.image_url||p.image_data))return false; // demo: only parts with photos
     if(filterLow&&p.stock>p.min_stock)return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
@@ -2943,8 +2952,28 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 <option value="none">❌ No fitment</option>
                 <option value="has">✅ Has fitment</option>
               </select>
-              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__")&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
+              {(role==="admin"&&branches.length>1)&&(
+                <select className="inp" value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{width:170,
+                  borderColor:filterBranch!=="__all__"?"var(--blue)":undefined,
+                  color:filterBranch!=="__all__"?"var(--blue)":undefined}}>
+                  <option value="__all__">🏢 All Branches</option>
+                  <option value="main">🏠 Main Branch</option>
+                  {branches.filter(b=>!b.is_main).map(b=>(
+                    <option key={b.id} value={b.id}>🏢 {b.name}</option>
+                  ))}
+                </select>
+              )}
+              {role==="branch_admin"&&(
+                <select className="inp" value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{width:170,
+                  borderColor:filterBranch!=="__all__"?"var(--blue)":undefined,
+                  color:filterBranch!=="__all__"?"var(--blue)":undefined}}>
+                  <option value="__all__">📦 All</option>
+                  <option value="main">🏠 Main Branch</option>
+                  <option value={branchId}>🏢 {currentBranch?.name||"My Branch"}</option>
+                </select>
+              )}
+              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__")&&(
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
             </div>
             {filterFits==="none"&&(
@@ -4268,6 +4297,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions}
           branches={branches} currentBranch={currentBranch} allParts={parts}
           branchSkuPrefix={currentBranch?.sku_prefix||""}
+          partSuppliers={getPartSupps(ep?.id)} suppliers={suppliers} allPartSuppliers={partSuppliers}
+          onSavePartSupplier={savePartSupplier} onDeletePartSupplier={deletePartSupplier} onUpdatePartSupplier={updatePartSupplier} onLoadSuppliers={loadPartSuppliers}
           onRequestNewPart={role==="branch_admin"?()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);closeM("editPart");openM("partRequest");}:null}
           onClose={()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);closeM("editPart");}}
           t={t}/>;

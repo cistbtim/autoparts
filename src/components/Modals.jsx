@@ -1950,7 +1950,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,branchSkuPrefix=""}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -1968,6 +1968,14 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
   const [saved, setSaved] = useState(false);
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
   const [catalogSearch,setCatalogSearch]=useState("");
+  const [suppId,setSuppId]=useState("");
+  const [suppPrice,setSuppPrice]=useState("");
+  const [suppLead,setSuppLead]=useState("");
+  const [suppMinOrd,setSuppMinOrd]=useState(1);
+  const [suppPartNo,setSuppPartNo]=useState("");
+  const [suppPartNoErr,setSuppPartNoErr]=useState("");
+  const [editingPsId,setEditingPsId]=useState(null);
+  const [editPsPartNo,setEditPsPartNo]=useState("");
   const mainBranch=branches.find(b=>b.is_main);
   const isNonMainBranch=!part&&currentBranch&&mainBranch&&currentBranch.id!==mainBranch.id;
 
@@ -2026,6 +2034,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     {id:"vehicle", label:`🚗 ${t.pmTabVehicle}`},
     {id:"fitment", label:`🔗 ${t.pmTabFits}`},
     {id:"rfq",     label:`📩 ${t.pmTabRfq}${rfqTotal>0?" ("+rfqTotal+")":""}`},
+    ...(part&&onSavePartSupplier?[{id:"supplier",label:`🏭 Suppliers${partSuppliers.length>0?" ("+partSuppliers.length+")":""}`}]:[]),
   ];
 
   return (
@@ -2077,7 +2086,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
           <button key={tab.id}
             className={`tab ${ptab===tab.id?"on":""}`}
             style={{fontSize:13,padding:"8px 14px"}}
-            onClick={()=>setPtab(tab.id)}>
+            onClick={()=>{if(tab.id==="supplier")onLoadSuppliers?.();setPtab(tab.id);}}>
             {tab.label}
             {/* Red dot if tab has error */}
             {((tab.id==="info"&&(errors.sku||errors.name))||(tab.id==="stock"&&errors.price))&&(
@@ -2192,6 +2201,12 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
         <div>
           {part&&<div style={{fontSize:12,color:"var(--green)",marginBottom:10,background:"rgba(34,197,94,.08)",borderRadius:8,padding:"6px 10px"}}>✅ {t.phuAutoSave}</div>}
           <PartPhotoUploader imageUrl={f.image_url} onChange={handlePhotoChange} sku={f.sku} t={t}/>
+          {part&&onSavePartSupplier&&partSuppliers.length===0&&(
+            <div style={{marginTop:14,background:"rgba(96,165,250,.07)",border:"1px dashed rgba(96,165,250,.35)",borderRadius:10,padding:14,textAlign:"center"}}>
+              <div style={{fontSize:13,fontWeight:600,color:"var(--blue)",marginBottom:6}}>🏭 No supplier linked yet</div>
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)"}} onClick={()=>{onLoadSuppliers?.();setPtab("supplier");}}>Link a Supplier →</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -2360,6 +2375,130 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
 
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── TAB: SUPPLIER ── */}
+      {ptab==="supplier"&&part&&(
+        <div>
+          {partSuppliers.length>0&&(
+            <div style={{marginBottom:18}}>
+              <FL label={`Linked Suppliers (${partSuppliers.length})`}/>
+              {partSuppliers.map(ps=>(
+                <div key={ps.id} style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",marginBottom:8,border:`1px solid ${ps.supplier_part_no?"rgba(52,211,153,.25)":"var(--border)"}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:14}}>{ps.supplier?.name}</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
+                        {ps.supplier?.country&&<span>📍 {ps.supplier.country} </span>}
+                        {ps.supplier?.phone&&<span>📞 {ps.supplier.phone} </span>}
+                        {ps.supplier?.account_number&&<span>🏷 {ps.supplier.account_number}</span>}
+                      </div>
+                      <div style={{fontSize:12,color:"var(--text2)",marginTop:3}}>
+                        {ps.supplier_price&&<span>💰 {fmtAmt(ps.supplier_price)} </span>}
+                        {ps.lead_time&&<span>⏱ {ps.lead_time} </span>}
+                        {ps.min_order&&<span>📦 Min: {ps.min_order}</span>}
+                      </div>
+                    </div>
+                    {onDeletePartSupplier&&<button className="btn btn-danger btn-xs" onClick={()=>onDeletePartSupplier(ps.id)}>{t.delete}</button>}
+                  </div>
+                  <div style={{borderTop:"1px solid var(--border)",paddingTop:9,marginTop:4}}>
+                    {editingPsId===ps.id?(
+                      <div style={{display:"flex",gap:7,alignItems:"center"}}>
+                        <div style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>Supplier Part No.</div>
+                        <input className="inp" style={{fontSize:13,padding:"4px 9px",flex:1,fontFamily:"DM Mono,monospace"}}
+                          value={editPsPartNo} onChange={e=>setEditPsPartNo(e.target.value)}
+                          placeholder="Enter supplier part number..." autoFocus/>
+                        <button className="btn btn-success btn-xs" onClick={()=>{onUpdatePartSupplier?.(ps.id,{supplier_part_no:editPsPartNo});setEditingPsId(null);}}>✓ Save</button>
+                        <button className="btn btn-ghost btn-xs" onClick={()=>setEditingPsId(null)}>✕</button>
+                      </div>
+                    ):(
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>Supplier Part No.</div>
+                        {ps.supplier_part_no?(
+                          <span style={{fontFamily:"DM Mono,monospace",fontSize:13,color:"var(--green)",fontWeight:600,flex:1}}>✓ {ps.supplier_part_no}</span>
+                        ):(
+                          <span style={{fontSize:12,color:"var(--yellow)",flex:1}}>⚠ Unknown — click to add</span>
+                        )}
+                        <button className="btn btn-ghost btn-xs" style={{color:"var(--accent)"}}
+                          onClick={()=>{setEditingPsId(ps.id);setEditPsPartNo(ps.supplier_part_no||"");}}>✏️ Edit</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {(()=>{
+            const avail=suppliers.filter(s=>!partSuppliers.find(ps=>ps.supplier_id===s.id));
+            if(avail.length>0){
+              const mainBId=branches.find(b=>b.is_main)?.id;
+              const q=(suppPartNo||"").trim().toLowerCase();
+              const dupMatch=suppId&&q?(()=>{
+                const hit=allPartSuppliers.find(ps=>
+                  ps.supplier_id===+suppId&&
+                  (ps.supplier_part_no||"").trim().toLowerCase()===q&&
+                  String(ps.part_id)!==String(part?.id)
+                );
+                if(!hit) return null;
+                const hitPart=allParts.find(ap=>String(ap.id)===String(hit.part_id));
+                if(!hitPart) return null;
+                return (!hitPart.branch_id||hitPart.branch_id===mainBId)?hitPart:null;
+              })():null;
+              return (
+                <div>
+                  <FL label="Link New Supplier"/>
+                  <div style={{background:"var(--surface2)",borderRadius:11,padding:15,border:"1px solid var(--border)"}}>
+                    <FD>
+                      <FL label="Supplier *"/>
+                      <select className="inp" value={suppId} onChange={e=>{setSuppId(e.target.value);setSuppPartNoErr("");}}>
+                        <option value="">Select supplier...</option>
+                        {avail.map(s=>(
+                          <option key={s.id} value={s.id}>
+                            {s.name}{s.account_number?" · Acc: "+s.account_number:""}{s.country?" ("+s.country+")":""}
+                          </option>
+                        ))}
+                      </select>
+                    </FD>
+                    <FD>
+                      <FL label="Supplier Part No. *"/>
+                      <input className="inp" value={suppPartNo}
+                        onChange={e=>{setSuppPartNo(e.target.value.toUpperCase());setSuppPartNoErr("");}}
+                        placeholder="e.g. MIT-ABC123"
+                        style={{fontFamily:"DM Mono,monospace",borderColor:suppPartNoErr?"var(--red)":dupMatch?"var(--accent)":undefined}}/>
+                      {suppPartNoErr&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {suppPartNoErr}</div>}
+                      {dupMatch&&(
+                        <div style={{marginTop:8,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.35)",borderRadius:8,padding:"10px 13px"}}>
+                          <div style={{fontWeight:700,color:"var(--accent)",fontSize:12,marginBottom:4}}>⚠ This supplier code already exists in main branch</div>
+                          <div style={{fontSize:12,color:"var(--text2)",marginBottom:8}}>
+                            Linked to: <strong style={{fontFamily:"DM Mono,monospace",color:"var(--accent)"}}>{dupMatch.sku}</strong> — {dupMatch.name}
+                          </div>
+                          <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(249,115,22,.4)"}}
+                            onClick={()=>onGoToPart?.(dupMatch.sku)}>
+                            → Go to {dupMatch.sku}
+                          </button>
+                        </div>
+                      )}
+                    </FD>
+                    <FG cols="1fr 1fr 1fr">
+                      <div><FL label={t.supplier_price}/><input className="inp" type="number" value={suppPrice} onChange={e=>setSuppPrice(e.target.value)} placeholder="0"/></div>
+                      <div><FL label={t.lead_time}/><input className="inp" value={suppLead} onChange={e=>setSuppLead(e.target.value)} placeholder="7 days"/></div>
+                      <div><FL label={t.min_order}/><input className="inp" type="number" value={suppMinOrd} onChange={e=>setSuppMinOrd(e.target.value)}/></div>
+                    </FG>
+                    <button className="btn btn-primary" style={{width:"100%",opacity:dupMatch?0.6:1}} onClick={()=>{
+                      if(!suppId) return;
+                      if(!suppPartNo.trim()){setSuppPartNoErr("Supplier part number is required");return;}
+                      if(dupMatch){if(!window.confirm(`This supplier code is already linked to ${dupMatch.sku} in the main branch. Link anyway?`))return;}
+                      onSavePartSupplier?.({part_id:part.id,supplier_id:+suppId,supplier_part_no:suppPartNo.trim(),supplier_price:suppPrice?+suppPrice:null,lead_time:suppLead,min_order:+suppMinOrd});
+                      setSuppId("");setSuppPartNo("");setSuppPrice("");setSuppLead("");setSuppMinOrd(1);setSuppPartNoErr("");
+                    }}>Link Supplier</button>
+                  </div>
+                </div>
+              );
+            }
+            if(partSuppliers.length===0) return <p style={{color:"var(--text3)",textAlign:"center",padding:20}}>No suppliers yet — add them in the Suppliers tab first.</p>;
+            return null;
+          })()}
         </div>
       )}
 

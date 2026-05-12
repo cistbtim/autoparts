@@ -1994,14 +1994,18 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
 
   const validate = () => {
     const e = {};
-    if(!f.sku.trim())   e.sku   = "SKU is required";
+    const skuVal = f.sku.trim();
+    if(!skuVal || (branchSkuPrefix && skuVal === branchSkuPrefix+"-")) e.sku = "SKU is required";
     if(!f.name.trim())  e.name  = "Name is required";
     if(f.price===""||f.price===null) e.price = "Price is required";
+    if(branchSkuPrefix&&!part&&skuVal&&skuVal!==branchSkuPrefix+"-"){
+      const isDup=allParts.some(p=>p.branch_id===currentBranch?.id&&p.sku===skuVal);
+      if(isDup) e.dupSku="This SKU already exists in your branch — choose a different number";
+    }
     setErrors(e);
     if(Object.keys(e).length>0){
-      // Switch to the tab with the first error
-      if(e.sku||e.name) setPtab("info");
-      else if(e.price)  setPtab("stock");
+      if(e.sku||e.name||e.dupSku) setPtab("info");
+      else if(e.price) setPtab("stock");
       return false;
     }
     return true;
@@ -2095,12 +2099,43 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                   {f.sku&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.sku)}>📋</button>}
                 </div>
               </div>
-              <input className="inp" value={f.sku} onChange={e=>{s("sku",e.target.value);setErrors(p=>({...p,sku:""}));}}
-                placeholder={branchSkuPrefix?`${branchSkuPrefix}-001`:"GP00001"} style={{borderColor:errors.sku?"var(--red)":undefined}}/>
+              {branchSkuPrefix&&!part ? (
+                <div style={{display:"flex",alignItems:"stretch"}}>
+                  <div style={{padding:"11px 12px",background:"rgba(99,102,241,.15)",border:"1.5px solid rgba(99,102,241,.4)",borderRight:"none",borderRadius:"9px 0 0 9px",fontSize:13,fontWeight:700,color:"#818cf8",fontFamily:"DM Mono,monospace",userSelect:"none",display:"flex",alignItems:"center",whiteSpace:"nowrap",gap:5}}>
+                    🔒 {branchSkuPrefix}-
+                  </div>
+                  <input className="inp" autoFocus
+                    value={f.sku.startsWith(branchSkuPrefix+"-")?f.sku.slice(branchSkuPrefix.length+1):""}
+                    onChange={e=>{s("sku",branchSkuPrefix+"-"+e.target.value);setErrors(p=>({...p,sku:"",dupSku:""}));}}
+                    placeholder="001"
+                    style={{borderRadius:"0 9px 9px 0",flex:1,borderColor:(errors.sku||errors.dupSku)?"var(--red)":undefined}}/>
+                </div>
+              ):(
+                <input className="inp" value={f.sku} onChange={e=>{s("sku",e.target.value);setErrors(p=>({...p,sku:""}));}}
+                  placeholder="GP00001" style={{borderColor:errors.sku?"var(--red)":undefined}}/>
+              )}
               <FormError errors={errors} k="sku"/>
-              {branchSkuPrefix&&!part&&<div style={{fontSize:11,color:"var(--accent)",marginTop:3}}>
-                Branch prefix: <strong>{branchSkuPrefix}-</strong> — keeps your SKUs separate from other branches
-              </div>}
+              {errors.dupSku&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {errors.dupSku}</div>}
+              {(()=>{
+                if(!branchSkuPrefix||part) return null;
+                const branchSkus=[...new Set(allParts.filter(p=>p.branch_id===currentBranch?.id&&p.sku).map(p=>p.sku))].sort().slice(-8).reverse();
+                if(!branchSkus.length) return <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>No branch SKUs yet — you'll be first!</div>;
+                return (
+                  <div style={{marginTop:7}}>
+                    <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Existing branch SKUs:</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                      {branchSkus.map(sku=>{
+                        const isDup=sku===f.sku;
+                        return (
+                          <span key={sku} style={{fontSize:11,fontFamily:"DM Mono,monospace",background:isDup?"rgba(248,113,113,.15)":"var(--surface2)",border:`1px solid ${isDup?"var(--red)":"var(--border)"}`,borderRadius:4,padding:"2px 7px",color:isDup?"var(--red)":"var(--text3)",fontWeight:isDup?700:400}}>
+                            {sku}{isDup&&" ⚠"}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             <div><FL label={t.brand}/><input className="inp" value={f.brand} onChange={e=>s("brand",e.target.value)} placeholder="GWM"/></div>
           </FG>

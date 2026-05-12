@@ -2109,12 +2109,12 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                   </div>
                   <input className="inp" autoFocus
                     value={f.sku.startsWith(branchSkuPrefix+"-")?f.sku.slice(branchSkuPrefix.length+1):""}
-                    onChange={e=>{s("sku",branchSkuPrefix+"-"+e.target.value);setErrors(p=>({...p,sku:"",dupSku:""}));}}
+                    onChange={e=>{s("sku",branchSkuPrefix+"-"+e.target.value.toUpperCase());setErrors(p=>({...p,sku:"",dupSku:""}));}}
                     placeholder="001"
                     style={{borderRadius:"0 9px 9px 0",flex:1,borderColor:(errors.sku||errors.dupSku)?"var(--red)":undefined}}/>
                 </div>
               ):(
-                <input className="inp" value={f.sku} onChange={e=>{s("sku",e.target.value);setErrors(p=>({...p,sku:"",dupSku:""}));}}
+                <input className="inp" value={f.sku} onChange={e=>{s("sku",e.target.value.toUpperCase());setErrors(p=>({...p,sku:"",dupSku:""}));}}
                   placeholder="GP00001" style={{borderColor:(errors.sku||errors.dupSku)?"var(--red)":undefined}}/>
               )}
               <FormError errors={errors} k="sku"/>

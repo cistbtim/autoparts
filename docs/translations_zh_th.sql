@@ -199,7 +199,14 @@ VALUES (
     "branchCopyTitle":"从主目录复制",
     "branchCopyPlaceholder":"按SKU或名称搜索主目录...",
     "branchCopyNoResults":"主目录中未找到零件",
-    "branchCopyMain":"主目录","branchCopySuggested":"建议"
+    "branchCopyMain":"主目录","branchCopySuggested":"建议",
+    "wsChCar":"车辆","wsChDocs":"照片/文档","wsChBill":"报价/发票","wsChPay":"付款","wsChCust":"客户",
+    "wsJobSheet":"工单打印","wsHistory":"历史记录","wsProblemJob":"问题工单",
+    "wsProfilePhotos":"车辆照片","wsEditPhotos":"编辑照片","wsDoneEditing":"完成",
+    "wsNoPhotos":"暂无照片 — 点击编辑照片添加",
+    "wsStPending":"待处理","wsStInProg":"进行中","wsStDone":"完成",
+    "wsStInvoiced":"已开票","wsStPaid":"已付款","wsStDelivered":"已交车",
+    "wsTabPayment":"付款"
   }'::jsonb,
   '{"Pending":"待处理","In Progress":"进行中","Done":"完成","Invoiced":"已开票","Paid":"已付款","Cancelled":"已取消","Delivered":"已交车"}'::jsonb
 )
@@ -414,7 +421,14 @@ VALUES (
     "branchCopyTitle":"คัดลอกจากแคตาล็อกหลัก",
     "branchCopyPlaceholder":"ค้นหาแคตาล็อกหลักด้วย SKU หรือชื่อ...",
     "branchCopyNoResults":"ไม่พบในแคตาล็อกหลัก",
-    "branchCopyMain":"หลัก","branchCopySuggested":"แนะนำ"
+    "branchCopyMain":"หลัก","branchCopySuggested":"แนะนำ",
+    "wsChCar":"รถ","wsChDocs":"รูป/เอกสาร","wsChBill":"ใบเสนอ/ใบแจ้งหนี้","wsChPay":"ชำระเงิน","wsChCust":"ลูกค้า",
+    "wsJobSheet":"พิมพ์ใบงาน","wsHistory":"ประวัติ","wsProblemJob":"งานมีปัญหา",
+    "wsProfilePhotos":"รูปรถ","wsEditPhotos":"แก้ไขรูป","wsDoneEditing":"เสร็จ",
+    "wsNoPhotos":"ยังไม่มีรูป — แตะแก้ไขรูปเพื่อเพิ่ม",
+    "wsStPending":"รอดำเนินการ","wsStInProg":"กำลังทำ","wsStDone":"เสร็จสิ้น",
+    "wsStInvoiced":"ออกใบแล้ว","wsStPaid":"ชำระแล้ว","wsStDelivered":"ส่งมอบแล้ว",
+    "wsTabPayment":"ชำระเงิน"
   }'::jsonb,
   '{"Pending":"รอดำเนินการ","In Progress":"กำลังดำเนินการ","Done":"เสร็จสิ้น","Invoiced":"ออกใบแจ้งหนี้แล้ว","Paid":"ชำระแล้ว","Cancelled":"ยกเลิก","Delivered":"ส่งมอบแล้ว"}'::jsonb
 )

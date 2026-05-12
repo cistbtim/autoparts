@@ -3139,11 +3139,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
         const isInvoiced = !!invoice;
         const isProblem = !!job.is_problem;
         const STAGES = [
-          {key:"Pending",         label:"⏳ Pending",          color:"#a78bfa", bg:"rgba(167,139,250,.18)", mechanic:true},
-          {key:"In Progress",     label:"⚙️ In Progress",      color:"#fbbf24", bg:"rgba(251,191,36,.18)",  mechanic:true},
-          {key:"Done",            label:"✅ Done",              color:"#34d399", bg:"rgba(52,211,153,.18)",  mechanic:false},
-          {key:"Invoiced",        label:"🧾 Invoiced",          color:"#f97316", bg:"rgba(249,115,22,.18)",  mechanic:false, derived:true},
-          {key:"Payment Received",label:"💚 Payment Received",  color:"#10b981", bg:"rgba(16,185,129,.18)",  mechanic:false, derived:true},
+          {key:"Pending",         label:"⏳ "+(t.wsStPending||"Pending"),          color:"#a78bfa", bg:"rgba(167,139,250,.18)", mechanic:true},
+          {key:"In Progress",     label:"⚙️ "+(t.inProgress||"In Progress"),       color:"#fbbf24", bg:"rgba(251,191,36,.18)",  mechanic:true},
+          {key:"Done",            label:"✅ "+(t.done||"Done"),                    color:"#34d399", bg:"rgba(52,211,153,.18)",  mechanic:false},
+          {key:"Invoiced",        label:"🧾 "+(t.wsStInvoiced||"Invoiced"),         color:"#f97316", bg:"rgba(249,115,22,.18)",  mechanic:false, derived:true},
+          {key:"Payment Received",label:"💚 "+(t.wsStPaid||"Paid"),                color:"#10b981", bg:"rgba(16,185,129,.18)",  mechanic:false, derived:true},
         ];
         const activeKey = isPaid?"Payment Received":isInvoiced?"Invoiced":job.status;
         const visibleStages = wsRole==="mechanic" ? STAGES.filter(s=>s.mechanic) : STAGES;
@@ -3157,7 +3157,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
                 const stageIdx = visibleStages.findIndex(st=>st.key===activeKey);
                 const done = i < stageIdx;
                 const clickable = !s.derived;
-                const short = s.key==="Payment Received"?"Paid":s.key==="In Progress"?"In Prog.":s.key;
+                const short = s.key==="Payment Received"?(t.wsStPaid||"Paid"):s.key==="In Progress"?(t.wsStInProg||"In Prog."):tSt(s.key);
                 return (
                   <span key={s.key} style={{display:"contents"}}>
                     {i>0&&<div style={{flex:1,height:2,minWidth:8,maxWidth:32,marginTop:13,background:done?visibleStages[i-1].color:"var(--border)",transition:"background .3s",flexShrink:1,alignSelf:"flex-start"}}/>}
@@ -3198,7 +3198,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
                     color:isProblem?"#f87171":"var(--text3)",
                     fontFamily:"'DM Sans',sans-serif",transition:"all .15s",
                   }}
-                >⚠️ Problem Job</button>
+                >⚠️ {t.wsProblemJob||"Problem Job"}</button>
               </div>
             )}
             {showWa&&(()=>{
@@ -3233,19 +3233,19 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
         const BILLING_TABS = wsRole==="mechanic" ? [] : [
           {id:"quote",   icon:"📝", label:t.wsTabQuote||"Quote",   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
           {id:"invoice", icon:"🧾", label:t.invoice||"Invoice",    badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
-          {id:"payment", icon:"💳", label:"Payment",               badge:payBadge},
+          {id:"payment", icon:"💳", label:t.wsTabPayment||"Payment", badge:payBadge},
         ];
 
         if(isMobile){
           // ── Mobile: 5 chapter buttons + optional sub-tab row ──
           const CHAPTERS = [
-            {id:"ch_car",  icon:"🚗", label:"Car",       color:"#2563eb", tabs:["car","inspect"]},
-            {id:"ch_docs", icon:"📷", label:"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"]},
+            {id:"ch_car",  icon:"🚗", label:t.wsChCar||"Car",        color:"#2563eb", tabs:["car","inspect"]},
+            {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"]},
             ...(wsRole!=="mechanic"?[
-              {id:"ch_bill",icon:"📝", label:"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"]},
-              {id:"ch_pay", icon:"💳", label:"Payment",    color:"#059669", tabs:["payment"]},
+              {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"]},
+              {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"]},
             ]:[]),
-            {id:"ch_cust", icon:"👤", label:"Customer",  color:"#db2777", tabs:["customer"]},
+            {id:"ch_cust", icon:"👤", label:t.wsChCust||"Customer",   color:"#db2777", tabs:["customer"]},
           ];
           const activeChapter = CHAPTERS.find(ch=>ch.tabs.includes(jobTab));
           const allFlatTabs = [...INFO_TABS,...BILLING_TABS];
@@ -3296,13 +3296,13 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
 
         // ── Desktop: same chapter button layout as mobile ──
         const CHAPTERS_D = [
-          {id:"ch_car",  icon:"🚗", label:"Car",       color:"#2563eb", tabs:["car","inspect"]},
-          {id:"ch_docs", icon:"📷", label:"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"]},
+          {id:"ch_car",  icon:"🚗", label:t.wsChCar||"Car",        color:"#2563eb", tabs:["car","inspect"]},
+          {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"]},
           ...(wsRole!=="mechanic"?[
-            {id:"ch_bill",icon:"📝", label:"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"]},
-            {id:"ch_pay", icon:"💳", label:"Payment",    color:"#059669", tabs:["payment"]},
+            {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"]},
+            {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"]},
           ]:[]),
-          {id:"ch_cust", icon:"👤", label:"Customer",  color:"#db2777", tabs:["customer"]},
+          {id:"ch_cust", icon:"👤", label:t.wsChCust||"Customer",   color:"#db2777", tabs:["customer"]},
         ];
         const activeChapterD = CHAPTERS_D.find(ch=>ch.tabs.includes(jobTab));
         const allFlatTabsD = [...INFO_TABS,...BILLING_TABS];
@@ -3374,8 +3374,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
                 heightMm: settings?.label_height_mm || 45,
               });
             }}>🏷️ {t.wsLabel}</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardSheet(job,items,settings)}>📄 Job Sheet</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setServiceHistModal(true)}>📋 History{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>printJobCardSheet(job,items,settings)}>📄 {t.wsJobSheet||"Job Sheet"}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setServiceHistModal(true)}>📋 {t.wsHistory||"History"}{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
             {wsRole==="main"&&onDeleteJob&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button>}
             <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={()=>setShowMoreActions(p=>!p)} title="More actions">⋯</button>
           </div>
@@ -3456,11 +3456,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
           {/* ── Profile Photos ── */}
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>📸 Profile Photos</div>
+              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>📸 {t.wsProfilePhotos||"Profile Photos"}</div>
               {vehicleRecord&&(
                 <button onClick={()=>setEditPhotos(p=>!p)}
                   style={{fontSize:11,padding:"3px 10px",background:editPhotos?"var(--accent)":"var(--surface2)",color:editPhotos?"#fff":"var(--text2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",fontWeight:600}}>
-                  {editPhotos?"✓ Done":"✏️ Edit Photos"}
+                  {editPhotos?`✓ ${t.wsDoneEditing||"Done"}`:`✏️ ${t.wsEditPhotos||"Edit Photos"}`}
                 </button>
               )}
             </div>
@@ -3491,7 +3491,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
                   ))}
                 </div>
               ):(
-                <div style={{fontSize:12,color:"var(--text3)"}}>No photos — tap Edit Photos to add</div>
+                <div style={{fontSize:12,color:"var(--text3)"}}>{t.wsNoPhotos||"No photos — tap Edit Photos to add"}</div>
               );
             })()}
           </div>

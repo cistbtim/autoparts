@@ -146,11 +146,20 @@ export const T = {
     // WorkshopJobDetail strings
     wsBack: "← Back", wsLabel: "Label", wsCollect: "Collect", wsInfoBtn: "Info", wsMove: "Move",
     wsTabCar: "Car", wsTabInspect: "Inspect", wsTabPhotos: "Photos", wsTabDocs: "Docs", wsTabQuote: "Quote",
+    wsChCar: "Car", wsChDocs: "Photo/Docs", wsChBill: "Quote/Inv", wsChPay: "Payment", wsChCust: "Customer",
+    wsJobSheet: "Job Sheet", wsHistory: "History", wsProblemJob: "Problem Job",
+    wsProfilePhotos: "Profile Photos", wsEditPhotos: "Edit Photos", wsDoneEditing: "Done",
+    wsNoPhotos: "No photos — tap Edit Photos to add",
     wsPlate: "Plate", wsMakeModel: "Make / Model", year: "Year",
     wsLicenceExpiry: "Licence Disc Expiry", wsExpired: "EXPIRED",
     wsRequestRenewal: "Request Renewal", wsVinSearch: "VIN Search", wsCopy: "Copy",
     wsOeSearch: "OE Number Search",
     wsMarkupPct: "Markup %", wsMarkupDefault: "Default Markup %",
+    // Job status pipeline labels
+    wsStPending: "Pending", wsStInProg: "In Prog.", wsStDone: "Done",
+    wsStInvoiced: "Invoiced", wsStPaid: "Paid", wsStDelivered: "Delivered",
+    wsStPayRec: "Paid",
+    wsTabPayment: "Payment",
     // Workshop quote tab — parts & labour section
     wsqtPartsLabour: "Parts & Labour",
     wsqtNoItems: "No items yet — add parts or labour",

@@ -3294,27 +3294,61 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
           );
         }
 
-        // ── Desktop: existing 2-row pill tabs ──
-        const mkBtn = (tab) => {
-          const active = jobTab===tab.id;
-          return (
-            <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
-              padding:"7px 13px",border:"none",borderRadius:8,cursor:"pointer",flexShrink:0,
-              fontSize:12,fontWeight:active?700:500,
-              color:active?"var(--accent)":"var(--text2)",
-              background:active?"var(--surface)":"transparent",
-              boxShadow:active?"0 1px 4px rgba(0,0,0,.25)":"none",
-              whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,transition:"all .18s",
-            }}>
-              {tab.icon} {tab.label}
-              {tab.badge!=null&&<span style={{fontSize:10,fontWeight:700,background:active?"var(--accent)":"var(--surface3)",color:active?"#fff":"var(--text2)",borderRadius:99,padding:"1px 6px",lineHeight:1.4,minWidth:16,textAlign:"center"}}>{tab.badge}</span>}
-            </button>
-          );
-        };
-        return (<>
-          <div style={{display:"flex",background:"var(--surface2)",borderRadius:10,padding:3,gap:2,marginBottom:4,overflowX:"auto",scrollbarWidth:"none"}}>{INFO_TABS.map(mkBtn)}</div>
-          {BILLING_TABS.length>0&&<div style={{display:"flex",background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.2)",borderRadius:10,padding:3,gap:2,marginBottom:14,overflowX:"auto",scrollbarWidth:"none"}}>{BILLING_TABS.map(mkBtn)}</div>}
-        </>);
+        // ── Desktop: same chapter button layout as mobile ──
+        const CHAPTERS_D = [
+          {id:"ch_car",  icon:"🚗", label:"Car",       color:"#2563eb", tabs:["car","inspect"]},
+          {id:"ch_docs", icon:"📷", label:"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"]},
+          ...(wsRole!=="mechanic"?[
+            {id:"ch_bill",icon:"📝", label:"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"]},
+            {id:"ch_pay", icon:"💳", label:"Payment",    color:"#059669", tabs:["payment"]},
+          ]:[]),
+          {id:"ch_cust", icon:"👤", label:"Customer",  color:"#db2777", tabs:["customer"]},
+        ];
+        const activeChapterD = CHAPTERS_D.find(ch=>ch.tabs.includes(jobTab));
+        const allFlatTabsD = [...INFO_TABS,...BILLING_TABS];
+        return (
+          <div style={{marginBottom:10}}>
+            <div style={{display:"grid",gridTemplateColumns:`repeat(${CHAPTERS_D.length},1fr)`,gap:8,marginBottom:6}}>
+              {CHAPTERS_D.map(ch=>{
+                const isActive = ch.tabs.includes(jobTab);
+                return (
+                  <button key={ch.id} onClick={()=>setJobTab(ch.tabs[0])} style={{
+                    display:"flex",flexDirection:"column",alignItems:"center",gap:5,
+                    padding:"14px 8px",border:"none",borderRadius:12,cursor:"pointer",
+                    background:isActive?ch.color:"var(--surface2)",
+                    color:isActive?"#fff":"var(--text3)",
+                    transition:"all .15s",
+                    boxShadow:isActive?"0 2px 10px rgba(0,0,0,.2)":"none",
+                  }}>
+                    <span style={{fontSize:28,lineHeight:1}}>{ch.icon}</span>
+                    <span style={{fontSize:11,fontWeight:700,lineHeight:1.2,textAlign:"center"}}>{ch.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {activeChapterD&&activeChapterD.tabs.length>1&&(
+              <div style={{display:"flex",gap:6,marginBottom:10}}>
+                {activeChapterD.tabs.map(tabId=>{
+                  const ti=allFlatTabsD.find(t=>t.id===tabId);
+                  if(!ti) return null;
+                  const isActive=jobTab===tabId;
+                  return (
+                    <button key={tabId} onClick={()=>setJobTab(tabId)} style={{
+                      flex:1,padding:"9px 8px",border:"none",borderRadius:9,cursor:"pointer",
+                      fontSize:13,fontWeight:700,
+                      background:isActive?"var(--accent)":"var(--surface3)",
+                      color:isActive?"#fff":"var(--text2)",
+                      display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                    }}>
+                      <span>{ti.icon}</span><span>{ti.label}</span>
+                      {ti.badge!=null&&<span style={{fontSize:10,background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 5px"}}>{ti.badge}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
       })()}
 
       {/* ══ CAR INFO tab ══ */}

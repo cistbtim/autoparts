@@ -4611,15 +4611,15 @@ export function BranchesPage({branches:propBranches=[], onRefresh, _t={}}) {
   const [userErr,         setUserErr]         = useState("");
   const [doneApproved,    setDoneApproved]    = useState(null);
 
-  const refresh = async () => {
+  const refresh = async (notifyParent=true) => {
     setRefreshing(true);
     const rows = await api.get("branches","select=*&order=is_main.desc,name.asc").catch(()=>[]);
     if(Array.isArray(rows)) setBranches(rows);
     setRefreshing(false);
-    onRefresh();
+    if(notifyParent) onRefresh();
   };
 
-  useEffect(()=>{ refresh(); },[]);
+  useEffect(()=>{ refresh(false); },[]);
 
   const copyLink = () => { navigator.clipboard.writeText(regLink); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 

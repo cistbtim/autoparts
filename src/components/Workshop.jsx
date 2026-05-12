@@ -6026,19 +6026,14 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,settings,onPlaceShopOrder})
 
   return (
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
-        <div>
-          <h2 style={{fontSize:18,fontWeight:700}}>🏪 {linkedBranch?.name||"Spare Shop"}</h2>
-          <p style={{fontSize:12,color:"var(--text3)",marginTop:2}}>Browse stock and place an order — will appear in the branch Orders page</p>
-        </div>
+      <div style={{background:"var(--accent)",color:"#fff",borderRadius:10,padding:"14px 18px",marginBottom:16}}>
+        <div style={{fontSize:20,fontWeight:800}}>🏪 {linkedBranch?.name||"Spare Shop"}</div>
+        <div style={{fontSize:12,opacity:0.85,marginTop:3}}>Branch ID: {linkedBranchId||"(none)"} · Parts loaded: {shopParts.length} · Loading: {String(loading)}</div>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 340px",gap:18,alignItems:"start"}}>
         {/* Parts list */}
         <div>
-          <div style={{fontSize:11,color:"var(--text3)",marginBottom:8,padding:"4px 8px",background:"var(--surface2)",borderRadius:6,fontFamily:"DM Mono,monospace"}}>
-            branch_id: {linkedBranchId||"(none)"} | parts: {shopParts.length} | loading: {String(loading)}
-          </div>
           <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
             placeholder="Search SKU, name, brand…" style={{marginBottom:12}}/>
           {loading

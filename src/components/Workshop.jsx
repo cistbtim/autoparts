@@ -3220,43 +3220,83 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
         );
       })()}
 
-      {/* ── Tab bars (two rows: job info + billing) ── */}
+      {/* ── Tab bars ── */}
       {(()=>{
         const payBadge = invoice?.status==="paid"?"✓":invoice?.status==="partial"?"½":null;
-        const INFO_TABS = isMobile ? [
-          {id:"car",     icon:"🚗", label:t.wsTabCar},
-          {id:"inspect", icon:"✅", label:t.wsTabInspect, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
-          {id:"photos",  icon:"📷", label:t.wsTabPhotos,  badge:savedPhotos.length>0?savedPhotos.length:null},
-          {id:"docs",    icon:"📎", label:t.wsTabDocs,    badge:jobDocs.length>0?jobDocs.length:null},
-        ] : [
-          {id:"car",     label:`🚗 ${t.wsTabCar}`},
-          {id:"inspect", label:`✅ ${t.wsTabInspect}`, badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
-          {id:"photos",  label:`📷 ${t.wsTabPhotos}`,  badge:savedPhotos.length>0?savedPhotos.length:null},
-          {id:"docs",    label:`📎 ${t.wsTabDocs}`,     badge:jobDocs.length>0?jobDocs.length:null},
+        const INFO_TABS = [
+          {id:"car",     icon:"🚗", label:t.wsTabCar||"Car"},
+          {id:"inspect", icon:"✅", label:t.wsTabInspect||"Inspect", badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
+          {id:"photos",  icon:"📷", label:t.wsTabPhotos||"Photos",  badge:savedPhotos.length>0?savedPhotos.length:null},
+          {id:"docs",    icon:"📎", label:t.wsTabDocs||"Docs",    badge:jobDocs.length>0?jobDocs.length:null},
         ];
-        const BILLING_TABS = wsRole==="mechanic" ? [] : isMobile ? [
-          {id:"quote",   icon:"📝", label:t.wsTabQuote,  badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
-          {id:"invoice", icon:"🧾", label:t.invoice,     badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
-          {id:"payment", icon:"💳", label:"Payment",     badge:payBadge},
-        ] : [
-          {id:"quote",   label:`📝 ${t.wsTabQuote}`,   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
-          {id:"invoice", label:`🧾 ${t.invoice}`,       badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
-          {id:"payment", label:`💳 Payment`,             badge:payBadge},
+        const BILLING_TABS = wsRole==="mechanic" ? [] : [
+          {id:"quote",   icon:"📝", label:t.wsTabQuote||"Quote",   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
+          {id:"invoice", icon:"🧾", label:t.invoice||"Invoice",    badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
+          {id:"payment", icon:"💳", label:"Payment",               badge:payBadge},
         ];
+
+        if(isMobile){
+          // ── Mobile: 5 chapter buttons + optional sub-tab row ──
+          const CHAPTERS = [
+            {id:"ch_car",  icon:"🚗", label:"Car",       color:"#2563eb", tabs:["car","inspect"]},
+            {id:"ch_docs", icon:"📷", label:"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"]},
+            ...(wsRole!=="mechanic"?[
+              {id:"ch_bill",icon:"📝", label:"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"]},
+              {id:"ch_pay", icon:"💳", label:"Payment",    color:"#059669", tabs:["payment"]},
+            ]:[]),
+            {id:"ch_cust", icon:"👤", label:"Customer",  color:"#db2777", tabs:["customer"]},
+          ];
+          const activeChapter = CHAPTERS.find(ch=>ch.tabs.includes(jobTab));
+          const allFlatTabs = [...INFO_TABS,...BILLING_TABS];
+          return (
+            <div style={{marginBottom:10}}>
+              <div style={{display:"grid",gridTemplateColumns:`repeat(${CHAPTERS.length},1fr)`,gap:5,marginBottom:6}}>
+                {CHAPTERS.map(ch=>{
+                  const isActive = ch.tabs.includes(jobTab);
+                  return (
+                    <button key={ch.id} onClick={()=>setJobTab(ch.tabs[0])} style={{
+                      display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+                      padding:"10px 2px",border:"none",borderRadius:12,cursor:"pointer",
+                      background:isActive?ch.color:"var(--surface2)",
+                      color:isActive?"#fff":"var(--text3)",
+                      transition:"all .15s",
+                      boxShadow:isActive?"0 2px 8px rgba(0,0,0,.18)":"none",
+                    }}>
+                      <span style={{fontSize:22,lineHeight:1}}>{ch.icon}</span>
+                      <span style={{fontSize:8,fontWeight:700,lineHeight:1.2,textAlign:"center",letterSpacing:".01em"}}>{ch.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {activeChapter&&activeChapter.tabs.length>1&&(
+                <div style={{display:"flex",gap:4,marginBottom:8}}>
+                  {activeChapter.tabs.map(tabId=>{
+                    const ti=allFlatTabs.find(t=>t.id===tabId);
+                    if(!ti)return null;
+                    const isActive=jobTab===tabId;
+                    return (
+                      <button key={tabId} onClick={()=>setJobTab(tabId)} style={{
+                        flex:1,padding:"7px 4px",border:"none",borderRadius:8,cursor:"pointer",
+                        fontSize:11,fontWeight:700,
+                        background:isActive?"var(--accent)":"var(--surface3)",
+                        color:isActive?"#fff":"var(--text2)",
+                        display:"flex",alignItems:"center",justifyContent:"center",gap:4,
+                      }}>
+                        <span>{ti.icon}</span><span>{ti.label}</span>
+                        {ti.badge!=null&&<span style={{fontSize:9,background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 4px"}}>{ti.badge}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // ── Desktop: existing 2-row pill tabs ──
         const mkBtn = (tab) => {
           const active = jobTab===tab.id;
-          return isMobile ? (
-            <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
-              position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:2,
-              padding:"8px 4px",border:"none",borderRadius:10,cursor:"pointer",
-              background:active?"var(--accent)":"var(--surface2)",
-              color:active?"#fff":"var(--text3)",transition:"background .15s",
-            }}>
-              <span style={{fontSize:20,lineHeight:1}}>{tab.icon}</span>
-              <span style={{fontSize:9,fontWeight:active?700:500,letterSpacing:".02em",lineHeight:1,whiteSpace:"nowrap"}}>{tab.label}</span>
-              {tab.badge!=null&&<span style={{position:"absolute",top:4,right:6,fontSize:9,fontWeight:700,background:active?"rgba(255,255,255,.3)":"var(--accent)",color:"#fff",borderRadius:99,padding:"1px 4px",lineHeight:1.4,minWidth:14,textAlign:"center"}}>{tab.badge}</span>}
-            </button>
-          ) : (
+          return (
             <button key={tab.id} onClick={()=>setJobTab(tab.id)} style={{
               padding:"7px 13px",border:"none",borderRadius:8,cursor:"pointer",flexShrink:0,
               fontSize:12,fontWeight:active?700:500,
@@ -3265,22 +3305,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
               boxShadow:active?"0 1px 4px rgba(0,0,0,.25)":"none",
               whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,transition:"all .18s",
             }}>
-              {tab.label}
+              {tab.icon} {tab.label}
               {tab.badge!=null&&<span style={{fontSize:10,fontWeight:700,background:active?"var(--accent)":"var(--surface3)",color:active?"#fff":"var(--text2)",borderRadius:99,padding:"1px 6px",lineHeight:1.4,minWidth:16,textAlign:"center"}}>{tab.badge}</span>}
             </button>
           );
         };
         return (<>
-          {/* Row 1 — Job info */}
-          {isMobile
-            ? <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,marginBottom:4}}>{INFO_TABS.map(mkBtn)}</div>
-            : <div style={{display:"flex",background:"var(--surface2)",borderRadius:10,padding:3,gap:2,marginBottom:4,overflowX:"auto",scrollbarWidth:"none"}}>{INFO_TABS.map(mkBtn)}</div>
-          }
-          {/* Row 2 — Billing (hidden for mechanic) */}
-          {BILLING_TABS.length>0&&(isMobile
-            ? <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:4,marginBottom:14}}>{BILLING_TABS.map(mkBtn)}</div>
-            : <div style={{display:"flex",background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.2)",borderRadius:10,padding:3,gap:2,marginBottom:14,overflowX:"auto",scrollbarWidth:"none"}}>{BILLING_TABS.map(mkBtn)}</div>
-          )}
+          <div style={{display:"flex",background:"var(--surface2)",borderRadius:10,padding:3,gap:2,marginBottom:4,overflowX:"auto",scrollbarWidth:"none"}}>{INFO_TABS.map(mkBtn)}</div>
+          {BILLING_TABS.length>0&&<div style={{display:"flex",background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.2)",borderRadius:10,padding:3,gap:2,marginBottom:14,overflowX:"auto",scrollbarWidth:"none"}}>{BILLING_TABS.map(mkBtn)}</div>}
         </>);
       })()}
 
@@ -4633,6 +4665,109 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
           </div>
         )}
       </>)}
+
+      {/* ══ CUSTOMER tab ══ */}
+      {jobTab==="customer"&&(()=>{
+        const custRecord=wsCustomers.find(c=>c.id===job.workshop_customer_id)||null;
+        const phone=(job.customer_phone||custRecord?.phone||"").replace(/\D/g,"");
+        const name=job.customer_name||custRecord?.name||"";
+        const email=job.customer_email||custRecord?.email||"";
+        const custJobs=jobs.filter(j=>j.id!==job.id&&(
+          (job.workshop_customer_id&&j.workshop_customer_id===job.workshop_customer_id)||
+          (name&&j.customer_name===name)
+        )).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
+        return(<>
+          {/* Customer card */}
+          <div className="card" style={{padding:16,marginBottom:12,borderLeft:"3px solid #db2777"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+              <div style={{width:44,height:44,borderRadius:22,background:"rgba(219,39,119,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>👤</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,fontSize:17,lineHeight:1.2}}>{name||<span style={{color:"var(--text3)"}}>No customer linked</span>}</div>
+                {custRecord&&<div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>ID: {custRecord.id}</div>}
+              </div>
+            </div>
+            {(phone||email)&&(
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {phone&&(
+                  <div style={{display:"flex",gap:8}}>
+                    <a href={`tel:${phone}`} className="btn btn-ghost" style={{flex:1,textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",fontSize:14,fontWeight:600,color:"var(--blue)"}}>
+                      📞 Call
+                    </a>
+                    <a href={`https://wa.me/${phone}?text=${encodeURIComponent(`Hi ${name.split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}`}
+                      className="btn btn-ghost" target="_blank" rel="noreferrer"
+                      style={{flex:1,textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",fontSize:14,fontWeight:600,color:"#25d366"}}>
+                      💬 WhatsApp
+                    </a>
+                  </div>
+                )}
+                {email&&(
+                  <a href={`mailto:${email}`} className="btn btn-ghost" style={{textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 0",fontSize:13,color:"var(--text2)"}}>
+                    ✉️ {email}
+                  </a>
+                )}
+              </div>
+            )}
+            {!phone&&!email&&!name&&(
+              <div style={{fontSize:13,color:"var(--text3)",textAlign:"center",padding:"8px 0"}}>No contact details on this job.</div>
+            )}
+          </div>
+
+          {/* Vehicle summary card */}
+          <div className="card" style={{padding:16,marginBottom:12}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>🚗 Vehicle Details</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 12px"}}>
+              {[
+                ["Plate",      job.vehicle_reg||"—"],
+                ["Make",       job.vehicle_make||"—"],
+                ["Model",      job.vehicle_model||"—"],
+                ["Year",       job.vehicle_year||"—"],
+                ["Color",      job.vehicle_color||"—"],
+                ["Mileage",    job.mileage?(+job.mileage).toLocaleString()+" km":"—"],
+                ["VIN",        job.vin||"—"],
+                ["Engine No",  job.engine_no||"—"],
+              ].map(([label,val])=>(
+                <div key={label} style={{background:"var(--surface2)",borderRadius:8,padding:"8px 10px"}}>
+                  <div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
+                  <div style={{fontSize:13,fontWeight:600,fontFamily:label==="Plate"||label==="VIN"||label==="Engine No"?"DM Mono,monospace":"inherit",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Service history */}
+          <div className="card" style={{padding:16}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span>🔧 Service History</span>
+              {custJobs.length>0&&<span style={{fontSize:12,color:"var(--text3)"}}>{custJobs.length} previous {custJobs.length===1?"visit":"visits"}</span>}
+            </div>
+            {custJobs.length===0?(
+              <div style={{textAlign:"center",padding:"20px 0",color:"var(--text3)",fontSize:13}}>No previous visits</div>
+            ):(
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {custJobs.slice(0,5).map(j=>{
+                  const ji=invoices.find(i=>i.job_id===j.id);
+                  return(
+                    <div key={j.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:600}}>{j.date_in||"—"} · <code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{j.vehicle_reg||"—"}</code></div>
+                        <div style={{fontSize:11,color:"var(--text3)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.complaint||j.notes||"No description"}</div>
+                      </div>
+                      {ji&&(
+                        <span style={{fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:6,flexShrink:0,
+                          background:ji.status==="paid"?"rgba(52,211,153,.15)":ji.status==="partial"?"rgba(251,191,36,.15)":"rgba(248,113,113,.12)",
+                          color:ji.status==="paid"?"var(--green)":ji.status==="partial"?"var(--yellow)":"var(--red)"}}>
+                          {ji.status==="paid"?"✅ Paid":ji.status==="partial"?"💛 Part":"⏳ Unpaid"}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                {custJobs.length>5&&<div style={{textAlign:"center",fontSize:12,color:"var(--text3)",paddingTop:4}}>+{custJobs.length-5} more visits</div>}
+              </div>
+            )}
+          </div>
+        </>);
+      })()}
 
       {/* Return Quote — supplier picker */}
       {returnQuoteOpen&&!returnQuoteTarget&&(()=>{

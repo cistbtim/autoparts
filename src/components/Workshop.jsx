@@ -3695,35 +3695,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
                     <span>WolfOil</span>
                   </button>
                 </div>
-                {/* OE Number search */}
-                <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
-                  <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🔎 {t.wsOeSearch}</div>
-                  <div style={{display:"flex",gap:6}}>
-                    <div style={{flex:1,position:"relative",display:"flex",alignItems:"center"}}>
-                      <input
-                        value={oeSearch} onChange={e=>setOeSearch(e.target.value)}
-                        onKeyDown={e=>{ if(e.key==="Enter"&&oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
-                        placeholder="Enter OE / part number…"
-                        style={{width:"100%",fontFamily:"DM Mono,monospace",fontSize:13,padding:"6px 30px 6px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)",outline:"none",boxSizing:"border-box"}}/>
-                      {oeSearch&&(
-                        <button onClick={()=>setOeSearch("")}
-                          style={{position:"absolute",right:6,background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,lineHeight:1,padding:0}}>✕</button>
-                      )}
-                    </div>
-                    <button
-                      onClick={()=>{ if(oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
-                      disabled={!oeSearch.trim()}
-                      style={{padding:"6px 14px",borderRadius:7,border:"none",background:"var(--accent)",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
-                      Goldwagen
-                    </button>
-                    <button
-                      onClick={()=>{ if(oeSearch.trim()) window.open(`https://www.autodoc.co.uk/spares-search?keyword=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
-                      disabled={!oeSearch.trim()}
-                      style={{padding:"6px 14px",borderRadius:7,border:"none",background:"#e63946",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
-                      AutoDoc
-                    </button>
-                  </div>
-                </div>
               </></div>)}
             </div>
           )}
@@ -3944,6 +3915,38 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
 
       {/* ══ QUOTE tab ══ */}
       {jobTab==="quote"&&wsRole!=="mechanic"&&(<>
+        {/* OE Number search */}
+        <div style={{marginBottom:14,borderRadius:12,overflow:"hidden",border:"1px solid var(--border)"}}>
+          <div style={{background:"linear-gradient(135deg,#0f766e,#14b8a6)",padding:"8px 14px",display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:15}}>🔎</span>
+            <span style={{fontSize:11,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".1em"}}>{t.wsOeSearch||"OE / Part Number Search"}</span>
+          </div>
+          <div style={{padding:"12px 14px",background:"var(--surface2)",borderLeft:"3px solid #14b8a6"}}>
+            <div style={{display:"flex",gap:6}}>
+              <div style={{flex:1,position:"relative",display:"flex",alignItems:"center"}}>
+                <input
+                  value={oeSearch} onChange={e=>setOeSearch(e.target.value)}
+                  onKeyDown={e=>{ if(e.key==="Enter"&&oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
+                  placeholder="Enter OE / part number…"
+                  style={{width:"100%",fontFamily:"DM Mono,monospace",fontSize:13,padding:"8px 32px 8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)",outline:"none",boxSizing:"border-box"}}/>
+                {oeSearch&&(
+                  <button onClick={()=>setOeSearch("")}
+                    style={{position:"absolute",right:8,background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,lineHeight:1,padding:0}}>✕</button>
+                )}
+              </div>
+              <button onClick={()=>{ if(oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
+                disabled={!oeSearch.trim()}
+                style={{padding:"8px 14px",borderRadius:8,border:"none",background:"var(--accent)",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
+                Goldwagen
+              </button>
+              <button onClick={()=>{ if(oeSearch.trim()) window.open(`https://www.autodoc.co.uk/spares-search?keyword=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
+                disabled={!oeSearch.trim()}
+                style={{padding:"8px 14px",borderRadius:8,border:"none",background:"#e63946",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
+                AutoDoc
+              </button>
+            </div>
+          </div>
+        </div>
         {/* Parts & Labour */}
         {(()=>{
           const defaultMarkup = +(wsProfile?.default_markup_pct||0);

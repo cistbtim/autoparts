@@ -3443,28 +3443,23 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
           )}
 
           {/* ── Profile Photos ── */}
-          <div style={{marginBottom:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>📸 {t.wsProfilePhotos||"Profile Photos"}</div>
+          <div style={{marginBottom:16,background:"var(--surface2)",borderRadius:14,padding:"12px 14px"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+              <div style={{fontSize:11,color:"var(--text2)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>📸 {t.wsProfilePhotos||"Profile Photos"}</div>
               {vehicleRecord&&(
                 <button onClick={()=>setEditPhotos(p=>!p)} style={{
                   fontSize:12,padding:"7px 16px",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,
-                  background:editPhotos
-                    ?"linear-gradient(135deg,#059669,#34d399)"
-                    :"linear-gradient(135deg,#7c3aed,#db2777)",
+                  background:editPhotos?"linear-gradient(135deg,#059669,#34d399)":"linear-gradient(135deg,#7c3aed,#db2777)",
                   color:"#fff",
-                  boxShadow:editPhotos
-                    ?"0 3px 14px rgba(52,211,153,0.45),inset 0 1px 0 rgba(255,255,255,0.15)"
-                    :"0 3px 14px rgba(124,58,237,0.45),inset 0 1px 0 rgba(255,255,255,0.15)",
-                  textShadow:"0 1px 2px rgba(0,0,0,0.2)",
-                  letterSpacing:"0.3px",
+                  boxShadow:editPhotos?"0 3px 14px rgba(52,211,153,0.45),inset 0 1px 0 rgba(255,255,255,0.15)":"0 3px 14px rgba(124,58,237,0.45),inset 0 1px 0 rgba(255,255,255,0.15)",
+                  textShadow:"0 1px 2px rgba(0,0,0,0.2)",letterSpacing:"0.3px",
                 }}>
                   {editPhotos?`✓ ${t.wsDoneEditing||"Done"}`:`✏️ ${t.wsEditPhotos||"Edit Photos"}`}
                 </button>
               )}
             </div>
             {editPhotos&&vehicleRecord?(
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,maxWidth:"50%"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
                 {[
                   {field:"photo_front",key:"front",label:"Front"},
                   {field:"photo_rear", key:"rear", label:"Rear"},
@@ -3478,21 +3473,26 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
               </div>
             ):(()=>{
               const allPhotos=[{url:vehiclePhotos.front,label:"Front"},{url:vehiclePhotos.rear,label:"Rear"},{url:vehiclePhotos.side,label:"Side"}];
-              const visible=allPhotos.filter(p=>p.url);
-              return visible.length>0?(
-                <div style={{display:"grid",gridTemplateColumns:`repeat(${visible.length},1fr)`,gap:6,maxWidth:"50%"}}>
-                  {visible.map(({url,label},i)=>(
-                    <div key={label} style={{position:"relative",borderRadius:7,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3",cursor:"zoom-in"}}
-                      onClick={()=>setPhotoLightbox(i)}>
-                      <DriveImg url={url} alt={label} style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}/>
-                      <div style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,.45)",color:"#fff",textAlign:"center",fontSize:9,padding:"2px 0",fontWeight:600}}>{label}</div>
+              const hasAny=allPhotos.some(p=>p.url);
+              return (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                  {allPhotos.map(({url,label},i)=>url?(
+                    <div key={label} style={{position:"relative",borderRadius:10,overflow:"hidden",background:"var(--surface3)",aspectRatio:"4/3",cursor:"zoom-in",boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}
+                      onClick={()=>setPhotoLightbox(allPhotos.filter(p=>p.url).findIndex(p=>p.label===label))}>
+                      <DriveImg url={url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                      <div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(0,0,0,.6))",color:"#fff",textAlign:"center",fontSize:10,padding:"10px 0 4px",fontWeight:700,letterSpacing:".04em"}}>{label}</div>
+                    </div>
+                  ):(
+                    <div key={label} onClick={vehicleRecord?()=>setEditPhotos(true):undefined}
+                      style={{aspectRatio:"4/3",borderRadius:10,border:"2px dashed var(--border2)",background:"var(--surface)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,cursor:vehicleRecord?"pointer":"default",opacity:.7}}>
+                      <span style={{fontSize:22}}>📷</span>
+                      <span style={{fontSize:10,color:"var(--text3)",fontWeight:600}}>{label}</span>
                     </div>
                   ))}
                 </div>
-              ):(
-                <div style={{fontSize:12,color:"var(--text3)"}}>{t.wsNoPhotos||"No photos — tap Edit Photos to add"}</div>
               );
             })()}
+            {!vehicleRecord&&<div style={{fontSize:12,color:"var(--text3)",textAlign:"center",padding:"8px 0"}}>{t.wsNoPhotos||"No photos — tap Edit Photos to add"}</div>}
           </div>
 
           {/* Complaint / Diagnosis / Return Reason / Notes */}

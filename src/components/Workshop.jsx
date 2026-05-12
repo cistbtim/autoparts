@@ -1241,7 +1241,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
           </div>
         );
-        return <WsSpareShopTab parts={parts} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder}/>;
+        const mainBranchId=branches.find(b=>b.is_main)?.id||null;
+        return <WsSpareShopTab parts={parts} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
@@ -5957,7 +5958,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // ═══════════════════════════════════════════════════════════════
 // WS SPARE SHOP TAB
 // ═══════════════════════════════════════════════════════════════
-function WsSpareShopTab({parts=[],linkedBranch,linkedBranchId,settings,onPlaceShopOrder}) {
+function WsSpareShopTab({parts=[],linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder}) {
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]); // [{id,sku,name,price,qty}]
   const [placing,setPlacing]=useState(false);
@@ -5965,7 +5966,10 @@ function WsSpareShopTab({parts=[],linkedBranch,linkedBranchId,settings,onPlaceSh
   const C=curSym(settings?.currency||"ZAR R");
 
   const shopParts=parts.filter(p=>{
-    if(p.branch_id!==linkedBranchId)return false;
+    // Include main catalog parts (null branch_id or main branch) AND branch-specific parts
+    const isMain=!p.branch_id||p.branch_id===mainBranchId;
+    const isBranch=p.branch_id===linkedBranchId;
+    if(!isMain&&!isBranch)return false;
     if(!search.trim())return true;
     const q=search.trim().toLowerCase();
     return (p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q);

@@ -5960,19 +5960,36 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // ═══════════════════════════════════════════════════════════════
 function WsSpareShopTab({parts=[],linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder}) {
   const [search,setSearch]=useState("");
-  const [cart,setCart]=useState([]); // [{id,sku,name,price,qty}]
+  const [cart,setCart]=useState([]);
   const [placing,setPlacing]=useState(false);
   const [placed,setPlaced]=useState(false);
+  const [branchStock,setBranchStock]=useState(null); // null = loading
   const C=curSym(settings?.currency||"ZAR R");
 
-  const shopParts=parts.filter(p=>{
-    // Include main catalog parts (null branch_id or main branch) AND branch-specific parts
-    const isMain=!p.branch_id||p.branch_id===mainBranchId;
-    const isBranch=p.branch_id===linkedBranchId;
-    if(!isMain&&!isBranch)return false;
+  // Lazy-load branch_stock for the linked branch on mount
+  useEffect(()=>{
+    if(!linkedBranchId)return;
+    api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=*`)
+      .then(d=>setBranchStock(Array.isArray(d)?d:[]))
+      .catch(()=>setBranchStock([]));
+  },[linkedBranchId]);
+
+  // Build visible catalog:
+  // 1. Main catalog parts that the branch has set up in branch_stock (apply branch qty/price)
+  // 2. Branch-specific own parts (branch_id === linkedBranchId)
+  const branchStockMap=Object.fromEntries((branchStock||[]).map(bs=>[String(bs.part_id),bs]));
+  const branchStockedIds=new Set((branchStock||[]).map(bs=>String(bs.part_id)));
+
+  const shopParts=(branchStock===null?[]:parts.filter(p=>{
+    const isBranchOwn=p.branch_id===linkedBranchId;
+    const isMainWithStock=((!p.branch_id||p.branch_id===mainBranchId)&&branchStockedIds.has(String(p.id)));
+    if(!isBranchOwn&&!isMainWithStock)return false;
     if(!search.trim())return true;
     const q=search.trim().toLowerCase();
     return (p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q);
+  })).map(p=>{
+    const bs=branchStockMap[String(p.id)];
+    return bs?{...p,stock:bs.qty??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;
   });
 
   const addToCart=(p)=>{

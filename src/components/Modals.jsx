@@ -2125,18 +2125,20 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                 // For branch prefix: show branch-scoped SKUs
                 // For main/no-prefix: show all SKUs filtered by what user is typing
                 let skuList;
+                if(!typed) return null;
                 if(branchSkuPrefix){
-                  skuList=[...new Set(allParts.filter(p=>p.branch_id===currentBranch?.id&&p.sku).map(p=>p.sku))].sort().slice(-8).reverse();
+                  const suffix=typed.startsWith(branchSkuPrefix+"-")?typed.slice(branchSkuPrefix.length+1):typed;
+                  if(!suffix) return null;
+                  const q=suffix.toLowerCase();
+                  skuList=[...new Set(allParts.filter(p=>p.branch_id===currentBranch?.id&&p.sku&&p.sku.toLowerCase().includes(q)).map(p=>p.sku))].sort().slice(0,10);
                 } else {
                   const q=typed.toLowerCase();
-                  skuList=q.length>=1
-                    ?[...new Set(allParts.filter(p=>p.sku&&p.sku.toLowerCase().includes(q)).map(p=>p.sku))].sort().slice(0,10)
-                    :[...new Set(allParts.filter(p=>p.sku).map(p=>p.sku))].sort().slice(-8).reverse();
+                  skuList=[...new Set(allParts.filter(p=>p.sku&&p.sku.toLowerCase().includes(q)).map(p=>p.sku))].sort().slice(0,10);
                 }
-                if(!skuList.length) return <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>No existing SKUs yet — you'll be first!</div>;
+                if(!skuList.length) return null;
                 return (
                   <div style={{marginTop:7}}>
-                    <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{typed.length>=1?"Matching SKUs:":"Recent SKUs:"}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Matching SKUs:</div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                       {skuList.map(sku=>{
                         const isDup=sku===typed;

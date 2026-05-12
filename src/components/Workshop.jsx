@@ -2715,6 +2715,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
   const [pastRec, setPastRec] = useState({date_in:"",date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});
   const [savingPastRec, setSavingPastRec] = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
+  const [showVinSearch, setShowVinSearch] = useState(false);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
   const [refreshing,    setRefreshing]    = useState(false);
   const [noteEdit,      setNoteEdit]      = useState(false);
@@ -3566,100 +3567,106 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
             })()}
           </div>
 
-          {/* VIN + Search tools */}
+          {/* VIN + Search tools — collapsed by default */}
           {job.vin&&(
-            <div style={{borderTop:"1px solid var(--border)",paddingTop:12}}>
-              <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:8}}>🔍 {t.wsVinSearch}</div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-                <code style={{fontFamily:"DM Mono,monospace",fontSize:14,fontWeight:700,letterSpacing:"1px",background:"var(--surface2)",padding:"5px 12px",borderRadius:7,border:"1px solid var(--border)"}}>{job.vin}</code>
-                <button onClick={()=>navigator.clipboard.writeText(job.vin).then(()=>alert("VIN copied!"))}
-                  style={{fontSize:11,padding:"4px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",color:"var(--text3)"}}>📋 {t.wsCopy}</button>
-              </div>
-              {(()=>{
-                const d=decodeVin(job.vin);
-                if(!d) return null;
-                const fields=[
-                  {k:'Year',   v:d.year},
-                  {k:'Origin', v:d.country},
-                  {k:'Make',   v:d.make},
-                  d.model ? {k:'Model', v:d.model} : null,
-                  d.plant ? {k:'Plant', v:d.plant} : null,
-                ].filter(Boolean);
-                return (
-                  <div style={{marginBottom:10,padding:"8px 12px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
-                    <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>📡 VIN Decoded</div>
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                      {fields.map(f=>(
-                        <div key={f.k} style={{fontSize:11,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 9px",lineHeight:1.5}}>
-                          <span style={{color:"var(--text3)",marginRight:4}}>{f.k}:</span>
-                          <span style={{fontWeight:700,color:"var(--text1)"}}>{f.v}</span>
-                        </div>
-                      ))}
+            <div style={{borderTop:"1px solid var(--border)",paddingTop:10}}>
+              <button onClick={()=>setShowVinSearch(v=>!v)}
+                style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"none",border:"none",cursor:"pointer",padding:"2px 0",marginBottom:showVinSearch?10:0}}>
+                <span style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em"}}>🔍 VIN Search &amp; Tools</span>
+                <span style={{fontSize:12,color:"var(--text3)"}}>{showVinSearch?"▲ Hide":"▼ Show"}</span>
+              </button>
+              {showVinSearch&&(<>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                  <code style={{fontFamily:"DM Mono,monospace",fontSize:14,fontWeight:700,letterSpacing:"1px",background:"var(--surface2)",padding:"5px 12px",borderRadius:7,border:"1px solid var(--border)"}}>{job.vin}</code>
+                  <button onClick={()=>navigator.clipboard.writeText(job.vin).then(()=>alert("VIN copied!"))}
+                    style={{fontSize:11,padding:"4px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",color:"var(--text3)"}}>📋 {t.wsCopy}</button>
+                </div>
+                {(()=>{
+                  const d=decodeVin(job.vin);
+                  if(!d) return null;
+                  const fields=[
+                    {k:'Year',   v:d.year},
+                    {k:'Origin', v:d.country},
+                    {k:'Make',   v:d.make},
+                    d.model ? {k:'Model', v:d.model} : null,
+                    d.plant ? {k:'Plant', v:d.plant} : null,
+                  ].filter(Boolean);
+                  return (
+                    <div style={{marginBottom:10,padding:"8px 12px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
+                      <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>📡 VIN Decoded</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {fields.map(f=>(
+                          <div key={f.k} style={{fontSize:11,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 9px",lineHeight:1.5}}>
+                            <span style={{color:"var(--text3)",marginRight:4}}>{f.k}:</span>
+                            <span style={{fontWeight:700,color:"var(--text1)"}}>{f.v}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-                {vinSearchLinks.map(lk=>(
-                  <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                  );
+                })()}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                  {vinSearchLinks.map(lk=>(
+                    <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                      style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
+                        background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:10,
+                        color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                      <span style={{fontSize:20}}>{lk.icon}</span>
+                      <span>{lk.label}</span>
+                    </a>
+                  ))}
+                  <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open(`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`,"_blank");}}
                     style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
-                      background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:10,
-                      color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
-                    <span style={{fontSize:20}}>{lk.icon}</span>
-                    <span>{lk.label}</span>
-                  </a>
-                ))}
-                <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open(`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`,"_blank");}}
-                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
-                    background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:10,
-                    color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
-                  <span style={{fontSize:20}}>🔴</span>
-                  <span>AutoZone</span>
-                </button>
-                <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
-                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
-                    background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:10,
-                    color:"#0ea5e9",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
-                  <span style={{fontSize:20}}>🔧</span>
-                  <span>Amayama 📋</span>
-                </button>
-                <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied!\n\nPaste it into WolfOil's VIN field.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
-                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
-                    background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:10,
-                    color:"#f97316",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
-                  <span style={{fontSize:20}}>🛢️</span>
-                  <span>WolfOil</span>
-                </button>
-              </div>
-              {/* OE Number search */}
-              <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
-                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🔎 {t.wsOeSearch}</div>
-                <div style={{display:"flex",gap:6}}>
-                  <div style={{flex:1,position:"relative",display:"flex",alignItems:"center"}}>
-                    <input
-                      value={oeSearch} onChange={e=>setOeSearch(e.target.value)}
-                      onKeyDown={e=>{ if(e.key==="Enter"&&oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
-                      placeholder="Enter OE / part number…"
-                      style={{width:"100%",fontFamily:"DM Mono,monospace",fontSize:13,padding:"6px 30px 6px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)",outline:"none",boxSizing:"border-box"}}/>
-                    {oeSearch&&(
-                      <button onClick={()=>setOeSearch("")}
-                        style={{position:"absolute",right:6,background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,lineHeight:1,padding:0}}>✕</button>
-                    )}
-                  </div>
-                  <button
-                    onClick={()=>{ if(oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
-                    disabled={!oeSearch.trim()}
-                    style={{padding:"6px 14px",borderRadius:7,border:"none",background:"var(--accent)",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
-                    Goldwagen
+                      background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:10,
+                      color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                    <span style={{fontSize:20}}>🔴</span>
+                    <span>AutoZone</span>
                   </button>
-                  <button
-                    onClick={()=>{ if(oeSearch.trim()) window.open(`https://www.autodoc.co.uk/spares-search?keyword=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
-                    disabled={!oeSearch.trim()}
-                    style={{padding:"6px 14px",borderRadius:7,border:"none",background:"#e63946",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
-                    AutoDoc
+                  <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
+                      background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:10,
+                      color:"#0ea5e9",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                    <span style={{fontSize:20}}>🔧</span>
+                    <span>Amayama 📋</span>
+                  </button>
+                  <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied!\n\nPaste it into WolfOil's VIN field.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
+                      background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:10,
+                      color:"#f97316",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                    <span style={{fontSize:20}}>🛢️</span>
+                    <span>WolfOil</span>
                   </button>
                 </div>
-              </div>
+                {/* OE Number search */}
+                <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:10}}>
+                  <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🔎 {t.wsOeSearch}</div>
+                  <div style={{display:"flex",gap:6}}>
+                    <div style={{flex:1,position:"relative",display:"flex",alignItems:"center"}}>
+                      <input
+                        value={oeSearch} onChange={e=>setOeSearch(e.target.value)}
+                        onKeyDown={e=>{ if(e.key==="Enter"&&oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
+                        placeholder="Enter OE / part number…"
+                        style={{width:"100%",fontFamily:"DM Mono,monospace",fontSize:13,padding:"6px 30px 6px 10px",borderRadius:7,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)",outline:"none",boxSizing:"border-box"}}/>
+                      {oeSearch&&(
+                        <button onClick={()=>setOeSearch("")}
+                          style={{position:"absolute",right:6,background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,lineHeight:1,padding:0}}>✕</button>
+                      )}
+                    </div>
+                    <button
+                      onClick={()=>{ if(oeSearch.trim()) window.open(`https://partsfinder.goldwagen.com/partsfinder?stext=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
+                      disabled={!oeSearch.trim()}
+                      style={{padding:"6px 14px",borderRadius:7,border:"none",background:"var(--accent)",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
+                      Goldwagen
+                    </button>
+                    <button
+                      onClick={()=>{ if(oeSearch.trim()) window.open(`https://www.autodoc.co.uk/spares-search?keyword=${encodeURIComponent(oeSearch.trim())}`, "_blank"); }}
+                      disabled={!oeSearch.trim()}
+                      style={{padding:"6px 14px",borderRadius:7,border:"none",background:"#e63946",color:"#fff",fontWeight:700,fontSize:12,cursor:oeSearch.trim()?"pointer":"default",opacity:oeSearch.trim()?1:.45}}>
+                      AutoDoc
+                    </button>
+                  </div>
+                </div>
+              </>)}
             </div>
           )}
 
@@ -4049,29 +4056,37 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
             )}
           </div>
         )}
-        {/* ── VIN & Search tools ── */}
+        {/* ── VIN & Search tools — collapsed by default ── */}
         {job.vin&&(
-          <div style={{marginBottom:12,padding:"8px 10px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-              <span style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",flexShrink:0}}>🔍 VIN</span>
-              <code style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.vin}</code>
-              <button onClick={()=>navigator.clipboard.writeText(job.vin).then(()=>alert("VIN copied!"))}
-                style={{fontSize:10,padding:"2px 7px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:5,cursor:"pointer",color:"var(--text3)",flexShrink:0}}>📋</button>
-            </div>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-              {vinSearchLinks.map(lk=>(
-                <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
-                  style={{fontSize:10,fontWeight:600,color:lk.color,background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:99,padding:"2px 9px",textDecoration:"none",whiteSpace:"nowrap"}}>
-                  {lk.icon} {lk.label}
-                </a>
-              ))}
-              <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open(`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`,"_blank");}}
-                style={{fontSize:10,fontWeight:600,color:"#dc2626",background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🔴 AutoZone</button>
-              <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
-                style={{fontSize:10,fontWeight:600,color:"#0ea5e9",background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🔧 Amayama</button>
-              <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied!\n\nPaste it into WolfOil's VIN field.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
-                style={{fontSize:10,fontWeight:600,color:"#f97316",background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🛢️ WolfOil</button>
-            </div>
+          <div style={{marginBottom:12,background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)",overflow:"hidden"}}>
+            <button onClick={()=>setShowVinSearch(v=>!v)}
+              style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:"none",border:"none",cursor:"pointer",textAlign:"left"}}>
+              <span style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",flexShrink:0}}>🔍 VIN Search</span>
+              <code style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"var(--text2)"}}>{job.vin}</code>
+              <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>{showVinSearch?"▲":"▼"}</span>
+            </button>
+            {showVinSearch&&(
+              <div style={{padding:"0 10px 10px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                  <button onClick={()=>navigator.clipboard.writeText(job.vin).then(()=>alert("VIN copied!"))}
+                    style={{fontSize:10,padding:"2px 7px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:5,cursor:"pointer",color:"var(--text3)"}}>📋 Copy</button>
+                </div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                  {vinSearchLinks.map(lk=>(
+                    <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                      style={{fontSize:10,fontWeight:600,color:lk.color,background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:99,padding:"2px 9px",textDecoration:"none",whiteSpace:"nowrap"}}>
+                      {lk.icon} {lk.label}
+                    </a>
+                  ))}
+                  <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open(`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`,"_blank");}}
+                    style={{fontSize:10,fontWeight:600,color:"#dc2626",background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🔴 AutoZone</button>
+                  <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
+                    style={{fontSize:10,fontWeight:600,color:"#0ea5e9",background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🔧 Amayama</button>
+                  <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied!\n\nPaste it into WolfOil's VIN field.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
+                    style={{fontSize:10,fontWeight:600,color:"#f97316",background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🛢️ WolfOil</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>

@@ -1241,8 +1241,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
           </div>
         );
-        const mainBranchId=branches.find(b=>b.is_main)?.id||null;
-        return <WsSpareShopTab parts={parts} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder}/>;
+        return <WsSpareShopTab linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
@@ -5958,39 +5957,51 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // ═══════════════════════════════════════════════════════════════
 // WS SPARE SHOP TAB
 // ═══════════════════════════════════════════════════════════════
-function WsSpareShopTab({parts=[],linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder}) {
+function WsSpareShopTab({linkedBranch,linkedBranchId,settings,onPlaceShopOrder}) {
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
   const [placing,setPlacing]=useState(false);
   const [placed,setPlaced]=useState(false);
-  const [branchStock,setBranchStock]=useState(null); // null = loading
+  const [loading,setLoading]=useState(true);
+  const [shopParts,setShopParts]=useState([]);
   const C=curSym(settings?.currency||"ZAR R");
 
-  // Lazy-load branch_stock for the linked branch on mount
+  // Fetch branch inventory directly: branch-owned parts + main catalog parts with branch_stock entries
   useEffect(()=>{
-    if(!linkedBranchId)return;
-    api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=*`)
-      .then(d=>setBranchStock(Array.isArray(d)?d:[]))
-      .catch(()=>setBranchStock([]));
+    if(!linkedBranchId){setLoading(false);setShopParts([]);return;}
+    setLoading(true);
+    Promise.all([
+      api.get("parts",`branch_id=eq.${linkedBranchId}&select=*&order=name.asc`).catch(()=>[]),
+      api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=*`).catch(()=>[]),
+    ]).then(async([ownParts,bStock])=>{
+      const bStockArr=Array.isArray(bStock)?bStock:[];
+      const ownArr=Array.isArray(ownParts)?ownParts:[];
+      // Fetch main catalog parts referenced by branch_stock
+      let catalogParts=[];
+      if(bStockArr.length){
+        const ids=bStockArr.map(bs=>bs.part_id).filter(Boolean);
+        if(ids.length){
+          const orFilter=ids.map(id=>`id.eq.${id}`).join(",");
+          catalogParts=await api.get("parts",`or=(${orFilter})&select=*`).catch(()=>[]);
+          if(!Array.isArray(catalogParts))catalogParts=[];
+        }
+      }
+      // Apply branch_stock overrides onto catalog parts
+      const bStockMap=Object.fromEntries(bStockArr.map(bs=>[String(bs.part_id),bs]));
+      const mergedCatalog=catalogParts.map(p=>{
+        const bs=bStockMap[String(p.id)];
+        return bs?{...p,stock:bs.qty??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;
+      });
+      // Combine: own parts first, then catalog (dedupe by id)
+      const seen=new Set(ownArr.map(p=>String(p.id)));
+      const combined=[...ownArr,...mergedCatalog.filter(p=>!seen.has(String(p.id)))];
+      setShopParts(combined);
+      setLoading(false);
+    });
   },[linkedBranchId]);
 
-  // Build visible catalog:
-  // 1. Main catalog parts that the branch has set up in branch_stock (apply branch qty/price)
-  // 2. Branch-specific own parts (branch_id === linkedBranchId)
-  const branchStockMap=Object.fromEntries((branchStock||[]).map(bs=>[String(bs.part_id),bs]));
-  const branchStockedIds=new Set((branchStock||[]).map(bs=>String(bs.part_id)));
-
-  const shopParts=(branchStock===null?[]:parts.filter(p=>{
-    const isBranchOwn=p.branch_id===linkedBranchId;
-    const isMainWithStock=((!p.branch_id||p.branch_id===mainBranchId)&&branchStockedIds.has(String(p.id)));
-    if(!isBranchOwn&&!isMainWithStock)return false;
-    if(!search.trim())return true;
-    const q=search.trim().toLowerCase();
-    return (p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q);
-  })).map(p=>{
-    const bs=branchStockMap[String(p.id)];
-    return bs?{...p,stock:bs.qty??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;
-  });
+  const q=search.trim().toLowerCase();
+  const filtered=q?shopParts.filter(p=>(p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q)):shopParts;
 
   const addToCart=(p)=>{
     setCart(prev=>{
@@ -6027,9 +6038,11 @@ function WsSpareShopTab({parts=[],linkedBranch,linkedBranchId,mainBranchId,setti
         <div>
           <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
             placeholder="Search SKU, name, brand…" style={{marginBottom:12}}/>
-          {shopParts.length===0
+          {loading
+            ? <div style={{textAlign:"center",padding:30,color:"var(--text3)",fontSize:13}}>Loading…</div>
+            : filtered.length===0
             ? <div style={{textAlign:"center",padding:30,color:"var(--text3)",fontSize:13}}>{search?"No parts matching search":"No parts found for this branch"}</div>
-            : shopParts.map(p=>(
+            : filtered.map(p=>(
               <div key={p.id} className="card" style={{padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>

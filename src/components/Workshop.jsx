@@ -6,7 +6,7 @@ import { fmtAmt, makeId, today, toImgUrl, waLink, openLabelWindow } from "../lib
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
-import { VehiclePhotoUploader } from "./RfqVehicles.jsx";
+import { VehiclePhotoUploader, VehicleSearchBar } from "./RfqVehicles.jsx";
 import { WsStockPage, WsStockModal, WsStockAdjustModal } from "./ws/Stock.jsx";
 import { WsServicesPage, WsServiceModal } from "./ws/Services.jsx";
 import { WsSuppliersPage, WsSupplierModal } from "./ws/WsSuppliers.jsx";
@@ -1234,6 +1234,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       {wsTab==="spareshop"&&(()=>{
         const linkedBranchId=wsProfile?.linked_branch_id;
         const linkedBranch=branches.find(b=>b.id===linkedBranchId);
+        const mainBranchId=branches.find(b=>b.is_main)?.id||null;
         if(!linkedBranchId) return (
           <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
             <div style={{fontSize:32,marginBottom:12}}>🏪</div>
@@ -1241,7 +1242,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
           </div>
         );
-        return <WsSpareShopTab linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder}/>;
+        return <WsSpareShopTab linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder} vehicles={vehicles} partFitments={partFitments}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
@@ -5957,26 +5958,34 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // ═══════════════════════════════════════════════════════════════
 // WS SPARE SHOP TAB
 // ═══════════════════════════════════════════════════════════════
-function WsSpareShopTab({linkedBranch,linkedBranchId,settings,onPlaceShopOrder}) {
+const WS_SHOP_PAGE_SIZE=20;
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,vehicles=[],partFitments=[]}) {
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
   const [placing,setPlacing]=useState(false);
   const [placed,setPlaced]=useState(false);
   const [loading,setLoading]=useState(true);
   const [shopParts,setShopParts]=useState([]);
-  const C=curSym(settings?.currency||"ZAR R");
+  const [page,setPage]=useState(0);
+  const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
+  const [stockOnly,setStockOnly]=useState(false);
+  const [lightbox,setLightbox]=useState(null);
+  const Cs=curSym(settings?.currency||"ZAR R");
 
-  // Fetch branch inventory directly: branch-owned parts + main catalog parts with branch_stock entries
   useEffect(()=>{
     if(!linkedBranchId){setLoading(false);setShopParts([]);return;}
     setLoading(true);
-    Promise.all([
+    const fetches=[
       api.get("parts",`branch_id=eq.${linkedBranchId}&select=*&order=name.asc`).catch(()=>[]),
       api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=*`).catch(()=>[]),
-    ]).then(async([ownParts,bStock])=>{
+      mainBranchId&&mainBranchId!==linkedBranchId
+        ?api.get("parts",`branch_id=eq.${mainBranchId}&select=*&order=name.asc`).catch(()=>[])
+        :Promise.resolve([]),
+    ];
+    Promise.all(fetches).then(async([ownParts,bStock,mainParts])=>{
       const bStockArr=Array.isArray(bStock)?bStock:[];
       const ownArr=Array.isArray(ownParts)?ownParts:[];
-      // Fetch main catalog parts referenced by branch_stock
+      const mainArr=Array.isArray(mainParts)?mainParts:[];
       let catalogParts=[];
       if(bStockArr.length){
         const ids=bStockArr.map(bs=>bs.part_id).filter(Boolean);
@@ -5986,33 +5995,37 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,settings,onPlaceShopOrder})
           if(!Array.isArray(catalogParts))catalogParts=[];
         }
       }
-      // Apply branch_stock overrides onto catalog parts
       const bStockMap=Object.fromEntries(bStockArr.map(bs=>[String(bs.part_id),bs]));
       const mergedCatalog=catalogParts.map(p=>{
         const bs=bStockMap[String(p.id)];
         return bs?{...p,stock:bs.qty??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;
       });
-      // Combine: own parts first, then catalog (dedupe by id)
       const seen=new Set(ownArr.map(p=>String(p.id)));
-      const combined=[...ownArr,...mergedCatalog.filter(p=>!seen.has(String(p.id)))];
+      const linkedParts=[...ownArr,...mergedCatalog.filter(p=>!seen.has(String(p.id)))];
+      // Add main branch parts (dedupe — linked branch takes priority)
+      const allSeen=new Set(linkedParts.map(p=>String(p.id)));
+      const combined=[...linkedParts,...mainArr.filter(p=>!allSeen.has(String(p.id)))];
       setShopParts(combined);
       setLoading(false);
     });
-  },[linkedBranchId]);
+  },[linkedBranchId,mainBranchId]);
 
   const q=search.trim().toLowerCase();
-  const filtered=q?shopParts.filter(p=>(p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q)):shopParts;
+  const filtered=(q
+    ?shopParts.filter(p=>(p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q))
+    :shopParts
+  ).filter(p=>!vehicleFilterIds||vehicleFilterIds.has(String(p.id)))
+   .filter(p=>!stockOnly||p.stock>0);
 
-  const addToCart=(p)=>{
-    setCart(prev=>{
-      const ex=prev.find(i=>i.id===p.id);
-      if(ex) return prev.map(i=>i.id===p.id?{...i,qty:i.qty+1}:i);
-      return [...prev,{id:p.id,sku:p.sku,name:p.name,price:+p.price||0,qty:1}];
-    });
-  };
+  const addToCart=(p)=>setCart(prev=>{
+    const ex=prev.find(i=>i.id===p.id);
+    if(ex) return prev.map(i=>i.id===p.id?{...i,qty:i.qty+1}:i);
+    return [...prev,{id:p.id,sku:p.sku,name:p.name,price:+p.price||0,qty:1}];
+  });
   const removeFromCart=(id)=>setCart(prev=>prev.filter(i=>i.id!==id));
   const qtyCart=(id,qty)=>setCart(prev=>prev.map(i=>i.id===id?{...i,qty:Math.max(1,+qty||1)}:i));
   const cartTotal=cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const cartCount=cart.reduce((s,i)=>s+i.qty,0);
 
   const placeOrder=async()=>{
     if(!cart.length)return;
@@ -6024,71 +6037,95 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,settings,onPlaceShopOrder})
     setPlacing(false);
   };
 
+  const paged=filtered.slice(page*WS_SHOP_PAGE_SIZE,(page+1)*WS_SHOP_PAGE_SIZE);
+
   return (
     <div>
-      <div style={{background:"var(--accent)",color:"#fff",borderRadius:10,padding:"14px 18px",marginBottom:16}}>
-        <div style={{fontSize:20,fontWeight:800}}>🏪 {linkedBranch?.name||"Spare Shop"}</div>
-        <div style={{fontSize:12,opacity:0.85,marginTop:3}}>Branch ID: {linkedBranchId||"(none)"} · Parts loaded: {shopParts.length} · Loading: {String(loading)}</div>
-      </div>
+      {lightbox&&<ImgLightbox url={lightbox.url} name={lightbox.name} onClose={()=>setLightbox(null)}/>}
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 340px",gap:18,alignItems:"start"}}>
-        {/* Parts list */}
-        <div>
-          <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
-            placeholder="Search SKU, name, brand…" style={{marginBottom:12}}/>
-          {loading
-            ? <div style={{textAlign:"center",padding:30,color:"var(--text3)",fontSize:13}}>Loading…</div>
-            : filtered.length===0
-            ? <div style={{textAlign:"center",padding:30,color:"var(--text3)",fontSize:13}}>{search?"No parts matching search":"No parts found for this branch"}</div>
-            : filtered.map(p=>(
-              <div key={p.id} className="card" style={{padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                  <div style={{display:"flex",gap:8,marginTop:3,fontSize:11,color:"var(--text3)"}}>
-                    <code style={{fontFamily:"DM Mono,monospace"}}>{p.sku}</code>
-                    {p.brand&&<span>{p.brand}</span>}
-                    <span style={{color:p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--green)",fontWeight:600}}>Qty: {p.stock}</span>
-                  </div>
-                </div>
-                <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16,flexShrink:0}}>{C}{(+p.price||0).toFixed(2)}</div>
-                <button className="btn btn-primary btn-sm" style={{flexShrink:0}} onClick={()=>addToCart(p)} disabled={p.stock===0}>
-                  {p.stock===0?"Out":"+ Add"}
-                </button>
-              </div>
-            ))
-          }
-        </div>
-
-        {/* Cart */}
-        <div className="card" style={{padding:16,position:"sticky",top:16}}>
-          <div style={{fontWeight:700,fontSize:15,marginBottom:12}}>🛒 Order Cart</div>
-          {cart.length===0
-            ? <div style={{textAlign:"center",padding:20,color:"var(--text3)",fontSize:13}}>No items yet — add parts from the list</div>
-            : <>
-              {cart.map(i=>(
-                <div key={i.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingBottom:10,borderBottom:"1px solid var(--border)"}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.name}</div>
-                    <div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{i.sku}</div>
-                  </div>
-                  <input type="number" min="1" className="inp" value={i.qty} onChange={e=>qtyCart(i.id,e.target.value)}
-                    style={{width:52,padding:"4px 6px",textAlign:"center",fontSize:13}}/>
-                  <div style={{fontWeight:700,color:"var(--accent)",fontSize:13,width:64,textAlign:"right",flexShrink:0}}>{C}{(i.price*i.qty).toFixed(2)}</div>
-                  <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}} onClick={()=>removeFromCart(i.id)}>✕</button>
-                </div>
-              ))}
-              <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:15,margin:"10px 0"}}>
-                <span>Total</span>
-                <span style={{color:"var(--accent)"}}>{C}{cartTotal.toFixed(2)}</span>
-              </div>
-              {placed&&<div style={{background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)",borderRadius:8,padding:"8px 12px",fontSize:13,color:"var(--green)",marginBottom:10,textAlign:"center"}}>✅ Order placed successfully!</div>}
-              <button className="btn btn-primary" style={{width:"100%",padding:11}} onClick={placeOrder} disabled={placing||!cart.length}>
-                {placing?"Placing order…":"📦 Place Order"}
-              </button>
-            </>
-          }
+      {/* Sticky toolbar */}
+      <div style={{position:"sticky",top:-26,zIndex:40,background:"var(--bg)",paddingTop:10,paddingBottom:12,marginBottom:6,marginLeft:-26,marginRight:-26,paddingLeft:26,paddingRight:26,borderBottom:"1px solid var(--border)"}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <input className="inp" value={search} onChange={e=>{setSearch(e.target.value);setPage(0);}}
+            placeholder="Search parts…" style={{flex:"1 1 180px",maxWidth:280}}/>
+          {search&&<button className="btn btn-ghost btn-sm" onClick={()=>{setSearch("");setPage(0);}} style={{color:"var(--accent)"}}>✕ Clear</button>}
+          <div style={{display:"flex",border:"1px solid var(--border)",borderRadius:8,overflow:"hidden",flexShrink:0}}>
+            <button onClick={()=>{setStockOnly(false);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:!stockOnly?700:400,background:!stockOnly?"var(--accent)":"transparent",color:!stockOnly?"#fff":"var(--text2)"}}>All</button>
+            <button onClick={()=>{setStockOnly(true);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:stockOnly?700:400,background:stockOnly?"var(--accent)":"transparent",color:stockOnly?"#fff":"var(--text2)"}}>In Stock</button>
+          </div>
+          <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}} onClick={placeOrder} disabled={placing||!cart.length}>
+            🛒 {cartCount>0?`(${cartCount}) `:""}Checkout{cartTotal>0?` · ${Cs}${cartTotal.toLocaleString()}`:""}
+          </button>
         </div>
       </div>
+
+      {/* Vehicle filter */}
+      <VehicleSearchBar vehicles={vehicles} partFitments={partFitments} parts={shopParts}
+        t={{}} onFilter={(ids)=>{setVehicleFilterIds(ids);setPage(0);}}/>
+
+      {vehicleFilterIds&&<div style={{fontSize:12,color:"var(--blue)",marginBottom:12,fontWeight:600}}>
+        🚗 {filtered.length} parts match your vehicle
+      </div>}
+
+      {loading
+        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>Loading…</div>
+        : filtered.length===0
+        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>{search||vehicleFilterIds?"No parts match your search":"No parts found for this branch"}</div>
+        : <>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14}}>
+            {paged.map(p=>{
+              const inCart=cart.find(i=>i.id===p.id);
+              const img=toImgUrl(p.image_url);
+              return (
+                <div key={p.id} className="card card-hover" style={{padding:16,borderColor:inCart?"var(--accent)":"var(--border)",boxShadow:inCart?"var(--glow)":"none",display:"flex",flexDirection:"column"}}>
+                  {img
+                    ? <div style={{marginBottom:12,flexShrink:0}}>
+                        <img src={img} alt={p.name}
+                          style={{width:"100%",height:120,objectFit:"contain",background:"#fff",borderRadius:9,cursor:"zoom-in",display:"block"}}
+                          onClick={()=>setLightbox({url:img,name:p.name})}
+                          onError={e=>e.target.parentNode.style.display="none"}/>
+                      </div>
+                    : <div style={{width:"100%",height:90,background:"var(--surface2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:38,marginBottom:12,flexShrink:0}}>
+                        {p.image||"🔩"}
+                      </div>}
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{p.sku} · {p.brand}</div>
+                    <div style={{fontSize:14,fontWeight:700,marginBottom:2,lineHeight:1.3}}>{p.name}</div>
+                    {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:2}}>{p.chinese_desc}</div>}
+                    {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>🚗 {[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
+                    {p.oe_number&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace"}}>OE: {p.oe_number}</div>}
+                  </div>
+                  <div style={{marginTop:8}}>
+                    <div style={{fontSize:20,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginBottom:4}}>{Cs}{(+p.price||0).toLocaleString()}</div>
+                    <div style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)",marginBottom:10}}>{p.stock>0?`${p.stock} in stock`:"Out of Stock"}</div>
+                    {inCart
+                      ? <div style={{display:"flex",alignItems:"center",gap:7}}>
+                          <button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty-1)}>−</button>
+                          <span style={{flex:1,textAlign:"center",fontWeight:700,fontSize:16}}>{inCart.qty}</span>
+                          <button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty+1)}>+</button>
+                          <button className="btn btn-danger btn-xs" onClick={()=>removeFromCart(p.id)}>✕</button>
+                        </div>
+                      : <button className="btn btn-primary" style={{width:"100%"}} disabled={p.stock===0} onClick={()=>addToCart(p)}>Add to Cart</button>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {filtered.length>WS_SHOP_PAGE_SIZE&&(
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:14,flexWrap:"wrap",gap:10}}>
+              <div style={{fontSize:13,color:"var(--text3)"}}>
+                Showing {page*WS_SHOP_PAGE_SIZE+1}–{Math.min((page+1)*WS_SHOP_PAGE_SIZE,filtered.length)} of <strong style={{color:"var(--text)"}}>{filtered.length}</strong> parts
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <button className="btn btn-ghost btn-sm" disabled={page===0} onClick={()=>setPage(p=>p-1)}>← Prev</button>
+                <span style={{fontSize:13,color:"var(--text2)",fontWeight:600,minWidth:80,textAlign:"center"}}>Page {page+1} / {Math.ceil(filtered.length/WS_SHOP_PAGE_SIZE)}</span>
+                <button className="btn btn-ghost btn-sm" disabled={(page+1)*WS_SHOP_PAGE_SIZE>=filtered.length} onClick={()=>setPage(p=>p+1)}>Next →</button>
+              </div>
+            </div>
+          )}
+          {placed&&<div style={{background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)",borderRadius:8,padding:"10px 14px",fontSize:13,color:"var(--green)",marginTop:14,textAlign:"center"}}>✅ Order placed successfully!</div>}
+        </>
+      }
     </div>
   );
 }

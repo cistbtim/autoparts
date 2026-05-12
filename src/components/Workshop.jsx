@@ -6036,6 +6036,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,settings,onPlaceShopOrder})
       <div style={{display:"grid",gridTemplateColumns:"1fr 340px",gap:18,alignItems:"start"}}>
         {/* Parts list */}
         <div>
+          <div style={{fontSize:11,color:"var(--text3)",marginBottom:8,padding:"4px 8px",background:"var(--surface2)",borderRadius:6,fontFamily:"DM Mono,monospace"}}>
+            branch_id: {linkedBranchId||"(none)"} | parts: {shopParts.length} | loading: {String(loading)}
+          </div>
           <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
             placeholder="Search SKU, name, brand…" style={{marginBottom:12}}/>
           {loading

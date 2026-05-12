@@ -3444,11 +3444,21 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
 
           {/* ── Profile Photos ── */}
           <div style={{marginBottom:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>📸 {t.wsProfilePhotos||"Profile Photos"}</div>
               {vehicleRecord&&(
-                <button onClick={()=>setEditPhotos(p=>!p)}
-                  style={{fontSize:11,padding:"3px 10px",background:editPhotos?"var(--accent)":"var(--surface2)",color:editPhotos?"#fff":"var(--text2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",fontWeight:600}}>
+                <button onClick={()=>setEditPhotos(p=>!p)} style={{
+                  fontSize:12,padding:"7px 16px",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,
+                  background:editPhotos
+                    ?"linear-gradient(135deg,#059669,#34d399)"
+                    :"linear-gradient(135deg,#7c3aed,#db2777)",
+                  color:"#fff",
+                  boxShadow:editPhotos
+                    ?"0 3px 14px rgba(52,211,153,0.45),inset 0 1px 0 rgba(255,255,255,0.15)"
+                    :"0 3px 14px rgba(124,58,237,0.45),inset 0 1px 0 rgba(255,255,255,0.15)",
+                  textShadow:"0 1px 2px rgba(0,0,0,0.2)",
+                  letterSpacing:"0.3px",
+                }}>
                   {editPhotos?`✓ ${t.wsDoneEditing||"Done"}`:`✏️ ${t.wsEditPhotos||"Edit Photos"}`}
                 </button>
               )}

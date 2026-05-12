@@ -2230,10 +2230,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       },
     ]:[]),
     {
-      id:"grp_sales", icon:"🛒", label:t.grpSales, roles:["admin","manager","shipper","customer","workshop"],
+      id:"grp_sales", icon:"🛒", label:t.grpSales, roles:["admin","manager","shipper","customer"],
       badge: pendingCnt,
       children:[
-        {id:"shop",icon:"🛒",label:t.shop,roles:["admin","customer","workshop"]},
+        {id:"shop",icon:"🛒",label:t.shop,roles:["admin","customer"]},
         {id:"picking",icon:"🔍",label:t.picking,roles:["admin","shipper"],badge:pendingCnt},
         {id:"orders",icon:"📋",label:t.orders,roles:["admin","shipper"]},
         {id:"myorders",icon:"📦",label:t.myOrders,roles:["customer"]},

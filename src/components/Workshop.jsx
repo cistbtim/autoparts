@@ -6004,7 +6004,10 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const linkedParts=[...ownArr,...mergedCatalog.filter(p=>!seen.has(String(p.id)))];
       // Add main branch parts (dedupe — linked branch takes priority)
       const allSeen=new Set(linkedParts.map(p=>String(p.id)));
-      const combined=[...linkedParts,...mainArr.filter(p=>!allSeen.has(String(p.id)))];
+      const combined=[
+        ...linkedParts.map(p=>({...p,_source:"local"})),
+        ...mainArr.filter(p=>!allSeen.has(String(p.id))).map(p=>({...p,_source:"other"})),
+      ];
       setShopParts(combined);
       setLoading(false);
     });
@@ -6054,7 +6057,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <button onClick={()=>{setStockOnly(true);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:stockOnly?700:400,background:stockOnly?"var(--accent)":"transparent",color:stockOnly?"#fff":"var(--text2)"}}>In Stock</button>
           </div>
           <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}} onClick={placeOrder} disabled={placing||!cart.length}>
-            🛒 {cartCount>0?`(${cartCount}) `:""}Checkout{cartTotal>0?` · ${Cs}${cartTotal.toLocaleString()}`:""}
+            🛒 {cartCount>0?`(${cartCount}) `:""}Checkout
           </button>
         </div>
       </div>
@@ -6089,6 +6092,13 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                         {p.image||"🔩"}
                       </div>}
                   <div style={{flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                      <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,
+                        background:p._source==="local"?"rgba(52,211,153,.15)":"rgba(96,165,250,.15)",
+                        color:p._source==="local"?"var(--green)":"var(--blue)"}}>
+                        {p._source==="local"?"🏪 Local":"🏬 Main Store"}
+                      </span>
+                    </div>
                     <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{p.sku} · {p.brand}</div>
                     <div style={{fontSize:14,fontWeight:700,marginBottom:2,lineHeight:1.3}}>{p.name}</div>
                     {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:2}}>{p.chinese_desc}</div>}
@@ -6096,7 +6106,6 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                     {p.oe_number&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace"}}>OE: {p.oe_number}</div>}
                   </div>
                   <div style={{marginTop:8}}>
-                    <div style={{fontSize:20,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginBottom:4}}>{Cs}{(+p.price||0).toLocaleString()}</div>
                     <div style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)",marginBottom:10}}>{p.stock>0?`${p.stock} in stock`:"Out of Stock"}</div>
                     {inCart
                       ? <div style={{display:"flex",alignItems:"center",gap:7}}>

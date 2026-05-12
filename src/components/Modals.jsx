@@ -1998,9 +1998,12 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     if(!skuVal || (branchSkuPrefix && skuVal === branchSkuPrefix+"-")) e.sku = "SKU is required";
     if(!f.name.trim())  e.name  = "Name is required";
     if(f.price===""||f.price===null) e.price = "Price is required";
-    if(branchSkuPrefix&&!part&&skuVal&&skuVal!==branchSkuPrefix+"-"){
-      const isDup=allParts.some(p=>p.branch_id===currentBranch?.id&&p.sku===skuVal);
-      if(isDup) e.dupSku="This SKU already exists in your branch — choose a different number";
+    if(!part&&skuVal&&skuVal!==(branchSkuPrefix?branchSkuPrefix+"-":"")){
+      const scopeId=currentBranch?.id??null;
+      const isDup=branchSkuPrefix
+        ?allParts.some(p=>p.branch_id===scopeId&&p.sku===skuVal)
+        :allParts.some(p=>p.sku===skuVal);
+      if(isDup) e.dupSku=branchSkuPrefix?"This SKU already exists in your branch — choose a different number":"This SKU already exists — choose a different one";
     }
     setErrors(e);
     if(Object.keys(e).length>0){
@@ -2111,21 +2114,32 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                     style={{borderRadius:"0 9px 9px 0",flex:1,borderColor:(errors.sku||errors.dupSku)?"var(--red)":undefined}}/>
                 </div>
               ):(
-                <input className="inp" value={f.sku} onChange={e=>{s("sku",e.target.value);setErrors(p=>({...p,sku:""}));}}
-                  placeholder="GP00001" style={{borderColor:errors.sku?"var(--red)":undefined}}/>
+                <input className="inp" value={f.sku} onChange={e=>{s("sku",e.target.value);setErrors(p=>({...p,sku:"",dupSku:""}));}}
+                  placeholder="GP00001" style={{borderColor:(errors.sku||errors.dupSku)?"var(--red)":undefined}}/>
               )}
               <FormError errors={errors} k="sku"/>
               {errors.dupSku&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {errors.dupSku}</div>}
               {(()=>{
-                if(!branchSkuPrefix||part) return null;
-                const branchSkus=[...new Set(allParts.filter(p=>p.branch_id===currentBranch?.id&&p.sku).map(p=>p.sku))].sort().slice(-8).reverse();
-                if(!branchSkus.length) return <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>No branch SKUs yet — you'll be first!</div>;
+                if(part) return null;
+                const typed=f.sku.trim();
+                // For branch prefix: show branch-scoped SKUs
+                // For main/no-prefix: show all SKUs filtered by what user is typing
+                let skuList;
+                if(branchSkuPrefix){
+                  skuList=[...new Set(allParts.filter(p=>p.branch_id===currentBranch?.id&&p.sku).map(p=>p.sku))].sort().slice(-8).reverse();
+                } else {
+                  const q=typed.toLowerCase();
+                  skuList=q.length>=1
+                    ?[...new Set(allParts.filter(p=>p.sku&&p.sku.toLowerCase().includes(q)).map(p=>p.sku))].sort().slice(0,10)
+                    :[...new Set(allParts.filter(p=>p.sku).map(p=>p.sku))].sort().slice(-8).reverse();
+                }
+                if(!skuList.length) return <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>No existing SKUs yet — you'll be first!</div>;
                 return (
                   <div style={{marginTop:7}}>
-                    <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Existing branch SKUs:</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{typed.length>=1?"Matching SKUs:":"Recent SKUs:"}</div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                      {branchSkus.map(sku=>{
-                        const isDup=sku===f.sku;
+                      {skuList.map(sku=>{
+                        const isDup=sku===typed;
                         return (
                           <span key={sku} style={{fontSize:11,fontFamily:"DM Mono,monospace",background:isDup?"rgba(248,113,113,.15)":"var(--surface2)",border:`1px solid ${isDup?"var(--red)":"var(--border)"}`,borderRadius:4,padding:"2px 7px",color:isDup?"var(--red)":"var(--text3)",fontWeight:isDup?700:400}}>
                             {sku}{isDup&&" ⚠"}

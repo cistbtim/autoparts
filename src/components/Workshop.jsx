@@ -3357,8 +3357,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
         <div className="card" style={{padding:16,marginBottom:14}}>
           {/* Action buttons */}
           <div style={{position:"relative",display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
-            {wsRole!=="mechanic"&&<button className="btn btn-primary btn-sm" onClick={()=>setEditJob(true)} style={{flex:1}}>✏️ {t.edit}</button>}
-            <button className="btn btn-ghost btn-sm" onClick={()=>setShowJobMenu(p=>!p)} style={{minWidth:44,fontSize:20,padding:"6px 12px"}}>⋯</button>
+            {wsRole!=="mechanic"&&<button className="btn" onClick={()=>setEditJob(true)} style={{flex:1,background:"linear-gradient(135deg,#fbbf24 0%,#f97316 55%,#ef4444 100%)",color:"#fff",padding:"13px 20px",fontSize:15,fontWeight:700,letterSpacing:"0.4px",borderRadius:12,boxShadow:"0 4px 24px rgba(249,115,22,0.55),inset 0 1px 0 rgba(255,255,255,0.18)",textShadow:"0 1px 3px rgba(0,0,0,0.25)",border:"none"}}>✏️ {t.edit}</button>}
+            <button className="btn btn-ghost btn-sm" onClick={()=>setShowJobMenu(p=>!p)} style={{minWidth:44,fontSize:20,padding:"6px 14px",borderRadius:12,border:"1px solid var(--border2)"}}>⋯</button>
             {showJobMenu&&(
               <>
                 <div style={{position:"fixed",inset:0,zIndex:199}} onClick={()=>setShowJobMenu(false)}/>

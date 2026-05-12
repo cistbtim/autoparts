@@ -2482,8 +2482,8 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                             This supplier code belongs to <strong style={{fontFamily:"DM Mono,monospace",color:"var(--accent)"}}>{dupMatch.sku}</strong> — {dupMatch.name}.<br/>
                             Use that part instead of creating a duplicate.
                           </div>
-                          <button className="btn btn-primary btn-sm" style={{background:"var(--accent)",fontSize:13,padding:"8px 16px"}}
-                            onClick={()=>onGoToMainPart?.(dupMatch)}>
+                          <button type="button" className="btn btn-primary btn-sm" style={{background:"var(--accent)",fontSize:13,padding:"8px 16px"}}
+                            onClick={(e)=>{e.stopPropagation();if(onGoToMainPart)onGoToMainPart(dupMatch);}}>
                             📦 Go to {dupMatch.sku} in Inventory
                           </button>
                         </div>

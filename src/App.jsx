@@ -2037,7 +2037,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
       const isOwnBranch=p.branch_id===branchId;
       if(!isMainCatalog&&!isOwnBranch)return false;
-    } else if(branchId&&p.branch_id!==branchId)return false;
+    } else if(branchId){
+      const isMain=!p.branch_id||p.branch_id===mainBranchId;
+      if(!isMain&&p.branch_id!==branchId)return false;
+    }
     // user-chosen branch sub-filter
     if(filterBranch!=="__all__"){
       if(filterBranch==="main"){
@@ -2980,7 +2983,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                   ))}
                 </select>
               )}
-              {role==="branch_admin"&&(
+              {(role==="branch_admin"||role==="branch_manager")&&(
                 <select className="inp" value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{width:170,
                   borderColor:filterBranch!=="__all__"?"var(--blue)":undefined,
                   color:filterBranch!=="__all__"?"var(--blue)":undefined}}>
@@ -4315,9 +4318,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             const cur=mData("editPart");
             if(cur?.id)releaseLock("part",cur.id);
             closeM("editPart");
-            setTab("inventory");
-            setFilterBranch("__all__");
-            setSearchPart(targetPart.sku||"");
+            setTimeout(()=>{
+              setTab("inventory");
+              setFilterBranch("__all__");
+              setSearchPart(targetPart.sku||"");
+            },0);
           }}
           inquiries={inquiries} rfqQuotes={rfqQuotes} rfqItems={rfqItems} rfqSessions={rfqSessions}
           branches={branches} currentBranch={currentBranch} allParts={parts}

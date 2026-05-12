@@ -91,6 +91,7 @@ export const T = {
     rptTotalPurchased: "Total Purchased", rptAvgInvoice: "Avg Invoice",
     rptNoSuppliers: "No purchase invoice data yet",
     // Login page tabs & buttons
+    loginSpareShop: "Spare Shop", loginSpareShopSub: "Sign in to your spare parts shop", branchNameField: "Branch Name", branchNamePlaceholder: "e.g. North Branch",
     loginShop: "Parts Shop", loginWorkshop: "Workshop", loginScrapyard: "Scrapyard", loginStaff: "Staff",
     signIn: "Sign In", registerNew: "Register", registerWorkshop: "Register Workshop", registerScrapyard: "Register Scrapyard",
     noAccount: "No account?", createAccount: "Create Account",
@@ -221,6 +222,11 @@ export const T = {
     wsiPayDate: "Pay Date",
     wsiReference: "Reference",
     wsiInvTotal: "Invoice Total",
+    // Scrapyard sidebar nav
+    grpScrapyard: "Scrapyard", syDashboard: "Dashboard", syVehicles: "Vehicles", syParts: "Parts", sySettings: "Settings",
+    grpSySales: "Sales", syOrders: "Orders", syPicking: "Picking", syInvoices: "Invoices",
+    syCustomers: "Customers", syReturns: "Returns", syGate: "Gate Check",
+    grpAllScraps: "Scrapyards", syAllVehicles: "All Vehicles", syAllParts: "All Parts",
     // Branch UI
     branchAllBranches: "All Branches",
     branchCrossBtn: "Cross-Branch",

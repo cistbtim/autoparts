@@ -4975,3 +4975,134 @@ export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
     </div>
   );
 }
+
+const BRANCH_USER_ROLES = [
+  {value:"branch_admin",     label:"Branch Admin",     icon:"🏢"},
+  {value:"branch_manager",   label:"Branch Manager",   icon:"👔"},
+  {value:"branch_warehouse", label:"Warehouse",        icon:"📦"},
+  {value:"branch_picker",    label:"Picker",           icon:"🔍"},
+];
+
+export function BranchUsersPage({branchId, branchName, user}) {
+  const [users,   setUsers]   = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showing, setShowing] = useState(false); // add/edit form visible
+  const [editing, setEditing] = useState(null);
+  const [form,    setForm]    = useState({username:"",password:"",name:"",role:"branch_manager"});
+  const [err,     setErr]     = useState("");
+  const [busy,    setBusy]    = useState(false);
+
+  const sf = (k,v) => setForm(p=>({...p,[k]:v}));
+
+  const load = async () => {
+    if(!branchId) return;
+    setLoading(true);
+    const rows = await api.get("users",`branch_id=eq.${branchId}&select=*&order=role.asc,name.asc`).catch(()=>[]);
+    if(Array.isArray(rows)) setUsers(rows);
+    setLoading(false);
+  };
+
+  useEffect(()=>{ load(); },[branchId]);
+
+  const openAdd = () => {
+    setEditing(null);
+    setForm({username:"",password:"",name:"",role:"branch_manager"});
+    setErr(""); setShowing(true);
+  };
+
+  const openEdit = (u) => {
+    setEditing(u);
+    setForm({username:u.username||"",password:"",name:u.name||"",role:u.role||"branch_manager"});
+    setErr(""); setShowing(true);
+  };
+
+  const save = async () => {
+    if(!form.username.trim()) return setErr("Username is required");
+    if(!editing && !form.password.trim()) return setErr("Password is required for new users");
+    setBusy(true); setErr("");
+    if(editing){
+      const upd = {username:form.username.trim(), name:form.name.trim(), role:form.role, branch_id:branchId};
+      if(form.password.trim()) upd.password = form.password.trim();
+      await api.patch("users","id",editing.id,upd).catch(e=>setErr(e.message));
+    } else {
+      const ex = await api.get("users",`username=eq.${encodeURIComponent(form.username.trim())}&select=id`).catch(()=>[]);
+      if(Array.isArray(ex)&&ex.length>0){setBusy(false);return setErr("Username already taken — choose another");}
+      await api.insert("users",{username:form.username.trim(),password:form.password.trim(),name:form.name.trim(),role:form.role,branch_id:branchId}).catch(e=>setErr(e.message));
+    }
+    setBusy(false); setShowing(false); setEditing(null);
+    await load();
+  };
+
+  const remove = async (u) => {
+    if(!window.confirm(`Delete user "${u.username}"? This cannot be undone.`)) return;
+    await api.delete("users","id",u.id);
+    await load();
+  };
+
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <div style={{fontSize:20,fontWeight:800}}>👥 Branch Users</div>
+          <div style={{fontSize:13,color:"var(--text3)",marginTop:2}}>{users.length} user{users.length!==1?"s":""}{branchName?" · "+branchName:""}</div>
+        </div>
+        <button className="btn btn-primary" onClick={openAdd}>+ Add User</button>
+      </div>
+
+      {showing&&(
+        <div className="card" style={{padding:"16px 18px",marginBottom:16,border:"1.5px solid var(--accent)"}}>
+          <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>{editing?"✏️ Edit User":"➕ New User"}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+            <div>
+              <label style={{fontSize:12,fontWeight:700,color:"var(--text3)",display:"block",marginBottom:4}}>Display Name</label>
+              <input className="inp" value={form.name} onChange={e=>sf("name",e.target.value)} placeholder="Full name"/>
+            </div>
+            <div>
+              <label style={{fontSize:12,fontWeight:700,color:"var(--text3)",display:"block",marginBottom:4}}>Username *</label>
+              <input className="inp" value={form.username} onChange={e=>sf("username",e.target.value)} autoCapitalize="none" placeholder="login username"/>
+            </div>
+            <div>
+              <label style={{fontSize:12,fontWeight:700,color:"var(--text3)",display:"block",marginBottom:4}}>Password{editing?" (leave blank to keep)":""} *</label>
+              <input className="inp" type="password" value={form.password} onChange={e=>sf("password",e.target.value)}/>
+            </div>
+            <div>
+              <label style={{fontSize:12,fontWeight:700,color:"var(--text3)",display:"block",marginBottom:4}}>Role *</label>
+              <select className="inp" value={form.role} onChange={e=>sf("role",e.target.value)}>
+                {BRANCH_USER_ROLES.map(r=><option key={r.value} value={r.value}>{r.icon} {r.label}</option>)}
+              </select>
+            </div>
+          </div>
+          {err&&<div style={{color:"var(--red)",fontSize:13,marginBottom:8}}>⚠ {err}</div>}
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-primary" onClick={save} disabled={busy}>{busy?"Saving…":editing?"Save Changes":"Create User"}</button>
+            <button className="btn btn-ghost" onClick={()=>{setShowing(false);setEditing(null);setErr("");}}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{color:"var(--text3)",padding:20,textAlign:"center"}}>Loading…</div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {users.map(u=>{
+            const ri = BRANCH_USER_ROLES.find(r=>r.value===u.role)||{icon:"👤",label:u.role||"unknown"};
+            const isSelf = u.id===user?.id;
+            return (
+              <div key={u.id} className="card" style={{padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:14}}>{ri.icon} {u.name||u.username}{isSelf&&<span style={{fontSize:11,color:"var(--accent)",marginLeft:6,fontWeight:600}}>(you)</span>}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>@{u.username} · {ri.label}</div>
+                </div>
+                <div style={{display:"flex",gap:7}}>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>openEdit(u)}>✏️ Edit</button>
+                  {!isSelf&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>remove(u)}>🗑</button>}
+                </div>
+              </div>
+            );
+          })}
+          {users.length===0&&<div style={{color:"var(--text3)",textAlign:"center",padding:24}}>No branch users yet — add the first one above.</div>}
+        </div>
+      )}
+    </div>
+  );
+}

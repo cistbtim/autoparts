@@ -22,7 +22,10 @@ const Field = ({label, hint, children}) => (
 );
 
 export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
-  const [authTab,setAuthTab] = useState("workshop");
+  const [authTab,setAuthTab] = useState("branch");
+  // branch
+  const [branchName,setBranchName] = useState("");
+  const [branchUser,setBranchUser] = useState(""); const [branchPass,setBranchPass] = useState("");
   // staff
   const [staffUser,setStaffUser] = useState(""); const [staffPass,setStaffPass] = useState("");
   // workshop
@@ -61,6 +64,22 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
       const g = await (await fetch("https://ipapi.co/json/")).json();
       await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:`${g.country_name||"?"} ${g.country_flag_emoji||""}`.trim(),city:g.city||"",device:navigator.userAgent.slice(0,100),status:"success"});
     } catch {}
+  };
+
+  const doBranchLogin = async () => {
+    if(!branchName||!branchUser||!branchPass){setErr("Branch name, username and password are required");return;}
+    setLoading(true);setErr("");
+    const brRes = await api.get("branches",`name=ilike.*${encodeURIComponent(branchName.trim())}*&status=eq.active&select=id,name,status`);
+    if(!Array.isArray(brRes)||brRes.length===0){setErr("Branch not found or inactive");setLoading(false);return;}
+    const branch = brRes[0];
+    const userRes = await api.get("users",`branch_id=eq.${branch.id}&username=eq.${encodeURIComponent(branchUser.trim())}&password=eq.${encodeURIComponent(branchPass)}&select=*`);
+    if(Array.isArray(userRes)&&userRes.length>0){
+      await logLogin(userRes[0]);
+      onLogin({...userRes[0],_branchName:branch.name});
+    } else {
+      setErr("Invalid username or password");
+    }
+    setLoading(false);
   };
 
   const doStaffLogin = async () => {
@@ -180,10 +199,11 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
   const switchTab = (tab) => { setAuthTab(tab); setErr(""); };
 
   const TAB_BTNS = [
-    {id:"workshop", icon:"🔧", label:"Workshop"},
-    {id:"scrapyard", icon:"🚗", label:"Scrapyard"},
-    {id:"customer", icon:"🛒", label:"Shop"},
-    {id:"staff", icon:"🏢", label:"Staff"},
+    {id:"branch",   icon:"🏬", label:t.loginSpareShop||"Spare Shop"},
+    {id:"workshop", icon:"🔧", label:t.loginWorkshop||"Workshop"},
+    {id:"scrapyard",icon:"🚗", label:t.loginScrapyard||"Scrapyard"},
+    {id:"customer", icon:"🛒", label:t.loginShop||"Shop"},
+    {id:"staff",    icon:"⚙️", label:t.loginStaff||"Staff"},
   ];
 
   const inpStyle = {
@@ -241,7 +261,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
         </div>
 
         {/* Login type tabs */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5,marginBottom:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:5,marginBottom:14}}>
           {TAB_BTNS.map(tb=>(
             <button key={tb.id} onClick={()=>switchTab(tb.id)} style={{
               padding:"10px 4px",borderRadius:11,border:"none",cursor:"pointer",
@@ -261,6 +281,41 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
 
         {/* Card */}
         <div style={{background:"var(--surface)",borderRadius:16,border:"1px solid var(--border)",boxShadow:"0 8px 32px rgba(0,0,0,.12)",padding:"26px 24px",overflow:"hidden"}}>
+
+          {/* ── Branch ── */}
+          {authTab==="branch"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:13}}>
+              <div style={{marginBottom:2}}>
+                <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>🏬 {t.loginSpareShop||"Spare Shop"} {t.signIn||"Login"}</div>
+                <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{t.loginSpareShopSub||"Sign in to your spare parts shop"}</div>
+              </div>
+              <Field label={t.branchNameField||"Branch Name"}>
+                <div style={{position:"relative"}}>
+                  <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none",opacity:.6}}>🏬</span>
+                  <input
+                    style={{...companyInpStyle, paddingLeft:34}}
+                    type="text" value={branchName}
+                    onChange={e=>setBranchName(e.target.value)}
+                    onKeyDown={e=>e.key==="Enter"&&doBranchLogin()}
+                    placeholder={t.branchNamePlaceholder||"e.g. North Branch"}
+                    autoCapitalize="words"
+                  />
+                </div>
+              </Field>
+              <Field label={t.username||"Username"}>
+                <input style={inpStyle} type="text" value={branchUser} onChange={e=>setBranchUser(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&doBranchLogin()} autoCapitalize="none" placeholder="Your login username"/>
+              </Field>
+              <Field label={t.password||"Password"}>
+                <input style={inpStyle} type="password" value={branchPass} onChange={e=>setBranchPass(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&doBranchLogin()}/>
+              </Field>
+              {err&&<ErrBox msg={err}/>}
+              <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doBranchLogin} disabled={loading}>
+                {loading?t.connecting||"Connecting…":"Sign In →"}
+              </button>
+            </div>
+          )}
 
           {/* ── Workshop ── */}
           {authTab==="workshop"&&(

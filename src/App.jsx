@@ -3,12 +3,12 @@ import { api, setDemoMode } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
 import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, today, fmtAmt, makeId, makeToken, detectGeoLocation, waLink, mailLink } from "./lib/helpers.js";
-import { ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess } from "./lib/constants.js";
+import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
@@ -77,7 +77,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const wsId  = role==="workshop"  ? String(user.id) : null;
   const scrapId = role==="scrapyard" ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_dashboard":role==="branch_admin"?"inventory":role==="demo"?"inventory":"dashboard";
+  const isBranchUser = BRANCH_ROLES.includes(role);
+  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_dashboard":role==="branch_picker"?"orders":isBranchUser?"inventory":role==="demo"?"inventory":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [parts,setParts]=useState([]);
@@ -279,7 +280,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     licence_renewal_agent_phone: workshopProfile.licence_renewal_agent_phone || settings.licence_renewal_agent_phone || "",
     label_width_mm:  workshopProfile.label_width_mm  || 98,
     label_height_mm: workshopProfile.label_height_mm || 45,
-  } : role==="branch_admin"&&currentBranch ? {
+  } : isBranchUser&&currentBranch ? {
     ...settings,
     shop_name: currentBranch.shop_name || currentBranch.name || settings.shop_name,
     logo_url:  currentBranch.logo_url  || "",
@@ -290,14 +291,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     currency:  currentBranch.currency  || settings.currency || "ZAR R",
   } : settings;
 
-  const _bId=role==="branch_admin"?user.branch_id||null:null; // branch_id for save-side isolation
+  const _bId=isBranchUser?user.branch_id||null:null; // branch_id for save-side isolation
   const logInv=async(part,before,after,action,reason="")=>{
     await api.upsert("inventory_logs",{part_id:part.id,part_name:part.name,part_sku:part.sku,action,qty_before:before,qty_after:after,changed_by:user.name||user.username,reason,...(_bId?{branch_id:_bId}:{})});
   };
 
   const loadAll=useCallback(async()=>{
-    // Branch filter prefix — limits fetch to this branch's records for branch_admin
-    const bF=role==="branch_admin"&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
+    // Branch filter prefix — limits fetch to this branch's records for branch users
+    const bF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
     setLoading(true);
     setLoadingItems([]);
 
@@ -481,13 +482,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setAllScrapParts(Array.isArray(rest[29])?rest[29]:[]);
     setAllScrapProfiles(Array.isArray(rest[30])?rest[30]:[]);
     setBgLoading(0); // all background tables done
-    // Part requests: admin sees all, branch_admin sees their own
-    if(role==="admin"||role==="branch_admin"){
-      const prF=role==="branch_admin"&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
+    // Part requests: admin sees all, branch users see their own
+    if(role==="admin"||isBranchUser){
+      const prF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
       api.get("part_requests",`${prF}select=*&order=created_at.desc`).catch(()=>[]).then(r=>{if(Array.isArray(r))setPartRequests(r);});
     }
-    // Branch stock: per-branch qty/price/bin overlay (branch_admin only)
-    if(role==="branch_admin"&&user.branch_id){
+    // Branch stock: per-branch qty/price/bin overlay
+    if(isBranchUser&&user.branch_id){
       api.get("branch_stock",`branch_id=eq.${user.branch_id}&select=*`).catch(()=>[]).then(r=>{if(Array.isArray(r))setBranchStock(r);});
     }
     // Load workshop profile for workshop role
@@ -553,7 +554,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   // Targeted refresh — fetch only the tables that a mutation actually dirtied.
   // Cuts ~40-table loadAll() down to 1-4 requests per save operation.
   const refreshTables=useCallback(async(...names)=>{
-    const bF=role==="branch_admin"&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
+    const bF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
     const D={
       parts:                    ["select=*&order=id.asc",                                         d=>setParts(Array.isArray(d)?d:[])],
       orders:                   ["select=*&order=created_at.desc",                                d=>setOrders(Array.isArray(d)?d:[])],
@@ -574,8 +575,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       rfq_quotes:               ["select=*&order=created_at.desc",                                d=>setRfqQuotes(Array.isArray(d)?d:[])],
       stock_moves:              [`${bF}select=*&order=moved_at.desc&limit=200`,                   d=>setStockMoves(Array.isArray(d)?d:[])],
       stock_takes:              ["select=*&order=created_at.desc",                   d=>setStockTakes(Array.isArray(d)?d:[])],
-      part_requests:            [role==="branch_admin"&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setPartRequests(Array.isArray(d)?d:[])],
-      branch_stock:             [role==="branch_admin"&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*`:"select=*", d=>setBranchStock(Array.isArray(d)?d:[])],
+      part_requests:            [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setPartRequests(Array.isArray(d)?d:[])],
+      branch_stock:             [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*`:"select=*", d=>setBranchStock(Array.isArray(d)?d:[])],
       workshop_jobs:            [`select=*&order=date_in.desc${wsF}`,                d=>setWorkshopJobs(Array.isArray(d)?d:[])],
       workshop_job_items:       [`select=*${wsF}`,                                   d=>setWorkshopJobItems(Array.isArray(d)?d:[])],
       workshop_invoices:        [`select=*&order=invoice_date.desc${wsF}`,           d=>setWorkshopInvoices(Array.isArray(d)?d:[])],
@@ -2089,31 +2090,31 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       ]
     },
     {
-      id:"grp_scrapyard", icon:"🚗", label:"Scrapyard", roles:["scrapyard"],
+      id:"grp_scrapyard", icon:"🚗", label:t.grpScrapyard||"Scrapyard", roles:["scrapyard"],
       children:[
-        {id:"sy_dashboard",icon:"📊", label:"Dashboard", roles:["scrapyard"]},
-        {id:"sy_vehicles", icon:"🚗", label:"Vehicles",  roles:["scrapyard"]},
-        {id:"sy_parts",    icon:"📦", label:"Parts",     roles:["scrapyard"], badge:scrapLowStock.length},
-        {id:"sy_settings", icon:"⚙️", label:"Settings",  roles:["scrapyard"]},
+        {id:"sy_dashboard",icon:"📊", label:t.syDashboard||"Dashboard", roles:["scrapyard"]},
+        {id:"sy_vehicles", icon:"🚗", label:t.syVehicles||"Vehicles",   roles:["scrapyard"]},
+        {id:"sy_parts",    icon:"📦", label:t.syParts||"Parts",         roles:["scrapyard"], badge:scrapLowStock.length},
+        {id:"sy_settings", icon:"⚙️", label:t.sySettings||"Settings",   roles:["scrapyard"]},
       ]
     },
     {
-      id:"grp_sy_sales", icon:"🛒", label:"Sales", roles:["scrapyard"],
+      id:"grp_sy_sales", icon:"🛒", label:t.grpSySales||"Sales", roles:["scrapyard"],
       badge: syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0,
       children:[
-        {id:"sy_orders",    icon:"📋", label:"Orders",    roles:["scrapyard"], badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
-        {id:"sy_picking",   icon:"🔍", label:"Picking",   roles:["scrapyard"]},
-        {id:"sy_invoices",  icon:"🧾", label:"Invoices",  roles:["scrapyard"]},
-        {id:"sy_customers", icon:"👥", label:"Customers", roles:["scrapyard"]},
-        {id:"sy_returns",   icon:"↩️", label:"Returns",   roles:["scrapyard"]},
-        {id:"sy_gate",      icon:"🛡️", label:"Gate Check",roles:["scrapyard"]},
+        {id:"sy_orders",    icon:"📋", label:t.syOrders||"Orders",     roles:["scrapyard"], badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
+        {id:"sy_picking",   icon:"🔍", label:t.syPicking||"Picking",   roles:["scrapyard"]},
+        {id:"sy_invoices",  icon:"🧾", label:t.syInvoices||"Invoices", roles:["scrapyard"]},
+        {id:"sy_customers", icon:"👥", label:t.syCustomers||"Customers",roles:["scrapyard"]},
+        {id:"sy_returns",   icon:"↩️", label:t.syReturns||"Returns",   roles:["scrapyard"]},
+        {id:"sy_gate",      icon:"🛡️", label:t.syGate||"Gate Check",   roles:["scrapyard"]},
       ]
     },
     {
-      id:"grp_all_scraps", icon:"🚗", label:"Scrapyards", roles:["admin","manager"],
+      id:"grp_all_scraps", icon:"🚗", label:t.grpAllScraps||"Scrapyards", roles:["admin","manager"],
       children:[
-        {id:"all_scrapyards",icon:"🚗",label:"All Vehicles",roles:["admin","manager"]},
-        {id:"all_scrap_parts",icon:"📦",label:"All Parts",roles:["admin","manager"]},
+        {id:"all_scrapyards", icon:"🚗",label:t.syAllVehicles||"All Vehicles",roles:["admin","manager"]},
+        {id:"all_scrap_parts",icon:"📦",label:t.syAllParts||"All Parts",      roles:["admin","manager"]},
       ]
     },
     {
@@ -2213,16 +2214,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"branches",icon:"🏢",label:t.branchMgmt||"Branches",roles:["admin"],badge:branches.filter(b=>b.status==="pending").length||0},
         {id:"settings",icon:"⚙️",label:t.settings,roles:["admin"]},
         {id:"users",icon:"🔑",label:t.users,roles:["admin"]},
-        {id:"branchProfile",icon:"🏢",label:"My Branch",roles:["admin"],branchAdminOnly:true},
+        {id:"branchProfile",  icon:"🏢",label:"My Branch",  roles:["admin"],branchAdminOnly:true},
+        {id:"branch_users",   icon:"👤",label:"Branch Users",roles:["admin"],branchAdminOnly:true},
       ]
     },
-  ].filter(g=>g.roles.includes(role)||(role==="branch_admin"&&g.roles.includes("admin")&&g.id!=="grp_workshop"&&g.id!=="grp_all_scraps")).map(g=>({
+  ].filter(g=>g.roles.includes(role)||(isBranchUser&&g.roles.includes("admin")&&g.id!=="grp_workshop"&&g.id!=="grp_all_scraps")).map(g=>({
     ...g,
     children:g.children.filter(c=>{
-      if(role==="branch_admin"){
-        // branch_admin sees all admin tabs except system-admin-only ones
+      if(isBranchUser){
+        // branch users see admin tabs scoped to their role
         const BA_HIDE=new Set(["dashboard","loginlogs","branches","settings","users","wssubscriptions"]);
-        return c.roles.includes("admin")&&!BA_HIDE.has(c.id);
+        if(!c.roles.includes("admin")||BA_HIDE.has(c.id)) return false;
+        // branchAdminOnly items only visible to branch_admin
+        if(c.branchAdminOnly && role!=="branch_admin") return false;
+        // branch_warehouse: inventory + orders + stocktake only
+        if(role==="branch_warehouse") return ["inventory","stocktake","stockmove","orders"].includes(c.id);
+        // branch_picker: orders only
+        if(role==="branch_picker") return ["orders","picking"].includes(c.id);
+        // branch_manager + branch_admin: full access minus hidden
+        return true;
       }
       if(c.branchAdminOnly) return false;
       return c.roles.includes(role)&&(!c.wsRoles||role!=="workshop"||c.wsRoles.includes(wsRole));
@@ -2242,11 +2252,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"stockmove",icon:"🔀",label:t.stockMove},
     ];
     if(role==="scrapyard") return [
-      {id:"sy_dashboard",icon:"📊", label:"Dashboard"},
-      {id:"sy_parts",    icon:"📦", label:"Parts",    badge:scrapLowStock.length},
-      {id:"sy_orders",   icon:"📋", label:"Orders",   badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
-      {id:"sy_invoices", icon:"🧾", label:"Invoices"},
-      {id:"sy_gate",     icon:"🛡️", label:"Gate"},
+      {id:"sy_dashboard",icon:"📊", label:t.syDashboard||"Dashboard"},
+      {id:"sy_parts",    icon:"📦", label:t.syParts||"Parts",       badge:scrapLowStock.length},
+      {id:"sy_orders",   icon:"📋", label:t.syOrders||"Orders",     badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
+      {id:"sy_invoices", icon:"🧾", label:t.syInvoices||"Invoices"},
+      {id:"sy_gate",     icon:"🛡️", label:t.syGate||"Gate"},
     ];
     if(role==="shipper") return [
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
@@ -2269,12 +2279,29 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"wsinvoices",  icon:"🧾",label:"Invoices"},
       {id:"wspayments",  icon:"💳",label:"Payments"},
     ];
-    if(role==="branch_admin") return [
+    if(role==="branch_picker") return [
+      {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
+      {id:"picking",   icon:"🔍",label:t.picking},
+    ];
+    if(role==="branch_warehouse") return [
+      {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
+      {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
+      {id:"stocktake", icon:"🔢",label:t.stockTake},
+    ];
+    if(role==="branch_manager") return [
       {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"customers", icon:"👥",label:t.customers},
       {id:"reports",   icon:"📊",label:t.reports},
       {id:"suppliers", icon:"🏭",label:t.suppliers},
+    ];
+    if(role==="branch_admin") return [
+      {id:"inventory",   icon:"📦",label:t.inventory,badge:lowStock.length},
+      {id:"orders",      icon:"📋",label:t.orders,badge:pendingCnt},
+      {id:"customers",   icon:"👥",label:t.customers},
+      {id:"reports",     icon:"📊",label:t.reports},
+      {id:"suppliers",   icon:"🏭",label:t.suppliers},
+      {id:"branch_users",icon:"👤",label:"Users"},
     ];
     // admin — show most used
     return [
@@ -3977,6 +4004,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
         {tab==="branches"&&role==="admin"&&(
           <BranchesPage branches={branches} onRefresh={loadAll} t={t}/>
+        )}
+
+        {tab==="branch_users"&&role==="branch_admin"&&(
+          <BranchUsersPage branchId={user.branch_id} branchName={currentBranch?.name} user={user} t={t}/>
         )}
 
         {tab==="branchProfile"&&role==="branch_admin"&&(

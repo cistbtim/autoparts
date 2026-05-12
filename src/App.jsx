@@ -2315,14 +2315,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"customers", icon:"👥",label:t.customers},
-      {id:"reports",   icon:"📊",label:t.reports},
+      {id:"rfq",       icon:"📋",label:t.rfqSession||"RFQ"},
       {id:"suppliers", icon:"🏭",label:t.suppliers},
     ];
     if(role==="branch_admin") return [
       {id:"inventory",   icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"orders",      icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"customers",   icon:"👥",label:t.customers},
-      {id:"reports",     icon:"📊",label:t.reports},
+      {id:"rfq",         icon:"📋",label:t.rfqSession||"RFQ"},
       {id:"suppliers",   icon:"🏭",label:t.suppliers},
       {id:"branch_users",icon:"👤",label:"Users"},
     ];
@@ -3300,7 +3300,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {/* ── RFQ ── */}
         {tab==="rfq"&&(
           <RfqPage
-            parts={parts} suppliers={suppliers}
+            parts={isBranchUser?displayParts:parts} suppliers={suppliers}
             rfqSessions={rfqSessions} rfqItems={rfqItems} rfqQuotes={rfqQuotes}
             onCreate={createRfqSession} onUpdateStatus={updateRfqStatus}
             onSelectQuote={selectRfqQuote} onUnselectQuote={unselectRfqQuote}

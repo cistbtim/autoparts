@@ -1722,15 +1722,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const rows=await api.get("supplier_invoice_items",`invoice_id=eq.${encodeURIComponent(inv.id)}&select=*`);
     if(!Array.isArray(rows)||rows.length===0){showToast("No line items found for this invoice","err");return;}
     let stocked=0,skipped=0;
-    // inv.branch_id is set for branch invoices; fall back to current branch context for admin users
-    const invBranchId=inv.branch_id?+inv.branch_id:(_bId||branchId)?+(_bId||branchId):null;
+    // Determine effective branch — no + coercion (branch IDs may be UUIDs)
+    const invBranchId=inv.branch_id||_bId||branchId||null;
     for(const item of rows){
       if(!item.part_id){skipped++;continue;}
       const catalogPart=parts.find(p=>+p.id===+item.part_id);
       if(!catalogPart){skipped++;continue;}
       if(invBranchId){
         // Branch invoice → update branch_stock table (not parts.stock)
-        const existing=branchStock.find(bs=>+bs.part_id===+item.part_id && +bs.branch_id===invBranchId);
+        const existing=branchStock.find(bs=>+bs.part_id===+item.part_id&&String(bs.branch_id)===String(invBranchId));
         const before=+(existing?.stock)||0;
         const after=before+(+item.qty||0);
         if(existing?.id){

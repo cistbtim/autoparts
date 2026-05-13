@@ -1588,7 +1588,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
       const part=parts.find(p=>p.id===linked[0].part_id);
       if(part){
         const cur=items.find(r=>r._k===k);
-        const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&+bs.branch_id===+branchId));
+        const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&String(bs.branch_id)===String(branchId)));
         upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false,_needsBranchSetup:needsBranchSetup,_bsPrice:"",_bsCost:String(cur?.unit_cost||""),_bsBin:""});
         return;
       }
@@ -1603,14 +1603,14 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
   const linkTo=async(k,item,part)=>{
     const res=await api.upsert("part_suppliers",{part_id:part.id,supplier_id:+suppId,supplier_part_no:(item.supplier_part_id||"").trim()});
     if(res?.code||res?.message){/* silent — link best-effort */}
-    const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&+bs.branch_id===+branchId));
+    const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&String(bs.branch_id)===String(branchId)));
     upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false,_hits:[],_needsBranchSetup:needsBranchSetup,_bsPrice:"",_bsCost:String(item.unit_cost||""),_bsBin:""});
   };
 
   const saveBranchSetup=async(k,item)=>{
     if(!branchId||!item.part_id)return;
     upd(k,{_bsSaving:true,_bsErr:null});
-    const payload={branch_id:+branchId,part_id:+item.part_id,stock:0,updated_at:new Date().toISOString()};
+    const payload={branch_id:branchId,part_id:+item.part_id,stock:0,updated_at:new Date().toISOString()};
     if(parseFloat(item._bsPrice)) payload.price=parseFloat(item._bsPrice);
     if(parseFloat(item._bsCost)) payload.cost_price=parseFloat(item._bsCost);
     if((item._bsBin||"").trim()) payload.bin_location=item._bsBin.trim();

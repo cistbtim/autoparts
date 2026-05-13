@@ -492,10 +492,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       const prF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
       api.get("part_requests",`${prF}select=*&order=created_at.desc`).catch(()=>[]).then(r=>{if(Array.isArray(r))setPartRequests(r);});
     }
-    // Branch stock requests: workshop sees own, branch admin sees requests for their branch, admin sees all
+    // Branch stock requests: workshop sees own, branch users see both sides (requesting or supplying), admin sees all
     {
-      const bsrF=role==="workshop"?`workshop_id=eq.${wsId}&`:isBranchUser&&user.branch_id?`requesting_branch_id=eq.${user.branch_id}&`:"";
-      api.get("branch_stock_requests",`${bsrF}select=*&order=created_at.desc`).catch(()=>[]).then(r=>{if(Array.isArray(r))setBranchStockRequests(r);});
+      const bsrQ=role==="workshop"
+        ?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`
+        :isBranchUser&&user.branch_id
+        ?`or=(requesting_branch_id.eq.${user.branch_id},supplying_branch_id.eq.${user.branch_id})&select=*&order=created_at.desc`
+        :"select=*&order=created_at.desc";
+      api.get("branch_stock_requests",bsrQ).catch(()=>[]).then(r=>{if(Array.isArray(r))setBranchStockRequests(r);});
     }
     // Branch stock: per-branch qty/price/bin overlay
     if(isBranchUser&&user.branch_id){
@@ -586,7 +590,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       stock_moves:              [`${bF}select=*&order=moved_at.desc&limit=200`,                   d=>setStockMoves(Array.isArray(d)?d:[])],
       stock_takes:              ["select=*&order=created_at.desc",                   d=>setStockTakes(Array.isArray(d)?d:[])],
       part_requests:            [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setPartRequests(Array.isArray(d)?d:[])],
-      branch_stock_requests:    [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`requesting_branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setBranchStockRequests(Array.isArray(d)?d:[])],
+      branch_stock_requests:    [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`or=(requesting_branch_id.eq.${user.branch_id},supplying_branch_id.eq.${user.branch_id})&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setBranchStockRequests(Array.isArray(d)?d:[])],
       branch_stock:             [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*`:"select=*", d=>setBranchStock(Array.isArray(d)?d:[])],
       workshop_jobs:            [`select=*&order=date_in.desc${wsF}`,                d=>setWorkshopJobs(Array.isArray(d)?d:[])],
       workshop_job_items:       [`select=*${wsF}`,                                   d=>setWorkshopJobItems(Array.isArray(d)?d:[])],

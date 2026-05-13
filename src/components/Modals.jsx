@@ -5418,7 +5418,7 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
   const baseUrl=window.location.origin+window.location.pathname;
 
   const myRequests=isMainSide
-    ?branchStockRequests.filter(r=>r.supplying_branch_id===mainBranch?.id)
+    ?(mainBranch?branchStockRequests.filter(r=>r.supplying_branch_id===mainBranch.id):branchStockRequests)
     :branchStockRequests;
 
   const sorted=[...myRequests].sort((a,b)=>{

@@ -2183,7 +2183,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"inventory",icon:"📦",label:t.inventory,roles:["admin","manager","shipper","stockman"],badge:lowStock.length},
         {id:"stocktake",icon:"🔢",label:t.stockTake,roles:["admin","manager","shipper","stockman"]},
         {id:"stockmove",icon:"🔀",label:t.stockMove,roles:["admin","manager","shipper","stockman"]},
-        {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager"]},
+        {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager","branch_admin"]},
         {id:"partRequests",icon:"📬",label:"Part Requests",roles:["admin"],badge:pendingPartRequests},
         {id:"transferRequests",icon:"🔄",label:"Transfer Requests",roles:["admin"],badge:pendingTransferRequests},
       ]
@@ -3953,14 +3953,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         )}
 
         {/* ── STOCK LOGS ── */}
-        {tab==="logs"&&role==="admin"&&(()=>{
+        {tab==="logs"&&(role==="admin"||role==="manager"||role==="branch_admin")&&(()=>{
           const logQ=logSearch.trim().toLowerCase();
+          // When a branch is selected (admin context) or user is branch_admin, filter logs to that branch
+          const branchLogs=branchId?logs.filter(l=>l.branch_id&&+l.branch_id===+branchId):logs;
           const filteredLogs=logQ
-            ? logs.filter(l=>(l.part_sku||"").toLowerCase().includes(logQ)||(l.part_name||"").toLowerCase().includes(logQ))
-            : logs;
+            ? branchLogs.filter(l=>(l.part_sku||"").toLowerCase().includes(logQ)||(l.part_name||"").toLowerCase().includes(logQ))
+            : branchLogs;
           return (
           <div className="fu">
-            <PH title={`📝 ${t.logs}`} subtitle={`${filteredLogs.length}${logQ?` of ${logs.length}`:""} ${t.records}`}/>
+            <PH title={`📝 ${t.logs}`} subtitle={`${filteredLogs.length}${logQ?` of ${branchLogs.length}`:""} ${t.records}${branchId?` · ${currentBranch?.name||"Branch"}`:" · All branches"}`}/>
             <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
               <div style={{position:"relative",flex:"1 1 220px",maxWidth:320}}>
                 <input className="inp" type="text"
@@ -4471,7 +4473,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {isOpen("editCustomer")&&<CustomerModal customer={mData("editCustomer")} onSave={saveCustomer} onClose={()=>closeM("editCustomer")} t={t}/>}
       {isOpen("editUser")&&<UserModal user={mData("editUser")} onSave={saveUser} onClose={()=>closeM("editUser")} t={t}/>}
       {isOpen("custHistory")&&<CustHistoryModal customer={mData("custHistory")} orders={orders.filter(o=>o.customer_phone===mData("custHistory")?.phone)} onClose={()=>closeM("custHistory")}/>}
-      {isOpen("supplierInvoice")&&<SupplierInvoiceModal data={mData("supplierInvoice")} suppliers={suppliers} parts={parts} onSave={saveSupplierInvoice} onDelete={deleteSupplierInvoice} onStockIn={stockInInvoice} onClose={()=>closeM("supplierInvoice")} t={t} settings={settings} role={role} branchId={branchId}/>}
+      {isOpen("supplierInvoice")&&<SupplierInvoiceModal data={mData("supplierInvoice")} suppliers={suppliers} parts={parts} onSave={saveSupplierInvoice} onDelete={deleteSupplierInvoice} onStockIn={stockInInvoice} onClose={()=>closeM("supplierInvoice")} t={t} settings={settings} role={role} branchId={branchId} branchStock={branchStock}/>}
       {isOpen("viewSupplierInvoice")&&<ViewSupplierInvoiceModal inv={mData("viewSupplierInvoice")} onClose={()=>closeM("viewSupplierInvoice")} settings={settings}/>}
       {isOpen("printPartLabel")&&<PrintPartLabelModal part={mData("printPartLabel")} settings={{...settings,...(currentBranch||{})}} onClose={()=>closeM("printPartLabel")}/>}
       {isOpen("printShelfLabel")&&<PrintShelfLabelModal settings={{...settings,...(currentBranch||{})}} onClose={()=>closeM("printShelfLabel")}/>}

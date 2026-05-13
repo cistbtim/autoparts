@@ -1565,8 +1565,8 @@ export function InvTotals({items,taxRate,costField="unit_cost",priceField}) {
 // SUPPLIER INVOICE — SMART LINE ITEM EDITOR
 // Primary input: Supplier Part # → auto-match → link
 // ═══════════════════════════════════════════════════════════════
-function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",branchId=null,t={},settings={}}) {
-  const mkRow=()=>({_k:String(Date.now()+Math.random()),supplier_part_id:"",part_id:null,part_name:"",part_sku:"",qty:1,unit_cost:0,_st:"idle",_hits:[],_drop:false});
+function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",branchId=null,branchStock=[],t={},settings={}}) {
+  const mkRow=()=>({_k:String(Date.now()+Math.random()),supplier_part_id:"",part_id:null,part_name:"",part_sku:"",qty:1,unit_cost:0,_st:"idle",_hits:[],_drop:false,_needsBranchSetup:false,_bsPrice:"",_bsCost:"",_bsBin:""});
   const inputRefs=useRef({});
   const [focusKey,setFocusKey]=useState(null);
   const add=()=>{const row=mkRow();setItems(p=>[...p,row]);setFocusKey(row._k);};
@@ -1586,7 +1586,12 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
     const linked=await api.get("part_suppliers",`supplier_id=eq.${suppId}&supplier_part_no=eq.${encodeURIComponent(q)}&select=part_id&limit=1`);
     if(Array.isArray(linked)&&linked[0]?.part_id){
       const part=parts.find(p=>p.id===linked[0].part_id);
-      if(part){upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false});return;}
+      if(part){
+        const cur=items.find(r=>r._k===k);
+        const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&+bs.branch_id===+branchId));
+        upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false,_needsBranchSetup:needsBranchSetup,_bsPrice:"",_bsCost:String(cur?.unit_cost||""),_bsBin:""});
+        return;
+      }
     }
     // 2. Fuzzy search in local parts (name / sku / oe_number)
     const ql=q.toLowerCase();
@@ -1596,10 +1601,16 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
   };
 
   const linkTo=async(k,item,part)=>{
-    // Create permanent part_supplier link
     const res=await api.upsert("part_suppliers",{part_id:part.id,supplier_id:+suppId,supplier_part_no:(item.supplier_part_id||"").trim()});
     if(res?.code||res?.message){/* silent — link best-effort */}
-    upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false,_hits:[]});
+    const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&+bs.branch_id===+branchId));
+    upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false,_hits:[],_needsBranchSetup:needsBranchSetup,_bsPrice:"",_bsCost:String(item.unit_cost||""),_bsBin:""});
+  };
+
+  const saveBranchSetup=async(k,item)=>{
+    if(!branchId||!item.part_id)return;
+    await api.insert("branch_stock",{branch_id:+branchId,part_id:+item.part_id,stock:0,price:parseFloat(item._bsPrice)||null,cost_price:parseFloat(item._bsCost)||null,bin_location:item._bsBin||null,updated_at:new Date().toISOString()});
+    upd(k,{_needsBranchSetup:false});
   };
 
   const requestMatch=async(k,item)=>{
@@ -1727,6 +1738,27 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                   📨 Request sent to main branch — they will link supplier part #{row.supplier_part_id}
                 </div>
               )}
+              {/* ── Branch stock setup ── */}
+              {row._needsBranchSetup&&branchId&&(
+                <div style={{marginTop:6,padding:"8px 12px",background:"rgba(251,191,36,.07)",border:"1px solid rgba(251,191,36,.35)",borderRadius:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"var(--yellow)",marginBottom:6}}>📦 New part for your branch — set price &amp; bin (stock qty comes from invoice):</div>
+                  <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                    <div><div style={{fontSize:10,color:"var(--text3)",marginBottom:2}}>Selling Price</div>
+                      <input className="inp" type="number" min="0" step="0.01" value={row._bsPrice||""} placeholder="0.00"
+                        onChange={e=>upd(k,{_bsPrice:e.target.value})} style={{width:100,fontSize:12}}/></div>
+                    <div><div style={{fontSize:10,color:"var(--text3)",marginBottom:2}}>Cost Price</div>
+                      <input className="inp" type="number" min="0" step="0.01" value={row._bsCost||""} placeholder="0.00"
+                        onChange={e=>upd(k,{_bsCost:e.target.value})} style={{width:100,fontSize:12}}/></div>
+                    <div><div style={{fontSize:10,color:"var(--text3)",marginBottom:2}}>Bin Location</div>
+                      <input className="inp" value={row._bsBin||""} placeholder="e.g. A1-01"
+                        onChange={e=>upd(k,{_bsBin:e.target.value})} style={{width:100,fontSize:12}}/></div>
+                    <div style={{display:"flex",gap:4,alignSelf:"flex-end",paddingBottom:2}}>
+                      <button className="btn btn-success btn-xs" onClick={()=>saveBranchSetup(k,row)}>✓ Set</button>
+                      <button className="btn btn-ghost btn-xs" onClick={()=>upd(k,{_needsBranchSetup:false})}>Skip</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -1743,7 +1775,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER INVOICE MODAL
 // ═══════════════════════════════════════════════════════════════
-export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onStockIn,onClose,t,settings,role="admin",branchId=null}) {
+export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onStockIn,onClose,t,settings,role="admin",branchId=null,branchStock=[]}) {
   const isNew=data?.isNew;
   const isPaid=data?.status==="paid";
   const isStocked=!!data?.stocked_in;
@@ -1806,7 +1838,7 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
       </FG>
       <div className="divider"/>
       <FL label="Line Items"/>
-      <SupplierInvoiceLineEditor items={items} setItems={setItems} suppId={suppId} parts={parts} role={role} branchId={branchId} t={t} settings={settings}/>
+      <SupplierInvoiceLineEditor items={items} setItems={setItems} suppId={suppId} parts={parts} role={role} branchId={branchId} branchStock={branchStock} t={t} settings={settings}/>
       {items.length>0&&<InvTotals items={items} taxRate={settings.tax_rate} costField="unit_cost"/>}
       <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
         {!isNew&&onDelete&&<button className="btn btn-danger" style={{flex:1}} onClick={handleDelete} disabled={saving||isPaid} title={isPaid?"Cannot delete a paid invoice":undefined}>🗑 Delete</button>}

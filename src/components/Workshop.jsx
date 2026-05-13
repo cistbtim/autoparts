@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, makeId, today, toImgUrl, waLink, openLabelWindow } from "../lib/helpers.js";
+import { fmtAmt, makeId, today, toImgUrl, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
@@ -6257,6 +6257,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const [showCheckout,setShowCheckout]=useState(false);
   const [loading,setLoading]=useState(true);
   const [myRequests,setMyRequests]=useState([]);
+  const [printLabelPart,setPrintLabelPart]=useState(null);
+  const [shelfModal,setShelfModal]=useState(false);
   const wsId=wsProfile?.id?String(wsProfile.id):null;
   useEffect(()=>{
     if(!wsId)return;
@@ -6366,6 +6368,76 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         })}
       </div>}
 
+      {/* Print Part Label inline modal */}
+      {printLabelPart&&(()=>{
+        const p=printLabelPart;
+        const [bin,setBin_]=[p._bin||p.bin_location||"",v=>setPrintLabelPart(prev=>({...prev,_bin:v}))];
+        const [supCode,setSupCode_]=[p._supCode||"",v=>setPrintLabelPart(prev=>({...prev,_supCode:v}))];
+        const [copies,setCopies_]=[p._copies||1,v=>setPrintLabelPart(prev=>({...prev,_copies:v}))];
+        return (
+          <Overlay onClose={()=>setPrintLabelPart(null)}>
+            <MHead title="🏷️ Print Part Label" sub={p.name} onClose={()=>setPrintLabelPart(null)}/>
+            <FD><FL label="Part SKU"/><div style={{fontFamily:"DM Mono,monospace",fontSize:13,color:"var(--accent)",padding:"6px 0"}}>{p.sku||"—"}</div></FD>
+            <FD><FL label="Bin / Location"/><input className="inp" value={bin} onChange={e=>setBin_(e.target.value)} placeholder="e.g. A1-02"/></FD>
+            <FD><FL label="Supplier Code (optional)"/><input className="inp" value={supCode} onChange={e=>setSupCode_(e.target.value)} placeholder="e.g. SUP-4567"/></FD>
+            <FD><FL label="Number of copies"/><input className="inp" type="number" min="1" max="999" value={copies} onChange={e=>setCopies_(+e.target.value||1)}/></FD>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>
+              Size: {wsProfile?.part_label_w||settings?.part_label_w||98}×{wsProfile?.part_label_h||settings?.part_label_h||45}mm
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:18}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setPrintLabelPart(null)}>Cancel</button>
+              <button className="btn btn-primary" style={{flex:2}} onClick={()=>{
+                const total=Math.max(1,+copies||1);
+                const labels=Array.from({length:total},(_,i)=>({
+                  sku:p.sku||"",name:p.name||"",binLocation:bin,supplierCode:supCode,
+                  invoiceNo:"",seq:total>1?`${i+1}/${total}`:"",
+                }));
+                openPartLabelsWindow(labels,{
+                  widthMm:wsProfile?.part_label_w||settings?.part_label_w||98,
+                  heightMm:wsProfile?.part_label_h||settings?.part_label_h||45,
+                  shopName:wsProfile?.name||settings?.shop_name||"",
+                });
+              }}>🖨️ Open Print Window</button>
+            </div>
+          </Overlay>
+        );
+      })()}
+
+      {/* Shelf label inline modal */}
+      {shelfModal&&(()=>{
+        const [binName,setBinName_]=[shelfModal._bin||"",v=>setShelfModal(prev=>({...prev,_bin:v}))];
+        const [desc,setDesc_]=[shelfModal._desc||"",v=>setShelfModal(prev=>({...prev,_desc:v}))];
+        return (
+          <Overlay onClose={()=>setShelfModal(false)}>
+            <MHead title="📋 Print Shelf Label" onClose={()=>setShelfModal(false)}/>
+            <FD><FL label="Shelf / Bin Name *"/><input className="inp" value={binName} onChange={e=>setBinName_(e.target.value)} placeholder="e.g. A1-02"/></FD>
+            <FD><FL label="Description (optional)"/><input className="inp" value={desc} onChange={e=>setDesc_(e.target.value)} placeholder="e.g. Engine Parts"/></FD>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>
+              Size: {wsProfile?.shelf_label_w||settings?.shelf_label_w||70}×{wsProfile?.shelf_label_h||settings?.shelf_label_h||45}mm
+            </div>
+            {binName&&<div style={{marginTop:10,background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)",padding:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,border:"2px solid var(--text)",borderRadius:6,overflow:"hidden",background:"#fff"}}>
+                <div style={{width:44,height:44,flexShrink:0,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",borderRight:"2px solid var(--text)",fontSize:20}}>▦</div>
+                <div style={{flex:1,padding:"4px 8px"}}>
+                  <div style={{fontFamily:"DM Mono,monospace",fontWeight:900,fontSize:20,letterSpacing:2,color:"#111",lineHeight:1}}>{binName}</div>
+                  {desc&&<div style={{fontSize:11,color:"#555",marginTop:3,textTransform:"uppercase",letterSpacing:".05em"}}>{desc}</div>}
+                </div>
+              </div>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:5,textAlign:"center"}}>Preview (QR code generates at print time)</div>
+            </div>}
+            <div style={{display:"flex",gap:10,marginTop:18}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShelfModal(false)}>Cancel</button>
+              <button className="btn btn-primary" style={{flex:2}} disabled={!binName.trim()} onClick={()=>{
+                openShelfLabelWindow({binName,description:desc},{
+                  widthMm:wsProfile?.shelf_label_w||settings?.shelf_label_w||70,
+                  heightMm:wsProfile?.shelf_label_h||settings?.shelf_label_h||45,
+                });
+              }}>🖨️ Open Print Window</button>
+            </div>
+          </Overlay>
+        );
+      })()}
+
       {/* Sticky toolbar */}
       <div style={{position:"sticky",top:-26,zIndex:40,background:"var(--bg)",paddingTop:10,paddingBottom:12,marginBottom:6,marginLeft:-26,marginRight:-26,paddingLeft:26,paddingRight:26,borderBottom:"1px solid var(--border)"}}>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
@@ -6376,6 +6448,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <button onClick={()=>{setStockOnly(false);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:!stockOnly?700:400,background:!stockOnly?"var(--accent)":"transparent",color:!stockOnly?"#fff":"var(--text2)"}}>All</button>
             <button onClick={()=>{setStockOnly(true);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:stockOnly?700:400,background:stockOnly?"var(--accent)":"transparent",color:stockOnly?"#fff":"var(--text2)"}}>In Stock</button>
           </div>
+          <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={()=>setShelfModal({})} title="Print shelf/bin label">📋 Shelf Label</button>
           <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}} onClick={()=>setShowCheckout(true)} disabled={!cart.length}>
             🛒 {cartCount>0?`(${cartCount}) `:""}{mainCart.length>0&&localCart.length>0?"Checkout & Request":mainCart.length>0?"Request from Main":"Checkout"}
           </button>
@@ -6430,7 +6503,10 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                     {p._source==="local"
                       ?<div style={{fontSize:16,fontWeight:800,color:"var(--accent)",marginBottom:4}}>{Cs}{(+p.price||0).toFixed(2)}</div>
                       :<div style={{fontSize:12,color:"var(--text3)",marginBottom:4,fontStyle:"italic"}}>Price on request</div>}
-                    <div style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)",marginBottom:10}}>{p.stock>0?`${p.stock} in stock`:"Out of Stock"}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                      <span style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)"}}>{p.stock>0?`${p.stock} in stock`:"Out of Stock"}</span>
+                      <button className="btn btn-ghost btn-xs" style={{fontSize:11,padding:"3px 8px"}} onClick={()=>setPrintLabelPart(p)} title="Print label for this part">🏷️</button>
+                    </div>
                     {inCart
                       ? <div style={{display:"flex",alignItems:"center",gap:7}}>
                           <button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty-1)}>−</button>

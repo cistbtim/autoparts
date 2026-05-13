@@ -166,3 +166,121 @@ export function openLabelWindow(data) {
   win.document.write(html);
   win.document.close();
 }
+
+// ── PART LABEL PRINTER ─────────────────────────────────────────
+// labels: [{sku, name, binLocation, supplierCode, invoiceNo, seq, total}]
+// Options: widthMm, heightMm, shopName
+export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shopName = "" } = {}) {
+  if (!labels?.length) return;
+  const e = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const px = (mm) => Math.round(mm * 3.78);
+  const W = px(widthMm); const H = px(heightMm);
+  const qrSz = Math.min(Math.round(H * 0.52), 80);
+  const leftW = qrSz + 14;
+
+  const css = [
+    "*{margin:0;padding:0;box-sizing:border-box}",
+    "body{font-family:Arial,sans-serif;font-weight:bold;background:#e5e7eb;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}",
+    ".print-btn{padding:9px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px}",
+    `.label{width:${W}px;height:${H}px;border:2px solid #111;background:#fff;display:flex;overflow:hidden;page-break-after:always}`,
+    `.l{width:${leftW}px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;gap:2px;border-right:1px solid #bbb;background:#f8f8f8}`,
+    `.qr{width:${qrSz}px;height:${qrSz}px}`,
+    ".r{flex:1;padding:4px 7px;display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0;overflow:hidden}",
+    ".sn{font-size:7px;font-weight:bold;text-transform:uppercase;letter-spacing:.07em;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+    ".sku{font-size:13px;font-weight:900;font-family:monospace;letter-spacing:.8px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+    ".pn{font-size:9px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#333}",
+    ".bin{font-size:11px;font-weight:900;color:#1d4ed8;background:#dbeafe;border-radius:3px;padding:1px 5px;display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}",
+    ".sup{font-size:9px;font-weight:bold;color:#7c3aed;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+    ".inv-row{display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #ccc;margin-top:2px;padding-top:2px}",
+    ".invno{font-size:8px;color:#555;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+    ".seq{font-size:11px;font-weight:900;color:#059669;font-family:monospace;white-space:nowrap;flex-shrink:0}",
+    `@page{size:${widthMm}mm ${heightMm}mm;margin:1mm}`,
+    `@media print{body{background:#fff;padding:0;gap:0}.print-btn{display:none}.label{border:1.5px solid #000;width:${widthMm-2}mm;height:${heightMm-2}mm;page-break-after:always}}`,
+  ].join("");
+
+  const labelsHtml = labels.map(lbl => {
+    const qrData = lbl.sku || lbl.name || "";
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}&format=png`;
+    return `<div class="label">
+      <div class="l"><img class="qr" src="${qrUrl}" alt="QR"/></div>
+      <div class="r">
+        <div class="sn">${e(shopName)}</div>
+        <div class="sku">${e(lbl.sku||lbl.name)}</div>
+        ${lbl.name&&lbl.sku?`<div class="pn">${e(lbl.name)}</div>`:""}
+        ${lbl.binLocation?`<div class="bin">📦 ${e(lbl.binLocation)}</div>`:"<div class=\"bin\" style=\"background:#fee2e2;color:#dc2626\">📦 NO BIN SET</div>"}
+        ${lbl.supplierCode?`<div class="sup">🏭 ${e(lbl.supplierCode)}</div>`:""}
+        ${(lbl.invoiceNo||lbl.seq)?`<div class="inv-row"><span class="invno">${lbl.invoiceNo?e(lbl.invoiceNo):""}</span><span class="seq">${lbl.seq?e(lbl.seq):""}</span></div>`:""}
+      </div>
+    </div>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Part Labels</title><style>${css}</style></head><body>
+    <button class="print-btn" onclick="window.print()">&#128424; Print ${labels.length} Label${labels.length>1?"s":""}</button>
+    ${labelsHtml}
+  </body></html>`;
+
+  const win = window.open("", "_blank", `width=${Math.max(W+100,480)},height=${Math.max(H*3+200,500)}`);
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+}
+
+// ── SHELF / BIN LABEL PRINTER ──────────────────────────────────
+export function openShelfLabelWindow({ binName, description = "" }, { widthMm = 70, heightMm = 45 } = {}) {
+  if (!binName) return;
+  const e = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const px = (mm) => Math.round(mm * 3.78);
+  const W = px(widthMm); const H = px(heightMm);
+  const qrSz = Math.min(Math.round(H * 0.55), 72);
+  const leftW = qrSz + 12;
+  const maxFontSize = Math.min(Math.round((H - 12) * 0.7), 72);
+  const descFontSize = Math.min(Math.round(H * 0.12), 13);
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent("#"+binName)}&format=png`;
+
+  const css = [
+    "*{margin:0;padding:0;box-sizing:border-box}",
+    "body{font-family:Arial,sans-serif;background:#e5e7eb;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}",
+    ".print-btn{padding:9px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px}",
+    `.label{width:${W}px;height:${H}px;border:3px solid #111;background:#fff;display:flex;overflow:hidden}`,
+    `.l{width:${leftW}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:5px;border-right:2px solid #111;background:#f8f8f8}`,
+    `.qr{width:${qrSz}px;height:${qrSz}px;display:block}`,
+    `.r{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 8px;overflow:hidden;min-width:0}`,
+    `.bn{font-weight:900;font-family:monospace;letter-spacing:2px;color:#111;text-align:center;line-height:1;white-space:nowrap;display:inline-block}`,
+    `.desc{font-size:${descFontSize}px;font-weight:bold;color:#555;text-align:center;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-transform:uppercase;letter-spacing:.05em}`,
+    `@page{size:${widthMm}mm ${heightMm}mm;margin:1mm}`,
+    `@media print{body{background:#fff;padding:0;gap:0}.print-btn{display:none}.label{border:2px solid #000;width:${widthMm-2}mm;height:${heightMm-2}mm}}`,
+  ].join("");
+
+  // JS in the popup auto-shrinks the bin name until it fits the right-panel width
+  const fitScript = `
+    (function(){
+      var el=document.querySelector('.bn');
+      var container=document.querySelector('.r');
+      var maxW=container.clientWidth-16;
+      var maxH=container.clientHeight-(${description?descFontSize+10:0});
+      var sz=${maxFontSize};
+      el.style.fontSize=sz+'px';
+      while(sz>8&&(el.scrollWidth>maxW||el.offsetHeight>maxH)){
+        sz--;
+        el.style.fontSize=sz+'px';
+      }
+    })();
+  `;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Shelf Label</title><style>${css}</style></head><body>
+    <button class="print-btn" onclick="window.print()">&#128424; Print Label</button>
+    <div class="label">
+      <div class="l"><img class="qr" src="${qrUrl}" alt="QR"/></div>
+      <div class="r">
+        <div class="bn">${e(binName)}</div>
+        ${description?`<div class="desc">${e(description)}</div>`:""}
+      </div>
+    </div>
+    <script>${fitScript}<\/script>
+  </body></html>`;
+
+  const win = window.open("", "_blank", `width=${Math.max(W+100,400)},height=${Math.max(H+160,300)}`);
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+}

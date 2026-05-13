@@ -8,7 +8,7 @@ import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./l
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
@@ -1707,17 +1707,47 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(isNew){
       for(const item of items){
         await api.insert("supplier_invoice_items",{...item,invoice_id:inv.id});
-        const part=parts.find(p=>p.id===item.part_id);
-        if(part){const ns=part.stock+item.qty;await api.patch("parts","id",item.part_id,{stock:ns});await logInv(part,part.stock,ns,"Stock In",`Invoice ${inv.id}`);}
+      }
+    } else {
+      // Update existing line items (qty, unit_cost, totals only — no stock adjustment)
+      for(const item of items){
+        if(item.id) await api.patch("supplier_invoice_items","id",item.id,{qty:item.qty,unit_cost:item.unit_cost,total:item.total,part_name:item.part_name,part_sku:item.part_sku,supplier_part_id:item.supplier_part_id});
       }
     }
-    await refreshTables("supplier_invoices","parts","inventory_logs");closeM("supplierInvoice");showToast(isNew?"Invoice saved & stock updated":"Invoice updated");
+    await refreshTables("supplier_invoices","parts","inventory_logs");closeM("supplierInvoice");showToast(isNew?"Invoice saved":"Invoice updated");
+  };
+  const stockInInvoice=async(inv)=>{
+    const rows=await api.get("supplier_invoice_items",`invoice_id=eq.${encodeURIComponent(inv.id)}&select=*`);
+    if(!Array.isArray(rows)||rows.length===0){showToast("No line items found for this invoice","err");return;}
+    let stocked=0,skipped=0;
+    const invBranchId=inv.branch_id?+inv.branch_id:null;
+    for(const item of rows){
+      if(!item.part_id){skipped++;continue;}
+      // Find the directly-linked catalog part first
+      const catalogPart=parts.find(p=>+p.id===+item.part_id);
+      if(!catalogPart){skipped++;continue;}
+      // If the invoice belongs to a branch, prefer the branch-specific part (matched by SKU)
+      // so stock goes into the branch's inventory, not the main catalog
+      let targetPart=catalogPart;
+      if(invBranchId && (+catalogPart.branch_id||null)!==invBranchId){
+        const branchCopy=parts.find(p=>p.sku===catalogPart.sku && +p.branch_id===invBranchId);
+        if(branchCopy) targetPart=branchCopy;
+      }
+      const ns=(+targetPart.stock||0)+(+item.qty||0);
+      await api.patch("parts","id",+targetPart.id,{stock:ns});
+      await logInv(targetPart,targetPart.stock,ns,"Stock In",`Invoice ${inv.id}`);
+      stocked++;
+    }
+    await api.patch("supplier_invoices","id",inv.id,{stocked_in:true});
+    await refreshTables("supplier_invoices","parts","inventory_logs");
+    closeM("supplierInvoice");
+    if(stocked>0) showToast(`Stocked in: ${stocked} part(s) updated${skipped?`, ${skipped} skipped (no part link)`:""}`);
+    else showToast(`No linked parts — ${skipped} item(s) have no part match. Link parts first.`,"err");
   };
   const deleteSupplierInvoice=async(id)=>{
-    if(!window.confirm("Delete this empty invoice?")) return;
     await api.delete("supplier_invoice_items","invoice_id",id);
     await api.delete("supplier_invoices","id",id);
-    await refreshTables("supplier_invoices");showToast("Invoice deleted","err");
+    await refreshTables("supplier_invoices");closeM("supplierInvoice");showToast("Invoice deleted","err");
   };
 
   // Supplier Returns
@@ -2884,6 +2914,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 <button className="btn btn-ghost btn-sm" onClick={loadAll} title="Refresh inventory">↻ Refresh</button>
                 {role==="admin"&&branches.length>1&&<button className={`btn btn-sm ${showCrossBranch?"btn-primary":"btn-ghost"}`} onClick={()=>setShowCrossBranch(v=>!v)} title="Cross-branch stock search">🏢 {t.branchCrossBtn}</button>}
                 {(isBranchUser&&currentBranch?.show_supplier_sku)||(role==="admin"||role==="branch_admin")?(<button onClick={()=>setShowSupplierCodes(v=>!v)} style={{padding:"7px 12px",border:`1.5px solid ${showSupplierCodes?"var(--purple)":"var(--border)"}`,borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,background:showSupplierCodes?"rgba(167,139,250,.15)":"transparent",color:showSupplierCodes?"var(--purple)":"var(--text3)",fontFamily:"DM Sans,sans-serif",transition:"all .18s",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>{showSupplierCodes?"🔓":"🔒"} Supplier Code</button>):null}
+                {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>openM("printShelfLabel")} title="Print shelf/bin label">📋 Shelf Label</button>}
                 {(role==="admin"||role==="branch_admin")&&<button className="btn btn-primary" onClick={()=>openM("editPart")}>+ {t.addPart}</button>}
               </div>}/>
             {showCrossBranch&&branches.length>1&&(
@@ -3092,12 +3123,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                             <button className="btn btn-ghost btn-xs" onClick={()=>openM("stockMove",p)}>🔀 Move</button>
                             <button className="btn btn-ghost btn-xs" onClick={()=>openM("partSupplier",p)}>🏭 Supp</button>
                             <button className="btn btn-ghost btn-xs" onClick={()=>{setLogSearch(p.sku||"");setTab("logs");}}>📝 Logs</button>
+                            <button className="btn btn-ghost btn-xs" onClick={()=>openM("printPartLabel",p)}>🏷️ Label</button>
                             <button className="btn btn-danger btn-xs" onClick={()=>deletePart(p.id)}>🗑</button>
                           </>
                         ):(
-                          <button className="btn btn-ghost btn-xs" onClick={()=>openM("branchStock",{part:p,existing:branchStockMap[String(p.id)]||null})}>
-                            {branchStockMap[String(p.id)]?"✏️ Edit Stock":"📦 Set Stock"}
-                          </button>
+                          <>
+                            <button className="btn btn-ghost btn-xs" onClick={()=>openM("branchStock",{part:p,existing:branchStockMap[String(p.id)]||null})}>
+                              {branchStockMap[String(p.id)]?"✏️ Edit Stock":"📦 Set Stock"}
+                            </button>
+                            <button className="btn btn-ghost btn-xs" onClick={()=>openM("printPartLabel",p)}>🏷️ Label</button>
+                          </>
                         )}
                       </div>
                     )}
@@ -3193,9 +3228,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                           {(role==="admin"||role==="branch_admin")&&(()=>{
                             if(!canEditPart(p)) return (
                               <td style={{position:"sticky",right:0,background:"var(--surface)",zIndex:1,boxShadow:"-2px 0 8px rgba(0,0,0,.2)",padding:"0 8px",whiteSpace:"nowrap"}}>
-                                <button className="btn btn-ghost btn-xs" onClick={()=>openM("branchStock",{part:p,existing:branchStockMap[String(p.id)]||null})}>
-                                  {branchStockMap[String(p.id)]?"✏️ Edit Stock":"📦 Set Stock"}
-                                </button>
+                                <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                                  <button className="btn btn-ghost btn-xs" onClick={()=>openM("branchStock",{part:p,existing:branchStockMap[String(p.id)]||null})}>
+                                    {branchStockMap[String(p.id)]?"✏️ Edit Stock":"📦 Set Stock"}
+                                  </button>
+                                  <button className="btn btn-ghost btn-xs" title="Print label" onClick={()=>openM("printPartLabel",p)}>🏷️</button>
+                                </div>
                               </td>
                             );
                             const lock=isLocked("part",p.id);
@@ -3217,6 +3255,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                                     onSupplier={()=>openM("partSupplier",p)}
                                     onRfq={()=>openM("inquiry",p)}
                                     onLogs={()=>{setLogSearch(p.sku||"");setTab("logs");}}
+                                    onPrintLabel={()=>openM("printPartLabel",p)}
                                     onDelete={()=>deletePart(p.id)}
                                     t={t}
                                   />
@@ -3646,14 +3685,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                         <td style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:15}}>{fmtAmt(inv.total)}</td>
                         <td><StatusBadge status={inv.status}/></td>
                         <td>
-                          <div style={{display:"flex",gap:5}}>
-                            <button className="btn btn-ghost btn-xs" onClick={()=>openM("viewSupplierInvoice",inv)}>View</button>
+                          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                            <button className="btn btn-ghost btn-xs" onClick={()=>openM("viewSupplierInvoice",inv)}>👁 View</button>
+                            <button className="btn btn-ghost btn-xs" onClick={()=>openM("supplierInvoice",inv)}>✏️ Edit</button>
                             <button className="btn btn-info btn-xs" onClick={()=>openM("pdfInvoice",{...inv,type:"supplier"})}>🖨 PDF</button>
+                            {!inv.stocked_in
+                              ? <button className="btn btn-warning btn-xs" onClick={()=>stockInInvoice(inv)}>📦 Stock In</button>
+                              : <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:11}}>✅ Stocked</span>
+                            }
                             {inv.status!=="paid"
                               ? <button className="btn btn-success btn-xs" onClick={()=>openM("addPayment",{prefill:{type:"payment",reference_id:inv.id,party_name:inv.supplier_name,amount:inv.total,payment_date:today()}})}>💳 Record Payment</button>
                               : <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:11}}>✅ Paid</span>
                             }
-                            {(inv.total===0||!inv.total)&&inv.status!=="paid"&&<button className="btn btn-danger btn-xs" onClick={()=>deleteSupplierInvoice(inv.id)}>🗑 Delete</button>}
                           </div>
                         </td>
                       </tr>
@@ -4418,8 +4461,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {isOpen("editCustomer")&&<CustomerModal customer={mData("editCustomer")} onSave={saveCustomer} onClose={()=>closeM("editCustomer")} t={t}/>}
       {isOpen("editUser")&&<UserModal user={mData("editUser")} onSave={saveUser} onClose={()=>closeM("editUser")} t={t}/>}
       {isOpen("custHistory")&&<CustHistoryModal customer={mData("custHistory")} orders={orders.filter(o=>o.customer_phone===mData("custHistory")?.phone)} onClose={()=>closeM("custHistory")}/>}
-      {isOpen("supplierInvoice")&&<SupplierInvoiceModal data={mData("supplierInvoice")} suppliers={suppliers} parts={parts} onSave={saveSupplierInvoice} onClose={()=>closeM("supplierInvoice")} t={t} settings={settings}/>}
+      {isOpen("supplierInvoice")&&<SupplierInvoiceModal data={mData("supplierInvoice")} suppliers={suppliers} parts={parts} onSave={saveSupplierInvoice} onDelete={deleteSupplierInvoice} onStockIn={stockInInvoice} onClose={()=>closeM("supplierInvoice")} t={t} settings={settings} role={role} branchId={branchId}/>}
       {isOpen("viewSupplierInvoice")&&<ViewSupplierInvoiceModal inv={mData("viewSupplierInvoice")} onClose={()=>closeM("viewSupplierInvoice")} settings={settings}/>}
+      {isOpen("printPartLabel")&&<PrintPartLabelModal part={mData("printPartLabel")} settings={{...settings,...(currentBranch||{})}} onClose={()=>closeM("printPartLabel")}/>}
+      {isOpen("printShelfLabel")&&<PrintShelfLabelModal settings={{...settings,...(currentBranch||{})}} onClose={()=>closeM("printShelfLabel")}/>}
       {isOpen("supplierReturn")&&<SupplierReturnModal data={mData("supplierReturn")} suppliers={suppliers} parts={parts} supplierInvoices={supplierInvoices} onSave={saveSupplierReturn} onClose={()=>closeM("supplierReturn")} t={t} settings={settings}/>}
       {isOpen("customerInvoice")&&<CustomerInvoiceModal data={mData("customerInvoice")} customers={customers} parts={parts} orders={orders} onSave={saveCustomerInvoice} onClose={()=>closeM("customerInvoice")} t={t} settings={settings}/>}
       {isOpen("viewCustomerInvoice")&&<ViewCustomerInvoiceModal inv={mData("viewCustomerInvoice")} onClose={()=>closeM("viewCustomerInvoice")} settings={settings}/>}

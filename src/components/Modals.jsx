@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { api } from "../lib/api.js";
 import { C, curSym, getSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
-import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink } from "../lib/helpers.js";
+import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
 import { CAR_MAKES, getCategories, DEFAULT_CATS, OC } from "../lib/constants.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
@@ -18,6 +18,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
     licence_renewal_agent_name:"", licence_renewal_agent_phone:"", default_markup_pct:0, move_pin:"",
     label_width_mm:98, label_height_mm:45, linked_branch_id:"",
+    part_label_w:98, part_label_h:45, shelf_label_w:70, shelf_label_h:45,
     ...profile
   });
   const [saving,setSaving]=useState(false);
@@ -241,24 +242,54 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
           </div>
         </div>
 
-        {/* Label Size */}
+        {/* Label Sizes */}
         <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🏷️ Label Size</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            <div>
-              <FL label="Label Width (mm)"/>
-              <input className="inp" type="number" min="50" max="200" step="1"
-                value={f.label_width_mm||98} onChange={e=>s("label_width_mm",Number(e.target.value)||98)}/>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Default: 98 mm</div>
-            </div>
-            <div>
-              <FL label="Label Height (mm)"/>
-              <input className="inp" type="number" min="20" max="120" step="1"
-                value={f.label_height_mm||45} onChange={e=>s("label_height_mm",Number(e.target.value)||45)}/>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Default: 45 mm</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🏷️ Label Sizes</div>
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>Job / Workshop label (used on job cards)</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div>
+                <FL label="Width (mm)"/>
+                <input className="inp" type="number" min="50" max="200" step="1"
+                  value={f.label_width_mm||98} onChange={e=>s("label_width_mm",Number(e.target.value)||98)}/>
+              </div>
+              <div>
+                <FL label="Height (mm)"/>
+                <input className="inp" type="number" min="20" max="120" step="1"
+                  value={f.label_height_mm||45} onChange={e=>s("label_height_mm",Number(e.target.value)||45)}/>
+              </div>
             </div>
           </div>
-          <div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>Applies to all labels printed from this workshop. Standard thermal label: 98 × 45 mm.</div>
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>Part / inventory label (spare shop, stock)</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div>
+                <FL label="Width (mm)"/>
+                <input className="inp" type="number" min="20" max="300" step="1"
+                  value={f.part_label_w||98} onChange={e=>s("part_label_w",Number(e.target.value)||98)}/>
+              </div>
+              <div>
+                <FL label="Height (mm)"/>
+                <input className="inp" type="number" min="15" max="200" step="1"
+                  value={f.part_label_h||45} onChange={e=>s("part_label_h",Number(e.target.value)||45)}/>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>Shelf / bin label</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div>
+                <FL label="Width (mm)"/>
+                <input className="inp" type="number" min="20" max="300" step="1"
+                  value={f.shelf_label_w||70} onChange={e=>s("shelf_label_w",Number(e.target.value)||70)}/>
+              </div>
+              <div>
+                <FL label="Height (mm)"/>
+                <input className="inp" type="number" min="15" max="200" step="1"
+                  value={f.shelf_label_h||45} onChange={e=>s("shelf_label_h",Number(e.target.value)||45)}/>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Licence Renewal Agent */}
@@ -1389,21 +1420,35 @@ export function SettingsPage({settings,onSave,t}) {
             <div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>Categories are saved locally on this device.</div>
           </div>
           <div className="card" style={{padding:22}}>
-            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:16}}>🏷️ Stock Label Size</h3>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Set the print size for stock labels</div>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🏷️ Part Label Size</h3>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Size for part/inventory labels (SKU, bin, supplier code, invoice)</div>
             <FG cols="1fr 1fr">
-              <div><FL label="Label Width (mm)"/><input className="inp" type="number" min="20" max="200" value={f.label_w||50} onChange={e=>s("label_w",+e.target.value)} placeholder="50"/></div>
-              <div><FL label="Label Height (mm)"/><input className="inp" type="number" min="15" max="200" value={f.label_h||50} onChange={e=>s("label_h",+e.target.value)} placeholder="50"/></div>
+              <div><FL label="Width (mm)"/><input className="inp" type="number" min="20" max="300" value={f.part_label_w||98} onChange={e=>s("part_label_w",+e.target.value)} placeholder="98"/></div>
+              <div><FL label="Height (mm)"/><input className="inp" type="number" min="15" max="200" value={f.part_label_h||45} onChange={e=>s("part_label_h",+e.target.value)} placeholder="45"/></div>
             </FG>
-            <div style={{background:"var(--surface2)",borderRadius:8,padding:12,border:"1px solid var(--border)",marginTop:10,display:"inline-flex",alignItems:"center",gap:12}}>
-              <div style={{width:Math.min(+(f.label_w||50)*2,160),height:Math.min(+(f.label_h||50)*2,100),border:"1px dashed var(--border2)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--surface3)",flexShrink:0}}>
-                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.label_w||50}×{f.label_h||50}mm</span>
+            <div style={{background:"var(--surface2)",borderRadius:8,padding:10,border:"1px solid var(--border)",marginTop:8,display:"inline-flex",alignItems:"center",gap:10}}>
+              <div style={{width:Math.min(+(f.part_label_w||98),180),height:Math.min(+(f.part_label_h||45)*2,90),border:"1px dashed var(--border2)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--surface3)",flexShrink:0}}>
+                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.part_label_w||98}×{f.part_label_h||45}mm</span>
               </div>
-              <div style={{fontSize:12,color:"var(--text3)"}}>Preview (2× scale)<br/>Default: 50mm × 50mm</div>
+              <div style={{fontSize:12,color:"var(--text3)"}}>Preview (approx)<br/>Default: 98×45mm</div>
             </div>
-            <div style={{marginTop:14}}>
-              <button className="btn btn-primary btn-sm" onClick={()=>onSave({label_w:f.label_w,label_h:f.label_h})}>💾 Save Label Size</button>
+          </div>
+          <div className="card" style={{padding:22}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>📋 Shelf Label Size</h3>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Size for shelf/bin identification labels</div>
+            <FG cols="1fr 1fr">
+              <div><FL label="Width (mm)"/><input className="inp" type="number" min="20" max="300" value={f.shelf_label_w||70} onChange={e=>s("shelf_label_w",+e.target.value)} placeholder="70"/></div>
+              <div><FL label="Height (mm)"/><input className="inp" type="number" min="15" max="200" value={f.shelf_label_h||45} onChange={e=>s("shelf_label_h",+e.target.value)} placeholder="45"/></div>
+            </FG>
+            <div style={{background:"var(--surface2)",borderRadius:8,padding:10,border:"1px solid var(--border)",marginTop:8,display:"inline-flex",alignItems:"center",gap:10}}>
+              <div style={{width:Math.min(+(f.shelf_label_w||70),180),height:Math.min(+(f.shelf_label_h||45)*2,90),border:"1px dashed var(--border2)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--surface3)",flexShrink:0}}>
+                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.shelf_label_w||70}×{f.shelf_label_h||45}mm</span>
+              </div>
+              <div style={{fontSize:12,color:"var(--text3)"}}>Preview (approx)<br/>Default: 70×45mm</div>
             </div>
+          </div>
+          <div style={{marginTop:4}}>
+            <button className="btn btn-primary btn-sm" onClick={()=>onSave({part_label_w:f.part_label_w||98,part_label_h:f.part_label_h||45,shelf_label_w:f.shelf_label_w||70,shelf_label_h:f.shelf_label_h||45})}>💾 Save Label Sizes</button>
           </div>
         </div>
       )}
@@ -1517,47 +1562,264 @@ export function InvTotals({items,taxRate,costField="unit_cost",priceField}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SUPPLIER INVOICE — SMART LINE ITEM EDITOR
+// Primary input: Supplier Part # → auto-match → link
+// ═══════════════════════════════════════════════════════════════
+function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",branchId=null,t={},settings={}}) {
+  const mkRow=()=>({_k:String(Date.now()+Math.random()),supplier_part_id:"",part_id:null,part_name:"",part_sku:"",qty:1,unit_cost:0,_st:"idle",_hits:[],_drop:false});
+  const inputRefs=useRef({});
+  const [focusKey,setFocusKey]=useState(null);
+  const add=()=>{const row=mkRow();setItems(p=>[...p,row]);setFocusKey(row._k);};
+  const upd=(k,patch)=>setItems(p=>p.map(r=>r._k===k?{...r,...patch}:r));
+  const rem=k=>setItems(p=>p.filter(r=>r._k!==k));
+
+  useEffect(()=>{
+    if(focusKey&&inputRefs.current[focusKey]){inputRefs.current[focusKey].focus();setFocusKey(null);}
+  },[focusKey,items]);
+
+  const search=async(k,spn)=>{
+    const q=(spn||"").trim();
+    if(!q)return;
+    if(!suppId){upd(k,{_st:"no_supplier"});return;}
+    upd(k,{_st:"searching",_drop:false});
+    // 1. Exact link in part_suppliers for this supplier
+    const linked=await api.get("part_suppliers",`supplier_id=eq.${suppId}&supplier_part_no=eq.${encodeURIComponent(q)}&select=part_id&limit=1`);
+    if(Array.isArray(linked)&&linked[0]?.part_id){
+      const part=parts.find(p=>p.id===linked[0].part_id);
+      if(part){upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false});return;}
+    }
+    // 2. Fuzzy search in local parts (name / sku / oe_number)
+    const ql=q.toLowerCase();
+    const hits=parts.filter(p=>(p.name||"").toLowerCase().includes(ql)||(p.sku||"").toLowerCase().includes(ql)||(p.oe_number||"").toLowerCase().includes(ql)).slice(0,8);
+    if(hits.length){upd(k,{_st:"candidates",_hits:hits,_drop:true});}
+    else{upd(k,{_st:"no_match",_hits:[],_drop:false});}
+  };
+
+  const linkTo=async(k,item,part)=>{
+    // Create permanent part_supplier link
+    const res=await api.upsert("part_suppliers",{part_id:part.id,supplier_id:+suppId,supplier_part_no:(item.supplier_part_id||"").trim()});
+    if(res?.code||res?.message){/* silent — link best-effort */}
+    upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false,_hits:[]});
+  };
+
+  const requestMatch=async(k,item)=>{
+    await api.insert("part_requests",{requesting_branch_id:branchId,part_name:item.supplier_part_id,notes:`Match supplier part# "${item.supplier_part_id}" to catalog part`,status:"pending",created_at:new Date().toISOString()});
+    upd(k,{_st:"requested",_drop:false});
+  };
+
+  return (
+    <div style={{overflowX:"auto"}}>
+      <div style={{minWidth:640}}>
+        {/* Header */}
+        <div style={{display:"grid",gridTemplateColumns:"160px 1fr 120px 64px 86px 60px 24px",gap:6,padding:"0 2px 6px",borderBottom:"1px solid var(--border)"}}>
+          {["Supplier Part #","Part / Description","SKU","Qty","Unit Cost","Amount",""].map((h,i)=>(
+            <div key={i} style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em"}}>{h}</div>
+          ))}
+        </div>
+
+        {items.length===0&&<div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:13}}>Click "+ Add Line" to start</div>}
+
+        {items.map(row=>{
+          const {_k:k,_st,_hits,_drop}=row;
+          const isLinked=_st==="linked";
+          const isSearching=_st==="searching";
+          const isCandidates=_st==="candidates";
+          const isNoMatch=_st==="no_match";
+          const isRequested=_st==="requested";
+          const linkedStyle={background:"rgba(52,211,153,.06)",borderColor:"rgba(52,211,153,.4)"};
+          return (
+            <div key={k} style={{marginTop:8}}>
+              <div style={{display:"grid",gridTemplateColumns:"160px 1fr 120px 64px 86px 60px 24px",gap:6,alignItems:"start"}}>
+
+                {/* ── Supplier Part # (PRIMARY) ── */}
+                <div style={{position:"relative"}}>
+                  <div style={{position:"relative"}}>
+                    <input className="inp" style={{fontSize:12,paddingRight:26,
+                      borderColor:isLinked?"rgba(52,211,153,.5)":isCandidates?"var(--blue)":isNoMatch?"var(--orange)":"var(--border)",
+                      background:isLinked?"rgba(52,211,153,.06)":""}}
+                      ref={el=>{inputRefs.current[k]=el;}}
+                      value={row.supplier_part_id||""}
+                      placeholder="Type part # → Enter"
+                      onChange={e=>upd(k,{supplier_part_id:e.target.value,_st:"idle",part_id:null,part_name:"",part_sku:"",_drop:false})}
+                      onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();search(k,e.target.value);}}}
+                      onBlur={e=>{
+                        setTimeout(()=>upd(k,{_drop:false}),180);
+                        if((e.target.value||"").trim()&&_st==="idle")search(k,e.target.value);
+                      }}
+                    />
+                    <span style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",fontSize:11,lineHeight:1,pointerEvents:"none"}}>
+                      {isLinked?"✅":isSearching?"⏳":isCandidates?"🔎":isNoMatch?"⚠️":isRequested?"📨":""}
+                    </span>
+                  </div>
+                  {/* Candidate dropdown */}
+                  {isCandidates&&_drop&&_hits.length>0&&(
+                    <div style={{position:"absolute",top:"100%",left:0,zIndex:400,minWidth:280,background:"var(--surface2)",border:"1px solid var(--border2)",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,.5)",overflow:"hidden"}}>
+                      <div style={{padding:"5px 10px 4px",fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",borderBottom:"1px solid var(--border)"}}>Select to link &amp; use</div>
+                      {_hits.map(p=>(
+                        <div key={p.id}
+                          style={{padding:"7px 12px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,borderBottom:"1px solid var(--border)"}}
+                          onMouseEnter={e=>e.currentTarget.style.background="var(--surface3)"}
+                          onMouseLeave={e=>e.currentTarget.style.background=""}
+                          onMouseDown={e=>{e.preventDefault();linkTo(k,row,p);}}>
+                          <div style={{minWidth:0}}>
+                            <div style={{fontSize:12,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
+                            <div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{p.sku}</div>
+                          </div>
+                          <span style={{fontSize:11,color:"var(--blue)",fontWeight:700,flexShrink:0}}>Link →</span>
+                        </div>
+                      ))}
+                      <div style={{padding:5}}>
+                        <button className="btn btn-ghost btn-xs" style={{width:"100%",fontSize:11}}
+                          onMouseDown={e=>{e.preventDefault();upd(k,{_drop:false,_st:"no_match"});}}>
+                          None match ✕
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Part Name ── */}
+                <input className="inp" style={{fontSize:12,...(isLinked?linkedStyle:{})}}
+                  value={row.part_name||""} placeholder={isLinked?"(auto)":"Part name…"}
+                  readOnly={isLinked}
+                  onChange={e=>upd(k,{part_name:e.target.value})}/>
+
+                {/* ── SKU ── */}
+                <input className="inp" style={{fontSize:11,fontFamily:"DM Mono,monospace",...(isLinked?linkedStyle:{})}}
+                  value={row.part_sku||""} placeholder="SKU"
+                  readOnly={isLinked}
+                  onChange={e=>upd(k,{part_sku:e.target.value})}/>
+
+                {/* ── Qty ── */}
+                <input className="inp" type="number" min="1" style={{fontSize:12,textAlign:"center"}}
+                  value={row.qty||1}
+                  onChange={e=>upd(k,{qty:+e.target.value||1,total:(+e.target.value||1)*(+row.unit_cost||0)})}/>
+
+                {/* ── Unit Cost ── */}
+                <input className="inp" type="number" min="0" step="0.01" style={{fontSize:12}}
+                  value={row.unit_cost||""}
+                  placeholder="0.00"
+                  onChange={e=>upd(k,{unit_cost:+e.target.value||0,total:(+row.qty||1)*(+e.target.value||0)})}/>
+
+                {/* ── Amount ── */}
+                <div style={{padding:"8px 2px",fontSize:12,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",display:"flex",alignItems:"center"}}>
+                  {fmtAmt((+row.qty||1)*(+row.unit_cost||0))}
+                </div>
+
+                {/* ── Delete ── */}
+                <button style={{background:"none",border:"none",cursor:"pointer",color:"var(--red)",fontSize:15,lineHeight:1,padding:"8px 0"}} onClick={()=>rem(k)}>✕</button>
+              </div>
+
+              {/* ── No match action bar ── */}
+              {(isNoMatch||_st==="no_supplier")&&(
+                <div style={{marginTop:4,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",padding:"6px 10px",background:"rgba(251,191,36,.07)",border:"1px solid rgba(251,191,36,.25)",borderRadius:8}}>
+                  <span style={{fontSize:11,color:"var(--yellow)",fontWeight:600,flexShrink:0}}>
+                    {_st==="no_supplier"?"⚠️ Select a supplier first":"⚠️ No match — type name manually or request"}
+                  </span>
+                  {isNoMatch&&<button className="btn btn-ghost btn-xs" onClick={()=>upd(k,{_st:"manual"})}>✏️ Enter manually</button>}
+                  {isNoMatch&&role==="branch_admin"&&branchId&&(
+                    <button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} onClick={()=>requestMatch(k,row)}>📨 Request match from main</button>
+                  )}
+                </div>
+              )}
+              {isRequested&&(
+                <div style={{marginTop:4,padding:"5px 10px",background:"rgba(96,165,250,.07)",border:"1px solid rgba(96,165,250,.25)",borderRadius:8,fontSize:11,color:"var(--blue)",fontWeight:600}}>
+                  📨 Request sent to main branch — they will link supplier part #{row.supplier_part_id}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:10,borderStyle:"dashed"}} onClick={add}>+ Add Line</button>
+        <div style={{marginTop:6,fontSize:11,color:"var(--text3)"}}>
+          💡 Type supplier part # → press Enter to search &nbsp;·&nbsp; ✅ linked &nbsp;·&nbsp; 🔎 candidates — click to link &nbsp;·&nbsp; ⚠️ not found
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SUPPLIER INVOICE MODAL
 // ═══════════════════════════════════════════════════════════════
-export function SupplierInvoiceModal({data,suppliers,parts,onSave,onClose,t,settings}) {
+export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onStockIn,onClose,t,settings,role="admin",branchId=null}) {
   const isNew=data?.isNew;
-  const [suppId,setSuppId]=useState("");
-  const [invDate,setInvDate]=useState(today());
-  const [dueDate,setDueDate]=useState("");
-  const [notes,setNotes]=useState("");
+  const isPaid=data?.status==="paid";
+  const isStocked=!!data?.stocked_in;
+  const [invNo,setInvNo]=useState(data?.id||"");
+  const [suppId,setSuppId]=useState(String(data?.supplier_id||""));
+  const [invDate,setInvDate]=useState(data?.invoice_date||today());
+  const [dueDate,setDueDate]=useState(data?.due_date||"");
+  const [notes,setNotes]=useState(data?.notes||"");
   const [items,setItems]=useState([]);
+  const [saving,setSaving]=useState(false);
 
   const sel=suppliers.find(s=>s.id===+suppId);
-  const sub=items.reduce((s,i)=>s+i.qty*i.unit_cost,0);
+  const sub=items.reduce((s,i)=>s+(+i.qty||1)*(+i.unit_cost||0),0);
   const tax=sub*(settings.tax_rate||0)/100;
   const total=sub+tax;
 
+  // Load existing items when editing
+  useEffect(()=>{
+    if(!isNew&&data?.id){
+      api.get("supplier_invoice_items",`invoice_id=eq.${data.id}&select=*`).then(r=>{
+        if(Array.isArray(r)) setItems(r.map((item,i)=>({...item,_k:item.id||String(i),_st:"linked",_hits:[],_drop:false})));
+      });
+    }
+  },[]);
+
+  // Reset match state on supplier change (new invoices only)
+  useEffect(()=>{
+    if(isNew&&suppId) setItems(p=>p.map(r=>({...r,_st:"idle",part_id:null,part_name:"",part_sku:"",_hits:[],_drop:false})));
+  },[suppId]);
+
   const handleSave=async()=>{
-    if(!suppId||items.length===0)return;
-    const id=makeId(settings.invoice_prefix||"INV");
-    const inv={id,supplier_id:+suppId,supplier_name:sel?.name,invoice_date:invDate,due_date:dueDate,status:"pending",subtotal:sub,tax,total,notes};
-    const lineItems=items.map(item=>({part_id:item.part_id?+item.part_id:null,part_name:item.part_name,part_sku:item.part_sku,supplier_part_id:item.supplier_part_id||"",qty:+item.qty,unit_cost:+item.unit_cost,total:+item.qty*+item.unit_cost}));
-    onSave({inv,isNew},lineItems);
+    if(!suppId||items.length===0||!invNo.trim())return;
+    setSaving(true);
+    const id=invNo.trim();
+    const inv={id,supplier_id:+suppId,supplier_name:sel?.name,invoice_date:invDate,due_date:dueDate,status:data?.status||"pending",subtotal:sub,tax,total,notes};
+    const lineItems=items.map(item=>({id:item.id||undefined,part_id:item.part_id?+item.part_id:null,part_name:item.part_name,part_sku:item.part_sku,supplier_part_id:item.supplier_part_id||"",qty:+item.qty||1,unit_cost:+item.unit_cost||0,total:(+item.qty||1)*(+item.unit_cost||0)}));
+    await onSave({inv,isNew},lineItems);
+    setSaving(false);
+  };
+
+  const handleDelete=async()=>{
+    if(!onDelete||isPaid)return;
+    if(!window.confirm("Delete this invoice? Stock levels will NOT be reversed."))return;
+    setSaving(true);
+    await onDelete(data.id);
+    setSaving(false);
   };
 
   return (
     <Overlay onClose={onClose} wide>
-      <MHead title={`🧾 ${isNew?"New Purchase Invoice":"View Invoice"}`} onClose={onClose}/>
+      <MHead title={`🧾 ${isNew?"New Purchase Invoice":"Edit Invoice"}`} onClose={onClose}/>
       <FG>
-        <div><FL label="Supplier *"/><select className="inp" value={suppId} onChange={e=>setSuppId(e.target.value)}><option value="">Select supplier...</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-        <div><FL label={t.invoiceDate}/><input className="inp" type="date" value={invDate} onChange={e=>setInvDate(e.target.value)}/></div>
+        <div><FL label="Invoice No. *"/><input className="inp" value={invNo} onChange={e=>setInvNo(e.target.value.toUpperCase())} placeholder="e.g. INV-2025-001" disabled={!isNew} style={{fontFamily:"DM Mono,monospace"}}/></div>
+        <div><FL label="Supplier *"/><select className="inp" value={suppId} onChange={e=>setSuppId(e.target.value)} disabled={!isNew}><option value="">Select supplier...</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
       </FG>
       <FG>
+        <div><FL label={t.invoiceDate}/><input className="inp" type="date" value={invDate} onChange={e=>setInvDate(e.target.value)}/></div>
         <div><FL label={t.dueDate}/><input className="inp" type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></div>
         <div><FL label={t.notes}/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional notes"/></div>
       </FG>
       <div className="divider"/>
       <FL label="Line Items"/>
-      <LineItemEditor items={items} setItems={setItems} parts={parts} showSupplierPartId t={t}/>
+      <SupplierInvoiceLineEditor items={items} setItems={setItems} suppId={suppId} parts={parts} role={role} branchId={branchId} t={t} settings={settings}/>
       {items.length>0&&<InvTotals items={items} taxRate={settings.tax_rate} costField="unit_cost"/>}
-      <div style={{display:"flex",gap:10,marginTop:18}}>
+      <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
+        {!isNew&&onDelete&&<button className="btn btn-danger" style={{flex:1}} onClick={handleDelete} disabled={saving||isPaid} title={isPaid?"Cannot delete a paid invoice":undefined}>🗑 Delete</button>}
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={!suppId||items.length===0}>💾 Save & Stock In</button>
+        {!isNew&&onStockIn&&(
+          <button className="btn btn-warning" style={{flex:2}} onClick={async()=>{setSaving(true);await onStockIn(data);setSaving(false);}} disabled={saving||isStocked}
+            title={isStocked?"Already stocked into inventory":undefined}>
+            {isStocked?"✅ Stocked":"📦 Stock In"}
+          </button>
+        )}
+        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={!suppId||!invNo.trim()||items.length===0||saving}>
+          {saving?"⏳ Saving...":isNew?"💾 Save":"💾 Update Invoice"}
+        </button>
       </div>
     </Overlay>
   );
@@ -1566,7 +1828,45 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onClose,t,sett
 // VIEW SUPPLIER INVOICE
 export function ViewSupplierInvoiceModal({inv,onClose,settings}) {
   const [items,setItems]=useState([]);
-  useEffect(()=>{api.get("supplier_invoice_items",`invoice_id=eq.${inv.id}&select=*`).then(r=>setItems(Array.isArray(r)?r:[]));},[inv.id]); 
+  const [showPrintSetup,setShowPrintSetup]=useState(false);
+  const [binMap,setBinMap]=useState({});
+  useEffect(()=>{
+    api.get("supplier_invoice_items",`invoice_id=eq.${inv.id}&select=*`).then(r=>{
+      if(Array.isArray(r)){
+        setItems(r);
+        // pre-fill bins from part records if available
+        const ids=r.filter(i=>i.part_id).map(i=>i.part_id);
+        if(ids.length) api.get("parts",`id=in.(${ids.join(",")})&select=id,bin_location`).then(ps=>{
+          if(!Array.isArray(ps))return;
+          const m={};ps.forEach(p=>{m[p.id]=p.bin_location||"";});setBinMap(m);
+        });
+      }
+    });
+  },[inv.id]);
+
+  const handlePrintLabels=()=>{
+    const labels=[];
+    items.forEach(item=>{
+      const bin=binMap[item.part_id]||"";
+      const total=+item.qty||1;
+      for(let i=1;i<=total;i++){
+        labels.push({
+          sku:item.part_sku||item.part_name,
+          name:item.part_name,
+          binLocation:bin,
+          supplierCode:item.supplier_part_id||"",
+          invoiceNo:inv.id,
+          seq:`${i}/${total}`,
+        });
+      }
+    });
+    openPartLabelsWindow(labels,{
+      widthMm:settings?.part_label_w||98,
+      heightMm:settings?.part_label_h||45,
+      shopName:settings?.shop_name||"",
+    });
+  };
+
   return (
     <Overlay onClose={onClose} wide>
       <MHead title={`🧾 Invoice ${inv.id}`} sub={`${inv.supplier_name} · ${inv.invoice_date}`} onClose={onClose}/>
@@ -1578,7 +1878,40 @@ export function ViewSupplierInvoiceModal({inv,onClose,settings}) {
         <div style={{marginTop:12,borderTop:"1px solid var(--border)",paddingTop:12,display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:16}}><span>Total</span><span style={{color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:20}}>{fmtAmt(inv.total)}</span></div>
       </div>
       <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"var(--text2)"}}><span>Status: <StatusBadge status={inv.status}/></span><span>Due: {inv.due_date||"—"}</span></div>
-      <div style={{display:"flex",gap:10,marginTop:16}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Close</button></div>
+
+      {/* Print Labels setup panel */}
+      {showPrintSetup&&items.length>0&&(
+        <div style={{marginTop:14,background:"var(--surface3)",borderRadius:10,border:"1px solid var(--border2)",padding:14}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🏷️ Set bin location per item before printing</div>
+          {items.map(item=>(
+            <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+              <div style={{flex:1,fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.part_name} <span style={{color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{item.part_sku}</span></div>
+              <div style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>×{item.qty}</div>
+              <input
+                className="inp"
+                style={{width:100,fontSize:12,padding:"4px 8px"}}
+                placeholder="Bin/Location"
+                value={binMap[item.part_id]??binMap[`tmp_${item.id}`]??""}
+                onChange={e=>{
+                  const key=item.part_id||`tmp_${item.id}`;
+                  setBinMap(p=>({...p,[key]:e.target.value}));
+                }}
+              />
+            </div>
+          ))}
+          <div style={{marginTop:8,display:"flex",gap:8}}>
+            <button className="btn btn-primary btn-sm" onClick={handlePrintLabels}>🖨️ Open Print Window</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setShowPrintSetup(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{display:"flex",gap:10,marginTop:16}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Close</button>
+        {!showPrintSetup&&items.length>0&&(
+          <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowPrintSetup(true)}>🏷️ Print Labels</button>
+        )}
+      </div>
     </Overlay>
   );
 }
@@ -1887,7 +2220,7 @@ export function CustomerReturnModal({data,customerInvoices,onSave,onClose,t,sett
 // ALL OTHER MODALS
 // ═══════════════════════════════════════════════════════════════
 // ── Part Actions Dropdown (... menu) ────────────────────────
-export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,onDelete,t}) {
+export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,onDelete,onPrintLabel,t}) {
   const [open,setOpen] = useState(false);
   const [menuPos,setMenuPos] = useState({top:0,left:0});
   const ref = useRef(null);
@@ -1922,6 +2255,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
     {label:"🏭 Suppliers", color:"var(--purple)", fn:onSupplier},
     {label:"📩 RFQ", color:"var(--blue)", fn:onRfq},
     {label:"📝 Stock Logs", color:"var(--text2)", fn:onLogs},
+    ...(onPrintLabel?[{label:"🏷️ Print Label", color:"var(--green)", fn:onPrintLabel}]:[]),
     {label:"🗑 "+t.delete, color:"var(--red)", fn:onDelete, danger:true},
   ];
 
@@ -5153,6 +5487,10 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
     logo_data:  branch?.logo_data||"",
     currency:   branch?.currency||getSettings().currency||"ZAR R",
     sku_prefix: branch?.sku_prefix||"",
+    part_label_w: branch?.part_label_w||98,
+    part_label_h: branch?.part_label_h||45,
+    shelf_label_w: branch?.shelf_label_w||70,
+    shelf_label_h: branch?.shelf_label_h||45,
   });
   const [busy,setBusy]=useState(false);
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -5193,9 +5531,39 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
         </FG>
         <div><FL label="Address"/><textarea className="inp" rows={2} value={f.address} onChange={e=>s("address",e.target.value)} style={{resize:"vertical"}}/></div>
       </div>
-      <div style={{background:"var(--surface)",borderRadius:12,padding:20,marginBottom:20}}>
+      <div style={{background:"var(--surface)",borderRadius:12,padding:20,marginBottom:16}}>
         <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:14}}>Logo</h3>
         <LogoUploader f={f} s={s}/>
+      </div>
+      <div style={{background:"var(--surface)",borderRadius:12,padding:20,marginBottom:20}}>
+        <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>🏷️ Label Sizes</h3>
+        <div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>Override the default label sizes for printing from this branch.</div>
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"var(--text2)",marginBottom:8}}>Part / inventory label</div>
+          <FG>
+            <div><FL label="Width (mm)"/><input className="inp" type="number" min="20" max="300" value={f.part_label_w} onChange={e=>s("part_label_w",+e.target.value||98)}/></div>
+            <div><FL label="Height (mm)"/><input className="inp" type="number" min="15" max="200" value={f.part_label_h} onChange={e=>s("part_label_h",+e.target.value||45)}/></div>
+          </FG>
+          <div style={{marginTop:8,display:"inline-flex",alignItems:"center",gap:10,background:"var(--surface2)",borderRadius:8,padding:"8px 12px",border:"1px solid var(--border)"}}>
+            <div style={{width:Math.min(f.part_label_w,160),height:Math.min(f.part_label_h*2,80),border:"1px dashed var(--border2)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--surface3)",flexShrink:0}}>
+              <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.part_label_w}×{f.part_label_h}mm</span>
+            </div>
+            <div style={{fontSize:11,color:"var(--text3)"}}>Preview · Default 98×45mm</div>
+          </div>
+        </div>
+        <div>
+          <div style={{fontSize:12,fontWeight:600,color:"var(--text2)",marginBottom:8}}>Shelf / bin label</div>
+          <FG>
+            <div><FL label="Width (mm)"/><input className="inp" type="number" min="20" max="300" value={f.shelf_label_w} onChange={e=>s("shelf_label_w",+e.target.value||70)}/></div>
+            <div><FL label="Height (mm)"/><input className="inp" type="number" min="15" max="200" value={f.shelf_label_h} onChange={e=>s("shelf_label_h",+e.target.value||45)}/></div>
+          </FG>
+          <div style={{marginTop:8,display:"inline-flex",alignItems:"center",gap:10,background:"var(--surface2)",borderRadius:8,padding:"8px 12px",border:"1px solid var(--border)"}}>
+            <div style={{width:Math.min(f.shelf_label_w,160),height:Math.min(f.shelf_label_h*2,80),border:"1px dashed var(--border2)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--surface3)",flexShrink:0}}>
+              <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.shelf_label_w}×{f.shelf_label_h}mm</span>
+            </div>
+            <div style={{fontSize:11,color:"var(--text3)"}}>Preview · Default 70×45mm</div>
+          </div>
+        </div>
       </div>
       <button className="btn btn-primary" onClick={save} disabled={busy} style={{width:"100%"}}>
         {busy?"Saving…":"💾 Save Branch Profile"}
@@ -5522,5 +5890,101 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
         );
       })}
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRINT PART LABEL MODAL — immediate/relabel
+// ═══════════════════════════════════════════════════════════════
+export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
+  const [bin,setBin]=useState(part?.bin_location||"");
+  const [supplierCode,setSupplierCode]=useState("");
+  const [qty,setQty]=useState(1);
+
+  // Try to load primary supplier code
+  useEffect(()=>{
+    if(!part?.id)return;
+    api.get("part_suppliers",`part_id=eq.${part.id}&select=supplier_part_no,supplier_id&limit=1`).then(r=>{
+      if(Array.isArray(r)&&r[0])setSupplierCode(r[0].supplier_part_no||"");
+    });
+  },[part?.id]);
+
+  const handlePrint=()=>{
+    const total=Math.max(1,+qty||1);
+    const labels=[];
+    for(let i=1;i<=total;i++){
+      labels.push({
+        sku:part?.sku||"",
+        name:part?.name||"",
+        binLocation:bin,
+        supplierCode,
+        invoiceNo:"",
+        seq:total>1?`${i}/${total}`:"",
+      });
+    }
+    openPartLabelsWindow(labels,{
+      widthMm:settings?.part_label_w||98,
+      heightMm:settings?.part_label_h||45,
+      shopName:settings?.shop_name||"",
+    });
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="🏷️ Print Part Label" sub={part?.name||""} onClose={onClose}/>
+      <FD><FL label="Part SKU"/><div style={{fontFamily:"DM Mono,monospace",fontSize:13,color:"var(--accent)",padding:"6px 0"}}>{part?.sku||"—"}</div></FD>
+      <FD><FL label="Bin / Location"/><input className="inp" value={bin} onChange={e=>setBin(e.target.value)} placeholder="e.g. A1-02"/></FD>
+      <FD><FL label="Supplier Code (optional)"/><input className="inp" value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} placeholder="e.g. SUP-4567"/></FD>
+      <FD><FL label="Number of copies"/><input className="inp" type="number" min="1" max="999" value={qty} onChange={e=>setQty(e.target.value)} placeholder="1"/></FD>
+      <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>
+        Label size: {settings?.part_label_w||98}×{settings?.part_label_h||45}mm · Change in ⚙️ Settings → Inventory
+      </div>
+      <div style={{display:"flex",gap:10,marginTop:18}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handlePrint} disabled={!part?.sku}>🖨️ Open Print Window</button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRINT SHELF LABEL MODAL
+// ═══════════════════════════════════════════════════════════════
+export function PrintShelfLabelModal({settings,onClose}) {
+  const [binName,setBinName]=useState("");
+  const [description,setDescription]=useState("");
+
+  const handlePrint=()=>{
+    openShelfLabelWindow({binName,description},{
+      widthMm:settings?.shelf_label_w||70,
+      heightMm:settings?.shelf_label_h||45,
+    });
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="📋 Print Shelf Label" onClose={onClose}/>
+      <FD><FL label="Shelf / Bin Name *"/><input className="inp" value={binName} onChange={e=>setBinName(e.target.value)} placeholder="e.g. A1-02"/></FD>
+      <FD><FL label="Description (optional)"/><input className="inp" value={description} onChange={e=>setDescription(e.target.value)} placeholder="e.g. Engine Parts"/></FD>
+      <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>
+        Label size: {settings?.shelf_label_w||70}×{settings?.shelf_label_h||45}mm · Change in ⚙️ Settings → Inventory
+      </div>
+      {binName&&(
+        <div style={{marginTop:12,background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)",padding:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,border:"2px solid var(--text)",borderRadius:6,overflow:"hidden",background:"#fff"}}>
+            <div style={{width:48,height:48,flexShrink:0,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",borderRight:"2px solid var(--text)",fontSize:22}}>▦</div>
+            <div style={{flex:1,padding:"4px 8px"}}>
+              <div style={{fontFamily:"DM Mono,monospace",fontWeight:900,fontSize:22,letterSpacing:2,color:"#111",lineHeight:1}}>{binName}</div>
+              {description&&<div style={{fontSize:11,color:"#555",marginTop:3,textTransform:"uppercase",letterSpacing:".05em"}}>{description}</div>}
+            </div>
+          </div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:6,textAlign:"center"}}>Preview (QR code generates at print time)</div>
+        </div>
+      )}
+      <div style={{display:"flex",gap:10,marginTop:18}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={handlePrint} disabled={!binName.trim()}>🖨️ Open Print Window</button>
+      </div>
+    </Overlay>
   );
 }

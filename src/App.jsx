@@ -4125,7 +4125,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 if(mainItems?.length){
                   bsrId=makeId("BSR");
                   const confirmToken=makeToken();
-                  await api.upsert("branch_stock_requests",{id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:mainBranchId||null,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:mainItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:confirmToken,notes:notes||null});
+                  const bsrPayload={id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:mainBranchId||null,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:mainItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:confirmToken,notes:notes||null};
+                  const bsrRes=await api.upsert("branch_stock_requests",bsrPayload);
+                  if(bsrRes?.code||bsrRes?.message){
+                    throw new Error(`DB error ${bsrRes.code||""}: ${bsrRes.message||JSON.stringify(bsrRes)}`);
+                  }
                 }
                 await refreshTables("orders","branch_stock_requests");
                 const msg=localOid&&bsrId?"✅ Order placed + request sent to main branch":localOid?"✅ Order placed — branch will process it":bsrId?"📋 Request sent to main branch":"Nothing to process";

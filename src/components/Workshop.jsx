@@ -6176,11 +6176,17 @@ function WsShopCheckoutModal({localCart,mainCart,wsProfile,Cs,onConfirm,onClose}
   const [confirming,setConfirming]=useState(false);
   const [notes,setNotes]=useState("");
   const [result,setResult]=useState(null);
+  const [errMsg,setErrMsg]=useState("");
   const localTotal=localCart.reduce((s,i)=>s+i.price*i.qty,0);
   const confirm=async()=>{
     setConfirming(true);
-    const res=await onConfirm({localItems:localCart,mainItems:mainCart,notes});
-    setResult(res||{});
+    setErrMsg("");
+    try{
+      const res=await onConfirm({localItems:localCart,mainItems:mainCart,notes});
+      setResult(res||{});
+    }catch(err){
+      setErrMsg(err?.message||"Save failed — check console for details");
+    }
     setConfirming(false);
   };
   if(result) return (
@@ -6230,6 +6236,9 @@ function WsShopCheckoutModal({localCart,mainCart,wsProfile,Cs,onConfirm,onClose}
           <label style={{fontSize:12,fontWeight:600,color:"var(--text2)",display:"block",marginBottom:4}}>Notes (optional)</label>
           <textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special instructions…" rows={2} style={{width:"100%",resize:"vertical"}}/>
         </div>
+        {errMsg&&<div style={{marginBottom:14,padding:"12px 14px",background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.4)",borderRadius:10,fontSize:13,color:"var(--red)",wordBreak:"break-word"}}>
+          <strong>❌ Save failed:</strong><br/>{errMsg}
+        </div>}
         <div style={{display:"flex",gap:10}}>
           <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" style={{flex:2}} disabled={confirming} onClick={confirm}>

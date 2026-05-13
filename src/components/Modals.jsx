@@ -1609,8 +1609,22 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
 
   const saveBranchSetup=async(k,item)=>{
     if(!branchId||!item.part_id)return;
-    await api.insert("branch_stock",{branch_id:+branchId,part_id:+item.part_id,stock:0,price:parseFloat(item._bsPrice)||null,cost_price:parseFloat(item._bsCost)||null,bin_location:item._bsBin||null,updated_at:new Date().toISOString()});
-    upd(k,{_needsBranchSetup:false});
+    upd(k,{_bsSaving:true,_bsErr:null});
+    const payload={branch_id:+branchId,part_id:+item.part_id,stock:0,updated_at:new Date().toISOString()};
+    if(parseFloat(item._bsPrice)) payload.price=parseFloat(item._bsPrice);
+    if(parseFloat(item._bsCost)) payload.cost_price=parseFloat(item._bsCost);
+    if((item._bsBin||"").trim()) payload.bin_location=item._bsBin.trim();
+    // try upsert first (handles duplicate branch+part gracefully)
+    const res=await api.upsert("branch_stock",payload);
+    if(res?.code||res?.message){
+      // upsert failed — try plain insert
+      const res2=await api.insert("branch_stock",payload);
+      if(res2?.code||res2?.message){
+        upd(k,{_bsSaving:false,_bsErr:res2.message||res.message||"Save failed"});
+        return;
+      }
+    }
+    upd(k,{_needsBranchSetup:false,_bsSaving:false,_bsErr:null});
   };
 
   const requestMatch=async(k,item)=>{
@@ -1753,10 +1767,13 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                       <input className="inp" value={row._bsBin||""} placeholder="e.g. A1-01"
                         onChange={e=>upd(k,{_bsBin:e.target.value})} style={{width:100,fontSize:12}}/></div>
                     <div style={{display:"flex",gap:4,alignSelf:"flex-end",paddingBottom:2}}>
-                      <button className="btn btn-success btn-xs" onClick={()=>saveBranchSetup(k,row)}>✓ Set</button>
-                      <button className="btn btn-ghost btn-xs" onClick={()=>upd(k,{_needsBranchSetup:false})}>Skip</button>
+                      <button className="btn btn-success btn-xs" onClick={()=>saveBranchSetup(k,row)} disabled={row._bsSaving}>
+                        {row._bsSaving?"⏳":"✓"} Set
+                      </button>
+                      <button className="btn btn-ghost btn-xs" onClick={()=>upd(k,{_needsBranchSetup:false,_bsErr:null})}>Skip</button>
                     </div>
                   </div>
+                  {row._bsErr&&<div style={{marginTop:4,fontSize:11,color:"var(--red)",fontWeight:600}}>⚠️ {row._bsErr}</div>}
                 </div>
               )}
             </div>

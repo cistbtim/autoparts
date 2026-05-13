@@ -1242,7 +1242,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
           </div>
         );
-        return <WsSpareShopTab linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder} vehicles={vehicles} partFitments={partFitments}/>;
+        return <WsSpareShopTab linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
@@ -6172,13 +6172,87 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // WS SPARE SHOP TAB
 // ═══════════════════════════════════════════════════════════════
 const WS_SHOP_PAGE_SIZE=20;
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,vehicles=[],partFitments=[]}) {
+function WsShopCheckoutModal({localCart,mainCart,wsProfile,Cs,onConfirm,onClose}) {
+  const [confirming,setConfirming]=useState(false);
+  const [notes,setNotes]=useState("");
+  const [result,setResult]=useState(null);
+  const localTotal=localCart.reduce((s,i)=>s+i.price*i.qty,0);
+  const confirm=async()=>{
+    setConfirming(true);
+    const res=await onConfirm({localItems:localCart,mainItems:mainCart,notes});
+    setResult(res||{});
+    setConfirming(false);
+  };
+  if(result) return (
+    <Overlay onClose={onClose}>
+      <div style={{maxWidth:480,width:"100%",background:"var(--surface)",borderRadius:16,padding:28,boxShadow:"var(--shadow-lg)"}}>
+        <div style={{fontSize:18,fontWeight:800,marginBottom:18}}>✅ Done</div>
+        {result.localOid&&<div style={{marginBottom:12,padding:"12px 16px",background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",borderRadius:10}}>
+          <div style={{fontWeight:700,color:"var(--green)",marginBottom:4}}>🏪 Local Order Placed</div>
+          <div style={{fontSize:13,color:"var(--text2)"}}>Order #{result.localOid} sent to branch for processing.</div>
+        </div>}
+        {result.bsrId&&<div style={{marginBottom:12,padding:"12px 16px",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",borderRadius:10}}>
+          <div style={{fontWeight:700,color:"var(--blue)",marginBottom:4}}>🏬 Main Branch Request Sent</div>
+          <div style={{fontSize:13,color:"var(--text2)",marginBottom:10}}>The main branch will confirm stock and contact you at {wsProfile.phone||wsProfile.whatsapp||"your saved number"}.</div>
+          {(wsProfile.phone||wsProfile.whatsapp)&&<a href={waLink(wsProfile.phone||wsProfile.whatsapp,"")} target="_blank" rel="noreferrer"
+            style={{display:"inline-block",padding:"8px 16px",background:"#25D366",color:"#fff",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none"}}>💬 Open WhatsApp</a>}
+        </div>}
+        <button className="btn btn-primary" style={{width:"100%",marginTop:10}} onClick={onClose}>Close</button>
+      </div>
+    </Overlay>
+  );
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{maxWidth:520,width:"100%",background:"var(--surface)",borderRadius:16,padding:28,boxShadow:"var(--shadow-lg)",maxHeight:"90vh",overflowY:"auto"}}>
+        <MHead title="Review Your Order" onClose={onClose}/>
+        {localCart.length>0&&<div style={{marginBottom:20}}>
+          <div style={{fontWeight:700,fontSize:14,color:"var(--green)",marginBottom:10}}>🏪 Local Stock — Order Now</div>
+          {localCart.map(i=>(
+            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"var(--surface2)",borderRadius:8,marginBottom:6}}>
+              <div><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
+              <div style={{textAlign:"right"}}><div style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</div><div style={{fontWeight:700,fontSize:13}}>{Cs}{(i.price*i.qty).toFixed(2)}</div></div>
+            </div>
+          ))}
+          <div style={{textAlign:"right",fontWeight:800,fontSize:15,marginTop:6}}>Total: {Cs}{localTotal.toFixed(2)}</div>
+        </div>}
+        {mainCart.length>0&&<div style={{marginBottom:20}}>
+          <div style={{fontWeight:700,fontSize:14,color:"var(--blue)",marginBottom:6}}>🏬 From Main Branch — Request</div>
+          <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>These items will be requested from the main branch. They'll confirm stock and contact you before ordering.</div>
+          {mainCart.map(i=>(
+            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"rgba(96,165,250,.06)",border:"1px solid rgba(96,165,250,.2)",borderRadius:8,marginBottom:6}}>
+              <div><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
+              <div style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</div>
+            </div>
+          ))}
+          <div style={{marginTop:8,fontSize:12,color:"var(--text3)"}}>📱 We'll contact: {wsProfile.phone||wsProfile.whatsapp||"(no phone on profile)"}{wsProfile.email?` · ${wsProfile.email}`:""}</div>
+        </div>}
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:12,fontWeight:600,color:"var(--text2)",display:"block",marginBottom:4}}>Notes (optional)</label>
+          <textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special instructions…" rows={2} style={{width:"100%",resize:"vertical"}}/>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" style={{flex:2}} disabled={confirming} onClick={confirm}>
+            {confirming?"Processing…":localCart.length>0&&mainCart.length>0?"✅ Place Order & Send Request":mainCart.length>0?"📋 Send Request to Main":"✅ Place Order"}
+          </button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[]}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
-  const [placing,setPlacing]=useState(false);
-  const [placed,setPlaced]=useState(false);
+  const [showCheckout,setShowCheckout]=useState(false);
   const [loading,setLoading]=useState(true);
+  const [myRequests,setMyRequests]=useState([]);
+  const wsId=wsProfile?.id?String(wsProfile.id):null;
+  useEffect(()=>{
+    if(!wsId)return;
+    api.get("branch_stock_requests",`workshop_id=eq.${wsId}&status=not.in.(completed,cancelled)&select=*&order=created_at.desc`).then(r=>{if(Array.isArray(r))setMyRequests(r);}).catch(()=>{});
+  },[wsId]);
   const [shopParts,setShopParts]=useState([]);
   const [page,setPage]=useState(0);
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
@@ -6237,28 +6311,51 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const addToCart=(p)=>setCart(prev=>{
     const ex=prev.find(i=>i.id===p.id);
     if(ex) return prev.map(i=>i.id===p.id?{...i,qty:i.qty+1}:i);
-    return [...prev,{id:p.id,sku:p.sku,name:p.name,price:+p.price||0,qty:1}];
+    return [...prev,{id:p.id,sku:p.sku,name:p.name,price:+p.price||0,qty:1,_source:p._source||"local"}];
   });
   const removeFromCart=(id)=>setCart(prev=>prev.filter(i=>i.id!==id));
   const qtyCart=(id,qty)=>setCart(prev=>prev.map(i=>i.id===id?{...i,qty:Math.max(1,+qty||1)}:i));
-  const cartTotal=cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const localCart=cart.filter(i=>i._source==="local");
+  const mainCart=cart.filter(i=>i._source!=="local");
+  const cartTotal=localCart.reduce((s,i)=>s+i.price*i.qty,0);
   const cartCount=cart.reduce((s,i)=>s+i.qty,0);
-
-  const placeOrder=async()=>{
-    if(!cart.length)return;
-    setPlacing(true);
-    await onPlaceShopOrder?.(cart,linkedBranchId);
-    setCart([]);
-    setPlaced(true);
-    setTimeout(()=>setPlaced(false),4000);
-    setPlacing(false);
-  };
 
   const paged=filtered.slice(page*WS_SHOP_PAGE_SIZE,(page+1)*WS_SHOP_PAGE_SIZE);
 
   return (
     <div>
       {lightbox&&<ImgLightbox url={lightbox.url} name={lightbox.name} onClose={()=>setLightbox(null)}/>}
+      {showCheckout&&<WsShopCheckoutModal
+        localCart={localCart} mainCart={mainCart}
+        wsProfile={wsProfile} Cs={Cs}
+        onConfirm={async({localItems,mainItems,notes})=>{
+          const res=await onPlaceShopOrder?.({localItems,mainItems,notes,linkedBranchId,mainBranchId});
+          if(res&&(res.localOid||res.bsrId)) setCart([]);
+          return res||{};
+        }}
+        onClose={()=>setShowCheckout(false)}
+      />}
+
+      {/* My pending requests */}
+      {myRequests.length>0&&<div style={{marginBottom:16,padding:"12px 16px",background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.25)",borderRadius:12}}>
+        <div style={{fontWeight:700,fontSize:13,color:"var(--blue)",marginBottom:8}}>🔄 My Main Branch Requests</div>
+        {myRequests.map(r=>{
+          const statusColor={pending:"var(--orange)",confirmed:"var(--blue)",ordered:"var(--accent)",dispatched:"var(--green)"}[r.status]||"var(--text3)";
+          const items=Array.isArray(r.items)?r.items:[];
+          return (
+            <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 10px",background:"var(--surface)",borderRadius:8,marginBottom:6,gap:10,flexWrap:"wrap"}}>
+              <div style={{fontSize:12}}>
+                <span style={{fontWeight:700}}>{items.map(i=>i.name).join(", ")}</span>
+                <span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{new Date(r.created_at).toLocaleDateString()}</span>
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${statusColor}20`,color:statusColor,textTransform:"capitalize"}}>{r.status}</span>
+                {r.status==="confirmed"&&r.confirm_token&&<a href={`${window.location.origin}${window.location.pathname}?bsr_confirm=${r.confirm_token}`} target="_blank" rel="noreferrer" className="btn btn-primary btn-xs">Confirm/Cancel</a>}
+              </div>
+            </div>
+          );
+        })}
+      </div>}
 
       {/* Sticky toolbar */}
       <div style={{position:"sticky",top:-26,zIndex:40,background:"var(--bg)",paddingTop:10,paddingBottom:12,marginBottom:6,marginLeft:-26,marginRight:-26,paddingLeft:26,paddingRight:26,borderBottom:"1px solid var(--border)"}}>
@@ -6270,8 +6367,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <button onClick={()=>{setStockOnly(false);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:!stockOnly?700:400,background:!stockOnly?"var(--accent)":"transparent",color:!stockOnly?"#fff":"var(--text2)"}}>All</button>
             <button onClick={()=>{setStockOnly(true);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:stockOnly?700:400,background:stockOnly?"var(--accent)":"transparent",color:stockOnly?"#fff":"var(--text2)"}}>In Stock</button>
           </div>
-          <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}} onClick={placeOrder} disabled={placing||!cart.length}>
-            🛒 {cartCount>0?`(${cartCount}) `:""}Checkout
+          <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}} onClick={()=>setShowCheckout(true)} disabled={!cart.length}>
+            🛒 {cartCount>0?`(${cartCount}) `:""}{mainCart.length>0&&localCart.length>0?"Checkout & Request":mainCart.length>0?"Request from Main":"Checkout"}
           </button>
         </div>
       </div>
@@ -6321,6 +6418,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                     {showSku&&p.oe_number&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace"}}>OE: {p.oe_number}</div>}
                   </div>
                   <div style={{marginTop:8}}>
+                    {p._source==="local"
+                      ?<div style={{fontSize:16,fontWeight:800,color:"var(--accent)",marginBottom:4}}>{Cs}{(+p.price||0).toFixed(2)}</div>
+                      :<div style={{fontSize:12,color:"var(--text3)",marginBottom:4,fontStyle:"italic"}}>Price on request</div>}
                     <div style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)",marginBottom:10}}>{p.stock>0?`${p.stock} in stock`:"Out of Stock"}</div>
                     {inCart
                       ? <div style={{display:"flex",alignItems:"center",gap:7}}>
@@ -6329,6 +6429,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                           <button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty+1)}>+</button>
                           <button className="btn btn-danger btn-xs" onClick={()=>removeFromCart(p.id)}>✕</button>
                         </div>
+                      : p._source==="other"
+                      ? <button className="btn btn-sm" style={{width:"100%",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.4)"}} disabled={p.stock===0} onClick={()=>addToCart(p)}>{p.stock===0?"Out of Stock":"+ Request from Main"}</button>
                       : <button className="btn btn-primary" style={{width:"100%"}} disabled={p.stock===0} onClick={()=>addToCart(p)}>Add to Cart</button>}
                   </div>
                 </div>
@@ -6347,7 +6449,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
               </div>
             </div>
           )}
-          {placed&&<div style={{background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)",borderRadius:8,padding:"10px 14px",fontSize:13,color:"var(--green)",marginTop:14,textAlign:"center"}}>✅ Order placed successfully!</div>}
+          {localCart.length>0&&!mainCart.length&&<div style={{textAlign:"right",fontSize:13,fontWeight:700,color:"var(--text2)",marginTop:10}}>Cart total: {Cs}{cartTotal.toFixed(2)}</div>}
+          {mainCart.length>0&&<div style={{marginTop:10,fontSize:12,color:"var(--blue)",fontWeight:600}}>🏬 {mainCart.length} item{mainCart.length>1?"s":""} in cart from main branch — price on request</div>}
         </>
       }
     </div>

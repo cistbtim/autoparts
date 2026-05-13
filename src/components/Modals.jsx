@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { api } from "../lib/api.js";
 import { C, curSym, getSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
-import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation } from "../lib/helpers.js";
+import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink } from "../lib/helpers.js";
 import { CAR_MAKES, getCategories, DEFAULT_CATS, OC } from "../lib/constants.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
@@ -5402,6 +5402,125 @@ export function BranchUsersPage({branchId, branchName, user}) {
           {users.length===0&&<div style={{color:"var(--text3)",textAlign:"center",padding:24}}>No branch users yet — add the first one above.</div>}
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BRANCH TRANSFER REQUESTS PAGE
+// ═══════════════════════════════════════════════════════════════
+export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,onRefresh}) {
+  const Cs=curSym(settings?.currency||"ZAR R");
+  const [acting,setActing]=useState(null);
+  const [copied,setCopied]=useState(null);
+  const mainBranch=branches.find(b=>b.is_main);
+  const isMainSide=role==="admin"||(mainBranch&&currentBranch?.id===mainBranch.id);
+  const baseUrl=window.location.origin+window.location.pathname;
+
+  const myRequests=isMainSide
+    ?branchStockRequests.filter(r=>r.supplying_branch_id===mainBranch?.id)
+    :branchStockRequests;
+
+  const sorted=[...myRequests].sort((a,b)=>{
+    const ord={pending:0,confirmed:1,ordered:2,dispatched:3,completed:4,cancelled:5};
+    const oa=ord[a.status]??9,ob=ord[b.status]??9;
+    return oa!==ob?oa-ob:new Date(b.created_at)-new Date(a.created_at);
+  });
+
+  const patch=async(id,data)=>{setActing(id);await api.patch("branch_stock_requests","id",id,data);await onRefresh?.();setActing(null);};
+
+  const statusBadge=(s)=>{
+    const map={pending:{l:"Pending",c:"var(--orange)"},confirmed:{l:"Confirmed",c:"var(--blue)"},ordered:{l:"Ordered",c:"var(--accent)"},dispatched:{l:"Dispatched",c:"var(--green)"},completed:{l:"Completed",c:"var(--text3)"},cancelled:{l:"Cancelled",c:"var(--red)"}};
+    const m=map[s]||{l:s,c:"var(--text3)"};
+    return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${m.c}20`,color:m.c}}>{m.l}</span>;
+  };
+
+  const pendingCount=myRequests.filter(r=>r.status==="pending").length;
+  const dispatchedCount=myRequests.filter(r=>r.status==="dispatched").length;
+
+  return (
+    <div>
+      <div style={{marginBottom:20}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:6}}>
+          <div style={{fontSize:18,fontWeight:800}}>🔄 Branch Transfer Requests</div>
+          {pendingCount>0&&<span style={{fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:99,background:"rgba(251,146,60,.2)",color:"var(--orange)"}}>{pendingCount} pending</span>}
+          {dispatchedCount>0&&!isMainSide&&<span style={{fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:99,background:"rgba(52,211,153,.2)",color:"var(--green)"}}>{dispatchedCount} arrived!</span>}
+        </div>
+        <div style={{fontSize:13,color:"var(--text2)"}}>
+          {isMainSide?"Incoming requests from branch stores — confirm stock, then mark dispatched when sent.":"Your requests to main branch — order confirmation and arrival updates appear here."}
+        </div>
+      </div>
+
+      {sorted.length===0&&<div style={{textAlign:"center",padding:48,color:"var(--text3)"}}>No transfer requests yet</div>}
+
+      {sorted.map(r=>{
+        const reqBranch=branches.find(b=>b.id===r.requesting_branch_id);
+        const confirmUrl=`${baseUrl}?bsr_confirm=${r.confirm_token}`;
+        const items=Array.isArray(r.items)?r.items:[];
+        const itemList=items.map(i=>`• ${i.name}${i.qty>1?` (×${i.qty})`:""}`).join("\n");
+        const waConfirmMsg=`Hi ${r.workshop_name||"there"}, your requested parts from ${mainBranch?.name||"main branch"} are confirmed in stock.\n\n${itemList}\n\nPlease confirm your order here:\n${confirmUrl}`;
+        const waArrivedMsg=`Hi ${r.workshop_name||"there"}, your parts have arrived at ${reqBranch?.name||"the branch"}. Please come collect at your earliest convenience. Thank you!`;
+        const isBusy=acting===r.id;
+        return (
+          <div key={r.id} className="card" style={{padding:18,marginBottom:14,borderLeft:`3px solid ${r.status==="pending"?"var(--orange)":r.status==="dispatched"?"var(--green)":r.status==="confirmed"?"var(--blue)":"var(--border)"}` }}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:10}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:15}}>{r.workshop_name||"Workshop"}</div>
+                <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
+                  {isMainSide&&reqBranch&&<span>From: <strong>{reqBranch.name}</strong> · </span>}
+                  {r.created_at&&new Date(r.created_at).toLocaleDateString()}
+                  {r.workshop_phone&&<span> · 📱 {r.workshop_phone}</span>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>{statusBadge(r.status)}</div>
+            </div>
+
+            <div style={{marginBottom:12}}>
+              {items.map((i,idx)=>(
+                <div key={idx} style={{display:"flex",justifyContent:"space-between",padding:"5px 10px",background:"var(--surface2)",borderRadius:6,marginBottom:4}}>
+                  <span style={{fontSize:13}}>{i.name}{i.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{i.sku}</span>}</span>
+                  <span style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</span>
+                </div>
+              ))}
+            </div>
+
+            {r.notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:10,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>📝 {r.notes}</div>}
+
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+              {/* Supplying-side (main branch) actions */}
+              {isMainSide&&r.status==="pending"&&<>
+                <button className="btn btn-primary btn-sm" disabled={isBusy} onClick={()=>patch(r.id,{status:"confirmed",confirmed_at:new Date().toISOString()})}>✅ Confirm Stock</button>
+                <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} disabled={isBusy} onClick={()=>patch(r.id,{status:"cancelled"})}>✕ Cancel</button>
+              </>}
+              {isMainSide&&r.status==="confirmed"&&<>
+                <a href={waLink(r.workshop_phone,waConfirmMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Workshop</a>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{navigator.clipboard?.writeText(confirmUrl);setCopied(r.id);setTimeout(()=>setCopied(null),2000);}}>
+                  {copied===r.id?"✅ Copied":"🔗 Copy Confirm Link"}
+                </button>
+                <button className="btn btn-ghost btn-sm" disabled={isBusy} onClick={()=>patch(r.id,{status:"ordered"})}>Mark Ordered</button>
+              </>}
+              {isMainSide&&r.status==="ordered"&&<>
+                <button className="btn btn-primary btn-sm" disabled={isBusy} onClick={()=>patch(r.id,{status:"dispatched",arrived_at:new Date().toISOString()})}>🚚 Mark Dispatched to Branch</button>
+              </>}
+              {isMainSide&&r.status==="dispatched"&&<>
+                <a href={waLink(r.workshop_phone,waArrivedMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 Notify Workshop — Parts Arrived</a>
+                <button className="btn btn-ghost btn-sm" disabled={isBusy} onClick={()=>patch(r.id,{status:"completed"})}>✅ Mark Collected</button>
+              </>}
+
+              {/* Requesting-side (branch) actions */}
+              {!isMainSide&&r.status==="confirmed"&&<>
+                <span style={{fontSize:12,color:"var(--blue)",fontWeight:600}}>⏳ Main branch confirmed — check WhatsApp or</span>
+                <a href={confirmUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">Open Confirm Link</a>
+              </>}
+              {!isMainSide&&r.status==="ordered"&&<span style={{fontSize:12,color:"var(--accent)",fontWeight:600}}>✅ Order placed — awaiting dispatch from main</span>}
+              {!isMainSide&&r.status==="dispatched"&&<>
+                <span style={{fontSize:12,color:"var(--green)",fontWeight:700}}>📦 Parts dispatched! Notify your workshop customer to collect.</span>
+                <a href={waLink(r.workshop_phone,waArrivedMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Workshop</a>
+              </>}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -8,13 +8,13 @@ import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./l
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
-import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage } from "./pages/PublicPages.jsx";
+import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage } from "./pages/PublicPages.jsx";
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -60,6 +60,8 @@ export default function App() {
   if(branchReg) return <BranchRegPage/>;
   const activateBranch = new URLSearchParams(window.location.search).get("activate_branch");
   if(activateBranch) return <BranchActivatePage/>;
+  const bsrConfirmToken = new URLSearchParams(window.location.search).get("bsr_confirm");
+  if(bsrConfirmToken) return <BranchStockRequestConfirmPage token={bsrConfirmToken}/>;
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
   if(!user) return <LoginPage onLogin={setUser} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={()=>setUser(null)} lang={lang}/>;
@@ -109,6 +111,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [currentBranch,setCurrentBranch]=useState(null); // null = all branches (admin); object = active branch
   const [partRequests,setPartRequests]=useState([]);
   const [branchStock,setBranchStock]=useState([]);
+  const [branchStockRequests,setBranchStockRequests]=useState([]);
   // Sync settings state from _settings cache after it loads from DB
   useEffect(()=>{ setSettings({...getSettings()}); },[]);
   const [loading,setLoading]=useState(true);
@@ -489,6 +492,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       const prF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
       api.get("part_requests",`${prF}select=*&order=created_at.desc`).catch(()=>[]).then(r=>{if(Array.isArray(r))setPartRequests(r);});
     }
+    // Branch stock requests: workshop sees own, branch admin sees requests for their branch, admin sees all
+    {
+      const bsrF=role==="workshop"?`workshop_id=eq.${wsId}&`:isBranchUser&&user.branch_id?`requesting_branch_id=eq.${user.branch_id}&`:"";
+      api.get("branch_stock_requests",`${bsrF}select=*&order=created_at.desc`).catch(()=>[]).then(r=>{if(Array.isArray(r))setBranchStockRequests(r);});
+    }
     // Branch stock: per-branch qty/price/bin overlay
     if(isBranchUser&&user.branch_id){
       api.get("branch_stock",`branch_id=eq.${user.branch_id}&select=*`).catch(()=>[]).then(r=>{if(Array.isArray(r))setBranchStock(r);});
@@ -578,6 +586,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       stock_moves:              [`${bF}select=*&order=moved_at.desc&limit=200`,                   d=>setStockMoves(Array.isArray(d)?d:[])],
       stock_takes:              ["select=*&order=created_at.desc",                   d=>setStockTakes(Array.isArray(d)?d:[])],
       part_requests:            [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setPartRequests(Array.isArray(d)?d:[])],
+      branch_stock_requests:    [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`requesting_branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setBranchStockRequests(Array.isArray(d)?d:[])],
       branch_stock:             [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*`:"select=*", d=>setBranchStock(Array.isArray(d)?d:[])],
       workshop_jobs:            [`select=*&order=date_in.desc${wsF}`,                d=>setWorkshopJobs(Array.isArray(d)?d:[])],
       workshop_job_items:       [`select=*${wsF}`,                                   d=>setWorkshopJobItems(Array.isArray(d)?d:[])],
@@ -2029,6 +2038,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       })
     :parts;
   const pendingPartRequests=partRequests.filter(r=>r.status==="pending").length||0;
+  const pendingTransferRequests=branchStockRequests.filter(r=>r.status==="pending"||r.status==="dispatched").length||0;
   // Multi-word search using DEBOUNCED value — fast typing won't lag UI
   const suppNoByPart={};
   partSuppliers.forEach(ps=>{if(ps.supplier_part_no)suppNoByPart[ps.part_id]=(suppNoByPart[ps.part_id]||[]).concat(ps.supplier_part_no.toLowerCase());});
@@ -2131,6 +2141,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"stockmove",icon:"🔀",label:t.stockMove,roles:["admin","manager","shipper","stockman"]},
         {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager"]},
         {id:"partRequests",icon:"📬",label:"Part Requests",roles:["admin"],badge:pendingPartRequests},
+        {id:"transferRequests",icon:"🔄",label:"Transfer Requests",roles:["admin"],badge:pendingTransferRequests},
       ]
     },
     {
@@ -4098,14 +4109,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             onRefresh={refreshWorkshopData}
             wsProfile={workshopProfile}
             branches={branches}
-            onPlaceShopOrder={async(cartItems,linkedBranchId)=>{
-              const oid=makeId("ORD");
-              const today=new Date().toISOString().slice(0,10);
-              const total=cartItems.reduce((s,i)=>s+i.price*i.qty,0);
-              const orderObj={id:oid,customer_name:workshopProfile.name||"Workshop Order",customer_phone:workshopProfile.phone||"",customer_email:workshopProfile.email||"",date:today,status:"Processing",items:cartItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,price:i.price})),total,branch_id:linkedBranchId,workshop_source_id:wsId||null};
-              await api.upsert("orders",orderObj);
-              await refreshTables("orders");
-              showToast("✅ Order placed — branch will process it");
+            onPlaceShopOrder={async({localItems,mainItems,notes,linkedBranchId,mainBranchId})=>{
+              let localOid=null,bsrId=null;
+              if(localItems?.length){
+                localOid=makeId("ORD");
+                const todayStr=new Date().toISOString().slice(0,10);
+                const total=localItems.reduce((s,i)=>s+i.price*i.qty,0);
+                await api.upsert("orders",{id:localOid,customer_name:workshopProfile.name||"Workshop Order",customer_phone:workshopProfile.phone||"",customer_email:workshopProfile.email||"",date:todayStr,status:"Processing",items:localItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,price:i.price})),total,branch_id:linkedBranchId,workshop_source_id:wsId||null});
+              }
+              if(mainItems?.length&&mainBranchId){
+                bsrId=makeId("BSR");
+                const confirmToken=makeToken();
+                await api.upsert("branch_stock_requests",{id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:mainBranchId,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:mainItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:confirmToken,notes:notes||null});
+              }
+              await refreshTables("orders","branch_stock_requests");
+              const msg=localOid&&bsrId?"✅ Order placed + request sent to main branch":localOid?"✅ Order placed — branch will process it":bsrId?"📋 Request sent to main branch":"Done";
+              showToast(msg);
+              return {localOid,bsrId};
             }}
             t={t} lang={lang}/>
         )}
@@ -4133,6 +4153,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
         {tab==="partRequests"&&(role==="admin"||role==="branch_admin")&&(
           <PartRequestsPage partRequests={partRequests} branches={branches} parts={parts} user={user} role={role} currentBranch={currentBranch} onRefresh={()=>refreshTables("part_requests")} t={t}/>
+        )}
+
+        {tab==="transferRequests"&&(role==="admin"||role==="branch_admin")&&(
+          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} onRefresh={()=>refreshTables("branch_stock_requests")}/>
         )}
 
         {tab==="settings"&&role==="admin"&&(

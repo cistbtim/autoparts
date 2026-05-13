@@ -1581,3 +1581,74 @@ export function BranchActivatePage() {
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// BRANCH STOCK REQUEST CONFIRM PAGE  (?bsr_confirm=TOKEN)
+// Workshop clicks link to confirm or cancel their main-branch parts order
+// ═══════════════════════════════════════════════════════════════
+export function BranchStockRequestConfirmPage({token}) {
+  const [rec,setRec]=useState(null);
+  const [loaded,setLoaded]=useState(false);
+  const [err,setErr]=useState("");
+  const [done,setDone]=useState(null);
+  const [acting,setActing]=useState(false);
+  const settings=getSettings();
+  useEffect(()=>{
+    api.get("branch_stock_requests",`confirm_token=eq.${token}&select=*`).then(r=>{
+      if(Array.isArray(r)&&r[0]) setRec(r[0]);
+      else setErr("Request not found or link expired.");
+      setLoaded(true);
+    }).catch(()=>{setErr("Could not load request.");setLoaded(true);});
+  },[]);
+  const act=async(action)=>{
+    setActing(true);
+    const newStatus=action==="confirm"?"ordered":"cancelled";
+    await api.patch("branch_stock_requests","confirm_token",token,{status:newStatus});
+    setDone(action);
+    setActing(false);
+  };
+  const items=Array.isArray(rec?.items)?rec.items:[];
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--bg)",padding:20}}>
+      <style>{CSS}</style>
+      <div style={{maxWidth:480,width:"100%",background:"var(--surface)",borderRadius:16,padding:32,boxShadow:"var(--shadow-lg)",textAlign:"center"}}>
+        <div style={{fontSize:28,marginBottom:8}}>🏬</div>
+        <div style={{fontSize:20,fontWeight:800,marginBottom:4}}>{settings.shop_name||"Spare Parts"}</div>
+        <div style={{fontSize:14,color:"var(--text2)",marginBottom:24}}>Main Branch Parts Request</div>
+        {!loaded&&<div style={{color:"var(--text3)",padding:24}}>Loading…</div>}
+        {err&&<div style={{color:"var(--red)",padding:16,background:"rgba(239,68,68,.1)",borderRadius:10,marginBottom:16}}>{err}</div>}
+        {done==="confirm"&&<div style={{padding:24}}>
+          <div style={{fontSize:32,marginBottom:8}}>✅</div>
+          <div style={{fontWeight:700,fontSize:16,color:"var(--green)"}}>Order Confirmed!</div>
+          <div style={{fontSize:13,color:"var(--text2)",marginTop:8}}>Your parts have been ordered. We will contact you when they arrive at the branch.</div>
+        </div>}
+        {done==="cancel"&&<div style={{padding:24}}>
+          <div style={{fontSize:32,marginBottom:8}}>❌</div>
+          <div style={{fontWeight:700,fontSize:16,color:"var(--orange)"}}>Request Cancelled</div>
+          <div style={{fontSize:13,color:"var(--text2)",marginTop:8}}>Your request has been cancelled. Contact us if you change your mind.</div>
+        </div>}
+        {loaded&&!err&&!done&&rec&&<>
+          {(rec.status==="completed"||rec.status==="cancelled")
+            ?<div style={{padding:16,borderRadius:10,background:"var(--surface2)",fontSize:14,color:"var(--text2)"}}>This request is already <strong>{rec.status}</strong>.</div>
+            :<>
+              <div style={{textAlign:"left",marginBottom:20}}>
+                <div style={{fontWeight:700,fontSize:15,marginBottom:12}}>Parts requested:</div>
+                {items.map((i,idx)=>(
+                  <div key={idx} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:"var(--surface2)",borderRadius:8,marginBottom:6}}>
+                    <span style={{fontSize:14}}>{i.name}</span>
+                    <span style={{fontSize:14,color:"var(--text2)"}}>×{i.qty}</span>
+                  </div>
+                ))}
+                {rec.notes&&<div style={{fontSize:13,color:"var(--text2)",marginTop:10,padding:"8px 12px",background:"var(--surface2)",borderRadius:8}}>📝 {rec.notes}</div>}
+              </div>
+              <div style={{fontSize:13,color:"var(--text2)",marginBottom:20}}>Confirm you want to order these parts from the main branch.</div>
+              <div style={{display:"flex",gap:12}}>
+                <button className="btn" style={{flex:1,background:"rgba(239,68,68,.15)",color:"var(--red)",border:"1px solid rgba(239,68,68,.3)",fontWeight:700}} disabled={acting} onClick={()=>act("cancel")}>Cancel</button>
+                <button className="btn btn-primary" style={{flex:2}} disabled={acting} onClick={()=>act("confirm")}>{acting?"Processing…":"Yes, Order These Parts"}</button>
+              </div>
+            </>}
+        </>}
+      </div>
+    </div>
+  );
+}

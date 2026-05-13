@@ -4115,20 +4115,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             branches={branches}
             onPlaceShopOrder={async({localItems,mainItems,notes,linkedBranchId,mainBranchId})=>{
               let localOid=null,bsrId=null;
-              if(localItems?.length){
-                localOid=makeId("ORD");
-                const todayStr=new Date().toISOString().slice(0,10);
-                const total=localItems.reduce((s,i)=>s+i.price*i.qty,0);
-                await api.upsert("orders",{id:localOid,customer_name:workshopProfile.name||"Workshop Order",customer_phone:workshopProfile.phone||"",customer_email:workshopProfile.email||"",date:todayStr,status:"Processing",items:localItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,price:i.price})),total,branch_id:linkedBranchId,workshop_source_id:wsId||null});
+              try{
+                if(localItems?.length){
+                  localOid=makeId("ORD");
+                  const todayStr=new Date().toISOString().slice(0,10);
+                  const total=localItems.reduce((s,i)=>s+i.price*i.qty,0);
+                  await api.upsert("orders",{id:localOid,customer_name:workshopProfile.name||"Workshop Order",customer_phone:workshopProfile.phone||"",customer_email:workshopProfile.email||"",date:todayStr,status:"Processing",items:localItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,price:i.price})),total,branch_id:linkedBranchId,workshop_source_id:wsId||null});
+                }
+                if(mainItems?.length){
+                  bsrId=makeId("BSR");
+                  const confirmToken=makeToken();
+                  await api.upsert("branch_stock_requests",{id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:mainBranchId||null,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:mainItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:confirmToken,notes:notes||null});
+                }
+                await refreshTables("orders","branch_stock_requests");
+                const msg=localOid&&bsrId?"✅ Order placed + request sent to main branch":localOid?"✅ Order placed — branch will process it":bsrId?"📋 Request sent to main branch":"Nothing to process";
+                showToast(msg);
+              }catch(err){
+                showToast(`❌ Error: ${err?.message||"save failed"}`, "err");
+                console.error("onPlaceShopOrder error",err);
               }
-              if(mainItems?.length&&mainBranchId){
-                bsrId=makeId("BSR");
-                const confirmToken=makeToken();
-                await api.upsert("branch_stock_requests",{id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:mainBranchId,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:mainItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:confirmToken,notes:notes||null});
-              }
-              await refreshTables("orders","branch_stock_requests");
-              const msg=localOid&&bsrId?"✅ Order placed + request sent to main branch":localOid?"✅ Order placed — branch will process it":bsrId?"📋 Request sent to main branch":"Done";
-              showToast(msg);
               return {localOid,bsrId};
             }}
             t={t} lang={lang}/>

@@ -1702,7 +1702,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   // Supplier Invoices
   const saveSupplierInvoice=async(data,items)=>{
     const {inv:invRaw,isNew}=data;
-    const inv={...invRaw,...(_bId?{branch_id:_bId}:{})};
+    // Use branch_admin's own branch (_bId) OR the currently-selected branch (branchId for admin viewing a branch)
+    const effectiveBranchId=_bId||branchId||null;
+    const inv={...invRaw,...(effectiveBranchId?{branch_id:effectiveBranchId}:{})};
     await api.upsert("supplier_invoices",inv);
     if(isNew){
       for(const item of items){
@@ -1720,7 +1722,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const rows=await api.get("supplier_invoice_items",`invoice_id=eq.${encodeURIComponent(inv.id)}&select=*`);
     if(!Array.isArray(rows)||rows.length===0){showToast("No line items found for this invoice","err");return;}
     let stocked=0,skipped=0;
-    const invBranchId=inv.branch_id?+inv.branch_id:null;
+    // inv.branch_id is set for branch invoices; fall back to current branch context for admin users
+    const invBranchId=inv.branch_id?+inv.branch_id:(_bId||branchId)?+(_bId||branchId):null;
     for(const item of rows){
       if(!item.part_id){skipped++;continue;}
       const catalogPart=parts.find(p=>+p.id===+item.part_id);

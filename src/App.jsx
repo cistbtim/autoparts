@@ -1723,23 +1723,30 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const invBranchId=inv.branch_id?+inv.branch_id:null;
     for(const item of rows){
       if(!item.part_id){skipped++;continue;}
-      // Find the directly-linked catalog part first
       const catalogPart=parts.find(p=>+p.id===+item.part_id);
       if(!catalogPart){skipped++;continue;}
-      // If the invoice belongs to a branch, prefer the branch-specific part (matched by SKU)
-      // so stock goes into the branch's inventory, not the main catalog
-      let targetPart=catalogPart;
-      if(invBranchId && (+catalogPart.branch_id||null)!==invBranchId){
-        const branchCopy=parts.find(p=>p.sku===catalogPart.sku && +p.branch_id===invBranchId);
-        if(branchCopy) targetPart=branchCopy;
+      if(invBranchId){
+        // Branch invoice → update branch_stock table (not parts.stock)
+        const existing=branchStock.find(bs=>+bs.part_id===+item.part_id && +bs.branch_id===invBranchId);
+        const before=+(existing?.stock)||0;
+        const after=before+(+item.qty||0);
+        if(existing?.id){
+          await api.patch("branch_stock","id",existing.id,{stock:after,updated_at:new Date().toISOString()});
+        } else {
+          await api.insert("branch_stock",{branch_id:invBranchId,part_id:+item.part_id,stock:+item.qty||0,updated_at:new Date().toISOString()});
+        }
+        await logInv(catalogPart,before,after,"Stock In",`Invoice ${inv.id}`);
+      } else {
+        // Main branch invoice → update parts.stock directly
+        const before=+catalogPart.stock||0;
+        const after=before+(+item.qty||0);
+        await api.patch("parts","id",+catalogPart.id,{stock:after});
+        await logInv(catalogPart,before,after,"Stock In",`Invoice ${inv.id}`);
       }
-      const ns=(+targetPart.stock||0)+(+item.qty||0);
-      await api.patch("parts","id",+targetPart.id,{stock:ns});
-      await logInv(targetPart,targetPart.stock,ns,"Stock In",`Invoice ${inv.id}`);
       stocked++;
     }
     await api.patch("supplier_invoices","id",inv.id,{stocked_in:true});
-    await refreshTables("supplier_invoices","parts","inventory_logs");
+    await refreshTables("supplier_invoices","parts","branch_stock","inventory_logs");
     closeM("supplierInvoice");
     if(stocked>0) showToast(`Stocked in: ${stocked} part(s) updated${skipped?`, ${skipped} skipped (no part link)`:""}`);
     else showToast(`No linked parts — ${skipped} item(s) have no part match. Link parts first.`,"err");

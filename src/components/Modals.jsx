@@ -1565,7 +1565,7 @@ export function InvTotals({items,taxRate,costField="unit_cost",priceField}) {
 // SUPPLIER INVOICE — SMART LINE ITEM EDITOR
 // Primary input: Supplier Part # → auto-match → link
 // ═══════════════════════════════════════════════════════════════
-function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",branchId=null,branchStock=[],t={},settings={}}) {
+function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",branchId=null,branchStock=[],t={},settings={},disabled=false}) {
   const mkRow=()=>({_k:String(Date.now()+Math.random()),supplier_part_id:"",part_id:null,part_name:"",part_sku:"",qty:1,unit_cost:0,_st:"idle",_hits:[],_drop:false,_needsBranchSetup:false,_bsPrice:"",_bsCost:"",_bsBin:""});
   const inputRefs=useRef({});
   const [focusKey,setFocusKey]=useState(null);
@@ -1716,14 +1716,16 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                   onChange={e=>upd(k,{part_sku:e.target.value})}/>
 
                 {/* ── Qty ── */}
-                <input className="inp" type="number" min="1" style={{fontSize:12,textAlign:"center"}}
+                <input className="inp" type="number" min="1" style={{fontSize:12,textAlign:"center",borderColor:(!disabled&&!(+row.qty>0))?"var(--red)":undefined}}
                   value={row.qty||1}
+                  disabled={disabled}
                   onChange={e=>upd(k,{qty:+e.target.value||1,total:(+e.target.value||1)*(+row.unit_cost||0)})}/>
 
                 {/* ── Unit Cost ── */}
-                <input className="inp" type="number" min="0" step="0.01" style={{fontSize:12}}
+                <input className="inp" type="number" min="0" step="0.01" style={{fontSize:12,borderColor:(!disabled&&!(+row.unit_cost>0))?"var(--red)":undefined}}
                   value={row.unit_cost||""}
                   placeholder="0.00"
+                  disabled={disabled}
                   onChange={e=>upd(k,{unit_cost:+e.target.value||0,total:(+row.qty||1)*(+e.target.value||0)})}/>
 
                 {/* ── Amount ── */}
@@ -1732,7 +1734,10 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                 </div>
 
                 {/* ── Delete ── */}
-                <button style={{background:"none",border:"none",cursor:"pointer",color:"var(--red)",fontSize:15,lineHeight:1,padding:"8px 0"}} onClick={()=>rem(k)}>✕</button>
+                {disabled
+                  ? <div/>
+                  : <button style={{background:"none",border:"none",cursor:"pointer",color:"var(--red)",fontSize:15,lineHeight:1,padding:"8px 0"}} onClick={()=>rem(k)}>✕</button>
+                }
               </div>
 
               {/* ── No match action bar ── */}
@@ -1780,10 +1785,10 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
           );
         })}
 
-        <button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:10,borderStyle:"dashed"}} onClick={add}>+ Add Line</button>
-        <div style={{marginTop:6,fontSize:11,color:"var(--text3)"}}>
+        {!disabled&&<button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:10,borderStyle:"dashed"}} onClick={add}>+ Add Line</button>}
+        {!disabled&&<div style={{marginTop:6,fontSize:11,color:"var(--text3)"}}>
           💡 Type supplier part # → press Enter to search &nbsp;·&nbsp; ✅ linked &nbsp;·&nbsp; 🔎 candidates — click to link &nbsp;·&nbsp; ⚠️ not found
-        </div>
+        </div>}
       </div>
     </div>
   );
@@ -1798,6 +1803,8 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
   const isStocked=!!data?.stocked_in;
   const [invNo,setInvNo]=useState(data?.id||"");
   const [suppId,setSuppId]=useState(String(data?.supplier_id||""));
+  const [suppSearch,setSuppSearch]=useState(()=>data?.supplier_name||(suppliers.find(s=>s.id===+data?.supplier_id)?.name)||"");
+  const [suppOpen,setSuppOpen]=useState(false);
   const [invDate,setInvDate]=useState(data?.invoice_date||today());
   const [dueDate,setDueDate]=useState(data?.due_date||"");
   const [notes,setNotes]=useState(data?.notes||"");
@@ -1808,6 +1815,15 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
   const sub=items.reduce((s,i)=>s+(+i.qty||1)*(+i.unit_cost||0),0);
   const tax=sub*(settings.tax_rate||0)/100;
   const total=sub+tax;
+
+  // Validation — every line must have qty > 0 and unit_cost > 0
+  const hasInvalidLines=items.length>0&&items.some(i=>!(+i.qty>0)||!(+i.unit_cost>0));
+  const canSave=!!suppId&&!!invNo.trim()&&items.length>0&&!hasInvalidLines&&!saving;
+
+  // Searchable supplier combobox helpers
+  const filteredSupps=suppSearch.trim()
+    ? suppliers.filter(s=>s.name.toLowerCase().includes(suppSearch.toLowerCase()))
+    : suppliers;
 
   // Load existing items when editing
   useEffect(()=>{
@@ -1824,7 +1840,7 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
   },[suppId]);
 
   const handleSave=async()=>{
-    if(!suppId||items.length===0||!invNo.trim())return;
+    if(!canSave)return;
     setSaving(true);
     const id=invNo.trim();
     const inv={id,supplier_id:+suppId,supplier_name:sel?.name,invoice_date:invDate,due_date:dueDate,status:data?.status||"pending",subtotal:sub,tax,total,notes};
@@ -1834,7 +1850,7 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
   };
 
   const handleDelete=async()=>{
-    if(!onDelete||isPaid)return;
+    if(!onDelete||isPaid||isStocked)return;
     if(!window.confirm("Delete this invoice? Stock levels will NOT be reversed."))return;
     setSaving(true);
     await onDelete(data.id);
@@ -1844,31 +1860,79 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
   return (
     <Overlay onClose={onClose} wide>
       <MHead title={`🧾 ${isNew?"New Purchase Invoice":"Edit Invoice"}`} onClose={onClose}/>
+
+      {/* Read-only banner after stock-in */}
+      {isStocked&&(
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",marginBottom:10,background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.35)",borderRadius:10,fontSize:13}}>
+          <span style={{fontSize:18}}>✅</span>
+          <div>
+            <div style={{fontWeight:700,color:"var(--green)"}}>Stocked In — view only</div>
+            <div style={{fontSize:11,color:"var(--text3)"}}>To return stock, use <strong>Supplier Returns</strong>. Deleting a stocked invoice does not reverse stock.</div>
+          </div>
+        </div>
+      )}
+
       <FG>
         <div><FL label="Invoice No. *"/><input className="inp" value={invNo} onChange={e=>setInvNo(e.target.value.toUpperCase())} placeholder="e.g. INV-2025-001" disabled={!isNew} style={{fontFamily:"DM Mono,monospace"}}/></div>
-        <div><FL label="Supplier *"/><select className="inp" value={suppId} onChange={e=>setSuppId(e.target.value)} disabled={!isNew}><option value="">Select supplier...</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+        {/* Searchable supplier combobox */}
+        <div style={{position:"relative"}}>
+          <FL label="Supplier *"/>
+          <input className="inp" value={suppSearch}
+            placeholder="Type to search supplier…"
+            disabled={!isNew}
+            onChange={e=>{setSuppSearch(e.target.value);setSuppId("");setSuppOpen(true);}}
+            onFocus={()=>{if(isNew)setSuppOpen(true);}}
+            onBlur={()=>setTimeout(()=>setSuppOpen(false),180)}
+            style={{borderColor:isNew&&!suppId&&suppSearch?"var(--orange)":undefined}}
+          />
+          {isNew&&suppOpen&&filteredSupps.length>0&&(
+            <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:500,background:"var(--surface2)",border:"1px solid var(--border2)",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,.45)",maxHeight:220,overflowY:"auto"}}>
+              {filteredSupps.map(s=>(
+                <div key={s.id}
+                  style={{padding:"8px 12px",cursor:"pointer",fontSize:13,borderBottom:"1px solid var(--border)"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="var(--surface3)"}
+                  onMouseLeave={e=>e.currentTarget.style.background=""}
+                  onMouseDown={e=>{e.preventDefault();setSuppId(String(s.id));setSuppSearch(s.name);setSuppOpen(false);}}>
+                  {s.name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </FG>
       <FG>
-        <div><FL label={t.invoiceDate}/><input className="inp" type="date" value={invDate} onChange={e=>setInvDate(e.target.value)}/></div>
-        <div><FL label={t.dueDate}/><input className="inp" type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></div>
-        <div><FL label={t.notes}/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional notes"/></div>
+        <div><FL label={t.invoiceDate}/><input className="inp" type="date" value={invDate} onChange={e=>setInvDate(e.target.value)} disabled={isStocked}/></div>
+        <div><FL label={t.dueDate}/><input className="inp" type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} disabled={isStocked}/></div>
+        <div><FL label={t.notes}/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional notes" disabled={isStocked}/></div>
       </FG>
       <div className="divider"/>
       <FL label="Line Items"/>
-      <SupplierInvoiceLineEditor items={items} setItems={setItems} suppId={suppId} parts={parts} role={role} branchId={branchId} branchStock={branchStock} t={t} settings={settings}/>
+      <SupplierInvoiceLineEditor items={items} setItems={setItems} suppId={suppId} parts={parts} role={role} branchId={branchId} branchStock={branchStock} t={t} settings={settings} disabled={isStocked}/>
       {items.length>0&&<InvTotals items={items} taxRate={settings.tax_rate} costField="unit_cost"/>}
+
+      {/* Validation warning */}
+      {hasInvalidLines&&!isStocked&&(
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",marginTop:10,background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.35)",borderRadius:8,fontSize:12,color:"var(--red)",fontWeight:600}}>
+          ⚠️ All lines must have qty &gt; 0 and cost price &gt; 0. Please fix highlighted fields before saving.
+        </div>
+      )}
+
       <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
-        {!isNew&&onDelete&&<button className="btn btn-danger" style={{flex:1}} onClick={handleDelete} disabled={saving||isPaid} title={isPaid?"Cannot delete a paid invoice":undefined}>🗑 Delete</button>}
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
-        {!isNew&&onStockIn&&(
-          <button className="btn btn-warning" style={{flex:2}} onClick={async()=>{setSaving(true);await onStockIn(data);setSaving(false);}} disabled={saving||isStocked}
-            title={isStocked?"Already stocked into inventory":undefined}>
-            {isStocked?"✅ Stocked":"📦 Stock In"}
+        {!isNew&&onDelete&&!isStocked&&(
+          <button className="btn btn-danger" style={{flex:1}} onClick={handleDelete} disabled={saving||isPaid}
+            title={isPaid?"Cannot delete a paid invoice":undefined}>🗑 Delete</button>
+        )}
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{isStocked?"Close":t.cancel}</button>
+        {!isNew&&onStockIn&&!isStocked&&(
+          <button className="btn btn-warning" style={{flex:2}} onClick={async()=>{setSaving(true);await onStockIn(data);setSaving(false);}} disabled={saving}>
+            📦 Stock In
           </button>
         )}
-        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={!suppId||!invNo.trim()||items.length===0||saving}>
-          {saving?"⏳ Saving...":isNew?"💾 Save":"💾 Update Invoice"}
-        </button>
+        {!isStocked&&(
+          <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={!canSave}>
+            {saving?"⏳ Saving...":isNew?"💾 Save":"💾 Update Invoice"}
+          </button>
+        )}
       </div>
     </Overlay>
   );

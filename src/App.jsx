@@ -1722,21 +1722,28 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const rows=await api.get("supplier_invoice_items",`invoice_id=eq.${encodeURIComponent(inv.id)}&select=*`);
     if(!Array.isArray(rows)||rows.length===0){showToast("No line items found for this invoice","err");return;}
     let stocked=0,skipped=0;
-    // Determine effective branch — no + coercion (branch IDs may be UUIDs)
+    // Determine effective branch — no + coercion (branch IDs are UUIDs)
     const invBranchId=inv.branch_id||_bId||branchId||null;
+    // Fetch FRESH branch_stock from DB to avoid stale React state
+    const freshBranchStock=invBranchId
+      ? await api.get("branch_stock",`branch_id=eq.${invBranchId}&select=*`)
+      : [];
     for(const item of rows){
       if(!item.part_id){skipped++;continue;}
       const catalogPart=parts.find(p=>+p.id===+item.part_id);
       if(!catalogPart){skipped++;continue;}
       if(invBranchId){
         // Branch invoice → update branch_stock table (not parts.stock)
-        const existing=branchStock.find(bs=>+bs.part_id===+item.part_id&&String(bs.branch_id)===String(invBranchId));
+        const existing=Array.isArray(freshBranchStock)
+          ? freshBranchStock.find(bs=>+bs.part_id===+item.part_id)
+          : null;
         const before=+(existing?.stock)||0;
         const after=before+(+item.qty||0);
         if(existing?.id){
           await api.patch("branch_stock","id",existing.id,{stock:after,updated_at:new Date().toISOString()});
         } else {
-          await api.insert("branch_stock",{branch_id:invBranchId,part_id:+item.part_id,stock:+item.qty||0,updated_at:new Date().toISOString()});
+          // Use upsert to handle unique constraint on (branch_id, part_id)
+          await api.upsert("branch_stock",{branch_id:invBranchId,part_id:+item.part_id,stock:after,updated_at:new Date().toISOString()});
         }
         await logInv(catalogPart,before,after,"Stock In",`Invoice ${inv.id}`);
       } else {
@@ -3956,7 +3963,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {tab==="logs"&&(role==="admin"||role==="manager"||role==="branch_admin")&&(()=>{
           const logQ=logSearch.trim().toLowerCase();
           // When a branch is selected (admin context) or user is branch_admin, filter logs to that branch
-          const branchLogs=branchId?logs.filter(l=>l.branch_id&&+l.branch_id===+branchId):logs;
+          const branchLogs=branchId?logs.filter(l=>l.branch_id&&String(l.branch_id)===String(branchId)):logs;
           const filteredLogs=logQ
             ? branchLogs.filter(l=>(l.part_sku||"").toLowerCase().includes(logQ)||(l.part_name||"").toLowerCase().includes(logQ))
             : branchLogs;

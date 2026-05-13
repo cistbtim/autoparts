@@ -15,6 +15,7 @@ export const T = {
     wrongPass: "Invalid username or password", addPart: "Add Part",
     adjustStock: "Adjust", save: "Save", cancel: "Cancel", delete: "Delete",
     edit: "Edit", close: "Close", confirm: "Confirm", sku: "SKU", name: "Name",
+    bin: "Bin", cost: "Cost", actions: "Actions",
     category: "Category", brand: "Brand", price: "Price", stock: "Stock",
     minStock: "Min Stock", status: "Status", normal: "OK", low: "Low", outOfStock: "Out of Stock",
     placeOrder: "Place Order", addToCart: "Add to Cart", checkout: "Checkout",

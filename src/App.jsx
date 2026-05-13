@@ -3112,9 +3112,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               <div className="tbl-wrap">
                 <table className="tbl">
                   <thead><tr>
-                    {["",t.sku,`${t.name} / ${t.chineseDesc}`,"Bin",t.make,t.model,t.yearRange,t.oeNumber,t.category,t.price,"Cost","St"].map(h=><th key={h}>{h}</th>)}
+                    {["",t.sku,`${t.name} / ${t.chineseDesc}`,t.bin||t.binLocation||"Bin",t.make,t.model,t.yearRange,t.oeNumber,t.category,t.price,t.cost||t.costPrice||"Cost",t.stock||"St"].map(h=><th key={h}>{h}</th>)}
                     <th style={{textAlign:"center",whiteSpace:"nowrap"}}>🚗</th>
-                    {(role==="admin"||role==="branch_admin")&&<th style={{position:"sticky",right:0,background:"var(--surface2)",zIndex:2,boxShadow:"-2px 0 8px rgba(0,0,0,.3)"}}>Actions</th>}
+                    {(role==="admin"||role==="branch_admin")&&<th style={{position:"sticky",right:0,background:"var(--surface2)",zIndex:2,boxShadow:"-2px 0 8px rgba(0,0,0,.3)"}}>{t.actions||"Actions"}</th>}
                   </tr></thead>
                   <tbody>
                     {fp.slice(invPage*PAGE_SIZE,(invPage+1)*PAGE_SIZE).map(p=>{

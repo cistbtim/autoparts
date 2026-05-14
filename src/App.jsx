@@ -3196,6 +3196,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                               {branchStockMap[String(p.id)]?"✏️ Edit Stock":"📦 Set Stock"}
                             </button>
                             <button className="btn btn-ghost btn-xs" onClick={()=>openM("printPartLabel",p)}>🏷️ Label</button>
+                            {(!p.image_url&&!p.image_data)&&(settings.whatsapp?(
+                              <a href={waLink(settings.whatsapp,`Hi, please add a photo for this part:\n*${p.name}*\nSKU: ${p.sku}${p.make||p.model?`\n${[p.make,p.model].filter(Boolean).join(" ")}`:""}`)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                                <button className="btn btn-xs" title="Request photo from main branch" style={{background:"rgba(236,72,153,.1)",color:"rgba(236,72,153,1)",border:"1px solid rgba(236,72,153,.3)"}}>📷 Request Photo</button>
+                              </a>
+                            ):(
+                              <button className="btn btn-xs" title="No WhatsApp configured in Settings" style={{background:"rgba(236,72,153,.1)",color:"rgba(236,72,153,1)",border:"1px solid rgba(236,72,153,.3)",opacity:.5,cursor:"default"}}>📷 Request Photo</button>
+                            ))}
                           </>
                         )}
                       </div>
@@ -3305,6 +3312,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                                     {branchStockMap[String(p.id)]?"✏️ Edit Stock":"📦 Set Stock"}
                                   </button>
                                   <button className="btn btn-ghost btn-xs" title="Print label" onClick={()=>openM("printPartLabel",p)}>🏷️</button>
+                                  {(!p.image_url&&!p.image_data)&&(settings.whatsapp?(
+                                    <a href={waLink(settings.whatsapp,`Hi, please add a photo for this part:\n*${p.name}*\nSKU: ${p.sku}${p.make||p.model?`\n${[p.make,p.model].filter(Boolean).join(" ")}`:""}`)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                                      <button className="btn btn-xs" title="Request photo from main branch" style={{background:"rgba(236,72,153,.1)",color:"rgba(236,72,153,1)",border:"1px solid rgba(236,72,153,.3)"}}>📷</button>
+                                    </a>
+                                  ):(
+                                    <button className="btn btn-xs" title="No WhatsApp configured in Settings" style={{background:"rgba(236,72,153,.1)",color:"rgba(236,72,153,1)",border:"1px solid rgba(236,72,153,.3)",opacity:.5,cursor:"default"}}>📷</button>
+                                  ))}
                                 </div>
                               </td>
                             );

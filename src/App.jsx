@@ -126,6 +126,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [filterLow,setFilterLow]=useState(false);
   const [filterFits,setFilterFits]=useState("__all__"); // __all__ | none | has
   const [filterBranch,setFilterBranch]=useState("__all__"); // __all__ | "main" | branch_id
+  const [filterQuantum,setFilterQuantum]=useState(false);
   const [invPage,setInvPage]=useState(0);   // inventory page
   const [invReport,setInvReport]=useState(null); // null | "quantum" | "others"
   const [shopPage,setShopPage]=useState(0); // shop page
@@ -186,7 +187,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   },[searchPart]);
 
   // Reset page when filters change
-  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits]);
+  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum]);
   useEffect(()=>{ setShopPage(0); },[searchPart]);
   // Modals
   const [M,setM]=useState({});
@@ -2114,6 +2115,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     }
     if(isDemo&&!(p.image_url||p.image_data))return false; // demo: only parts with photos
     if(filterLow&&p.stock>p.min_stock)return false;
+    if(filterQuantum&&!p.is_quantum)return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
     if(filterFits!=="__all__"){
       const hasFit=partFitments.some(f=>String(f.part_id)===String(p.id));
@@ -3086,8 +3088,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                   <option value={branchId}>🏢 {currentBranch?.name||"My Branch"}</option>
                 </select>
               )}
-              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__")&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
+              <button className="btn btn-sm" onClick={()=>setFilterQuantum(v=>!v)} style={{whiteSpace:"nowrap",background:filterQuantum?"rgba(249,115,22,.18)":"var(--surface2)",color:filterQuantum?"var(--accent)":"var(--text2)",border:filterQuantum?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:filterQuantum?700:400}}>🚐 Quantum{filterQuantum?" ✓":""}</button>
+              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum)&&(
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
             </div>
             {filterFits==="none"&&(

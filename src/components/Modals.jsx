@@ -5754,6 +5754,7 @@ export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
           <div>
             <div style={{fontWeight:700,fontSize:15}}>{part?.name}</div>
             <div style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2}}>{part?.sku}</div>
+            {(part?.make||part?.model)&&<div style={{fontSize:12,color:"var(--text2)",marginTop:3}}>{[part.make,part.model].filter(Boolean).join(" · ")}</div>}
           </div>
         </div>
         <FG>

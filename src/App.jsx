@@ -2085,7 +2085,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const displayParts=role==="branch_admin"
     ?parts.map(p=>{
         const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
-        if(!isMainCatalog)return p; // branch's own part — use as-is
+        if(!isMainCatalog)return {...p,_bsSet:true}; // branch's own part — stock is in parts table directly
         const bs=branchStockMap[String(p.id)];
         // Always replace stock & bin with branch values (0/blank until set)
         return{...p,

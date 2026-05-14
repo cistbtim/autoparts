@@ -5745,11 +5745,11 @@ export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
         <div style={{display:"flex",gap:12,alignItems:"center",padding:"12px 0 4px",marginBottom:10}}>
           {(()=>{const img=part?.image_url?toImgUrl(part.image_url):null;return img?(
             <img src={img} alt={part?.name}
-              style={{width:72,height:72,objectFit:"contain",borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",flexShrink:0,cursor:"zoom-in"}}
+              style={{width:110,height:110,objectFit:"contain",borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",flexShrink:0,cursor:"zoom-in"}}
               onClick={()=>setLightbox(toFullUrl(part.image_url))}
               onError={e=>e.target.style.display="none"}/>
           ):(
-            <div style={{width:72,height:72,borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🔩</div>
+            <div style={{width:110,height:110,borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,flexShrink:0}}>🔩</div>
           );})()}
           <div>
             <div style={{fontWeight:700,fontSize:15}}>{part?.name}</div>

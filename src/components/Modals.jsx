@@ -5738,6 +5738,7 @@ export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
     } finally { setBusy(false); }
   };
   return (
+    <>
     <div className="overlay" onClick={onClose}>
       <div className="modal" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
         <MHead title={existing?"✏️ Edit Branch Stock":"📦 Set Branch Stock"} onClose={onClose}/>
@@ -5784,6 +5785,7 @@ export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
       </div>
     </div>
     {lightbox&&<ImgLightbox url={lightbox} onClose={()=>setLightbox(null)}/>}
+    </>
   );
 }
 

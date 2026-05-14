@@ -2148,8 +2148,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(role==="branch_admin"){const isMain=!p.branch_id||p.branch_id===mainBranchId;const isOwn=p.branch_id===branchId;return (isMain||isOwn)&&p.stock<=p.min_stock;}
     return (branchId?p.branch_id===branchId:true)&&p.stock<=p.min_stock;
   });
-  const quantumStockValue=displayParts.reduce((s,p)=>p.is_quantum&&(p.stock??0)>0?s+(p.stock??0)*(p.price??0):s,0);
-  const othersStockValue=displayParts.reduce((s,p)=>!p.is_quantum&&(p.stock??0)>0?s+(p.stock??0)*(p.price??0):s,0);
+  const _vatMult=1+(settings.tax_rate||0)/100;
+  const quantumStockValue=displayParts.reduce((s,p)=>p.is_quantum&&(p.stock??0)>0?s+(p.stock??0)*(p.cost_price??0)*_vatMult:s,0);
+  const othersStockValue=displayParts.reduce((s,p)=>!p.is_quantum&&(p.stock??0)>0?s+(p.stock??0)*(p.cost_price??0)*_vatMult:s,0);
   const scrapLowStock=scrapParts.filter(p=>p.quantity<=p.min_qty);
   const branchOrders=branchId?orders.filter(o=>o.branch_id===branchId):orders;
   const totalRev=branchOrders.filter(o=>o.status==="Completed").reduce((s,o)=>s+(o.total||0),0);

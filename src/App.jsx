@@ -127,6 +127,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [filterFits,setFilterFits]=useState("__all__"); // __all__ | none | has
   const [filterBranch,setFilterBranch]=useState("__all__"); // __all__ | "main" | branch_id
   const [filterQuantum,setFilterQuantum]=useState(false);
+  const [invRefreshing,setInvRefreshing]=useState(false);
   const [filterHiace,setFilterHiace]=useState(false);
   const [invPage,setInvPage]=useState(0);   // inventory page
   const [invReport,setInvReport]=useState(null); // null | "quantum" | "hiace" | "others"
@@ -2937,7 +2938,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             )}
             <PH title={t.inventory} subtitle={`${parts.length} parts · ${lowStock.length} low`}
               action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <button className="btn btn-ghost btn-sm" onClick={loadAll} title="Refresh inventory">↻ Refresh</button>
+                <button className="btn btn-ghost btn-sm" disabled={invRefreshing} onClick={async()=>{setInvRefreshing(true);try{await refreshTables("parts","branch_stock","part_fitments","part_suppliers");}finally{setInvRefreshing(false);}}} title="Refresh inventory data only">
+                  <span style={invRefreshing?{display:"inline-block",animation:"spin 1s linear infinite"}:{}}>{invRefreshing?"⟳":"↻"}</span> {invRefreshing?"Refreshing…":"Refresh"}
+                </button>
                 {role==="admin"&&branches.length>1&&<button className={`btn btn-sm ${showCrossBranch?"btn-primary":"btn-ghost"}`} onClick={()=>setShowCrossBranch(v=>!v)} title="Cross-branch stock search">🏢 {t.branchCrossBtn}</button>}
                 {(isBranchUser&&currentBranch?.show_supplier_sku)||(role==="admin"||role==="branch_admin")?(<button onClick={()=>setShowSupplierCodes(v=>!v)} style={{padding:"7px 12px",border:`1.5px solid ${showSupplierCodes?"var(--purple)":"var(--border)"}`,borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,background:showSupplierCodes?"rgba(167,139,250,.15)":"transparent",color:showSupplierCodes?"var(--purple)":"var(--text3)",fontFamily:"DM Sans,sans-serif",transition:"all .18s",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>{showSupplierCodes?"🔓":"🔒"} Supplier Code</button>):null}
                 {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>openM("printShelfLabel")} title="Print shelf/bin label">📋 Shelf Label</button>}

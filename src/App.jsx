@@ -2118,7 +2118,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(filterBranch!=="__all__"){
       if(filterBranch==="main"){
         if(p.branch_id&&p.branch_id!==mainBranchId)return false;
-      } else if(filterBranchStockMap){
+      } else if(filterBranchStockMap!==null){
         // admin filtering by a specific branch
         if(branchMatchedOnly&&!filterBranchStockMap[String(p.id)])return false;
       } else {
@@ -3106,9 +3106,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                   })}
                 </select>
               )}
-              {(role==="admin"&&filterBranchStockMap)&&(
-                <button className="btn btn-sm" onClick={()=>setBranchMatchedOnly(v=>!v)} style={{whiteSpace:"nowrap",background:branchMatchedOnly?"rgba(59,130,246,.15)":"var(--surface2)",color:branchMatchedOnly?"var(--blue)":"var(--text2)",border:branchMatchedOnly?"1.5px solid var(--blue)":"1px solid var(--border)",fontWeight:branchMatchedOnly?700:400}}>
-                  {branchMatchedOnly?"✓ Matched only":"All catalog"}
+              {(role==="admin"&&filterBranch!=="__all__"&&filterBranch!=="main")&&(
+                <button className="btn btn-sm" onClick={()=>setBranchMatchedOnly(v=>!v)} style={{whiteSpace:"nowrap",background:branchMatchedOnly?"rgba(59,130,246,.15)":"rgba(52,211,153,.12)",color:branchMatchedOnly?"var(--blue)":"var(--green)",border:branchMatchedOnly?"1.5px solid var(--blue)":"1.5px solid rgba(52,211,153,.4)",fontWeight:700}}>
+                  {branchMatchedOnly?"✓ Matched only":"📋 All catalog"}
                 </button>
               )}
               {(role==="branch_admin"||role==="branch_manager")&&(

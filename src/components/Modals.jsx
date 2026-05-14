@@ -2417,10 +2417,10 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
     image_url:p.image_url||"", chinese_desc:p.chinese_desc||"",
     make:p.make||"", model:p.model||"", year_range:p.year_range||"", oe_number:p.oe_number||"",
-    bin_location:p.bin_location||"", is_quantum:p.is_quantum||false,
+    bin_location:p.bin_location||"", is_quantum:p.is_quantum||false, is_hiace:p.is_hiace||false,
   }:{
     sku:branchSkuPrefix?branchSkuPrefix+"-":"", name:"", category:"Engine", brand:"", price:"", cost_price:"", stock:"", minStock:"",
-    image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", bin_location:"", is_quantum:false,
+    image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", bin_location:"", is_quantum:false, is_hiace:false,
   };
   const [f,setF]=useState(()=>makeF(part));
   const [ptab, setPtab] = useState(initialTab||"info");
@@ -2453,7 +2453,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     price:+fv.price, cost_price:+fv.cost_price||0, stock:+fv.stock, min_stock:+fv.minStock,
     image_url:fv.image_url, chinese_desc:fv.chinese_desc,
     make:fv.make, model:fv.model, year_range:fv.year_range, oe_number:fv.oe_number,
-    bin_location:fv.bin_location||"", is_quantum:!!fv.is_quantum,
+    bin_location:fv.bin_location||"", is_quantum:!!fv.is_quantum, is_hiace:!!fv.is_hiace,
   });
 
   // Auto-save immediately when photo is uploaded (existing part only)
@@ -2678,6 +2678,25 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
               <div>
                 <div style={{fontWeight:600,fontSize:13}}>🚐 Toyota Quantum Part</div>
                 <div style={{fontSize:11,color:"var(--text3)"}}>Mark this part as Quantum-specific stock</div>
+              </div>
+            </label>
+          </FD>
+          <FD>
+            <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+              <div onClick={()=>s("is_hiace",!f.is_hiace)} style={{
+                width:42,height:24,borderRadius:12,background:f.is_hiace?"var(--blue)":"var(--surface3)",
+                border:`1.5px solid ${f.is_hiace?"var(--blue)":"var(--border)"}`,
+                position:"relative",transition:"background .18s,border-color .18s",flexShrink:0,cursor:"pointer"
+              }}>
+                <div style={{
+                  position:"absolute",top:2,left:f.is_hiace?20:2,width:16,height:16,
+                  borderRadius:"50%",background:"#fff",transition:"left .18s",
+                  boxShadow:"0 1px 3px rgba(0,0,0,.3)"
+                }}/>
+              </div>
+              <div>
+                <div style={{fontWeight:600,fontSize:13}}>🚐 Toyota Hiace Part</div>
+                <div style={{fontSize:11,color:"var(--text3)"}}>Mark this part as Hiace-specific stock</div>
               </div>
             </label>
           </FD>

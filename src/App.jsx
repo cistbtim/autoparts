@@ -127,8 +127,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [filterFits,setFilterFits]=useState("__all__"); // __all__ | none | has
   const [filterBranch,setFilterBranch]=useState("__all__"); // __all__ | "main" | branch_id
   const [filterQuantum,setFilterQuantum]=useState(false);
+  const [filterHiace,setFilterHiace]=useState(false);
   const [invPage,setInvPage]=useState(0);   // inventory page
-  const [invReport,setInvReport]=useState(null); // null | "quantum" | "others"
+  const [invReport,setInvReport]=useState(null); // null | "quantum" | "hiace" | "others"
   const [shopPage,setShopPage]=useState(0); // shop page
   const PAGE_SIZE=20;
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
@@ -187,7 +188,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   },[searchPart]);
 
   // Reset page when filters change
-  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum]);
+  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace]);
   useEffect(()=>{ setShopPage(0); },[searchPart]);
   // Modals
   const [M,setM]=useState({});
@@ -2116,6 +2117,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(isDemo&&!(p.image_url||p.image_data))return false; // demo: only parts with photos
     if(filterLow&&p.stock>p.min_stock)return false;
     if(filterQuantum&&!p.is_quantum)return false;
+    if(filterHiace&&!p.is_hiace)return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
     if(filterFits!=="__all__"){
       const hasFit=partFitments.some(f=>String(f.part_id)===String(p.id));
@@ -2153,7 +2155,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   });
   const _vatMult=1+(settings.tax_rate||0)/100;
   const quantumStockValue=displayParts.reduce((s,p)=>p.is_quantum&&(p.stock??0)>0?s+(p.stock??0)*(p.cost_price??0)*_vatMult:s,0);
-  const othersStockValue=displayParts.reduce((s,p)=>!p.is_quantum&&(p.stock??0)>0?s+(p.stock??0)*(p.cost_price??0)*_vatMult:s,0);
+  const hiaceStockValue=displayParts.reduce((s,p)=>p.is_hiace&&(p.stock??0)>0?s+(p.stock??0)*(p.cost_price??0)*_vatMult:s,0);
+  const othersStockValue=displayParts.reduce((s,p)=>!p.is_quantum&&!p.is_hiace&&(p.stock??0)>0?s+(p.stock??0)*(p.cost_price??0)*_vatMult:s,0);
   const scrapLowStock=scrapParts.filter(p=>p.quantity<=p.min_qty);
   const branchOrders=branchId?orders.filter(o=>o.branch_id===branchId):orders;
   const totalRev=branchOrders.filter(o=>o.status==="Completed").reduce((s,o)=>s+(o.total||0),0);
@@ -2979,7 +2982,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               <span style={{animation:"spin 1s linear infinite",display:"inline-block",fontSize:14}}>⟳</span>
               <span>Loading full inventory… showing first {parts.length} parts. Search is limited until complete.</span>
             </div>}
-            {(quantumStockValue>0||othersStockValue>0)&&(
+            {(quantumStockValue>0||hiaceStockValue>0||othersStockValue>0)&&(
               <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
                 {quantumStockValue>0&&(
                   <div onClick={()=>setInvReport("quantum")} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px",cursor:"pointer",transition:"background .15s"}}
@@ -2988,6 +2991,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                     <div>
                       <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text3)"}}>Quantum Parts</div>
                       <div style={{fontWeight:800,fontFamily:"Rajdhani,sans-serif",fontSize:18,color:"var(--accent)"}}>{fmtAmt(quantumStockValue)}</div>
+                    </div>
+                  </div>
+                )}
+                {hiaceStockValue>0&&(
+                  <div onClick={()=>setInvReport("hiace")} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(59,130,246,.08)",border:"1px solid rgba(59,130,246,.25)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px",cursor:"pointer",transition:"background .15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="rgba(59,130,246,.16)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(59,130,246,.08)"}>
+                    <span style={{fontSize:18}}>🚐</span>
+                    <div>
+                      <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text3)"}}>Hiace Parts</div>
+                      <div style={{fontWeight:800,fontFamily:"Rajdhani,sans-serif",fontSize:18,color:"var(--blue)"}}>{fmtAmt(hiaceStockValue)}</div>
                     </div>
                   </div>
                 )}
@@ -3089,8 +3102,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 </select>
               )}
               <button className="btn btn-sm" onClick={()=>setFilterQuantum(v=>!v)} style={{whiteSpace:"nowrap",background:filterQuantum?"rgba(249,115,22,.18)":"var(--surface2)",color:filterQuantum?"var(--accent)":"var(--text2)",border:filterQuantum?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:filterQuantum?700:400}}>🚐 Quantum{filterQuantum?" ✓":""}</button>
-              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum)&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
+              <button className="btn btn-sm" onClick={()=>setFilterHiace(v=>!v)} style={{whiteSpace:"nowrap",background:filterHiace?"rgba(59,130,246,.18)":"var(--surface2)",color:filterHiace?"var(--blue)":"var(--text2)",border:filterHiace?"1.5px solid var(--blue)":"1px solid var(--border)",fontWeight:filterHiace?700:400}}>🚐 Hiace{filterHiace?" ✓":""}</button>
+              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace)&&(
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
             </div>
             {filterFits==="none"&&(
@@ -3132,6 +3146,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                           {p.bin_location&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)",background:"rgba(96,165,250,.1)",padding:"1px 7px",borderRadius:5}}>📦 {p.bin_location}</span>}
                           {p.category&&<span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:10}}>{p.category}</span>}
                           {p.is_quantum&&<span className="badge" style={{background:"rgba(249,115,22,.12)",color:"var(--accent)",fontSize:10}}>🚐 Quantum</span>}
+                          {p.is_hiace&&<span className="badge" style={{background:"rgba(59,130,246,.12)",color:"var(--blue)",fontSize:10}}>🚐 Hiace</span>}
                         </div>
                         {showSupplierCodes&&(()=>{const ps=getPartSupps(p.id);return ps.length>0?(
                           <div style={{marginTop:6,display:"flex",flexDirection:"column",gap:4}}>
@@ -3198,7 +3213,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                   <thead><tr>
                     {["",t.sku,`${t.name} / ${t.chineseDesc}`,t.bin||t.binLocation||"Bin",t.make,t.model,t.yearRange,t.oeNumber,t.category,t.price,t.cost||t.costPrice||"Cost",t.stock||"St"].map(h=><th key={h}>{h}</th>)}
                     <th style={{textAlign:"center",whiteSpace:"nowrap"}}>🚗</th>
-                    <th style={{textAlign:"center",whiteSpace:"nowrap"}} title="Toyota Quantum">🚐</th>
+                    <th style={{textAlign:"center",whiteSpace:"nowrap"}} title="Toyota Quantum">🚐Q</th>
+                    <th style={{textAlign:"center",whiteSpace:"nowrap"}} title="Toyota Hiace">🚐H</th>
                     {(role==="admin"||role==="branch_admin")&&<th style={{position:"sticky",right:0,background:"var(--surface2)",zIndex:2,boxShadow:"-2px 0 8px rgba(0,0,0,.3)"}}>{t.actions||"Actions"}</th>}
                   </tr></thead>
                   <tbody>
@@ -3277,6 +3293,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                           </td>
                           <td style={{textAlign:"center",fontSize:16}} title={p.is_quantum?"Toyota Quantum part":""}>
                             {p.is_quantum?<span title="Toyota Quantum">🚐</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>}
+                          </td>
+                          <td style={{textAlign:"center",fontSize:16}} title={p.is_hiace?"Toyota Hiace part":""}>
+                            {p.is_hiace?<span title="Toyota Hiace" style={{filter:"hue-rotate(200deg)"}}>🚐</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>}
                           </td>
                           {(role==="admin"||role==="branch_admin")&&(()=>{
                             if(!canEditPart(p)) return (
@@ -4601,10 +4620,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {/* INVENTORY STOCK VALUE REPORT */}
       {invReport&&(()=>{
         const isQ=invReport==="quantum";
+        const isH=invReport==="hiace";
         const vatRate=settings.tax_rate||0;
         const cur=C();
         const rows=[...displayParts]
-          .filter(p=>(isQ?p.is_quantum:!p.is_quantum)&&(p.stock??0)>0)
+          .filter(p=>{
+            if(isQ) return p.is_quantum&&(p.stock??0)>0;
+            if(isH) return p.is_hiace&&(p.stock??0)>0;
+            return !p.is_quantum&&!p.is_hiace&&(p.stock??0)>0;
+          })
           .sort((a,b)=>{
             const cc=(a.category||"").localeCompare(b.category||"");
             return cc!==0?cc:(a.sku||"").localeCompare(b.sku||"");
@@ -4613,7 +4637,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         const totalCost=rows.reduce((s,p)=>s+(p.stock??0)*(p.cost_price??0),0);
         const vatAmt=totalCost*vatRate/100;
         const grandTotal=totalCost+vatAmt;
-        const title=isQ?"Quantum Parts Report":"Others (Non-Quantum) Report";
+        const title=isQ?"Quantum Parts Report":isH?"Hiace Parts Report":"Others Report";
         const shopName=settings.shop_name||"";
         const dateStr=new Date().toLocaleDateString();
 
@@ -4683,7 +4707,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           <div className="overlay" onClick={()=>setInvReport(null)}>
             <div className="modal" style={{maxWidth:780,maxHeight:"82vh",overflow:"hidden",display:"flex",flexDirection:"column",padding:0}} onClick={e=>e.stopPropagation()}>
               <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0,flexWrap:"wrap",gap:8}}>
-                <div style={{fontWeight:700,fontSize:16}}>{isQ?"🚐 Quantum Parts Report":"🔩 Others Report"}</div>
+                <div style={{fontWeight:700,fontSize:16}}>{isQ?"🚐 Quantum Parts Report":isH?"🚐 Hiace Parts Report":"🔩 Others Report"}</div>
                 <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                   <span style={{fontSize:12,color:"var(--text3)"}}>{rows.length} parts</span>
                   <button className="btn btn-ghost btn-sm" onClick={()=>openPrintWindow(true)}>🖨 Print</button>

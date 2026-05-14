@@ -505,9 +505,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         :"select=*&order=created_at.desc";
       api.get("branch_stock_requests",bsrQ).catch(()=>[]).then(r=>{if(Array.isArray(r))setBranchStockRequests(r);});
     }
-    // Branch stock: per-branch qty/price/bin overlay
+    // Branch stock: per-branch qty/price/bin overlay (branch users) + all entries for admin branch filter
     if(isBranchUser&&user.branch_id){
       api.get("branch_stock",`branch_id=eq.${user.branch_id}&select=*`).catch(()=>[]).then(r=>{if(Array.isArray(r))setBranchStock(r);});
+    } else if(role==="admin"){
+      api.get("branch_stock","select=*").catch(()=>[]).then(r=>{if(Array.isArray(r))setBranchStock(r);});
     }
     // Load workshop profile for workshop role
     if(wsId){

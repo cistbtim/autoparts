@@ -5726,10 +5726,10 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
 export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
   const [lightbox,setLightbox]=useState(null);
   const [f,setF]=useState({
-    stock:   existing?.stock   ?? part?.stock   ?? 0,
+    stock:   existing?.stock   ?? part?.stock   ?? 2,
     price:   existing?.price   ?? part?.price   ?? "",
     cost_price: existing?.cost_price ?? part?.cost_price ?? "",
-    min_stock:  existing?.min_stock  ?? part?.min_stock  ?? 0,
+    min_stock:  existing?.min_stock  ?? part?.min_stock  ?? 2,
     bin_location: existing?.bin_location ?? part?.bin_location ?? "",
   });
   const [busy,setBusy]=useState(false);

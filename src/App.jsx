@@ -2075,6 +2075,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const canEditPart=(p)=>role==="admin"||(role==="branch_admin"&&p.branch_id===branchId);
   // branch_stock overlay — merge per-branch qty/price/bin over main catalog for branch_admin display
   const branchStockMap=Object.fromEntries(branchStock.map(bs=>[String(bs.part_id),bs]));
+  // When admin filters by a specific branch, build a map of that branch's stock entries
+  const filterBranchStockMap=(role==="admin"&&filterBranch!=="__all__"&&filterBranch!=="main")
+    ?Object.fromEntries(branchStock.filter(bs=>String(bs.branch_id)===filterBranch).map(bs=>[String(bs.part_id),bs]))
+    :null;
   const displayParts=role==="branch_admin"
     ?parts.map(p=>{
         const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
@@ -2111,6 +2115,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(filterBranch!=="__all__"){
       if(filterBranch==="main"){
         if(p.branch_id&&p.branch_id!==mainBranchId)return false;
+      } else if(filterBranchStockMap){
+        // admin filtering by a specific branch — show only parts that branch has stocked
+        if(!filterBranchStockMap[String(p.id)])return false;
       } else {
         if(p.branch_id!==filterBranch)return false;
       }
@@ -3085,14 +3092,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 <option value="has">✅ Has fitment</option>
               </select>
               {(role==="admin"&&branches.length>1)&&(
-                <select className="inp" value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{width:170,
+                <select className="inp" value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{minWidth:200,maxWidth:260,
                   borderColor:filterBranch!=="__all__"?"var(--blue)":undefined,
                   color:filterBranch!=="__all__"?"var(--blue)":undefined}}>
                   <option value="__all__">🏢 All Branches</option>
                   <option value="main">🏠 Main Branch</option>
-                  {branches.filter(b=>!b.is_main).map(b=>(
-                    <option key={b.id} value={b.id}>🏢 {b.name}</option>
-                  ))}
+                  {branches.filter(b=>!b.is_main).map(b=>{
+                    const cnt=branchStock.filter(bs=>String(bs.branch_id)===String(b.id)).length;
+                    return <option key={b.id} value={b.id}>🏢 {b.name}{cnt>0?` (${cnt})`:" (0)"}</option>;
+                  })}
                 </select>
               )}
               {(role==="branch_admin"||role==="branch_manager")&&(
@@ -3264,14 +3272,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                                 })}
                               </div>
                               {/* Stock qty badge — always visible */}
+                              {(()=>{const bsE=filterBranchStockMap?filterBranchStockMap[String(p.id)]:null;const dStock=bsE!=null?bsE.stock:p.stock;const notSet=(role==="branch_admin"&&!p._bsSet);return(
                               <div style={{flexShrink:0,textAlign:"right"}}>
                                 <span style={{
                                   fontWeight:800, fontFamily:"Rajdhani,sans-serif", fontSize:17,
-                                  color:(role==="branch_admin"&&!p._bsSet)?"var(--text3)":p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--green)"
-                                }}>{(role==="branch_admin"&&!p._bsSet)?"—":p.stock}</span>
-                                {!(role==="branch_admin"&&!p._bsSet)&&p.stock<=p.min_stock&&p.stock>0&&<div style={{fontSize:9,color:"var(--yellow)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",lineHeight:1}}>LOW</div>}
-                                {!(role==="branch_admin"&&!p._bsSet)&&p.stock===0&&<div style={{fontSize:9,color:"var(--red)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",lineHeight:1}}>OUT</div>}
+                                  color:notSet?"var(--text3)":dStock===0?"var(--red)":dStock<=(bsE?.min_stock??p.min_stock)?"var(--yellow)":"var(--green)"
+                                }}>{notSet?"—":dStock}</span>
+                                {!notSet&&dStock<=(bsE?.min_stock??p.min_stock)&&dStock>0&&<div style={{fontSize:9,color:"var(--yellow)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",lineHeight:1}}>LOW</div>}
+                                {!notSet&&dStock===0&&<div style={{fontSize:9,color:"var(--red)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",lineHeight:1}}>OUT</div>}
                               </div>
+                              );})()}
                             </div>
                           </td>
                           <td>

@@ -2121,6 +2121,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       } else if(filterBranchStockMap!==null){
         // admin filtering by a specific branch
         if(branchMatchedOnly&&!filterBranchStockMap[String(p.id)])return false;
+      } else if(role==="branch_admin"&&filterBranch===String(branchId)){
+        // branch_admin viewing "My Branch": show own parts + main catalog parts with branch_stock
+        const isOwnPart=p.branch_id===branchId;
+        const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
+        if(branchMatchedOnly){
+          if(!isOwnPart&&!(isMainCatalog&&branchStockMap[String(p.id)]))return false;
+        } else {
+          if(!isOwnPart&&!isMainCatalog)return false;
+        }
       } else {
         if(p.branch_id!==filterBranch)return false;
       }
@@ -3112,13 +3121,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 </button>
               )}
               {(role==="branch_admin"||role==="branch_manager")&&(
-                <select className="inp" value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{width:170,
+                <select className="inp" value={filterBranch} onChange={e=>{setFilterBranch(e.target.value);setBranchMatchedOnly(true);}} style={{width:170,
                   borderColor:filterBranch!=="__all__"?"var(--blue)":undefined,
                   color:filterBranch!=="__all__"?"var(--blue)":undefined}}>
                   <option value="__all__">📦 All</option>
                   <option value="main">🏠 Main Branch</option>
-                  <option value={branchId}>🏢 {currentBranch?.name||"My Branch"}</option>
+                  <option value={String(branchId)}>🏢 {currentBranch?.name||"My Branch"}</option>
                 </select>
+              )}
+              {(role==="branch_admin"&&filterBranch===String(branchId))&&(
+                <button className="btn btn-sm" onClick={()=>setBranchMatchedOnly(v=>!v)} style={{whiteSpace:"nowrap",background:branchMatchedOnly?"rgba(59,130,246,.15)":"rgba(52,211,153,.12)",color:branchMatchedOnly?"var(--blue)":"var(--green)",border:branchMatchedOnly?"1.5px solid var(--blue)":"1.5px solid rgba(52,211,153,.4)",fontWeight:700}}>
+                  {branchMatchedOnly?"✓ My Stock":"📋 All catalog"}
+                </button>
               )}
               <button className="btn btn-sm" onClick={()=>setFilterQuantum(v=>!v)} style={{whiteSpace:"nowrap",background:filterQuantum?"rgba(249,115,22,.18)":"var(--surface2)",color:filterQuantum?"var(--accent)":"var(--text2)",border:filterQuantum?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:filterQuantum?700:400}}>🚐 Quantum{filterQuantum?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterHiace(v=>!v)} style={{whiteSpace:"nowrap",background:filterHiace?"rgba(59,130,246,.18)":"var(--surface2)",color:filterHiace?"var(--blue)":"var(--text2)",border:filterHiace?"1.5px solid var(--blue)":"1px solid var(--border)",fontWeight:filterHiace?700:400}}>🚐 Hiace{filterHiace?" ✓":""}</button>

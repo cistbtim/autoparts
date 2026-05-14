@@ -129,7 +129,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [filterQuantum,setFilterQuantum]=useState(false);
   const [invRefreshing,setInvRefreshing]=useState(false);
   const [filterHiace,setFilterHiace]=useState(false);
-  const [branchMatchedOnly,setBranchMatchedOnly]=useState(true);
+  const [branchMatchedOnly,setBranchMatchedOnly]=useState("matched"); // "matched"|"own"|"all"
   const [invPage,setInvPage]=useState(0);   // inventory page
   const [invReport,setInvReport]=useState(null); // null | "quantum" | "hiace" | "others"
   const [shopPage,setShopPage]=useState(0); // shop page
@@ -2120,14 +2120,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         if(p.branch_id&&p.branch_id!==mainBranchId)return false;
       } else if(filterBranchStockMap!==null){
         // admin filtering by a specific branch
-        if(branchMatchedOnly&&!filterBranchStockMap[String(p.id)])return false;
+        if(branchMatchedOnly==="matched"&&!filterBranchStockMap[String(p.id)])return false;
       } else if(role==="branch_admin"&&filterBranch===String(branchId)){
-        // branch_admin viewing "My Branch": show own parts + main catalog parts with branch_stock
-        const isOwnPart=p.branch_id===branchId;
+        // branch_admin viewing "My Branch"
+        const isOwnPart=String(p.branch_id)===String(branchId);
         const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
-        if(branchMatchedOnly){
+        if(branchMatchedOnly==="own"){
+          if(!isOwnPart)return false; // only branch-created parts
+        } else if(branchMatchedOnly==="matched"){
           if(!isOwnPart&&!(isMainCatalog&&branchStockMap[String(p.id)]))return false;
         } else {
+          // "all" — show own parts + all main catalog parts
           if(!isOwnPart&&!isMainCatalog)return false;
         }
       } else {
@@ -3104,7 +3107,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 <option value="has">✅ Has fitment</option>
               </select>
               {(role==="admin"&&branches.length>1)&&(
-                <select className="inp" value={filterBranch} onChange={e=>{setFilterBranch(e.target.value);setBranchMatchedOnly(true);}} style={{minWidth:200,maxWidth:260,
+                <select className="inp" value={filterBranch} onChange={e=>{setFilterBranch(e.target.value);setBranchMatchedOnly("matched");}} style={{minWidth:200,maxWidth:260,
                   borderColor:filterBranch!=="__all__"?"var(--blue)":undefined,
                   color:filterBranch!=="__all__"?"var(--blue)":undefined}}>
                   <option value="__all__">🏢 All Branches</option>
@@ -3116,12 +3119,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 </select>
               )}
               {(role==="admin"&&filterBranch!=="__all__"&&filterBranch!=="main")&&(
-                <button className="btn btn-sm" onClick={()=>setBranchMatchedOnly(v=>!v)} style={{whiteSpace:"nowrap",background:branchMatchedOnly?"rgba(59,130,246,.15)":"rgba(52,211,153,.12)",color:branchMatchedOnly?"var(--blue)":"var(--green)",border:branchMatchedOnly?"1.5px solid var(--blue)":"1.5px solid rgba(52,211,153,.4)",fontWeight:700}}>
-                  {branchMatchedOnly?"✓ Matched only":"📋 All catalog"}
+                <button className="btn btn-sm" onClick={()=>setBranchMatchedOnly(v=>v==="matched"?"all":"matched")} style={{whiteSpace:"nowrap",background:branchMatchedOnly==="matched"?"rgba(59,130,246,.15)":"rgba(52,211,153,.12)",color:branchMatchedOnly==="matched"?"var(--blue)":"var(--green)",border:branchMatchedOnly==="matched"?"1.5px solid var(--blue)":"1.5px solid rgba(52,211,153,.4)",fontWeight:700}}>
+                  {branchMatchedOnly==="matched"?"✓ Matched only":"📋 All catalog"}
                 </button>
               )}
               {(role==="branch_admin"||role==="branch_manager")&&(
-                <select className="inp" value={filterBranch} onChange={e=>{setFilterBranch(e.target.value);setBranchMatchedOnly(true);}} style={{width:170,
+                <select className="inp" value={filterBranch} onChange={e=>{setFilterBranch(e.target.value);setBranchMatchedOnly("matched");}} style={{width:170,
                   borderColor:filterBranch!=="__all__"?"var(--blue)":undefined,
                   color:filterBranch!=="__all__"?"var(--blue)":undefined}}>
                   <option value="__all__">📦 All</option>
@@ -3130,14 +3133,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 </select>
               )}
               {(role==="branch_admin"&&filterBranch===String(branchId))&&(
-                <button className="btn btn-sm" onClick={()=>setBranchMatchedOnly(v=>!v)} style={{whiteSpace:"nowrap",background:branchMatchedOnly?"rgba(59,130,246,.15)":"rgba(52,211,153,.12)",color:branchMatchedOnly?"var(--blue)":"var(--green)",border:branchMatchedOnly?"1.5px solid var(--blue)":"1.5px solid rgba(52,211,153,.4)",fontWeight:700}}>
-                  {branchMatchedOnly?"✓ My Stock":"📋 All catalog"}
+                <button className="btn btn-sm" onClick={()=>setBranchMatchedOnly(v=>v==="matched"?"own":v==="own"?"all":"matched")}
+                  style={{whiteSpace:"nowrap",fontWeight:700,
+                    background:branchMatchedOnly==="matched"?"rgba(59,130,246,.15)":branchMatchedOnly==="own"?"rgba(249,115,22,.15)":"rgba(52,211,153,.12)",
+                    color:branchMatchedOnly==="matched"?"var(--blue)":branchMatchedOnly==="own"?"var(--accent)":"var(--green)",
+                    border:branchMatchedOnly==="matched"?"1.5px solid var(--blue)":branchMatchedOnly==="own"?"1.5px solid var(--accent)":"1.5px solid rgba(52,211,153,.4)"}}>
+                  {branchMatchedOnly==="matched"?"✓ My Stock":branchMatchedOnly==="own"?"🏢 Own Parts":"📋 All catalog"}
                 </button>
               )}
               <button className="btn btn-sm" onClick={()=>setFilterQuantum(v=>!v)} style={{whiteSpace:"nowrap",background:filterQuantum?"rgba(249,115,22,.18)":"var(--surface2)",color:filterQuantum?"var(--accent)":"var(--text2)",border:filterQuantum?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:filterQuantum?700:400}}>🚐 Quantum{filterQuantum?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterHiace(v=>!v)} style={{whiteSpace:"nowrap",background:filterHiace?"rgba(59,130,246,.18)":"var(--surface2)",color:filterHiace?"var(--blue)":"var(--text2)",border:filterHiace?"1.5px solid var(--blue)":"1px solid var(--border)",fontWeight:filterHiace?700:400}}>🚐 Hiace{filterHiace?" ✓":""}</button>
               {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace)&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setBranchMatchedOnly(true);}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
             </div>
             {filterFits==="none"&&(

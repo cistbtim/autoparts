@@ -2938,7 +2938,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             )}
             <PH title={t.inventory} subtitle={`${parts.length} parts · ${lowStock.length} low`}
               action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <button className="btn btn-ghost btn-sm" disabled={invRefreshing} onClick={async()=>{setInvRefreshing(true);try{await refreshTables("parts","branch_stock","part_fitments","part_suppliers");}finally{setInvRefreshing(false);}}} title="Refresh inventory data only">
+                <button className="btn btn-ghost btn-sm" disabled={invRefreshing} onClick={async()=>{setInvRefreshing(true);try{api.cacheInvalidate("parts");api.cacheInvalidate("branch_stock");await refreshTables("parts","branch_stock","part_fitments","part_suppliers");}finally{setInvRefreshing(false);}}} title="Refresh inventory data only">
                   <span style={invRefreshing?{display:"inline-block",animation:"spin 1s linear infinite"}:{}}>{invRefreshing?"⟳":"↻"}</span> {invRefreshing?"Refreshing…":"Refresh"}
                 </button>
                 {role==="admin"&&branches.length>1&&<button className={`btn btn-sm ${showCrossBranch?"btn-primary":"btn-ghost"}`} onClick={()=>setShowCrossBranch(v=>!v)} title="Cross-branch stock search">🏢 {t.branchCrossBtn}</button>}

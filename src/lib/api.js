@@ -104,9 +104,10 @@ export const api = {
     return extra;
   },
 
-  // Cache read/write — lets callers prime or read the cache directly
+  // Cache read/write/invalidate — lets callers prime, read, or bust the cache
   cacheGet: (t, q) => _cRead(_cKey(t, q)),
   cacheSet: (t, q, data) => _cWrite(_cKey(t, q), data),
+  cacheInvalidate: (t) => _cInvalidate(t),
 
   upsert: async (t, d) => {
     if (_demoMode) return _demoBlock();

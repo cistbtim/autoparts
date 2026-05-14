@@ -2148,6 +2148,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(role==="branch_admin"){const isMain=!p.branch_id||p.branch_id===mainBranchId;const isOwn=p.branch_id===branchId;return (isMain||isOwn)&&p.stock<=p.min_stock;}
     return (branchId?p.branch_id===branchId:true)&&p.stock<=p.min_stock;
   });
+  const quantumStockValue=displayParts.reduce((s,p)=>p.is_quantum&&(p.stock??0)>0?s+(p.stock??0)*(p.price??0):s,0);
+  const othersStockValue=displayParts.reduce((s,p)=>!p.is_quantum&&(p.stock??0)>0?s+(p.stock??0)*(p.price??0):s,0);
   const scrapLowStock=scrapParts.filter(p=>p.quantity<=p.min_qty);
   const branchOrders=branchId?orders.filter(o=>o.branch_id===branchId):orders;
   const totalRev=branchOrders.filter(o=>o.status==="Completed").reduce((s,o)=>s+(o.total||0),0);
@@ -2973,6 +2975,28 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               <span style={{animation:"spin 1s linear infinite",display:"inline-block",fontSize:14}}>⟳</span>
               <span>Loading full inventory… showing first {parts.length} parts. Search is limited until complete.</span>
             </div>}
+            {(quantumStockValue>0||othersStockValue>0)&&(
+              <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+                {quantumStockValue>0&&(
+                  <div style={{display:"flex",alignItems:"center",gap:8,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px"}}>
+                    <span style={{fontSize:18}}>🚐</span>
+                    <div>
+                      <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text3)"}}>Quantum Parts</div>
+                      <div style={{fontWeight:800,fontFamily:"Rajdhani,sans-serif",fontSize:18,color:"var(--accent)"}}>{fmtAmt(quantumStockValue)}</div>
+                    </div>
+                  </div>
+                )}
+                {othersStockValue>0&&(
+                  <div style={{display:"flex",alignItems:"center",gap:8,background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px"}}>
+                    <span style={{fontSize:18}}>🔩</span>
+                    <div>
+                      <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text3)"}}>Others</div>
+                      <div style={{fontWeight:800,fontFamily:"Rajdhani,sans-serif",fontSize:18,color:"var(--text)"}}>{fmtAmt(othersStockValue)}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
               <div style={{position:"relative",flex:"1 1 220px",maxWidth:340}}>
                 <input className="inp" type="text"
@@ -3100,6 +3124,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                           <span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)",opacity:.55}}>#{p.id}</span>
                           {p.bin_location&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)",background:"rgba(96,165,250,.1)",padding:"1px 7px",borderRadius:5}}>📦 {p.bin_location}</span>}
                           {p.category&&<span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:10}}>{p.category}</span>}
+                          {p.is_quantum&&<span className="badge" style={{background:"rgba(249,115,22,.12)",color:"var(--accent)",fontSize:10}}>🚐 Quantum</span>}
                         </div>
                         {showSupplierCodes&&(()=>{const ps=getPartSupps(p.id);return ps.length>0?(
                           <div style={{marginTop:6,display:"flex",flexDirection:"column",gap:4}}>
@@ -3166,6 +3191,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                   <thead><tr>
                     {["",t.sku,`${t.name} / ${t.chineseDesc}`,t.bin||t.binLocation||"Bin",t.make,t.model,t.yearRange,t.oeNumber,t.category,t.price,t.cost||t.costPrice||"Cost",t.stock||"St"].map(h=><th key={h}>{h}</th>)}
                     <th style={{textAlign:"center",whiteSpace:"nowrap"}}>🚗</th>
+                    <th style={{textAlign:"center",whiteSpace:"nowrap"}} title="Toyota Quantum">🚐</th>
                     {(role==="admin"||role==="branch_admin")&&<th style={{position:"sticky",right:0,background:"var(--surface2)",zIndex:2,boxShadow:"-2px 0 8px rgba(0,0,0,.3)"}}>{t.actions||"Actions"}</th>}
                   </tr></thead>
                   <tbody>
@@ -3241,6 +3267,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                           </td>
                           <td style={{textAlign:"center"}}>
                             {(()=>{const cnt=partFitments.filter(f=>String(f.part_id)===String(p.id)).length;return cnt>0?<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{cnt} 🚗</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>;})()}
+                          </td>
+                          <td style={{textAlign:"center",fontSize:16}} title={p.is_quantum?"Toyota Quantum part":""}>
+                            {p.is_quantum?<span title="Toyota Quantum">🚐</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>}
                           </td>
                           {(role==="admin"||role==="branch_admin")&&(()=>{
                             if(!canEditPart(p)) return (

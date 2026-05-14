@@ -6172,7 +6172,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // WS SPARE SHOP TAB
 // ═══════════════════════════════════════════════════════════════
 const WS_SHOP_PAGE_SIZE=20;
-function WsShopCheckoutModal({localCart,mainCart,wsProfile,Cs,onConfirm,onClose}) {
+function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onConfirm,onClose}) {
   const [confirming,setConfirming]=useState(false);
   const [notes,setNotes]=useState("");
   const [result,setResult]=useState(null);
@@ -6182,7 +6182,7 @@ function WsShopCheckoutModal({localCart,mainCart,wsProfile,Cs,onConfirm,onClose}
     setConfirming(true);
     setErrMsg("");
     try{
-      const res=await onConfirm({localItems:localCart,mainItems:mainCart,notes});
+      const res=await onConfirm({localItems:localCart,mainItems:mainCart,requestItems:requestCart,notes});
       setResult(res||{});
     }catch(err){
       setErrMsg(err?.message||"Save failed — check console for details");
@@ -6220,6 +6220,16 @@ function WsShopCheckoutModal({localCart,mainCart,wsProfile,Cs,onConfirm,onClose}
             </div>
           ))}
           <div style={{textAlign:"right",fontWeight:800,fontSize:15,marginTop:6}}>Total: {Cs}{localTotal.toFixed(2)}</div>
+        </div>}
+        {requestCart.length>0&&<div style={{marginBottom:20}}>
+          <div style={{fontWeight:700,fontSize:14,color:"var(--accent)",marginBottom:6}}>📦 Out of Stock — Request from Branch</div>
+          <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>These items are currently out of stock. The branch will be notified to restock or source them.</div>
+          {requestCart.map(i=>(
+            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)",borderRadius:8,marginBottom:6}}>
+              <div><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
+              <div style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</div>
+            </div>
+          ))}
         </div>}
         {mainCart.length>0&&<div style={{marginBottom:20}}>
           <div style={{fontWeight:700,fontSize:14,color:"var(--blue)",marginBottom:6}}>🏬 From Main Branch — Request</div>
@@ -6260,15 +6270,37 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const [printLabelPart,setPrintLabelPart]=useState(null);
   const [shelfModal,setShelfModal]=useState(false);
   const wsId=wsProfile?.id?String(wsProfile.id):null;
+  const prevReqStatusRef=useRef({});
   useEffect(()=>{
     if(!wsId)return;
-    api.get("branch_stock_requests",`workshop_id=eq.${wsId}&status=not.in.(completed,cancelled)&select=*&order=created_at.desc`).then(r=>{if(Array.isArray(r))setMyRequests(r);}).catch(()=>{});
+    const fetchReqs=()=>{
+      api.cacheInvalidate("branch_stock_requests");
+      api.get("branch_stock_requests",`workshop_id=eq.${wsId}&status=not.in.(completed,cancelled)&select=*&order=created_at.desc`).then(reqs=>{
+        if(!Array.isArray(reqs))return;
+        setMyRequests(reqs);
+        // If any request just became "quoted", bust branch_stock cache and reload shop parts
+        const newQuoted=reqs.some(r=>r.status==="quoted"&&prevReqStatusRef.current[r.id]!=="quoted");
+        if(newQuoted){
+          api.cacheInvalidate("branch_stock");
+          api.cacheInvalidate("parts");
+          setRefreshKey(k=>k+1);
+        }
+        const statusMap={};
+        reqs.forEach(r=>{statusMap[r.id]=r.status;});
+        prevReqStatusRef.current=statusMap;
+      }).catch(()=>{});
+    };
+    fetchReqs();
+    const timer=setInterval(fetchReqs,30000);
+    return()=>clearInterval(timer);
   },[wsId]);
   const [shopParts,setShopParts]=useState([]);
   const [page,setPage]=useState(0);
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [stockOnly,setStockOnly]=useState(false);
   const [lightbox,setLightbox]=useState(null);
+  const [refreshKey,setRefreshKey]=useState(0);
+  const [refreshing,setRefreshing]=useState(false);
   const Cs=curSym(settings?.currency||"ZAR R");
 
   useEffect(()=>{
@@ -6297,7 +6329,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const bStockMap=Object.fromEntries(bStockArr.map(bs=>[String(bs.part_id),bs]));
       const mergedCatalog=catalogParts.map(p=>{
         const bs=bStockMap[String(p.id)];
-        return bs?{...p,stock:bs.qty??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;
+        return bs?{...p,stock:bs.stock??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;
       });
       const seen=new Set(ownArr.map(p=>String(p.id)));
       const linkedParts=[...ownArr,...mergedCatalog.filter(p=>!seen.has(String(p.id)))];
@@ -6309,8 +6341,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       ];
       setShopParts(combined);
       setLoading(false);
+      setRefreshing(false);
     });
-  },[linkedBranchId,mainBranchId]);
+  },[linkedBranchId,mainBranchId,refreshKey]);
 
   const q=search.trim().toLowerCase();
   const filtered=(q
@@ -6327,7 +6360,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const removeFromCart=(id)=>setCart(prev=>prev.filter(i=>i.id!==id));
   const qtyCart=(id,qty)=>setCart(prev=>prev.map(i=>i.id===id?{...i,qty:Math.max(1,+qty||1)}:i));
   const localCart=cart.filter(i=>i._source==="local");
-  const mainCart=cart.filter(i=>i._source!=="local");
+  const requestCart=cart.filter(i=>i._source==="request");
+  const mainCart=cart.filter(i=>i._source!=="local"&&i._source!=="request");
   const cartTotal=localCart.reduce((s,i)=>s+i.price*i.qty,0);
   const cartCount=cart.reduce((s,i)=>s+i.qty,0);
 
@@ -6337,10 +6371,10 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     <div>
       {lightbox&&<ImgLightbox url={lightbox.url} name={lightbox.name} onClose={()=>setLightbox(null)}/>}
       {showCheckout&&<WsShopCheckoutModal
-        localCart={localCart} mainCart={mainCart}
+        localCart={localCart} mainCart={mainCart} requestCart={requestCart}
         wsProfile={wsProfile} Cs={Cs}
-        onConfirm={async({localItems,mainItems,notes})=>{
-          const res=await onPlaceShopOrder?.({localItems,mainItems,notes,linkedBranchId,mainBranchId});
+        onConfirm={async({localItems,mainItems,requestItems,notes})=>{
+          const res=await onPlaceShopOrder?.({localItems,mainItems,requestItems,notes,linkedBranchId,mainBranchId});
           if(res&&(res.localOid||res.bsrId)) setCart([]);
           return res||{};
         }}
@@ -6348,20 +6382,67 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       />}
 
       {/* My pending requests */}
-      {myRequests.length>0&&<div style={{marginBottom:16,padding:"12px 16px",background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.25)",borderRadius:12}}>
-        <div style={{fontWeight:700,fontSize:13,color:"var(--blue)",marginBottom:8}}>🔄 My Main Branch Requests</div>
+      {myRequests.length>0&&<div style={{marginBottom:16}}>
+        <div style={{fontWeight:700,fontSize:13,color:"var(--text2)",marginBottom:8}}>🔄 My Requests</div>
         {myRequests.map(r=>{
-          const statusColor={pending:"var(--orange)",confirmed:"var(--blue)",ordered:"var(--accent)",dispatched:"var(--green)"}[r.status]||"var(--text3)";
+          const replyItems=Array.isArray(r.reply_items)?r.reply_items:[];
           const items=Array.isArray(r.items)?r.items:[];
+          const Cs=curSym(settings?.currency||"ZAR R");
+          const isQuoted=r.status==="quoted";
+          const isDispatched=r.status==="dispatched"||r.status==="confirmed";
+          const borderColor={pending:"var(--border)",quoted:"var(--purple)",confirmed:"var(--blue)",dispatched:"var(--green)",cancelled:"var(--red)"}[r.status]||"var(--border)";
+          const statusMap={pending:{l:"Pending",c:"var(--orange)"},quoted:{l:"Quoted",c:"var(--purple)"},confirmed:{l:"Confirmed",c:"var(--blue)"},dispatched:{l:"Ready",c:"var(--green)"},cancelled:{l:"Cancelled",c:"var(--red)"}};
+          const sm=statusMap[r.status]||{l:r.status,c:"var(--text3)"};
+          const patchReq=async(data)=>{
+            await api.patch("branch_stock_requests","id",r.id,data);
+            api.cacheInvalidate("branch_stock_requests");
+            const fresh=await api.get("branch_stock_requests",`workshop_id=eq.${wsProfile?.id}&status=not.in.(completed,cancelled)&select=*&order=created_at.desc`).catch(()=>[]);
+            if(Array.isArray(fresh))setMyRequests(fresh);
+          };
           return (
-            <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 10px",background:"var(--surface)",borderRadius:8,marginBottom:6,gap:10,flexWrap:"wrap"}}>
-              <div style={{fontSize:12}}>
-                <span style={{fontWeight:700}}>{items.map(i=>i.name).join(", ")}</span>
-                <span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{new Date(r.created_at).toLocaleDateString()}</span>
+            <div key={r.id} className="card" style={{marginBottom:10,padding:14,borderLeft:`3px solid ${borderColor}`}}>
+              {/* Header row */}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:replyItems.length>0||items.length>0?10:0}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:13}}>{items.map(i=>i.name).join(", ")}</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{new Date(r.created_at).toLocaleDateString()}{r.reply_at&&<span> · Quoted {new Date(r.reply_at).toLocaleDateString()}</span>}</div>
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                  <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${sm.c}20`,color:sm.c}}>{sm.l}</span>
+                  <button className="btn btn-danger btn-xs" title="Remove" onClick={async()=>{await api.delete("branch_stock_requests","id",r.id);setMyRequests(prev=>prev.filter(x=>x.id!==r.id));}}>🗑️</button>
+                </div>
               </div>
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${statusColor}20`,color:statusColor,textTransform:"capitalize"}}>{r.status}</span>
-                {r.status==="confirmed"&&r.confirm_token&&<a href={`${window.location.origin}${window.location.pathname}?bsr_confirm=${r.confirm_token}`} target="_blank" rel="noreferrer" className="btn btn-primary btn-xs">Confirm/Cancel</a>}
+
+              {/* Quote details */}
+              {replyItems.length>0&&<div style={{marginBottom:10,padding:"8px 10px",background:"rgba(167,139,250,.06)",border:"1px solid rgba(167,139,250,.2)",borderRadius:8}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--purple)",marginBottom:6,textTransform:"uppercase",letterSpacing:".05em"}}>💬 Quote</div>
+                {replyItems.map((it,i)=>{
+                  const avColor={in_stock:"var(--green)",can_source:"var(--yellow)",not_available:"var(--red)"}[it.availability]||"var(--text3)";
+                  const avLabel={in_stock:"✅ In Stock",can_source:"🔍 Can Source",not_available:"❌ Not Available"}[it.availability]||it.availability;
+                  return(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderBottom:i<replyItems.length-1?"1px solid var(--border)":"none",gap:8,flexWrap:"wrap"}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{it.name}</div>
+                      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                        <span style={{fontSize:11,fontWeight:600,padding:"1px 6px",borderRadius:99,background:`${avColor}18`,color:avColor}}>{avLabel}</span>
+                        {it.availability!=="not_available"&&+it.price>0&&<span style={{fontSize:14,fontWeight:800,color:"var(--accent)"}}>{Cs}{(+it.price).toFixed(2)}</span>}
+                        {it.notes&&<span style={{fontSize:11,color:"var(--text3)"}}>({it.notes})</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+                {r.reply_notes&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6}}>📝 {r.reply_notes}</div>}
+              </div>}
+
+              {/* Actions */}
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                {isQuoted&&<>
+                  <button className="btn btn-primary btn-sm" onClick={()=>patchReq({status:"confirmed",confirmed_at:new Date().toISOString()})}>✅ Accept Order</button>
+                  <button className="btn btn-danger btn-sm" onClick={()=>patchReq({status:"cancelled"})}>✕ Decline</button>
+                </>}
+                {r.status==="confirmed"&&<span style={{fontSize:12,color:"var(--blue)",fontWeight:600}}>✅ Confirmed — branch is preparing your parts</span>}
+                {r.status==="dispatched"&&<span style={{fontSize:12,color:"var(--green)",fontWeight:700}}>📦 Parts are ready for collection!</span>}
+                {r.status==="pending"&&<span style={{fontSize:12,color:"var(--orange)"}}>⏳ Waiting for quote…</span>}
+                {r.status==="cancelled"&&<span style={{fontSize:12,color:"var(--red)"}}>✕ Cancelled</span>}
               </div>
             </div>
           );
@@ -6449,8 +6530,12 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <button onClick={()=>{setStockOnly(true);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:stockOnly?700:400,background:stockOnly?"var(--accent)":"transparent",color:stockOnly?"#fff":"var(--text2)"}}>In Stock</button>
           </div>
           <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={()=>setShelfModal({})} title="Print shelf/bin label">📋 Shelf Label</button>
+          <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} disabled={refreshing} title="Refresh parts"
+            onClick={()=>{api.cacheInvalidate("parts");api.cacheInvalidate("branch_stock");setRefreshing(true);setRefreshKey(k=>k+1);}}>
+            <span style={refreshing?{display:"inline-block",animation:"spin 1s linear infinite"}:{}}>{refreshing?"⟳":"↻"}</span>{refreshing?" Refreshing…":" Refresh"}
+          </button>
           <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}} onClick={()=>setShowCheckout(true)} disabled={!cart.length}>
-            🛒 {cartCount>0?`(${cartCount}) `:""}{mainCart.length>0&&localCart.length>0?"Checkout & Request":mainCart.length>0?"Request from Main":"Checkout"}
+            🛒 {cartCount>0?`(${cartCount}) `:""}{ (mainCart.length>0||requestCart.length>0)&&localCart.length>0?"Checkout & Request":(mainCart.length>0||requestCart.length>0)?"Send Request":"Checkout"}
           </button>
         </div>
       </div>
@@ -6503,9 +6588,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                     {p._source==="local"
                       ?<div style={{fontSize:16,fontWeight:800,color:"var(--accent)",marginBottom:4}}>{Cs}{(+p.price||0).toFixed(2)}</div>
                       :<div style={{fontSize:12,color:"var(--text3)",marginBottom:4,fontStyle:"italic"}}>Price on request</div>}
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                    <div style={{marginBottom:10}}>
                       <span style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)"}}>{p.stock>0?`${p.stock} in stock`:"Out of Stock"}</span>
-                      <button className="btn btn-ghost btn-xs" style={{fontSize:11,padding:"3px 8px"}} onClick={()=>setPrintLabelPart(p)} title="Print label for this part">🏷️</button>
                     </div>
                     {inCart
                       ? <div style={{display:"flex",alignItems:"center",gap:7}}>
@@ -6515,8 +6599,10 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                           <button className="btn btn-danger btn-xs" onClick={()=>removeFromCart(p.id)}>✕</button>
                         </div>
                       : p._source==="other"
-                      ? <button className="btn btn-sm" style={{width:"100%",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.4)"}} disabled={p.stock===0} onClick={()=>addToCart(p)}>{p.stock===0?"Out of Stock":"+ Request from Main"}</button>
-                      : <button className="btn btn-primary" style={{width:"100%"}} disabled={p.stock===0} onClick={()=>addToCart(p)}>Add to Cart</button>}
+                      ? <button className="btn btn-sm" style={{width:"100%",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.4)"}} onClick={()=>addToCart(p)}>+ Request from Main</button>
+                      : p.stock===0
+                      ? <button className="btn btn-sm" style={{width:"100%",background:"rgba(249,115,22,.12)",color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}} onClick={()=>addToCart({...p,_source:"request"})}>📦 Request Stock</button>
+                      : <button className="btn btn-primary" style={{width:"100%"}} onClick={()=>addToCart(p)}>Add to Cart</button>}
                   </div>
                 </div>
               );

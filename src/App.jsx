@@ -112,6 +112,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [partRequests,setPartRequests]=useState([]);
   const [branchStock,setBranchStock]=useState([]);
   const [branchStockRequests,setBranchStockRequests]=useState([]);
+  const [wsReadyPopup,setWsReadyPopup]=useState(null); // confirmed BSRs to show after invoice save
   // Sync settings state from _settings cache after it loads from DB
   useEffect(()=>{ setSettings({...getSettings()}); },[]);
   const [loading,setLoading]=useState(true);
@@ -1794,6 +1795,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       await api.patch("orders","id",inv.order_id,{status:"Invoiced"});
     }
     await refreshTables("customer_invoices","orders");closeM("customerInvoice");showToast("✅ Invoice created — awaiting payment");
+    // After saving, alert clerk if there are confirmed workshop requests awaiting preparation
+    const wsConfirmed=branchStockRequests.filter(r=>r.status==="confirmed"&&r.workshop_id);
+    if(wsConfirmed.length) setWsReadyPopup(wsConfirmed);
   };
 
   // Customer Returns
@@ -2100,7 +2104,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       })
     :parts;
   const pendingPartRequests=partRequests.filter(r=>r.status==="pending").length||0;
-  const pendingTransferRequests=branchStockRequests.filter(r=>r.status==="pending"||r.status==="dispatched").length||0;
+  const pendingTransferRequests=branchStockRequests.filter(r=>r.status==="pending"||r.status==="quoted"||r.status==="confirmed"||r.status==="dispatched").length||0;
   // Multi-word search using DEBOUNCED value — fast typing won't lag UI
   const suppNoByPart={};
   partSuppliers.forEach(ps=>{if(ps.supplier_part_no)suppNoByPart[ps.part_id]=(suppNoByPart[ps.part_id]||[]).concat(ps.supplier_part_no.toLowerCase());});
@@ -2126,7 +2130,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         const isOwnPart=String(p.branch_id)===String(branchId);
         const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
         if(branchMatchedOnly==="own"){
-          if(!isOwnPart)return false; // only branch-created parts
+          if(!isOwnPart)return false; // only parts created by this branch
         } else if(branchMatchedOnly==="matched"){
           if(!isOwnPart&&!(isMainCatalog&&branchStockMap[String(p.id)]))return false;
         } else {
@@ -2224,7 +2228,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"stockmove",icon:"🔀",label:t.stockMove,roles:["admin","manager","shipper","stockman"]},
         {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager","branch_admin"]},
         {id:"partRequests",icon:"📬",label:"Part Requests",roles:["admin"],badge:pendingPartRequests},
-        {id:"transferRequests",icon:"🔄",label:"Transfer Requests",roles:["admin"],badge:pendingTransferRequests},
+        {id:"transferRequests",icon:"🔄",label:"Transfer Requests",roles:["admin","branch_admin","branch_manager"],badge:pendingTransferRequests},
       ]
     },
     {
@@ -3882,6 +3886,42 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           <div className="fu">
             <PH title={`🧾 ${t.salesInvoices}`} subtitle={`${customerInvoices.length} invoices`}
               action={<button className="btn btn-primary" onClick={()=>openM("customerInvoice",{isNew:true})}>+ New Invoice</button>}/>
+            {/* Confirmed workshop BSR alert — prompts clerk to mark parts ready */}
+            {(()=>{
+              const wsConfirmed=branchStockRequests.filter(r=>r.status==="confirmed"&&r.workshop_id);
+              if(!wsConfirmed.length)return null;
+              const Cs=curSym(settings?.currency||"ZAR R");
+              return (
+                <div style={{marginBottom:16,padding:"14px 18px",background:"rgba(52,211,153,.08)",border:"1.5px solid rgba(52,211,153,.35)",borderRadius:12}}>
+                  <div style={{fontWeight:700,fontSize:14,color:"var(--green)",marginBottom:10}}>
+                    ✅ {wsConfirmed.length} workshop order{wsConfirmed.length>1?"s":""} confirmed — prepare parts for collection
+                  </div>
+                  {wsConfirmed.map(r=>{
+                    const items=Array.isArray(r.items)?r.items:[];
+                    const replyItems=Array.isArray(r.reply_items)?r.reply_items:[];
+                    const total=replyItems.reduce((s,i)=>s+(+i.price||0)*(i.qty||1),0);
+                    const waMsg=`Hi ${r.workshop_name||"there"}, your parts are ready for collection at ${currentBranch?.name||"the branch"}. Please come collect at your earliest convenience. Thank you!`;
+                    return (
+                      <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:"var(--surface)",borderRadius:8,marginBottom:8,gap:12,flexWrap:"wrap",border:"1px solid var(--border)"}}>
+                        <div>
+                          <div style={{fontWeight:700,fontSize:13}}>{r.workshop_name||"Workshop"}</div>
+                          <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{items.map(i=>i.name).join(", ")}</div>
+                          {total>0&&<div style={{fontSize:12,color:"var(--accent)",fontWeight:600,marginTop:2}}>{Cs}{total.toFixed(2)}</div>}
+                        </div>
+                        <div style={{display:"flex",gap:8,flexWrap:"wrap",flexShrink:0}}>
+                          {r.workshop_phone&&<a href={waLink(r.workshop_phone,waMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp</a>}
+                          <button className="btn btn-success btn-sm" onClick={async()=>{
+                            await api.patch("branch_stock_requests","id",r.id,{status:"dispatched",dispatched_at:new Date().toISOString()});
+                            await refreshTables("branch_stock_requests");
+                            showToast("✅ Marked ready for collection");
+                          }}>🚚 Mark Ready</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
@@ -4297,8 +4337,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             onRefresh={refreshWorkshopData}
             wsProfile={workshopProfile}
             branches={branches}
-            onPlaceShopOrder={async({localItems,mainItems,notes,linkedBranchId,mainBranchId})=>{
-              let localOid=null,bsrId=null;
+            onPlaceShopOrder={async({localItems,mainItems,requestItems,notes,linkedBranchId,mainBranchId})=>{
+              let localOid=null,bsrId=null,linkedBsrId=null;
               try{
                 if(localItems?.length){
                   localOid=makeId("ORD");
@@ -4308,21 +4348,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 }
                 if(mainItems?.length){
                   bsrId=makeId("BSR");
-                  const confirmToken=makeToken();
-                  const bsrPayload={id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:mainBranchId||null,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:mainItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:confirmToken,notes:notes||null};
+                  const bsrPayload={id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:mainBranchId||null,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:mainItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:makeToken(),notes:notes||null};
                   const bsrRes=await api.upsert("branch_stock_requests",bsrPayload);
-                  if(bsrRes?.code||bsrRes?.message){
-                    throw new Error(`DB error ${bsrRes.code||""}: ${bsrRes.message||JSON.stringify(bsrRes)}`);
-                  }
+                  if(bsrRes?.code||bsrRes?.message) throw new Error(`DB error ${bsrRes.code||""}: ${bsrRes.message||JSON.stringify(bsrRes)}`);
+                }
+                if(requestItems?.length){
+                  // Out-of-stock parts from the linked branch — request goes TO the linked branch (not main)
+                  linkedBsrId=makeId("BSR");
+                  const linkedBsrPayload={id:linkedBsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:linkedBranchId,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:requestItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:makeToken(),notes:notes||null};
+                  const linkedBsrRes=await api.upsert("branch_stock_requests",linkedBsrPayload);
+                  if(linkedBsrRes?.code||linkedBsrRes?.message) throw new Error(`DB error ${linkedBsrRes.code||""}: ${linkedBsrRes.message||JSON.stringify(linkedBsrRes)}`);
                 }
                 await refreshTables("orders","branch_stock_requests");
-                const msg=localOid&&bsrId?"✅ Order placed + request sent to main branch":localOid?"✅ Order placed — branch will process it":bsrId?"📋 Request sent to main branch":"Nothing to process";
-                showToast(msg);
+                const parts=[localOid&&"✅ Order placed",bsrId&&"📋 Main branch request sent",linkedBsrId&&"📦 Branch stock request sent"].filter(Boolean);
+                showToast(parts.join(" · ")||"Nothing to process");
               }catch(err){
                 showToast(`❌ Error: ${err?.message||"save failed"}`, "err");
                 console.error("onPlaceShopOrder error",err);
               }
-              return {localOid,bsrId};
+              return {localOid,bsrId:bsrId||linkedBsrId};
             }}
             t={t} lang={lang}/>
         )}
@@ -4609,6 +4653,47 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {isOpen("supplierReturn")&&<SupplierReturnModal data={mData("supplierReturn")} suppliers={suppliers} parts={parts} supplierInvoices={supplierInvoices} onSave={saveSupplierReturn} onClose={()=>closeM("supplierReturn")} t={t} settings={settings}/>}
       {isOpen("customerInvoice")&&<CustomerInvoiceModal data={mData("customerInvoice")} customers={customers} parts={parts} orders={orders} onSave={saveCustomerInvoice} onClose={()=>closeM("customerInvoice")} t={t} settings={settings}/>}
       {isOpen("viewCustomerInvoice")&&<ViewCustomerInvoiceModal inv={mData("viewCustomerInvoice")} onClose={()=>closeM("viewCustomerInvoice")} settings={settings}/>}
+
+      {/* Workshop order ready popup — shown after invoice save when confirmed BSRs exist */}
+      {wsReadyPopup&&wsReadyPopup.length>0&&(()=>{
+        const Cs=curSym(settings?.currency||"ZAR R");
+        return (
+          <div className="overlay" onClick={()=>setWsReadyPopup(null)}>
+            <div className="modal" style={{maxWidth:520}} onClick={e=>e.stopPropagation()}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                <div>
+                  <div style={{fontWeight:800,fontSize:17}}>⚠️ Workshop Orders Need Preparation</div>
+                  <div style={{fontSize:13,color:"var(--text2)",marginTop:3}}>The following workshop orders are confirmed. Prepare the parts and notify the workshop.</div>
+                </div>
+                <button style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:"var(--text3)"}} onClick={()=>setWsReadyPopup(null)}>✕</button>
+              </div>
+              {wsReadyPopup.map(r=>{
+                const items=Array.isArray(r.items)?r.items:[];
+                const replyItems=Array.isArray(r.reply_items)?r.reply_items:[];
+                const total=replyItems.reduce((s,i)=>s+(+i.price||0)*(i.qty||1),0);
+                const waMsg=`Hi ${r.workshop_name||"there"}, your parts are ready for collection at ${currentBranch?.name||"the branch"}. Please come collect at your earliest convenience. Thank you!`;
+                return (
+                  <div key={r.id} style={{padding:"12px 14px",background:"var(--surface2)",borderRadius:10,marginBottom:10,border:"1px solid var(--border)"}}>
+                    <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>{r.workshop_name||"Workshop"}</div>
+                    <div style={{fontSize:12,color:"var(--text3)",marginBottom:total>0?2:8}}>{items.map(i=>`${i.name} ×${i.qty}`).join(" · ")}</div>
+                    {total>0&&<div style={{fontSize:13,color:"var(--accent)",fontWeight:700,marginBottom:8}}>{Cs}{total.toFixed(2)}</div>}
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {r.workshop_phone&&<a href={waLink(r.workshop_phone,waMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Workshop</a>}
+                      <button className="btn btn-success btn-sm" onClick={async()=>{
+                        await api.patch("branch_stock_requests","id",r.id,{status:"dispatched",dispatched_at:new Date().toISOString()});
+                        await refreshTables("branch_stock_requests");
+                        setWsReadyPopup(prev=>prev.filter(x=>x.id!==r.id));
+                        showToast("✅ Marked ready — workshop will be notified");
+                      }}>🚚 Mark Ready for Collection</button>
+                    </div>
+                  </div>
+                );
+              })}
+              <button className="btn btn-ghost" style={{width:"100%",marginTop:8}} onClick={()=>setWsReadyPopup(null)}>Close</button>
+            </div>
+          </div>
+        );
+      })()}
       {isOpen("customerReturn")&&<CustomerReturnModal data={mData("customerReturn")} customers={customers} parts={parts} customerInvoices={customerInvoices} onSave={saveCustomerReturn} onClose={()=>closeM("customerReturn")} t={t} settings={settings}/>}
       {isOpen("checkout")&&<CheckoutModal cart={cart} customers={customers} cartTotal={cartTotal} role={role} currentUser={user} onPlace={placeOrder} onClose={()=>closeM("checkout")} onRemove={removeFromCart} onQty={qtyCart} t={t} lang={lang}/>}
       {isOpen("customerQuery")&&<CustomerQueryModal part={mData("customerQuery")} currentUser={user} onSubmit={submitCustomerQuery} onClose={()=>closeM("customerQuery")} t={t}/>}

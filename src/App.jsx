@@ -127,6 +127,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [filterFits,setFilterFits]=useState("__all__"); // __all__ | none | has
   const [filterBranch,setFilterBranch]=useState("__all__"); // __all__ | "main" | branch_id
   const [invPage,setInvPage]=useState(0);   // inventory page
+  const [invReport,setInvReport]=useState(null); // null | "quantum" | "others"
   const [shopPage,setShopPage]=useState(0); // shop page
   const PAGE_SIZE=20;
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
@@ -2979,7 +2980,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             {(quantumStockValue>0||othersStockValue>0)&&(
               <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
                 {quantumStockValue>0&&(
-                  <div style={{display:"flex",alignItems:"center",gap:8,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px"}}>
+                  <div onClick={()=>setInvReport("quantum")} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px",cursor:"pointer",transition:"background .15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="rgba(249,115,22,.16)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(249,115,22,.08)"}>
                     <span style={{fontSize:18}}>🚐</span>
                     <div>
                       <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text3)"}}>Quantum Parts</div>
@@ -2988,7 +2990,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                   </div>
                 )}
                 {othersStockValue>0&&(
-                  <div style={{display:"flex",alignItems:"center",gap:8,background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px"}}>
+                  <div onClick={()=>setInvReport("others")} style={{display:"flex",alignItems:"center",gap:8,background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px",cursor:"pointer",transition:"background .15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="var(--surface3)"} onMouseLeave={e=>e.currentTarget.style.background="var(--surface2)"}>
                     <span style={{fontSize:18}}>🔩</span>
                     <div>
                       <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text3)"}}>Others</div>
@@ -3755,6 +3758,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             </div>
           </div>
         )}
+
+
+
+
+
 
         {/* ── SUPPLIER RETURNS ── */}
         {tab==="supplierReturns"&&(
@@ -4586,6 +4594,76 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
       {/* LIGHTBOX */}
       {lightbox&&<ImgLightbox url={lightbox.url} onClose={()=>setLightbox(null)}/>}
+
+      {/* INVENTORY STOCK VALUE REPORT */}
+      {invReport&&(()=>{
+        const isQ=invReport==="quantum";
+        const vatRate=settings.tax_rate||0;
+        const rows=[...displayParts]
+          .filter(p=>(isQ?p.is_quantum:!p.is_quantum)&&(p.stock??0)>0)
+          .sort((a,b)=>{
+            const cc=(a.category||"").localeCompare(b.category||"");
+            return cc!==0?cc:(a.sku||"").localeCompare(b.sku||"");
+          });
+        const totalQty=rows.reduce((s,p)=>s+(p.stock??0),0);
+        const totalCost=rows.reduce((s,p)=>s+(p.stock??0)*(p.cost_price??0),0);
+        const vatAmt=totalCost*vatRate/100;
+        const grandTotal=totalCost+vatAmt;
+        return (
+          <div className="overlay" onClick={()=>setInvReport(null)}>
+            <div className="modal" style={{maxWidth:780,maxHeight:"82vh",overflow:"hidden",display:"flex",flexDirection:"column",padding:0}} onClick={e=>e.stopPropagation()}>
+              <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+                <div style={{fontWeight:700,fontSize:16}}>{isQ?"🚐 Quantum Parts Report":"🔩 Others Report"}</div>
+                <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                  <span style={{fontSize:12,color:"var(--text3)"}}>{rows.length} parts</span>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setInvReport(null)}>✕</button>
+                </div>
+              </div>
+              <div style={{overflowY:"auto",flex:1}}>
+                <table className="tbl" style={{fontSize:13}}>
+                  <thead><tr>
+                    {["Category","SKU","Part Name","Qty","Cost Price","Price"].map(h=>(
+                      <th key={h} style={{whiteSpace:"nowrap"}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {rows.map(p=>(
+                      <tr key={p.id}>
+                        <td><span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:11}}>{p.category||"—"}</span></td>
+                        <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{p.sku}</code></td>
+                        <td style={{fontWeight:600,maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:15,color:(p.stock??0)<=p.min_stock?"var(--yellow)":"var(--text)"}}>{p.stock??0}</td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:13,color:"var(--text2)"}}>{p.cost_price>0?fmtAmt(p.cost_price):"—"}</td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)"}}>{fmtAmt(p.price??0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{borderTop:"2px solid var(--border)",background:"var(--surface2)"}}>
+                      <td colSpan={3} style={{textAlign:"right",fontWeight:700,fontSize:13,padding:"10px 12px"}}>Subtotal (cost × qty)</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:15,padding:"10px 8px"}}>{totalQty}</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:15,padding:"10px 8px"}}>{fmtAmt(totalCost)}</td>
+                      <td/>
+                    </tr>
+                    {vatRate>0&&(
+                      <tr style={{background:"var(--surface2)"}}>
+                        <td colSpan={4} style={{textAlign:"right",fontSize:12,color:"var(--text3)",padding:"6px 12px"}}>VAT ({vatRate}%)</td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:13,color:"var(--text3)",padding:"6px 8px"}}>{fmtAmt(vatAmt)}</td>
+                        <td/>
+                      </tr>
+                    )}
+                    <tr style={{background:"var(--surface2)"}}>
+                      <td colSpan={4} style={{textAlign:"right",fontWeight:700,fontSize:14,padding:"10px 12px"}}>Grand Total (incl. VAT)</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:18,color:"var(--accent)",padding:"10px 8px"}}>{fmtAmt(grandTotal)}</td>
+                      <td/>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* STOCK MOVE MODAL */}
       {isOpen("stockMove")&&<StockMoveModal

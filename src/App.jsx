@@ -4599,6 +4599,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {invReport&&(()=>{
         const isQ=invReport==="quantum";
         const vatRate=settings.tax_rate||0;
+        const cur=C();
         const rows=[...displayParts]
           .filter(p=>(isQ?p.is_quantum:!p.is_quantum)&&(p.stock??0)>0)
           .sort((a,b)=>{
@@ -4609,13 +4610,81 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         const totalCost=rows.reduce((s,p)=>s+(p.stock??0)*(p.cost_price??0),0);
         const vatAmt=totalCost*vatRate/100;
         const grandTotal=totalCost+vatAmt;
+        const title=isQ?"Quantum Parts Report":"Others (Non-Quantum) Report";
+        const shopName=settings.shop_name||"";
+        const dateStr=new Date().toLocaleDateString();
+
+        const openPrintWindow=(autoPrint)=>{
+          const e=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+          const rowsHtml=rows.map(p=>`
+            <tr>
+              <td>${e(p.category||"—")}</td>
+              <td class="mono">${e(p.sku)}</td>
+              <td>${e(p.name)}</td>
+              <td class="num">${p.stock??0}</td>
+              <td class="num">${p.cost_price>0?cur+(+(p.cost_price)).toFixed(2):"—"}</td>
+              <td class="num">${cur+(+(p.price??0)).toFixed(2)}</td>
+            </tr>`).join("");
+          const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${e(title)}</title>
+          <style>
+            *{box-sizing:border-box;margin:0;padding:0}
+            body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:32px;max-width:900px;margin:0 auto}
+            .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #111}
+            .shop{font-size:22px;font-weight:900;color:#f97316}
+            .meta{font-size:11px;color:#666;margin-top:4px}
+            .report-title{font-size:18px;font-weight:700;text-align:right}
+            .report-date{font-size:11px;color:#666;text-align:right;margin-top:4px}
+            table{width:100%;border-collapse:collapse;margin-top:8px}
+            thead tr{background:#111;color:#fff}
+            thead th{padding:9px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+            thead th.num{text-align:right}
+            tbody tr:nth-child(even){background:#f9f9f9}
+            tbody td{padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:12px}
+            .mono{font-family:monospace;font-size:11px;color:#555}
+            .num{text-align:right;font-family:monospace}
+            tfoot td{padding:9px 10px;font-weight:700;background:#f3f4f6}
+            tfoot tr.grand td{background:#111;color:#fff;font-size:14px}
+            tfoot tr.vat td{background:#f9f9f9;color:#666;font-weight:400;font-size:11px}
+            .print-btn{display:flex;gap:10px;margin-bottom:20px}
+            .btn{padding:8px 20px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer}
+            .btn-print{background:#1d4ed8;color:#fff}
+            .btn-pdf{background:#dc2626;color:#fff}
+            @media print{.print-btn{display:none!important}body{padding:16px}}
+          </style></head><body>
+          <div class="print-btn">
+            <button class="btn btn-print" onclick="window.print()">🖨 Print</button>
+            <button class="btn btn-pdf" onclick="window.print()">📄 Save as PDF</button>
+          </div>
+          <div class="header">
+            <div><div class="shop">${e(shopName)}</div><div class="meta">Stock Value Report</div></div>
+            <div><div class="report-title">${e(title)}</div><div class="report-date">Date: ${dateStr} · ${rows.length} parts</div></div>
+          </div>
+          <table>
+            <thead><tr><th>Category</th><th>SKU</th><th>Part Name</th><th class="num">Qty</th><th class="num">Cost Price</th><th class="num">Price</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+            <tfoot>
+              <tr><td colspan="3" style="text-align:right">Subtotal (cost × qty)</td><td class="num">${totalQty}</td><td class="num">${cur+totalCost.toFixed(2)}</td><td></td></tr>
+              ${vatRate>0?`<tr class="vat"><td colspan="4" style="text-align:right">VAT (${vatRate}%)</td><td class="num">${cur+vatAmt.toFixed(2)}</td><td></td></tr>`:""}
+              <tr class="grand"><td colspan="4" style="text-align:right">Grand Total (incl. VAT)</td><td class="num">${cur+grandTotal.toFixed(2)}</td><td></td></tr>
+            </tfoot>
+          </table>
+          </body></html>`;
+          const w=window.open("","_blank","width=960,height=800");
+          if(!w)return;
+          w.document.write(html);
+          w.document.close();
+          if(autoPrint) setTimeout(()=>w.print(),400);
+        };
+
         return (
           <div className="overlay" onClick={()=>setInvReport(null)}>
             <div className="modal" style={{maxWidth:780,maxHeight:"82vh",overflow:"hidden",display:"flex",flexDirection:"column",padding:0}} onClick={e=>e.stopPropagation()}>
-              <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+              <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0,flexWrap:"wrap",gap:8}}>
                 <div style={{fontWeight:700,fontSize:16}}>{isQ?"🚐 Quantum Parts Report":"🔩 Others Report"}</div>
-                <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                   <span style={{fontSize:12,color:"var(--text3)"}}>{rows.length} parts</span>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>openPrintWindow(true)}>🖨 Print</button>
+                  <button className="btn btn-info btn-sm" onClick={()=>openPrintWindow(false)}>📄 PDF</button>
                   <button className="btn btn-ghost btn-sm" onClick={()=>setInvReport(null)}>✕</button>
                 </div>
               </div>

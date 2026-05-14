@@ -129,6 +129,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [filterQuantum,setFilterQuantum]=useState(false);
   const [invRefreshing,setInvRefreshing]=useState(false);
   const [filterHiace,setFilterHiace]=useState(false);
+  const [branchMatchedOnly,setBranchMatchedOnly]=useState(true);
   const [invPage,setInvPage]=useState(0);   // inventory page
   const [invReport,setInvReport]=useState(null); // null | "quantum" | "hiace" | "others"
   const [shopPage,setShopPage]=useState(0); // shop page
@@ -2118,8 +2119,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       if(filterBranch==="main"){
         if(p.branch_id&&p.branch_id!==mainBranchId)return false;
       } else if(filterBranchStockMap){
-        // admin filtering by a specific branch — show only parts that branch has stocked
-        if(!filterBranchStockMap[String(p.id)])return false;
+        // admin filtering by a specific branch
+        if(branchMatchedOnly&&!filterBranchStockMap[String(p.id)])return false;
       } else {
         if(p.branch_id!==filterBranch)return false;
       }
@@ -3094,7 +3095,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 <option value="has">✅ Has fitment</option>
               </select>
               {(role==="admin"&&branches.length>1)&&(
-                <select className="inp" value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{minWidth:200,maxWidth:260,
+                <select className="inp" value={filterBranch} onChange={e=>{setFilterBranch(e.target.value);setBranchMatchedOnly(true);}} style={{minWidth:200,maxWidth:260,
                   borderColor:filterBranch!=="__all__"?"var(--blue)":undefined,
                   color:filterBranch!=="__all__"?"var(--blue)":undefined}}>
                   <option value="__all__">🏢 All Branches</option>
@@ -3104,6 +3105,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                     return <option key={b.id} value={b.id}>🏢 {b.name}{cnt>0?` (${cnt})`:" (0)"}</option>;
                   })}
                 </select>
+              )}
+              {(role==="admin"&&filterBranchStockMap)&&(
+                <button className="btn btn-sm" onClick={()=>setBranchMatchedOnly(v=>!v)} style={{whiteSpace:"nowrap",background:branchMatchedOnly?"rgba(59,130,246,.15)":"var(--surface2)",color:branchMatchedOnly?"var(--blue)":"var(--text2)",border:branchMatchedOnly?"1.5px solid var(--blue)":"1px solid var(--border)",fontWeight:branchMatchedOnly?700:400}}>
+                  {branchMatchedOnly?"✓ Matched only":"All catalog"}
+                </button>
               )}
               {(role==="branch_admin"||role==="branch_manager")&&(
                 <select className="inp" value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{width:170,
@@ -3117,7 +3123,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               <button className="btn btn-sm" onClick={()=>setFilterQuantum(v=>!v)} style={{whiteSpace:"nowrap",background:filterQuantum?"rgba(249,115,22,.18)":"var(--surface2)",color:filterQuantum?"var(--accent)":"var(--text2)",border:filterQuantum?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:filterQuantum?700:400}}>🚐 Quantum{filterQuantum?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterHiace(v=>!v)} style={{whiteSpace:"nowrap",background:filterHiace?"rgba(59,130,246,.18)":"var(--surface2)",color:filterHiace?"var(--blue)":"var(--text2)",border:filterHiace?"1.5px solid var(--blue)":"1px solid var(--border)",fontWeight:filterHiace?700:400}}>🚐 Hiace{filterHiace?" ✓":""}</button>
               {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace)&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setBranchMatchedOnly(true);}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
             </div>
             {filterFits==="none"&&(
@@ -3340,6 +3346,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                             const lock=isLocked("part",p.id);
                             return (
                               <td style={{position:"sticky",right:0,background:"var(--surface)",zIndex:1,boxShadow:"-2px 0 8px rgba(0,0,0,.2)",padding:"0 8px"}}>
+                                {filterBranchStockMap&&(
+                                  <button className="btn btn-ghost btn-xs" style={{marginRight:4,whiteSpace:"nowrap",borderColor:filterBranchStockMap[String(p.id)]?"var(--blue)":"var(--border)",color:filterBranchStockMap[String(p.id)]?"var(--blue)":"var(--text3)"}}
+                                    onClick={()=>openM("branchStock",{part:p,existing:filterBranchStockMap[String(p.id)]||null,overrideBranchId:filterBranch})}>
+                                    {filterBranchStockMap[String(p.id)]?"✏️ Branch Stock":"📦 Set Branch"}
+                                  </button>
+                                )}
                                 {lock?(
                                   <div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"rgba(248,113,113,.1)",borderRadius:8,border:"1px solid rgba(248,113,113,.2)"}}>
                                     <span style={{fontSize:14}}>🔒</span>
@@ -4560,7 +4572,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       })()}
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}
       {isOpen("partRequest")&&<PartRequestModal currentBranch={currentBranch} user={user} onClose={()=>closeM("partRequest")} onSave={async()=>{await refreshTables("part_requests");closeM("partRequest");showToast("Part request submitted ✅");}} t={t}/>}
-      {isOpen("branchStock")&&<BranchStockModal part={mData("branchStock")?.part} existing={mData("branchStock")?.existing} branchId={branchId} onClose={()=>closeM("branchStock")} onSave={async()=>{await refreshTables("branch_stock");closeM("branchStock");showToast("Stock updated ✅");}} t={t}/>}
+      {isOpen("branchStock")&&<BranchStockModal part={mData("branchStock")?.part} existing={mData("branchStock")?.existing} branchId={branchId} overrideBranchId={mData("branchStock")?.overrideBranchId} onClose={()=>closeM("branchStock")} onSave={async()=>{api.cacheInvalidate("branch_stock");await refreshTables("branch_stock");closeM("branchStock");showToast("Stock updated ✅");}} t={t}/>}
       {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}
       {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} vehicles={vehicles} partFitments={partFitments} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} onEditPart={(p,tab)=>{closeM("partSupplier");openM("editPart",{...p,_tab:tab||"info"});}} onMergePart={mergePart} branches={branches} allParts={parts} onGoToMainPart={(targetPart)=>{closeM("partSupplier");setTimeout(()=>{setTab("inventory");setFilterBranch("__all__");setSearchPart(targetPart.sku||"");},0);}} t={t}/>}

@@ -5723,7 +5723,7 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
   );
 }
 
-export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
+export function BranchStockModal({part,existing,branchId,overrideBranchId,onClose,onSave,t={}}) {
   const [lightbox,setLightbox]=useState(null);
   const [f,setF]=useState({
     stock:   existing?.stock   ?? 2,
@@ -5734,12 +5734,13 @@ export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
   });
   const [busy,setBusy]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const effectiveBranchId=overrideBranchId||branchId;
   const save=async()=>{
-    if(!part||!branchId) return;
+    if(!part||!effectiveBranchId) return;
     setBusy(true);
     try{
       const payload={
-        branch_id:branchId,
+        branch_id:effectiveBranchId,
         part_id:part.id,
         stock:parseInt(f.stock)||0,
         price:parseFloat(f.price)||null,

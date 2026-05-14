@@ -5705,6 +5705,7 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
 }
 
 export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
+  const [lightbox,setLightbox]=useState(null);
   const [f,setF]=useState({
     stock:   existing?.stock   ?? part?.stock   ?? 0,
     price:   existing?.price   ?? part?.price   ?? "",
@@ -5740,9 +5741,19 @@ export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
     <div className="overlay" onClick={onClose}>
       <div className="modal" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
         <MHead title={existing?"✏️ Edit Branch Stock":"📦 Set Branch Stock"} onClose={onClose}/>
-        <div style={{padding:"12px 0 4px",marginBottom:10}}>
-          <div style={{fontWeight:700,fontSize:15}}>{part?.name}</div>
-          <div style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2}}>{part?.sku}</div>
+        <div style={{display:"flex",gap:12,alignItems:"center",padding:"12px 0 4px",marginBottom:10}}>
+          {(()=>{const img=part?.image_url?toImgUrl(part.image_url):null;return img?(
+            <img src={img} alt={part?.name}
+              style={{width:72,height:72,objectFit:"contain",borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",flexShrink:0,cursor:"zoom-in"}}
+              onClick={()=>setLightbox(toFullUrl(part.image_url))}
+              onError={e=>e.target.style.display="none"}/>
+          ):(
+            <div style={{width:72,height:72,borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🔩</div>
+          );})()}
+          <div>
+            <div style={{fontWeight:700,fontSize:15}}>{part?.name}</div>
+            <div style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2}}>{part?.sku}</div>
+          </div>
         </div>
         <FG>
           <div><FL label="Stock Qty"/><input className="inp" type="number" min={0} value={f.stock} onChange={e=>set("stock",e.target.value)} autoFocus/></div>
@@ -5772,6 +5783,7 @@ export function BranchStockModal({part,existing,branchId,onClose,onSave,t={}}) {
         </div>
       </div>
     </div>
+    {lightbox&&<ImgLightbox url={lightbox} onClose={()=>setLightbox(null)}/>}
   );
 }
 

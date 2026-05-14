@@ -35,7 +35,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 }
 .tbl th{padding:11px 14px;text-align:left;font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap}
 .tbl td{padding:13px 14px;font-size:14px;border-bottom:1px solid var(--border);vertical-align:middle}
-.tbl tr:last-child td{border-bottom:none}.tbl tr:hover td{background:var(--surface2)}
+.tbl tr:last-child td{border-bottom:none}.tbl tr:hover td{background:rgba(236,72,153,.1)}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;z-index:200;padding:0}
 @media(min-width:640px){.overlay{align-items:center;padding:20px}}
 .modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius) var(--radius) 0 0;padding:24px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;animation:slideUp .2s ease}

@@ -3361,15 +3361,27 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
 
               {/* Supplier Part No — editable inline */}
               <div style={{borderTop:"1px solid var(--border)",paddingTop:9,marginTop:4}}>
-                {editingId===ps.id ? (
-                  <div style={{display:"flex",gap:7,alignItems:"center"}}>
-                    <div style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>Supplier Part No.</div>
-                    <input className="inp" style={{fontSize:13,padding:"4px 9px",flex:1,fontFamily:"DM Mono,monospace"}}
-                      value={editPartNo} onChange={e=>setEditPartNo(e.target.value)}
-                      placeholder="Enter supplier part number..." autoFocus/>
-                    <button className="btn btn-success btn-xs" onClick={()=>{onUpdate(ps.id,{supplier_part_no:editPartNo});setEditingId(null);}}>✓ Save</button>
-                    <button className="btn btn-ghost btn-xs" onClick={()=>setEditingId(null)}>✕</button>
+                {editingId===ps.id ? (()=>{
+                  const editDup=editPartNo.trim()&&partSuppliers.find(other=>
+                    other.id!==ps.id&&
+                    String(other.supplier_id)===String(ps.supplier_id)&&
+                    (other.supplier_part_no||"").trim().toLowerCase()===editPartNo.trim().toLowerCase()
+                  );
+                  return (
+                  <div>
+                    <div style={{display:"flex",gap:7,alignItems:"center"}}>
+                      <div style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>Supplier Part No.</div>
+                      <input className="inp" style={{fontSize:13,padding:"4px 9px",flex:1,fontFamily:"DM Mono,monospace",borderColor:editDup?"var(--red)":undefined}}
+                        value={editPartNo} onChange={e=>setEditPartNo(e.target.value)}
+                        placeholder="Enter supplier part number..." autoFocus/>
+                      <button className="btn btn-success btn-xs" disabled={!!editDup} onClick={()=>{onUpdate(ps.id,{supplier_part_no:editPartNo});setEditingId(null);}}>✓ Save</button>
+                      <button className="btn btn-ghost btn-xs" onClick={()=>setEditingId(null)}>✕</button>
+                    </div>
+                    {editDup&&<div style={{marginTop:4,fontSize:11,color:"var(--red)",fontWeight:600}}>
+                      🚫 That code is already linked to this supplier on this part — choose a different code.
+                    </div>}
                   </div>
+                );})()}
                 ) : (
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <div style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>Supplier Part No.</div>
@@ -3421,7 +3433,13 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
       {avail.length>0&&(()=>{
         const mainBId=branches.find(b=>b.is_main)?.id;
         const q=(newPartNo||"").trim().toLowerCase();
-        const dupMatch=suppId&&q?(()=>{
+        // Same supplier + same code already on THIS part
+        const exactDup=suppId&&q&&partSuppliers.find(ps=>
+          String(ps.supplier_id)===String(suppId)&&
+          (ps.supplier_part_no||"").trim().toLowerCase()===q
+        )||null;
+        // Same code on a DIFFERENT part for this supplier
+        const dupMatch=!exactDup&&suppId&&q?(()=>{
           const hit=suppDupLinks.find(ps=>
             (ps.supplier_part_no||"").trim().toLowerCase()===q&&
             String(ps.part_id)!==String(part?.id)
@@ -3452,6 +3470,12 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
                   placeholder="Their part number — leave blank if unknown"
                   style={{fontFamily:"DM Mono,monospace",borderColor:dupMatch?"var(--accent)":undefined}}/>
                 {!newPartNo&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>💡 Leave blank — you can add it later or let supplier fill via RFQ</div>}
+                {exactDup&&(
+                  <div style={{marginTop:8,background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.4)",borderRadius:8,padding:"10px 14px",fontSize:12}}>
+                    <span style={{fontWeight:700,color:"var(--red)"}}>🚫 Already linked — </span>
+                    <span style={{color:"var(--text2)"}}>this supplier code is already saved on this part. No need to add it again.</span>
+                  </div>
+                )}
                 {dupMatch&&(
                   <div style={{marginTop:8,background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.4)",borderRadius:8,padding:"12px 14px"}}>
                     <div style={{fontWeight:700,color:"var(--red)",fontSize:13,marginBottom:4}}>🚫 Already linked in main branch</div>
@@ -3468,7 +3492,7 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
                   </div>
                 )}
               </FD>
-              {!dupMatch&&(
+              {!dupMatch&&!exactDup&&(
                 <>
                   <FG cols="1fr 1fr 1fr">
                     <div><FL label={t.supplier_price}/><input className="inp" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0"/></div>

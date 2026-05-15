@@ -1796,7 +1796,12 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                           <div style={{fontSize:11,color:"var(--text3)",fontWeight:600,marginBottom:3}}>EXISTING SUPPLIER CODES LINKED TO THIS PART:</div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                             {row._skuLinks.map((lk,i)=>(
-                              <span key={i} style={{fontSize:11,fontFamily:"DM Mono,monospace",padding:"2px 7px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:4,color:lk.supplier_id===+suppId?"var(--green)":"var(--text2)",fontWeight:lk.supplier_id===+suppId?700:400}}>
+                              <span key={i}
+                                title="Click to use this code in Supplier Part #"
+                                style={{fontSize:11,fontFamily:"DM Mono,monospace",padding:"2px 7px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:4,cursor:"pointer",userSelect:"none",
+                                  color:lk.supplier_id===+suppId?"var(--green)":"var(--text2)",
+                                  fontWeight:lk.supplier_id===+suppId?700:400}}
+                                onMouseDown={e=>{e.preventDefault();upd(k,{supplier_part_id:lk.supplier_part_no||""});}}>
                                 {lk.supplier_part_no||"—"}{lk.supplier_id===+suppId?" ← this supplier":""}
                               </span>
                             ))}

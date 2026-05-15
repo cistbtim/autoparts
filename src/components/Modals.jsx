@@ -3381,8 +3381,8 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
                       🚫 That code is already linked to this supplier on this part — choose a different code.
                     </div>}
                   </div>
-                );})()}
-                ) : (
+                );})()
+                : (
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <div style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>Supplier Part No.</div>
                     {ps.supplier_part_no ? (

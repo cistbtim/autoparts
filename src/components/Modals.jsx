@@ -1614,9 +1614,13 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
   };
 
   const linkTo=async(k,item,part)=>{
-    if(suppId&&(item.supplier_part_id||"").trim()){
-      const res=await api.upsert("part_suppliers",{part_id:part.id,supplier_id:+suppId,supplier_part_no:(item.supplier_part_id||"").trim()});
-      if(res?.code||res?.message){/* silent — link best-effort */}
+    const spn=(item.supplier_part_id||"").trim();
+    if(suppId&&spn){
+      // Check existence first — api.upsert has no on_conflict column so it inserts duplicates
+      const existing=await api.get("part_suppliers",`supplier_id=eq.${suppId}&supplier_part_no=eq.${encodeURIComponent(spn)}&limit=1`);
+      if(!Array.isArray(existing)||existing.length===0){
+        await api.upsert("part_suppliers",{part_id:part.id,supplier_id:+suppId,supplier_part_no:spn});
+      }
     }
     const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&String(bs.branch_id)===String(branchId)));
     upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,supplier_part_id:(item.supplier_part_id||"").trim(),_drop:false,_hits:[],_needsBranchSetup:needsBranchSetup,_bsPrice:"",_bsCost:String(item.unit_cost||""),_bsBin:""});

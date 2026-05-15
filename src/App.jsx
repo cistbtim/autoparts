@@ -1720,7 +1720,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       const rows=items.map(item=>{const {id:_id,_k,_st,_hits,_drop,_skuPart,_skuLinks,_needsBranchSetup,...clean}=item;return{...clean,invoice_id:inv.id,part_id:clean.part_id?+clean.part_id:null,qty:+clean.qty||1,unit_cost:+clean.unit_cost||0,total:(+clean.qty||1)*(+clean.unit_cost||0)};});
       await api.insert("supplier_invoice_items",rows);
     }
-    await refreshTables("supplier_invoices","parts","inventory_logs");closeM("supplierInvoice");showToast(isNew?"Invoice saved":"Invoice updated");
+    await refreshTables("supplier_invoices");closeM("supplierInvoice");showToast(isNew?"Invoice saved":"Invoice updated");
   };
   const stockInInvoice=async(inv)=>{
     const rows=await api.get("supplier_invoice_items",`invoice_id=eq.${encodeURIComponent(inv.id)}&select=*`);

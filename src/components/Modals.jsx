@@ -3284,6 +3284,14 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
   },[suppId]);
   const [editingId,setEditingId]=useState(null);
   const [editPartNo,setEditPartNo]=useState("");
+  const [confirmDeleteId,setConfirmDeleteId]=useState(null);
+  const [deletingId,setDeletingId]=useState(null);
+  const handleDelete=async(id)=>{
+    setDeletingId(id);
+    await onDelete(id);
+    setConfirmDeleteId(null);
+    setDeletingId(null);
+  };
   // merge state
   const [mergeOpen,setMergeOpen]=useState(false);
   const [mergeTargetId,setMergeTargetId]=useState("");
@@ -3338,7 +3346,17 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
                     {ps.min_order&&<span>📦 Min: {ps.min_order}</span>}
                   </div>
                 </div>
-                <button className="btn btn-danger btn-xs" onClick={()=>onDelete(ps.id)}>{t.delete}</button>
+                {deletingId===ps.id ? (
+                  <button className="btn btn-danger btn-xs" disabled>⏳ Deleting…</button>
+                ) : confirmDeleteId===ps.id ? (
+                  <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                    <span style={{fontSize:11,color:"var(--red)",fontWeight:600}}>Sure?</span>
+                    <button className="btn btn-danger btn-xs" onClick={()=>handleDelete(ps.id)}>✓ Yes, delete</button>
+                    <button className="btn btn-ghost btn-xs" onClick={()=>setConfirmDeleteId(null)}>✕</button>
+                  </div>
+                ) : (
+                  <button className="btn btn-danger btn-xs" onClick={()=>setConfirmDeleteId(ps.id)}>{t.delete}</button>
+                )}
               </div>
 
               {/* Supplier Part No — editable inline */}

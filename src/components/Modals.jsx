@@ -1566,7 +1566,7 @@ export function InvTotals({items,taxRate,costField="unit_cost",priceField}) {
 // Primary input: Supplier Part # → auto-match → link
 // ═══════════════════════════════════════════════════════════════
 function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",branchId=null,branchStock=[],t={},settings={},disabled=false}) {
-  const mkRow=()=>({_k:String(Date.now()+Math.random()),supplier_part_id:"",part_id:null,part_name:"",part_sku:"",qty:1,unit_cost:0,_st:"idle",_hits:[],_drop:false,_needsBranchSetup:false,_bsPrice:"",_bsCost:"",_bsBin:""});
+  const mkRow=()=>({_k:String(Date.now()+Math.random()),supplier_part_id:"",part_id:null,part_name:"",part_sku:"",qty:1,unit_cost:0,_st:"idle",_hits:[],_drop:false,_needsBranchSetup:false,_bsPrice:"",_bsCost:"",_bsBin:"",_skuPart:null,_skuLinks:[]});
   const inputRefs=useRef({});
   const [focusKey,setFocusKey]=useState(null);
   const add=()=>{const row=mkRow();setItems(p=>[...p,row]);setFocusKey(row._k);};
@@ -1600,9 +1600,24 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
     else{upd(k,{_st:"no_match",_hits:[],_drop:false});}
   };
 
+  // Search by SKU — alternative entry when supplier part# is unknown
+  const searchBySku=async(k,sku)=>{
+    const q=(sku||"").trim().toLowerCase();
+    if(!q)return;
+    upd(k,{_st:"searching"});
+    const found=parts.find(p=>(p.sku||"").toLowerCase()===q)
+      ||(q.length>=3?parts.find(p=>(p.sku||"").toLowerCase().includes(q)):null);
+    if(!found){upd(k,{_st:"sku_no_match",_drop:false});return;}
+    // Fetch existing supplier links for this part so the panel can show them
+    const links=await api.get("part_suppliers",`part_id=eq.${found.id}&select=*`).catch(()=>[]);
+    upd(k,{_st:"sku_found",part_id:found.id,part_name:found.name,part_sku:found.sku,_skuPart:found,_skuLinks:Array.isArray(links)?links:[],_drop:false});
+  };
+
   const linkTo=async(k,item,part)=>{
-    const res=await api.upsert("part_suppliers",{part_id:part.id,supplier_id:+suppId,supplier_part_no:(item.supplier_part_id||"").trim()});
-    if(res?.code||res?.message){/* silent — link best-effort */}
+    if(suppId&&(item.supplier_part_id||"").trim()){
+      const res=await api.upsert("part_suppliers",{part_id:part.id,supplier_id:+suppId,supplier_part_no:(item.supplier_part_id||"").trim()});
+      if(res?.code||res?.message){/* silent — link best-effort */}
+    }
     const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&String(bs.branch_id)===String(branchId)));
     upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false,_hits:[],_needsBranchSetup:needsBranchSetup,_bsPrice:"",_bsCost:String(item.unit_cost||""),_bsBin:""});
   };
@@ -1709,11 +1724,23 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                   readOnly={isLinked}
                   onChange={e=>upd(k,{part_name:e.target.value})}/>
 
-                {/* ── SKU ── */}
-                <input className="inp" style={{fontSize:11,fontFamily:"DM Mono,monospace",...(isLinked?linkedStyle:{})}}
-                  value={row.part_sku||""} placeholder="SKU"
-                  readOnly={isLinked}
-                  onChange={e=>upd(k,{part_sku:e.target.value})}/>
+                {/* ── SKU — also searchable when not linked ── */}
+                <div style={{position:"relative"}}>
+                  <input className="inp" style={{fontSize:11,fontFamily:"DM Mono,monospace",paddingRight:isLinked?4:22,
+                    ...( isLinked?linkedStyle
+                      :_st==="sku_found"?{borderColor:"rgba(52,211,153,.5)",background:"rgba(52,211,153,.06)"}
+                      :_st==="sku_no_match"?{borderColor:"var(--orange)"}
+                      :{})}}
+                    value={row.part_sku||""} placeholder={isLinked?"SKU":"SKU → Enter"}
+                    readOnly={isLinked}
+                    onChange={e=>upd(k,{part_sku:e.target.value,...(!isLinked&&_st!=="idle"?{_st:"idle"}:{})})}
+                    onKeyDown={e=>{if(e.key==="Enter"&&!isLinked){e.preventDefault();searchBySku(k,e.target.value);}}}
+                    onBlur={e=>{if(!isLinked&&(e.target.value||"").trim()&&(_st==="idle"||_st==="sku_no_match"))searchBySku(k,e.target.value);}}
+                  />
+                  {!isLinked&&<span style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",fontSize:10,pointerEvents:"none",color:"var(--text3)"}}>
+                    {_st==="sku_found"?"✅":_st==="sku_no_match"?"⚠️":_st==="searching"?"⏳":""}
+                  </span>}
+                </div>
 
                 {/* ── Qty ── */}
                 <input className="inp" type="number" min="1" style={{fontSize:12,textAlign:"center",borderColor:(!disabled&&!(+row.qty>0))?"var(--red)":undefined}}
@@ -1757,6 +1784,49 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                   📨 Request sent to main branch — they will link supplier part #{row.supplier_part_id}
                 </div>
               )}
+              {/* ── SKU found — supplier link panel ── */}
+              {_st==="sku_found"&&row._skuPart&&(
+                <div style={{marginTop:6,padding:"10px 14px",background:"rgba(52,211,153,.07)",border:"1.5px solid rgba(52,211,153,.35)",borderRadius:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:13,color:"var(--green)",marginBottom:4}}>✅ Part found: {row._skuPart.name}</div>
+                      {/* Existing supplier links for this part */}
+                      {row._skuLinks.length>0?(
+                        <div style={{marginBottom:6}}>
+                          <div style={{fontSize:11,color:"var(--text3)",fontWeight:600,marginBottom:3}}>EXISTING SUPPLIER CODES LINKED TO THIS PART:</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                            {row._skuLinks.map((lk,i)=>(
+                              <span key={i} style={{fontSize:11,fontFamily:"DM Mono,monospace",padding:"2px 7px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:4,color:lk.supplier_id===+suppId?"var(--green)":"var(--text2)",fontWeight:lk.supplier_id===+suppId?700:400}}>
+                                {lk.supplier_part_no||"—"}{lk.supplier_id===+suppId?" ← this supplier":""}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ):(
+                        <div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>No supplier codes linked to this part yet.</div>
+                      )}
+                      {row.supplier_part_id&&(
+                        <div style={{fontSize:12,color:"var(--text2)"}}>
+                          Confirm: link <strong style={{fontFamily:"DM Mono,monospace"}}>{row.supplier_part_id}</strong> → this part (saved for future auto-match)
+                        </div>
+                      )}
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0,alignSelf:"center"}}>
+                      <button className="btn btn-success btn-sm" onMouseDown={e=>{e.preventDefault();linkTo(k,row,row._skuPart);}}>
+                        {row.supplier_part_id?"✅ Link & Use":"✅ Use Part"}
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onMouseDown={e=>{e.preventDefault();upd(k,{_st:"idle",part_id:null,part_name:"",part_sku:"",_skuPart:null,_skuLinks:[]});}}>
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {_st==="sku_no_match"&&(
+                <div style={{marginTop:4,padding:"5px 10px",background:"rgba(249,115,22,.07)",border:"1px solid rgba(249,115,22,.25)",borderRadius:8,fontSize:11,color:"var(--orange)",fontWeight:600}}>
+                  ⚠️ No part found with that SKU — try a different SKU or use the supplier part # field above
+                </div>
+              )}
               {/* ── Branch stock setup ── */}
               {row._needsBranchSetup&&branchId&&(
                 <div style={{marginTop:6,padding:"8px 12px",background:"rgba(251,191,36,.07)",border:"1px solid rgba(251,191,36,.35)",borderRadius:8}}>
@@ -1787,7 +1857,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
 
         {!disabled&&<button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:10,borderStyle:"dashed"}} onClick={add}>+ Add Line</button>}
         {!disabled&&<div style={{marginTop:6,fontSize:11,color:"var(--text3)"}}>
-          💡 Type supplier part # → press Enter to search &nbsp;·&nbsp; ✅ linked &nbsp;·&nbsp; 🔎 candidates — click to link &nbsp;·&nbsp; ⚠️ not found
+          💡 Supplier Part # → Enter to search &nbsp;·&nbsp; <strong>or</strong> type SKU → Enter to find by catalog SKU &nbsp;·&nbsp; ✅ linked &nbsp;·&nbsp; 🔎 candidates — click to link &nbsp;·&nbsp; ⚠️ not found
         </div>}
       </div>
     </div>

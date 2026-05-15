@@ -1889,6 +1889,8 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
   const [notes,setNotes]=useState(data?.notes||"");
   const [items,setItems]=useState([]);
   const [saving,setSaving]=useState(false);
+  const [saveMs,setSaveMs]=useState(0);
+  const _saveTimer=useRef(null);
 
   const sel=suppliers.find(s=>s.id===+suppId);
   const sub=items.reduce((s,i)=>s+(+i.qty||1)*(+i.unit_cost||0),0);
@@ -1923,11 +1925,18 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
   const handleSave=async()=>{
     if(!canSave)return;
     setSaving(true);
-    const id=invNo.trim();
-    const inv={id,supplier_id:+suppId,supplier_name:sel?.name,invoice_date:invDate,due_date:dueDate,status:data?.status||"pending",subtotal:sub,tax,total,notes};
-    const lineItems=items.map(item=>({id:item.id||undefined,part_id:item.part_id?+item.part_id:null,part_name:item.part_name,part_sku:item.part_sku,supplier_part_id:item.supplier_part_id||"",qty:+item.qty||1,unit_cost:+item.unit_cost||0,total:(+item.qty||1)*(+item.unit_cost||0)}));
-    await onSave({inv,isNew},lineItems);
-    setSaving(false);
+    setSaveMs(0);
+    const t0=Date.now();
+    _saveTimer.current=setInterval(()=>setSaveMs(Date.now()-t0),100);
+    try{
+      const id=invNo.trim();
+      const inv={id,supplier_id:+suppId,supplier_name:sel?.name,invoice_date:invDate,due_date:dueDate,status:data?.status||"pending",subtotal:sub,tax,total,notes};
+      const lineItems=items.map(item=>({id:item.id||undefined,part_id:item.part_id?+item.part_id:null,part_name:item.part_name,part_sku:item.part_sku,supplier_part_id:item.supplier_part_id||"",qty:+item.qty||1,unit_cost:+item.unit_cost||0,total:(+item.qty||1)*(+item.unit_cost||0)}));
+      await onSave({inv,isNew},lineItems);
+    }finally{
+      clearInterval(_saveTimer.current);
+      setSaving(false);
+    }
   };
 
   const handleDelete=async()=>{
@@ -2036,7 +2045,7 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
         )}
         {!isStocked&&(
           <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={!canSave}>
-            {saving?"⏳ Saving...":isNew?"💾 Save":"💾 Update Invoice"}
+            {saving?`⏳ Saving… ${(saveMs/1000).toFixed(1)}s`:isNew?"💾 Save":"💾 Update Invoice"}
           </button>
         )}
       </div>

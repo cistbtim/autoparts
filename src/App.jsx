@@ -1714,15 +1714,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const effectiveBranchId=_bId||branchId||null;
     const inv={...invRaw,...(effectiveBranchId?{branch_id:effectiveBranchId}:{})};
     await api.upsert("supplier_invoices",inv);
-    if(isNew){
-      for(const item of items){
-        await api.insert("supplier_invoice_items",{...item,invoice_id:inv.id});
-      }
-    } else {
-      // Update existing line items (qty, unit_cost, totals only — no stock adjustment)
-      for(const item of items){
-        if(item.id) await api.patch("supplier_invoice_items","id",item.id,{qty:item.qty,unit_cost:item.unit_cost,total:item.total,part_name:item.part_name,part_sku:item.part_sku,supplier_part_id:item.supplier_part_id});
-      }
+    // Delete all existing line items then re-insert — handles row deletions correctly
+    if(!isNew) await api.delete("supplier_invoice_items","invoice_id",inv.id);
+    for(const item of items){
+      const {id:_id,_k,_st,_hits,_drop,_skuPart,_skuLinks,_needsBranchSetup,...clean}=item;
+      await api.insert("supplier_invoice_items",{...clean,invoice_id:inv.id,part_id:clean.part_id?+clean.part_id:null,qty:+clean.qty||1,unit_cost:+clean.unit_cost||0,total:(+clean.qty||1)*(+clean.unit_cost||0)});
     }
     await refreshTables("supplier_invoices","parts","inventory_logs");closeM("supplierInvoice");showToast(isNew?"Invoice saved":"Invoice updated");
   };

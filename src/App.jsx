@@ -1730,6 +1730,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const rows=await api.get("supplier_invoice_items",`invoice_id=eq.${encodeURIComponent(inv.id)}&select=*`);
     if(!Array.isArray(rows)||rows.length===0){showToast("No line items found for this invoice","err");return;}
     let stocked=0,skipped=0;
+    const stockedPartIds=[];
     // Determine effective branch — no + coercion (branch IDs are UUIDs)
     const invBranchId=inv.branch_id||_bId||branchId||null;
     // Fetch FRESH branch_stock from DB to avoid stale React state
@@ -1761,13 +1762,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         await api.patch("parts","id",+catalogPart.id,{stock:after});
         await logInv(catalogPart,before,after,"Stock In",`Invoice ${inv.id}`);
       }
+      stockedPartIds.push(String(item.part_id));
       stocked++;
     }
     if(stocked>0) await api.patch("supplier_invoices","id",inv.id,{stocked_in:true});
     await refreshTables("supplier_invoices","parts","branch_stock","inventory_logs");
     closeM("supplierInvoice");
-    if(stocked>0) showToast(`Stocked in: ${stocked} part(s) updated${skipped?`, ${skipped} skipped (no part link)`:""}`);
-    else showToast(`No linked parts — ${skipped} item(s) have no part match. Link parts first.`,"err");
+    if(stocked>0){
+      showToast(`Stocked in: ${stocked} part(s) updated${skipped?`, ${skipped} skipped (no part link)`:""}`);
+      // Show popup if any confirmed/pending/quoted workshop BSRs contain these parts
+      const matchedBsrs=branchStockRequests.filter(r=>
+        ["pending","quoted","confirmed"].includes(r.status)&&r.workshop_id&&
+        Array.isArray(r.items)&&r.items.some(i=>stockedPartIds.includes(String(i.partId)))
+      );
+      if(matchedBsrs.length) setWsReadyPopup(matchedBsrs);
+    } else showToast(`No linked parts — ${skipped} item(s) have no part match. Link parts first.`,"err");
   };
   const deleteSupplierInvoice=async(id)=>{
     await api.delete("supplier_invoice_items","invoice_id",id);

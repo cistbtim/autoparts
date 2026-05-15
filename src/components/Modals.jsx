@@ -1801,7 +1801,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                                 style={{fontSize:11,fontFamily:"DM Mono,monospace",padding:"2px 7px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:4,cursor:"pointer",userSelect:"none",
                                   color:lk.supplier_id===+suppId?"var(--green)":"var(--text2)",
                                   fontWeight:lk.supplier_id===+suppId?700:400}}
-                                onMouseDown={e=>{e.preventDefault();upd(k,{supplier_part_id:lk.supplier_part_no||""});}}>
+                                onMouseDown={e=>{e.preventDefault();linkTo(k,{...row,supplier_part_id:lk.supplier_part_no||""},row._skuPart);}}>
                                 {lk.supplier_part_no||"—"}{lk.supplier_id===+suppId?" ← this supplier":""}
                               </span>
                             ))}

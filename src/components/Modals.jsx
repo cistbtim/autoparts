@@ -1819,6 +1819,8 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
   // Validation — every line must have qty > 0 and unit_cost > 0
   const hasInvalidLines=items.length>0&&items.some(i=>!(+i.qty>0)||!(+i.unit_cost>0));
   const canSave=!!suppId&&!!invNo.trim()&&items.length>0&&!hasInvalidLines&&!saving;
+  // Unlinked items block Stock In — must be matched to a catalog part first
+  const unlinkedItems=items.filter(i=>!i.part_id);
 
   // Searchable supplier combobox helpers
   const filteredSupps=suppSearch.trim()
@@ -1917,6 +1919,28 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
         </div>
       )}
 
+      {/* Unlinked items warning — blocks Stock In */}
+      {!isNew&&!isStocked&&unlinkedItems.length>0&&(
+        <div style={{marginTop:10,padding:"12px 14px",background:"rgba(249,115,22,.08)",border:"1.5px solid rgba(249,115,22,.4)",borderRadius:10,fontSize:13}}>
+          <div style={{fontWeight:700,color:"var(--orange)",marginBottom:6}}>
+            ⚠️ {unlinkedItems.length} line{unlinkedItems.length>1?"s":""} not linked — Stock In blocked
+          </div>
+          <div style={{color:"var(--text2)",marginBottom:8,fontSize:12}}>
+            Each line must be matched to a catalog part before stock can be received. Type the supplier part # in the field and press <strong>Enter</strong> to search, then click the matching part to link it.
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {unlinkedItems.map((it,i)=>(
+              <div key={it._k||i} style={{display:"flex",gap:8,alignItems:"center",fontSize:12,padding:"4px 8px",background:"rgba(249,115,22,.07)",borderRadius:6}}>
+                <span style={{color:"var(--orange)",fontWeight:700}}>↳</span>
+                <span style={{fontFamily:"DM Mono,monospace",color:"var(--text2)"}}>{it.supplier_part_id||"—"}</span>
+                <span style={{color:"var(--text3)"}}>·</span>
+                <span>{it.part_name||it.part_description||"(no description)"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
         {!isNew&&onDelete&&!isStocked&&(
           <button className="btn btn-danger" style={{flex:1}} onClick={handleDelete} disabled={saving||isPaid}
@@ -1924,8 +1948,11 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
         )}
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{isStocked?"Close":t.cancel}</button>
         {!isNew&&onStockIn&&!isStocked&&(
-          <button className="btn btn-warning" style={{flex:2}} onClick={async()=>{setSaving(true);await onStockIn(data);setSaving(false);}} disabled={saving}>
-            📦 Stock In
+          <button className="btn btn-warning" style={{flex:2}}
+            onClick={async()=>{setSaving(true);await onStockIn(data);setSaving(false);}}
+            disabled={saving||unlinkedItems.length>0}
+            title={unlinkedItems.length>0?`Link ${unlinkedItems.length} unlinked item(s) first`:undefined}>
+            📦 Stock In{unlinkedItems.length>0?` (${unlinkedItems.length} unlinked)`:""}
           </button>
         )}
         {!isStocked&&(

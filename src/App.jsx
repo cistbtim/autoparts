@@ -1763,7 +1763,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       }
       stocked++;
     }
-    await api.patch("supplier_invoices","id",inv.id,{stocked_in:true});
+    if(stocked>0) await api.patch("supplier_invoices","id",inv.id,{stocked_in:true});
     await refreshTables("supplier_invoices","parts","branch_stock","inventory_logs");
     closeM("supplierInvoice");
     if(stocked>0) showToast(`Stocked in: ${stocked} part(s) updated${skipped?`, ${skipped} skipped (no part link)`:""}`);

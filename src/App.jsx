@@ -4406,7 +4406,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         )}
 
         {tab==="transferRequests"&&(role==="admin"||role==="branch_admin")&&(
-          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} onRefresh={()=>refreshTables("branch_stock_requests")}/>
+          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} onRefresh={()=>refreshTables("branch_stock_requests")}/>
         )}
 
         {tab==="settings"&&role==="admin"&&(

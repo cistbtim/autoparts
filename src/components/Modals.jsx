@@ -6092,7 +6092,7 @@ export function BranchUsersPage({branchId, branchName, user}) {
 // ═══════════════════════════════════════════════════════════════
 // BRANCH TRANSFER REQUESTS PAGE
 // ═══════════════════════════════════════════════════════════════
-export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,onRefresh}) {
+export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],onRefresh}) {
   const Cs=curSym(settings?.currency||"ZAR R");
   const [acting,setActing]=useState(null);
   const [replyingId,setReplyingId]=useState(null); // which request is in reply-edit mode
@@ -6150,13 +6150,23 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
     }finally{setActing(null);}
   };
 
+  // Look up live stock for a BSR item in the supplying branch
+  const getItemStock=(it,supplyingBranchId)=>{
+    const part=parts.find(p=>String(p.id)===String(it.partId));
+    const bs=Array.isArray(branchStock)?branchStock.find(b=>String(b.part_id)===String(it.partId)&&String(b.branch_id)===String(supplyingBranchId)):null;
+    const stock=bs!=null?+(bs.stock)||0:part?+(part.stock)||0:null;
+    return stock;
+  };
+
   const startReply=(r)=>{
     const items=Array.isArray(r.items)?r.items:[];
     const existing=Array.isArray(r.reply_items)?r.reply_items:[];
     const form={};
     items.forEach((it,idx)=>{
       const prev=existing[idx]||{};
-      form[idx]={price:prev.price??it.price??"",availability:prev.availability||"in_stock",notes:prev.notes||""};
+      const stock=getItemStock(it,r.supplying_branch_id);
+      const autoAvail=stock==null?"in_stock":stock>0?"in_stock":"can_source";
+      form[idx]={price:prev.price??it.price??"",availability:prev.availability||autoAvail,notes:prev.notes||""};
     });
     setReplyForm(form);
     setReplyNotes(r.reply_notes||"");
@@ -6269,12 +6279,20 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
             {/* Requested items */}
             <div style={{marginBottom:10}}>
               <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:5}}>Requested Items</div>
-              {items.map((i,idx)=>(
-                <div key={idx} style={{display:"flex",justifyContent:"space-between",padding:"5px 10px",background:"var(--surface2)",borderRadius:6,marginBottom:3}}>
-                  <span style={{fontSize:13}}>{i.name}{i.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>{i.sku}</span>}</span>
-                  <span style={{fontSize:13,color:"var(--text2)",flexShrink:0}}>×{i.qty}</span>
-                </div>
-              ))}
+              {items.map((i,idx)=>{
+                const stock=getItemStock(i,r.supplying_branch_id);
+                const stockColor=stock==null?"var(--text3)":stock>0?"var(--green)":"var(--orange)";
+                const stockLabel=stock==null?"—":stock>0?`${stock} in stock`:"0 — need to order";
+                return(
+                  <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 10px",background:"var(--surface2)",borderRadius:6,marginBottom:3,gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontSize:13}}>{i.name}{i.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>{i.sku}</span>}</span>
+                    <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+                      <span style={{fontSize:11,fontWeight:600,color:stockColor}}>📦 {stockLabel}</span>
+                      <span style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {r.notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:10,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>📝 {r.notes}</div>}
@@ -6298,9 +6316,16 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
             {/* Inline reply form — supplier fills in price + availability per item */}
             {isReplying&&<div style={{marginBottom:12,padding:"12px 14px",background:"rgba(167,139,250,.07)",border:"1.5px solid rgba(167,139,250,.3)",borderRadius:10}}>
               <div style={{fontSize:13,fontWeight:700,color:"var(--purple)",marginBottom:10}}>💬 Reply with Quote</div>
-              {items.map((it,idx)=>(
+              {items.map((it,idx)=>{
+                const stock=getItemStock(it,r.supplying_branch_id);
+                const stockColor=stock==null?"var(--text3)":stock>0?"var(--green)":"var(--orange)";
+                const stockLabel=stock==null?"stock unknown":stock>0?`${stock} in stock`:"0 in stock — need to order";
+                return(
                 <div key={idx} style={{marginBottom:12,paddingBottom:12,borderBottom:idx<items.length-1?"1px solid var(--border)":"none"}}>
-                  <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>{it.name}{it.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{it.sku}</span>} <span style={{color:"var(--text3)"}}>×{it.qty}</span></div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
+                    <div style={{fontWeight:600,fontSize:13}}>{it.name}{it.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{it.sku}</span>} <span style={{color:"var(--text3)"}}>×{it.qty}</span></div>
+                    <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${stockColor}18`,color:stockColor}}>📦 {stockLabel}</span>
+                  </div>
                   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                     <div style={{flex:"1 1 120px"}}>
                       <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Availability</label>
@@ -6322,7 +6347,7 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
                     </div>
                   </div>
                 </div>
-              ))}
+              );})}
               <div style={{marginBottom:10}}>
                 <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Overall Notes</label>
                 <textarea className="inp" rows={2} placeholder="Delivery time, payment terms, etc."

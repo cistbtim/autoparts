@@ -1619,7 +1619,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
       if(res?.code||res?.message){/* silent — link best-effort */}
     }
     const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&String(bs.branch_id)===String(branchId)));
-    upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false,_hits:[],_needsBranchSetup:needsBranchSetup,_bsPrice:"",_bsCost:String(item.unit_cost||""),_bsBin:""});
+    upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,supplier_part_id:(item.supplier_part_id||"").trim(),_drop:false,_hits:[],_needsBranchSetup:needsBranchSetup,_bsPrice:"",_bsCost:String(item.unit_cost||""),_bsBin:""});
   };
 
   const saveBranchSetup=async(k,item)=>{

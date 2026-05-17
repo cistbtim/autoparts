@@ -866,6 +866,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       for(const item of o.items){
         const p=parts.find(p=>p.id===item.partId);
         if(p){const ns2=Math.max(0,p.stock-item.qty);await api.patch("parts","id",item.partId,{stock:ns2});await logInv(p,p.stock,ns2,"Picked",id);await checkAutoReorder(item.partId,ns2);}
+        // Branch: also deduct branch_stock and check branch reorder
+        if(_bId){
+          const bs=branchStock.find(b=>String(b.branch_id)===String(_bId)&&String(b.part_id)===String(item.partId));
+          if(bs?.id){const nbq=Math.max(0,(+bs.stock||0)-item.qty);await api.patch("branch_stock","id",bs.id,{stock:nbq,updated_at:new Date().toISOString()});await checkAutoReorder(item.partId,nbq,_bId);}
+        }
       }
       showToast("✅ Stock deducted — ready to ship");
     }
@@ -882,6 +887,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       for(const item of o.items){
         const p=parts.find(p=>p.id===item.partId);
         if(p){const ns2=Math.max(0,p.stock-item.qty);await api.patch("parts","id",item.partId,{stock:ns2});await logInv(p,p.stock,ns2,"Re-Picked",id);await checkAutoReorder(item.partId,ns2);}
+        if(_bId){
+          const bs=branchStock.find(b=>String(b.branch_id)===String(_bId)&&String(b.part_id)===String(item.partId));
+          if(bs?.id){const nbq=Math.max(0,(+bs.stock||0)-item.qty);await api.patch("branch_stock","id",bs.id,{stock:nbq,updated_at:new Date().toISOString()});await checkAutoReorder(item.partId,nbq,_bId);}
+        }
       }
       showToast("Order restored & stock deducted");
     }
@@ -1549,6 +1558,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     closeM("adjust");
     showToast(`Stock → ${nq}`);
     if(nq<part.stock) await checkAutoReorder(part.id,nq);
+    // Branch: also update branch_stock and check branch reorder
+    if(_bId&&nq<part.stock){
+      const bs=branchStock.find(b=>String(b.branch_id)===String(_bId)&&String(b.part_id)===String(part.id));
+      if(bs?.id){await api.patch("branch_stock","id",bs.id,{stock:nq,updated_at:new Date().toISOString()});await checkAutoReorder(part.id,nq,_bId);}
+    }
   };
 
   // Suppliers
@@ -1947,12 +1961,27 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   // Called after any stock decrease — creates auto-RFQ if configured
-  const checkAutoReorder=async(partId,newStock)=>{
+  // branchId: if provided, checks branch_stock reorder config instead of global part config
+  const checkAutoReorder=async(partId,newStock,branchId=null)=>{
+    if(branchId){
+      // Per-branch reorder: use branch_stock entry config
+      const bs=branchStock.find(b=>String(b.branch_id)===String(branchId)&&String(b.part_id)===String(partId));
+      if(!bs?.auto_reorder||!bs.preferred_supplier_id)return;
+      if(newStock>bs.reorder_point)return;
+      const existing=rfqSessions.find(s=>s.is_auto&&s.auto_part_id===String(partId)&&String(s.branch_id)===String(branchId)&&["pending","draft"].includes(s.status));
+      if(existing)return;
+      const sup=suppliers.find(s=>+s.id===+bs.preferred_supplier_id);
+      if(!sup)return;
+      const part=parts.find(p=>+p.id===+partId);
+      if(!part)return;
+      await createAutoRfq({...part,reorder_qty:bs.reorder_qty||1},sup,1,null);
+      return;
+    }
+    // Global part-level reorder
     const part=parts.find(p=>+p.id===+partId);
     if(!part?.auto_reorder||!part.preferred_supplier_id)return;
     if(newStock>part.reorder_point)return;
-    // Don't double-send — check for open auto RFQ for this part
-    const existing=rfqSessions.find(s=>s.is_auto&&s.auto_part_id===String(partId)&&["pending","draft"].includes(s.status));
+    const existing=rfqSessions.find(s=>s.is_auto&&s.auto_part_id===String(partId)&&!s.branch_id&&["pending","draft"].includes(s.status));
     if(existing)return;
     const sup=suppliers.find(s=>+s.id===+part.preferred_supplier_id);
     if(!sup)return;
@@ -4750,7 +4779,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       })()}
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}
       {isOpen("partRequest")&&<PartRequestModal currentBranch={currentBranch} user={user} onClose={()=>closeM("partRequest")} onSave={async()=>{await refreshTables("part_requests");closeM("partRequest");showToast("Part request submitted ✅");}} t={t}/>}
-      {isOpen("branchStock")&&<BranchStockModal part={mData("branchStock")?.part} existing={mData("branchStock")?.existing} branchId={branchId} overrideBranchId={mData("branchStock")?.overrideBranchId} onClose={()=>closeM("branchStock")} onSave={async()=>{api.cacheInvalidate("branch_stock");await refreshTables("branch_stock");closeM("branchStock");showToast("Stock updated ✅");}} t={t}/>}
+      {isOpen("branchStock")&&<BranchStockModal part={mData("branchStock")?.part} existing={mData("branchStock")?.existing} branchId={branchId} overrideBranchId={mData("branchStock")?.overrideBranchId} onClose={()=>closeM("branchStock")} onSave={async()=>{api.cacheInvalidate("branch_stock");await refreshTables("branch_stock");closeM("branchStock");showToast("Stock updated ✅");}} suppliers={suppliers} t={t}/>}
       {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}
       {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} vehicles={vehicles} partFitments={partFitments} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} onEditPart={(p,tab)=>{closeM("partSupplier");openM("editPart",{...p,_tab:tab||"info"});}} onMergePart={mergePart} branches={branches} allParts={parts} onGoToMainPart={(targetPart)=>{closeM("partSupplier");setTimeout(()=>{setTab("inventory");setFilterBranch("__all__");setSearchPart(targetPart.sku||"");},0);}} t={t}/>}

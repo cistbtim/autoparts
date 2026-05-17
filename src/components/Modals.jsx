@@ -5966,7 +5966,7 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
   );
 }
 
-export function BranchStockModal({part,existing,branchId,overrideBranchId,onClose,onSave,t={}}) {
+export function BranchStockModal({part,existing,branchId,overrideBranchId,onClose,onSave,suppliers=[],t={}}) {
   const [lightbox,setLightbox]=useState(null);
   const [f,setF]=useState({
     stock:   existing?.stock   ?? 2,
@@ -5974,6 +5974,10 @@ export function BranchStockModal({part,existing,branchId,overrideBranchId,onClos
     cost_price: existing?.cost_price ?? part?.cost_price ?? "",
     min_stock:  existing?.min_stock  ?? 2,
     bin_location: existing?.bin_location ?? part?.bin_location ?? "",
+    auto_reorder: existing?.auto_reorder ?? false,
+    reorder_point: existing?.reorder_point ?? 0,
+    reorder_qty:   existing?.reorder_qty   ?? 1,
+    preferred_supplier_id: existing?.preferred_supplier_id ?? "",
   });
   const [busy,setBusy]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -5990,6 +5994,10 @@ export function BranchStockModal({part,existing,branchId,overrideBranchId,onClos
         cost_price:parseFloat(f.cost_price)||null,
         min_stock:parseInt(f.min_stock)||0,
         bin_location:f.bin_location||null,
+        auto_reorder:!!f.auto_reorder,
+        reorder_point:parseInt(f.reorder_point)||0,
+        reorder_qty:parseInt(f.reorder_qty)||1,
+        preferred_supplier_id:f.preferred_supplier_id?+f.preferred_supplier_id:null,
         updated_at:new Date().toISOString(),
       };
       if(existing?.id){
@@ -6042,6 +6050,45 @@ export function BranchStockModal({part,existing,branchId,overrideBranchId,onClos
           );
         })()}
         <div><FL label="Bin Location"/><input className="inp" value={f.bin_location} placeholder="e.g. A1-03" onChange={e=>set("bin_location",e.target.value)}/></div>
+
+        {/* ── Auto-Reorder ── */}
+        <div style={{borderTop:"1px solid var(--border)",marginTop:16,paddingTop:14}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",background:f.auto_reorder?"rgba(52,211,153,.08)":"var(--surface2)",borderRadius:10,border:`1.5px solid ${f.auto_reorder?"rgba(52,211,153,.4)":"var(--border)"}`,cursor:"pointer",marginBottom:f.auto_reorder?12:0}} onClick={()=>set("auto_reorder",!f.auto_reorder)}>
+            <div>
+              <div style={{fontWeight:700,fontSize:13}}>🔄 Auto-Reorder</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>Send RFQ automatically when branch stock is low</div>
+            </div>
+            <div style={{width:40,height:22,borderRadius:99,background:f.auto_reorder?"var(--green)":"var(--border)",position:"relative",transition:"background .2s",flexShrink:0}}>
+              <div style={{position:"absolute",top:3,left:f.auto_reorder?20:3,width:16,height:16,borderRadius:"50%",background:"#fff",transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/>
+            </div>
+          </div>
+          {f.auto_reorder&&(
+            <>
+              <FG>
+                <div>
+                  <FL label="Reorder when branch stock ≤"/>
+                  <input className="inp" type="number" min="0" value={f.reorder_point} onChange={e=>set("reorder_point",+e.target.value||0)}/>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Current: <strong>{existing?.stock??0}</strong></div>
+                </div>
+                <div>
+                  <FL label="Request qty"/>
+                  <input className="inp" type="number" min="1" value={f.reorder_qty} onChange={e=>set("reorder_qty",+e.target.value||1)}/>
+                </div>
+              </FG>
+              <div>
+                <FL label="Preferred supplier"/>
+                {suppliers.length===0
+                  ? <div style={{fontSize:12,color:"var(--text3)",padding:"8px 0"}}>No suppliers available</div>
+                  : <select className="inp" value={f.preferred_supplier_id||""} onChange={e=>set("preferred_supplier_id",e.target.value)}>
+                      <option value="">— Select supplier —</option>
+                      {suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                }
+              </div>
+            </>
+          )}
+        </div>
+
         <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:16}}>
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={save} disabled={busy}>{busy?"Saving…":"Save Stock"}</button>

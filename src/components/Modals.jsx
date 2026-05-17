@@ -1568,14 +1568,26 @@ export function InvTotals({items,taxRate,costField="unit_cost",priceField}) {
 function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",branchId=null,branchStock=[],t={},settings={},disabled=false}) {
   const mkRow=()=>({_k:String(Date.now()+Math.random()),supplier_part_id:"",part_id:null,part_name:"",part_sku:"",qty:1,unit_cost:0,_st:"idle",_hits:[],_drop:false,_needsBranchSetup:false,_bsPrice:"",_bsCost:"",_bsBin:"",_skuPart:null,_skuLinks:[]});
   const inputRefs=useRef({});
+  const qtyRefs=useRef({});
+  const costRefs=useRef({});
+  const skuRefs=useRef({});
   const [focusKey,setFocusKey]=useState(null);
-  const add=()=>{const row=mkRow();setItems(p=>[...p,row]);setFocusKey(row._k);};
+  const [focusField,setFocusField]=useState("sup"); // "sup"|"sku"|"qty"|"cost"
+  const add=()=>{const row=mkRow();setItems(p=>[...p,row]);setFocusKey(row._k);setFocusField("sup");};
   const upd=(k,patch)=>setItems(p=>p.map(r=>r._k===k?{...r,...patch}:r));
   const rem=k=>setItems(p=>p.filter(r=>r._k!==k));
 
+  const focusQty=(k)=>{if(qtyRefs.current[k]){qtyRefs.current[k].focus();qtyRefs.current[k].select();}};
+  const focusCost=(k)=>{if(costRefs.current[k]){costRefs.current[k].focus();costRefs.current[k].select();}};
+  const focusSku=(k)=>{if(skuRefs.current[k]){skuRefs.current[k].focus();skuRefs.current[k].select();}};
+
   useEffect(()=>{
-    if(focusKey&&inputRefs.current[focusKey]){inputRefs.current[focusKey].focus();setFocusKey(null);}
-  },[focusKey,items]);
+    if(!focusKey)return;
+    const map={sup:inputRefs,sku:skuRefs,qty:qtyRefs,cost:costRefs};
+    const el=map[focusField]?.current[focusKey];
+    if(el){el.focus();if(focusField!=="sup")el.select();}
+    setFocusKey(null);
+  },[focusKey,focusField,items]);
 
   const search=async(k,spn)=>{
     const q=(spn||"").trim();
@@ -1590,6 +1602,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
         const cur=items.find(r=>r._k===k);
         const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&String(bs.branch_id)===String(branchId)));
         upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,_drop:false,_needsBranchSetup:needsBranchSetup,_bsPrice:"",_bsCost:String(cur?.unit_cost||""),_bsBin:""});
+        setTimeout(()=>focusQty(k),50);
         return;
       }
     }
@@ -1597,7 +1610,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
     const ql=q.toLowerCase();
     const hits=parts.filter(p=>(p.name||"").toLowerCase().includes(ql)||(p.sku||"").toLowerCase().includes(ql)||(p.oe_number||"").toLowerCase().includes(ql)).slice(0,8);
     if(hits.length){upd(k,{_st:"candidates",_hits:hits,_drop:true});}
-    else{upd(k,{_st:"no_match",_hits:[],_drop:false});}
+    else{upd(k,{_st:"no_match",_hits:[],_drop:false});setTimeout(()=>focusSku(k),50);}
   };
 
   // Search by SKU — alternative entry when supplier part# is unknown
@@ -1611,6 +1624,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
     // Fetch existing supplier links for this part so the panel can show them
     const links=await api.get("part_suppliers",`part_id=eq.${found.id}&select=*`).catch(()=>[]);
     upd(k,{_st:"sku_found",part_id:found.id,part_name:found.name,part_sku:found.sku,_skuPart:found,_skuLinks:Array.isArray(links)?links:[],_drop:false});
+    setTimeout(()=>focusQty(k),50);
   };
 
   const linkTo=async(k,item,part)=>{
@@ -1624,6 +1638,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
     }
     const needsBranchSetup=!!(branchId&&!branchStock.find(bs=>+bs.part_id===+part.id&&String(bs.branch_id)===String(branchId)));
     upd(k,{_st:"linked",part_id:part.id,part_name:part.name,part_sku:part.sku,supplier_part_id:(item.supplier_part_id||"").trim(),_drop:false,_hits:[],_needsBranchSetup:needsBranchSetup,_bsPrice:"",_bsCost:String(item.unit_cost||""),_bsBin:""});
+    setTimeout(()=>focusQty(k),50);
   };
 
   const saveBranchSetup=async(k,item)=>{
@@ -1735,10 +1750,14 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                       :_st==="sku_found"?{borderColor:"rgba(52,211,153,.5)",background:"rgba(52,211,153,.06)"}
                       :_st==="sku_no_match"?{borderColor:"var(--orange)"}
                       :{})}}
+                    ref={el=>{skuRefs.current[k]=el;}}
                     value={row.part_sku||""} placeholder={isLinked?"SKU":"SKU → Enter"}
                     readOnly={isLinked}
                     onChange={e=>upd(k,{part_sku:e.target.value,...(!isLinked&&_st!=="idle"?{_st:"idle"}:{})})}
-                    onKeyDown={e=>{if(e.key==="Enter"&&!isLinked){e.preventDefault();searchBySku(k,e.target.value);}}}
+                    onKeyDown={e=>{
+                      if(e.key==="Enter"&&!isLinked){e.preventDefault();searchBySku(k,e.target.value);}
+                      else if(e.key==="Enter"&&isLinked){e.preventDefault();focusQty(k);}
+                    }}
                     onBlur={e=>{if(!isLinked&&(e.target.value||"").trim()&&(_st==="idle"||_st==="sku_no_match"))searchBySku(k,e.target.value);}}
                   />
                   {!isLinked&&<span style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",fontSize:10,pointerEvents:"none",color:"var(--text3)"}}>
@@ -1748,16 +1767,20 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
 
                 {/* ── Qty ── */}
                 <input className="inp" type="number" min="1" style={{fontSize:12,textAlign:"center",borderColor:(!disabled&&!(+row.qty>0))?"var(--red)":undefined}}
+                  ref={el=>{qtyRefs.current[k]=el;}}
                   value={row.qty||1}
                   disabled={disabled}
-                  onChange={e=>upd(k,{qty:+e.target.value||1,total:(+e.target.value||1)*(+row.unit_cost||0)})}/>
+                  onChange={e=>upd(k,{qty:+e.target.value||1,total:(+e.target.value||1)*(+row.unit_cost||0)})}
+                  onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();focusCost(k);}}}/>
 
                 {/* ── Unit Cost ── */}
                 <input className="inp" type="number" min="0" step="0.01" style={{fontSize:12,borderColor:(!disabled&&!(+row.unit_cost>0))?"var(--red)":undefined}}
+                  ref={el=>{costRefs.current[k]=el;}}
                   value={row.unit_cost||""}
                   placeholder="0.00"
                   disabled={disabled}
-                  onChange={e=>upd(k,{unit_cost:+e.target.value||0,total:(+row.qty||1)*(+e.target.value||0)})}/>
+                  onChange={e=>upd(k,{unit_cost:+e.target.value||0,total:(+row.qty||1)*(+e.target.value||0)})}
+                  onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();add();}}}/>
 
                 {/* ── Amount ── */}
                 <div style={{padding:"8px 2px",fontSize:12,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",display:"flex",alignItems:"center"}}>

@@ -1223,7 +1223,7 @@ export function SettingsPage({settings,onSave,t}) {
     onSave({categories:JSON.stringify(updated)});
   };
 
-  const TABS=[["shop","🏪 Shop"],["billing","💰 Billing"],["inventory","🏷️ Inventory"],["languages","🌐 Languages"]];
+  const TABS=[["shop","🏪 Shop"],["billing","💰 Billing"],["inventory","🏷️ Inventory"],["pos","🖥️ POS"],["languages","🌐 Languages"]];
 
   return (
     <div className="fu">
@@ -1449,6 +1449,26 @@ export function SettingsPage({settings,onSave,t}) {
           </div>
           <div style={{marginTop:4}}>
             <button className="btn btn-primary btn-sm" onClick={()=>onSave({part_label_w:f.part_label_w||98,part_label_h:f.part_label_h||45,shelf_label_w:f.shelf_label_w||70,shelf_label_h:f.shelf_label_h||45})}>💾 Save Label Sizes</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: POS ── */}
+      {sTab==="pos"&&(
+        <div style={{maxWidth:480}}>
+          <div className="card" style={{padding:22}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>🖥️ Point of Sale</h3>
+            <FD>
+              <FL label="Manager PIN (4 digits)"/>
+              <input className="inp" type="password" inputMode="numeric" maxLength={4} value={f.pos_manager_pin||""}
+                onChange={e=>s("pos_manager_pin",e.target.value.replace(/\D/g,"").slice(0,4))}
+                placeholder="Leave blank to disable PIN lock"
+                style={{letterSpacing:8,fontSize:20,fontWeight:800,textAlign:"center"}}/>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>
+                Required to unlock discount at POS. If blank, discount is always unlocked.
+              </div>
+            </FD>
+            <button className="btn btn-primary" style={{marginTop:14}} onClick={()=>onSave({pos_manager_pin:f.pos_manager_pin||""})}>💾 Save POS Settings</button>
           </div>
         </div>
       )}

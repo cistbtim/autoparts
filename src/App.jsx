@@ -11,6 +11,7 @@ import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg,
 import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
+import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
@@ -1809,6 +1810,53 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     await refreshTables("supplier_returns","parts","inventory_logs");closeM("supplierReturn");showToast("Return recorded & stock adjusted");
   };
 
+  // POS — instant sale: create invoice + items + deduct stock in one go
+  const savePosInvoice=async(cart,customer,payMethod,cashReceived,change,discount)=>{
+    const invId=makeId("INV");
+    const subtotal=cart.reduce((s,i)=>s+(i.qty*i.price),0);
+    const total=Math.max(0,subtotal-(discount||0));
+    await api.insert("customer_invoices",{
+      id:invId,
+      customer_id:customer?.id||null,
+      customer_name:customer?.name||"Walk-in",
+      customer_phone:customer?.phone||"",
+      date:new Date().toISOString().slice(0,10),
+      subtotal,
+      discount:discount||0,
+      total,
+      status:"paid",
+      payment_method:payMethod,
+      cash_received:payMethod==="cash"?cashReceived:null,
+      change_given:payMethod==="cash"?change:null,
+      is_pos:true,
+      created_by:user.name||user.username,
+      created_at:new Date().toISOString(),
+      ...(_bId?{branch_id:_bId}:{}),
+    });
+    for(const it of cart){
+      await api.insert("customer_invoice_items",{
+        id:makeId("CIVI"),
+        invoice_id:invId,
+        part_id:it.part_id,
+        part_name:it.name,
+        part_sku:it.sku,
+        qty:it.qty,
+        unit_price:it.price,
+        total:it.qty*it.price,
+      });
+      const part=parts.find(p=>+p.id===+it.part_id);
+      if(part){
+        const ns=Math.max(0,(+part.stock||0)-it.qty);
+        await api.patch("parts","id",it.part_id,{stock:ns});
+        await logInv(part,part.stock,ns,"POS Sale",invId);
+        await checkAutoReorder(it.part_id,ns);
+      }
+    }
+    await refreshTables("customer_invoices","parts","inventory_logs");
+    showToast(`✅ Sale complete — ${C()}${total.toFixed(2)}`);
+    return invId;
+  };
+
   // Customer Invoices
   const saveCustomerInvoice=async(inv,items)=>{
     await api.upsert("customer_invoices",{...inv,...(_bId?{branch_id:_bId}:{})});
@@ -2460,6 +2508,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       id:"grp_sales", icon:"🛒", label:t.grpSales, roles:["admin","manager","shipper","customer"],
       badge: pendingCnt,
       children:[
+        {id:"pos",icon:"🖥️",label:"POS",roles:["admin","manager"]},
         {id:"shop",icon:"🛒",label:t.shop,roles:["admin","customer"]},
         {id:"picking",icon:"🔍",label:t.picking,roles:["admin","shipper"],badge:pendingCnt},
         {id:"orders",icon:"📋",label:t.orders,roles:["admin","shipper"]},
@@ -3738,6 +3787,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ── POS ── */}
+        {tab==="pos"&&(
+          <PosPage
+            parts={isBranchUser?displayParts:parts}
+            customers={customers}
+            onSave={savePosInvoice}/>
         )}
 
         {/* ── SHOP ── */}

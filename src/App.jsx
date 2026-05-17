@@ -494,6 +494,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setAllScrapParts(Array.isArray(rest[29])?rest[29]:[]);
     setAllScrapProfiles(Array.isArray(rest[30])?rest[30]:[]);
     setBgLoading(0); // all background tables done
+    // Check for overdue auto-RFQs on every app load (runs after state is set)
+    setTimeout(()=>checkStaleRfqs(),2000);
     // Part requests: admin sees all, branch users see their own
     if(role==="admin"||isBranchUser){
       const prF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
@@ -863,7 +865,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(prev!=="Ready to Ship"&&ns==="Ready to Ship"&&Array.isArray(o.items)){
       for(const item of o.items){
         const p=parts.find(p=>p.id===item.partId);
-        if(p){const ns2=Math.max(0,p.stock-item.qty);await api.patch("parts","id",item.partId,{stock:ns2});await logInv(p,p.stock,ns2,"Picked",id);}
+        if(p){const ns2=Math.max(0,p.stock-item.qty);await api.patch("parts","id",item.partId,{stock:ns2});await logInv(p,p.stock,ns2,"Picked",id);await checkAutoReorder(item.partId,ns2);}
       }
       showToast("✅ Stock deducted — ready to ship");
     }
@@ -879,7 +881,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     else if(prev==="Cancelled"&&ns==="Ready to Ship"&&Array.isArray(o.items)){
       for(const item of o.items){
         const p=parts.find(p=>p.id===item.partId);
-        if(p){const ns2=Math.max(0,p.stock-item.qty);await api.patch("parts","id",item.partId,{stock:ns2});await logInv(p,p.stock,ns2,"Re-Picked",id);}
+        if(p){const ns2=Math.max(0,p.stock-item.qty);await api.patch("parts","id",item.partId,{stock:ns2});await logInv(p,p.stock,ns2,"Re-Picked",id);await checkAutoReorder(item.partId,ns2);}
       }
       showToast("Order restored & stock deducted");
     }
@@ -1546,6 +1548,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setParts(prev=>prev.map(p=>String(p.id)===String(part.id)?{...p,stock:nq}:p));
     closeM("adjust");
     showToast(`Stock → ${nq}`);
+    if(nq<part.stock) await checkAutoReorder(part.id,nq);
   };
 
   // Suppliers
@@ -1908,6 +1911,94 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     await refreshTables("rfq_sessions");
   };
 
+  // ── Auto-reorder: create RFQ for one part → one supplier ─────────────────
+  const REORDER_DEADLINE_HOURS=24;
+
+  const createAutoRfq=async(part,sup,attemptCount=1,prevSid=null)=>{
+    const sid=makeId("RFQ");
+    const deadline=new Date(Date.now()+REORDER_DEADLINE_HOURS*3600*1000).toISOString();
+    await api.insert("rfq_sessions",{
+      id:sid, name:`Auto-Reorder: ${part.name}`, status:"pending",
+      deadline:"", is_auto:true, auto_part_id:String(part.id),
+      attempt_count:attemptCount, last_sent_at:new Date().toISOString(),
+      reply_deadline:deadline, escalated_supplier_id:null,
+      created_by:"system", created_at:new Date().toISOString(),
+      ...(_bId?{branch_id:_bId}:{})
+    });
+    const itemId=makeId("RFQI");
+    await api.insert("rfq_items",{
+      id:itemId, rfq_id:sid,
+      part_id:String(part.id), part_name:part.name, part_sku:part.sku||"",
+      part_chinese_desc:part.chinese_desc||"", oe_number:part.oe_number||"",
+      make:part.make||"", model:part.model||"", qty_needed:part.reorder_qty||1
+    });
+    await api.insert("rfq_quotes",{
+      id:makeId("RFQQ"), rfq_id:sid, rfq_item_id:itemId,
+      supplier_id:String(sup.id), supplier_name:sup.name,
+      supplier_part_no:"", unit_price:null, stock_qty:null, lead_days:null,
+      notes:"", token:makeToken(), status:"pending", availability:"pending",
+      created_at:new Date().toISOString()
+    });
+    // Close previous session if escalating
+    if(prevSid) await api.patch("rfq_sessions","id",prevSid,{status:"escalated"});
+    await refreshTables("rfq_sessions","rfq_items","rfq_quotes");
+    showToast(`📋 Auto-RFQ sent to ${sup.name} for ${part.name} (attempt ${attemptCount})`);
+    return sid;
+  };
+
+  // Called after any stock decrease — creates auto-RFQ if configured
+  const checkAutoReorder=async(partId,newStock)=>{
+    const part=parts.find(p=>+p.id===+partId);
+    if(!part?.auto_reorder||!part.preferred_supplier_id)return;
+    if(newStock>part.reorder_point)return;
+    // Don't double-send — check for open auto RFQ for this part
+    const existing=rfqSessions.find(s=>s.is_auto&&s.auto_part_id===String(partId)&&["pending","draft"].includes(s.status));
+    if(existing)return;
+    const sup=suppliers.find(s=>+s.id===+part.preferred_supplier_id);
+    if(!sup)return;
+    await createAutoRfq({...part,reorder_qty:part.reorder_qty||1},sup,1,null);
+  };
+
+  // Runs on app load — finds overdue auto-RFQs, resends or escalates
+  const checkStaleRfqs=async()=>{
+    const now=new Date();
+    const stale=rfqSessions.filter(s=>
+      s.is_auto&&s.status==="pending"&&s.reply_deadline&&new Date(s.reply_deadline)<now
+    );
+    for(const rfq of stale){
+      const part=parts.find(p=>String(p.id)===String(rfq.auto_part_id));
+      if(!part)continue;
+      if((rfq.attempt_count||1)<3){
+        // Resend to same supplier
+        const quote=rfqQuotes.find(q=>q.rfq_id===rfq.id);
+        if(!quote)continue;
+        const sup=suppliers.find(s=>String(s.id)===String(quote.supplier_id));
+        if(!sup)continue;
+        await createAutoRfq(part,sup,(rfq.attempt_count||1)+1,rfq.id);
+      } else {
+        // Escalate — find next supplier from part_suppliers
+        const partSupps=await api.get("part_suppliers",`part_id=eq.${part.id}&select=*`);
+        const currentQuote=rfqQuotes.find(q=>q.rfq_id===rfq.id);
+        const usedIds=rfqSessions
+          .filter(s=>s.is_auto&&s.auto_part_id===String(part.id))
+          .map(s=>rfqQuotes.find(q=>q.rfq_id===s.id)?.supplier_id).filter(Boolean).map(String);
+        const nextPs=Array.isArray(partSupps)?partSupps.find(ps=>!usedIds.includes(String(ps.supplier_id))):null;
+        if(nextPs){
+          const nextSup=suppliers.find(s=>+s.id===+nextPs.supplier_id);
+          if(nextSup){
+            await createAutoRfq(part,nextSup,1,rfq.id);
+            showToast(`⚠️ No reply from previous supplier — escalated to ${nextSup.name}`,"err");
+            continue;
+          }
+        }
+        // No more suppliers — mark failed, alert admin
+        await api.patch("rfq_sessions","id",rfq.id,{status:"no_supplier"});
+        await refreshTables("rfq_sessions");
+        showToast(`❌ Auto-reorder failed for ${part.name} — no supplier responded. Manual action needed.`,"err");
+      }
+    }
+  };
+
   const selectRfqQuote=async(quoteId,rfqItemId)=>{
     const itemQuotes=rfqQuotes.filter(q=>q.rfq_item_id===rfqItemId);
     for(const q of itemQuotes){
@@ -2196,6 +2287,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const totalRev=branchOrders.filter(o=>o.status==="Completed").reduce((s,o)=>s+(o.total||0),0);
   const pendingCnt=branchOrders.filter(o=>o.status==="Processing"||o.status==="Ready to Ship").length;
   const pendingInq=inquiries.filter(i=>i.status==="pending").length;
+  const overdueAutoRfq=rfqSessions.filter(s=>s.is_auto&&s.status==="pending"&&s.reply_deadline&&new Date(s.reply_deadline)<new Date()).length;
   const pendingCQ=customerQueries.filter(q=>q.status==="pending").length;
   const getPartSupps=(pid)=>partSuppliers.filter(ps=>ps.part_id===pid).map(ps=>({...ps,supplier:suppliers.find(s=>s.id===ps.supplier_id)}));
   const OS = role==="shipper"
@@ -2271,7 +2363,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       badge: pendingInq,
       children:[
         {id:"suppliers",icon:"🏭",label:t.suppliers,roles:["admin"]},
-        {id:"rfq",icon:"📋",label:t.rfqSession,roles:["admin"]},
+        {id:"rfq",icon:"📋",label:t.rfqSession,roles:["admin"],badge:overdueAutoRfq||0},
         {id:"inquiries",icon:"📩",label:t.inquiries,roles:["admin"],badge:pendingInq},
         {id:"purchaseInvoices",icon:"🧾",label:t.purchaseInvoices,roles:["admin"]},
         {id:"supplierReturns",icon:"↩️",label:t.supplierReturns,roles:["admin"]},
@@ -2442,14 +2534,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"customers", icon:"👥",label:t.customers},
-      {id:"rfq",       icon:"📋",label:t.rfqSession||"RFQ"},
+      {id:"rfq",       icon:"📋",label:t.rfqSession||"RFQ",badge:overdueAutoRfq||0},
       {id:"suppliers", icon:"🏭",label:t.suppliers},
     ];
     if(role==="branch_admin") return [
       {id:"inventory",   icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"orders",      icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"customers",   icon:"👥",label:t.customers},
-      {id:"rfq",         icon:"📋",label:t.rfqSession||"RFQ"},
+      {id:"rfq",         icon:"📋",label:t.rfqSession||"RFQ",badge:overdueAutoRfq||0},
       {id:"suppliers",   icon:"🏭",label:t.suppliers},
       {id:"branch_users",icon:"👤",label:"Users"},
     ];
@@ -3565,7 +3657,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             onCreate={createRfqSession} onUpdateStatus={updateRfqStatus}
             onSelectQuote={selectRfqQuote} onUnselectQuote={unselectRfqQuote}
             onUnselectAll={unselectAllRfq} onRefresh={loadAll}
-            onCreatePO={createPOFromRfq}
+            onCreatePO={createPOFromRfq} onResendStale={checkStaleRfqs}
             onEditPart={(p)=>{if(p)openM("editPart",p);}}
             t={t} user={user} settings={settings}/>
         )}

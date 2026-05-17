@@ -133,6 +133,7 @@ export function RfqQuoteReplyPage({token}) {
   const [quote,setQuote]=useState(null);
   const [item,setItem]=useState(null);
   const [session,setSession]=useState(null);
+  const [avail,setAvail]=useState("in_stock"); // "in_stock" | "not_available"
   const [form,setForm]=useState({supplier_part_no:"",unit_price:"",stock_qty:"",lead_days:"",notes:""});
   const [saved,setSaved]=useState(false);
   const [loading,setLoading]=useState(true);
@@ -142,7 +143,8 @@ export function RfqQuoteReplyPage({token}) {
       if(!Array.isArray(r)||!r[0]){setLoading(false);return;}
       const q=r[0];
       setQuote(q);
-      if(q.status==="quoted") setSaved(true);
+      if(q.status==="quoted"||q.status==="not_available") setSaved(true);
+      if(q.availability==="not_available") setAvail("not_available");
       setForm({
         supplier_part_no:q.supplier_part_no||"",
         unit_price:q.unit_price||"",
@@ -161,14 +163,16 @@ export function RfqQuoteReplyPage({token}) {
   },[token]);
 
   const submit=async()=>{
-    if(!form.unit_price){alert("Please enter unit price");return;}
+    const notAvail=avail==="not_available";
+    if(!notAvail&&!form.unit_price){alert("Please enter unit price");return;}
     await api.patch("rfq_quotes","token",token,{
       supplier_part_no:form.supplier_part_no,
-      unit_price:+form.unit_price,
-      stock_qty:form.stock_qty?+form.stock_qty:null,
-      lead_days:form.lead_days?+form.lead_days:null,
+      unit_price:notAvail?null:+form.unit_price,
+      stock_qty:notAvail?0:form.stock_qty?+form.stock_qty:null,
+      lead_days:notAvail?null:form.lead_days?+form.lead_days:null,
       notes:form.notes,
-      status:"quoted",
+      availability:avail,
+      status:notAvail?"not_available":"quoted",
       quoted_at:new Date().toISOString()
     });
     setSaved(true);
@@ -200,6 +204,7 @@ export function RfqQuoteReplyPage({token}) {
           <ShopLogo settings={getSettings()} size="md" style={{width:"100%",maxWidth:"100%",maxHeight:100,objectFit:"contain",height:"auto",margin:"0 auto"}}/>
           <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:26,fontWeight:700,color:"var(--accent)",marginTop:10}}>📋 RFQ Quote Request</div>
           <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>From: {quote.supplier_name||"Supplier"}</div>
+          {session?.reply_deadline&&(()=>{const dl=new Date(session.reply_deadline);const hrs=Math.max(0,Math.round((dl-Date.now())/3600000));return <div style={{marginTop:8,padding:"6px 14px",borderRadius:20,display:"inline-block",background:hrs<6?"rgba(248,113,113,.15)":"rgba(251,146,60,.12)",color:hrs<6?"#f87171":"#f97316",fontSize:13,fontWeight:600}}>⏰ Reply by: {dl.toLocaleString()} {hrs>0?`(${hrs}h left)`:""}</div>;})()}
         </div>
 
         {/* Part info */}
@@ -220,31 +225,45 @@ export function RfqQuoteReplyPage({token}) {
           </div>
         )}
 
+        {/* Availability toggle */}
+        <div style={{display:"flex",gap:10,marginBottom:16}}>
+          <button onClick={()=>setAvail("in_stock")} style={{flex:1,padding:"12px 0",borderRadius:10,border:`2px solid ${avail==="in_stock"?"#34d399":"var(--border)"}`,background:avail==="in_stock"?"rgba(52,211,153,.12)":"var(--surface2)",color:avail==="in_stock"?"#34d399":"var(--text3)",fontWeight:700,fontSize:14,cursor:"pointer",transition:"all .15s"}}>
+            ✅ Available to Order
+          </button>
+          <button onClick={()=>setAvail("not_available")} style={{flex:1,padding:"12px 0",borderRadius:10,border:`2px solid ${avail==="not_available"?"#f87171":"var(--border)"}`,background:avail==="not_available"?"rgba(248,113,113,.12)":"var(--surface2)",color:avail==="not_available"?"#f87171":"var(--text3)",fontWeight:700,fontSize:14,cursor:"pointer",transition:"all .15s"}}>
+            ❌ Not Available
+          </button>
+        </div>
+
         {saved?(
           <div className="card" style={{padding:24,textAlign:"center"}}>
-            <div style={{fontSize:48,marginBottom:12}}>✅</div>
-            <div style={{fontSize:18,fontWeight:700,marginBottom:8}}>Quote Submitted!</div>
-            <div style={{color:"var(--text3)",fontSize:13}}>Thank you. Your quote has been received.</div>
-            {quote.unit_price&&<div style={{marginTop:12,color:"var(--accent)",fontSize:20,fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>Quoted: {quote.unit_price}</div>}
-            <button className="btn btn-ghost" style={{marginTop:16,width:"100%"}} onClick={()=>setSaved(false)}>Edit Quote</button>
+            <div style={{fontSize:48,marginBottom:12}}>{avail==="not_available"?"❌":"✅"}</div>
+            <div style={{fontSize:18,fontWeight:700,marginBottom:8}}>{avail==="not_available"?"Marked as Not Available":"Quote Submitted!"}</div>
+            <div style={{color:"var(--text3)",fontSize:13}}>Thank you. Your response has been recorded.</div>
+            {quote.unit_price&&avail!=="not_available"&&<div style={{marginTop:12,color:"var(--accent)",fontSize:20,fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>Quoted: {quote.unit_price}</div>}
+            <button className="btn btn-ghost" style={{marginTop:16,width:"100%"}} onClick={()=>setSaved(false)}>Edit Response</button>
           </div>
         ):(
           <div className="card" style={{padding:20}}>
-            <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:14}}>Your Quote</div>
-            <FD><FL label="Your Part Number (optional)"/>
-              <input className="inp" value={form.supplier_part_no} onChange={e=>setForm(p=>({...p,supplier_part_no:e.target.value}))} placeholder="Your internal part number"/></FD>
-            <FG>
-              <div><FL label="Unit Price *"/>
-                <input className="inp" type="number" value={form.unit_price} onChange={e=>setForm(p=>({...p,unit_price:e.target.value}))} placeholder="0.00" step="0.01"/></div>
-              <div><FL label="Stock Available"/>
-                <input className="inp" type="number" value={form.stock_qty} onChange={e=>setForm(p=>({...p,stock_qty:e.target.value}))} placeholder="qty"/></div>
-            </FG>
-            <FD><FL label="Lead Time (days)"/>
-              <input className="inp" type="number" value={form.lead_days} onChange={e=>setForm(p=>({...p,lead_days:e.target.value}))} placeholder="e.g. 7"/></FD>
+            <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:14}}>{avail==="not_available"?"Not Available — Reason (optional)":"Your Quote"}</div>
+            {avail==="in_stock"&&(
+              <>
+                <FD><FL label="Your Part Number (optional)"/>
+                  <input className="inp" value={form.supplier_part_no} onChange={e=>setForm(p=>({...p,supplier_part_no:e.target.value}))} placeholder="Your internal part number"/></FD>
+                <FG>
+                  <div><FL label="Unit Price *"/>
+                    <input className="inp" type="number" value={form.unit_price} onChange={e=>setForm(p=>({...p,unit_price:e.target.value}))} placeholder="0.00" step="0.01"/></div>
+                  <div><FL label="Stock Available"/>
+                    <input className="inp" type="number" value={form.stock_qty} onChange={e=>setForm(p=>({...p,stock_qty:e.target.value}))} placeholder="qty"/></div>
+                </FG>
+                <FD><FL label="Lead Time (days)"/>
+                  <input className="inp" type="number" value={form.lead_days} onChange={e=>setForm(p=>({...p,lead_days:e.target.value}))} placeholder="e.g. 7"/></FD>
+              </>
+            )}
             <FD><FL label="Notes"/>
-              <textarea className="inp" value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} placeholder="Any conditions, MOQ, etc." style={{minHeight:70}}/></FD>
-            <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,marginTop:4}} onClick={submit}>
-              📤 Submit Quote
+              <textarea className="inp" value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} placeholder={avail==="not_available"?"Reason for unavailability (optional)":"Any conditions, MOQ, etc."} style={{minHeight:70}}/></FD>
+            <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,marginTop:4,background:avail==="not_available"?"#f87171":undefined}} onClick={submit}>
+              {avail==="not_available"?"❌ Confirm Not Available":"📤 Submit Quote"}
             </button>
           </div>
         )}
@@ -294,6 +313,7 @@ export function RfqBatchReplyPage({token}) {
           quote:q,
           item,
           prefilled:!q.supplier_part_no&&!!psMap[String(item.part_id)],
+          avail:q.availability==="not_available"?"not_available":"in_stock",
           form:{
             supplier_part_no:knownPartNo,
             unit_price:q.unit_price||"",
@@ -309,19 +329,22 @@ export function RfqBatchReplyPage({token}) {
   },[token]);
 
   const upd=(qi,k,v)=>setRows(prev=>prev.map((r,i)=>i===qi?{...r,form:{...r.form,[k]:v}}:r));
+  const updAvail=(qi,v)=>setRows(prev=>prev.map((r,i)=>i===qi?{...r,avail:v}:r));
 
   const submitAll=async()=>{
-    const missing=rows.filter(r=>!r.form.unit_price);
+    const missing=rows.filter(r=>r.avail!=="not_available"&&!r.form.unit_price);
     if(missing.length>0){setErr(`Please enter price for: ${missing.map(r=>r.item.part_name).join(", ")}`);return;}
     setErr("");setSubmitting(true);
     for(const r of rows){
+      const notAvail=r.avail==="not_available";
       await api.patch("rfq_quotes","token",r.quote.token,{
         supplier_part_no:r.form.supplier_part_no,
-        unit_price:+r.form.unit_price,
-        stock_qty:r.form.stock_qty?+r.form.stock_qty:null,
-        lead_days:r.form.lead_days?+r.form.lead_days:null,
+        unit_price:notAvail?null:+r.form.unit_price,
+        stock_qty:notAvail?0:r.form.stock_qty?+r.form.stock_qty:null,
+        lead_days:notAvail?null:r.form.lead_days?+r.form.lead_days:null,
         notes:r.form.notes,
-        status:"quoted",
+        availability:r.avail,
+        status:notAvail?"not_available":"quoted",
         quoted_at:new Date().toISOString(),
       });
     }
@@ -372,6 +395,7 @@ export function RfqBatchReplyPage({token}) {
           <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>
             {session?.name&&<span style={{fontWeight:600,color:"var(--text)"}}>{session.name} · </span>}
             {supplierName} · {rows.length} item{rows.length!==1?"s":""}
+            {session?.reply_deadline&&(()=>{const dl=new Date(session.reply_deadline);const hrs=Math.max(0,Math.round((dl-Date.now())/3600000));return <span style={{marginLeft:10,padding:"3px 10px",borderRadius:12,background:hrs<6?"rgba(248,113,113,.15)":"rgba(251,146,60,.12)",color:hrs<6?"#f87171":"#f97316",fontWeight:600}}>⏰ {dl.toLocaleString()} {hrs>0?`(${hrs}h left)`:""}</span>;})()}
             {session?.deadline&&<span style={{color:"var(--yellow)",marginLeft:8}}>⏰ Deadline: {session.deadline}</span>}
           </div>
         </div>
@@ -415,8 +439,10 @@ export function RfqBatchReplyPage({token}) {
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((r,i)=>(
-                      <tr key={r.quote.id} style={{borderBottom:"1px solid var(--border)",background:i%2===0?"transparent":"rgba(255,255,255,.02)"}}>
+                    {rows.map((r,i)=>{
+                      const na=r.avail==="not_available";
+                      return (
+                      <tr key={r.quote.id} style={{borderBottom:"1px solid var(--border)",background:na?"rgba(248,113,113,.05)":i%2===0?"transparent":"rgba(255,255,255,.02)",opacity:na?.7:1}}>
                         <td style={{padding:"10px 14px",verticalAlign:"middle"}}>
                           <div style={{fontWeight:600,fontSize:13}}>{i+1}. {r.item.part_name||"—"}</div>
                           <div style={{fontSize:11,color:"var(--text3)",marginTop:2,fontFamily:"DM Mono,monospace"}}>
@@ -424,37 +450,44 @@ export function RfqBatchReplyPage({token}) {
                             {r.item.oe_number&&<span style={{marginLeft:8}}>OE: {r.item.oe_number}</span>}
                           </div>
                           {(r.item.make||r.item.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{[r.item.make,r.item.model,r.item.part_chinese_desc].filter(Boolean).join(" · ")}</div>}
+                          {/* Availability toggle */}
+                          <div style={{display:"flex",gap:4,marginTop:6}}>
+                            <button onClick={()=>updAvail(i,"in_stock")} style={{fontSize:10,padding:"2px 8px",borderRadius:8,border:`1px solid ${!na?"#34d399":"var(--border)"}`,background:!na?"rgba(52,211,153,.15)":"transparent",color:!na?"#34d399":"var(--text3)",cursor:"pointer",fontWeight:700}}>✓ Available</button>
+                            <button onClick={()=>updAvail(i,"not_available")} style={{fontSize:10,padding:"2px 8px",borderRadius:8,border:`1px solid ${na?"#f87171":"var(--border)"}`,background:na?"rgba(248,113,113,.15)":"transparent",color:na?"#f87171":"var(--text3)",cursor:"pointer",fontWeight:700}}>✗ Not Available</button>
+                          </div>
                         </td>
                         <td style={{padding:"10px 8px",textAlign:"center",verticalAlign:"middle"}}>
                           <span style={{fontWeight:800,fontSize:18,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{r.item.qty_needed||1}</span>
                         </td>
                         <td style={{padding:"6px 8px",verticalAlign:"middle"}}>
                           <input className="inp" value={r.form.supplier_part_no} onChange={e=>upd(i,"supplier_part_no",e.target.value)}
-                            placeholder="your ref#"
+                            placeholder="your ref#" disabled={na}
                             style={{fontSize:12,fontFamily:"DM Mono,monospace",padding:"6px 8px",
                               borderColor:r.form.supplier_part_no?"rgba(52,211,153,.4)":"var(--border)",
-                              background:r.form.supplier_part_no?"rgba(52,211,153,.04)":"transparent"}}/>
-                          {r.prefilled&&<div style={{fontSize:10,color:"var(--green)",marginTop:2}}>✓ from records</div>}
+                              background:r.form.supplier_part_no?"rgba(52,211,153,.04)":"transparent",opacity:na?.5:1}}/>
+                          {r.prefilled&&!na&&<div style={{fontSize:10,color:"var(--green)",marginTop:2}}>✓ from records</div>}
                         </td>
                         <td style={{padding:"6px 8px",verticalAlign:"middle"}}>
+                          {na?<span style={{color:"var(--text3)",fontSize:12,padding:"6px 8px",display:"block"}}>—</span>:
                           <input className="inp" type="number" value={r.form.unit_price} onChange={e=>upd(i,"unit_price",e.target.value)}
                             placeholder="0.00" step="0.01"
-                            style={{fontSize:13,fontWeight:700,padding:"6px 8px",borderColor:!r.form.unit_price?"rgba(248,113,113,.5)":"var(--border)",color:"var(--accent)"}}/>
+                            style={{fontSize:13,fontWeight:700,padding:"6px 8px",borderColor:!r.form.unit_price?"rgba(248,113,113,.5)":"var(--border)",color:"var(--accent)"}}/>}
                         </td>
                         <td style={{padding:"6px 8px",verticalAlign:"middle"}}>
-                          <input className="inp" type="number" value={r.form.stock_qty} onChange={e=>upd(i,"stock_qty",e.target.value)}
-                            placeholder="qty" style={{fontSize:12,padding:"6px 8px"}}/>
+                          <input className="inp" type="number" value={na?"0":r.form.stock_qty} onChange={e=>upd(i,"stock_qty",e.target.value)}
+                            placeholder="qty" disabled={na} style={{fontSize:12,padding:"6px 8px",opacity:na?.5:1}}/>
                         </td>
                         <td style={{padding:"6px 8px",verticalAlign:"middle"}}>
                           <input className="inp" type="number" value={r.form.lead_days} onChange={e=>upd(i,"lead_days",e.target.value)}
-                            placeholder="7" style={{fontSize:12,padding:"6px 8px"}}/>
+                            placeholder="7" disabled={na} style={{fontSize:12,padding:"6px 8px",opacity:na?.5:1}}/>
                         </td>
                         <td style={{padding:"6px 8px",verticalAlign:"middle"}}>
                           <input className="inp" value={r.form.notes} onChange={e=>upd(i,"notes",e.target.value)}
-                            placeholder="MOQ, conditions..." style={{fontSize:12,padding:"6px 8px"}}/>
+                            placeholder={na?"Reason (optional)":"MOQ, conditions..."} style={{fontSize:12,padding:"6px 8px"}}/>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

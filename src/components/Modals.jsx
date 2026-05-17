@@ -2556,9 +2556,12 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     image_url:p.image_url||"", chinese_desc:p.chinese_desc||"",
     make:p.make||"", model:p.model||"", year_range:p.year_range||"", oe_number:p.oe_number||"",
     bin_location:p.bin_location||"", is_quantum:p.is_quantum||false, is_hiace:p.is_hiace||false,
+    auto_reorder:p.auto_reorder||false, reorder_point:p.reorder_point??0, reorder_qty:p.reorder_qty??1,
+    preferred_supplier_id:p.preferred_supplier_id||"",
   }:{
     sku:branchSkuPrefix?branchSkuPrefix+"-":"", name:"", category:"Engine", brand:"", price:"", cost_price:"", stock:"", minStock:"",
     image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", bin_location:"", is_quantum:false, is_hiace:false,
+    auto_reorder:false, reorder_point:0, reorder_qty:1, preferred_supplier_id:"",
   };
   const [f,setF]=useState(()=>makeF(part));
   const [ptab, setPtab] = useState(initialTab||"info");
@@ -2592,6 +2595,8 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     image_url:fv.image_url, chinese_desc:fv.chinese_desc,
     make:fv.make, model:fv.model, year_range:fv.year_range, oe_number:fv.oe_number,
     bin_location:fv.bin_location||"", is_quantum:!!fv.is_quantum, is_hiace:!!fv.is_hiace,
+    auto_reorder:!!fv.auto_reorder, reorder_point:+fv.reorder_point||0, reorder_qty:+fv.reorder_qty||1,
+    preferred_supplier_id:fv.preferred_supplier_id?+fv.preferred_supplier_id:null,
   });
 
   // Auto-save immediately when photo is uploaded (existing part only)
@@ -2642,6 +2647,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     {id:"fitment", label:`🔗 ${t.pmTabFits}`},
     {id:"rfq",     label:`📩 ${t.pmTabRfq}${rfqTotal>0?" ("+rfqTotal+")":""}`},
     ...(part&&onSavePartSupplier?[{id:"supplier",label:`🏭 Suppliers${partSuppliers.length>0?" ("+partSuppliers.length+")":""}`}]:[]),
+    ...(part?[{id:"reorder",label:`🔄 Reorder${part?.auto_reorder?"  ✓":""}`}]:[]),
   ];
 
   return (
@@ -3148,6 +3154,63 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             if(partSuppliers.length===0) return <p style={{color:"var(--text3)",textAlign:"center",padding:20}}>No suppliers yet — add them in the Suppliers tab first.</p>;
             return null;
           })()}
+        </div>
+      )}
+
+      {/* ── REORDER TAB ── */}
+      {ptab==="reorder"&&part&&(
+        <div>
+          {/* Enable toggle */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",background:f.auto_reorder?"rgba(52,211,153,.08)":"var(--surface2)",borderRadius:12,border:`1.5px solid ${f.auto_reorder?"rgba(52,211,153,.4)":"var(--border)"}`,marginBottom:16,cursor:"pointer"}} onClick={()=>s("auto_reorder",!f.auto_reorder)}>
+            <div>
+              <div style={{fontWeight:700,fontSize:14}}>🔄 Auto-Reorder</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>Automatically send RFQ to supplier when stock falls to reorder point</div>
+            </div>
+            <div style={{width:44,height:24,borderRadius:99,background:f.auto_reorder?"var(--green)":"var(--border)",position:"relative",transition:"background .2s",flexShrink:0}}>
+              <div style={{position:"absolute",top:3,left:f.auto_reorder?22:3,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
+            </div>
+          </div>
+
+          {f.auto_reorder&&(<>
+            <FG cols="1fr 1fr">
+              <div>
+                <FL label="Reorder when stock ≤"/>
+                <input className="inp" type="number" min="0" value={f.reorder_point} onChange={e=>s("reorder_point",+e.target.value||0)}/>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Current stock: <strong>{part.stock??0}</strong></div>
+              </div>
+              <div>
+                <FL label="Request quantity"/>
+                <input className="inp" type="number" min="1" value={f.reorder_qty} onChange={e=>s("reorder_qty",+e.target.value||1)}/>
+              </div>
+            </FG>
+
+            <FD>
+              <FL label="Preferred supplier"/>
+              {suppliers.length===0
+                ? <div style={{fontSize:12,color:"var(--text3)",padding:"8px 0"}}>No suppliers — add suppliers first</div>
+                : <select className="inp" value={f.preferred_supplier_id||""} onChange={e=>s("preferred_supplier_id",e.target.value)}>
+                    <option value="">— Select supplier —</option>
+                    {(partSuppliers.length>0
+                      ? partSuppliers.map(ps=>suppliers.find(s=>s.id===+ps.supplier_id)).filter(Boolean)
+                      : suppliers
+                    ).map(sup=>(
+                      <option key={sup.id} value={sup.id}>{sup.name}</option>
+                    ))}
+                  </select>
+              }
+            </FD>
+
+            {/* Status summary */}
+            <div style={{marginTop:12,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)",fontSize:13}}>
+              <div style={{fontWeight:700,marginBottom:6}}>📋 How it works</div>
+              <div style={{color:"var(--text2)",lineHeight:1.7}}>
+                <div>1. Stock drops to ≤ <strong>{f.reorder_point}</strong> units</div>
+                <div>2. RFQ sent to <strong>{suppliers.find(s=>s.id===+f.preferred_supplier_id)?.name||"preferred supplier"}</strong> for <strong>{f.reorder_qty}</strong> units</div>
+                <div>3. Supplier has <strong>24h</strong> to reply — auto-resend if no response</div>
+                <div>4. After 3 attempts → escalate to next linked supplier</div>
+              </div>
+            </div>
+          </>)}
         </div>
       )}
 

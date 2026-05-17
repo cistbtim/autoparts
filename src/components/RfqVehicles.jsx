@@ -6,7 +6,7 @@ import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
 
-export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpdateStatus,onSelectQuote,onUnselectQuote,onUnselectAll,onRefresh,onCreatePO,onEditPart,t,user,settings}) {
+export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpdateStatus,onSelectQuote,onUnselectQuote,onUnselectAll,onRefresh,onCreatePO,onResendStale,onEditPart,t,user,settings}) {
   const [view,setView]=useState("list"); // list | create | detail
   const [activeSession,setActiveSession]=useState(null);
   const [lq,setLq]=useState([]); // local quote state for detail view (no auto-refresh)
@@ -517,17 +517,29 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
               const sSupps=[...new Set(sQuotes.map(q=>q.supplier_id))];
               const quotedCnt=sQuotes.filter(q=>q.status==="quoted").length;
               const statusColor={draft:"var(--text3)",sent:"var(--blue)",comparing:"var(--yellow)",ordered:"var(--green)"}[s.status]||"var(--text3)";
+              const isOverdue=s.is_auto&&s.status==="pending"&&s.reply_deadline&&new Date(s.reply_deadline)<new Date();
               return (
-                <tr key={s.id}>
-                  <td style={{fontWeight:600}}>{s.name}</td>
-                  <td><span className="badge" style={{background:statusColor+"20",color:statusColor,textTransform:"capitalize"}}>{tSt(s.status)}</span></td>
+                <tr key={s.id} style={isOverdue?{background:"rgba(251,146,60,.08)",outline:"1px solid rgba(251,146,60,.3)"}:{}}>
+                  <td style={{fontWeight:600}}>
+                    {s.name}
+                    {s.is_auto&&<span style={{marginLeft:6,fontSize:11,color:"var(--text3)",fontWeight:400}}>auto</span>}
+                  </td>
+                  <td>
+                    {isOverdue
+                      ? <span className="badge" style={{background:"rgba(251,146,60,.2)",color:"#f97316",fontWeight:700}}>⚠️ Overdue</span>
+                      : <span className="badge" style={{background:statusColor+"20",color:statusColor,textTransform:"capitalize"}}>{tSt(s.status)}</span>
+                    }
+                  </td>
                   <td style={{textAlign:"center"}}>{sItems.length}</td>
                   <td style={{textAlign:"center"}}>{sSupps.length}</td>
                   <td style={{textAlign:"center"}}>
                     <span style={{color:quotedCnt===sQuotes.length&&sQuotes.length>0?"var(--green)":"var(--text2)"}}>{quotedCnt}/{sQuotes.length}</span>
                   </td>
                   <td style={{color:"var(--text3)",fontSize:13}}>{s.created_at?.slice(0,10)}</td>
-                  <td><button className="btn btn-info btn-xs" onClick={()=>openSession(s)}>{t.rfqView}</button></td>
+                  <td style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <button className="btn btn-info btn-xs" onClick={()=>openSession(s)}>{t.rfqView}</button>
+                    {isOverdue&&onResendStale&&<button className="btn btn-xs" style={{background:"#f97316",color:"#fff",border:"none"}} onClick={async()=>{await onResendStale();onRefresh();}}>Resend</button>}
+                  </td>
                 </tr>
               );
             })}

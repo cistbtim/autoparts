@@ -3156,6 +3156,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
                 <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
             </div>
+            {/* ── Top pagination bar (between search and table) ── */}
+            {fp.length>PAGE_SIZE&&(
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:8}}>
+                <div style={{fontSize:13,color:"var(--text3)"}}>
+                  Showing <strong style={{color:"var(--text)"}}>{invPage*PAGE_SIZE+1}–{Math.min((invPage+1)*PAGE_SIZE,fp.length)}</strong> of <strong style={{color:"var(--text)"}}>{fp.length}</strong> parts
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <button className="btn btn-ghost btn-sm" disabled={invPage===0} onClick={()=>setInvPage(p=>p-1)}>← Prev</button>
+                  <span style={{fontSize:12,color:"var(--text2)",fontWeight:600,minWidth:70,textAlign:"center"}}>Page {invPage+1} / {Math.ceil(fp.length/PAGE_SIZE)}</span>
+                  <button className="btn btn-ghost btn-sm" disabled={(invPage+1)*PAGE_SIZE>=fp.length} onClick={()=>setInvPage(p=>p+1)}>Next →</button>
+                </div>
+              </div>
+            )}
             {filterFits==="none"&&(
               <div style={{fontSize:12,color:"var(--red)",marginBottom:10,background:"rgba(248,113,113,.08)",borderRadius:8,padding:"6px 10px"}}>
                 ❌ {fp.length} part{fp.length!==1?"s":""} with no vehicle fitment — open each and add fits in the <strong>Fits</strong> tab

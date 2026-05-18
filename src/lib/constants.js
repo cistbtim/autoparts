@@ -6,6 +6,7 @@ export const ROLES = {
   branch_manager:    { color: "#06b6d4", bg: "rgba(6,182,212,0.12)",    icon: "👔" },
   branch_warehouse:  { color: "#84cc16", bg: "rgba(132,204,22,0.12)",   icon: "📦" },
   branch_picker:     { color: "#f59e0b", bg: "rgba(245,158,11,0.12)",   icon: "🔍" },
+  branch_salesman:   { color: "#ec4899", bg: "rgba(236,72,153,0.12)",   icon: "🛒" },
   manager:           { color: "#8b5cf6", bg: "rgba(139,92,246,0.12)",   icon: "👔" },
   shipper:           { color: "#60a5fa", bg: "rgba(96,165,250,0.12)",   icon: "🚚" },
   stockman:          { color: "#10b981", bg: "rgba(16,185,129,0.12)",   icon: "📦" },
@@ -14,7 +15,7 @@ export const ROLES = {
   scrapyard:         { color: "#6b7280", bg: "rgba(107,114,128,0.12)",  icon: "🚗" },
 };
 
-export const BRANCH_ROLES = ["branch_admin","branch_manager","branch_warehouse","branch_picker"];
+export const BRANCH_ROLES = ["branch_admin","branch_manager","branch_warehouse","branch_picker","branch_salesman"];
 
 export const OC = { "Completed": "#34d399", "Ready to Ship": "#fbbf24", "Processing": "#60a5fa", "Cancelled": "#f87171", "Quoted": "#a855f7", "Invoiced": "#f97316", "Paid": "#10b981", "已完成": "#34d399", "待出貨": "#fbbf24", "處理中": "#60a5fa", "已取消": "#f87171" };
 

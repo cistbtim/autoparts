@@ -1,7 +1,42 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { getSettings, C } from "../lib/settings.js";
+import { api } from "../lib/api.js";
+import { makeId, toImgUrl } from "../lib/helpers.js";
+import { getCategories } from "../lib/constants.js";
 
-// ── Manager PIN modal ────────────────────────────────────────────────────────
+// ── Abbreviation expansion ────────────────────────────────────────────────────
+const ABBREVS = [
+  { short: "h/lamp",  full: "head lamp"   },
+  { short: "t/lamp",  full: "tail lamp"   },
+  { short: "c/lamp",  full: "corner lamp" },
+  { short: "m/lamp",  full: "marker lamp" },
+];
+
+// Returns the full label if the text contains any known abbreviation, else ""
+const abbrevLabel = (text) => {
+  if (!text) return "";
+  const t = text.toLowerCase();
+  const found = ABBREVS.filter(a => t.includes(a.short));
+  return found.map(a => a.full.replace(/\b\w/g, c => c.toUpperCase())).join(" / ");
+};
+
+// Expand text for searching — replaces abbreviations with full words
+const expandText = (text) => {
+  if (!text) return "";
+  let t = text.toLowerCase();
+  for (const { short, full } of ABBREVS) t = t.replaceAll(short, full);
+  return t;
+};
+
+// Contract search query — replaces full words with abbreviations so typing
+// "head lamp" matches parts stored as "h/lamp"
+const contractQuery = (q) => {
+  let t = q.toLowerCase();
+  for (const { short, full } of ABBREVS) t = t.replaceAll(full, short);
+  return t;
+};
+
+// ── Manager PIN modal ─────────────────────────────────────────────────────────
 function PinModal({ onSuccess, onClose }) {
   const [pin, setPin] = useState("");
   const [err, setErr] = useState("");
@@ -9,7 +44,7 @@ function PinModal({ onSuccess, onClose }) {
   const tryPin = (p) => {
     const stored = getSettings().pos_manager_pin || "";
     if (!stored || p === stored) { onSuccess(); }
-    else { setErr("Wrong PIN — try again"); setPin(""); }
+    else { setErr("Wrong PIN"); setPin(""); }
   };
 
   const tap = (k) => {
@@ -27,7 +62,7 @@ function PinModal({ onSuccess, onClose }) {
         <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 20 }}>Enter PIN to unlock discount</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 6 }}>
           {[0, 1, 2, 3].map(i => (
-            <div key={i} style={{ width: 44, height: 52, borderRadius: 10, border: `2px solid ${pin.length > i ? "var(--accent)" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800, transition: "border-color .15s" }}>
+            <div key={i} style={{ width: 44, height: 52, borderRadius: 10, border: `2px solid ${pin.length > i ? "var(--accent)" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800 }}>
               {pin[i] ? "•" : ""}
             </div>
           ))}
@@ -49,122 +84,460 @@ function PinModal({ onSuccess, onClose }) {
   );
 }
 
-// ── Receipt view ─────────────────────────────────────────────────────────────
-function PosReceipt({ sale, onNewSale }) {
-  const { invId, cart, customer, subtotal, discount, total, payMethod, cashReceived, change } = sale;
+// ── Searchable combobox ───────────────────────────────────────────────────────
+function Combo({ value, options, placeholder, disabled, onChange, monoFont }) {
+  const [input, setInput] = useState(value);
+  const [open, setOpen]   = useState(false);
+  const ref = useRef(null);
+
+  // Keep input in sync when parent clears the value
+  const prevVal = useRef(value);
+  if (prevVal.current !== value) { prevVal.current = value; setInput(value); }
+
+  const filtered = options.filter(o => o.toLowerCase().includes(input.toLowerCase()));
+
+  const select = (o) => { setInput(o); setOpen(false); onChange(o); };
+  const clear   = ()  => { setInput(""); setOpen(false); onChange(""); };
+
+  return (
+    <div ref={ref} style={{ position: "relative", flex: "1 1 130px", minWidth: 110 }}>
+      <div style={{ position: "relative" }}>
+        <input className="inp" value={input} disabled={disabled}
+          placeholder={placeholder}
+          style={{ fontSize: 13, paddingRight: 24, fontFamily: monoFont ? "DM Mono,monospace" : undefined, width: "100%", boxSizing: "border-box" }}
+          onChange={e => { setInput(e.target.value); setOpen(true); onChange(""); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)} />
+        {input && !disabled && (
+          <button onMouseDown={e => { e.preventDefault(); clear(); }}
+            style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, lineHeight: 1, padding: 0 }}>✕</button>
+        )}
+      </div>
+      {open && !disabled && filtered.length > 0 && (
+        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, maxHeight: 200, overflowY: "auto", boxShadow: "0 6px 20px rgba(0,0,0,.3)", marginTop: 2 }}>
+          {filtered.map(o => (
+            <div key={o} onMouseDown={e => { e.preventDefault(); select(o); }}
+              style={{ padding: "7px 12px", cursor: "pointer", fontSize: 13, fontFamily: monoFont ? "DM Mono,monospace" : undefined,
+                background: o === value ? "rgba(249,115,22,.12)" : "transparent",
+                color: o === value ? "var(--accent)" : "var(--text)" }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--surface3)"}
+              onMouseLeave={e => e.currentTarget.style.background = o === value ? "rgba(249,115,22,.12)" : "transparent"}>
+              {o}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Inline vehicle filter ─────────────────────────────────────────────────────
+function PosVehicleFilter({ vehicles, partFitments, onFilter, onZoom }) {
+  const [make, setMake]   = useState("");
+  const [model, setModel] = useState("");
+  const [code, setCode]   = useState("");
+
+  const makes = [...new Set(vehicles.map(v => v.make).filter(Boolean))].sort();
+
+  // Models for selected make — include codes in label
+  const modelRows = (() => {
+    const filtered = vehicles.filter(v => !make || v.make === make);
+    const map = {};
+    for (const v of filtered) {
+      if (!v.model) continue;
+      if (!map[v.model]) map[v.model] = new Set();
+      if (v.code) map[v.model].add(v.code);
+    }
+    return Object.entries(map)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([m, codes]) => ({ model: m, label: codes.size > 0 ? `${m} [${[...codes].sort().join(" / ")}]` : m }));
+  })();
+  const modelOptions = modelRows.map(r => r.label);
+
+  // Codes for selected make + model
+  const codeList = (make && model)
+    ? [...new Set(vehicles.filter(v => v.make === make && v.model === model).map(v => v.code).filter(Boolean))].sort()
+    : [];
+
+  const apply = (mk, md, cd) => {
+    if (!mk) { onFilter(null); return; }
+    const vIds = new Set(
+      vehicles.filter(v => v.make === mk && (!md || v.model === md) && (!cd || v.code === cd))
+        .map(v => String(v.id))
+    );
+    const pIds = new Set(partFitments.filter(f => vIds.has(String(f.vehicle_id))).map(f => String(f.part_id)));
+    onFilter(pIds.size > 0 ? pIds : new Set(["__none__"]));
+  };
+
+  const handleMake = (v) => { setMake(v); setModel(""); setCode(""); apply(v, "", ""); };
+  const handleModel = (label) => {
+    // strip the "[codes]" suffix to get raw model name
+    const raw = label.replace(/\s*\[.*\]$/, "");
+    setModel(raw); setCode(""); apply(make, raw, "");
+  };
+  const handleCode = (v) => { setCode(v); apply(make, model, v); };
+
+  const selectedVehicle = (make && model)
+    ? vehicles.find(v => v.make === make && v.model === model && (!code || v.code === code))
+    : null;
+  const vehiclePhotos = selectedVehicle
+    ? [
+        { url: toImgUrl(selectedVehicle.photo_front), label: "Front" },
+        { url: toImgUrl(selectedVehicle.photo_side),  label: "Side"  },
+        { url: toImgUrl(selectedVehicle.photo_rear),  label: "Rear"  },
+      ].filter(p => p.url)
+    : [];
+
+  if (!vehicles.length) return null;
+
+  // label shown in model combo matches what we stored
+  const modelLabel = model
+    ? (modelRows.find(r => r.model === model)?.label || model)
+    : "";
+
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+      <span style={{ fontSize: 13 }}>🚗</span>
+
+      <Combo value={make} options={makes} placeholder="Make…" onChange={handleMake} />
+
+      <Combo value={modelLabel} options={modelOptions} placeholder="Model…" disabled={!make} onChange={handleModel} />
+
+      {codeList.length > 1 && (
+        <Combo value={code} options={codeList} placeholder="Code…" onChange={handleCode} monoFont />
+      )}
+
+      {(make || model || code) && (
+        <button className="btn btn-xs btn-ghost" style={{ color: "var(--red)", flexShrink: 0 }}
+          onClick={() => { setMake(""); setModel(""); setCode(""); onFilter(null); }}>✕ Clear</button>
+      )}
+
+      {vehiclePhotos.map(({ url, label }, i) => (
+        <img key={label} src={url} alt={label} title={label}
+          style={{ height: 52, maxWidth: 90, objectFit: "contain", borderRadius: 7, background: "var(--surface2)", border: "1px solid var(--border)", flexShrink: 0, cursor: "zoom-in" }}
+          onError={e => e.target.style.display = "none"}
+          onClick={() => onZoom?.({
+            photos: vehiclePhotos.map(p => ({ url: p.url, name: `${make} ${model}${code ? " " + code : ""} — ${p.label}` })),
+            index: i,
+          })} />
+      ))}
+    </div>
+  );
+}
+
+// ── Print helpers ─────────────────────────────────────────────────────────────
+function _openPrint(html, title) {
+  const w = window.open("", "_blank", "width=900,height=700");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 500);
+}
+
+function _receiptHtml(sale, settings, sym) {
+  const { invId, cart, customer, subtotal, discount, total, payMethod, cashReceived, change, isQuote } = sale;
+  const now = new Date().toLocaleString();
+  const rows = cart.map(it =>
+    `<div style="display:flex;justify-content:space-between;padding:3px 0">
+      <div><b>${it.name}</b><br><span style="font-size:10px;color:#666">${it.sku || ""} ×${it.qty} @ ${sym}${(+it.price).toFixed(2)}</span></div>
+      <div style="font-weight:700">${sym}${(it.qty * it.price).toFixed(2)}</div>
+    </div>`).join("");
+  return `<!DOCTYPE html><html><head><title>Receipt ${invId}</title>
+<style>@media print{@page{margin:4mm;size:80mm auto}body{margin:0;padding:0}}
+body{font-family:monospace;max-width:300px;margin:0 auto;padding:8px;font-size:13px}
+hr{border:none;border-top:1px dashed #999;margin:6px 0}
+.row{display:flex;justify-content:space-between;margin:2px 0;font-size:13px}
+</style></head><body>
+<div style="text-align:center;margin-bottom:10px">
+  <div style="font-weight:800;font-size:16px">${settings.shop_name || "Shop"}</div>
+  ${settings.address ? `<div style="font-size:11px;color:#555">${settings.address}</div>` : ""}
+  ${settings.phone ? `<div style="font-size:11px;color:#555">${settings.phone}</div>` : ""}
+</div>
+<hr>
+<div class="row" style="font-size:11px;color:#555"><span>${isQuote ? "QUOTE" : "INVOICE"} #${invId}</span><span>${now}</span></div>
+<div style="font-size:12px;margin:4px 0">👤 ${customer?.name || "Walk-in"}${customer?.phone ? ` · ${customer.phone}` : ""}</div>
+<hr>${rows}<hr>
+<div class="row"><span>Subtotal</span><span>${sym}${subtotal.toFixed(2)}</span></div>
+${discount > 0 ? `<div class="row" style="color:green"><span>Discount</span><span>−${sym}${discount.toFixed(2)}</span></div>` : ""}
+<div class="row" style="font-weight:800;font-size:17px"><span>TOTAL</span><span>${sym}${total.toFixed(2)}</span></div>
+${!isQuote ? `<div style="font-size:12px;color:#555;text-align:center;margin-top:4px">${payMethod === "cash" ? "💵 Cash" : payMethod === "card" ? "💳 Card" : payMethod === "transfer" ? "🏦 Transfer" : "📱 QR Code"}</div>` : ""}
+${payMethod === "cash" && cashReceived > 0 && !isQuote ? `<div class="row" style="font-size:12px;color:#555"><span>Cash</span><span>${sym}${(+cashReceived).toFixed(2)}</span></div>${change > 0 ? `<div class="row" style="font-weight:700;color:green"><span>Change</span><span>${sym}${(+change).toFixed(2)}</span></div>` : ""}` : ""}
+<hr><div style="text-align:center;font-size:11px;color:#777;margin-top:8px">${isQuote ? "This is a quote — not a receipt" : "Thank you!"}</div>
+</body></html>`;
+}
+
+function _a4Html(sale, settings, sym) {
+  const { invId, cart, customer, subtotal, discount, total, payMethod, isQuote } = sale;
+  const now = new Date();
+  const rows = cart.map((it, i) =>
+    `<tr>
+      <td style="text-align:center;color:#888">${i + 1}</td>
+      <td><b>${it.name}</b>${it.sku ? `<br><span style="font-size:11px;color:#888">${it.sku}</span>` : ""}</td>
+      <td style="text-align:center">${it.qty}</td>
+      <td style="text-align:right">${sym}${(+it.price).toFixed(2)}</td>
+      <td style="text-align:right;font-weight:700">${sym}${(it.qty * it.price).toFixed(2)}</td>
+    </tr>`).join("");
+  return `<!DOCTYPE html><html><head><title>${isQuote ? "Quote" : "Invoice"} ${invId}</title>
+<style>@media print{@page{margin:15mm;size:A4}}
+body{font-family:Arial,sans-serif;font-size:13px;max-width:800px;margin:0 auto;padding:24px;color:#222}
+.hd{display:flex;justify-content:space-between;margin-bottom:32px}
+.label{font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+table{width:100%;border-collapse:collapse;margin-top:24px}
+th{background:#f5f5f5;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #ddd}
+td{padding:9px 12px;border-bottom:1px solid #eee;font-size:13px}
+.totals{float:right;margin-top:20px;min-width:260px}
+.trow{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.tbig{font-size:20px;font-weight:800;border-top:2px solid #222;padding-top:8px;margin-top:6px}
+.foot{clear:both;margin-top:50px;padding-top:12px;border-top:1px solid #ddd;font-size:11px;color:#888;text-align:center}
+</style></head><body>
+<div class="hd">
+  <div>
+    <div style="font-size:22px;font-weight:800;margin-bottom:4px">${settings.shop_name || "Invoice"}</div>
+    ${settings.address ? `<div style="color:#555;font-size:12px">${settings.address}</div>` : ""}
+    ${settings.phone ? `<div style="color:#555;font-size:12px">${settings.phone}</div>` : ""}
+    ${settings.email ? `<div style="color:#555;font-size:12px">${settings.email}</div>` : ""}
+  </div>
+  <div style="text-align:right">
+    <div class="label">${isQuote ? "Quote" : "Invoice"}</div>
+    <div style="font-size:24px;font-weight:800">#${invId}</div>
+    <div class="label" style="margin-top:12px">Date</div>
+    <div>${now.toLocaleDateString()}</div>
+  </div>
+</div>
+<div>
+  <div class="label">Bill To</div>
+  <div style="font-size:15px;font-weight:700">${customer?.name || "Walk-in Customer"}</div>
+  ${customer?.phone ? `<div style="color:#555">${customer.phone}</div>` : ""}
+</div>
+<table>
+  <thead><tr>
+    <th style="width:36px;text-align:center">#</th>
+    <th>Description</th>
+    <th style="width:60px;text-align:center">Qty</th>
+    <th style="width:100px;text-align:right">Unit Price</th>
+    <th style="width:100px;text-align:right">Total</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="totals">
+  <div class="trow"><span style="color:#888">Subtotal</span><span>${sym}${subtotal.toFixed(2)}</span></div>
+  ${discount > 0 ? `<div class="trow" style="color:green"><span>Discount</span><span>−${sym}${discount.toFixed(2)}</span></div>` : ""}
+  <div class="trow tbig"><span>TOTAL</span><span>${sym}${total.toFixed(2)}</span></div>
+  ${!isQuote ? `<div style="color:#888;font-size:12px;margin-top:8px">Payment: ${payMethod === "cash" ? "Cash" : payMethod === "card" ? "Card" : payMethod === "transfer" ? "Bank Transfer" : "QR Code"}</div>` : ""}
+  ${isQuote ? `<div style="color:#e88c30;font-size:12px;margin-top:8px">⚠️ Quote only — not a tax invoice</div>` : ""}
+</div>
+<div class="foot">${settings.shop_name || ""} · Thank you for your business!</div>
+</body></html>`;
+}
+
+// ── Completed-sale / saved-quote screen ───────────────────────────────────────
+function PosDone({ sale, onNewSale }) {
   const settings = getSettings();
   const sym = C();
+  const { invId, cart, customer, subtotal, discount, total, payMethod, cashReceived, change, isQuote } = sale;
   const now = new Date();
 
   return (
-    <div style={{ maxWidth: 420, margin: "0 auto", padding: 20 }}>
-      <div className="card" style={{ padding: 24 }} id="pos-receipt">
-        <div style={{ textAlign: "center", marginBottom: 16 }}>
-          {settings.shop_name && <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>{settings.shop_name}</div>}
-          {settings.address && <div style={{ fontSize: 12, color: "var(--text3)" }}>{settings.address}</div>}
-          {settings.phone && <div style={{ fontSize: 12, color: "var(--text3)" }}>{settings.phone}</div>}
-        </div>
-
-        <div style={{ borderTop: "1px dashed var(--border)", borderBottom: "1px dashed var(--border)", padding: "8px 0", marginBottom: 12, fontSize: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text3)" }}>
-            <span>#{invId}</span>
-            <span>{now.toLocaleString()}</span>
+    <div style={{ maxWidth: 520, margin: "0 auto", padding: 20 }}>
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 44 }}>{isQuote ? "📋" : "✅"}</div>
+          <div style={{ fontWeight: 800, fontSize: 20, marginTop: 8 }}>
+            {isQuote ? "Quote Saved" : "Sale Complete!"}
           </div>
-          <div style={{ marginTop: 4 }}>👤 {customer?.name || "Walk-in"}{customer?.phone ? ` · ${customer.phone}` : ""}</div>
+          <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 4, fontFamily: "DM Mono,monospace" }}>
+            #{invId}
+            {!isQuote && ` · ${now.toLocaleString()}`}
+          </div>
+          {isQuote && (
+            <div style={{ marginTop: 8, padding: "8px 16px", background: "rgba(96,165,250,.1)", border: "1px solid rgba(96,165,250,.3)", borderRadius: 8, fontSize: 13, color: "var(--blue)" }}>
+              Give this number to the customer to collect their order
+            </div>
+          )}
         </div>
 
-        <div style={{ marginBottom: 12 }}>
+        {/* Items summary */}
+        <div style={{ borderTop: "1px dashed var(--border)", borderBottom: "1px dashed var(--border)", padding: "10px 0", marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>
+            👤 {customer?.name || "Walk-in"}{customer?.phone ? ` · ${customer.phone}` : ""}
+          </div>
           {cart.map((it, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{it.name}</div>
-                <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "DM Mono,monospace" }}>{it.sku} × {it.qty} @ {sym}{(+it.price).toFixed(2)}</div>
-              </div>
-              <div style={{ fontWeight: 700, fontFamily: "Rajdhani,sans-serif", fontSize: 14 }}>{sym}{(it.qty * +it.price).toFixed(2)}</div>
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 13 }}>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {it.name} <span style={{ color: "var(--text3)", fontSize: 11 }}>×{it.qty}</span>
+              </span>
+              <span style={{ fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>
+                {sym}{(it.qty * it.price).toFixed(2)}
+              </span>
             </div>
           ))}
         </div>
 
-        <div style={{ borderTop: "1px dashed var(--border)", paddingTop: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-            <span style={{ color: "var(--text3)" }}>Subtotal</span>
-            <span>{sym}{subtotal.toFixed(2)}</span>
-          </div>
+        {/* Totals */}
+        <div style={{ marginBottom: 18 }}>
           {discount > 0 && (
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4, color: "var(--green)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--green)", marginBottom: 4 }}>
               <span>Discount</span><span>−{sym}{discount.toFixed(2)}</span>
             </div>
           )}
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 16, borderTop: "1px solid var(--border)", paddingTop: 6, marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 20 }}>
             <span>TOTAL</span>
-            <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 22, color: "var(--accent)" }}>{sym}{total.toFixed(2)}</span>
+            <span style={{ color: "var(--accent)", fontFamily: "Rajdhani,sans-serif", fontSize: 28 }}>
+              {sym}{total.toFixed(2)}
+            </span>
           </div>
-          <div style={{ fontSize: 12, color: "var(--text3)", textAlign: "center" }}>
-            {payMethod === "cash" ? "💵 Cash" : payMethod === "card" ? "💳 Card" : "📱 QR Code"}
-          </div>
-          {payMethod === "cash" && cashReceived > 0 && (
-            <>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text3)", marginTop: 4 }}>
+          {!isQuote && payMethod === "cash" && cashReceived > 0 && (
+            <div style={{ marginTop: 8, padding: "10px 12px", background: "rgba(52,211,153,.1)", borderRadius: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text3)" }}>
                 <span>Cash received</span><span>{sym}{(+cashReceived).toFixed(2)}</span>
               </div>
               {change > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 700, color: "var(--green)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, color: "var(--green)", fontSize: 16 }}>
                   <span>Change</span><span>{sym}{(+change).toFixed(2)}</span>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
 
-        <div style={{ textAlign: "center", marginTop: 18, fontSize: 12, color: "var(--text3)", borderTop: "1px dashed var(--border)", paddingTop: 14 }}>
-          Thank you for your purchase!
+        {/* Print actions */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button className="btn btn-primary" style={{ padding: "13px 0", fontSize: 15 }}
+            onClick={() => _openPrint(_receiptHtml(sale, settings, sym))}>
+            🖨️ Print Receipt (Narrow / Thermal)
+          </button>
+          <button className="btn btn-ghost" style={{ padding: "13px 0", fontSize: 15 }}
+            onClick={() => _openPrint(_a4Html(sale, settings, sym))}>
+            📄 Print {isQuote ? "Quote" : "Invoice"} (A4)
+          </button>
+          <button className="btn btn-ghost" style={{ padding: "9px 0", fontSize: 13, color: "var(--text3)", marginTop: 4 }}
+            onClick={onNewSale}>
+            ➕ New Sale
+          </button>
         </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "center" }}>
-        <button className="btn btn-primary" style={{ padding: "10px 28px" }} onClick={() => window.print()}>🖨️ Print</button>
-        <button className="btn btn-ghost" style={{ padding: "10px 28px" }} onClick={onNewSale}>➕ New Sale</button>
       </div>
     </div>
   );
 }
 
-// ── Main POS page ────────────────────────────────────────────────────────────
-export function PosPage({ parts, customers, onSave }) {
+// ── Main POS page ─────────────────────────────────────────────────────────────
+export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, branchId = null }) {
   const sym = C();
-  const [cart, setCart] = useState([]);
+
+  // Parts filter — searchInput updates instantly (for the input box display),
+  // search is debounced 200ms so the expensive filter only runs after typing pauses
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState([]);
+  const [filterCat, setFilterCat] = useState("__all__");
+  const [vehicleFilterIds, setVehicleFilterIds] = useState(null);
+  const debounceRef = useRef(null);
+
+  // Cart
+  const [cart, setCart] = useState([]);
   const [customer, setCustomer] = useState(null);
   const [custSearch, setCustSearch] = useState("");
+
+  // Quote
+  const [quoteId, setQuoteId] = useState(null);
+  const [loadInput, setLoadInput] = useState("");
+  const [loadErr, setLoadErr] = useState("");
+  const [loadBusy, setLoadBusy] = useState(false);
+
+  // Payment
   const [payMethod, setPayMethod] = useState("cash");
   const [cashReceived, setCashReceived] = useState("");
   const [discount, setDiscount] = useState(0);
   const [discLocked, setDiscLocked] = useState(true);
   const [showPin, setShowPin] = useState(false);
+
+  // UI
   const [saving, setSaving] = useState(false);
-  const [completedSale, setCompletedSale] = useState(null);
+  const [done, setDone] = useState(null);
+  const [lightbox, setLightbox] = useState(null); // {photos:[{url,name}], index}
+  const [page, setPage] = useState(0);
+
   const searchRef = useRef(null);
 
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e) => {
+      if (e.key === "ArrowLeft")  setLightbox(lb => lb && lb.photos.length > 1 ? { ...lb, index: (lb.index - 1 + lb.photos.length) % lb.photos.length } : lb);
+      if (e.key === "ArrowRight") setLightbox(lb => lb && lb.photos.length > 1 ? { ...lb, index: (lb.index + 1) % lb.photos.length } : lb);
+      if (e.key === "Escape") setLightbox(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [!!lightbox]);
+
+  // Computed totals
   const subtotal = cart.reduce((s, i) => s + i.qty * i.price, 0);
   const total = Math.max(0, subtotal - discount);
   const cashAmt = payMethod === "cash" && cashReceived !== "" ? +cashReceived : null;
   const change = cashAmt !== null && cashAmt >= total ? cashAmt - total : null;
 
-  const doSearch = (q) => {
-    setSearch(q);
-    if (!q.trim()) { setResults([]); return; }
-    const lq = q.toLowerCase();
-    const found = parts.filter(p =>
-      p.sku?.toLowerCase().includes(lq) ||
-      p.name?.toLowerCase().includes(lq) ||
-      p.barcode?.includes(q)
-    ).slice(0, 8);
-    // Auto-add on exact match (barcode scanner sends Enter after scan)
-    if (found.length === 1 && (found[0].sku?.toLowerCase() === lq || found[0].barcode === q)) {
-      addToCart(found[0]); setSearch(""); setResults([]); return;
+  const categories = getCategories().filter(c => c !== "All");
+  const lq = search.trim().toLowerCase();
+
+  // Pre-built search index: one concatenated lowercase string per part, built once
+  // when `parts` changes — not on every keystroke. Includes both raw and expanded text.
+  const searchIndex = useMemo(() => parts.map(p => {
+    const raw = [p.sku, p.name, p.oe_number, p.make, p.model, p.description, p.chinese_desc, p.brand]
+      .filter(Boolean).join(" ").toLowerCase();
+    return { raw, expanded: expandText(raw), barcode: (p.barcode || "").trim() };
+  }), [parts]);
+
+  // partCodeMap built once when fitments/vehicles change
+  const partCodeMap = useMemo(() => {
+    const vById = Object.fromEntries(vehicles.map(v => [String(v.id), v]));
+    const map = {};
+    for (const f of partFitments) {
+      const v = vById[String(f.vehicle_id)];
+      if (!v?.code) continue;
+      if (!map[String(f.part_id)]) map[String(f.part_id)] = new Set();
+      map[String(f.part_id)].add(v.code);
     }
-    setResults(found);
+    return map;
+  }, [partFitments, vehicles]);
+
+  // filteredParts only recomputes when debounced search/filters change
+  const filteredParts = useMemo(() => {
+    const words = lq ? lq.split(/\s+/).filter(Boolean) : [];
+    return parts.filter((p, i) => {
+      if (vehicleFilterIds && !vehicleFilterIds.has(String(p.id))) return false;
+      if (filterCat !== "__all__" && p.category !== filterCat) return false;
+      if (!words.length) return true;
+      const idx = searchIndex[i];
+      // barcode exact match
+      if (idx.barcode === search.trim()) return true;
+      // all words must appear somewhere in raw or expanded index (AND search)
+      return words.every(w => {
+        const cw = contractQuery(w); // e.g. "lamp" stays, "head lamp" → n/a (single word)
+        return idx.raw.includes(w) || idx.expanded.includes(w) || (cw !== w && idx.raw.includes(cw));
+      });
+    });
+  }, [parts, searchIndex, vehicleFilterIds, filterCat, lq, search]);
+
+  const PAGE_SIZE = 15;
+  const totalPages = Math.ceil(filteredParts.length / PAGE_SIZE);
+  const safePage = Math.min(page, Math.max(0, totalPages - 1));
+  const pageParts = filteredParts.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  // Debounced setter — input box updates immediately, filter waits 200ms
+  const setSearch2 = (v) => {
+    setSearchInput(v);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { setSearch(v); setPage(0); }, 200);
+  };
+  const setFilterCat2 = (v) => { setFilterCat(v); setPage(0); };
+  const setVehicleFilter2 = (v) => { setVehicleFilterIds(v); setPage(0); };
+
+  // Barcode Enter handler — exact match auto-adds
+  const handleSearchKey = (e) => {
+    if (e.key !== "Enter" || !lq) return;
+    const exact = parts.find(p => p.sku?.toLowerCase() === lq || p.barcode === searchInput.trim());
+    if (exact) { addToCart(exact); setSearch2(""); return; }
+    if (filteredParts.length === 1) { addToCart(filteredParts[0]); setSearch2(""); }
   };
 
   const addToCart = (part) => {
@@ -177,207 +550,456 @@ export function PosPage({ parts, customers, onSave }) {
   };
 
   const removeFromCart = (pid) => setCart(prev => prev.filter(i => i.part_id !== pid));
-  const setQty = (pid, q) => { if (+q <= 0) { removeFromCart(pid); return; } setCart(prev => prev.map(i => i.part_id === pid ? { ...i, qty: +q } : i)); };
-  const setPrice = (pid, p) => setCart(prev => prev.map(i => i.part_id === pid ? { ...i, price: +p || 0 } : i));
+  const setQty = (pid, q) => {
+    if (+q <= 0) { removeFromCart(pid); return; }
+    setCart(prev => prev.map(i => i.part_id === pid ? { ...i, qty: +q } : i));
+  };
+  const setItemPrice = (pid, p) => setCart(prev => prev.map(i => i.part_id === pid ? { ...i, price: +p || 0 } : i));
 
-  const clearAll = () => { setCart([]); setDiscount(0); setDiscLocked(true); setCashReceived(""); setCustomer(null); setSearch(""); setResults([]); };
+  const clearAll = () => {
+    setCart([]); setDiscount(0); setDiscLocked(true); setCashReceived("");
+    setCustomer(null); setCustSearch(""); setSearch2("");
+    setQuoteId(null); setLoadInput(""); setLoadErr("");
+  };
 
-  const completeSale = async () => {
+  // Save as quote (inserts/updates record, no stock deduction)
+  const saveQuote = async () => {
     if (!cart.length) return;
-    if (payMethod === "cash" && cashReceived !== "" && +cashReceived < total) { alert("Cash received is less than total"); return; }
     setSaving(true);
     try {
-      const invId = await onSave(cart, customer, payMethod, cashAmt, change, discount);
-      setCompletedSale({ invId, cart: [...cart], customer, subtotal, discount, total, payMethod, cashReceived: cashAmt || 0, change: change || 0 });
+      const qId = quoteId || makeId("QT");
+      const payload = {
+        customer_id: customer?.id || null,
+        customer_name: customer?.name || "Walk-in",
+        customer_phone: customer?.phone || "",
+        date: new Date().toISOString().slice(0, 10),
+        subtotal, discount, total,
+        status: "pos_quote",
+        is_pos: true,
+        ...(branchId ? { branch_id: branchId } : {}),
+      };
+
+      if (quoteId) {
+        await api.patch("customer_invoices", "id", quoteId, payload);
+        await api.delete("customer_invoice_items", "invoice_id", quoteId);
+      } else {
+        await api.insert("customer_invoices", { id: qId, ...payload, created_at: new Date().toISOString() });
+      }
+
+      for (const it of cart) {
+        await api.insert("customer_invoice_items", {
+          id: makeId("CIVI"), invoice_id: qId,
+          part_id: it.part_id, part_name: it.name, part_sku: it.sku,
+          qty: it.qty, unit_price: it.price, total: it.qty * it.price,
+        });
+      }
+
+      setQuoteId(qId);
+      setDone({ invId: qId, cart: [...cart], customer, subtotal, discount, total, payMethod, cashReceived: 0, change: 0, isQuote: true });
       clearAll();
     } finally { setSaving(false); }
   };
 
-  if (completedSale) return <PosReceipt sale={completedSale} onNewSale={() => setCompletedSale(null)} />;
+  // Load an existing quote into the cart
+  const loadQuote = async () => {
+    const q = loadInput.trim().toUpperCase();
+    if (!q) return;
+    setLoadErr("");
+    setLoadBusy(true);
+    try {
+      const invs = await api.get("customer_invoices", `id=eq.${encodeURIComponent(q)}&select=*`);
+      if (!invs?.length) { setLoadErr("Quote not found"); return; }
+      const inv = invs[0];
+      if (inv.status !== "pos_quote") { setLoadErr("Not a pending quote"); return; }
+
+      const items = await api.get("customer_invoice_items", `invoice_id=eq.${encodeURIComponent(q)}&select=*`);
+      setCart((items || []).map(it => ({
+        part_id: it.part_id,
+        sku: it.part_sku || "",
+        name: it.part_name || "",
+        price: +(it.unit_price || 0),
+        qty: +(it.qty || 1),
+      })));
+      setDiscount(+(inv.discount || 0));
+      setQuoteId(q);
+      setLoadInput("");
+
+      if (inv.customer_id) {
+        const c = customers.find(c => String(c.id) === String(inv.customer_id));
+        if (c) setCustomer(c);
+      }
+    } catch { setLoadErr("Error loading quote"); }
+    finally { setLoadBusy(false); }
+  };
+
+  // Complete the sale
+  const completeSale = async () => {
+    if (!cart.length) return;
+    if (payMethod === "cash" && cashReceived !== "" && +cashReceived < total) {
+      alert("Cash received is less than total");
+      return;
+    }
+    setSaving(true);
+    try {
+      const invId = await onSave(cart, customer, payMethod, cashAmt, change, discount, quoteId);
+      setDone({ invId, cart: [...cart], customer, subtotal, discount, total, payMethod, cashReceived: cashAmt || 0, change: change || 0, isQuote: false });
+      clearAll();
+    } finally { setSaving(false); }
+  };
+
+  if (done) return <PosDone sale={done} onNewSale={() => setDone(null)} />;
+
+  const hasFilter = vehicleFilterIds || filterCat !== "__all__" || searchInput.trim();
+
+  const _lbPhoto = lightbox ? lightbox.photos[lightbox.index] : null;
+  const _lbMulti = lightbox && lightbox.photos.length > 1;
+  const _lbNav = (dir) => setLightbox(lb => ({ ...lb, index: (lb.index + dir + lb.photos.length) % lb.photos.length }));
+  const navBtn = (dir, label) => (
+    <button onClick={e => { e.stopPropagation(); _lbNav(dir); }}
+      style={{ position: "absolute", top: "50%", [dir === -1 ? "left" : "right"]: 8, transform: "translateY(-50%)", background: "rgba(0,0,0,.6)", border: "1px solid rgba(255,255,255,.25)", color: "#fff", borderRadius: "50%", width: 44, height: 44, fontSize: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2 }}>{label}</button>
+  );
+
+  const Lightbox = lightbox && (
+    <div className="overlay" onClick={() => setLightbox(null)}
+      style={{ zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(0,0,0,.92)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ position: "relative", width: "calc(100vw - 32px)", height: "calc(100vh - 32px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        <img src={_lbPhoto.url} alt={_lbPhoto.name}
+          style={{ width: "100%", height: "calc(100% - 36px)", objectFit: "contain", borderRadius: 12, boxShadow: "0 8px 40px rgba(0,0,0,.7)", background: "#fff" }} />
+        <div style={{ color: "#fff", fontSize: 15, fontWeight: 600, textShadow: "0 1px 4px rgba(0,0,0,.9)", textAlign: "center" }}>
+          {_lbPhoto.name}{_lbMulti && <span style={{ color: "rgba(255,255,255,.5)", fontWeight: 400, marginLeft: 10 }}>{lightbox.index + 1} / {lightbox.photos.length}</span>}
+        </div>
+        {_lbMulti && navBtn(-1, "‹")}
+        {_lbMulti && navBtn(1, "›")}
+        <button onClick={() => setLightbox(null)}
+          style={{ position: "absolute", top: 0, right: 0, background: "rgba(0,0,0,.75)", border: "1px solid rgba(255,255,255,.2)", color: "#fff", borderRadius: "50%", width: 36, height: 36, fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+        {_lbMulti && (
+          <div style={{ position: "absolute", bottom: 36, display: "flex", gap: 6 }}>
+            {lightbox.photos.map((_, i) => (
+              <div key={i} onClick={e => { e.stopPropagation(); setLightbox(lb => ({ ...lb, index: i })); }}
+                style={{ width: i === lightbox.index ? 20 : 8, height: 8, borderRadius: 4, background: i === lightbox.index ? "#fff" : "rgba(255,255,255,.35)", cursor: "pointer", transition: "all .2s" }} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const S = { // shared style tokens for the right panel
+    panel:  { background: "var(--surface)", borderLeft: "2px solid var(--border)" },
+    label:  { fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: "var(--text3)", textTransform: "uppercase", marginBottom: 5 },
+    divider:{ borderTop: "1px solid var(--border)", margin: "2px 0" },
+  };
 
   return (
-    <div style={{ display: "flex", gap: 14, height: "calc(100vh - 110px)", minHeight: 500 }}>
+    <div style={{ display: "flex", gap: 0, height: "calc(100vh - 110px)", minHeight: 500, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", boxShadow: "0 4px 24px rgba(0,0,0,.18)" }}>
       {showPin && <PinModal onSuccess={() => { setDiscLocked(false); setShowPin(false); }} onClose={() => setShowPin(false)} />}
+      {Lightbox}
 
-      {/* LEFT: Search + Cart + Customer */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, minWidth: 0, overflow: "hidden" }}>
-        {/* Search bar */}
-        <div className="card" style={{ padding: 12 }}>
-          <input ref={searchRef} className="inp" value={search} onChange={e => doSearch(e.target.value)}
-            placeholder="🔍 Scan barcode or type SKU / part name…"
-            style={{ fontSize: 15, fontWeight: 600 }}
-            onKeyDown={e => { if (e.key === "Enter" && results.length > 0) { addToCart(results[0]); setSearch(""); setResults([]); } }}
-            autoFocus />
-          {results.length > 0 && (
-            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
-              {results.map(p => (
-                <button key={p.id} className="btn btn-ghost"
-                  style={{ textAlign: "left", padding: "8px 12px", justifyContent: "flex-start", gap: 10, display: "flex", alignItems: "center" }}
-                  onClick={() => { addToCart(p); setSearch(""); setResults([]); }}>
-                  <span style={{ fontFamily: "DM Mono,monospace", fontSize: 12, color: "var(--text3)", minWidth: 90 }}>{p.sku}</span>
-                  <span style={{ fontWeight: 600, flex: 1 }}>{p.name}</span>
-                  <span style={{ color: "var(--accent)", fontFamily: "Rajdhani,sans-serif", fontWeight: 700 }}>{sym}{(p.price || 0).toFixed(2)}</span>
-                  <span style={{ fontSize: 11, color: (p.stock || 0) > 0 ? "var(--green)" : "var(--red)", minWidth: 50, textAlign: "right" }}>×{p.stock || 0}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* ══ LEFT: Parts catalog ══ */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", background: "var(--bg)" }}>
 
-        {/* Cart */}
-        <div className="card" style={{ flex: 1, overflow: "auto", padding: 0 }}>
-          {cart.length === 0 ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text3)", fontSize: 14, flexDirection: "column", gap: 8 }}>
-              <div style={{ fontSize: 40 }}>🛒</div>
-              <div>Cart empty — scan or search a part to begin</div>
-            </div>
-          ) : (
-            <table className="tbl" style={{ tableLayout: "fixed" }}>
-              <thead>
-                <tr>
-                  <th>Part</th>
-                  <th style={{ width: 112, textAlign: "center" }}>Qty</th>
-                  <th style={{ width: 100, textAlign: "right" }}>Price</th>
-                  <th style={{ width: 90, textAlign: "right" }}>Total</th>
-                  <th style={{ width: 36 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {cart.map(it => (
-                  <tr key={it.part_id}>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{it.name}</div>
-                      <div style={{ fontFamily: "DM Mono,monospace", fontSize: 11, color: "var(--text3)" }}>{it.sku}</div>
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
-                        <button className="btn btn-xs btn-ghost" onClick={() => setQty(it.part_id, it.qty - 1)}>−</button>
-                        <input className="inp" type="number" min={1} value={it.qty}
-                          onChange={e => setQty(it.part_id, e.target.value)}
-                          style={{ width: 46, textAlign: "center", padding: "3px 4px" }} />
-                        <button className="btn btn-xs btn-ghost" onClick={() => setQty(it.part_id, it.qty + 1)}>+</button>
-                      </div>
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <input className="inp" type="number" min={0} step="0.01" value={it.price}
-                        onChange={e => setPrice(it.part_id, e.target.value)}
-                        style={{ width: 84, textAlign: "right", padding: "3px 6px", fontWeight: 700 }} />
-                    </td>
-                    <td style={{ textAlign: "right", fontWeight: 700, fontFamily: "Rajdhani,sans-serif", fontSize: 15, color: "var(--accent)" }}>
-                      {sym}{(it.qty * it.price).toFixed(2)}
-                    </td>
-                    <td style={{ textAlign: "center" }}>
-                      <button style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontSize: 16, lineHeight: 1 }} onClick={() => removeFromCart(it.part_id)}>✕</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Customer (optional) */}
-        <div className="card" style={{ padding: 10 }}>
-          {customer ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13 }}>👤 {customer.name}{customer.phone ? ` · ${customer.phone}` : ""}</span>
-              <button className="btn btn-xs btn-ghost" style={{ marginLeft: "auto" }} onClick={() => setCustomer(null)}>✕ Walk-in</button>
-            </div>
-          ) : (
-            <div style={{ position: "relative" }}>
-              <input className="inp" value={custSearch} onChange={e => setCustSearch(e.target.value)}
-                placeholder="👤 Customer (optional — search by name or phone)"
-                style={{ fontSize: 13 }} />
-              {custSearch.length > 0 && (
-                <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 50, maxHeight: 160, overflow: "auto", boxShadow: "0 -4px 16px rgba(0,0,0,.25)" }}>
-                  {(() => {
-                    const lq = custSearch.toLowerCase();
-                    const hits = customers.filter(c => c.name?.toLowerCase().includes(lq) || c.phone?.includes(custSearch)).slice(0, 5);
-                    return hits.length > 0
-                      ? hits.map(c => (
-                        <button key={c.id} className="btn btn-ghost" style={{ width: "100%", textAlign: "left", padding: "8px 12px" }}
-                          onClick={() => { setCustomer(c); setCustSearch(""); }}>
-                          {c.name}{c.phone ? ` · ${c.phone}` : ""}
-                        </button>
-                      ))
-                      : <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text3)" }}>No match — will record as Walk-in</div>;
-                  })()}
-                </div>
+        {/* Search + filter bar */}
+        <div style={{ padding: "10px 12px", borderBottom: "2px solid var(--border)", background: "var(--surface2)", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <input ref={searchRef} className="inp" value={searchInput}
+                onChange={e => setSearch2(e.target.value)}
+                onKeyDown={handleSearchKey}
+                placeholder="🔍  Scan barcode · SKU · part name · OE number…"
+                style={{ fontSize: 14, fontWeight: 600, paddingRight: 32, background: "var(--surface)", border: "2px solid var(--border)", transition: "border-color .15s" }}
+                autoFocus />
+              {searchInput && (
+                <button onClick={() => setSearch2("")}
+                  style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 14, lineHeight: 1 }}>✕</button>
               )}
             </div>
+<select className="inp" value={filterCat} onChange={e => setFilterCat2(e.target.value)}
+              style={{ width: 150, fontSize: 13, flexShrink: 0, background: "var(--surface)" }}>
+              <option value="__all__">All Categories</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} onFilter={setVehicleFilter2} onZoom={setLightbox} />
+        </div>
+
+        {/* Parts table */}
+        <div style={{ flex: 1, overflow: "auto" }}>
+          {!hasFilter ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 12, color: "var(--text3)" }}>
+              <div style={{ fontSize: 52, opacity: .4 }}>🔎</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text2)" }}>Search or filter to browse parts</div>
+              <div style={{ fontSize: 12 }}>Type a keyword · scan a barcode · pick make / model</div>
+            </div>
+          ) : filteredParts.length === 0 ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 8, color: "var(--text3)" }}>
+              <div style={{ fontSize: 40, opacity: .4 }}>🔍</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>No parts match</div>
+            </div>
+          ) : (
+            <>
+              <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                <thead>
+                  <tr style={{ background: "var(--surface2)", position: "sticky", top: 0, zIndex: 2 }}>
+                    <th style={{ width: 96, padding: "8px 8px" }}></th>
+                    <th style={{ padding: "8px 10px", textAlign: "left", fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: ".04em" }}>PART</th>
+                    <th style={{ width: 100, padding: "8px 10px", textAlign: "right", fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: ".04em" }}>PRICE</th>
+                    <th style={{ width: 58, padding: "8px 8px", textAlign: "center", fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: ".04em" }}>QTY</th>
+                    <th style={{ width: 58, padding: "8px 8px" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageParts.map((p, idx) => {
+                    const inCart = cart.find(i => i.part_id === p.id);
+                    const img = toImgUrl(p.image_url);
+                    const codes = partCodeMap[String(p.id)];
+                    return (
+                      <tr key={p.id} style={{
+                        opacity: p.stock <= 0 ? 0.5 : 1,
+                        background: inCart ? "rgba(249,115,22,.07)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.018)",
+                        borderLeft: inCart ? "3px solid var(--accent)" : "3px solid transparent",
+                        transition: "background .1s",
+                      }}>
+                        <td style={{ padding: "6px 8px", verticalAlign: "middle" }}>
+                          {img
+                            ? <div style={{ width: 80, height: 80, borderRadius: 8, background: "#fff", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in", overflow: "hidden" }}
+                                onClick={() => setLightbox({ photos: [{ url: img, name: p.name }], index: 0 })}>
+                                <img src={img} alt=""
+                                  style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                                  onError={e => e.target.parentElement.style.display = "none"} />
+                              </div>
+                            : <div style={{ width: 80, height: 80, borderRadius: 8, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, border: "1px solid var(--border)" }}>{p.image || "🔩"}</div>
+                          }
+                        </td>
+                        <td style={{ padding: "8px 10px", verticalAlign: "middle" }}>
+                          <div style={{ fontWeight: 700, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)", marginBottom: 2 }}>{p.name}</div>
+                          {p.sku && <div style={{ fontFamily: "DM Mono,monospace", fontSize: 15, color: "var(--blue)", fontWeight: 700, marginBottom: 2 }}>{p.sku}</div>}
+                          {abbrevLabel(p.name) && <div style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>{abbrevLabel(p.name)}</div>}
+                          {p.brand && <div style={{ fontSize: 12, color: "var(--text3)" }}>{p.brand}</div>}
+                          {(p.make || p.model) && (
+                            <div style={{ fontSize: 12, color: "var(--blue)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              🚗 {[p.make, p.model, p.year_range].filter(Boolean).join(" · ")}
+                            </div>
+                          )}
+                          {codes?.size > 0 && (() => {
+                            const list = [...codes].sort();
+                            const show = list.slice(0, 4);
+                            return <div style={{ fontSize: 11, fontFamily: "DM Mono,monospace", color: "var(--accent)", fontWeight: 700 }}>{show.join(" · ")}{list.length > 4 ? ` +${list.length - 4}` : ""}</div>;
+                          })()}
+                        </td>
+                        <td style={{ textAlign: "right", fontFamily: "Rajdhani,sans-serif", fontWeight: 800, fontSize: 17, color: "var(--accent)", padding: "8px 10px", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                          {sym}{(p.price || 0).toFixed(2)}
+                        </td>
+                        <td style={{ textAlign: "center", verticalAlign: "middle", padding: "8px 6px" }}>
+                          <span style={{ display: "inline-block", minWidth: 34, padding: "4px 8px", borderRadius: 6, fontSize: 14, fontWeight: 800, background: p.stock > 0 ? "rgba(52,211,153,.15)" : "rgba(248,113,113,.15)", color: p.stock > 0 ? "var(--green)" : "var(--red)", border: `1px solid ${p.stock > 0 ? "rgba(52,211,153,.3)" : "rgba(248,113,113,.3)"}` }}>
+                            {p.stock || 0}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "center", verticalAlign: "middle", padding: "8px 6px" }}>
+                          {inCart ? (
+                            <button onClick={() => setQty(p.id, inCart.qty + 1)}
+                              style={{ background: "var(--accent)", border: "none", color: "#fff", borderRadius: 8, padding: "6px 10px", fontWeight: 800, fontSize: 14, cursor: "pointer", minWidth: 42 }}>
+                              +{inCart.qty}
+                            </button>
+                          ) : (
+                            <button onClick={() => addToCart(p)} disabled={p.stock <= 0}
+                              style={{ background: "var(--surface2)", border: `1px solid ${p.stock <= 0 ? "var(--border)" : "var(--accent)"}`, color: p.stock <= 0 ? "var(--text3)" : "var(--accent)", borderRadius: 8, padding: "6px 10px", fontWeight: 700, fontSize: 16, cursor: p.stock <= 0 ? "not-allowed" : "pointer" }}>
+                              +
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {totalPages > 1 && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px", borderTop: "1px solid var(--border)", background: "var(--surface2)", position: "sticky", bottom: 0 }}>
+                  <button className="btn btn-ghost btn-sm" disabled={safePage === 0} onClick={() => setPage(p => p - 1)}>← Prev</button>
+                  <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                    Page <strong style={{ color: "var(--text)", fontSize: 13 }}>{safePage + 1}</strong> / {totalPages}
+                    <span style={{ marginLeft: 8, color: "var(--text3)" }}>· {filteredParts.length} parts</span>
+                  </span>
+                  <button className="btn btn-ghost btn-sm" disabled={safePage >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next →</button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      {/* RIGHT: Payment panel */}
-      <div className="card" style={{ width: 268, flexShrink: 0, display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
-        {/* Totals */}
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
-            <span style={{ color: "var(--text3)" }}>Subtotal</span>
-            <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 15 }}>{sym}{subtotal.toFixed(2)}</span>
-          </div>
-          {/* Discount */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 }}>
-            <span style={{ fontSize: 13, color: "var(--text3)", flexShrink: 0 }}>Discount</span>
-            {discLocked ? (
-              <button className="btn btn-xs btn-ghost" style={{ fontSize: 11 }} onClick={() => setShowPin(true)}>🔒 Manager</button>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <input className="inp" type="number" min={0} step="0.01" value={discount || ""}
-                  onChange={e => setDiscount(+e.target.value || 0)}
-                  placeholder="0.00" autoFocus
-                  style={{ width: 80, textAlign: "right", padding: "3px 8px", fontSize: 13, color: "var(--green)", fontWeight: 700 }} />
-                <button className="btn btn-xs btn-ghost" title="Lock" onClick={() => { setDiscount(0); setDiscLocked(true); }}>🔒</button>
-              </div>
-            )}
-          </div>
-          {/* Total */}
-          <div style={{ borderTop: "2px solid var(--border)", paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontWeight: 700, fontSize: 15 }}>TOTAL</span>
-            <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 26, fontWeight: 800, color: "var(--accent)" }}>{sym}{total.toFixed(2)}</span>
-          </div>
-        </div>
+      {/* ══ RIGHT: Register panel ══ */}
+      <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden", ...S.panel }}>
 
-        {/* Payment method */}
-        <div>
-          <div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Payment</div>
-          <div style={{ display: "flex", gap: 5 }}>
-            {[["cash", "💵 Cash"], ["card", "💳 Card"], ["qr", "📱 QR"]].map(([m, lbl]) => (
-              <button key={m} onClick={() => setPayMethod(m)}
-                style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: `2px solid ${payMethod === m ? "var(--accent)" : "var(--border)"}`, background: payMethod === m ? "rgba(251,146,60,.12)" : "var(--surface2)", color: payMethod === m ? "var(--accent)" : "var(--text2)", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
-                {lbl}
+        {/* Quote bar */}
+        <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", background: quoteId ? "rgba(96,165,250,.08)" : "var(--surface)" }}>
+          {quoteId ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: "var(--blue)", fontWeight: 800, fontFamily: "DM Mono,monospace" }}>📋 {quoteId}</span>
+              <span style={{ fontSize: 11, color: "var(--text3)", flex: 1 }}>quote loaded</span>
+              <button className="btn btn-xs btn-ghost" style={{ color: "var(--red)" }} onClick={() => setQuoteId(null)}>✕</button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 5 }}>
+              <input className="inp" value={loadInput}
+                onChange={e => { setLoadInput(e.target.value.toUpperCase()); setLoadErr(""); }}
+                onKeyDown={e => e.key === "Enter" && loadQuote()}
+                placeholder="Load quote: QT-…" style={{ flex: 1, fontSize: 12, fontFamily: "DM Mono,monospace", padding: "5px 8px" }} />
+              <button className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: 12, flexShrink: 0 }}
+                onClick={loadQuote} disabled={loadBusy || !loadInput.trim()}>
+                {loadBusy ? "…" : "Load"}
               </button>
-            ))}
-          </div>
+            </div>
+          )}
+          {loadErr && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 3 }}>{loadErr}</div>}
         </div>
 
-        {/* Cash received + change */}
-        {payMethod === "cash" && (
-          <div>
-            <div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Cash Received</div>
-            <input className="inp" type="number" min={0} step="0.01" value={cashReceived}
-              onChange={e => setCashReceived(e.target.value)}
-              placeholder={total.toFixed(2)}
-              style={{ fontSize: 20, fontWeight: 800, textAlign: "right" }} />
-            {change !== null && (
-              <div style={{ marginTop: 8, padding: "10px 12px", background: "rgba(52,211,153,.1)", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>Change</span>
-                <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 22, fontWeight: 800, color: "var(--green)" }}>{sym}{change.toFixed(2)}</span>
+        {/* Cart items */}
+        <div style={{ flex: 1, overflowY: "auto", background: "var(--surface)" }}>
+          {cart.length === 0 ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text3)", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 36, opacity: .3 }}>🛒</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Cart is empty</div>
+            </div>
+          ) : cart.map((it, idx) => (
+            <div key={it.part_id} style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", background: idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.02)" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 5 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--text)" }}>{it.name}</div>
+                  <div style={{ fontFamily: "DM Mono,monospace", fontSize: 10, color: "var(--text3)" }}>{it.sku}</div>
+                </div>
+                <button style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontSize: 14, lineHeight: 1, opacity: .7, padding: 2 }} onClick={() => removeFromCart(it.part_id)}>✕</button>
               </div>
-            )}
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <button style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6, width: 26, height: 26, fontWeight: 800, fontSize: 15, cursor: "pointer", color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setQty(it.part_id, it.qty - 1)}>−</button>
+                <input className="inp" type="number" min={1} value={it.qty}
+                  onChange={e => setQty(it.part_id, e.target.value)}
+                  style={{ width: 36, textAlign: "center", padding: "2px 3px", fontSize: 13, fontWeight: 700 }} />
+                <button style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6, width: 26, height: 26, fontWeight: 800, fontSize: 15, cursor: "pointer", color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setQty(it.part_id, it.qty + 1)}>+</button>
+                <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: 2 }}>@</span>
+                <input className="inp" type="number" min={0} step="0.01" value={it.price}
+                  onChange={e => setItemPrice(it.part_id, e.target.value)}
+                  style={{ flex: 1, textAlign: "right", padding: "2px 5px", fontSize: 13, fontWeight: 700, color: "var(--text)" }} />
+                <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 14, fontWeight: 800, color: "var(--accent)", flexShrink: 0, minWidth: 56, textAlign: "right" }}>
+                  {sym}{(it.qty * it.price).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Customer */}
+        <div style={{ padding: "7px 12px", borderTop: "1px solid var(--border)", background: customer ? "rgba(52,211,153,.06)" : "var(--surface)" }}>
+          {customer ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600, color: "var(--green)" }}>
+                👤 {customer.name}{customer.phone ? ` · ${customer.phone}` : ""}
+              </span>
+              <button className="btn btn-xs btn-ghost" onClick={() => { setCustomer(null); setCustSearch(""); }}>✕</button>
+            </div>
+          ) : (
+            <div style={{ position: "relative" }}>
+              <input className="inp" value={custSearch} onChange={e => setCustSearch(e.target.value)}
+                placeholder="👤 Customer name or phone (optional)"
+                style={{ fontSize: 12, padding: "5px 8px" }} />
+              {custSearch.length > 0 && (() => {
+                const lq2 = custSearch.toLowerCase();
+                const hits = customers.filter(c => c.name?.toLowerCase().includes(lq2) || c.phone?.includes(custSearch)).slice(0, 5);
+                return (
+                  <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 50, maxHeight: 180, overflow: "auto", boxShadow: "0 -4px 20px rgba(0,0,0,.3)", marginBottom: 2 }}>
+                    {hits.length > 0 ? hits.map(c => (
+                      <button key={c.id} className="btn btn-ghost" style={{ width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13 }}
+                        onClick={() => { setCustomer(c); setCustSearch(""); }}>
+                        {c.name}{c.phone ? ` · ${c.phone}` : ""}
+                      </button>
+                    )) : <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text3)" }}>No match — will record as Walk-in</div>}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+
+        {/* ── Bottom: Totals + Payment ── */}
+        <div style={{ background: "var(--surface2)", borderTop: "2px solid var(--border)", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+
+          {/* Subtotal + Discount */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+              <span style={{ color: "var(--text3)" }}>Subtotal</span>
+              <span style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 700 }}>{sym}{subtotal.toFixed(2)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 13, color: "var(--text3)" }}>Discount</span>
+              {discLocked ? (
+                <button className="btn btn-xs btn-ghost" style={{ fontSize: 11, borderColor: "rgba(251,146,60,.3)", color: "var(--accent)" }} onClick={() => setShowPin(true)}>🔒 Manager PIN</button>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input className="inp" type="number" min={0} step="0.01" value={discount || ""}
+                    onChange={e => setDiscount(+e.target.value || 0)}
+                    placeholder="0.00" autoFocus
+                    style={{ width: 72, textAlign: "right", padding: "3px 6px", fontSize: 14, color: "var(--green)", fontWeight: 800 }} />
+                  <button className="btn btn-xs btn-ghost" title="Lock" onClick={() => { setDiscount(0); setDiscLocked(true); }}>🔒</button>
+                </div>
+              )}
+            </div>
           </div>
-        )}
 
-        <div style={{ flex: 1 }} />
+          {/* TOTAL — big and bold */}
+          <div style={{ background: "var(--surface)", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "2px solid var(--border)" }}>
+            <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: ".02em" }}>TOTAL</span>
+            <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 32, fontWeight: 900, color: "var(--accent)", letterSpacing: "-.01em" }}>
+              {sym}{total.toFixed(2)}
+            </span>
+          </div>
 
-        <button className="btn btn-primary" style={{ padding: "15px 0", fontSize: 16, fontWeight: 800 }}
-          onClick={completeSale} disabled={saving || cart.length === 0}>
-          {saving ? "⏳ Processing…" : "✅ Complete Sale"}
-        </button>
-        <button className="btn btn-ghost" style={{ fontSize: 12, color: "var(--text3)", padding: "7px 0" }} onClick={clearAll}>
-          🗑 Clear Cart
-        </button>
+          {/* Payment method */}
+          <div>
+            <div style={S.label}>Payment Method</div>
+            <div style={{ display: "flex", gap: 5 }}>
+              {[["cash", "💵", "Cash"], ["card", "💳", "Card"], ["qr", "📱", "QR"], ["transfer", "🏦", "Transfer"]].map(([m, icon, lbl]) => (
+                <button key={m} onClick={() => setPayMethod(m)}
+                  style={{ flex: 1, padding: "9px 0", borderRadius: 9, border: `2px solid ${payMethod === m ? "var(--accent)" : "var(--border)"}`, background: payMethod === m ? "rgba(249,115,22,.15)" : "var(--surface)", color: payMethod === m ? "var(--accent)" : "var(--text3)", fontWeight: 800, fontSize: 11, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, transition: "all .15s" }}>
+                  <span style={{ fontSize: 18 }}>{icon}</span>
+                  <span>{lbl}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cash received + change */}
+          {payMethod === "cash" && (
+            <div>
+              <div style={S.label}>Cash Received</div>
+              <input className="inp" type="number" min={0} step="0.01" value={cashReceived}
+                onChange={e => setCashReceived(e.target.value)}
+                placeholder={total.toFixed(2)}
+                style={{ fontSize: 22, fontWeight: 900, textAlign: "right", letterSpacing: "-.01em" }} />
+              {change !== null && (
+                <div style={{ marginTop: 6, padding: "10px 14px", background: "rgba(52,211,153,.15)", border: "1px solid rgba(52,211,153,.35)", borderRadius: 9, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--green)" }}>Change</span>
+                  <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 26, fontWeight: 900, color: "var(--green)" }}>{sym}{change.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Complete Sale */}
+          <button onClick={completeSale} disabled={saving || cart.length === 0}
+            style={{ padding: "15px 0", borderRadius: 10, border: "none", background: cart.length === 0 ? "var(--border)" : "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", fontSize: 16, fontWeight: 900, cursor: cart.length === 0 ? "not-allowed" : "pointer", letterSpacing: ".02em", boxShadow: cart.length > 0 ? "0 4px 16px rgba(34,197,94,.35)" : "none", transition: "all .15s" }}>
+            {saving ? "⏳  Processing…" : "✅  Complete Sale"}
+          </button>
+
+          {/* Save Quote + Clear */}
+          <div style={{ display: "flex", gap: 6 }}>
+            <button className="btn btn-ghost" style={{ flex: 1, fontSize: 12, padding: "8px 0", borderColor: "rgba(96,165,250,.4)", color: "var(--blue)" }}
+              onClick={saveQuote} disabled={saving || cart.length === 0}>
+              📋 {quoteId ? "Update Quote" : "Save as Quote"}
+            </button>
+            <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: 13, color: "var(--text3)" }}
+              title="Clear cart" onClick={clearAll}>🗑</button>
+          </div>
+        </div>
       </div>
     </div>
   );

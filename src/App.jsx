@@ -81,7 +81,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const scrapId = role==="scrapyard" ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const isBranchUser = BRANCH_ROLES.includes(role);
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_dashboard":role==="branch_picker"?"orders":isBranchUser?"inventory":role==="demo"?"inventory":"dashboard";
+  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":isBranchUser?"inventory":role==="demo"?"inventory":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [parts,setParts]=useState([]);
@@ -312,6 +312,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const loadAll=useCallback(async()=>{
     // Branch filter prefix — limits fetch to this branch's records for branch users
     const bF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
+    const isSalesman=role==="branch_salesman"; // POS-only role — skip unneeded tables
     setLoading(true);
     setLoadingItems([]);
 
@@ -352,8 +353,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setParts(Array.isArray(partsFirst)?partsFirst:[]);
 
     const [o,s,st,br]=await Promise.all([
-      track('orders',    api.get("orders","select=*&order=created_at.desc")),
-      track('suppliers', api.get("suppliers",isBranchUser&&user.branch_id?`or=(branch_id.is.null,branch_id.eq.${user.branch_id})&order=name.asc`:"select=*&order=name.asc")),
+      isSalesman ? Promise.resolve([]) : track('orders',    api.get("orders","select=*&order=created_at.desc")),
+      isSalesman ? Promise.resolve([]) : track('suppliers', api.get("suppliers",isBranchUser&&user.branch_id?`or=(branch_id.is.null,branch_id.eq.${user.branch_id})&order=name.asc`:"select=*&order=name.asc")),
       track('settings',  api.get("settings","id=eq.1&select=*")),
       track('branches',  api.get("branches","select=*&order=is_main.desc,name.asc").catch(()=>[])),
     ]);
@@ -400,36 +401,36 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
 
     // LAZY: load secondary data in background
     // Role-scoped: skip tables the current role will never use
-    const needsWs  = role==="admin"||role==="manager"||role==="workshop"||role==="demo";
-    const needsScrap = role==="admin"||role==="scrapyard"||role==="demo";
-    const needsAdmin = role==="admin"||role==="demo";
+    const needsWs  = !isSalesman&&(role==="admin"||role==="manager"||role==="workshop"||role==="demo");
+    const needsScrap = !isSalesman&&(role==="admin"||role==="scrapyard"||role==="demo");
+    const needsAdmin = !isSalesman&&(role==="admin"||role==="demo");
     const BG_TABLES=["customers","users","inventory_logs",needsAdmin?"login_logs":null,"inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","vehicles","part_fitments","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes",needsWs?"workshop_jobs":null,needsWs?"workshop_job_items":null,needsWs?"workshop_invoices":null,needsWs?"workshop_quotes":null,needsWs?"workshop_customers":null,needsWs?"workshop_vehicles":null,"customer_queries",needsWs?"workshop_stock":null,needsWs?"workshop_services":null,needsWs?"workshop_documents":null,needsWs?"workshop_profiles":null,needsWs?"workshop_suppliers":null,needsWs?"ws_supplier_requests":null,needsWs?"ws_supplier_quotes":null,needsWs?"ws_supplier_invoices":null,needsWs?"ws_supplier_invoice_items":null,needsWs?"ws_supplier_payments":null,needsWs?"ws_supplier_returns":null,needsWs?"ws_sq_replies":null,needsWs?"ws_purchase_orders":null,needsWs?"ws_po_items":null,needsWs?"ws_licence_renewals":null,needsWs?"workshop_bookings":null,needsScrap?"scrapyard_vehicles":null,needsScrap?"scrapyard_parts":null,needsScrap?"scrapyard_profiles":null].filter(Boolean);
     setBgLoading(BG_TABLES.length);
     const [c,u,l,ll,inq,si,ci,sr,cr,veh,fit,py,...rest]=await Promise.all([
       api.get("customers","select=*&order=total_spent.desc"),
-      api.get("users","select=*&order=id.asc"),
-      api.get("inventory_logs",`${bF}select=*&order=created_at.desc&limit=200`),
+      isSalesman ? Promise.resolve([]) : api.get("users","select=*&order=id.asc"),
+      isSalesman ? Promise.resolve([]) : api.get("inventory_logs",`${bF}select=*&order=created_at.desc&limit=200`),
       needsAdmin ? api.get("login_logs","select=*&order=created_at.desc&limit=200") : Promise.resolve([]),
-      api.get("inquiries",`${bF}select=*&order=created_at.desc`),
-      api.get("supplier_invoices",`${bF}select=*&order=created_at.desc`),
+      isSalesman ? Promise.resolve([]) : api.get("inquiries",`${bF}select=*&order=created_at.desc`),
+      isSalesman ? Promise.resolve([]) : api.get("supplier_invoices",`${bF}select=*&order=created_at.desc`),
       api.get("customer_invoices",`${bF}select=*&order=created_at.desc`),
-      api.get("supplier_returns",`${bF}select=*&order=created_at.desc`),
-      api.get("customer_returns",`${bF}select=*&order=created_at.desc`),
+      isSalesman ? Promise.resolve([]) : api.get("supplier_returns",`${bF}select=*&order=created_at.desc`),
+      isSalesman ? Promise.resolve([]) : api.get("customer_returns",`${bF}select=*&order=created_at.desc`),
       api.get("vehicles","select=*&order=make.asc,model.asc,year_from.asc").catch(()=>[]),
       api.get("part_fitments","select=*").catch(()=>[]),
-      api.get("payments",`${bF}select=*&order=payment_date.desc`).catch(()=>[]),
-      api.get("rfq_sessions",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
-      api.get("rfq_items","select=*").catch(()=>[]),
-      api.get("rfq_quotes","select=*&order=created_at.desc").catch(()=>[]),
-      api.get("stock_moves",`${bF}select=*&order=moved_at.desc&limit=200`).catch(()=>[]),
-      api.get("stock_takes",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
+      isSalesman ? Promise.resolve([]) : api.get("payments",`${bF}select=*&order=payment_date.desc`).catch(()=>[]),
+      isSalesman ? Promise.resolve([]) : api.get("rfq_sessions",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
+      isSalesman ? Promise.resolve([]) : api.get("rfq_items","select=*").catch(()=>[]),
+      isSalesman ? Promise.resolve([]) : api.get("rfq_quotes","select=*&order=created_at.desc").catch(()=>[]),
+      isSalesman ? Promise.resolve([]) : api.get("stock_moves",`${bF}select=*&order=moved_at.desc&limit=200`).catch(()=>[]),
+      isSalesman ? Promise.resolve([]) : api.get("stock_takes",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
       needsWs ? api.get("workshop_jobs",`select=*&order=date_in.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_job_items",`select=*${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_quotes",`select=*&order=quote_date.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_customers",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_vehicles",`select=*&order=reg.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
-      api.get("customer_queries",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
+      isSalesman ? Promise.resolve([]) : api.get("customer_queries",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
       needsWs ? api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
@@ -496,14 +497,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setAllScrapProfiles(Array.isArray(rest[30])?rest[30]:[]);
     setBgLoading(0); // all background tables done
     // Check for overdue auto-RFQs on every app load (runs after state is set)
-    setTimeout(()=>checkStaleRfqs(),2000);
+    if(!isSalesman) setTimeout(()=>checkStaleRfqs(),2000);
     // Part requests: admin sees all, branch users see their own
-    if(role==="admin"||isBranchUser){
+    if(!isSalesman&&(role==="admin"||isBranchUser)){
       const prF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
       api.get("part_requests",`${prF}select=*&order=created_at.desc`).catch(()=>[]).then(r=>{if(Array.isArray(r))setPartRequests(r);});
     }
     // Branch stock requests: workshop sees own, branch users see both sides (requesting or supplying), admin sees all
-    {
+    if(!isSalesman){
       const bsrQ=role==="workshop"
         ?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`
         :isBranchUser&&user.branch_id
@@ -1811,12 +1812,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   };
 
   // POS — instant sale: create invoice + items + deduct stock in one go
-  const savePosInvoice=async(cart,customer,payMethod,cashReceived,change,discount)=>{
-    const invId=makeId("INV");
+  const savePosInvoice=async(cart,customer,payMethod,cashReceived,change,discount,existingQuoteId=null)=>{
+    const invId=existingQuoteId||makeId("INV");
     const subtotal=cart.reduce((s,i)=>s+(i.qty*i.price),0);
     const total=Math.max(0,subtotal-(discount||0));
-    await api.insert("customer_invoices",{
-      id:invId,
+    const payPayload={
       customer_id:customer?.id||null,
       customer_name:customer?.name||"Walk-in",
       customer_phone:customer?.phone||"",
@@ -1830,9 +1830,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       change_given:payMethod==="cash"?change:null,
       is_pos:true,
       created_by:user.name||user.username,
-      created_at:new Date().toISOString(),
       ...(_bId?{branch_id:_bId}:{}),
-    });
+    };
+    if(existingQuoteId){
+      // Convert saved quote to paid invoice — patch header, replace items
+      await api.patch("customer_invoices","id",existingQuoteId,payPayload);
+      await api.delete("customer_invoice_items","invoice_id",existingQuoteId);
+    } else {
+      await api.insert("customer_invoices",{id:invId,...payPayload,created_at:new Date().toISOString()});
+    }
     for(const it of cart){
       await api.insert("customer_invoice_items",{
         id:makeId("CIVI"),
@@ -2260,7 +2266,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const filterBranchStockMap=(role==="admin"&&filterBranch!=="__all__"&&filterBranch!=="main")
     ?Object.fromEntries(branchStock.filter(bs=>String(bs.branch_id)===filterBranch).map(bs=>[String(bs.part_id),bs]))
     :null;
-  const displayParts=role==="branch_admin"
+  const displayParts=isBranchUser
     ?parts.map(p=>{
         const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
         if(!isMainCatalog)return {...p,_bsSet:true}; // branch's own part — stock is in parts table directly
@@ -2551,6 +2557,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         if(role==="branch_warehouse") return ["inventory","stocktake","stockmove","orders"].includes(c.id);
         // branch_picker: orders only
         if(role==="branch_picker") return ["orders","picking"].includes(c.id);
+        // branch_salesman: POS only
+        if(role==="branch_salesman") return c.id==="pos";
         // branch_manager + branch_admin: full access minus hidden
         return true;
       }
@@ -2602,6 +2610,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     if(role==="branch_picker") return [
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"picking",   icon:"🔍",label:t.picking},
+    ];
+    if(role==="branch_salesman") return [
+      {id:"pos", icon:"🖥️", label:"POS"},
     ];
     if(role==="branch_warehouse") return [
       {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
@@ -3794,6 +3805,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           <PosPage
             parts={isBranchUser?displayParts:parts}
             customers={customers}
+            vehicles={vehicles}
+            partFitments={partFitments}
+            branchId={_bId}
             onSave={savePosInvoice}/>
         )}
 

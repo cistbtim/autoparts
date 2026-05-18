@@ -6125,6 +6125,7 @@ const BRANCH_USER_ROLES = [
   {value:"branch_manager",   label:"Branch Manager",   icon:"👔"},
   {value:"branch_warehouse", label:"Warehouse",        icon:"📦"},
   {value:"branch_picker",    label:"Picker",           icon:"🔍"},
+  {value:"branch_salesman",  label:"Salesman",         icon:"🛒"},
 ];
 
 export function BranchUsersPage({branchId, branchName, user}) {

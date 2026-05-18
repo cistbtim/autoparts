@@ -275,6 +275,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const isDemo = user?.role==="demo";
   setDemoMode(isDemo, ()=>showToast("🔒 Demo mode — sign up to save changes","err"));
 
+  // Spare shop mode: scrapyard account that only manages parts, no sales/orders system
+  const isSpareShop = role==="scrapyard" && !!workshopProfile.spare_shop_mode;
+
   // For workshop/scrapyard roles: merge their profile over shop settings so logo/name/contacts show correctly
   const wsDisplaySettings = (wsId || scrapId) ? {
     ...settings,
@@ -2545,7 +2548,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {id:"branch_users",   icon:"👤",label:"Branch Users",roles:["admin"],branchAdminOnly:true},
       ]
     },
-  ].filter(g=>g.roles.includes(role)||(isBranchUser&&g.roles.includes("admin")&&g.id!=="grp_workshop"&&g.id!=="grp_all_scraps")).map(g=>({
+  ].filter(g=>
+    (g.roles.includes(role)||(isBranchUser&&g.roles.includes("admin")&&g.id!=="grp_workshop"&&g.id!=="grp_all_scraps"))
+    && !(isSpareShop&&g.id==="grp_sy_sales")
+  ).map(g=>({
     ...g,
     children:g.children.filter(c=>{
       if(isBranchUser){
@@ -2582,10 +2588,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     ];
     if(role==="scrapyard") return [
       {id:"sy_dashboard",icon:"📊", label:t.syDashboard||"Dashboard"},
-      {id:"sy_parts",    icon:"📦", label:t.syParts||"Parts",       badge:scrapLowStock.length},
-      {id:"sy_orders",   icon:"📋", label:t.syOrders||"Orders",     badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
-      {id:"sy_invoices", icon:"🧾", label:t.syInvoices||"Invoices"},
-      {id:"sy_gate",     icon:"🛡️", label:t.syGate||"Gate"},
+      {id:"sy_parts",    icon:"📦", label:t.syParts||"Parts", badge:scrapLowStock.length},
+      ...(!isSpareShop?[
+        {id:"sy_orders",  icon:"📋", label:t.syOrders||"Orders",   badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
+        {id:"sy_invoices",icon:"🧾", label:t.syInvoices||"Invoices"},
+        {id:"sy_gate",    icon:"🛡️", label:t.syGate||"Gate"},
+      ]:[]),
     ];
     if(role==="shipper") return [
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},

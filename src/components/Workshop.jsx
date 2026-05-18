@@ -4914,6 +4914,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
           onSave={async(item)=>{ await onSaveItem({...item,job_id:job.id}); }}
           onClose={()=>setAddingItem(null)}
           onGoToStock={onGoToStock}
+          wsId={wsId}
           t={t}/>
       )}
 
@@ -5995,21 +5996,29 @@ function JobPhotoSlot({label, value, onChange, reg}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP ITEM MODAL — Add Part or Labour (uses workshop stock)
 // ═══════════════════════════════════════════════════════════════
-function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, t}) {
-  const [desc,      setDesc]      = useState("");
-  const [qty,       setQty]       = useState(1);
-  const [price,     setPrice]     = useState("");
-  const [costPrice, setCostPrice] = useState(0);
-  const [markupPct, setMarkupPct] = useState(defaultMarkupPct);
-  const [selItem,   setSelItem]   = useState(null);
-  const [search,    setSearch]    = useState("");
-  const [saving,    setSaving]    = useState(false);
-  const [justAdded, setJustAdded] = useState(false);
-  const [addedIds,  setAddedIds]  = useState(new Set());
+function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, wsId=null, t}) {
+  const [desc,        setDesc]        = useState("");
+  const [qty,         setQty]         = useState(1);
+  const [price,       setPrice]       = useState("");
+  const [costPrice,   setCostPrice]   = useState(0);
+  const [markupPct,   setMarkupPct]   = useState(defaultMarkupPct);
+  const [selItem,     setSelItem]     = useState(null);
+  const [search,      setSearch]      = useState("");
+  const [saving,      setSaving]      = useState(false);
+  const [justAdded,   setJustAdded]   = useState(false);
+  const [addedIds,    setAddedIds]    = useState(new Set());
+  const [localExtras, setLocalExtras] = useState([]); // items created this session
+  // Create-new sub-form
+  const [creating,    setCreating]    = useState(false);
+  const [newName,     setNewName]     = useState("");
+  const [newSku,      setNewSku]      = useState("");
+  const [newCost,     setNewCost]     = useState("");
+  const [newSell,     setNewSell]     = useState("");
+  const [createSaving,setCreateSaving]= useState(false);
+  const descRef = useRef(null);
 
-  const list = type==="part" ? wsStock : wsServices;
-
-  // SKUs already on the job (pre-existing) + IDs added this session
+  const baseList = type==="part" ? wsStock : wsServices;
+  const list = [...localExtras, ...baseList];
   const existingSkus = new Set(existingItems.map(i=>i.part_sku).filter(Boolean));
 
   const filtered = list.filter(p=>{
@@ -6044,6 +6053,46 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       setPrice(String(listPrice||""));
     }
     setSearch("");
+    setCreating(false);
+  };
+
+  const openCreateForm=()=>{
+    setNewName(search.trim());
+    setNewSku("");
+    setNewCost("");
+    setNewSell("");
+    setCreating(true);
+  };
+
+  const useSearchAsDesc=()=>{
+    setDesc(search.trim());
+    setSearch("");
+    setCreating(false);
+    setTimeout(()=>descRef.current?.focus(),50);
+  };
+
+  const handleCreateAndSelect=async()=>{
+    if(!newName.trim()){alert("Enter a name");return;}
+    setCreateSaving(true);
+    try{
+      const id=`${type==="part"?"WSK":"WSS"}-${Date.now()}`;
+      let newItem;
+      if(type==="part"){
+        const payload={id,workshop_id:wsId||null,name:newName.trim(),sku:newSku.trim()||null,unit_cost:+newCost||0,unit_price:+newSell||0,qty:0,min_qty:0};
+        await api.insert("workshop_stock",payload);
+        newItem={...payload};
+      } else {
+        const payload={id,workshop_id:wsId||null,name:newName.trim(),description:"",default_price:+newSell||0,rate:+newSell||0};
+        await api.insert("workshop_services",payload);
+        newItem={...payload};
+      }
+      setLocalExtras(prev=>[newItem,...prev]);
+      setSearch(newName.trim());
+      setCreating(false);
+      // auto-select after a tick so filtered list updates
+      setTimeout(()=>selectItem(newItem),30);
+    }catch(e){ alert("Create failed: "+e.message); }
+    finally{ setCreateSaving(false); }
   };
 
   const handleSave=async()=>{
@@ -6081,29 +6130,42 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 
   return (
     <Overlay onClose={onClose} wide>
-      <MHead title={type==="part"?"🔩 Add WS Part":"👷 Add Labour"} onClose={onClose}/>
+      <MHead title={type==="part"?"🔩 Add Part":"👷 Add Labour"} onClose={onClose}/>
 
       <div style={{marginBottom:14}}>
         <FL label={type==="part"?"Search Workshop Stock":"Search Service Preset"}/>
         <div style={{marginBottom:8}}>
-          <input className="inp" value={search} onChange={e=>{setSearch(e.target.value);setSelItem(null);}}
-            placeholder={type==="part"?"Search part name, SKU...":"Search service name..."}/>
+          <input className="inp" value={search} onChange={e=>{setSearch(e.target.value);setSelItem(null);setCreating(false);}}
+            placeholder={type==="part"?"Search part name, SKU...":"Search service name..."}
+            onKeyDown={e=>{ if(e.key==="Enter"&&search.trim()&&filtered.length===0) useSearchAsDesc(); }}/>
         </div>
 
         {(search||list.length<=10)&&!selItem&&(
-          <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:300,overflowY:"auto",marginBottom:8}}>
+          <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:creating?180:300,overflowY:"auto",marginBottom:8}}>
             {(search?filtered:list.slice(0,20)).length===0
-              ? <div style={{padding:16,textAlign:"center"}}>
+              ? <div style={{padding:"14px 16px"}}>
                   <div style={{color:"var(--text3)",fontSize:13,marginBottom:10}}>
-                    {type==="part"
-                      ? (search ? `No stock found for "${search}"` : "No workshop stock yet")
-                      : (search ? `No services found for "${search}"` : "No services yet")}
+                    {search
+                      ? `"${search}" not found in ${type==="part"?"workshop stock":"services"}`
+                      : (type==="part"?"No workshop stock yet":"No services yet")}
                   </div>
-                  {type==="part"&&onGoToStock&&(
-                    <button className="btn btn-primary btn-sm" onClick={()=>{onClose();onGoToStock();}}>
-                      + Add to WS Stock
-                    </button>
-                  )}
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {search&&wsId&&(
+                      <button className="btn btn-primary btn-sm" onClick={openCreateForm}>
+                        ➕ Create New {type==="part"?"Part":"Service"}
+                      </button>
+                    )}
+                    {search&&(
+                      <button className="btn btn-ghost btn-sm" onClick={useSearchAsDesc}>
+                        Add manually ↓
+                      </button>
+                    )}
+                    {!search&&type==="part"&&onGoToStock&&(
+                      <button className="btn btn-primary btn-sm" onClick={()=>{onClose();onGoToStock();}}>
+                        + Add to WS Stock
+                      </button>
+                    )}
+                  </div>
                 </div>
               : (search?filtered:list.slice(0,20)).map(p=>(
                   <div key={p.id} onClick={()=>selectItem(p)}
@@ -6129,6 +6191,43 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
           </div>
         )}
 
+        {/* Create-new mini form */}
+        {creating&&(
+          <div style={{border:"1px solid var(--accent)",borderRadius:10,padding:"14px 16px",marginBottom:12,background:"rgba(249,115,22,.04)"}}>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:12,color:"var(--accent)"}}>
+              ➕ New {type==="part"?"Stock Item":"Service"}
+            </div>
+            <FD style={{marginBottom:10}}>
+              <FL label="Name *"/>
+              <input className="inp" value={newName} onChange={e=>setNewName(e.target.value)} placeholder={type==="part"?"e.g. Oil Filter":"e.g. Oil Change"} autoFocus/>
+            </FD>
+            {type==="part"&&(
+              <FD style={{marginBottom:10}}>
+                <FL label="Part Number / SKU"/>
+                <input className="inp" value={newSku} onChange={e=>setNewSku(e.target.value)} placeholder="e.g. OIL-15W40"/>
+              </FD>
+            )}
+            <FG style={{marginBottom:12}}>
+              <div>
+                <FL label={type==="part"?"Cost Price":"—"}/>
+                {type==="part"
+                  ? <input className="inp" type="number" value={newCost} onChange={e=>setNewCost(e.target.value)} placeholder="0.00"/>
+                  : <div style={{height:38}}/>}
+              </div>
+              <div>
+                <FL label="Sell Price"/>
+                <input className="inp" type="number" value={newSell} onChange={e=>setNewSell(e.target.value)} placeholder="0.00"/>
+              </div>
+            </FG>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setCreating(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" style={{flex:2}} onClick={handleCreateAndSelect} disabled={createSaving}>
+                {createSaving?"Creating...":"✅ Create & Select"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {selItem&&(
           <div style={{padding:"10px 12px",background:"rgba(96,165,250,.08)",borderRadius:8,border:"1px solid rgba(96,165,250,.2)",marginBottom:8,display:"flex",gap:10,alignItems:"center"}}>
             <div style={{fontSize:22,flexShrink:0}}>{type==="part"?"🔩":"🔧"}</div>
@@ -6144,7 +6243,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       </div>
 
       <FD><FL label="Description *"/>
-        <input className="inp" value={desc} onChange={e=>setDesc(e.target.value)}
+        <input ref={descRef} className="inp" value={desc} onChange={e=>setDesc(e.target.value)}
           placeholder={type==="part"?"Part name...":"Labour e.g. Oil change, brake pad replacement..."}/>
       </FD>
       <FG>

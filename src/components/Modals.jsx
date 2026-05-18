@@ -359,6 +359,7 @@ export function ScrapyardProfilePage({profile, onSave}) {
     logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
     vat_number:"", vat_rate:15,
     label_width_mm:98, label_height_mm:45,
+    spare_shop_mode:false,
     ...profile
   });
   const [saving, setSaving] = useState(false);
@@ -480,6 +481,18 @@ export function ScrapyardProfilePage({profile, onSave}) {
             </div>
           </div>
           <div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>Used for vehicle labels and stripping parts labels. Standard thermal label: 98 × 45 mm.</div>
+        </div>
+
+        {/* Spare Shop Mode */}
+        <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🏪 Mode</div>
+          <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+            <input type="checkbox" checked={!!f.spare_shop_mode} onChange={e=>s("spare_shop_mode",e.target.checked)} style={{width:16,height:16,cursor:"pointer"}}/>
+            <div>
+              <div style={{fontSize:13,fontWeight:600}}>Spare Shop Mode</div>
+              <div style={{fontSize:12,color:"var(--text3)"}}>Hides orders, picking, invoices and gate — use when you only list parts for sale without full sales management</div>
+            </div>
+          </label>
         </div>
 
         <button className="btn btn-primary" style={{padding:13,fontSize:15}} onClick={save} disabled={saving}>

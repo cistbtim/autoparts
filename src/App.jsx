@@ -2515,7 +2515,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       badge: pendingCnt,
       children:[
         {id:"pos",icon:"🖥️",label:"POS",roles:["admin","manager"]},
-        {id:"my_sales",icon:"📊",label:"My Statement",roles:["admin"]},
+        {id:"my_sales",icon:"📊",label:"My Statement",roles:["admin","manager"]},
         {id:"shop",icon:"🛒",label:t.shop,roles:["admin","customer"]},
         {id:"picking",icon:"🔍",label:t.picking,roles:["admin","shipper"],badge:pendingCnt},
         {id:"orders",icon:"📋",label:t.orders,roles:["admin","shipper"]},
@@ -2593,7 +2593,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
     ];
     if(role==="manager") return [
-      {id:"stocktake", icon:"🔢",label:t.stockTake},
+      {id:"pos",       icon:"🖥️",label:"POS"},
+      {id:"my_sales",  icon:"📊",label:"My Sales"},
       {id:"inventory", icon:"📦",label:t.inventory},
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"reports",   icon:"📊",label:t.reports},
@@ -2641,8 +2642,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"dashboard", icon:"📊",label:t.dashboard},
       {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
-      {id:"shop",      icon:"🛒",label:t.shop},
-      {id:"suppliers", icon:"🏭",label:t.suppliers},
+      {id:"pos",       icon:"🖥️",label:"POS"},
+      {id:"my_sales",  icon:"📊",label:"My Sales"},
     ];
   })();
 
@@ -3814,7 +3815,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         )}
 
         {/* ── MY SALES STATEMENT (branch_salesman) ── */}
-        {tab==="my_sales"&&role==="branch_salesman"&&(
+        {tab==="my_sales"&&["branch_salesman","admin","manager","branch_admin","branch_manager"].includes(role)&&(
           <SalesmanStatementPage
             customerInvoices={customerInvoices}
             customerReturns={customerReturns}

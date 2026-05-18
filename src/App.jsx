@@ -2527,9 +2527,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       ]
     },
     {
-      id:"grp_reports", icon:"📊", label:t.grpReports, roles:["admin"],
+      id:"grp_reports", icon:"📊", label:t.grpReports, roles:["admin","manager"],
       children:[
-        {id:"reports",icon:"📊",label:t.reports,roles:["admin"]},
+        {id:"reports",icon:"📊",label:t.reports,roles:["admin","manager"]},
         {id:"payments",icon:"💳",label:t.payments,roles:["admin"]},
       ]
     },
@@ -4618,10 +4618,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         )}
 
         {/* ── REPORTS ── */}
-        {tab==="reports"&&(role==="admin"||role==="branch_admin")&&(
+        {tab==="reports"&&(role==="admin"||role==="branch_admin"||role==="manager"||role==="branch_manager")&&(
           <ReportsPage orders={orders} parts={parts} customers={customers}
             supplierInvoices={supplierInvoices} payments={payments}
-            settings={settings} t={t} lang={lang}/>
+            customerInvoices={customerInvoices}
+            settings={settings} t={t} lang={lang} role={role}/>
         )}
 
         {/* ── PAYMENTS ── */}

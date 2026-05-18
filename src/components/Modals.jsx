@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { C, curSym, getSettings } from "../lib/settings.js";
@@ -4390,33 +4390,92 @@ export function AddPaymentModal({data,customerInvoices,supplierInvoices,onSave,o
 // ═══════════════════════════════════════════════════════════════
 // REPORTS PAGE
 // ═══════════════════════════════════════════════════════════════
-export function ReportsPage({orders,parts,customers,supplierInvoices,payments,settings,t,lang}) {
+export function ReportsPage({orders,parts,customers,supplierInvoices,payments,customerInvoices=[],settings,t,lang,role}) {
   const [period,setPeriod]=useState("monthly");
-  const [reportTab,setReportTab]=useState("sales");
+  const [reportTab,setReportTab]=useState("pos");
   const cur=curSym(settings.currency||"TWD NT$");
-  const fmt=(n)=>`${cur}${(n||0).toLocaleString()}`;
+  const fmt=(n)=>`${cur}${(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const fmtN=(n)=>(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
-  // ── Sales data ──
+  // ── POS Sales data ──
+  const posInvoices=customerInvoices.filter(i=>i.is_pos&&i.status==="paid");
+
+  // Parse payment_method field (may be plain string or JSON splits array)
+  const parseSplits=(inv)=>{
+    const pm=inv.payment_method||"cash";
+    if(pm.startsWith("[")){
+      try{ return JSON.parse(pm); }catch{ return [{method:"cash",amount:inv.total||0}]; }
+    }
+    // legacy single method — treat full invoice total as that method
+    return [{method:pm,amount:inv.total||0}];
+  };
+
+  const METHODS=["cash","card","qr","transfer"];
+  const METHOD_LABEL={cash:"💵 Cash",card:"💳 Card",qr:"📱 QR",transfer:"🏦 Transfer"};
+  const METHOD_COLOR={cash:"var(--green)",card:"var(--blue)",qr:"var(--purple)",transfer:"var(--yellow)"};
+
+  // Period key helper
+  const periodKey=(dateStr)=>{
+    const d=new Date(dateStr);
+    if(isNaN(d)) return "—";
+    if(period==="daily")   return d.toISOString().slice(0,10);
+    if(period==="weekly"){
+      // ISO week: Mon-Sun
+      const tmp=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+      const day=tmp.getUTCDay()||7;
+      tmp.setUTCDate(tmp.getUTCDate()+4-day);
+      const yearStart=new Date(Date.UTC(tmp.getUTCFullYear(),0,1));
+      const wk=Math.ceil(((tmp-yearStart)/86400000+1)/7);
+      return `${tmp.getUTCFullYear()}-W${String(wk).padStart(2,"0")}`;
+    }
+    if(period==="monthly") return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+    return `${d.getFullYear()}`;
+  };
+
+  // Build grouped rows
+  const posGrouped=useMemo(()=>{
+    const map={};
+    posInvoices.forEach(inv=>{
+      const key=periodKey(inv.date||inv.created_at);
+      if(!map[key]) map[key]={key,count:0,total:0,cash:0,card:0,qr:0,transfer:0};
+      map[key].count++;
+      map[key].total+=(inv.total||0);
+      parseSplits(inv).forEach(s=>{
+        const m=s.method||"cash";
+        if(map[key][m]!==undefined) map[key][m]+=parseFloat(s.amount)||0;
+      });
+    });
+    return Object.values(map).sort((a,b)=>b.key.localeCompare(a.key)).slice(0,60);
+  },[posInvoices,period]);
+
+  // Overall payment method totals
+  const methodTotals=useMemo(()=>{
+    const t2={cash:0,card:0,qr:0,transfer:0,total:0,count:posInvoices.length};
+    posInvoices.forEach(inv=>{
+      t2.total+=(inv.total||0);
+      parseSplits(inv).forEach(s=>{
+        const m=s.method||"cash";
+        if(t2[m]!==undefined) t2[m]+=parseFloat(s.amount)||0;
+      });
+    });
+    return t2;
+  },[posInvoices]);
+
+  // ── Legacy sales data (orders) ──
   const completedOrders=orders.filter(o=>o.status==="Completed");
   const totalRevenue=completedOrders.reduce((s,o)=>s+(o.total||0),0);
-  const totalOrders=orders.length;
 
-  // Group orders by period
-  const groupBy=(arr,field,fmt2)=>{
+  // Group orders by period (legacy)
+  const ordersByPeriod=useMemo(()=>{
     const map={};
-    arr.forEach(o=>{
-      const d=new Date(o[field]||o.created_at||o.date);
-      let key="";
-      if(period==="daily") key=d.toISOString().slice(0,10);
-      else if(period==="monthly") key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-      else key=`${d.getFullYear()}`;
+    completedOrders.forEach(o=>{
+      const key=periodKey(o.date||o.created_at);
       if(!map[key]) map[key]={key,count:0,total:0};
       map[key].count++;
       map[key].total+=(o.total||0);
     });
-    return Object.values(map).sort((a,b)=>b.key.localeCompare(a.key)).slice(0,12);
-  };
-  const salesByPeriod=groupBy(completedOrders,"date");
+    return Object.values(map).sort((a,b)=>b.key.localeCompare(a.key)).slice(0,60);
+  },[completedOrders,period]);
 
   // ── Inventory data ──
   const totalInventoryValue=parts.reduce((s,p)=>s+(p.stock||0)*(p.price||0),0);
@@ -4433,14 +4492,25 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
 
   // ── Payments ──
   const totalReceived=payments.filter(p=>p.type==="receipt").reduce((s,p)=>s+(p.amount||0),0);
-  const totalPaid=payments.filter(p=>p.type==="payment").reduce((s,p)=>s+(p.amount||0),0);
 
+  const isManagerOnly=role==="manager"||role==="branch_manager";
   const TABS=[
-    {id:"sales",label:"📈 "+t.salesReport},
+    {id:"pos",    label:"🛒 POS Sales"},
+    {id:"sales",  label:"📈 "+t.salesReport},
     {id:"inventory",label:"📦 "+t.inventoryReport},
     {id:"customers",label:"👥 "+t.customerReport},
-    {id:"suppliers",label:"🏭 "+t.supplierReport},
+    ...(isManagerOnly?[]:[{id:"suppliers",label:"🏭 "+t.supplierReport}]),
   ];
+
+  const PeriodBtns=()=>(
+    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+      <span style={{fontSize:12,color:"var(--text3)",fontWeight:600}}>Period:</span>
+      {["daily","weekly","monthly","yearly"].map(p=>(
+        <button key={p} className={`btn btn-sm ${period===p?"btn-primary":"btn-ghost"}`}
+          onClick={()=>setPeriod(p)} style={{fontSize:12,textTransform:"capitalize"}}>{p}</button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="fu">
@@ -4448,61 +4518,127 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
         <div><h1 style={{fontSize:20,fontWeight:700}}>📊 {t.reports}</h1><p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{t.rptBusinessAnalytics}</p></div>
       </div>
 
-      {/* Summary cards */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
-        {[
-          {label:t.rptTotalRevenue,value:fmt(totalRevenue),icon:"💰",color:"var(--green)"},
-          {label:t.rptTotalOrders,value:totalOrders,icon:"📋",color:"var(--blue)"},
-          {label:t.rptInventoryValue,value:fmt(totalInventoryValue),icon:"📦",color:"var(--purple)"},
-          {label:t.rptCashReceived,value:fmt(totalReceived),icon:"💳",color:"var(--accent)"},
-        ].map(s=>(
-          <div key={s.label} className="card stat-card" style={{"--gc":s.color+"20"}}>
-            <div style={{display:"flex",justifyContent:"space-between"}}>
-              <div><div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>{s.label}</div>
-              <div style={{fontSize:22,fontWeight:700,color:s.color,fontFamily:"Rajdhani,sans-serif"}}>{s.value}</div></div>
-              <div style={{fontSize:24}}>{s.icon}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* Report tabs */}
       <div className="tabs" style={{marginBottom:20,width:"fit-content"}}>
         {TABS.map(tb=><button key={tb.id} className={`tab ${reportTab===tb.id?"on":""}`} onClick={()=>setReportTab(tb.id)}>{tb.label}</button>)}
       </div>
 
-      {/* SALES REPORT */}
+      {/* ── POS SALES REPORT ── */}
+      {reportTab==="pos"&&(
+        <div>
+          {/* Method summary cards */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:18}}>
+            <div className="card stat-card" style={{"--gc":"rgba(52,211,153,.15)",padding:"18px 20px"}}>
+              <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:6}}>Total POS Revenue</div>
+              <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:28,fontWeight:900,color:"var(--green)"}}>{fmt(methodTotals.total)}</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>{methodTotals.count} transactions</div>
+            </div>
+            {METHODS.map(m=>(
+              <div key={m} className="card" style={{padding:"18px 20px",borderLeft:`3px solid ${METHOD_COLOR[m]}`}}>
+                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:6}}>{METHOD_LABEL[m]}</div>
+                <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:22,fontWeight:800,color:METHOD_COLOR[m]}}>{fmt(methodTotals[m])}</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>
+                  {methodTotals.total>0?Math.round(methodTotals[m]/methodTotals.total*100):0}% of total
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Period selector */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+            <PeriodBtns/>
+            <span style={{fontSize:12,color:"var(--text3)"}}>{posGrouped.length} period{posGrouped.length!==1?"s":""} · {posInvoices.length} sales total</span>
+          </div>
+
+          {/* Main breakdown table */}
+          <div className="card tbl-wrap" style={{overflow:"auto"}}>
+            <table className="tbl" style={{minWidth:680}}>
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th style={{textAlign:"center"}}>Sales</th>
+                  <th style={{textAlign:"right"}}>Revenue</th>
+                  <th style={{textAlign:"right",color:"var(--green)"}}>💵 Cash</th>
+                  <th style={{textAlign:"right",color:"var(--blue)"}}>💳 Card</th>
+                  <th style={{textAlign:"right",color:"var(--purple)"}}>📱 QR</th>
+                  <th style={{textAlign:"right",color:"var(--yellow)"}}>🏦 Transfer</th>
+                  <th style={{textAlign:"right"}}>Avg/Sale</th>
+                </tr>
+              </thead>
+              <tbody>
+                {posGrouped.length===0&&(
+                  <tr><td colSpan={8} style={{textAlign:"center",padding:40,color:"var(--text3)"}}>No POS sales found</td></tr>
+                )}
+                {posGrouped.map(row=>(
+                  <tr key={row.key}>
+                    <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,fontSize:13}}>{row.key}</td>
+                    <td style={{textAlign:"center"}}>
+                      <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{row.count}</span>
+                    </td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:15,fontWeight:800,color:"var(--green)"}}>{fmtN(row.total)}</td>
+                    <td style={{textAlign:"right",color:row.cash>0?"var(--green)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.cash>0?fmtN(row.cash):"—"}</td>
+                    <td style={{textAlign:"right",color:row.card>0?"var(--blue)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.card>0?fmtN(row.card):"—"}</td>
+                    <td style={{textAlign:"right",color:row.qr>0?"var(--purple)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.qr>0?fmtN(row.qr):"—"}</td>
+                    <td style={{textAlign:"right",color:row.transfer>0?"var(--yellow)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.transfer>0?fmtN(row.transfer):"—"}</td>
+                    <td style={{textAlign:"right",color:"var(--text2)",fontFamily:"Rajdhani,sans-serif"}}>{fmtN(row.count?row.total/row.count:0)}</td>
+                  </tr>
+                ))}
+                {posGrouped.length>0&&(
+                  <tr style={{borderTop:"2px solid var(--border2)",background:"var(--surface2)"}}>
+                    <td style={{fontWeight:800,fontSize:13}}>TOTAL</td>
+                    <td style={{textAlign:"center",fontWeight:800}}>{methodTotals.count}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:16,fontWeight:900,color:"var(--green)"}}>{fmtN(methodTotals.total)}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:"var(--green)"}}>{fmtN(methodTotals.cash)}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:"var(--blue)"}}>{fmtN(methodTotals.card)}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:"var(--purple)"}}>{fmtN(methodTotals.qr)}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:"var(--yellow)"}}>{fmtN(methodTotals.transfer)}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",color:"var(--text2)",fontWeight:700}}>{fmtN(methodTotals.count?methodTotals.total/methodTotals.count:0)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── SALES REPORT (orders) ── */}
       {reportTab==="sales"&&(
         <div>
-          <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center"}}>
-            <span style={{fontSize:13,color:"var(--text3)"}}>{t.rptPeriod}:</span>
-            {["daily","monthly","yearly"].map(p=>(
-              <button key={p} className={`btn btn-sm ${period===p?"btn-primary":"btn-ghost"}`} onClick={()=>setPeriod(p)} style={{fontSize:12}}>
-                {p==="daily"?t.daily:p==="monthly"?t.monthly:t.yearly}
-              </button>
+          <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
+            <PeriodBtns/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:18}}>
+            {[
+              {label:t.rptTotalRevenue,value:fmt(totalRevenue),color:"var(--green)"},
+              {label:t.rptTotalOrders,value:orders.length,color:"var(--blue)"},
+              {label:t.rptCashReceived,value:fmt(totalReceived),color:"var(--accent)"},
+            ].map(s=>(
+              <div key={s.label} className="card" style={{padding:"16px 20px",textAlign:"center"}}>
+                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>{s.label}</div>
+                <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:24,fontWeight:800,color:s.color}}>{s.value}</div>
+              </div>
             ))}
           </div>
           <div className="card" style={{overflow:"hidden"}}>
             <table className="tbl">
               <thead><tr>{[t.rptPeriod,t.orders_count,t.revenue,t.rptAvgOrder].map(h=><th key={h}>{h}</th>)}</tr></thead>
               <tbody>
-                {salesByPeriod.length===0&&<tr><td colSpan={4} style={{textAlign:"center",padding:30,color:"var(--text3)"}}>{t.rptNoOrders}</td></tr>}
-                {salesByPeriod.map(row=>(
+                {ordersByPeriod.length===0&&<tr><td colSpan={4} style={{textAlign:"center",padding:30,color:"var(--text3)"}}>{t.rptNoOrders}</td></tr>}
+                {ordersByPeriod.map(row=>(
                   <tr key={row.key}>
                     <td style={{fontWeight:600,fontFamily:"DM Mono,monospace"}}>{row.key}</td>
                     <td style={{textAlign:"center"}}><span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{row.count}</span></td>
-                    <td style={{fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif",fontSize:15}}>{fmt(row.total)}</td>
-                    <td style={{color:"var(--text2)"}}>{fmt(Math.round(row.total/row.count))}</td>
+                    <td style={{textAlign:"right",fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif",fontSize:15}}>{fmtN(row.total)}</td>
+                    <td style={{textAlign:"right",color:"var(--text2)"}}>{fmtN(row.total/row.count)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
-
       )}
 
-      {/* INVENTORY REPORT */}
+      {/* ── INVENTORY REPORT ── */}
       {reportTab==="inventory"&&(
         <div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:18}}>
@@ -4518,7 +4654,7 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
             ))}
           </div>
           <div className="card" style={{padding:20,marginBottom:16}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em"}}>📦 {t.rptTotalInventoryValue}</h3>
               <span style={{fontSize:24,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(totalInventoryValue)}</span>
             </div>
@@ -4546,7 +4682,7 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
         </div>
       )}
 
-      {/* CUSTOMER REPORT */}
+      {/* ── CUSTOMER REPORT ── */}
       {reportTab==="customers"&&(
         <div className="card" style={{overflow:"hidden"}}>
           <div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13}}>🏆 {t.rptTopCustomers}</div>
@@ -4569,7 +4705,7 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,se
         </div>
       )}
 
-      {/* SUPPLIER REPORT */}
+      {/* ── SUPPLIER REPORT ── */}
       {reportTab==="suppliers"&&(
         <div className="card" style={{overflow:"hidden"}}>
           <div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13}}>🏭 {t.rptSupplierSummary}</div>

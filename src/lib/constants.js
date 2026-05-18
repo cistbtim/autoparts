@@ -68,6 +68,7 @@ export const getSubInfo = (u) => {
   if (u.role === "branch_manager")    return { status: "admin", label: "Branch Manager",   color: "#06b6d4" };
   if (u.role === "branch_warehouse")  return { status: "admin", label: "Branch Warehouse", color: "#84cc16" };
   if (u.role === "branch_picker")     return { status: "admin", label: "Branch Picker",    color: "#f59e0b" };
+  if (u.role === "branch_salesman")   return { status: "admin", label: "Branch Salesman",  color: "#ec4899" };
   const s = u.subscription_status || "trial";
   if (s === "active") return { status: "active", label: "✅ Active", color: "#34d399" };
   if (s === "blocked" || s === "expired") return { status: s, label: s === "blocked" ? "🚫 Blocked" : "⏰ Expired", color: "#f87171" };
@@ -83,6 +84,7 @@ export const canAccess = (u) => {
   if (u.role === "branch_manager")   return true;
   if (u.role === "branch_warehouse") return true;
   if (u.role === "branch_picker")    return true;
+  if (u.role === "branch_salesman")  return true;
   if (u.role === "demo") return true;
   if (u.role === "workshop") return true;
   if (u.role === "scrapyard") return true;

@@ -782,12 +782,22 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             )}
           </div>
 
-          {/* Floating cart button */}
+          {/* Cart summary bar — always visible at bottom */}
           <button onClick={() => setMobView("cart")}
-            style={{ position: "absolute", bottom: 20, right: 16, background: "var(--accent)", border: "none", color: "#fff", borderRadius: 28, padding: "13px 20px", fontWeight: 800, fontSize: 16, cursor: "pointer", boxShadow: "0 4px 20px rgba(249,115,22,.5)", display: "flex", alignItems: "center", gap: 8, zIndex: 10 }}>
-            🛒 Cart
-            {cartCount > 0 && <span style={{ background: "#fff", color: "var(--accent)", borderRadius: 12, minWidth: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, padding: "0 5px" }}>{cartCount}</span>}
-            {cartCount > 0 && <span style={{ fontSize: 14 }}>{sym}{total.toFixed(2)}</span>}
+            style={{ flexShrink: 0, display: "flex", alignItems: "center", padding: "12px 16px", background: cartCount > 0 ? "var(--accent)" : "var(--surface2)", border: "none", borderTop: `2px solid ${cartCount > 0 ? "rgba(0,0,0,.1)" : "var(--border)"}`, cursor: "pointer", width: "100%", gap: 10, transition: "background .2s" }}>
+            <span style={{ fontSize: 22 }}>🛒</span>
+            {cartCount > 0 ? (
+              <>
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: "#fff" }}>{cartCount} item{cartCount !== 1 ? "s" : ""} selected</div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)" }}>Tap to review &amp; pay</div>
+                </div>
+                <div style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 900, fontSize: 24, color: "#fff" }}>{sym}{total.toFixed(2)}</div>
+                <span style={{ color: "#fff", fontSize: 20 }}>›</span>
+              </>
+            ) : (
+              <div style={{ flex: 1, textAlign: "left", color: "var(--text3)", fontSize: 14, fontWeight: 600 }}>Cart is empty</div>
+            )}
           </button>
         </>
       ) : (

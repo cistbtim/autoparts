@@ -235,14 +235,20 @@ function _openPrint(html, title) {
   setTimeout(() => w.print(), 500);
 }
 
+const PAY_LABEL = { cash: "💵 Cash", card: "💳 Card", qr: "📱 QR", transfer: "🏦 Transfer" };
+
 function _receiptHtml(sale, settings, sym) {
-  const { invId, cart, customer, subtotal, discount, total, payMethod, cashReceived, change, isQuote } = sale;
+  const { invId, cart, customer, subtotal, discount, total, splits, change, isQuote } = sale;
   const now = new Date().toLocaleString();
   const rows = cart.map(it =>
     `<div style="display:flex;justify-content:space-between;padding:3px 0">
       <div><b>${it.name}</b><br><span style="font-size:10px;color:#666">${it.sku || ""} ×${it.qty} @ ${sym}${(+it.price).toFixed(2)}</span></div>
       <div style="font-weight:700">${sym}${(it.qty * it.price).toFixed(2)}</div>
     </div>`).join("");
+  const payRows = !isQuote && splits?.length ? splits.map(s =>
+    `<div class="row" style="font-size:12px;color:#555"><span>${PAY_LABEL[s.method]||s.method}</span><span>${sym}${(parseFloat(s.amount)||0).toFixed(2)}</span></div>`
+  ).join("") : "";
+  const changeRow = !isQuote && change > 0 ? `<div class="row" style="font-weight:700;color:green"><span>Change</span><span>${sym}${change.toFixed(2)}</span></div>` : "";
   return `<!DOCTYPE html><html><head><title>Receipt ${invId}</title>
 <style>@media print{@page{margin:4mm;size:80mm auto}body{margin:0;padding:0}}
 body{font-family:monospace;max-width:300px;margin:0 auto;padding:8px;font-size:13px}
@@ -261,14 +267,13 @@ hr{border:none;border-top:1px dashed #999;margin:6px 0}
 <div class="row"><span>Subtotal</span><span>${sym}${subtotal.toFixed(2)}</span></div>
 ${discount > 0 ? `<div class="row" style="color:green"><span>Discount</span><span>−${sym}${discount.toFixed(2)}</span></div>` : ""}
 <div class="row" style="font-weight:800;font-size:17px"><span>TOTAL</span><span>${sym}${total.toFixed(2)}</span></div>
-${!isQuote ? `<div style="font-size:12px;color:#555;text-align:center;margin-top:4px">${payMethod === "cash" ? "💵 Cash" : payMethod === "card" ? "💳 Card" : payMethod === "transfer" ? "🏦 Transfer" : "📱 QR Code"}</div>` : ""}
-${payMethod === "cash" && cashReceived > 0 && !isQuote ? `<div class="row" style="font-size:12px;color:#555"><span>Cash</span><span>${sym}${(+cashReceived).toFixed(2)}</span></div>${change > 0 ? `<div class="row" style="font-weight:700;color:green"><span>Change</span><span>${sym}${(+change).toFixed(2)}</span></div>` : ""}` : ""}
+${payRows}${changeRow}
 <hr><div style="text-align:center;font-size:11px;color:#777;margin-top:8px">${isQuote ? "This is a quote — not a receipt" : "Thank you!"}</div>
 </body></html>`;
 }
 
 function _a4Html(sale, settings, sym) {
-  const { invId, cart, customer, subtotal, discount, total, payMethod, isQuote } = sale;
+  const { invId, cart, customer, subtotal, discount, total, splits, isQuote } = sale;
   const now = new Date();
   const rows = cart.map((it, i) =>
     `<tr>
@@ -324,7 +329,7 @@ td{padding:9px 12px;border-bottom:1px solid #eee;font-size:13px}
   <div class="trow"><span style="color:#888">Subtotal</span><span>${sym}${subtotal.toFixed(2)}</span></div>
   ${discount > 0 ? `<div class="trow" style="color:green"><span>Discount</span><span>−${sym}${discount.toFixed(2)}</span></div>` : ""}
   <div class="trow tbig"><span>TOTAL</span><span>${sym}${total.toFixed(2)}</span></div>
-  ${!isQuote ? `<div style="color:#888;font-size:12px;margin-top:8px">Payment: ${payMethod === "cash" ? "Cash" : payMethod === "card" ? "Card" : payMethod === "transfer" ? "Bank Transfer" : "QR Code"}</div>` : ""}
+  ${!isQuote && splits?.length ? splits.map(s=>`<div style="color:#888;font-size:12px;margin-top:4px">${PAY_LABEL[s.method]||s.method}: ${sym}${(parseFloat(s.amount)||0).toFixed(2)}</div>`).join("") : ""}
   ${isQuote ? `<div style="color:#e88c30;font-size:12px;margin-top:8px">⚠️ Quote only — not a tax invoice</div>` : ""}
 </div>
 <div class="foot">${settings.shop_name || ""} · Thank you for your business!</div>
@@ -335,7 +340,7 @@ td{padding:9px 12px;border-bottom:1px solid #eee;font-size:13px}
 function PosDone({ sale, onNewSale }) {
   const settings = getSettings();
   const sym = C();
-  const { invId, cart, customer, subtotal, discount, total, payMethod, cashReceived, change, isQuote } = sale;
+  const { invId, cart, customer, subtotal, discount, total, splits, change, isQuote } = sale;
   const now = new Date();
 
   return (
@@ -387,14 +392,17 @@ function PosDone({ sale, onNewSale }) {
               {sym}{total.toFixed(2)}
             </span>
           </div>
-          {!isQuote && payMethod === "cash" && cashReceived > 0 && (
-            <div style={{ marginTop: 8, padding: "10px 12px", background: "rgba(52,211,153,.1)", borderRadius: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text3)" }}>
-                <span>Cash received</span><span>{sym}{(+cashReceived).toFixed(2)}</span>
-              </div>
+          {!isQuote && splits?.length > 0 && (
+            <div style={{ marginTop: 8, padding: "10px 12px", background: "rgba(52,211,153,.06)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+              {splits.map((s, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text2)" }}>
+                  <span>{PAY_LABEL[s.method] || s.method}</span>
+                  <span style={{ fontWeight: 700 }}>{sym}{(parseFloat(s.amount) || 0).toFixed(2)}</span>
+                </div>
+              ))}
               {change > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, color: "var(--green)", fontSize: 16 }}>
-                  <span>Change</span><span>{sym}{(+change).toFixed(2)}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, color: "var(--green)", fontSize: 16, borderTop: "1px solid rgba(52,211,153,.3)", marginTop: 4, paddingTop: 4 }}>
+                  <span>Change</span><span>{sym}{change.toFixed(2)}</span>
                 </div>
               )}
             </div>
@@ -444,9 +452,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const [loadErr, setLoadErr] = useState("");
   const [loadBusy, setLoadBusy] = useState(false);
 
-  // Payment
-  const [payMethod, setPayMethod] = useState("cash");
-  const [cashReceived, setCashReceived] = useState("");
+  // Payment — split support
+  const [splits, setSplits] = useState([{ method: "cash", amount: "" }]);
   const [discount, setDiscount] = useState(0);
   const [discLocked, setDiscLocked] = useState(true);
   const [showPin, setShowPin] = useState(false);
@@ -480,8 +487,16 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   // Computed totals
   const subtotal = cart.reduce((s, i) => s + i.qty * i.price, 0);
   const total = Math.max(0, subtotal - discount);
-  const cashAmt = payMethod === "cash" && cashReceived !== "" ? +cashReceived : null;
-  const change = cashAmt !== null && cashAmt >= total ? cashAmt - total : null;
+  const splitTotal = splits.reduce((s, sp) => s + (parseFloat(sp.amount) || 0), 0);
+  const remaining = Math.max(0, total - splitTotal);
+  const change = splitTotal > total ? +(splitTotal - total).toFixed(2) : 0;
+
+  // Split helpers
+  const PAY_OPTS = [["cash","💵","Cash"],["card","💳","Card"],["qr","📱","QR"],["transfer","🏦","Transfer"]];
+  const setSplitMethod = (i, m) => setSplits(sp => sp.map((s, j) => j === i ? { ...s, method: m } : s));
+  const setSplitAmount = (i, v) => setSplits(sp => sp.map((s, j) => j === i ? { ...s, amount: v } : s));
+  const addSplit = () => setSplits(sp => [...sp, { method: "card", amount: "" }]);
+  const removeSplit = (i) => setSplits(sp => sp.filter((_, j) => j !== i));
 
   const categories = getCategories().filter(c => c !== "All");
   const lq = search.trim().toLowerCase();
@@ -564,7 +579,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const setItemPrice = (pid, p) => setCart(prev => prev.map(i => i.part_id === pid ? { ...i, price: +p || 0 } : i));
 
   const clearAll = () => {
-    setCart([]); setDiscount(0); setDiscLocked(true); setCashReceived("");
+    setCart([]); setDiscount(0); setDiscLocked(true); setSplits([{ method: "cash", amount: "" }]);
     setCustomer(null); setCustSearch(""); setSearch2("");
     setQuoteId(null); setLoadInput(""); setLoadErr("");
   };
@@ -602,7 +617,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       }
 
       setQuoteId(qId);
-      setDone({ invId: qId, cart: [...cart], customer, subtotal, discount, total, payMethod, cashReceived: 0, change: 0, isQuote: true });
+      setDone({ invId: qId, cart: [...cart], customer, subtotal, discount, total, splits: [], change: 0, isQuote: true });
       clearAll();
     } finally { setSaving(false); }
   };
@@ -642,14 +657,14 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   // Complete the sale
   const completeSale = async () => {
     if (!cart.length) return;
-    if (payMethod === "cash" && cashReceived !== "" && +cashReceived < total) {
-      alert("Cash received is less than total");
-      return;
-    }
+    if (remaining > 0) { alert(`Still unpaid: ${sym}${remaining.toFixed(2)}`); return; }
     setSaving(true);
     try {
+      const cashSplit = splits.find(s => s.method === "cash");
+      const payMethod = splits.length === 1 ? splits[0].method : JSON.stringify(splits);
+      const cashAmt = cashSplit ? parseFloat(cashSplit.amount) || 0 : 0;
       const invId = await onSave(cart, customer, payMethod, cashAmt, change, discount, quoteId);
-      setDone({ invId, cart: [...cart], customer, subtotal, discount, total, payMethod, cashReceived: cashAmt || 0, change: change || 0, isQuote: false });
+      setDone({ invId, cart: [...cart], customer, subtotal, discount, total, splits: [...splits], change, isQuote: false });
       clearAll();
     } finally { setSaving(false); }
   };
@@ -911,34 +926,35 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                 <span style={{ fontWeight: 800, fontSize: 15, color: "var(--text2)" }}>TOTAL</span>
                 <span style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 900, fontSize: 28, color: "var(--accent)" }}>{sym}{total.toFixed(2)}</span>
               </div>
-              {/* Payment method */}
-              <div>
-                <div style={S.label}>Payment Method</div>
-                <div style={{ display: "flex", gap: 5 }}>
-                  {[["cash", "💵", "Cash"], ["card", "💳", "Card"], ["qr", "📱", "QR"], ["transfer", "🏦", "Transfer"]].map(([m, icon, lbl]) => (
-                    <button key={m} onClick={() => setPayMethod(m)}
-                      style={{ flex: 1, padding: "10px 0", borderRadius: 9, border: `2px solid ${payMethod === m ? "var(--accent)" : "var(--border)"}`, background: payMethod === m ? "rgba(249,115,22,.15)" : "var(--surface)", color: payMethod === m ? "var(--accent)" : "var(--text3)", fontWeight: 800, fontSize: 11, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                      <span style={{ fontSize: 20 }}>{icon}</span>
-                      {lbl}
-                    </button>
-                  ))}
-                </div>
+              {/* Split payments */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={S.label}>Payment</div>
+                {splits.map((sp, i) => (
+                  <div key={i} style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                    <select value={sp.method} onChange={e => setSplitMethod(i, e.target.value)}
+                      style={{ flex: "0 0 110px", fontSize: 13, padding: "6px 8px", background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: 8, color: "var(--text)", fontFamily: "DM Sans,sans-serif" }}>
+                      {PAY_OPTS.map(([m,,lbl]) => <option key={m} value={m}>{lbl}</option>)}
+                    </select>
+                    <input className="inp" type="number" min={0} step="0.01" value={sp.amount}
+                      onChange={e => setSplitAmount(i, e.target.value)}
+                      placeholder={i === 0 && splits.length === 1 ? `${sym} Full amount` : `${sym} Amount`}
+                      style={{ flex: 1, textAlign: "right", padding: "6px 10px", fontSize: 14, fontWeight: 700 }} />
+                    {splits.length > 1 && (
+                      <button onClick={() => removeSplit(i)} style={{ background: "none", border: "none", color: "var(--red)", fontSize: 18, cursor: "pointer", padding: "0 4px", lineHeight: 1 }}>✕</button>
+                    )}
+                  </div>
+                ))}
+                <button onClick={addSplit} style={{ alignSelf: "flex-start", background: "none", border: "1px dashed var(--border)", borderRadius: 8, color: "var(--text3)", fontSize: 12, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>+ Add payment method</button>
+                {remaining > 0 && splitTotal > 0 && (
+                  <div style={{ fontSize: 12, color: "var(--red)", fontWeight: 700 }}>Still unpaid: {sym}{remaining.toFixed(2)}</div>
+                )}
+                {change > 0 && (
+                  <div style={{ background: "rgba(52,211,153,.12)", border: "1px solid rgba(52,211,153,.3)", borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: "var(--green)" }}>Change</span>
+                    <span style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 900, fontSize: 20, color: "var(--green)" }}>{sym}{change.toFixed(2)}</span>
+                  </div>
+                )}
               </div>
-              {/* Cash received */}
-              {payMethod === "cash" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <input className="inp" type="number" min={0} step="0.01" value={cashReceived}
-                    onChange={e => setCashReceived(e.target.value)}
-                    placeholder={`${sym} Cash received`}
-                    style={{ fontSize: 16, fontWeight: 700, textAlign: "right", padding: "8px 12px" }} />
-                  {change !== null && (
-                    <div style={{ background: "rgba(52,211,153,.12)", border: "1px solid rgba(52,211,153,.3)", borderRadius: 8, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: "var(--green)" }}>Change</span>
-                      <span style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 900, fontSize: 22, color: "var(--green)" }}>{sym}{change.toFixed(2)}</span>
-                    </div>
-                  )}
-                </div>
-              )}
               {/* Action buttons */}
               <button onClick={completeSale} disabled={saving || cart.length === 0}
                 style={{ width: "100%", padding: "16px 0", borderRadius: 12, border: "none", background: saving || cart.length === 0 ? "var(--surface3)" : "linear-gradient(135deg,#f97316,#fb923c)", color: "#fff", fontWeight: 900, fontSize: 18, cursor: saving || cart.length === 0 ? "not-allowed" : "pointer", boxShadow: cart.length > 0 ? "0 4px 20px rgba(249,115,22,.4)" : "none" }}>
@@ -1221,36 +1237,44 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             </span>
           </div>
 
-          {/* Payment method */}
+          {/* Split payment */}
           <div>
-            <div style={S.label}>Payment Method</div>
-            <div style={{ display: "flex", gap: 5 }}>
-              {[["cash", "💵", "Cash"], ["card", "💳", "Card"], ["qr", "📱", "QR"], ["transfer", "🏦", "Transfer"]].map(([m, icon, lbl]) => (
-                <button key={m} onClick={() => setPayMethod(m)}
-                  style={{ flex: 1, padding: "9px 0", borderRadius: 9, border: `2px solid ${payMethod === m ? "var(--accent)" : "var(--border)"}`, background: payMethod === m ? "rgba(249,115,22,.15)" : "var(--surface)", color: payMethod === m ? "var(--accent)" : "var(--text3)", fontWeight: 800, fontSize: 11, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, transition: "all .15s" }}>
-                  <span style={{ fontSize: 18 }}>{icon}</span>
-                  <span>{lbl}</span>
-                </button>
+            <div style={S.label}>Payment</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {splits.map((sp, i) => (
+                <div key={i} style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                  <select value={sp.method} onChange={e => setSplitMethod(i, e.target.value)}
+                    style={{ flex: "0 0 110px", background: "var(--surface)", border: "1.5px solid var(--border)", color: "var(--text)", borderRadius: 8, padding: "8px 8px", fontSize: 13, cursor: "pointer" }}>
+                    {PAY_OPTS.map(([m,,lbl]) => <option key={m} value={m}>{lbl}</option>)}
+                  </select>
+                  <input className="inp" type="number" min={0} step="0.01" value={sp.amount}
+                    onChange={e => setSplitAmount(i, e.target.value)}
+                    placeholder={i === 0 && splits.length === 1 ? total.toFixed(2) : "0.00"}
+                    style={{ flex: 1, textAlign: "right", fontSize: 18, fontWeight: 800, padding: "8px 10px" }} />
+                  {splits.length > 1 && (
+                    <button onClick={() => removeSplit(i)}
+                      style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text3)", cursor: "pointer", padding: "6px 9px", fontSize: 14, flexShrink: 0 }}>✕</button>
+                  )}
+                </div>
               ))}
-            </div>
-          </div>
-
-          {/* Cash received + change */}
-          {payMethod === "cash" && (
-            <div>
-              <div style={S.label}>Cash Received</div>
-              <input className="inp" type="number" min={0} step="0.01" value={cashReceived}
-                onChange={e => setCashReceived(e.target.value)}
-                placeholder={total.toFixed(2)}
-                style={{ fontSize: 22, fontWeight: 900, textAlign: "right", letterSpacing: "-.01em" }} />
-              {change !== null && (
-                <div style={{ marginTop: 6, padding: "10px 14px", background: "rgba(52,211,153,.15)", border: "1px solid rgba(52,211,153,.35)", borderRadius: 9, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <button onClick={addSplit}
+                style={{ background: "none", border: "1.5px dashed var(--border2)", borderRadius: 8, color: "var(--blue)", cursor: "pointer", padding: "7px 0", fontSize: 13, fontWeight: 600, width: "100%", textAlign: "center" }}>
+                + Add payment method
+              </button>
+              {remaining > 0 && splitTotal > 0 && (
+                <div style={{ padding: "8px 12px", background: "rgba(248,113,113,.12)", border: "1px solid rgba(248,113,113,.25)", borderRadius: 8, display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--red)" }}>Still unpaid</span>
+                  <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 20, fontWeight: 900, color: "var(--red)" }}>{sym}{remaining.toFixed(2)}</span>
+                </div>
+              )}
+              {change > 0 && (
+                <div style={{ padding: "8px 12px", background: "rgba(52,211,153,.12)", border: "1px solid rgba(52,211,153,.25)", borderRadius: 8, display: "flex", justifyContent: "space-between" }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "var(--green)" }}>Change</span>
-                  <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 26, fontWeight: 900, color: "var(--green)" }}>{sym}{change.toFixed(2)}</span>
+                  <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 20, fontWeight: 900, color: "var(--green)" }}>{sym}{change.toFixed(2)}</span>
                 </div>
               )}
             </div>
-          )}
+          </div>
 
           {/* Complete Sale */}
           <button onClick={completeSale} disabled={saving || cart.length === 0}

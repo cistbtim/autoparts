@@ -4388,6 +4388,198 @@ export function AddPaymentModal({data,customerInvoices,supplierInvoices,onSave,o
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SALESMAN STATEMENT PAGE
+// ═══════════════════════════════════════════════════════════════
+export function SalesmanStatementPage({customerInvoices=[],customerReturns=[],user,settings}) {
+  const [period,setPeriod]=useState("month");
+  const sym=curSym(settings.currency||"TWD NT$");
+  const fmt=(n)=>`${sym}${(n||0).toFixed(2)}`;
+
+  const salesmanName=(user.name||user.username||"").trim();
+
+  const PAY_LABEL={cash:"💵 Cash",card:"💳 Card",qr:"📱 QR",transfer:"🏦 Transfer"};
+  const PAY_COLOR={cash:"var(--green)",card:"var(--blue)",qr:"var(--purple)",transfer:"var(--yellow)"};
+
+  const parseSplits=(inv)=>{
+    const pm=inv.payment_method||"cash";
+    if(pm.startsWith("[")){try{return JSON.parse(pm);}catch{return [{method:"cash",amount:inv.total||0}];}}
+    return [{method:pm,amount:inv.total||0}];
+  };
+
+  const myInvoices=useMemo(()=>{
+    const now=new Date();
+    const todayStr=now.toISOString().slice(0,10);
+    const monDay=new Date(now);monDay.setDate(monDay.getDate()-((monDay.getDay()+6)%7));
+    const weekStart=monDay.toISOString().slice(0,10);
+    const monthPfx=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+    const yearPfx=`${now.getFullYear()}`;
+    return customerInvoices
+      .filter(inv=>{
+        if(!inv.is_pos||inv.status!=="paid") return false;
+        if((inv.created_by||"").trim().toLowerCase()!==salesmanName.toLowerCase()) return false;
+        const d=(inv.date||inv.created_at||"").slice(0,10);
+        if(period==="today")  return d===todayStr;
+        if(period==="week")   return d>=weekStart;
+        if(period==="month")  return d.startsWith(monthPfx);
+        if(period==="year")   return d.startsWith(yearPfx);
+        return true;
+      })
+      .sort((a,b)=>((b.date||b.created_at||"")>(a.date||a.created_at||"")?1:-1));
+  },[customerInvoices,salesmanName,period]);
+
+  const myInvIds=useMemo(()=>new Set(myInvoices.map(i=>i.id)),[myInvoices]);
+
+  const myReturns=useMemo(()=>
+    customerReturns
+      .filter(r=>myInvIds.has(r.invoice_id))
+      .sort((a,b)=>((b.return_date||"")>(a.return_date||"")?1:-1)),
+    [customerReturns,myInvIds]
+  );
+
+  const totals=useMemo(()=>{
+    const t={sales:0,count:myInvoices.length,returns:0,returnCount:myReturns.length,cash:0,card:0,qr:0,transfer:0};
+    myInvoices.forEach(inv=>{
+      t.sales+=(inv.total||0);
+      parseSplits(inv).forEach(s=>{const m=s.method||"cash";if(t[m]!==undefined)t[m]+=parseFloat(s.amount)||0;});
+    });
+    t.returns=myReturns.reduce((s,r)=>s+(r.total||0),0);
+    t.net=t.sales-t.returns;
+    return t;
+  },[myInvoices,myReturns]);
+
+  const PERIODS=[["today","Today"],["week","This Week"],["month","This Month"],["year","This Year"],["all","All Time"]];
+
+  return (
+    <div className="fu">
+      <div className="page-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>📊 My Sales Statement</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>Salesman: <strong style={{color:"var(--text)"}}>{salesmanName}</strong></p>
+        </div>
+      </div>
+
+      {/* Period selector */}
+      <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
+        {PERIODS.map(([p,lbl])=>(
+          <button key={p} className={`btn btn-sm ${period===p?"btn-primary":"btn-ghost"}`}
+            onClick={()=>setPeriod(p)} style={{fontSize:12}}>{lbl}</button>
+        ))}
+      </div>
+
+      {/* Summary cards */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+        <div className="card" style={{padding:"16px 18px",borderLeft:"3px solid var(--green)"}}>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:5}}>Total Sales</div>
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:26,fontWeight:900,color:"var(--green)"}}>{fmt(totals.sales)}</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{totals.count} transaction{totals.count!==1?"s":""}</div>
+        </div>
+        <div className="card" style={{padding:"16px 18px",borderLeft:"3px solid var(--red)"}}>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:5}}>Returns</div>
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:26,fontWeight:900,color:"var(--red)"}}>{fmt(totals.returns)}</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{totals.returnCount} return{totals.returnCount!==1?"s":""}</div>
+        </div>
+      </div>
+      <div className="card" style={{padding:"16px 18px",marginBottom:18,borderLeft:"3px solid var(--accent)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:5}}>Net Revenue</div>
+            <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:30,fontWeight:900,color:"var(--accent)"}}>{fmt(totals.net)}</div>
+          </div>
+          <div style={{fontSize:32}}>💰</div>
+        </div>
+      </div>
+
+      {/* Payment method breakdown */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:22}}>
+        {["cash","card","qr","transfer"].map(m=>(
+          <div key={m} className="card" style={{padding:"12px 14px",textAlign:"center",borderTop:`2px solid ${PAY_COLOR[m]}`}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:5}}>{PAY_LABEL[m]}</div>
+            <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:17,fontWeight:800,color:PAY_COLOR[m]}}>{fmt(totals[m])}</div>
+            {totals.sales>0&&<div style={{fontSize:10,color:"var(--text3)",marginTop:2}}>{Math.round(totals[m]/totals.sales*100)}%</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Sales list */}
+      <h3 style={{fontSize:12,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>🧾 Sales ({myInvoices.length})</h3>
+      <div className="card tbl-wrap" style={{overflow:"auto",marginBottom:24}}>
+        <table className="tbl" style={{minWidth:520}}>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Invoice</th>
+              <th>Customer</th>
+              <th>Payment</th>
+              <th style={{textAlign:"right"}}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {myInvoices.length===0&&<tr><td colSpan={5} style={{textAlign:"center",padding:32,color:"var(--text3)"}}>No sales in this period</td></tr>}
+            {myInvoices.map(inv=>{
+              const splits=parseSplits(inv);
+              const payLabel=splits.length===1
+                ?(PAY_LABEL[splits[0].method]||splits[0].method)
+                :splits.map(s=>PAY_LABEL[s.method]||s.method).join(" + ");
+              return (
+                <tr key={inv.id}>
+                  <td style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{(inv.date||inv.created_at||"").slice(0,10)}</td>
+                  <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{inv.id}</code></td>
+                  <td style={{fontWeight:600}}>{inv.customer_name||"Walk-in"}</td>
+                  <td style={{fontSize:12,color:"var(--text2)"}}>{payLabel}</td>
+                  <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:15,color:"var(--green)"}}>{fmt(inv.total)}</td>
+                </tr>
+              );
+            })}
+            {myInvoices.length>0&&(
+              <tr style={{background:"var(--surface2)",borderTop:"2px solid var(--border2)"}}>
+                <td colSpan={4} style={{fontWeight:800,fontSize:13}}>TOTAL</td>
+                <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:16,color:"var(--green)"}}>{fmt(totals.sales)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Returns list */}
+      <h3 style={{fontSize:12,fontWeight:700,color:"var(--red)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>↩️ Returns ({myReturns.length})</h3>
+      <div className="card tbl-wrap" style={{overflow:"auto"}}>
+        <table className="tbl" style={{minWidth:560}}>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Return #</th>
+              <th>Invoice</th>
+              <th>Customer</th>
+              <th>Reason</th>
+              <th style={{textAlign:"right"}}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {myReturns.length===0&&<tr><td colSpan={6} style={{textAlign:"center",padding:32,color:"var(--text3)"}}>No returns in this period</td></tr>}
+            {myReturns.map(r=>(
+              <tr key={r.id}>
+                <td style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{r.return_date}</td>
+                <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--purple)"}}>{r.id}</code></td>
+                <td style={{fontSize:12,color:"var(--blue)"}}>{r.invoice_id||"—"}</td>
+                <td style={{fontWeight:600}}>{r.customer_name||"—"}</td>
+                <td style={{fontSize:13,color:"var(--text2)"}}>{r.reason||"—"}</td>
+                <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:15,color:"var(--red)"}}>-{fmt(r.total)}</td>
+              </tr>
+            ))}
+            {myReturns.length>0&&(
+              <tr style={{background:"var(--surface2)",borderTop:"2px solid var(--border2)"}}>
+                <td colSpan={5} style={{fontWeight:800,fontSize:13}}>TOTAL RETURNS</td>
+                <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:16,color:"var(--red)"}}>-{fmt(totals.returns)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // REPORTS PAGE
 // ═══════════════════════════════════════════════════════════════
 export function ReportsPage({orders,parts,customers,supplierInvoices,payments,customerInvoices=[],settings,t,lang,role}) {

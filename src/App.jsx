@@ -8,7 +8,7 @@ import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./l
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { PosPage } from "./components/Pos.jsx";
@@ -415,7 +415,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       isSalesman ? Promise.resolve([]) : api.get("supplier_invoices",`${bF}select=*&order=created_at.desc`),
       api.get("customer_invoices",`${bF}select=*&order=created_at.desc`),
       isSalesman ? Promise.resolve([]) : api.get("supplier_returns",`${bF}select=*&order=created_at.desc`),
-      isSalesman ? Promise.resolve([]) : api.get("customer_returns",`${bF}select=*&order=created_at.desc`),
+      api.get("customer_returns",`${bF}select=*&order=created_at.desc`),
       api.get("vehicles","select=*&order=make.asc,model.asc,year_from.asc").catch(()=>[]),
       api.get("part_fitments","select=*").catch(()=>[]),
       isSalesman ? Promise.resolve([]) : api.get("payments",`${bF}select=*&order=payment_date.desc`).catch(()=>[]),
@@ -2515,6 +2515,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       badge: pendingCnt,
       children:[
         {id:"pos",icon:"🖥️",label:"POS",roles:["admin","manager"]},
+        {id:"my_sales",icon:"📊",label:"My Statement",roles:["admin"]},
         {id:"shop",icon:"🛒",label:t.shop,roles:["admin","customer"]},
         {id:"picking",icon:"🔍",label:t.picking,roles:["admin","shipper"],badge:pendingCnt},
         {id:"orders",icon:"📋",label:t.orders,roles:["admin","shipper"]},
@@ -2557,8 +2558,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         if(role==="branch_warehouse") return ["inventory","stocktake","stockmove","orders"].includes(c.id);
         // branch_picker: orders only
         if(role==="branch_picker") return ["orders","picking"].includes(c.id);
-        // branch_salesman: POS only
-        if(role==="branch_salesman") return c.id==="pos";
+        // branch_salesman: POS + My Statement
+        if(role==="branch_salesman") return ["pos","my_sales"].includes(c.id);
         // branch_manager + branch_admin: full access minus hidden
         return true;
       }
@@ -2612,7 +2613,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       {id:"picking",   icon:"🔍",label:t.picking},
     ];
     if(role==="branch_salesman") return [
-      {id:"pos", icon:"🖥️", label:"POS"},
+      {id:"pos",      icon:"🖥️", label:"POS"},
+      {id:"my_sales", icon:"📊", label:"My Sales"},
     ];
     if(role==="branch_warehouse") return [
       {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
@@ -3809,6 +3811,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
             partFitments={partFitments}
             branchId={_bId}
             onSave={savePosInvoice}/>
+        )}
+
+        {/* ── MY SALES STATEMENT (branch_salesman) ── */}
+        {tab==="my_sales"&&role==="branch_salesman"&&(
+          <SalesmanStatementPage
+            customerInvoices={customerInvoices}
+            customerReturns={customerReturns}
+            user={user}
+            settings={settings}/>
         )}
 
         {/* ── SHOP ── */}

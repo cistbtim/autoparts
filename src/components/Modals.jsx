@@ -6439,11 +6439,13 @@ export function BranchStockModal({part,existing,branchId,overrideBranchId,onClos
     preferred_supplier_id: existing?.preferred_supplier_id ?? "",
   });
   const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState(null);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const effectiveBranchId=overrideBranchId||branchId;
   const save=async()=>{
     if(!part||!effectiveBranchId) return;
     setBusy(true);
+    setErr(null);
     try{
       const payload={
         branch_id:effectiveBranchId,
@@ -6459,12 +6461,20 @@ export function BranchStockModal({part,existing,branchId,overrideBranchId,onClos
         preferred_supplier_id:f.preferred_supplier_id?+f.preferred_supplier_id:null,
         updated_at:new Date().toISOString(),
       };
-      if(existing?.id){
-        await api.patch("branch_stock","id",existing.id,payload);
+      // Fresh lookup to avoid stale state — bypasses cache
+      api.cacheInvalidate("branch_stock");
+      const freshRows=await api.get("branch_stock",`branch_id=eq.${effectiveBranchId}&part_id=eq.${part.id}&select=id`);
+      const freshId=Array.isArray(freshRows)&&freshRows[0]?freshRows[0].id:(existing?.id||null);
+      let res;
+      if(freshId){
+        res=await api.patch("branch_stock","id",freshId,payload);
       } else {
-        await api.insert("branch_stock",payload);
+        res=await api.insert("branch_stock",payload);
       }
+      if(res?.code||res?.message){setErr(res.message||res.details||"Save failed");return;}
       await onSave();
+    } catch(e){
+      setErr(e?.message||"Unexpected error");
     } finally { setBusy(false); }
   };
   return (
@@ -6549,6 +6559,7 @@ export function BranchStockModal({part,existing,branchId,overrideBranchId,onClos
           )}
         </div>
 
+        {err&&<div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.3)",borderRadius:8,padding:"8px 12px",fontSize:13,color:"var(--red)",marginTop:12}}>{err}</div>}
         <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:16}}>
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={save} disabled={busy}>{busy?"Saving…":"Save Stock"}</button>

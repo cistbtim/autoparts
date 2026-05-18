@@ -938,7 +938,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                 <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13, padding: "9px 0", borderColor: "rgba(96,165,250,.4)", color: "var(--blue)" }}
                   onClick={saveQuote} disabled={saving || cart.length === 0}>💾 Save Quote</button>
                 <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13, padding: "9px 0", borderColor: "rgba(107,114,128,.3)", color: "var(--text3)" }}
-                  onClick={clearCart} disabled={cart.length === 0}>🗑 Clear</button>
+                  onClick={clearAll} disabled={cart.length === 0}>🗑 Clear</button>
               </div>
             </div>
           </div>

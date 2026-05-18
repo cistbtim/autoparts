@@ -4582,7 +4582,7 @@ export function SalesmanStatementPage({customerInvoices=[],customerReturns=[],us
 // ═══════════════════════════════════════════════════════════════
 // REPORTS PAGE
 // ═══════════════════════════════════════════════════════════════
-export function ReportsPage({orders,parts,customers,supplierInvoices,payments,customerInvoices=[],settings,t,lang,role}) {
+export function ReportsPage({orders,parts,customers,supplierInvoices,payments,customerInvoices=[],customerReturns=[],settings,t,lang,role}) {
   const [period,setPeriod]=useState("monthly");
   const [reportTab,setReportTab]=useState("pos");
   const cur=curSym(settings.currency||"TWD NT$");
@@ -4592,13 +4592,9 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,cu
   // ── POS Sales data ──
   const posInvoices=customerInvoices.filter(i=>i.is_pos&&i.status==="paid");
 
-  // Parse payment_method field (may be plain string or JSON splits array)
   const parseSplits=(inv)=>{
     const pm=inv.payment_method||"cash";
-    if(pm.startsWith("[")){
-      try{ return JSON.parse(pm); }catch{ return [{method:"cash",amount:inv.total||0}]; }
-    }
-    // legacy single method — treat full invoice total as that method
+    if(pm.startsWith("[")){try{return JSON.parse(pm);}catch{return [{method:"cash",amount:inv.total||0}];}}
     return [{method:pm,amount:inv.total||0}];
   };
 
@@ -4606,13 +4602,11 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,cu
   const METHOD_LABEL={cash:"💵 Cash",card:"💳 Card",qr:"📱 QR",transfer:"🏦 Transfer"};
   const METHOD_COLOR={cash:"var(--green)",card:"var(--blue)",qr:"var(--purple)",transfer:"var(--yellow)"};
 
-  // Period key helper
   const periodKey=(dateStr)=>{
     const d=new Date(dateStr);
     if(isNaN(d)) return "—";
     if(period==="daily")   return d.toISOString().slice(0,10);
     if(period==="weekly"){
-      // ISO week: Mon-Sun
       const tmp=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
       const day=tmp.getUTCDay()||7;
       tmp.setUTCDate(tmp.getUTCDate()+4-day);
@@ -4624,7 +4618,23 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,cu
     return `${d.getFullYear()}`;
   };
 
-  // Build grouped rows
+  // POS returns linked to POS invoice IDs
+  const posInvIds=useMemo(()=>new Set(posInvoices.map(i=>i.id)),[posInvoices]);
+  const posRets=useMemo(()=>customerReturns.filter(r=>posInvIds.has(r.invoice_id)),[customerReturns,posInvIds]);
+
+  // Group returns by period (using return_date)
+  const retByPeriod=useMemo(()=>{
+    const map={};
+    posRets.forEach(r=>{
+      const key=periodKey(r.return_date||r.created_at);
+      if(!map[key]) map[key]={returns:0,returnCount:0};
+      map[key].returns+=(r.total||0);
+      map[key].returnCount++;
+    });
+    return map;
+  },[posRets,period]);
+
+  // Build grouped rows (sales)
   const posGrouped=useMemo(()=>{
     const map={};
     posInvoices.forEach(inv=>{
@@ -4640,18 +4650,37 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,cu
     return Object.values(map).sort((a,b)=>b.key.localeCompare(a.key)).slice(0,60);
   },[posInvoices,period]);
 
-  // Overall payment method totals
+  // Overall totals
   const methodTotals=useMemo(()=>{
     const t2={cash:0,card:0,qr:0,transfer:0,total:0,count:posInvoices.length};
     posInvoices.forEach(inv=>{
       t2.total+=(inv.total||0);
-      parseSplits(inv).forEach(s=>{
-        const m=s.method||"cash";
-        if(t2[m]!==undefined) t2[m]+=parseFloat(s.amount)||0;
-      });
+      parseSplits(inv).forEach(s=>{const m=s.method||"cash";if(t2[m]!==undefined)t2[m]+=parseFloat(s.amount)||0;});
     });
+    t2.returns=posRets.reduce((s,r)=>s+(r.total||0),0);
+    t2.returnCount=posRets.length;
+    t2.net=t2.total-t2.returns;
     return t2;
-  },[posInvoices]);
+  },[posInvoices,posRets]);
+
+  // By-salesman breakdown
+  const bySalesman=useMemo(()=>{
+    const invSalesmanMap={};
+    posInvoices.forEach(inv=>{invSalesmanMap[inv.id]=inv.created_by||"—";});
+    const map={};
+    posInvoices.forEach(inv=>{
+      const name=inv.created_by||"—";
+      if(!map[name]) map[name]={name,sales:0,count:0,returns:0,returnCount:0,cash:0,card:0,qr:0,transfer:0};
+      map[name].sales+=(inv.total||0);
+      map[name].count++;
+      parseSplits(inv).forEach(s=>{const m=s.method||"cash";if(map[name][m]!==undefined)map[name][m]+=parseFloat(s.amount)||0;});
+    });
+    posRets.forEach(r=>{
+      const name=invSalesmanMap[r.invoice_id]||"—";
+      if(map[name]){map[name].returns+=(r.total||0);map[name].returnCount++;}
+    });
+    return Object.values(map).map(s=>({...s,net:s.sales-s.returns})).sort((a,b)=>b.sales-a.sales);
+  },[posInvoices,posRets]);
 
   // ── Legacy sales data (orders) ──
   const completedOrders=orders.filter(o=>o.status==="Completed");
@@ -4718,20 +4747,32 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,cu
       {/* ── POS SALES REPORT ── */}
       {reportTab==="pos"&&(
         <div>
-          {/* Method summary cards */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:18}}>
-            <div className="card stat-card" style={{"--gc":"rgba(52,211,153,.15)",padding:"18px 20px"}}>
-              <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:6}}>Total POS Revenue</div>
-              <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:28,fontWeight:900,color:"var(--green)"}}>{fmt(methodTotals.total)}</div>
-              <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>{methodTotals.count} transactions</div>
+          {/* Top summary: Sales / Returns / Net */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:12}}>
+            <div className="card" style={{padding:"16px 18px",borderLeft:"3px solid var(--green)"}}>
+              <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:5}}>Total Sales</div>
+              <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:26,fontWeight:900,color:"var(--green)"}}>{fmt(methodTotals.total)}</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{methodTotals.count} transactions</div>
             </div>
+            <div className="card" style={{padding:"16px 18px",borderLeft:"3px solid var(--red)"}}>
+              <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:5}}>Returns</div>
+              <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:26,fontWeight:900,color:"var(--red)"}}>{fmt(methodTotals.returns)}</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{methodTotals.returnCount} return{methodTotals.returnCount!==1?"s":""}</div>
+            </div>
+            <div className="card" style={{padding:"16px 18px",borderLeft:"3px solid var(--accent)"}}>
+              <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:5}}>Net Revenue</div>
+              <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:26,fontWeight:900,color:"var(--accent)"}}>{fmt(methodTotals.net)}</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>after returns</div>
+            </div>
+          </div>
+
+          {/* Payment method cards */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
             {METHODS.map(m=>(
-              <div key={m} className="card" style={{padding:"18px 20px",borderLeft:`3px solid ${METHOD_COLOR[m]}`}}>
-                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:6}}>{METHOD_LABEL[m]}</div>
-                <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:22,fontWeight:800,color:METHOD_COLOR[m]}}>{fmt(methodTotals[m])}</div>
-                <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>
-                  {methodTotals.total>0?Math.round(methodTotals[m]/methodTotals.total*100):0}% of total
-                </div>
+              <div key={m} className="card" style={{padding:"14px 16px",borderTop:`2px solid ${METHOD_COLOR[m]}`}}>
+                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:5}}>{METHOD_LABEL[m]}</div>
+                <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:20,fontWeight:800,color:METHOD_COLOR[m]}}>{fmt(methodTotals[m])}</div>
+                <div style={{fontSize:10,color:"var(--text3)",marginTop:2}}>{methodTotals.total>0?Math.round(methodTotals[m]/methodTotals.total*100):0}% of sales</div>
               </div>
             ))}
           </div>
@@ -4739,57 +4780,112 @@ export function ReportsPage({orders,parts,customers,supplierInvoices,payments,cu
           {/* Period selector */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
             <PeriodBtns/>
-            <span style={{fontSize:12,color:"var(--text3)"}}>{posGrouped.length} period{posGrouped.length!==1?"s":""} · {posInvoices.length} sales total</span>
+            <span style={{fontSize:12,color:"var(--text3)"}}>{posGrouped.length} period{posGrouped.length!==1?"s":""} · {posInvoices.length} sales · {posRets.length} returns</span>
           </div>
 
-          {/* Main breakdown table */}
-          <div className="card tbl-wrap" style={{overflow:"auto"}}>
-            <table className="tbl" style={{minWidth:680}}>
+          {/* Period breakdown table */}
+          <div className="card tbl-wrap" style={{overflow:"auto",marginBottom:24}}>
+            <table className="tbl" style={{minWidth:780}}>
               <thead>
                 <tr>
                   <th>Period</th>
                   <th style={{textAlign:"center"}}>Sales</th>
-                  <th style={{textAlign:"right"}}>Revenue</th>
+                  <th style={{textAlign:"right",color:"var(--green)"}}>Revenue</th>
+                  <th style={{textAlign:"right",color:"var(--red)"}}>↩ Returns</th>
+                  <th style={{textAlign:"right",color:"var(--accent)"}}>Net</th>
                   <th style={{textAlign:"right",color:"var(--green)"}}>💵 Cash</th>
                   <th style={{textAlign:"right",color:"var(--blue)"}}>💳 Card</th>
                   <th style={{textAlign:"right",color:"var(--purple)"}}>📱 QR</th>
                   <th style={{textAlign:"right",color:"var(--yellow)"}}>🏦 Transfer</th>
-                  <th style={{textAlign:"right"}}>Avg/Sale</th>
                 </tr>
               </thead>
               <tbody>
                 {posGrouped.length===0&&(
-                  <tr><td colSpan={8} style={{textAlign:"center",padding:40,color:"var(--text3)"}}>No POS sales found</td></tr>
+                  <tr><td colSpan={9} style={{textAlign:"center",padding:40,color:"var(--text3)"}}>No POS sales found</td></tr>
                 )}
-                {posGrouped.map(row=>(
-                  <tr key={row.key}>
-                    <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,fontSize:13}}>{row.key}</td>
-                    <td style={{textAlign:"center"}}>
-                      <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{row.count}</span>
-                    </td>
-                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:15,fontWeight:800,color:"var(--green)"}}>{fmtN(row.total)}</td>
-                    <td style={{textAlign:"right",color:row.cash>0?"var(--green)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.cash>0?fmtN(row.cash):"—"}</td>
-                    <td style={{textAlign:"right",color:row.card>0?"var(--blue)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.card>0?fmtN(row.card):"—"}</td>
-                    <td style={{textAlign:"right",color:row.qr>0?"var(--purple)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.qr>0?fmtN(row.qr):"—"}</td>
-                    <td style={{textAlign:"right",color:row.transfer>0?"var(--yellow)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.transfer>0?fmtN(row.transfer):"—"}</td>
-                    <td style={{textAlign:"right",color:"var(--text2)",fontFamily:"Rajdhani,sans-serif"}}>{fmtN(row.count?row.total/row.count:0)}</td>
-                  </tr>
-                ))}
+                {posGrouped.map(row=>{
+                  const ret=retByPeriod[row.key]||{returns:0,returnCount:0};
+                  const net=row.total-ret.returns;
+                  return (
+                    <tr key={row.key}>
+                      <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,fontSize:13}}>{row.key}</td>
+                      <td style={{textAlign:"center"}}>
+                        <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{row.count}</span>
+                      </td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:800,color:"var(--green)"}}>{fmtN(row.total)}</td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:ret.returns>0?"var(--red)":"var(--text3)"}}>
+                        {ret.returns>0?`-${fmtN(ret.returns)}`:"—"}
+                        {ret.returnCount>0&&<span style={{fontSize:10,color:"var(--text3)",marginLeft:4}}>({ret.returnCount})</span>}
+                      </td>
+                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:800,color:net>=0?"var(--accent)":"var(--red)"}}>{fmtN(net)}</td>
+                      <td style={{textAlign:"right",color:row.cash>0?"var(--green)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.cash>0?fmtN(row.cash):"—"}</td>
+                      <td style={{textAlign:"right",color:row.card>0?"var(--blue)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.card>0?fmtN(row.card):"—"}</td>
+                      <td style={{textAlign:"right",color:row.qr>0?"var(--purple)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.qr>0?fmtN(row.qr):"—"}</td>
+                      <td style={{textAlign:"right",color:row.transfer>0?"var(--yellow)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{row.transfer>0?fmtN(row.transfer):"—"}</td>
+                    </tr>
+                  );
+                })}
                 {posGrouped.length>0&&(
                   <tr style={{borderTop:"2px solid var(--border2)",background:"var(--surface2)"}}>
                     <td style={{fontWeight:800,fontSize:13}}>TOTAL</td>
                     <td style={{textAlign:"center",fontWeight:800}}>{methodTotals.count}</td>
-                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:16,fontWeight:900,color:"var(--green)"}}>{fmtN(methodTotals.total)}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:15,fontWeight:900,color:"var(--green)"}}>{fmtN(methodTotals.total)}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:900,color:"var(--red)"}}>-{fmtN(methodTotals.returns)}</td>
+                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:15,fontWeight:900,color:"var(--accent)"}}>{fmtN(methodTotals.net)}</td>
                     <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:"var(--green)"}}>{fmtN(methodTotals.cash)}</td>
                     <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:"var(--blue)"}}>{fmtN(methodTotals.card)}</td>
                     <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:"var(--purple)"}}>{fmtN(methodTotals.qr)}</td>
                     <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:"var(--yellow)"}}>{fmtN(methodTotals.transfer)}</td>
-                    <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",color:"var(--text2)",fontWeight:700}}>{fmtN(methodTotals.count?methodTotals.total/methodTotals.count:0)}</td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* By Salesman */}
+          {bySalesman.length>0&&(
+            <>
+              <h3 style={{fontSize:12,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>👤 By Salesman</h3>
+              <div className="card tbl-wrap" style={{overflow:"auto"}}>
+                <table className="tbl" style={{minWidth:680}}>
+                  <thead>
+                    <tr>
+                      <th>Salesman</th>
+                      <th style={{textAlign:"center"}}>Sales</th>
+                      <th style={{textAlign:"right",color:"var(--green)"}}>Revenue</th>
+                      <th style={{textAlign:"right",color:"var(--red)"}}>↩ Returns</th>
+                      <th style={{textAlign:"right",color:"var(--accent)"}}>Net</th>
+                      <th style={{textAlign:"right",color:"var(--green)"}}>💵 Cash</th>
+                      <th style={{textAlign:"right",color:"var(--blue)"}}>💳 Card</th>
+                      <th style={{textAlign:"right",color:"var(--purple)"}}>📱 QR</th>
+                      <th style={{textAlign:"right",color:"var(--yellow)"}}>🏦 Transfer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bySalesman.map((s,i)=>(
+                      <tr key={s.name}>
+                        <td>
+                          <div style={{fontWeight:700}}>{s.name}</div>
+                          {i===0&&<div style={{fontSize:11,color:"var(--accent)"}}>⭐ Top performer</div>}
+                        </td>
+                        <td style={{textAlign:"center"}}><span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{s.count}</span></td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:"var(--green)",fontSize:14}}>{fmtN(s.sales)}</td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:s.returns>0?"var(--red)":"var(--text3)"}}>
+                          {s.returns>0?`-${fmtN(s.returns)}`:"—"}
+                          {s.returnCount>0&&<span style={{fontSize:10,color:"var(--text3)",marginLeft:3}}>({s.returnCount})</span>}
+                        </td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:s.net>=0?"var(--accent)":"var(--red)",fontSize:14}}>{fmtN(s.net)}</td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:s.cash>0?"var(--green)":"var(--text3)"}}>{s.cash>0?fmtN(s.cash):"—"}</td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:s.card>0?"var(--blue)":"var(--text3)"}}>{s.card>0?fmtN(s.card):"—"}</td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:s.qr>0?"var(--purple)":"var(--text3)"}}>{s.qr>0?fmtN(s.qr):"—"}</td>
+                        <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:s.transfer>0?"var(--yellow)":"var(--text3)"}}>{s.transfer>0?fmtN(s.transfer):"—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 

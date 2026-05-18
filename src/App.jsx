@@ -4632,7 +4632,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {tab==="reports"&&(role==="admin"||role==="branch_admin"||role==="manager"||role==="branch_manager")&&(
           <ReportsPage orders={orders} parts={parts} customers={customers}
             supplierInvoices={supplierInvoices} payments={payments}
-            customerInvoices={customerInvoices}
+            customerInvoices={customerInvoices} customerReturns={customerReturns}
             settings={settings} t={t} lang={lang} role={role}/>
         )}
 

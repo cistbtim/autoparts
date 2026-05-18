@@ -251,7 +251,7 @@ function ScrapVehiclePhotoSlot({label, url, vehicleId, vin, photoKey, onSaved}) 
           </div>
         ) : url ? (
           <>
-            <img src={toImgUrl(url)||url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            <img src={toImgUrl(url)||url} alt={label} referrerPolicy="no-referrer" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
             <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0)",display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity .2s"}}
               onMouseEnter={e=>e.currentTarget.style.opacity=1}
               onMouseLeave={e=>e.currentTarget.style.opacity=0}>
@@ -352,7 +352,7 @@ function ScrapPartPhotoSlot({label, url, partId, vin, photoKey, onChange}) {
           </div>
         ) : url ? (
           <>
-            <img src={toImgUrl(url)||url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            <img src={toImgUrl(url)||url} alt={label} referrerPolicy="no-referrer" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
             <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0)",display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity .2s"}}
               onMouseEnter={e=>e.currentTarget.style.opacity=1}
               onMouseLeave={e=>e.currentTarget.style.opacity=0}>
@@ -826,7 +826,7 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
                     {photos.length>0 ? (
                       <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,height:130}}>
                         {photos.map((url,i)=>(
-                          <img key={i} src={toImgUrl(url)||url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
+                          <img key={i} src={toImgUrl(url)||url} alt="" referrerPolicy="no-referrer" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
                         ))}
                       </div>
                     ) : (
@@ -1161,7 +1161,7 @@ export function ScrapyardPartsPage({scrapId, vehicles, parts, onRefresh}) {
                   {photos.length>0 ? (
                     <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,height:130}}>
                       {photos.map((url,i)=>(
-                        <img key={i} src={toImgUrl(url)||url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
+                        <img key={i} src={toImgUrl(url)||url} alt="" referrerPolicy="no-referrer" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
                       ))}
                     </div>
                   ) : (
@@ -1310,7 +1310,7 @@ export function ScrapyardAdminPage({vehicles, parts, profiles, users, onRefresh}
                     {photos2.length>0 ? (
                       <div style={{display:"grid",gridTemplateColumns:`repeat(${photos2.length},1fr)`,height:110}}>
                         {photos2.map((url,i)=>(
-                          <img key={i} src={toImgUrl(url)||url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos2.length-1?"1px solid var(--border)":"none"}}/>
+                          <img key={i} src={toImgUrl(url)||url} alt="" referrerPolicy="no-referrer" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos2.length-1?"1px solid var(--border)":"none"}}/>
                         ))}
                       </div>
                     ) : (
@@ -1525,7 +1525,7 @@ export function ScrapyardPartsAdminPage({vehicles, parts, profiles, users, onRef
                   {photos.length>0 ? (
                     <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,height:120}}>
                       {photos.map((url,i)=>(
-                        <img key={i} src={toImgUrl(url)||url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
+                        <img key={i} src={toImgUrl(url)||url} alt="" referrerPolicy="no-referrer" style={{width:"100%",height:"100%",objectFit:"cover",borderRight:i<photos.length-1?"1px solid var(--border)":"none"}}/>
                       ))}
                     </div>
                   ) : (

@@ -38,6 +38,7 @@ export const ShopLogo = ({settings, size="md", style={}}) => {
   if(src) return (
     <img src={src} alt="logo"
       style={{maxHeight:h, maxWidth:h*5, width:"auto", height:"auto", objectFit:"contain", display:"block", ...style}}
+      referrerPolicy="no-referrer"
       onError={e=>e.target.style.display="none"}/>
   );
   return null;
@@ -78,6 +79,7 @@ export function DriveImg({url, alt, style, onClick}) {
       alt={alt||""}
       style={style}
       onClick={onClick}
+      referrerPolicy="no-referrer"
       onError={()=>{
         if(idx < urls.length - 1) setIdx(i => i + 1);
         else setFailed(true);
@@ -201,6 +203,7 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
       <img key={src} src={src} alt="photo"
         style={{maxWidth:"90%",maxHeight:"90%",objectFit:"contain",
           display:status==="ok"?"block":"none",borderRadius:8}}
+        referrerPolicy="no-referrer"
         onLoad={()=>setStatus("ok")}
         onError={handleError}
         onClick={e=>e.stopPropagation()}/>

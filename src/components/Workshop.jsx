@@ -431,6 +431,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   {frontPhoto?(
                     <img src={toImgUrl(frontPhoto)} alt="car"
                       style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+                      referrerPolicy="no-referrer"
                       onError={e=>{const m=frontPhoto.match(/thumbnail[?]id=([^&]+)/)||frontPhoto.match(/[?&]id=([^&]+)/)||frontPhoto.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view"))e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;else e.target.style.display="none";}}/>
                   ):(
                     <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,color:"var(--border2)"}}>🚗</div>
@@ -546,6 +547,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   {fp
                     ? <>
                         <img src={toImgUrl(fp)} alt="car" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+                          referrerPolicy="no-referrer"
                           onError={e=>{e.target.style.display="none";}}/>
                         <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.72) 0%,rgba(0,0,0,.08) 55%,transparent 100%)"}}/>
                       </>
@@ -3081,6 +3083,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
           <>
             <img src={toImgUrl(vehiclePhotos.front)} alt="vehicle"
               style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+              referrerPolicy="no-referrer"
               onError={e=>{e.target.style.display="none";}}/>
             <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.08) 0%,rgba(0,0,0,.72) 100%)"}}/>
           </>
@@ -3783,7 +3786,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
                       {cl.photo_url&&(
                         <img src={toImgUrl(cl.photo_url)} alt="check" onClick={()=>setViewPhoto(cl.photo_url)}
                           style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)"}}
-                          onError={e=>{const m=cl.photo_url.match(/thumbnail[?]id=([^&]+)/)||cl.photo_url.match(/[?&]id=([^&]+)/)||cl.photo_url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){console.log("[CL Photo] Thumbnail failed, retrying with uc?export=view",m[1]);e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {console.warn("[CL Photo] Both thumbnail and uc?export=view failed or no Drive ID found");e.target.style.display="none";}}}/>
+                          referrerPolicy="no-referrer"
+                          onError={e=>{const m=cl.photo_url.match(/thumbnail[?]id=([^&]+)/)||cl.photo_url.match(/[?&]id=([^&]+)/)||cl.photo_url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {e.target.style.display="none";}}}/>
                       )}
                     </div>
                     <input className="inp" placeholder="Note (optional)..." value={cl.note}
@@ -3855,7 +3859,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
       {/* ══ PHOTO LIGHTBOX (global) ══ */}
       {viewPhoto&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setViewPhoto(null)}>
-          <img src={toImgUrl(viewPhoto)} alt="preview" style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8}}/>
+          <img src={toImgUrl(viewPhoto)} alt="preview" style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8}} referrerPolicy="no-referrer"/>
           <button style={{position:"absolute",top:16,right:20,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:"50%",width:36,height:36,fontSize:18,cursor:"pointer"}} onClick={()=>setViewPhoto(null)}>✕</button>
           <a href={viewPhoto} target="_blank" rel="noreferrer" style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",background:"rgba(255,255,255,.15)",color:"#fff",padding:"8px 20px",borderRadius:20,fontSize:13,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>Open in Drive ↗</a>
         </div>

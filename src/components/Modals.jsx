@@ -1302,6 +1302,7 @@ export function SettingsPage({settings,onSave,t}) {
                   {(f.logo_data||f.logo_url)
                     ? <img src={f.logo_data||(toLogoUrl(f.logo_url)||f.logo_url)} alt="preview"
                         style={{maxHeight:56,maxWidth:220,width:"auto",height:"auto",objectFit:"contain",display:"block"}}
+                        referrerPolicy="no-referrer"
                         onError={e=>e.target.style.display="none"}/>
                     : <LogoSVG height={44}/>
                   }
@@ -1334,6 +1335,7 @@ export function SettingsPage({settings,onSave,t}) {
                           {(f.logo_data||f.logo_url)
                             ? <img src={f.logo_data||(toLogoUrl(f.logo_url)||f.logo_url)} alt=""
                                 style={{maxHeight:+(f[key]||def),maxWidth:160,width:"auto",height:"auto",objectFit:"contain"}}
+                                referrerPolicy="no-referrer"
                                 onError={e=>e.target.style.display="none"}/>
                             : <LogoSVG height={Math.min(+(f[key]||def),60)}/>
                           }
@@ -6170,7 +6172,7 @@ export function PartRequestModal({currentBranch, user, onClose, onSave, t={}}) {
           <FL label="Part Photo URL"/>
           <input className="inp" value={f.image_url} onChange={e=>s("image_url",e.target.value)} placeholder="Paste Google Drive or image link"/>
         </FD>
-        {f.image_url&&<div style={{textAlign:"center"}}><img src={toImgUrl(f.image_url)} alt="" style={{maxHeight:120,maxWidth:"100%",borderRadius:8,border:"1px solid var(--border)"}} onError={e=>e.target.style.display="none"}/></div>}
+        {f.image_url&&<div style={{textAlign:"center"}}><img src={toImgUrl(f.image_url)} alt="" referrerPolicy="no-referrer" style={{maxHeight:120,maxWidth:"100%",borderRadius:8,border:"1px solid var(--border)"}} onError={e=>e.target.style.display="none"}/></div>}
         <FD><FL label="Your Suggested Selling Price"/><input className="inp" type="number" value={f.suggested_price} onChange={e=>s("suggested_price",e.target.value)} placeholder="0.00"/></FD>
         <FD><FL label="Notes for Head Office"/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} rows={2} placeholder="Where you sourced this, urgency, any other info…"/></FD>
         <div style={{fontSize:11,color:"var(--text3)"}}>Temp reference: <code style={{fontFamily:"monospace"}}>{tempSku}</code></div>
@@ -6229,7 +6231,7 @@ export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role
     return (
       <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
         <div style={{display:"flex",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
-          {r.image_url&&<img src={toImgUrl(r.image_url)} alt="" style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",flexShrink:0}} onError={e=>e.target.style.display="none"}/>}
+          {r.image_url&&<img src={toImgUrl(r.image_url)} alt="" referrerPolicy="no-referrer" style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",flexShrink:0}} onError={e=>e.target.style.display="none"}/>}
           <div style={{flex:1,minWidth:200}}>
             <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
               <span style={{fontWeight:700,fontSize:13}}>{r.name}</span>
@@ -6474,6 +6476,7 @@ export function BranchStockModal({part,existing,branchId,overrideBranchId,onClos
           {(()=>{const img=part?.image_url?toImgUrl(part.image_url):null;return img?(
             <img src={img} alt={part?.name}
               style={{width:110,height:110,objectFit:"contain",borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",flexShrink:0,cursor:"zoom-in"}}
+              referrerPolicy="no-referrer"
               onClick={()=>setLightbox(toFullUrl(part.image_url))}
               onError={e=>e.target.style.display="none"}/>
           ):(

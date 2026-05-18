@@ -320,7 +320,7 @@ export function printWorkshopInvoice(job, items, invoice, settings, photos={}) {
     <div style="width:190px;flex-shrink:0">
       <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📸 Vehicle Photos</div>
       ${photoList.map(p=>`<div style="margin-bottom:6px">
-        <img src="${toImgUrl(p.url)||p.url}" style="width:100%;height:58px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
+        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:58px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
         <div style="font-size:9px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.06em">${p.label}</div>
       </div>`).join("")}
     </div>` : "";
@@ -482,7 +482,7 @@ export function printWorkshopQuote(job, items, quote, settings, photos={}, share
     <div style="width:190px;flex-shrink:0">
       <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📸 Vehicle Photos</div>
       ${photoList.map(p=>`<div style="margin-bottom:6px">
-        <img src="${toImgUrl(p.url)||p.url}" style="width:100%;height:58px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
+        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:58px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
         <div style="font-size:9px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.06em">${p.label}</div>
       </div>`).join("")}
     </div>` : "";

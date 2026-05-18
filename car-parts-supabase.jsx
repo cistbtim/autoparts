@@ -695,7 +695,7 @@ function MainApp({ user, onLogout, onSetup, t, lang, setLang, api }) {
                         <td style={{ padding: "11px 14px", fontSize: 11, color: "#64748b", fontFamily: "monospace" }}>{p.sku}</td>
                         <td style={{ padding: "11px 14px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            {imgUrl ? <img src={imgUrl} alt={p.name} style={{ width: 36, height: 36, borderRadius: 6, objectFit: "cover", border: "1px solid #1e2130" }} onError={e => { e.target.style.display = "none"; }} /> : <span style={{ fontSize: 22 }}>{p.image || "🔩"}</span>}
+                            {imgUrl ? <img src={imgUrl} alt={p.name} referrerPolicy="no-referrer" style={{ width: 36, height: 36, borderRadius: 6, objectFit: "cover", border: "1px solid #1e2130" }} onError={e => { e.target.style.display = "none"; }} /> : <span style={{ fontSize: 22 }}>{p.image || "🔩"}</span>}
                             <div><div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>{pSupps.length > 0 && <div style={{ fontSize: 10, color: "#64748b" }}>🏭 {pSupps.length} supplier{pSupps.length > 1 ? "s" : ""}</div>}</div>
                           </div>
                         </td>
@@ -771,7 +771,7 @@ function MainApp({ user, onLogout, onSetup, t, lang, setLang, api }) {
                 const imgUrl = toImgUrl(p.image_url);
                 return (
                   <div key={p.id} className="card" style={{ padding: 16, borderColor: inCart ? "#e85d04" : "#1e2130" }}>
-                    {imgUrl ? <img src={imgUrl} alt={p.name} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} onError={e => { e.target.style.display = "none"; }} /> : <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>{p.image || "🔩"}</div>}
+                    {imgUrl ? <img src={imgUrl} alt={p.name} referrerPolicy="no-referrer" style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} onError={e => { e.target.style.display = "none"; }} /> : <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>{p.image || "🔩"}</div>}
                     <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>{p.sku} · {p.brand}</div>
                     <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 5 }}>{p.name}</div>
                     <span className="badge" style={{ background: "#1e2130", color: "#94a3b8", marginBottom: 8, display: "block", width: "fit-content" }}>{p.category}</span>
@@ -1084,7 +1084,7 @@ function PartModal({ part, onSave, onClose, t }) {
           {LBL(t.image_url)}
           <input type="url" value={form.image_url} onChange={e => set("image_url", e.target.value)} placeholder="https://drive.google.com/file/d/..." />
           <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{t.gdrive_hint}</div>
-          {preview && <img src={preview} alt="preview" style={{ marginTop: 8, width: "100%", maxHeight: 120, objectFit: "cover", borderRadius: 6 }} onError={e => e.target.style.display = "none"} />}
+          {preview && <img src={preview} alt="preview" referrerPolicy="no-referrer" style={{ marginTop: 8, width: "100%", maxHeight: 120, objectFit: "cover", borderRadius: 6 }} onError={e => e.target.style.display = "none"} />}
         </div>
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 20 }}>

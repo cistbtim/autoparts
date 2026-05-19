@@ -360,7 +360,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     setParts(Array.isArray(partsFirst)?partsFirst:[]);
 
     const [o,s,st,br]=await Promise.all([
-      isSalesman ? Promise.resolve([]) : track('orders',    api.get("orders","select=*&order=created_at.desc")),
+      isSalesman ? Promise.resolve([]) : track('orders',    api.get("orders",`${isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:""}select=*&order=created_at.desc`)),
       isSalesman ? Promise.resolve([]) : track('suppliers', api.get("suppliers",isBranchUser&&user.branch_id?`or=(branch_id.is.null,branch_id.eq.${user.branch_id})&order=name.asc`:"select=*&order=name.asc")),
       track('settings',  api.get("settings","id=eq.1&select=*")),
       track('branches',  api.get("branches","select=*&order=is_main.desc,name.asc").catch(()=>[])),
@@ -591,7 +591,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
     const bF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
     const D={
       parts:                    ["select=*&order=id.asc",                                         d=>setParts(Array.isArray(d)?d:[])],
-      orders:                   ["select=*&order=created_at.desc",                                d=>setOrders(Array.isArray(d)?d:[])],
+      orders:                   [`${bF}select=*&order=created_at.desc`,                          d=>setOrders(Array.isArray(d)?d:[])],
       suppliers:                [isBranchUser&&user.branch_id?`or=(branch_id.is.null,branch_id.eq.${user.branch_id})&order=name.asc`:"select=*&order=name.asc", d=>setSuppliers(Array.isArray(d)?d:[])],
       customers:                ["select=*&order=total_spent.desc",                               d=>setCustomers(Array.isArray(d)?d:[])],
       users:                    ["select=*&order=id.asc",                                         d=>setUsers(Array.isArray(d)?d:[])],

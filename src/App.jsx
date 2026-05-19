@@ -955,6 +955,42 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
       }
     }
   };
+  const createOpposite=async({sku,name,chineseDesc,originalPart,originalF})=>{
+    if(parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase())){
+      showToast(`SKU "${sku}" already exists`,"err"); return;
+    }
+    setBusyMsg(`Creating ${sku}…`);
+    try{
+      const newData={
+        sku:sku.trim(), name:name.trim(), chinese_desc:chineseDesc||"",
+        brand:originalF.brand||"", category:originalF.category||"Engine",
+        price:+originalF.price||0, cost_price:+originalF.cost_price||0,
+        stock:0, min_stock:+originalF.minStock||0,
+        image_url:toSaveUrl(originalF.image_url||""),
+        make:originalF.make||"", model:originalF.model||"",
+        year_range:originalF.year_range||"", oe_number:originalF.oe_number||"",
+        bin_location:originalF.bin_location||"",
+      };
+      const r=await api.upsert("parts",newData);
+      const newPart=Array.isArray(r)&&r[0]?r[0]:null;
+      if(!newPart?.id){showToast("Failed to create part","err");return;}
+      await logInv(newPart,0,0,"New Part","Opposite side copy");
+      const srcFits=partFitments.filter(f=>String(f.part_id)===String(originalPart.id));
+      for(const fit of srcFits)
+        await api.upsert("part_fitments",{part_id:newPart.id,vehicle_id:fit.vehicle_id,notes:fit.notes||""});
+      const srcSupps=partSuppliers.filter(ps=>String(ps.part_id)===String(originalPart.id));
+      for(const ps of srcSupps)
+        await api.upsert("part_suppliers",{part_id:newPart.id,supplier_id:ps.supplier_id,supplier_part_no:"",supplier_price:ps.supplier_price||null,lead_time:ps.lead_time||"",min_order:ps.min_order||1});
+      await refreshTables("parts","part_fitments");
+      if(srcSupps.length>0) await reloadPartSuppliers();
+      closeM("editPart");
+      setTab("inventory");
+      setSearchPart(newPart.sku);
+      setSearchDebounced(newPart.sku);
+      showToast(`✅ ${sku} created`);
+      setTimeout(()=>openM("editPart",{...newPart,_tab:"info"}),300);
+    }finally{setBusyMsg(null);}
+  };
   // ── Workshop ──
   const saveWorkshopJob=async(data, onProgress)=>{
     const chk=(r,label)=>{ if(r&&!Array.isArray(r)&&r.message){ throw new Error(`${label}: ${r.message}`); } return r; };
@@ -4837,6 +4873,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           nextPart={nextPart}
           vehicles={vehicles} partFitments={partFitments}
           onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart}
+          onCreateOpposite={createOpposite}
           onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}}
           onGoSupplier={async(p)=>{closeM("editPart");await loadPartSuppliers();openM("partSupplier",p);}}
           onGoToPart={(sku)=>{

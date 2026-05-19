@@ -11,6 +11,24 @@ import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 
 const FormError = ({errors,k}) => errors[k] ? <div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {errors[k]}</div> : null;
 
+// ── Opposite-side part helpers ──────────────────────────────────────────────
+const _LR_MAP = {
+  'Left':'Right','Right':'Left','left':'right','right':'left','LEFT':'RIGHT','RIGHT':'LEFT',
+  'LH':'RH','RH':'LH',
+  '左':'右','右':'左',
+  'Driver':'Passenger','Passenger':'Driver','driver':'passenger','passenger':'driver','DRIVER':'PASSENGER','PASSENGER':'DRIVER',
+};
+const _LR_RE = /\b(Left|Right|left|right|LEFT|RIGHT|LH|RH|Driver|Passenger|driver|passenger|DRIVER|PASSENGER)\b|左|右/g;
+function swapLR(str){ return (str||"").replace(_LR_RE, m => _LR_MAP[m]||m); }
+function detectSide(sku, name) {
+  const s=(sku||"").toUpperCase(), n=(name||"").toUpperCase();
+  if(/\bLH\b/.test(s)||/(-L$|-L-)/.test(s)) return 'L';
+  if(/\bRH\b/.test(s)||/(-R$|-R-)/.test(s)) return 'R';
+  if(/\bLEFT\b/.test(n)||/\bLH\b/.test(n)||/左/.test(name||"")||/\bDRIVER\b/.test(n)) return 'L';
+  if(/\bRIGHT\b/.test(n)||/\bRH\b/.test(n)||/右/.test(name||"")||/\bPASSENGER\b/.test(n)) return 'R';
+  return null;
+}
+
 export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=[]}) {
   const [pTab,setPTab]=useState("profile"); // "profile" | "users"
   const [f,setF]=useState({
@@ -2584,7 +2602,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -2603,6 +2621,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [oppConfirm, setOppConfirm] = useState(null);
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
   const [catalogSearch,setCatalogSearch]=useState("");
   const [suppId,setSuppId]=useState("");
@@ -2623,6 +2642,9 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
   },[suppId]);
   const mainBranch=branches.find(b=>b.is_main);
   const isNonMainBranch=!part&&currentBranch&&mainBranch&&currentBranch.id!==mainBranch.id;
+
+  const side = part ? detectSide(f.sku, f.name) : null;
+  const myFitments = part ? partFitments.filter(pf=>String(pf.part_id)===String(part.id)) : [];
 
   const buildPayload=(fv)=>({
     sku:fv.sku.trim(), name:fv.name.trim(), category:fv.category, brand:fv.brand,
@@ -3249,6 +3271,26 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
         </div>
       )}
 
+      {/* Opposite-side confirmation dialog */}
+      {oppConfirm&&(
+        <div style={{marginTop:14,background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.3)",borderRadius:10,padding:"12px 14px"}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:"var(--purple)"}}>🔄 建立對應零件確認</div>
+          <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"4px 10px",fontSize:12,marginBottom:10}}>
+            <span style={{color:"var(--text3)"}}>新 SKU</span><span style={{fontWeight:600,fontFamily:"monospace"}}>{oppConfirm.sku}</span>
+            <span style={{color:"var(--text3)"}}>新名稱</span><span>{oppConfirm.name}</span>
+            {oppConfirm.chineseDesc&&<><span style={{color:"var(--text3)"}}>中文說明</span><span>{oppConfirm.chineseDesc}</span></>}
+            <span style={{color:"var(--text3)"}}>車型符合</span><span>{oppConfirm.fitCount} 筆複製</span>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setOppConfirm(null)}>取消</button>
+            <button className="btn btn-sm" style={{flex:2,background:"var(--purple)",color:"#fff",border:"none"}}
+              onClick={()=>{ onCreateOpposite(oppConfirm); setOppConfirm(null); }}>
+              ✅ 確認建立
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Saved banner */}
       {saved&&(
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,
@@ -3276,6 +3318,18 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
               <button className="btn btn-ghost" style={{flexShrink:0,borderColor:"var(--blue)",color:"var(--blue)"}}
                 onClick={()=>onGoSupplier(part)}>
                 🏭 Suppliers
+              </button>
+            )}
+            {part&&side&&onCreateOpposite&&!oppConfirm&&(
+              <button className="btn btn-ghost" style={{flexShrink:0,borderColor:"rgba(139,92,246,.5)",color:"var(--purple)"}}
+                title={`建立${side==='L'?'右':'左'}邊對應零件`}
+                onClick={()=>{
+                  const newSku=swapLR(f.sku);
+                  const newName=swapLR(f.name);
+                  const newCd=swapLR(f.chinese_desc);
+                  setOppConfirm({sku:newSku,name:newName,chineseDesc:newCd,fitCount:myFitments.length,originalPart:part,originalF:f});
+                }}>
+                🔄 對應零件
               </button>
             )}
             <button className="btn btn-primary" style={{flex:2,position:"relative",

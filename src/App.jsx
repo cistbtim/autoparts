@@ -20,7 +20,11 @@ import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, W
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
   const [lang,setLang] = useState(localStorage.getItem("ap_lang")||"en");
-  const [user,setUser] = useState(null);
+  const [user,setUser] = useState(()=>{
+    try{const s=localStorage.getItem("ap_user");return s?JSON.parse(s):null;}catch{return null;}
+  });
+  const handleLogin=(u)=>{setUser(u);try{localStorage.setItem("ap_user",JSON.stringify(u));}catch{}};
+  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");};
   const [settingsLoaded,setSettingsLoaded] = useState(false);
   const [availLangs,setAvailLangs] = useState(getLangs());
   const [theme,setTheme] = useState(localStorage.getItem("ap_theme")||"dark");
@@ -64,9 +68,9 @@ export default function App() {
   const bsrConfirmToken = new URLSearchParams(window.location.search).get("bsr_confirm");
   if(bsrConfirmToken) return <BranchStockRequestConfirmPage token={bsrConfirmToken}/>;
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
-  if(!user) return <LoginPage onLogin={setUser} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs}/>;
-  if(!canAccess(user)) return <PaywallPage user={user} onLogout={()=>setUser(null)} lang={lang}/>;
-  return <MainApp user={user} onLogout={()=>setUser(null)} t={t} lang={lang} setLang={changeLang} langs={availLangs} theme={theme} toggleTheme={toggleTheme}/>;
+  if(!user) return <LoginPage onLogin={handleLogin} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs}/>;
+  if(!canAccess(user)) return <PaywallPage user={user} onLogout={handleLogout} lang={lang}/>;
+  return <MainApp user={user} onLogout={handleLogout} t={t} lang={lang} setLang={changeLang} langs={availLangs} theme={theme} toggleTheme={toggleTheme}/>;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4516,7 +4520,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
         {/* ── WORKSHOP (all sub-tabs) ── */}
         {/* Subscription expired block */}
         {role==="workshop"&&subStatus?.expired&&(
-          <WsSubscriptionExpiredPage expiresAt={subStatus.expiresAt} onLogout={()=>{setUser(null);setTab("workshop");setSubStatus(null);}} settings={wsDisplaySettings}/>
+          <WsSubscriptionExpiredPage expiresAt={subStatus.expiresAt} onLogout={()=>{onLogout();setTab("workshop");setSubStatus(null);}} settings={wsDisplaySettings}/>
         )}
         {tab==="wsprofile"&&role==="workshop"&&!subStatus?.expired&&(
           <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId} branches={branches}/>

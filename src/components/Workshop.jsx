@@ -69,6 +69,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [kanbanInvOpen,   setKanbanInvOpen]   = useState(false);
   const kanbanInvPanelRef = useRef(null);
   const [kanbanPayJob,    setKanbanPayJob]    = useState(null);
+  const [dragOverColId,   setDragOverColId]   = useState(null);
+  const dragJobRef = useRef(null);
   const [jobsRefreshing,  setJobsRefreshing]  = useState(false);
 
   // Keep activeJob in sync when jobs array refreshes
@@ -532,6 +534,46 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             </div>
           );
 
+          const DRAGGABLE_COLS = ["pending","wip","done","problem"];
+          const DROP_TARGET_COLS = ["pending","wip","done","problem"];
+
+          const handleDragStart = (job, col) => {
+            dragJobRef.current = {job, srcColId: col.id};
+          };
+          const handleDragEnd = () => {
+            dragJobRef.current = null;
+            setDragOverColId(null);
+          };
+          const handleDragOver = (e, colId) => {
+            if (!dragJobRef.current) return;
+            if (!DROP_TARGET_COLS.includes(colId)) return;
+            e.preventDefault();
+            setDragOverColId(colId);
+          };
+          const handleDragLeave = (colId) => {
+            setDragOverColId(c => c === colId ? null : c);
+          };
+          const handleDrop = async (e, col) => {
+            e.preventDefault();
+            setDragOverColId(null);
+            const drag = dragJobRef.current;
+            dragJobRef.current = null;
+            if (!drag || !DROP_TARGET_COLS.includes(col.id)) return;
+            const {job, srcColId} = drag;
+            if (srcColId === col.id) return;
+
+            if (col.id === "problem") {
+              flagProblem(job);
+            } else if (col.id === "pending") {
+              await onSaveJob({...job, is_problem:false, status:"Pending"});
+            } else if (col.id === "wip") {
+              await onSaveJob({...job, is_problem:false, status:"In Progress"});
+            } else if (col.id === "done") {
+              if (!job.is_problem && srcColId === "wip" && !jobQuote(job.id)) return;
+              await onSaveJob({...job, is_problem:false, status:"Done"});
+            }
+          };
+
           const JobCard = ({job, col}) => {
             const inv = jInv(job.id);
             const fp  = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)?.photo_front||"";
@@ -539,8 +581,13 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             const canFlag   = col.id!=="paid"&&col.id!=="problem";
             const canUnflag = col.id==="problem";
             const canInvoice= col.id==="done";
+            const isDraggable = DRAGGABLE_COLS.includes(col.id);
             return (
               <div className="kb-card"
+                draggable={isDraggable}
+                onDragStart={isDraggable ? ()=>handleDragStart(job,col) : undefined}
+                onDragEnd={isDraggable ? handleDragEnd : undefined}
+                style={{cursor: isDraggable ? "grab" : undefined}}
                 onClick={()=>{setJobDetailTab(col.id==="invoiced"||col.id==="paid"?"invoice":"car");setActiveJob(job);setView("job");}}>
                 <div style={{height:3,background:col.color}}/>
                 <div style={{position:"relative",height:90,background:"var(--surface2)",overflow:"hidden"}}>
@@ -652,9 +699,13 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                     </div>
                     <span style={{background:`${col.color}22`,color:col.color,borderRadius:99,padding:"2px 9px",fontSize:11,fontWeight:700,minWidth:22,textAlign:"center",flexShrink:0}}>{col.items.length}</span>
                   </div>
-                  <div style={{background:`${col.color}07`,border:`1px solid ${col.color}25`,borderTop:"none",borderRadius:"0 0 12px 12px",padding:"8px 7px",minHeight:160,maxHeight:"calc(100vh - 240px)",overflowY:"auto"}}>
+                  <div
+                    onDragOver={e=>handleDragOver(e,col.id)}
+                    onDragLeave={()=>handleDragLeave(col.id)}
+                    onDrop={e=>handleDrop(e,col)}
+                    style={{background: dragOverColId===col.id ? `${col.color}20` : `${col.color}07`, border:`1px solid ${dragOverColId===col.id ? col.color : `${col.color}25`}`,borderTop:"none",borderRadius:"0 0 12px 12px",padding:"8px 7px",minHeight:160,maxHeight:"calc(100vh - 240px)",overflowY:"auto",transition:"background .15s,border-color .15s"}}>
                     {col.items.length===0&&(
-                      <div style={{textAlign:"center",padding:"32px 10px",border:"1.5px dashed var(--border2)",borderRadius:10,margin:"2px 0"}}>
+                      <div style={{textAlign:"center",padding:"32px 10px",border:`1.5px dashed ${dragOverColId===col.id ? col.color : "var(--border2)"}`,borderRadius:10,margin:"2px 0",transition:"border-color .15s"}}>
                         <div style={{fontSize:24,marginBottom:6,opacity:.25}}>{col.id==="booking"?"🗓️":col.id==="paid"?"💳":col.id==="problem"?"⚠️":"📋"}</div>
                         <div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic"}}>No items</div>
                       </div>

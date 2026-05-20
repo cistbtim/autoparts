@@ -3128,6 +3128,19 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                         ):(
                           <span style={{fontSize:12,color:"var(--yellow)",flex:1}}>⚠ Unknown — click to add</span>
                         )}
+                        {ps.supplier_part_no&&(()=>{
+                          const searchUrl = ps.supplier?.search_url
+                            ? ps.supplier.search_url.replace("{sku}", encodeURIComponent(ps.supplier_part_no))
+                            : `https://www.google.com/search?q=${encodeURIComponent(ps.supplier_part_no)}`;
+                          const isGoogle = !ps.supplier?.search_url;
+                          return (
+                            <button className="btn btn-ghost btn-xs" title={isGoogle?"Search on Google":ps.supplier.name}
+                              style={{color:"var(--blue)"}}
+                              onClick={()=>window.open(searchUrl,"_blank")}>
+                              {isGoogle?"🔍 Google":"🔍 Search"}
+                            </button>
+                          );
+                        })()}
                         <button className="btn btn-ghost btn-xs" style={{color:"var(--accent)"}}
                           onClick={()=>{setEditingPsId(ps.id);setEditPsPartNo(ps.supplier_part_no||"");}}>✏️ Edit</button>
                       </div>

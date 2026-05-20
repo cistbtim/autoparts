@@ -26,6 +26,9 @@ window.addEventListener("popstate",()=>{
   window.history.pushState({appLoaded:true},"");
 },{capture:true});
 
+const APP_VERSION = "1.0.0";
+const APP_UPDATE_DATE = "2026-05-20";
+
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
   const [lang,setLang] = useState(localStorage.getItem("ap_lang")||"en");
@@ -198,6 +201,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
   const [showCrossBranch,setShowCrossBranch]=useState(false);
   const [showSupplierCodes,setShowSupplierCodes]=useState(false);
   const [wsMoreOpen,setWsMoreOpen]=useState(false);
+  const [versionTip,setVersionTip]=useState(false);
 
   // Debounce search input — only filter after 250ms of no typing
   useEffect(()=>{
@@ -2935,6 +2939,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light Mode":"🌙 Dark Mode"}</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>openM("changePassword")}>🔑 Change Password</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={onLogout}>🚪 {t.logout}</button>
+          <div style={{fontSize:10,color:"var(--text3)",textAlign:"center",marginTop:2,letterSpacing:".03em"}}>v{APP_VERSION} · {APP_UPDATE_DATE}</div>
         </div>
       </aside>
 
@@ -2990,6 +2995,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light Mode":"🌙 Dark Mode"}</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>{openM("changePassword");setDrawerOpen(false);}}>🔑 Change Password</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 {t.logout}</button>
+          <div style={{display:"flex",justifyContent:"center",marginTop:2,position:"relative"}}>
+            <button onClick={()=>setVersionTip(v=>!v)} style={{background:"none",border:"none",color:"var(--text3)",fontSize:18,cursor:"pointer",padding:"2px 8px",lineHeight:1}} title="App version">ℹ️</button>
+            {versionTip&&<div style={{position:"absolute",bottom:"calc(100% + 4px)",left:"50%",transform:"translateX(-50%)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"5px 12px",fontSize:11,color:"var(--text2)",whiteSpace:"nowrap",zIndex:300,boxShadow:"0 2px 8px #0004"}}>v{APP_VERSION} · {APP_UPDATE_DATE}</div>}
+          </div>
         </div>
       </div>
 

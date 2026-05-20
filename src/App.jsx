@@ -17,6 +17,15 @@ import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturns
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage } from "./pages/PublicPages.jsx";
 
+// ── Trap browser back button so the page never goes blank ─────
+if(window.history.state?.appLoaded !== true){
+  window.history.replaceState({appLoaded:true},"");
+  window.history.pushState({appLoaded:true},"");
+}
+window.addEventListener("popstate",()=>{
+  window.history.pushState({appLoaded:true},"");
+},{capture:true});
+
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
   const [lang,setLang] = useState(localStorage.getItem("ap_lang")||"en");

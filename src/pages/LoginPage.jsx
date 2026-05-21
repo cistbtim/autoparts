@@ -6,20 +6,39 @@ import { ShopLogo, FL } from "../components/shared.jsx";
 import { makeId, detectGeoLocation } from "../lib/helpers.js";
 
 const ErrBox = ({msg}) => (
-  <div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.25)",borderRadius:9,padding:"9px 13px",fontSize:13,color:"var(--red)",display:"flex",alignItems:"center",gap:7}}>
+  <div style={{background:"rgba(220,38,38,.07)",border:"1px solid rgba(220,38,38,.2)",borderRadius:9,padding:"9px 13px",fontSize:13,color:"var(--red)",display:"flex",alignItems:"center",gap:7}}>
     <span style={{flexShrink:0}}>⚠</span> {msg}
   </div>
 );
 
+/* Stitch-style field — uppercase label + optional right hint */
 const Field = ({label, hint, children}) => (
   <div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:5}}>
-      <label style={{fontSize:12,fontWeight:700,color:"var(--text3)",letterSpacing:".03em"}}>{label}</label>
-      {hint&&<span style={{fontSize:11,color:"var(--text3)"}}>{hint}</span>}
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+      <label style={{fontSize:10,fontWeight:700,color:"var(--text3)",letterSpacing:".08em",textTransform:"uppercase"}}>{label}</label>
+      {hint&&<span style={{fontSize:11,color:"var(--accent)",cursor:"pointer",fontWeight:500}}>{hint}</span>}
     </div>
     {children}
   </div>
 );
+
+/* Right-side icon wrapper for inputs */
+const InpIcon = ({children, inp}) => (
+  <div className="inp-wrap">
+    {inp}
+    <span className="inp-icon" style={{color:"var(--text3)"}}>{children}</span>
+  </div>
+);
+
+/* Simple SVG icons — replaces emoji in module tabs */
+const IcBox    = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>;
+const IcWrench = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>;
+const IcCar    = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>;
+const IcCart   = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>;
+const IcStaff  = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+const IcUser   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+const IcLock   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+const IcGrid   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
 
 export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
   const [authTab,setAuthTab] = useState("branch");
@@ -199,33 +218,33 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
   const switchTab = (tab) => { setAuthTab(tab); setErr(""); };
 
   const TAB_BTNS = [
-    {id:"branch",   icon:"🏬", label:t.loginSpareShop||"Spare Shop"},
-    {id:"workshop", icon:"🔧", label:t.loginWorkshop||"Workshop"},
-    {id:"scrapyard",icon:"🚗", label:t.loginScrapyard||"Scrapyard"},
-    {id:"customer", icon:"🛒", label:t.loginShop||"Shop"},
-    {id:"staff",    icon:"⚙️", label:t.loginStaff||"Staff"},
+    {id:"branch",   Icon:IcBox,    label:t.loginSpareShop||"Spare Shop"},
+    {id:"workshop", Icon:IcWrench, label:t.loginWorkshop||"Workshop"},
+    {id:"scrapyard",Icon:IcCar,    label:t.loginScrapyard||"Scrapyard"},
+    {id:"customer", Icon:IcCart,   label:t.loginShop||"Parts Shop"},
+    {id:"staff",    Icon:IcStaff,  label:t.loginStaff||"Staff"},
   ];
 
   const inpStyle = {
-    width:"100%",padding:"11px 14px",borderRadius:9,border:"1.5px solid var(--border)",
-    background:"var(--surface2)",color:"var(--text)",fontSize:14,boxSizing:"border-box",
+    width:"100%",padding:"11px 38px 11px 14px",borderRadius:9,border:"1.5px solid var(--border2)",
+    background:"var(--surface)",color:"var(--text)",fontSize:14,boxSizing:"border-box",
     outline:"none",fontFamily:"inherit",transition:"border-color .15s",
   };
-  const companyInpStyle = {...inpStyle, borderColor:"rgba(96,165,250,.35)", background:"rgba(96,165,250,.05)"};
+  const companyInpStyle = {...inpStyle, borderColor:"rgba(37,99,235,.25)", background:"rgba(37,99,235,.03)"};
 
   return (
-    <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+    <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 16px"}}>
       <style>{CSS}</style>
-      <div style={{width:"100%",maxWidth:430}}>
+      <div style={{width:"100%",maxWidth:480}}>
 
-        {/* Logo + app subtitle */}
-        <div style={{textAlign:"center",marginBottom:24}}>
-          <div style={{display:"flex",justifyContent:"center",marginBottom:6}}>
+        {/* Logo card */}
+        <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:14,padding:"20px",textAlign:"center",marginBottom:18,boxShadow:"var(--shadow)"}}>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:8}}>
             <ShopLogo settings={loadedSettings||getSettings()} size="lg"/>
           </div>
-          <div style={{color:"var(--text3)",fontSize:13}}>{t.appSub}</div>
+          <div style={{color:"var(--text3)",fontSize:13,fontWeight:500}}>{t.appSub||"Parts Management System"}</div>
           {langs.length>1&&(
-            <div style={{display:"flex",justifyContent:"center",gap:5,marginTop:10,flexWrap:"wrap"}}>
+            <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:10}}>
               {langs.map(l=>(
                 <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
                   {l.flag||l.lang.toUpperCase()}
@@ -233,79 +252,55 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
               ))}
             </div>
           )}
-
-          {/* DB status indicator */}
-          <div style={{display:"flex",justifyContent:"center",marginTop:12}}>
-            {dbStatus==="checking"&&(
-              <span style={{fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}>
-                <span style={{width:7,height:7,borderRadius:"50%",background:"var(--text3)",display:"inline-block",opacity:.5}}/>
-                Checking database…
-              </span>
-            )}
-            {dbStatus==="connected"&&(
-              <a href={SUPABASE_URL} target="_blank" rel="noreferrer"
-                style={{fontSize:11,fontWeight:600,color:"#34d399",textDecoration:"none",display:"flex",alignItems:"center",gap:5,
-                  padding:"4px 12px",borderRadius:20,background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)"}}>
-                <span style={{width:7,height:7,borderRadius:"50%",background:"#34d399",display:"inline-block",boxShadow:"0 0 7px #34d399"}}/>
-                Database Connected
-              </a>
-            )}
-            {dbStatus==="disconnected"&&(
-              <span style={{fontSize:11,fontWeight:600,color:"#f87171",display:"flex",alignItems:"center",gap:5,
-                padding:"4px 12px",borderRadius:20,background:"rgba(248,113,113,.12)",border:"1px solid rgba(248,113,113,.3)"}}>
-                <span style={{width:7,height:7,borderRadius:"50%",background:"#f87171",display:"inline-block"}}/>
-                Database Disconnected
-              </span>
-            )}
+          <div style={{display:"flex",justifyContent:"center",marginTop:10}}>
+            {dbStatus==="checking"&&<span style={{fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}><span style={{width:6,height:6,borderRadius:"50%",background:"var(--text3)",display:"inline-block",opacity:.5}}/>Checking…</span>}
+            {dbStatus==="connected"&&<span style={{fontSize:11,fontWeight:600,color:"#16a34a",display:"flex",alignItems:"center",gap:5,padding:"3px 10px",borderRadius:20,background:"rgba(22,163,74,.1)",border:"1px solid rgba(22,163,74,.25)"}}><span style={{width:6,height:6,borderRadius:"50%",background:"#16a34a",display:"inline-block"}}/>Database Connected</span>}
+            {dbStatus==="disconnected"&&<span style={{fontSize:11,fontWeight:600,color:"var(--red)",display:"flex",alignItems:"center",gap:5,padding:"3px 10px",borderRadius:20,background:"rgba(220,38,38,.07)",border:"1px solid rgba(220,38,38,.2)"}}><span style={{width:6,height:6,borderRadius:"50%",background:"var(--red)",display:"inline-block"}}/>Disconnected</span>}
           </div>
         </div>
 
-        {/* Login type tabs */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:5,marginBottom:14}}>
-          {TAB_BTNS.map(tb=>(
-            <button key={tb.id} onClick={()=>switchTab(tb.id)} style={{
-              padding:"10px 4px",borderRadius:11,border:"none",cursor:"pointer",
-              background:authTab===tb.id?"var(--accent)":"var(--surface2)",
-              color:authTab===tb.id?"#fff":"var(--text2)",
-              fontWeight:authTab===tb.id?700:500,
-              fontSize:12,letterSpacing:".01em",
-              display:"flex",flexDirection:"column",alignItems:"center",gap:3,
-              boxShadow:authTab===tb.id?"0 3px 12px rgba(0,0,0,.18)":"none",
+        {/* Module tabs — SVG icons, outlined style */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,marginBottom:14}}>
+          {TAB_BTNS.map(({id,Icon,label})=>(
+            <button key={id} onClick={()=>switchTab(id)} style={{
+              padding:"12px 4px 10px",borderRadius:12,
+              border:`1.5px solid ${authTab===id?"var(--accent)":"var(--border2)"}`,
+              cursor:"pointer",
+              background:authTab===id?"var(--accent)":"var(--surface)",
+              color:authTab===id?"#fff":"var(--text3)",
+              fontWeight:authTab===id?700:500,
+              fontSize:10,letterSpacing:".06em",textTransform:"uppercase",
+              display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+              boxShadow:authTab===id?"0 4px 14px rgba(249,115,22,.25)":"none",
               transition:"all .15s",
             }}>
-              <span style={{fontSize:19}}>{tb.icon}</span>
-              <span>{tb.label}</span>
+              <Icon/>
+              <span>{label}</span>
             </button>
           ))}
         </div>
 
         {/* Card */}
-        <div style={{background:"var(--surface)",borderRadius:16,border:"1px solid var(--border)",boxShadow:"0 8px 32px rgba(0,0,0,.12)",padding:"26px 24px",overflow:"hidden"}}>
+        <div style={{background:"var(--surface)",borderRadius:16,border:"1px solid var(--border2)",boxShadow:"var(--shadow-lg)",padding:"28px 26px",overflow:"hidden"}}>
 
           {/* ── Branch ── */}
           {authTab==="branch"&&(
-            <div style={{display:"flex",flexDirection:"column",gap:13}}>
-              <div style={{marginBottom:2}}>
-                <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>🏬 {t.loginSpareShop||"Spare Shop"} {t.signIn||"Login"}</div>
-                <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{t.loginSpareShopSub||"Sign in to your spare parts shop"}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+                <div style={{width:38,height:38,borderRadius:10,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcBox/></div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginSpareShop||"Spare Shop"} {t.signIn||"Login"}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginSpareShopSub||"Sign in to your spare parts shop"}</div>
+                </div>
               </div>
               <Field label={t.branchNameField||"Branch Name"}>
-                <input
-                  style={companyInpStyle}
-                  type="text" value={branchName}
-                  onChange={e=>setBranchName(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&doBranchLogin()}
-                  placeholder={t.branchNamePlaceholder||"e.g. North Branch"}
-                  autoCapitalize="words"
-                />
+                <InpIcon inp={<input style={companyInpStyle} type="text" value={branchName} onChange={e=>setBranchName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doBranchLogin()} placeholder={t.branchNamePlaceholder||"e.g. North Branch"} autoCapitalize="words"/>}><IcGrid/></InpIcon>
               </Field>
               <Field label={t.username||"Username"}>
-                <input style={inpStyle} type="text" value={branchUser} onChange={e=>setBranchUser(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&doBranchLogin()} autoCapitalize="none" placeholder="Your login username"/>
+                <InpIcon inp={<input style={inpStyle} type="text" value={branchUser} onChange={e=>setBranchUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doBranchLogin()} autoCapitalize="none" placeholder="Your login username"/>}><IcUser/></InpIcon>
               </Field>
               <Field label={t.password||"Password"}>
-                <input style={inpStyle} type="password" value={branchPass} onChange={e=>setBranchPass(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&doBranchLogin()}/>
+                <InpIcon inp={<input style={inpStyle} type="password" value={branchPass} onChange={e=>setBranchPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doBranchLogin()}/>}><IcLock/></InpIcon>
               </Field>
               {err&&<ErrBox msg={err}/>}
               <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doBranchLogin} disabled={loading}>
@@ -325,32 +320,24 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
 
               {wsTab==="login"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:13}}>
-                  <div style={{marginBottom:2}}>
-                    <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>🔧 Workshop Login</div>
-                    <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>Sign in to your workshop account</div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcWrench/></div>
+                    <div>
+                      <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginWorkshop||"Workshop"} {t.signIn||"Login"}</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Sign in to your workshop account</div>
+                    </div>
                   </div>
 
-                  {/* Company name field */}
                   <Field label="Company Name" hint="Optional">
-                    <div>
-                      <input
-                        style={companyInpStyle}
-                        type="text" value={wsCompany}
-                        onChange={e=>setWsCompany(e.target.value)}
-                        placeholder="e.g. ABC Auto Workshop"
-                        autoCapitalize="words"
-                      />
-                    </div>
+                    <InpIcon inp={<input style={companyInpStyle} type="text" value={wsCompany} onChange={e=>setWsCompany(e.target.value)} placeholder="e.g. ABC Auto Workshop" autoCapitalize="words"/>}><IcGrid/></InpIcon>
                     <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Helps identify your account if multiple workshops share a username</div>
                   </Field>
 
                   <Field label={t.username||"Username"}>
-                    <input style={inpStyle} type="text" value={wsUser} onChange={e=>setWsUser(e.target.value)}
-                      onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()} autoCapitalize="none" placeholder="Your login username"/>
+                    <InpIcon inp={<input style={inpStyle} type="text" value={wsUser} onChange={e=>setWsUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()} autoCapitalize="none" placeholder="Your login username"/>}><IcUser/></InpIcon>
                   </Field>
                   <Field label={t.password||"Password"}>
-                    <input style={inpStyle} type="password" value={wsPass} onChange={e=>setWsPass(e.target.value)}
-                      onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()}/>
+                    <InpIcon inp={<input style={inpStyle} type="password" value={wsPass} onChange={e=>setWsPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()}/>}><IcLock/></InpIcon>
                   </Field>
 
                   {err&&<ErrBox msg={err}/>}
@@ -426,32 +413,24 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
 
               {scrapTab==="login"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:13}}>
-                  <div style={{marginBottom:2}}>
-                    <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>🚗 Scrapyard Login</div>
-                    <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>Sign in to your scrapyard account</div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcCar/></div>
+                    <div>
+                      <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginScrapyard||"Scrapyard"} {t.signIn||"Login"}</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Sign in to your scrapyard account</div>
+                    </div>
                   </div>
 
-                  {/* Company name field */}
                   <Field label="Company Name" hint="Optional">
-                    <div>
-                      <input
-                        style={companyInpStyle}
-                        type="text" value={scrapCompany}
-                        onChange={e=>setScrapCompany(e.target.value)}
-                        placeholder="e.g. City Scrapyard"
-                        autoCapitalize="words"
-                      />
-                    </div>
+                    <InpIcon inp={<input style={companyInpStyle} type="text" value={scrapCompany} onChange={e=>setScrapCompany(e.target.value)} placeholder="e.g. City Scrapyard" autoCapitalize="words"/>}><IcGrid/></InpIcon>
                     <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Helps identify your account if multiple scrapyards share a username</div>
                   </Field>
 
                   <Field label={t.username||"Username"}>
-                    <input style={inpStyle} type="text" value={scrapUser} onChange={e=>setScrapUser(e.target.value)}
-                      onKeyDown={e=>e.key==="Enter"&&doScrapyardLogin()} autoCapitalize="none" placeholder="Your login username"/>
+                    <InpIcon inp={<input style={inpStyle} type="text" value={scrapUser} onChange={e=>setScrapUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doScrapyardLogin()} autoCapitalize="none" placeholder="Your login username"/>}><IcUser/></InpIcon>
                   </Field>
                   <Field label={t.password||"Password"}>
-                    <input style={inpStyle} type="password" value={scrapPass} onChange={e=>setScrapPass(e.target.value)}
-                      onKeyDown={e=>e.key==="Enter"&&doScrapyardLogin()}/>
+                    <InpIcon inp={<input style={inpStyle} type="password" value={scrapPass} onChange={e=>setScrapPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doScrapyardLogin()}/>}><IcLock/></InpIcon>
                   </Field>
 
                   {err&&<ErrBox msg={err}/>}
@@ -527,15 +506,18 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
 
               {custTab==="login"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:13}}>
-                  <div style={{marginBottom:2}}>
-                    <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>🛒 Shop Login</div>
-                    <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>Browse and order parts</div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcCart/></div>
+                    <div>
+                      <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginShop||"Parts Shop"} {t.signIn||"Login"}</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Browse and order parts</div>
+                    </div>
                   </div>
                   <Field label={t.phone||"Phone"}>
-                    <input style={inpStyle} type="tel" value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="+27..."/>
+                    <InpIcon inp={<input style={inpStyle} type="tel" value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="+27..."/>}><IcUser/></InpIcon>
                   </Field>
                   <Field label={t.password||"Password"}>
-                    <input style={inpStyle} type="password" value={cPass} onChange={e=>setCPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustLogin()}/>
+                    <InpIcon inp={<input style={inpStyle} type="password" value={cPass} onChange={e=>setCPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustLogin()}/>}><IcLock/></InpIcon>
                   </Field>
                   {err&&<ErrBox msg={err}/>}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doCustLogin} disabled={loading}>
@@ -578,17 +560,18 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
           {/* ── Staff ── */}
           {authTab==="staff"&&(
             <div style={{display:"flex",flexDirection:"column",gap:13}}>
-              <div style={{marginBottom:2}}>
-                <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>🏢 Staff Login</div>
-                <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>Admin, manager and fulfilment access</div>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+                <div style={{width:38,height:38,borderRadius:10,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcStaff/></div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginStaff||"Staff"} {t.signIn||"Login"}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Admin, manager and fulfilment access</div>
+                </div>
               </div>
               <Field label={t.username||"Username"}>
-                <input style={inpStyle} type="text" value={staffUser} onChange={e=>setStaffUser(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&doStaffLogin()} autoCapitalize="none" placeholder="Username"/>
+                <InpIcon inp={<input style={inpStyle} type="text" value={staffUser} onChange={e=>setStaffUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doStaffLogin()} autoCapitalize="none" placeholder="Username"/>}><IcUser/></InpIcon>
               </Field>
               <Field label={t.password||"Password"}>
-                <input style={inpStyle} type="password" value={staffPass} onChange={e=>setStaffPass(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&doStaffLogin()}/>
+                <InpIcon inp={<input style={inpStyle} type="password" value={staffPass} onChange={e=>setStaffPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doStaffLogin()}/>}><IcLock/></InpIcon>
               </Field>
               {err&&<ErrBox msg={err}/>}
               <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doStaffLogin} disabled={loading}>
@@ -598,6 +581,14 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
           )}
 
         </div>
+
+        {/* Footer */}
+        <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:18}}>
+          <span style={{fontSize:11,color:"var(--text3)",cursor:"pointer",fontWeight:500,letterSpacing:".03em"}} onClick={()=>{}}>Help Desk</span>
+          <span style={{fontSize:11,color:"var(--border2)"}}>|</span>
+          <span style={{fontSize:11,color:"var(--text3)",cursor:"pointer",fontWeight:500,letterSpacing:".03em"}} onClick={()=>{}}>Security Policy</span>
+        </div>
+
       </div>
     </div>
   );

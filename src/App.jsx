@@ -2861,40 +2861,50 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       <style>{CSS}</style>
 
       {/* SIDEBAR */}
-      <aside className="sidebar" style={{width:240,background:"var(--surface)",borderRight:"1px solid var(--border)",position:"fixed",height:"100vh",zIndex:50,display:"flex",flexDirection:"column"}}>
-        <div style={{padding:"18px 18px 12px"}}>
-          <div style={{maxWidth:210,overflow:"hidden"}}>
-            <ShopLogo settings={wsDisplaySettings} size="md"/>
+      <aside className="sidebar" style={{width:240,position:"fixed",height:"100vh",zIndex:50,display:"flex",flexDirection:"column"}}>
+        {/* Brand + user */}
+        <div style={{padding:"16px 14px 10px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+            <div style={{width:36,height:36,borderRadius:10,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:13,color:"#fff",flexShrink:0,fontFamily:"'Rajdhani',sans-serif",letterSpacing:".05em"}}>
+              {(user.name||user.username||"?").slice(0,2).toUpperCase()}
+            </div>
+            <div style={{overflow:"hidden"}}>
+              <div style={{fontSize:13,fontWeight:600,color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:150}}>{user.name||user.username}</div>
+              <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginTop:1}}>{t[role]||role}</div>
+            </div>
           </div>
-          <div style={{fontSize:10,color:"var(--green)",marginTop:4}}>{`🟢 ${t.connected}`}</div>
-          <div style={{display:"flex",gap:5,marginTop:9,justifyContent:"center"}}>
-            {langs.map(l=>(
-              <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
-                {l.flag||l.lang.toUpperCase()}
-              </button>
-            ))}
+          <div style={{maxWidth:"100%",overflow:"hidden",marginBottom:8}}>
+            <ShopLogo settings={wsDisplaySettings} size="sm"/>
           </div>
+          <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8}}>
+            <span style={{width:6,height:6,borderRadius:"50%",background:"var(--green)",display:"inline-block",flexShrink:0}}/>
+            <span style={{fontSize:10,color:"var(--text3)",letterSpacing:".03em"}}>{t.connected||"Connected"}</span>
+          </div>
+          {langs.length>1&&(
+            <div style={{display:"flex",gap:4}}>
+              {langs.map(l=>(
+                <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
+                  {l.flag||l.lang.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <div style={{margin:"0 10px 8px",background:"var(--surface2)",borderRadius:11,padding:"10px 12px",border:"1px solid var(--border)"}}>
-          <div style={{display:"flex",alignItems:"center",gap:9}}>
-            <div style={{width:33,height:33,borderRadius:"50%",background:ROLES[role]?.bg,border:`1.5px solid ${ROLES[role]?.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>{ROLES[role]?.icon}</div>
-            <div><div style={{fontSize:13,fontWeight:600,color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:130}}>{user.name||user.username}</div><span className="badge" style={{background:ROLES[role]?.bg,color:ROLES[role]?.color,fontSize:10,padding:"1px 7px"}}>{t[role]||role}</span></div>
-          </div>
-          {role!=="admin"&&<div style={{marginTop:7,background:sub.color+"18",borderRadius:6,padding:"3px 9px",fontSize:11,color:sub.color,fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
-        </div>
+        {role!=="admin"&&sub?.label&&<div style={{margin:"0 12px 8px",background:"rgba(249,115,22,.15)",borderRadius:7,padding:"3px 9px",fontSize:11,color:"var(--accent)",fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
+
         {branches.length>0&&(
-          <div style={{margin:"0 10px 8px"}}>
+          <div style={{margin:"0 12px 8px"}}>
             {role==="admin"?(
               <select value={currentBranch?.id||"__all__"} onChange={e=>{
                 if(e.target.value==="__all__") setCurrentBranch(null);
                 else setCurrentBranch(branches.find(b=>b.id===e.target.value)||null);
-              }} style={{width:"100%",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"5px 8px",fontSize:12,color:"var(--text)",cursor:"pointer"}}>
-                <option value="__all__">🏢 {t.branchAllBranches}</option>
-                {branches.map(b=><option key={b.id} value={b.id}>{b.is_main?"🏠":""} {b.name}</option>)}
+              }} style={{width:"100%",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 8px",fontSize:12,color:"var(--text)",cursor:"pointer",fontFamily:"inherit"}}>
+                <option value="__all__">{t.branchAllBranches}</option>
+                {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             ):(
-              <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"5px 8px",fontSize:12,color:"var(--text3)",textAlign:"center"}}>
-                🏢 {currentBranch?.name||"—"}
+              <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 8px",fontSize:12,color:"var(--text3)",textAlign:"center"}}>
+                {currentBranch?.name||"—"}
               </div>
             )}
           </div>
@@ -2916,7 +2926,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 {isExpanded&&(
                   <div style={{marginLeft:8,marginTop:1,borderLeft:"2px solid var(--surface3)",paddingLeft:8}}>
                     {g.children.map(n=>(
-                      <button key={n.id} onClick={()=>setTab(n.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:tab===n.id?"var(--surface3)":"none",border:"none",borderRadius:7,color:tab===n.id?"var(--accent)":"var(--text3)",cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:tab===n.id?600:400,marginBottom:1,textAlign:"left",transition:"all .18s",borderLeft:`2px solid ${tab===n.id?"var(--accent)":"transparent"}`}}>
+                      <button key={n.id} onClick={()=>setTab(n.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:tab===n.id?"var(--accent)":"transparent",border:"none",borderRadius:7,color:tab===n.id?"#fff":"var(--text3)",cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:tab===n.id?600:400,marginBottom:1,textAlign:"left",transition:"all .18s"}}>
                         <span style={{fontSize:13}}>{n.icon}</span>
                         <span style={{flex:1}}>{n.label}</span>
                         {n.badge>0&&<span style={{background:"var(--accent)",color:"#fff",borderRadius:99,minWidth:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,padding:"0 3px"}}>{n.badge}</span>}
@@ -2928,14 +2938,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             );
           })}
         </nav>
-        <div style={{padding:"9px 9px 14px",borderTop:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:5}}>
+        <div style={{padding:"9px 12px 14px",borderTop:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:5}}>
           {(role==="admin"||role==="customer")&&(
             <button className="btn btn-primary btn-sm" style={{width:"100%",position:"relative"}} onClick={()=>openM("checkout")}>
-              🛒 {t.cart} {cartCount>0&&<span style={{background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 7px",fontSize:11}}>{cartCount}</span>}
+              {t.cart} {cartCount>0&&<span style={{background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 7px",fontSize:11}}>{cartCount}</span>}
             </button>
           )}
-          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>openM("changePassword")}>🔑 Change Password</button>
-          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={onLogout}>🚪 {t.logout}</button>
+          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>openM("changePassword")}>{t.changePassword||"Change Password"}</button>
+          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12,color:"rgba(248,113,113,.85)"}} onClick={onLogout}>{t.logout||"Sign Out"}</button>
           <div style={{fontSize:10,color:"var(--text3)",textAlign:"center",marginTop:2,letterSpacing:".03em"}}>v{APP_VERSION} · {APP_UPDATE_DATE}</div>
         </div>
       </aside>
@@ -2972,7 +2982,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",padding:"8px 10px 4px"}}>{g.icon} {g.label}</div>
                 {g.children.map(n=>(
                   <button key={n.id} onClick={()=>{setTab(n.id);setDrawerOpen(false);}}
-                    style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"10px 12px",background:tab===n.id?"var(--surface3)":"none",border:"none",borderRadius:9,color:tab===n.id?"var(--accent)":"var(--text2)",cursor:"pointer",fontSize:14,fontFamily:"inherit",fontWeight:tab===n.id?700:400,marginBottom:2,textAlign:"left",position:"relative"}}>
+                    style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"10px 12px",background:tab===n.id?"var(--accent)":"none",border:"none",borderRadius:9,color:tab===n.id?"#fff":"var(--text2)",cursor:"pointer",fontSize:14,fontFamily:"inherit",fontWeight:tab===n.id?700:400,marginBottom:2,textAlign:"left",position:"relative"}}>
                     <span style={{fontSize:16}}>{n.icon}</span>
                     <span style={{flex:1}}>{n.label}</span>
                     {(n.badge||0)>0&&<span style={{background:"var(--accent)",color:"#fff",borderRadius:99,minWidth:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,padding:"0 5px"}}>{n.badge}</span>}

@@ -26,8 +26,8 @@ window.addEventListener("popstate",()=>{
   window.history.pushState({appLoaded:true},"");
 },{capture:true});
 
-const APP_VERSION = "1.0.0";
-const APP_UPDATE_DATE = "2026-05-20";
+const APP_VERSION = "1.1.0";
+const APP_UPDATE_DATE = "2026-05-21";
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {

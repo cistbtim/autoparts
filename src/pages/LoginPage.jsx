@@ -290,17 +290,14 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                 <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{t.loginSpareShopSub||"Sign in to your spare parts shop"}</div>
               </div>
               <Field label={t.branchNameField||"Branch Name"}>
-                <div style={{position:"relative"}}>
-                  <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none",opacity:.6}}>🏬</span>
-                  <input
-                    style={{...companyInpStyle, paddingLeft:34}}
-                    type="text" value={branchName}
-                    onChange={e=>setBranchName(e.target.value)}
-                    onKeyDown={e=>e.key==="Enter"&&doBranchLogin()}
-                    placeholder={t.branchNamePlaceholder||"e.g. North Branch"}
-                    autoCapitalize="words"
-                  />
-                </div>
+                <input
+                  style={companyInpStyle}
+                  type="text" value={branchName}
+                  onChange={e=>setBranchName(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&doBranchLogin()}
+                  placeholder={t.branchNamePlaceholder||"e.g. North Branch"}
+                  autoCapitalize="words"
+                />
               </Field>
               <Field label={t.username||"Username"}>
                 <input style={inpStyle} type="text" value={branchUser} onChange={e=>setBranchUser(e.target.value)}
@@ -335,10 +332,9 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
 
                   {/* Company name field */}
                   <Field label="Company Name" hint="Optional">
-                    <div style={{position:"relative"}}>
-                      <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none",opacity:.6}}>🏢</span>
+                    <div>
                       <input
-                        style={{...companyInpStyle, paddingLeft:34}}
+                        style={companyInpStyle}
                         type="text" value={wsCompany}
                         onChange={e=>setWsCompany(e.target.value)}
                         placeholder="e.g. ABC Auto Workshop"
@@ -437,10 +433,9 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
 
                   {/* Company name field */}
                   <Field label="Company Name" hint="Optional">
-                    <div style={{position:"relative"}}>
-                      <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none",opacity:.6}}>🏢</span>
+                    <div>
                       <input
-                        style={{...companyInpStyle, paddingLeft:34}}
+                        style={companyInpStyle}
                         type="text" value={scrapCompany}
                         onChange={e=>setScrapCompany(e.target.value)}
                         placeholder="e.g. City Scrapyard"

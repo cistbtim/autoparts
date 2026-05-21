@@ -99,7 +99,12 @@
       "Bash(npm --prefix /c/Users/Tim/car-parts-app run build)",
       "Bash(git -C \"/c/Users/Tim/car-parts-app\" add src/App.jsx src/lib/api.js)",
       "Bash(awk '/App\\\\.jsx|Modals\\\\.jsx|Workshop\\\\.jsx/{found=1} found && /^\\\\s+[0-9]+/{print} /^$/{found=0}')",
-      "Bash(~/.claude/skills/gstack/bin/gstack-config get *)"
+      "Bash(~/.claude/skills/gstack/bin/gstack-config get *)",
+      "Skill(land-and-deploy)",
+      "Skill(land-and-deploy:*)",
+      "PowerShell(gh run list --branch main --limit 5 --json databaseId,status,conclusion,workflowName,headSha,createdAt)",
+      "Skill(design-review)",
+      "Skill(design-review:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory",

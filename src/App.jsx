@@ -39,9 +39,7 @@ export default function App() {
   const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");};
   const [settingsLoaded,setSettingsLoaded] = useState(false);
   const [availLangs,setAvailLangs] = useState(getLangs());
-  const [theme,setTheme] = useState(localStorage.getItem("ap_theme")||"dark");
-  useEffect(()=>{ document.documentElement.setAttribute("data-theme",theme); },[theme]);
-  const toggleTheme = ()=>{ const n=theme==="dark"?"light":"dark"; setTheme(n); localStorage.setItem("ap_theme",n); };
+  useEffect(()=>{ document.documentElement.setAttribute("data-theme","light"); localStorage.removeItem("ap_theme"); },[]);
   const changeLang = (l)=>{setLang(l);localStorage.setItem("ap_lang",l);api.patch("settings","id",1,{default_lang:l}).catch(()=>{});};
   const t = T[lang] || T.en;
 
@@ -82,13 +80,13 @@ export default function App() {
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
   if(!user) return <LoginPage onLogin={handleLogin} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={handleLogout} lang={lang}/>;
-  return <MainApp user={user} onLogout={handleLogout} t={t} lang={lang} setLang={changeLang} langs={availLangs} theme={theme} toggleTheme={toggleTheme}/>;
+  return <MainApp user={user} onLogout={handleLogout} t={t} lang={lang} setLang={changeLang} langs={availLangs}/>;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════
-function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
+function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   setCurrentLang(lang); // sync for tSt
   const role = user.role;
   const wsRole = user.wsRole || "main"; // workshop sub-role: "main" | "manager" | "mechanic"
@@ -2936,7 +2934,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               🛒 {t.cart} {cartCount>0&&<span style={{background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 7px",fontSize:11}}>{cartCount}</span>}
             </button>
           )}
-          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light Mode":"🌙 Dark Mode"}</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>openM("changePassword")}>🔑 Change Password</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={onLogout}>🚪 {t.logout}</button>
           <div style={{fontSize:10,color:"var(--text3)",textAlign:"center",marginTop:2,letterSpacing:".03em"}}>v{APP_VERSION} · {APP_UPDATE_DATE}</div>
@@ -2992,7 +2989,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               🛒 {t.cart} {cartCount>0&&<span style={{background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 7px",fontSize:11}}>{cartCount}</span>}
             </button>
           )}
-          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light Mode":"🌙 Dark Mode"}</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>{openM("changePassword");setDrawerOpen(false);}}>🔑 Change Password</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 {t.logout}</button>
           <div style={{display:"flex",justifyContent:"center",marginTop:2,position:"relative"}}>
@@ -3076,7 +3072,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],theme,toggleTheme}) {
               <div className="ws-more-sep"/>
               {/* Action buttons */}
               <div className="ws-more-actions">
-                <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12}} onClick={toggleTheme}>{theme==="dark"?"☀️ Light":"🌙 Dark"}</button>
                 <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12}} onClick={()=>{openM("changePassword");setWsMoreOpen(false);}}>🔑 {t.changePassword||"Password"}</button>
                 <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 {t.logout||"Logout"}</button>
               </div>

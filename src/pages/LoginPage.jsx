@@ -268,7 +268,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
               background:authTab===tb.id?"var(--accent)":"var(--surface2)",
               color:authTab===tb.id?"#fff":"var(--text2)",
               fontWeight:authTab===tb.id?700:500,
-              fontSize:10.5,letterSpacing:".01em",
+              fontSize:12,letterSpacing:".01em",
               display:"flex",flexDirection:"column",alignItems:"center",gap:3,
               boxShadow:authTab===tb.id?"0 3px 12px rgba(0,0,0,.18)":"none",
               transition:"all .15s",

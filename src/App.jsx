@@ -149,6 +149,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [branchMatchedOnly,setBranchMatchedOnly]=useState("matched"); // "matched"|"own"|"all"
   const [invPage,setInvPage]=useState(0);   // inventory page
   const [invReport,setInvReport]=useState(null); // null | "quantum" | "hiace" | "others"
+  const [activePicker,setActivePicker]=useState(null); // {userId, date} — inline expiry date picker in Users table
   const [shopPage,setShopPage]=useState(0); // shop page
   const PAGE_SIZE=20;
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
@@ -4485,17 +4486,34 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 <table className="tbl">
                   <thead><tr>{["User",t.role,"Subscription",t.phone,t.email,"Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {users.map(u=>{const sub2=getSubInfo(u);return(
+                    {users.map(u=>{const sub2=getSubInfo(u);const isPicking=activePicker?.userId===u.id;
+                    // default expiry = existing expiry + 1 month, or today + 1 month
+                    const nextMonthDefault=(()=>{const base=u.subscription_expires_at?new Date(u.subscription_expires_at):new Date();base.setMonth(base.getMonth()+1);return base.toISOString().slice(0,10);})();
+                    return(
                       <tr key={u.id}>
                         <td><div style={{fontWeight:600}}>{u.name||u.username}</div><div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{u.username}</div></td>
                         <td><span className="badge" style={{background:ROLES[u.role]?.bg||"var(--surface3)",color:ROLES[u.role]?.color||"var(--text2)"}}>{ROLES[u.role]?.icon} {t[u.role]||u.role}</span></td>
                         <td>
                           <span className="badge" style={{background:sub2.color+"22",color:sub2.color,marginBottom:5}}>{sub2.label}</span>
-                          <div style={{display:"flex",gap:4,marginTop:5,flexWrap:"wrap"}}>
-                            {["trial","active","expired","blocked"].map(s=>(
-                              <button key={s} className="btn btn-ghost btn-xs" style={{color:u.subscription_status===s?sub2.color:"var(--text3)",borderColor:u.subscription_status===s?sub2.color:"var(--border)",padding:"2px 8px",fontSize:11}} onClick={()=>saveUser({...u,subscription_status:s})}>{s}</button>
-                            ))}
-                          </div>
+                          {sub2.expiresAt&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Expires: {sub2.expiresAt}</div>}
+                          {isPicking?(
+                            <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:6}}>
+                              <span style={{fontSize:11,color:"var(--text3)"}}>Expiry:</span>
+                              <input type="date" className="inp" value={activePicker.date}
+                                onChange={e=>setActivePicker(p=>({...p,date:e.target.value}))}
+                                style={{padding:"3px 7px",fontSize:12,width:140}}/>
+                              <button className="btn btn-primary btn-xs" onClick={()=>{saveUser({...u,subscription_status:"active",subscription_expires_at:activePicker.date});setActivePicker(null);}}>✅ Confirm</button>
+                              <button className="btn btn-ghost btn-xs" onClick={()=>setActivePicker(null)}>✕</button>
+                            </div>
+                          ):(
+                            <div style={{display:"flex",gap:4,marginTop:5,flexWrap:"wrap"}}>
+                              <button className="btn btn-ghost btn-xs" style={{color:sub2.status==="active"?sub2.color:"var(--text3)",borderColor:sub2.status==="active"?sub2.color:"var(--border)",padding:"2px 8px",fontSize:11}}
+                                onClick={()=>setActivePicker({userId:u.id,date:nextMonthDefault})}>active</button>
+                              {["trial","expired","blocked"].map(s=>(
+                                <button key={s} className="btn btn-ghost btn-xs" style={{color:u.subscription_status===s?sub2.color:"var(--text3)",borderColor:u.subscription_status===s?sub2.color:"var(--border)",padding:"2px 8px",fontSize:11}} onClick={()=>saveUser({...u,subscription_status:s})}>{s}</button>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td style={{color:"var(--text2)",fontSize:13}}>{u.phone||"—"}</td>
                         <td style={{color:"var(--text2)",fontSize:13}}>{u.email||"—"}</td>
@@ -5255,6 +5273,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           ⚠️ {subStatus.status==="trial"?"Free trial":"Subscription"} expires in <strong>{subStatus.daysLeft<=0?"today":subStatus.daysLeft===1?"1 day":`${subStatus.daysLeft} days`}</strong> ({subStatus.expiresAt}) — Contact admin to renew
         </div>
       )}
+      {role!=="workshop"&&role!=="admin"&&(()=>{const si=getSubInfo(user);return si.status==="active"&&si.daysLeft!=null&&si.daysLeft<=7&&(
+        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9998,background:"linear-gradient(90deg,#f97316,#ef4444)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
+          ⚠️ Subscription expires in <strong>{si.daysLeft<=0?"today":si.daysLeft===1?"1 day":`${si.daysLeft} days`}</strong> ({si.expiresAt}) — Contact admin to renew
+        </div>
+      );})()}
     </div>
   );
 }

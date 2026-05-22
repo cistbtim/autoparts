@@ -70,7 +70,17 @@ export const getSubInfo = (u) => {
   if (u.role === "branch_picker")     return { status: "admin", label: "Branch Picker",    color: "#f59e0b" };
   if (u.role === "branch_salesman")   return { status: "admin", label: "Branch Salesman",  color: "#ec4899" };
   const s = u.subscription_status || "trial";
-  if (s === "active") return { status: "active", label: "✅ Active", color: "#34d399" };
+  if (s === "active") {
+    if (u.subscription_expires_at) {
+      const exp = new Date(u.subscription_expires_at); exp.setHours(23,59,59,999);
+      const now = new Date();
+      if (now > exp) return { status: "expired", label: "⏰ Expired", color: "#f87171", expiresAt: u.subscription_expires_at };
+      const daysLeft = Math.ceil((exp - now) / 86400000);
+      const color = daysLeft <= 7 ? "#fbbf24" : "#34d399";
+      return { status: "active", label: `✅ Active · ${daysLeft}d left`, color, daysLeft, expiresAt: u.subscription_expires_at };
+    }
+    return { status: "active", label: "✅ Active", color: "#34d399" };
+  }
   if (s === "blocked" || s === "expired") return { status: s, label: s === "blocked" ? "🚫 Blocked" : "⏰ Expired", color: "#f87171" };
   const days = Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - new Date(u.trial_start || Date.now())) / 86400000));
   if (days <= 0) return { status: "expired", label: "⏰ Expired", color: "#f87171", days: 0 };

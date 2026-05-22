@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { getSettings, C } from "../lib/settings.js";
 import { api } from "../lib/api.js";
-import { makeId, toImgUrl } from "../lib/helpers.js";
+import { makeId, toImgUrl, waLink, mailLink } from "../lib/helpers.js";
 import { getCategories } from "../lib/constants.js";
 
 // ── Abbreviation expansion ────────────────────────────────────────────────────
@@ -430,7 +430,7 @@ function PosDone({ sale, onNewSale }) {
 }
 
 // ── Main POS page ─────────────────────────────────────────────────────────────
-export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, branchId = null }) {
+export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, branchId = null, suppliers = [], partSuppliers = [], settings = {} }) {
   const sym = C();
 
   // Parts filter — searchInput updates instantly (for the input box display),
@@ -457,6 +457,9 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const [discount, setDiscount] = useState(0);
   const [discLocked, setDiscLocked] = useState(true);
   const [showPin, setShowPin] = useState(false);
+
+  // Ask-supplier modal
+  const [askPart, setAskPart] = useState(null);
 
   // UI
   const [saving, setSaving] = useState(false);
@@ -706,6 +709,68 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
     </div>
   );
 
+  // Ask-supplier overlay
+  const AskSupplierModal = askPart && (() => {
+    const linked = partSuppliers
+      .filter(ps => String(ps.part_id) === String(askPart.id))
+      .map(ps => ({ ...ps, sup: suppliers.find(s => String(s.id) === String(ps.supplier_id)) }))
+      .filter(ps => ps.sup);
+    const shopName = settings?.shop_name || "AutoParts";
+    const msg = (supName) =>
+      `Hi ${supName},\n\nCould you please check stock and your best price for:\n\n${askPart.name}${askPart.sku ? ` (${askPart.sku})` : ""}${askPart.oe_number ? `\nOE: ${askPart.oe_number}` : ""}\n\nThank you,\n${shopName}`;
+    return (
+      <div className="overlay" onClick={() => setAskPart(null)}
+        style={{ zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+        <div onClick={e => e.stopPropagation()}
+          style={{ background: "var(--surface)", borderRadius: 14, padding: 20, width: "100%", maxWidth: 420, boxShadow: "0 8px 40px rgba(0,0,0,.35)", border: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>📤 Ask Supplier</div>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{askPart.name}{askPart.sku ? ` · ${askPart.sku}` : ""}</div>
+            </div>
+            <button onClick={() => setAskPart(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "var(--text3)", lineHeight: 1 }}>✕</button>
+          </div>
+          {linked.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--text3)", textAlign: "center", padding: "20px 0" }}>
+              No suppliers linked to this part.<br/>
+              <span style={{ fontSize: 12 }}>Link suppliers in the Inventory tab → Part Suppliers.</span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {linked.map(ps => {
+                const s = ps.sup;
+                const m = msg(s.name);
+                return (
+                  <div key={ps.id} style={{ background: "var(--surface2)", borderRadius: 10, padding: "12px 14px", border: "1px solid var(--border)" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{s.name}</div>
+                    {ps.supplier_part_no && <div style={{ fontSize: 11, fontFamily: "DM Mono,monospace", color: "var(--purple)", marginBottom: 6 }}>Supplier code: {ps.supplier_part_no}</div>}
+                    {!ps.supplier_part_no && <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6 }}>{s.phone || s.email || "No contact info"}</div>}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {s.phone && (
+                        <a href={waLink(s.phone, m)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                          <button style={{ background: "#25D366", color: "#fff", border: "none", borderRadius: 7, padding: "6px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                            📲 WhatsApp
+                          </button>
+                        </a>
+                      )}
+                      {s.email && (
+                        <a href={mailLink(s.email, `Stock check: ${askPart.name}`, m)} style={{ textDecoration: "none" }}>
+                          <button style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text2)", borderRadius: 7, padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                            ✉ Email
+                          </button>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  })();
+
   const S = { // shared style tokens for the right panel
     panel:  { background: "var(--surface)", borderLeft: "2px solid var(--border)" },
     label:  { fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: "var(--text3)", textTransform: "uppercase", marginBottom: 5 },
@@ -719,6 +784,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 110px)", background: "var(--bg)", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", position: "relative" }}>
       {showPin && <PinModal onSuccess={() => { setDiscLocked(false); setShowPin(false); }} onClose={() => setShowPin(false)} />}
       {Lightbox}
+      {AskSupplierModal}
 
       {mobView === "catalog" ? (
         <>
@@ -978,6 +1044,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
     <div style={{ display: "flex", gap: 0, height: "calc(100vh - 110px)", minHeight: 500, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", boxShadow: "0 4px 24px rgba(0,0,0,.18)" }}>
       {showPin && <PinModal onSuccess={() => { setDiscLocked(false); setShowPin(false); }} onClose={() => setShowPin(false)} />}
       {Lightbox}
+      {AskSupplierModal}
 
       {/* ══ LEFT: Parts catalog ══ */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", background: "var(--bg)" }}>
@@ -1084,9 +1151,14 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                               style={{ background: "var(--accent)", border: "none", color: "#fff", borderRadius: 8, padding: "6px 10px", fontWeight: 800, fontSize: 14, cursor: "pointer", minWidth: 42 }}>
                               +{inCart.qty}
                             </button>
+                          ) : p.stock <= 0 ? (
+                            <button onClick={() => setAskPart(p)} title="Ask supplier for stock & price"
+                              style={{ background: "rgba(96,165,250,.12)", border: "1px solid rgba(96,165,250,.35)", color: "var(--blue)", borderRadius: 8, padding: "6px 10px", fontWeight: 700, fontSize: 14, cursor: "pointer", minWidth: 42 }}>
+                              📤
+                            </button>
                           ) : (
-                            <button onClick={() => addToCart(p)} disabled={p.stock <= 0}
-                              style={{ background: "var(--surface2)", border: `1px solid ${p.stock <= 0 ? "var(--border)" : "var(--accent)"}`, color: p.stock <= 0 ? "var(--text3)" : "var(--accent)", borderRadius: 8, padding: "6px 10px", fontWeight: 700, fontSize: 16, cursor: p.stock <= 0 ? "not-allowed" : "pointer" }}>
+                            <button onClick={() => addToCart(p)}
+                              style={{ background: "var(--surface2)", border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 8, padding: "6px 10px", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>
                               +
                             </button>
                           )}

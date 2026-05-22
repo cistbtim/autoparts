@@ -593,7 +593,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setPartSuppliers(Array.isArray(data)?data:[]);
   },[]);
   useEffect(()=>{
-    if(tab==="inventory"||tab==="suppliers") loadPartSuppliers();
+    if(tab==="inventory"||tab==="suppliers"||tab==="pos") loadPartSuppliers();
   },[tab,loadPartSuppliers]);
 
   // Targeted refresh — fetch only the tables that a mutation actually dirtied.
@@ -3882,6 +3882,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             vehicles={vehicles}
             partFitments={partFitments}
             branchId={_bId}
+            suppliers={suppliers}
+            partSuppliers={partSuppliers}
+            settings={settings}
             onSave={savePosInvoice}/>
         )}
 

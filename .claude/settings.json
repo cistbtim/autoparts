@@ -105,7 +105,11 @@
       "PowerShell(gh run list --branch main --limit 5 --json databaseId,status,conclusion,workflowName,headSha,createdAt)",
       "Skill(design-review)",
       "Skill(design-review:*)",
-      "Bash(claude mcp *)"
+      "Bash(claude mcp *)",
+      "Bash(grep -v \"//\")",
+      "Bash(grep -v \"partId\\\\|partName\\\\|partQty\\\\|partPrice\\\\|part_id\\\\|part_name\\\\|\\\\\\\\.part\\\\b\\\\|parts\\\\b\")",
+      "Bash(gh auth *)",
+      "Bash(git symbolic-ref *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory",

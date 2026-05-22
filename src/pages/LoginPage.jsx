@@ -3,7 +3,15 @@ import { api, SUPABASE_URL } from "../lib/api.js";
 import { getSettings } from "../lib/settings.js";
 import { CSS } from "../styles.js";
 import { ShopLogo, FL } from "../components/shared.jsx";
-import { makeId, detectGeoLocation } from "../lib/helpers.js";
+import { makeId, detectGeoLocation, waLink } from "../lib/helpers.js";
+import { getSubInfo } from "../lib/constants.js";
+
+const checkAccess = (u) => {
+  const si = getSubInfo(u);
+  if (si.status === "expired") return "Subscription expired — contact admin to renew";
+  if (si.status === "blocked") return "Account blocked — contact admin";
+  return null;
+};
 
 const ErrBox = ({msg}) => (
   <div style={{background:"rgba(220,38,38,.07)",border:"1px solid rgba(220,38,38,.2)",borderRadius:9,padding:"9px 13px",fontSize:13,color:"var(--red)",display:"flex",alignItems:"center",gap:7}}>
@@ -71,6 +79,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
   const [err,setErr] = useState(""); const [loading,setLoading] = useState(false);
   const [detectingLoc,setDetectingLoc] = useState(false);
   const [dbStatus, setDbStatus] = useState("checking");
+  const [expiredInfo,setExpiredInfo] = useState(null);
 
   useEffect(()=>{
     api.get("settings","id=eq.1&select=id")
@@ -87,14 +96,17 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
 
   const doBranchLogin = async () => {
     if(!branchName||!branchUser||!branchPass){setErr("Branch name, username and password are required");return;}
-    setLoading(true);setErr("");
+    setLoading(true);setErr("");setExpiredInfo(null);
     const brRes = await api.get("branches",`name=ilike.*${encodeURIComponent(branchName.trim())}*&status=eq.active&select=id,name,status`);
     if(!Array.isArray(brRes)||brRes.length===0){setErr("Branch not found or inactive");setLoading(false);return;}
     const branch = brRes[0];
     const userRes = await api.get("users",`branch_id=eq.${branch.id}&username=eq.${encodeURIComponent(branchUser.trim())}&password=eq.${encodeURIComponent(branchPass)}&select=*`);
     if(Array.isArray(userRes)&&userRes.length>0){
+      const u={...userRes[0],_branchName:branch.name};
+      const accErr=checkAccess(u);
+      if(accErr){setErr(accErr);setExpiredInfo({name:u.name,username:u.username,company:u._branchName});setLoading(false);return;}
       await logLogin(userRes[0]);
-      onLogin({...userRes[0],_branchName:branch.name});
+      onLogin(u);
     } else {
       setErr("Invalid username or password");
     }
@@ -103,22 +115,29 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
 
   const doStaffLogin = async () => {
     if(!staffUser||!staffPass){setErr(t.wrongPass);return;}
-    setLoading(true);setErr("");
+    setLoading(true);setErr("");setExpiredInfo(null);
     const res = await api.get("users",`username=eq.${encodeURIComponent(staffUser)}&password=eq.${encodeURIComponent(staffPass)}&select=*`);
-    if(Array.isArray(res)&&res.length>0){await logLogin(res[0]);onLogin(res[0]);}
-    else setErr(t.wrongPass);
+    if(Array.isArray(res)&&res.length>0){
+      const accErr=checkAccess(res[0]);
+      if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username});setLoading(false);return;}
+      await logLogin(res[0]);onLogin(res[0]);
+    } else setErr(t.wrongPass);
     setLoading(false);
   };
 
   const doWorkshopLogin = async () => {
     if(!wsUser||!wsPass){setErr("Fill username & password");return;}
-    setLoading(true);setErr("");
+    setLoading(true);setErr("");setExpiredInfo(null);
     const company = wsCompany.trim();
     // Check main workshop account
     let q = `username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&role=eq.workshop&select=*`;
     if(company) q += `&name=ilike.*${encodeURIComponent(company)}*`;
     const res = await api.get("users", q);
-    if(Array.isArray(res)&&res.length>0){await logLogin(res[0]);onLogin(res[0]);setLoading(false);return;}
+    if(Array.isArray(res)&&res.length>0){
+      const accErr=checkAccess(res[0]);
+      if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username,company:res[0].name});setLoading(false);return;}
+      await logLogin(res[0]);onLogin(res[0]);setLoading(false);return;
+    }
     // Check workshop sub-users
     let suQ = `username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&is_active=eq.true&select=*`;
     if(company) {
@@ -131,6 +150,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
       const mainRes=await api.get("users",`id=eq.${wu.workshop_id}&select=*`);
       if(Array.isArray(mainRes)&&mainRes.length>0){
         const userObj={...mainRes[0],wsRole:wu.ws_role,wsUsername:wu.username,name:wu.name||mainRes[0].name};
+        const accErr=checkAccess(userObj);
+        if(accErr){setErr(accErr);setExpiredInfo({name:wu.name||mainRes[0].name,username:wu.username,company:mainRes[0].name});setLoading(false);return;}
         await logLogin({...userObj,username:wu.username});
         onLogin(userObj);
         setLoading(false);return;
@@ -142,13 +163,16 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
 
   const doScrapyardLogin = async () => {
     if(!scrapUser||!scrapPass){setErr(t.wrongPass);return;}
-    setLoading(true);setErr("");
+    setLoading(true);setErr("");setExpiredInfo(null);
     const company = scrapCompany.trim();
     let q = `username=eq.${encodeURIComponent(scrapUser)}&password=eq.${encodeURIComponent(scrapPass)}&role=eq.scrapyard&select=*`;
     if(company) q += `&name=ilike.*${encodeURIComponent(company)}*`;
     const res = await api.get("users", q);
-    if(Array.isArray(res)&&res.length>0){await logLogin(res[0]);onLogin(res[0]);}
-    else setErr(t.wrongPass);
+    if(Array.isArray(res)&&res.length>0){
+      const accErr=checkAccess(res[0]);
+      if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username,company:res[0].name});setLoading(false);return;}
+      await logLogin(res[0]);onLogin(res[0]);
+    } else setErr(t.wrongPass);
     setLoading(false);
   };
 
@@ -215,7 +239,25 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
     setLoading(false);
   };
 
-  const switchTab = (tab) => { setAuthTab(tab); setErr(""); };
+  const switchTab = (tab) => { setAuthTab(tab); setErr(""); setExpiredInfo(null); };
+
+  const waRenewLink = (() => {
+    if (!expiredInfo) return null;
+    const s = loadedSettings || getSettings();
+    const phone = s.whatsapp || s.phone || "";
+    if (!phone) return null;
+    const lines = ["Hi, my account has expired and I need to renew my subscription.", ""];
+    if (expiredInfo.name) lines.push(`Name: ${expiredInfo.name}`);
+    if (expiredInfo.company && expiredInfo.company !== expiredInfo.name) lines.push(`Company: ${expiredInfo.company}`);
+    lines.push(`Username: ${expiredInfo.username}`);
+    return (
+      <a href={waLink(phone, lines.join("\n"))} target="_blank" rel="noreferrer"
+         style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"11px 16px",borderRadius:10,background:"#25D366",color:"#fff",fontSize:14,fontWeight:600,textDecoration:"none",marginTop:2}}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+        Message Admin on WhatsApp
+      </a>
+    );
+  })();
 
   const TAB_BTNS = [
     {id:"branch",   Icon:IcBox,    label:t.loginSpareShop||"Spare Shop"},
@@ -303,6 +345,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                 <InpIcon inp={<input style={inpStyle} type="password" value={branchPass} onChange={e=>setBranchPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doBranchLogin()}/>}><IcLock/></InpIcon>
               </Field>
               {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
               <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doBranchLogin} disabled={loading}>
                 {loading?t.connecting||"Connecting…":"Sign In →"}
               </button>
@@ -341,6 +384,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                   </Field>
 
                   {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doWorkshopLogin} disabled={loading}>
                     {loading?t.connecting||"Connecting…":"Sign In →"}
                   </button>
@@ -391,6 +435,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                     </div>
                   </div>
                   {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10}} onClick={doWsSignup} disabled={loading}>
                     {loading?t.connecting||"Connecting…":"🚀 "+(t.startFreeTrial||"Start Free Trial")}
                   </button>
@@ -434,6 +479,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                   </Field>
 
                   {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doScrapyardLogin} disabled={loading}>
                     {loading?t.connecting||"Connecting…":"Sign In →"}
                   </button>
@@ -484,6 +530,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                     </div>
                   </div>
                   {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10}} onClick={doScrapyardSignup} disabled={loading}>
                     {loading?t.connecting||"Connecting…":"🚗 Start Free Trial"}
                   </button>
@@ -520,6 +567,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                     <InpIcon inp={<input style={inpStyle} type="password" value={cPass} onChange={e=>setCPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustLogin()}/>}><IcLock/></InpIcon>
                   </Field>
                   {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doCustLogin} disabled={loading}>
                     {loading?t.connecting||"Connecting…":"Sign In →"}
                   </button>
@@ -549,6 +597,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                     </Field>
                   </div>
                   {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10}} onClick={doCustRegister} disabled={loading}>
                     {loading?t.connecting||"Connecting…":t.createAccount||"Create Account"}
                   </button>
@@ -574,6 +623,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
                 <InpIcon inp={<input style={inpStyle} type="password" value={staffPass} onChange={e=>setStaffPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doStaffLogin()}/>}><IcLock/></InpIcon>
               </Field>
               {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
               <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doStaffLogin} disabled={loading}>
                 {loading?t.connecting||"Connecting…":"Sign In →"}
               </button>

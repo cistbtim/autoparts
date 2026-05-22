@@ -721,6 +721,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       const lines = [`Hi ${supName},`, "", "Could you please check stock and your best price for:"];
       if (ps.supplier_part_no) lines.push("", `Code: ${ps.supplier_part_no}`);
       lines.push(`${askPart.name}${askPart.sku ? ` (${askPart.sku})` : ""}`);
+      const vehicle = [askPart.make, askPart.model, askPart.year_range].filter(Boolean).join(" ");
+      if (vehicle) lines.push(`Vehicle: ${vehicle}`);
       if (askPart.oe_number) lines.push(`OE: ${askPart.oe_number}`);
       lines.push("", `Thank you,\n${shopName}`);
       return lines.join("\n");

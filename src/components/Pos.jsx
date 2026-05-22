@@ -716,8 +716,15 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       .map(ps => ({ ...ps, sup: suppliers.find(s => String(s.id) === String(ps.supplier_id)) }))
       .filter(ps => ps.sup);
     const shopName = settings?.shop_name || "AutoParts";
-    const msg = (supName) =>
-      `Hi ${supName},\n\nCould you please check stock and your best price for:\n\n${askPart.name}${askPart.sku ? ` (${askPart.sku})` : ""}${askPart.oe_number ? `\nOE: ${askPart.oe_number}` : ""}\n\nThank you,\n${shopName}`;
+    const msg = (ps) => {
+      const supName = ps.sup.name;
+      const lines = [`Hi ${supName},`, "", "Could you please check stock and your best price for:"];
+      if (ps.supplier_part_no) lines.push("", `Code: ${ps.supplier_part_no}`);
+      lines.push(`${askPart.name}${askPart.sku ? ` (${askPart.sku})` : ""}`);
+      if (askPart.oe_number) lines.push(`OE: ${askPart.oe_number}`);
+      lines.push("", `Thank you,\n${shopName}`);
+      return lines.join("\n");
+    };
     return (
       <div className="overlay" onClick={() => setAskPart(null)}
         style={{ zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -739,7 +746,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {linked.map(ps => {
                 const s = ps.sup;
-                const m = msg(s.name);
+                const m = msg(ps);
                 return (
                   <div key={ps.id} style={{ background: "var(--surface2)", borderRadius: 10, padding: "12px 14px", border: "1px solid var(--border)" }}>
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{s.name}</div>

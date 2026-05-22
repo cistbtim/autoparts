@@ -104,7 +104,8 @@
       "Skill(land-and-deploy:*)",
       "PowerShell(gh run list --branch main --limit 5 --json databaseId,status,conclusion,workflowName,headSha,createdAt)",
       "Skill(design-review)",
-      "Skill(design-review:*)"
+      "Skill(design-review:*)",
+      "Bash(claude mcp *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory",

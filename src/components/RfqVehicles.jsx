@@ -1284,13 +1284,14 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
     const filtered = vehicles.filter(v => !selMake || v.make === selMake);
     const map = {};
     for (const v of filtered) {
-      if (!map[v.model]) map[v.model] = { yearFrom: v.year_from, yearTo: v.year_to };
+      if (!map[v.model]) map[v.model] = { yearFrom: v.year_from, yearTo: v.year_to, code: v.code||"" };
       else {
         if (v.year_from && (!map[v.model].yearFrom || v.year_from < map[v.model].yearFrom)) map[v.model].yearFrom = v.year_from;
         if (!v.year_to || !map[v.model].yearTo || v.year_to > map[v.model].yearTo) map[v.model].yearTo = v.year_to;
+        if (v.code && !map[v.model].code) map[v.model].code = v.code;
       }
     }
-    return Object.entries(map).map(([model, {yearFrom, yearTo}]) => ({model, yearFrom, yearTo})).sort((a,b)=>a.model.localeCompare(b.model));
+    return Object.entries(map).map(([model, {yearFrom, yearTo, code}]) => ({model, yearFrom, yearTo, code})).sort((a,b)=>(a.code||a.model).localeCompare(b.code||b.model));
   })();
   const engines = [...new Set(
     vehicles
@@ -1340,9 +1341,9 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
           disabled={!selMake}
           onChange={e=>{ const v=e.target.value; setSelModel(v); setSelEngine(""); applyFilter(selMake,v,""); }}>
           <option value="">{t.selectModel||"Select Model"}</option>
-          {models.map(({model, yearFrom, yearTo})=>(
+          {models.map(({model, yearFrom, yearTo, code})=>(
             <option key={model} value={model}>
-              {model}{yearFrom ? ` (${yearFrom}–${yearTo||"present"})` : ""}
+              {code?`[${code}] `:""}{model}{yearFrom ? ` (${yearFrom}–${yearTo||"present"})` : ""}
             </option>
           ))}
         </select>

@@ -5002,7 +5002,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
       {matchModelOpen&&(()=>{
         const scannedMake=(job.vehicle_make||"").toLowerCase().split(" ")[0];
         const seen=new Set();
-        const sorted=[...vehicles].sort((a,b)=>(b.photo_front?1:0)-(a.photo_front?1:0));
+        const sorted=[...vehicles].sort((a,b)=>{
+          const ca=a.code||"",cb=b.code||"";
+          if(ca&&!cb) return -1; if(!ca&&cb) return 1;
+          return ca.localeCompare(cb)||a.model.localeCompare(b.model);
+        });
         const sq=matchModelSearch.trim().toLowerCase();
         const modelCards=sorted.filter(v=>{
           if(!v.model) return false;

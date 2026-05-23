@@ -35,6 +35,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [search,         setSearch]         = useState("");
   const [bookIn,         setBookIn]         = useState(false);
   const [wsTab,          setWsTab]          = useState(initialTab||"jobs");
+  const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:""});
   const [stmtCust,       setStmtCust]       = useState("");
   const [qInvModal,      setQInvModal]      = useState(null);
   const [sortBy,         setSortBy]         = useState("date_desc");
@@ -262,6 +263,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onViewPurchaseOrders={()=>{ setView("list"); setWsTab("wssuporders"); }}
         onViewPO={(poId)=>{ setPendingViewPoId(poId); setView("list"); setWsTab("wssuporders"); }}
         onGoToStock={()=>{ setView("list"); setWsTab("wsstock"); }}
+        onGoToSpareShop={(make,model)=>{ setSpareShopFilter({make:make||"",model:model||""}); setView("list"); setWsTab("spareshop"); }}
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
@@ -336,7 +338,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       {/* ── Sub-navigation (desktop) ── */}
       <div className="hide-mobile" style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
         {WS_TABS.map(([v,label,cnt])=>(
-          <button key={v} onClick={()=>setWsTab(v)} style={{
+          <button key={v} onClick={()=>{ setWsTab(v); if(v==="spareshop") setSpareShopFilter({make:"",model:""}); }} style={{
             padding:"8px 14px",border:"none",background:"none",cursor:"pointer",
             fontSize:13,fontWeight:wsTab===v?700:400,
             color:wsTab===v?"var(--accent)":"var(--text2)",
@@ -349,7 +351,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       </div>
       {/* ── Sub-navigation (mobile dropdown) ── */}
       <div className="show-mobile" style={{marginBottom:14}}>
-        <select className="inp" value={wsTab} onChange={e=>setWsTab(e.target.value)} style={{width:"100%",fontWeight:600}}>
+        <select className="inp" value={wsTab} onChange={e=>{ const v=e.target.value; setWsTab(v); if(v==="spareshop") setSpareShopFilter({make:"",model:""}); }} style={{width:"100%",fontWeight:600}}>
           {WS_TABS.map(([v,label,cnt])=>(
             <option key={v} value={v}>{label}{cnt!=null?` (${cnt})`:""}</option>
           ))}
@@ -1295,7 +1297,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
           </div>
         );
-        return <WsSpareShopTab linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments}/>;
+        return <WsSpareShopTab key={`${spareShopFilter.make}|${spareShopFilter.model}`} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
@@ -1522,7 +1524,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
       {/* ── Modals ── */}
       {bookIn&&(
-        <BookInModal wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs} settings={settings}
+        <BookInModal wsCustomers={wsCustomers} wsVehicles={wsVehicles} vehicles={vehicles} jobs={jobs} settings={settings}
           onSaveJob={async(d)=>{ await onSaveJob(d); setBookIn(false); }}
           onReopenJob={async(d)=>{ await onSaveJob(d); setBookIn(false); setActiveJob(d); setView("job"); }}
           onClose={()=>setBookIn(false)} t={t}/>
@@ -2726,7 +2728,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,wsId=null,wsProfile={},sourceBooking=null,initialTab="car",onRefresh,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[],wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},sourceBooking=null,initialTab="car",onRefresh,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -2771,6 +2773,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
   const [savingPastRec, setSavingPastRec] = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   const [showVinSearch, setShowVinSearch] = useState(false);
+  const [matchModelOpen, setMatchModelOpen] = useState(false);
+  const [matchModelSearch, setMatchModelSearch] = useState("");
+  const [matchModelLightbox, setMatchModelLightbox] = useState(null); // null | index
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
   const [refreshing,    setRefreshing]    = useState(false);
   const [noteEdit,      setNoteEdit]      = useState(false);
@@ -3658,6 +3663,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
                   </div>
                 )}
               </div>
+              {job.vin&&job.vin.length>=12&&(
+                <div style={{marginBottom:8}}>
+                  <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)",fontSize:12}}
+                    onClick={()=>setMatchModelOpen(true)}>
+                    🔗 Match model code from VIN
+                  </button>
+                </div>
+              )}
               {(vehicleRecord?.licence_disc_expiry||job?.licence_disc_expiry)&&(()=>{
                 const exp=vehicleRecord?.licence_disc_expiry||job.licence_disc_expiry;
                 const expired=new Date(exp)<new Date();
@@ -3747,6 +3760,13 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
                       color:"#f97316",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
                     <span style={{fontSize:20}}>🛢️</span>
                     <span>WolfOil</span>
+                  </button>
+                  <button onClick={()=>setMatchModelOpen(true)}
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
+                      background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:10,
+                      color:"var(--blue)",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                    <span style={{fontSize:20}}>🔗</span>
+                    <span>Match Model</span>
                   </button>
                 </div>
               </></div>)}
@@ -4482,6 +4502,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
             <div style={{display:"flex",gap:6}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ {t.wsqtPart}</button>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ {t.wsqtLabour}</button>
+              {wsProfile?.linked_branch_id&&job.vehicle_make&&onGoToSpareShop&&(
+                <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.35)"}} onClick={()=>onGoToSpareShop(job.vehicle_make,job.vehicle_model||"")}>
+                  🏪 {job.vehicle_make}{job.vehicle_model?` ${job.vehicle_model}`:""}
+                </button>
+              )}
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📤 {t.wsqtSendQuote}</button>
               {wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&<button className="btn btn-ghost btn-sm" style={{color:"#38bdf8",borderColor:"rgba(56,189,248,.35)"}} onClick={()=>setReturnQuoteOpen(true)}>↩️ {t.wsqtReturnQuote}</button>}
               {(wsSupplierQuotes.filter(q=>q.job_id===job.id).length>0||sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id)).length>0)&&(
@@ -4972,6 +4997,142 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,wsVehicles=
           wsId={wsId}
           t={t}/>
       )}
+
+      {/* Match model from VIN modal */}
+      {matchModelOpen&&(()=>{
+        const scannedMake=(job.vehicle_make||"").toLowerCase().split(" ")[0];
+        const seen=new Set();
+        const sorted=[...vehicles].sort((a,b)=>(b.photo_front?1:0)-(a.photo_front?1:0));
+        const sq=matchModelSearch.trim().toLowerCase();
+        const modelCards=sorted.filter(v=>{
+          if(!v.model) return false;
+          if(scannedMake&&!(v.make||"").toLowerCase().includes(scannedMake)) return false;
+          if(seen.has(v.model)) return false;
+          seen.add(v.model);
+          if(sq&&!`${v.model} ${v.make} ${v.code||""} ${v.variant||""}`.toLowerCase().includes(sq)) return false;
+          return true;
+        });
+        const pickModel=async(model)=>{
+          setMatchModelOpen(false);
+          // Update job
+          await onSaveJob({...job,vehicle_model:model});
+          // Update vehicle record if one is linked
+          if(vehicleRecord) await onSaveWsVehicle({...vehicleRecord,model});
+          // Save to global VIN cache
+          if(job.vin&&job.vin.length>=12){
+            const vin_prefix=job.vin.slice(0,12).toUpperCase();
+            await api.upsert("ws_vin_model_cache",{vin_prefix,make:job.vehicle_make||"",model}).catch(()=>{});
+          }
+        };
+        return(
+          <Overlay onClose={()=>setMatchModelOpen(false)} wide>
+            <MHead title="🔗 Match Vehicle Model" onClose={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelLightbox(null); }}/>
+            {/* Job car photos for comparison */}
+            {(()=>{
+              const photos=[
+                {src:toImgUrl(vehiclePhotos.front||""),label:"Front"},
+                {src:toImgUrl(vehiclePhotos.rear||""), label:"Rear"},
+                {src:toImgUrl(vehiclePhotos.side||""), label:"Side"},
+              ].filter(p=>p.src);
+              if(!photos.length) return null;
+              return(
+                <>
+                  {matchModelLightbox!==null&&(
+                    <ImgLightbox
+                      urls={photos.map(p=>p.src)}
+                      labels={photos.map(p=>p.label)}
+                      startIdx={matchModelLightbox}
+                      onClose={()=>setMatchModelLightbox(null)}/>
+                  )}
+                  <div style={{marginBottom:12}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>
+                      🚗 This car — {[job.vehicle_reg,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" · ")}
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,gap:6}}>
+                      {photos.map((p,i)=>(
+                        <div key={p.label} style={{position:"relative",borderRadius:8,overflow:"hidden",cursor:"zoom-in",border:"2px solid var(--accent)"}}
+                          onClick={()=>setMatchModelLightbox(i)}>
+                          <img src={p.src} alt={p.label} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}
+                            onError={e=>e.target.parentNode.style.display="none"}/>
+                          <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"2px 7px",background:"rgba(0,0,0,.55)",fontSize:10,fontWeight:700,color:"#fff",textAlign:"center"}}>
+                            {p.label}
+                          </div>
+                          <div style={{position:"absolute",top:4,right:6,fontSize:14,color:"rgba(255,255,255,.8)"}}>🔍</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+            <div style={{marginBottom:10,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,fontSize:13,display:"flex",gap:12,flexWrap:"wrap"}}>
+              <span>🚗 {job.vehicle_reg}</span>
+              {job.vehicle_make&&<span>Make: <strong>{job.vehicle_make}</strong></span>}
+              {job.vehicle_model&&<span>Current model: <strong>{job.vehicle_model}</strong></span>}
+              {job.vin&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11}}>VIN: {job.vin}</span>}
+            </div>
+            {/* VIN decoded info */}
+            {job.vin&&(()=>{
+              const d=decodeVin(job.vin);
+              if(!d) return null;
+              const fields=[
+                d.year&&{k:"Year",v:d.year},
+                d.country&&{k:"Origin",v:d.country},
+                d.make&&{k:"Make",v:d.make},
+                d.model&&{k:"Model",v:d.model},
+                d.plant&&{k:"Plant",v:d.plant},
+              ].filter(Boolean);
+              if(!fields.length) return null;
+              return(
+                <div style={{marginBottom:10,padding:"8px 12px",background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.25)",borderRadius:8}}>
+                  <div style={{fontSize:10,color:"var(--blue)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:5}}>📡 VIN Decoded</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {fields.map(f=>(
+                      <div key={f.k} style={{fontSize:11,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 9px",lineHeight:1.5}}>
+                        <span style={{color:"var(--text3)",marginRight:4}}>{f.k}:</span>
+                        <span style={{fontWeight:700}}>{f.v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+            <div style={{marginBottom:12,display:"flex",gap:8,alignItems:"center"}}>
+              <input className="inp" autoFocus value={matchModelSearch} onChange={e=>setMatchModelSearch(e.target.value)}
+                placeholder="Search model, code…" style={{flex:1}}/>
+              {matchModelSearch&&<button className="btn btn-ghost btn-sm" onClick={()=>setMatchModelSearch("")}>✕</button>}
+            </div>
+            {modelCards.length===0
+              ? <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>
+                  No {job.vehicle_make||""} vehicles with model codes found in your records yet.
+                </div>
+              : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:16}}>
+                  {modelCards.map(v=>{
+                    const img=toImgUrl(v.photo_front||"");
+                    const isCurrent=v.model===job.vehicle_model;
+                    return(
+                      <button key={v.id} onClick={()=>pickModel(v.model)} style={{
+                        background:isCurrent?"rgba(52,211,153,.1)":"var(--surface2)",
+                        border:`2px solid ${isCurrent?"var(--green)":"var(--border)"}`,
+                        borderRadius:12,padding:0,cursor:"pointer",overflow:"hidden",textAlign:"left",
+                      }}>
+                        {img
+                          ? <img src={img} alt={v.model} style={{width:"100%",height:100,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
+                          : <div style={{width:"100%",height:100,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🚗</div>
+                        }
+                        <div style={{padding:"8px 10px"}}>
+                          <div style={{fontWeight:700,fontSize:13}}>{v.model}{isCurrent?" ✓":""}</div>
+                          <div style={{fontSize:11,color:"var(--text3)"}}>{v.make}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+            }
+            <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); }}>Cancel</button>
+          </Overlay>
+        );
+      })()}
 
       {/* Edit job modal */}
       {editJob&&(
@@ -6414,7 +6575,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
   );
 }
 
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[]}) {
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel=""}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
@@ -6696,7 +6857,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
 
       {/* Vehicle filter */}
       <VehicleSearchBar vehicles={vehicles} partFitments={partFitments} parts={shopParts}
-        t={{}} onFilter={(ids)=>{setVehicleFilterIds(ids);setPage(0);}}/>
+        t={{}} initialMake={initialMake} initialModel={initialModel} onFilter={(ids)=>{setVehicleFilterIds(ids);setPage(0);}}/>
 
       {vehicleFilterIds&&<div style={{fontSize:12,color:"var(--blue)",marginBottom:12,fontWeight:600}}>
         🚗 {filtered.length} parts match your vehicle

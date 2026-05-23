@@ -1,11 +1,11 @@
 import { useState, useRef } from "react";
 import { api } from "../../lib/api.js";
-import { makeId } from "../../lib/helpers.js";
+import { makeId, toImgUrl } from "../../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../../lib/barcode.js";
 import { Overlay, MHead, FL } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 
-export function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],onSaveJob,onReopenJob,onClose}) {
+export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],onSaveJob,onReopenJob,onClose}) {
   const [step,setStep]=useState("scan");
   const [plate,setPlate]=useState("");
   const [scanLoading,setScanLoading]=useState(false);
@@ -22,6 +22,10 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],onSaveJob,onRe
   const [decision,setDecision]=useState("new");
   const [returnReason,setReturnReason]=useState("");
   const [reopenJobId,setReopenJobId]=useState(null);
+  // VIN model cache
+  const [vinCacheResult,setVinCacheResult]=useState(null); // null | {vin_prefix,make,model}
+  const [vinPickLoading,setVinPickLoading]=useState(false);
+  const [vinPickSearch,setVinPickSearch]=useState("");
   // job prefill for WorkshopJobModal
   const [jobPrefill,setJobPrefill]=useState(null);
   const [savingIntake,setSavingIntake]=useState(false);
@@ -154,7 +158,15 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],onSaveJob,onRe
     setStep("lookup");
   };
 
-  const proceedToJob=()=>{
+  const saveVinCache=async(model)=>{
+    if(!scanResult?.vin||scanResult.vin.length<12) return;
+    const vin_prefix=scanResult.vin.slice(0,12).toUpperCase();
+    const make=foundVehicle?.make||scanResult?.make||"";
+    await api.upsert("ws_vin_model_cache",{vin_prefix,make,model}).catch(()=>{});
+    api.cacheInvalidate("ws_vin_model_cache");
+  };
+
+  const proceedToJob=(modelOverride="")=>{
     const prefill={
       workshop_customer_id:foundCustomer?.id||null,
       workshop_vehicle_id:foundVehicle?.id||null,
@@ -162,8 +174,8 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],onSaveJob,onRe
       customer_phone:foundCustomer?.phone||"",
       customer_email:foundCustomer?.email||"",
       vehicle_reg:plate,
-      vehicle_make:scanResult?.make||foundVehicle?.make||"",
-      vehicle_model:scanResult?.model||foundVehicle?.model||"",
+      vehicle_make:foundVehicle?.make||scanResult?.make||"",
+      vehicle_model:foundVehicle?.model||modelOverride||scanResult?.model||"",
       vehicle_year:foundVehicle?.year||"",
       vehicle_color:scanResult?.color||foundVehicle?.color||"",
       vin:scanResult?.vin||foundVehicle?.vin||"",
@@ -189,8 +201,125 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],onSaveJob,onRe
     if(openJobs.length>0&&decision==="new"&&!returnReason.trim()){
       alert("Return reason required when vehicle has open jobs");return;
     }
+    // If no existing vehicle record but we have a VIN, check global model cache
+    if(!foundVehicle&&scanResult?.vin&&scanResult.vin.length>=12){
+      setVinPickLoading(true);
+      setVinCacheResult(null);
+      try{
+        const prefix=scanResult.vin.slice(0,12).toUpperCase();
+        const cached=await api.get("ws_vin_model_cache",`vin_prefix=eq.${prefix}`);
+        setVinCacheResult(Array.isArray(cached)&&cached[0]?cached[0]:null);
+      }catch{ setVinCacheResult(null); }
+      setVinPickLoading(false);
+      setStep("vinpick");
+      return;
+    }
     proceedToJob();
   };
+
+  // ── VIN model picker step ─────────────────────────────────────
+  if(step==="vinpick"){
+    const scannedMake=(scanResult?.make||"").toLowerCase().split(" ")[0];
+    const seen=new Set();
+    const sorted=[...vehicles].sort((a,b)=>(b.photo_front?1:0)-(a.photo_front?1:0));
+    const sq=vinPickSearch.trim().toLowerCase();
+    const modelCards=sorted.filter(v=>{
+      if(!v.model) return false;
+      if(scannedMake&&!(v.make||"").toLowerCase().includes(scannedMake)) return false;
+      if(seen.has(v.model)) return false;
+      seen.add(v.model);
+      if(sq&&!`${v.model} ${v.make} ${v.code||""} ${v.variant||""}`.toLowerCase().includes(sq)) return false;
+      return true;
+    });
+
+    if(vinPickLoading){
+      return(
+        <Overlay onClose={onClose} wide>
+          <MHead title="🔍 Checking VIN…" onClose={onClose}/>
+          <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>Searching global VIN database…</div>
+        </Overlay>
+      );
+    }
+
+    return(
+      <Overlay onClose={onClose} wide>
+        <MHead title="🚗 Match Vehicle Model" onClose={onClose}/>
+
+        {/* Scanned info summary */}
+        <div style={{marginBottom:16,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,fontSize:13,display:"flex",gap:12,flexWrap:"wrap"}}>
+          <span>🔍 Plate: <strong>{plate}</strong></span>
+          {scanResult?.make&&<span>Make: <strong>{scanResult.make}</strong></span>}
+          {scanResult?.vin&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11}}>VIN: {scanResult.vin.slice(0,12)}…</span>}
+        </div>
+
+        {/* Cache hit — show suggestion */}
+        {vinCacheResult&&(
+          <div style={{marginBottom:16,padding:"12px 14px",background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",borderRadius:12}}>
+            <div style={{fontSize:12,color:"var(--green)",fontWeight:700,marginBottom:6}}>✅ VIN Recognized — matched from previous records</div>
+            <div style={{fontSize:18,fontWeight:700,marginBottom:10}}>{vinCacheResult.make} {vinCacheResult.model}</div>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-primary" style={{flex:1}} onClick={()=>proceedToJob(vinCacheResult.model)}>
+                ✅ Confirm — {vinCacheResult.model}
+              </button>
+              <button className="btn btn-ghost" onClick={()=>setVinCacheResult(null)}>
+                Pick differently
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Gallery picker — show when no cache hit or user dismissed cache */}
+        {!vinCacheResult&&(
+          <>
+            <div style={{marginBottom:12,display:"flex",gap:8,alignItems:"center"}}>
+              <input className="inp" autoFocus value={vinPickSearch} onChange={e=>setVinPickSearch(e.target.value)}
+                placeholder="Search model, code…" style={{flex:1}}/>
+              {vinPickSearch&&<button className="btn btn-ghost btn-sm" onClick={()=>setVinPickSearch("")}>✕</button>}
+            </div>
+            {modelCards.length===0
+              ? <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>
+                  No {scanResult?.make||""} vehicles found in your records yet.<br/>
+                  <span style={{fontSize:12}}>Skip and enter the model manually.</span>
+                </div>
+              : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:16}}>
+                  {modelCards.map(v=>{
+                    const img=toImgUrl(v.photo_front||"");
+                    return(
+                      <button key={v.id} onClick={async()=>{
+                        await saveVinCache(v.model);
+                        proceedToJob(v.model);
+                      }} style={{
+                        background:"var(--surface2)",border:"2px solid var(--border)",borderRadius:12,
+                        padding:0,cursor:"pointer",overflow:"hidden",textAlign:"left",
+                        transition:"border-color .15s,box-shadow .15s",
+                      }}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--accent)";e.currentTarget.style.boxShadow="var(--glow)";}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border)";e.currentTarget.style.boxShadow="none";}}>
+                        {img
+                          ? <img src={img} alt={v.model} style={{width:"100%",height:100,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
+                          : <div style={{width:"100%",height:100,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🚗</div>
+                        }
+                        <div style={{padding:"8px 10px"}}>
+                          <div style={{fontWeight:700,fontSize:13}}>{v.model}</div>
+                          <div style={{fontSize:11,color:"var(--text3)"}}>{v.make}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+            }
+          </>
+        )}
+
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setStep("lookup")}>← Back</button>
+          <button className="btn btn-ghost" style={{flex:1,color:"var(--text3)"}} onClick={()=>proceedToJob()}>
+            Skip →
+          </button>
+        </div>
+      </Overlay>
+    );
+  }
 
   // ── Quick intake step ─────────────────────────────────────────
   if(step==="intake"&&jobPrefill){
@@ -225,6 +354,10 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],jobs=[],onSaveJob,onRe
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{display:"flex",gap:8}}>
+            <div style={{flex:1}}><FL label="Make"/><input className="inp" value={jobPrefill.vehicle_make} onChange={e=>setJobPrefill(p=>({...p,vehicle_make:e.target.value}))} placeholder="e.g. BMW"/></div>
+            <div style={{flex:1}}><FL label="Model"/><input className="inp" value={jobPrefill.vehicle_model} onChange={e=>setJobPrefill(p=>({...p,vehicle_model:e.target.value}))} placeholder="e.g. F30"/></div>
+          </div>
           <div><FL label="Customer Name *"/><input className="inp" autoFocus value={intakeName} onChange={e=>setIntakeName(e.target.value)} placeholder="e.g. John Smith"/></div>
           <div><FL label="Phone *"/><input className="inp" type="tel" value={intakePhone} onChange={e=>setIntakePhone(e.target.value)} placeholder="+27 82 000 0000"/></div>
           <div><FL label="Current Mileage *"/><input className="inp" type="number" min="0" value={intakeMileage} onChange={e=>setIntakeMileage(e.target.value)} placeholder="e.g. 120000"/></div>

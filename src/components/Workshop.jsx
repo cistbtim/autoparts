@@ -4503,11 +4503,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
             <div style={{display:"flex",gap:6}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ {t.wsqtPart}</button>
               <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ {t.wsqtLabour}</button>
-              {wsProfile?.linked_branch_id&&job.vehicle_make&&onGoToSpareShop&&(
-                <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.35)"}} onClick={()=>onGoToSpareShop(job.vehicle_make,job.vehicle_model||"")}>
-                  🏪 {job.vehicle_make}{job.vehicle_model?` ${job.vehicle_model}`:""}
-                </button>
-              )}
+              {wsProfile?.linked_branch_id&&job.vehicle_make&&onGoToSpareShop&&(()=>{
+                const mv=vehicles.find(v=>v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()&&(v.model?.toLowerCase()===job.vehicle_model?.toLowerCase()||v.code?.toLowerCase()===job.vehicle_model?.toLowerCase()));
+                const displayCode=mv?.code||job.vehicle_model||"";
+                const shopMake=job.vehicle_make;
+                const shopModel=mv?.model||job.vehicle_model||"";
+                return(
+                  <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.35)"}} onClick={()=>onGoToSpareShop(shopMake,shopModel)}>
+                    🏪 {job.vehicle_make}{displayCode?` · ${displayCode}`:""}
+                  </button>
+                );
+              })()}
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📤 {t.wsqtSendQuote}</button>
               {wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&<button className="btn btn-ghost btn-sm" style={{color:"#38bdf8",borderColor:"rgba(56,189,248,.35)"}} onClick={()=>setReturnQuoteOpen(true)}>↩️ {t.wsqtReturnQuote}</button>}
               {(wsSupplierQuotes.filter(q=>q.job_id===job.id).length>0||sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id)).length>0)&&(

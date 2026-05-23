@@ -4502,7 +4502,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                               <input type="date" className="inp" value={activePicker.date}
                                 onChange={e=>setActivePicker(p=>({...p,date:e.target.value}))}
                                 style={{padding:"3px 7px",fontSize:12,width:140}}/>
-                              <button className="btn btn-primary btn-xs" onClick={async()=>{const p={subscription_status:"active",subscription_expires_at:activePicker.date};setActivePicker(null);setUsers(prev=>prev.map(uu=>uu.id===u.id?{...uu,...p}:uu));await api.patch("users","id",u.id,p);showToast("Updated");}}>✅ Confirm</button>
+                              <button className="btn btn-primary btn-xs" onClick={async()=>{const p={subscription_status:"active",subscription_expires_at:activePicker.date};setActivePicker(null);setUsers(prev=>prev.map(uu=>uu.id===u.id?{...uu,...p}:uu));const r=await api.patch("users","id",u.id,p);if(r?.code||r?.message){showToast(`DB error: ${r.message||r.code}`,"err");console.error("patch users failed",r);}else showToast("Updated");}}>✅ Confirm</button>
                               <button className="btn btn-ghost btn-xs" onClick={()=>setActivePicker(null)}>✕</button>
                             </div>
                           ):(
@@ -4510,7 +4510,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                               <button className="btn btn-ghost btn-xs" style={{color:sub2.status==="active"?sub2.color:"var(--text3)",borderColor:sub2.status==="active"?sub2.color:"var(--border)",padding:"2px 8px",fontSize:11}}
                                 onClick={()=>setActivePicker({userId:u.id,date:nextMonthDefault})}>active</button>
                               {["trial","expired","blocked"].map(s=>(
-                                <button key={s} className="btn btn-ghost btn-xs" style={{color:u.subscription_status===s?sub2.color:"var(--text3)",borderColor:u.subscription_status===s?sub2.color:"var(--border)",padding:"2px 8px",fontSize:11}} onClick={async()=>{setUsers(prev=>prev.map(uu=>uu.id===u.id?{...uu,subscription_status:s}:uu));await api.patch("users","id",u.id,{subscription_status:s});showToast("Updated");}}>{s}</button>
+                                <button key={s} className="btn btn-ghost btn-xs" style={{color:u.subscription_status===s?sub2.color:"var(--text3)",borderColor:u.subscription_status===s?sub2.color:"var(--border)",padding:"2px 8px",fontSize:11}} onClick={async()=>{setUsers(prev=>prev.map(uu=>uu.id===u.id?{...uu,subscription_status:s}:uu));const r=await api.patch("users","id",u.id,{subscription_status:s});if(r?.code||r?.message){showToast(`DB error: ${r.message||r.code}`,"err");console.error("patch users failed",r);}else showToast("Updated");}}>{s}</button>
                               ))}
                             </div>
                           )}

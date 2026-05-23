@@ -2776,6 +2776,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
   const [matchModelOpen, setMatchModelOpen] = useState(false);
   const [matchModelSearch, setMatchModelSearch] = useState("");
   const [matchModelLightbox, setMatchModelLightbox] = useState(null); // null | index
+  const [matchModelSelected, setMatchModelSelected] = useState(null);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
   const [refreshing,    setRefreshing]    = useState(false);
   const [noteEdit,      setNoteEdit]      = useState(false);
@@ -5129,12 +5130,16 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                   {modelCards.map(v=>{
                     const img=toImgUrl(v.photo_front||"");
                     const isCurrent=v.model===job.vehicle_model;
+                    const isSel=matchModelSelected?.id===v.id;
                     return(
-                      <button key={v.id} onClick={()=>pickModel(v.model)} style={{
-                        background:isCurrent?"rgba(52,211,153,.1)":"var(--surface2)",
-                        border:`2px solid ${isCurrent?"var(--green)":"var(--border)"}`,
+                      <button key={v.id} onClick={()=>setMatchModelSelected(isSel?null:v)} style={{
+                        background:isSel?"rgba(249,115,22,.12)":isCurrent?"rgba(52,211,153,.1)":"var(--surface2)",
+                        border:`2px solid ${isSel?"var(--accent)":isCurrent?"var(--green)":"var(--border)"}`,
                         borderRadius:12,padding:0,cursor:"pointer",overflow:"hidden",textAlign:"left",
-                      }}>
+                        transition:"border-color .15s,box-shadow .15s",
+                      }}
+                      onMouseEnter={e=>{if(!isSel){e.currentTarget.style.borderColor="var(--accent)";e.currentTarget.style.boxShadow="var(--glow)";}}}
+                      onMouseLeave={e=>{if(!isSel){e.currentTarget.style.borderColor=isCurrent?"var(--green)":"var(--border)";e.currentTarget.style.boxShadow="none";}}}>
                         {img
                           ? <img src={img} alt={v.model} style={{width:"100%",height:100,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
                           : <div style={{width:"100%",height:100,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🚗</div>
@@ -5150,7 +5155,46 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                   })}
                 </div>
             }
-            <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); }}>Cancel</button>
+            {/* Expanded preview when a card is selected */}
+            {matchModelSelected&&(()=>{
+              const sv=matchModelSelected;
+              const photos=[sv.photo_front,sv.photo_rear,sv.photo_side].filter(Boolean).map(toImgUrl);
+              const labels=["Front","Rear","Side"];
+              return(
+                <div style={{marginBottom:16,padding:14,background:"var(--surface)",border:"2px solid var(--accent)",borderRadius:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:15}}>{sv.model}</div>
+                      {sv.code&&<div style={{fontSize:12,color:"var(--accent)",fontWeight:700}}>{sv.code}</div>}
+                      <div style={{fontSize:12,color:"var(--text3)"}}>{sv.make}{(sv.year_from||sv.year_to)?` · ${sv.year_from||"?"}${sv.year_to&&sv.year_to!==sv.year_from?` – ${sv.year_to}`:""}`:""}</div>
+                    </div>
+                    <button className="btn btn-ghost btn-sm" onClick={()=>setMatchModelSelected(null)}>✕</button>
+                  </div>
+                  {photos.length>0
+                    ? <div style={{display:"flex",gap:8,marginBottom:12}}>
+                        {photos.map((p,i)=>(
+                          <div key={i} style={{flex:1,cursor:"pointer",borderRadius:8,overflow:"hidden",border:"1px solid var(--border)"}}
+                            onClick={()=>setMatchModelLightbox(i)}>
+                            <img src={p} alt={labels[i]} style={{width:"100%",height:90,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
+                            <div style={{fontSize:10,textAlign:"center",padding:"3px 0",color:"var(--text3)"}}>{labels[i]}</div>
+                          </div>
+                        ))}
+                      </div>
+                    : <div style={{textAlign:"center",padding:16,color:"var(--text3)",fontSize:13,marginBottom:12}}>No photos in database</div>
+                  }
+                  {matchModelLightbox!==null&&photos.length>0&&(
+                    <ImgLightbox urls={photos} startIdx={matchModelLightbox} labels={labels} onClose={()=>setMatchModelLightbox(null)}/>
+                  )}
+                  <div style={{display:"flex",gap:8}}>
+                    <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setMatchModelSelected(null)}>← Back</button>
+                    <button className="btn btn-primary" style={{flex:2}} onClick={()=>{ pickModel(sv.model); setMatchModelSelected(null); }}>
+                      ✅ Confirm — {sv.model}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+            <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelSelected(null); }}>Cancel</button>
           </Overlay>
         );
       })()}

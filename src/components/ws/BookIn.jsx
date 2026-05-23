@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { api } from "../../lib/api.js";
 import { makeId, toImgUrl } from "../../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../../lib/barcode.js";
-import { Overlay, MHead, FL } from "../shared.jsx";
+import { Overlay, MHead, FL, ImgLightbox } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 
 export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],onSaveJob,onReopenJob,onClose}) {
@@ -26,6 +26,8 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
   const [vinCacheResult,setVinCacheResult]=useState(null); // null | {vin_prefix,make,model}
   const [vinPickLoading,setVinPickLoading]=useState(false);
   const [vinPickSearch,setVinPickSearch]=useState("");
+  const [vinPickSelected,setVinPickSelected]=useState(null);
+  const [vinPickLightbox,setVinPickLightbox]=useState(null);
   // job prefill for WorkshopJobModal
   const [jobPrefill,setJobPrefill]=useState(null);
   const [savingIntake,setSavingIntake]=useState(false);
@@ -288,17 +290,16 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
               : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:16}}>
                   {modelCards.map(v=>{
                     const img=toImgUrl(v.photo_front||"");
+                    const isSel=vinPickSelected?.id===v.id;
                     return(
-                      <button key={v.id} onClick={async()=>{
-                        await saveVinCache(v.model);
-                        proceedToJob(v.model);
-                      }} style={{
-                        background:"var(--surface2)",border:"2px solid var(--border)",borderRadius:12,
+                      <button key={v.id} onClick={()=>setVinPickSelected(isSel?null:v)} style={{
+                        background:isSel?"rgba(249,115,22,.12)":"var(--surface2)",
+                        border:`2px solid ${isSel?"var(--accent)":"var(--border)"}`,borderRadius:12,
                         padding:0,cursor:"pointer",overflow:"hidden",textAlign:"left",
                         transition:"border-color .15s,box-shadow .15s",
                       }}
-                      onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--accent)";e.currentTarget.style.boxShadow="var(--glow)";}}
-                      onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border)";e.currentTarget.style.boxShadow="none";}}>
+                      onMouseEnter={e=>{if(!isSel){e.currentTarget.style.borderColor="var(--accent)";e.currentTarget.style.boxShadow="var(--glow)";}}}
+                      onMouseLeave={e=>{if(!isSel){e.currentTarget.style.borderColor="var(--border)";e.currentTarget.style.boxShadow="none";}}}>
                         {img
                           ? <img src={img} alt={v.model} style={{width:"100%",height:100,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
                           : <div style={{width:"100%",height:100,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🚗</div>
@@ -314,6 +315,49 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
                   })}
                 </div>
             }
+            {/* Expanded preview when a card is selected */}
+            {vinPickSelected&&(()=>{
+              const sv=vinPickSelected;
+              const photos=[sv.photo_front,sv.photo_rear,sv.photo_side].filter(Boolean).map(toImgUrl);
+              const labels=["Front","Rear","Side"];
+              return(
+                <div style={{marginBottom:16,padding:14,background:"var(--surface)",border:"2px solid var(--accent)",borderRadius:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:15}}>{sv.model}</div>
+                      {sv.code&&<div style={{fontSize:12,color:"var(--accent)",fontWeight:700}}>{sv.code}</div>}
+                      <div style={{fontSize:12,color:"var(--text3)"}}>{sv.make}{(sv.year_from||sv.year_to)?` · ${sv.year_from||"?"}${sv.year_to&&sv.year_to!==sv.year_from?` – ${sv.year_to}`:""}`:""}</div>
+                    </div>
+                    <button className="btn btn-ghost btn-sm" onClick={()=>setVinPickSelected(null)}>✕</button>
+                  </div>
+                  {photos.length>0
+                    ? <div style={{display:"flex",gap:8,marginBottom:12}}>
+                        {photos.map((p,i)=>(
+                          <div key={i} style={{flex:1,cursor:"pointer",borderRadius:8,overflow:"hidden",border:"1px solid var(--border)"}}
+                            onClick={()=>setVinPickLightbox(i)}>
+                            <img src={p} alt={labels[i]} style={{width:"100%",height:90,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
+                            <div style={{fontSize:10,textAlign:"center",padding:"3px 0",color:"var(--text3)"}}>{labels[i]}</div>
+                          </div>
+                        ))}
+                      </div>
+                    : <div style={{textAlign:"center",padding:16,color:"var(--text3)",fontSize:13,marginBottom:12}}>No photos in database</div>
+                  }
+                  {vinPickLightbox!==null&&photos.length>0&&(
+                    <ImgLightbox urls={photos} startIdx={vinPickLightbox} labels={labels} onClose={()=>setVinPickLightbox(null)}/>
+                  )}
+                  <div style={{display:"flex",gap:8}}>
+                    <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setVinPickSelected(null)}>← Back</button>
+                    <button className="btn btn-primary" style={{flex:2}} onClick={async()=>{
+                      await saveVinCache(sv.model);
+                      setVinPickSelected(null);
+                      proceedToJob(sv.model);
+                    }}>
+                      ✅ Confirm — {sv.model}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </>
         )}
 

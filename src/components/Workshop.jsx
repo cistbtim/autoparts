@@ -5086,12 +5086,27 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
               return(
                 <div style={{marginBottom:10,padding:"8px 12px",background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.25)",borderRadius:8}}>
                   <div style={{fontSize:10,color:"var(--blue)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:5}}>📡 VIN Decoded</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
                     {fields.map(f=>(
                       <div key={f.k} style={{fontSize:11,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 9px",lineHeight:1.5}}>
                         <span style={{color:"var(--text3)",marginRight:4}}>{f.k}:</span>
                         <span style={{fontWeight:700}}>{f.v}</span>
                       </div>
+                    ))}
+                  </div>
+                  {/* VIN tool links — small */}
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {[...vinSearchLinks,
+                      {label:"AutoZone",  icon:"🔴", color:"#dc2626", bg:"rgba(220,38,38,.12)",  href:`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`},
+                      {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)", href:"https://www.amayama.com"},
+                      {label:"WolfOil",   icon:"🛢️", color:"#f97316", bg:"rgba(249,115,22,.12)", href:"https://za.wolfoil.com/en-us/oil-finder"},
+                    ].map(lk=>(
+                      <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                        style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",
+                          background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:8,
+                          color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>
+                        <span>{lk.icon}</span><span>{lk.label.replace(/ 🔋/,"")}</span>
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -5122,7 +5137,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                         }
                         <div style={{padding:"8px 10px"}}>
                           <div style={{fontWeight:700,fontSize:13}}>{v.model}{isCurrent?" ✓":""}</div>
+                          {v.code&&<div style={{fontSize:11,color:"var(--accent)",fontWeight:600}}>{v.code}</div>}
                           <div style={{fontSize:11,color:"var(--text3)"}}>{v.make}</div>
+                          {(v.year_from||v.year_to)&&<div style={{fontSize:11,color:"var(--blue)",marginTop:2}}>{v.year_from||"?"}{v.year_to&&v.year_to!==v.year_from?` – ${v.year_to}`:""}</div>}
                         </div>
                       </button>
                     );

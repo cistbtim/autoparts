@@ -301,7 +301,9 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
                         }
                         <div style={{padding:"8px 10px"}}>
                           <div style={{fontWeight:700,fontSize:13}}>{v.model}</div>
+                          {v.code&&<div style={{fontSize:11,color:"var(--accent)",fontWeight:600}}>{v.code}</div>}
                           <div style={{fontSize:11,color:"var(--text3)"}}>{v.make}</div>
+                          {(v.year_from||v.year_to)&&<div style={{fontSize:11,color:"var(--blue)",marginTop:2}}>{v.year_from||"?"}{v.year_to&&v.year_to!==v.year_from?` – ${v.year_to}`:""}</div>}
                         </div>
                       </button>
                     );

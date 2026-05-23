@@ -4487,8 +4487,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                   <thead><tr>{["User",t.role,"Subscription",t.phone,t.email,"Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {users.map(u=>{const sub2=getSubInfo(u);const isPicking=activePicker?.userId===u.id;
-                    // default expiry = existing expiry + 1 month, or today + 1 month
-                    const nextMonthDefault=(()=>{const base=u.subscription_expires_at?new Date(u.subscription_expires_at):new Date();base.setMonth(base.getMonth()+1);return base.toISOString().slice(0,10);})();
+                    // default expiry = today + 1 month (always future, regardless of old expiry)
+                    const nextMonthDefault=(()=>{const base=new Date();base.setMonth(base.getMonth()+1);return base.toISOString().slice(0,10);})();
                     return(
                       <tr key={u.id}>
                         <td><div style={{fontWeight:600}}>{u.name||u.username}</div><div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{u.username}</div></td>

@@ -4502,7 +4502,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                               <input type="date" className="inp" value={activePicker.date}
                                 onChange={e=>setActivePicker(p=>({...p,date:e.target.value}))}
                                 style={{padding:"3px 7px",fontSize:12,width:140}}/>
-                              <button className="btn btn-primary btn-xs" onClick={()=>{saveUser({...u,subscription_status:"active",subscription_expires_at:activePicker.date});setActivePicker(null);}}>✅ Confirm</button>
+                              <button className="btn btn-primary btn-xs" onClick={async()=>{await api.patch("users","id",u.id,{subscription_status:"active",subscription_expires_at:activePicker.date});setActivePicker(null);await refreshTables("users");showToast("Updated");}}>✅ Confirm</button>
                               <button className="btn btn-ghost btn-xs" onClick={()=>setActivePicker(null)}>✕</button>
                             </div>
                           ):(
@@ -4510,7 +4510,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                               <button className="btn btn-ghost btn-xs" style={{color:sub2.status==="active"?sub2.color:"var(--text3)",borderColor:sub2.status==="active"?sub2.color:"var(--border)",padding:"2px 8px",fontSize:11}}
                                 onClick={()=>setActivePicker({userId:u.id,date:nextMonthDefault})}>active</button>
                               {["trial","expired","blocked"].map(s=>(
-                                <button key={s} className="btn btn-ghost btn-xs" style={{color:u.subscription_status===s?sub2.color:"var(--text3)",borderColor:u.subscription_status===s?sub2.color:"var(--border)",padding:"2px 8px",fontSize:11}} onClick={()=>saveUser({...u,subscription_status:s})}>{s}</button>
+                                <button key={s} className="btn btn-ghost btn-xs" style={{color:u.subscription_status===s?sub2.color:"var(--text3)",borderColor:u.subscription_status===s?sub2.color:"var(--border)",padding:"2px 8px",fontSize:11}} onClick={async()=>{await api.patch("users","id",u.id,{subscription_status:s});await refreshTables("users");showToast("Updated");}}>{s}</button>
                               ))}
                             </div>
                           )}

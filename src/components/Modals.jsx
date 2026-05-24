@@ -18,12 +18,19 @@ const _LR_MAP = {
   '左':'右','右':'左',
   'Driver':'Passenger','Passenger':'Driver','driver':'passenger','passenger':'driver','DRIVER':'PASSENGER','PASSENGER':'DRIVER',
 };
-const _LR_RE = /\b(Left|Right|left|right|LEFT|RIGHT|LH|RH|Driver|Passenger|driver|passenger|DRIVER|PASSENGER)\b|左|右/g;
-function swapLR(str){ return (str||"").replace(_LR_RE, m => _LR_MAP[m]||m); }
+const _LR_RE = /(?<![A-Za-z])(Left|Right|left|right|LEFT|RIGHT|LH|RH|Driver|Passenger|driver|passenger|DRIVER|PASSENGER)(?![A-Za-z])|左|右/g;
+// _SINGLE_LR: swap terminal L/R when preceded by digit+letter (e.g. 054GL→054GR)
+// Requires the letter before L/R is not itself L or R to avoid double-swapping LH/RH
+const _SINGLE_LR_RE = /(?<=\d[A-KM-QS-Za-km-qs-z])[LRlr](?=[^A-Za-z]|$)/g;
+function swapLR(str){
+  return (str||"")
+    .replace(_LR_RE, m => _LR_MAP[m]||m)
+    .replace(_SINGLE_LR_RE, c => c==='L'?'R':c==='R'?'L':c==='l'?'r':'l');
+}
 function detectSide(sku, name) {
   const s=(sku||"").toUpperCase(), n=(name||"").toUpperCase();
-  if(/\bLH\b/.test(s)||/(-L$|-L-)/.test(s)) return 'L';
-  if(/\bRH\b/.test(s)||/(-R$|-R-)/.test(s)) return 'R';
+  if(/(?<![A-Za-z])LH(?![A-Za-z])/.test(s)||/(-L$|-L-)/.test(s)||/\d[A-KM-QS-Z]L(?=[^A-Z]|$)/.test(s)) return 'L';
+  if(/(?<![A-Za-z])RH(?![A-Za-z])/.test(s)||/(-R$|-R-)/.test(s)||/\d[A-KM-QS-Z]R(?=[^A-Z]|$)/.test(s)) return 'R';
   if(/\bLEFT\b/.test(n)||/\bLH\b/.test(n)||/左/.test(name||"")||/\bDRIVER\b/.test(n)) return 'L';
   if(/\bRIGHT\b/.test(n)||/\bRH\b/.test(n)||/右/.test(name||"")||/\bPASSENGER\b/.test(n)) return 'R';
   return null;
@@ -2950,6 +2957,39 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
       {/* ── TAB: VEHICLE ── */}
       {ptab==="vehicle"&&(
         <div>
+          {(()=>{
+            const skuCode=(f.sku||"").split(/[-\s]/)[0].toUpperCase();
+            if(skuCode.length<3) return null;
+            const matches=vehicles.filter(v=>v.code&&v.code.toUpperCase()===skuCode);
+            if(!matches.length) return null;
+            return (
+              <div style={{marginBottom:12,padding:"10px 12px",background:"rgba(52,211,153,.07)",border:"1px solid rgba(52,211,153,.3)",borderRadius:9}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--green)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
+                  🎯 SKU prefix "{skuCode}" — {matches.length} vehicle match{matches.length!==1?"es":""}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                  {matches.map(v=>(
+                    <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13}}>
+                      <span>
+                        <span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",marginRight:6}}>{v.code}</span>
+                        <span style={{fontWeight:600}}>{v.make} {v.model}</span>
+                        {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
+                        <span style={{fontSize:12,color:"var(--text3)",marginLeft:8}}>{v.year_from}{v.year_to?`–${v.year_to}`:""}</span>
+                      </span>
+                      <button className="btn btn-ghost btn-xs" style={{color:"var(--green)",borderColor:"rgba(52,211,153,.4)",flexShrink:0}}
+                        onClick={()=>{
+                          s("make",v.make||"");
+                          s("model",[v.model,v.variant].filter(Boolean).join(" "));
+                          s("year_range",v.year_to?`${v.year_from}-${v.year_to}`:`${v.year_from}`);
+                        }}>
+                        ↙ Fill
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           <FG cols="1fr 1fr 1fr">
             <div>
               <FL label={t.make}/>
@@ -3294,6 +3334,20 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             {oppConfirm.chineseDesc&&<><span style={{color:"var(--text3)"}}>中文說明</span><span>{oppConfirm.chineseDesc}</span></>}
             <span style={{color:"var(--text3)"}}>車型符合</span><span>{oppConfirm.fitCount} 筆複製</span>
           </div>
+          {oppConfirm.originalF?.image_url&&(
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"8px 10px",background:"rgba(139,92,246,.06)",borderRadius:7,border:"1px solid rgba(139,92,246,.2)"}}>
+              <img src={toImgUrl(oppConfirm.originalF.image_url)} referrerPolicy="no-referrer"
+                style={{width:48,height:48,objectFit:"cover",borderRadius:5,border:"1px solid var(--border)",
+                  transform:oppConfirm.flipPhoto?"scaleX(-1)":"none",transition:"transform .2s",flexShrink:0}}
+                onError={e=>e.target.style.display="none"}/>
+              <label style={{display:"flex",alignItems:"center",gap:7,fontSize:12,cursor:"pointer",userSelect:"none"}}>
+                <input type="checkbox" checked={oppConfirm.flipPhoto||false}
+                  onChange={e=>setOppConfirm(p=>({...p,flipPhoto:e.target.checked}))}
+                  style={{width:14,height:14,accentColor:"var(--purple)",cursor:"pointer"}}/>
+                <span>鏡像翻轉照片 <span style={{color:"var(--text3)"}}>(水平)</span></span>
+              </label>
+            </div>
+          )}
           <div style={{display:"flex",gap:8}}>
             <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setOppConfirm(null)}>取消</button>
             <button className="btn btn-sm" style={{flex:2,background:"var(--purple)",color:"#fff",border:"none"}}
@@ -3340,7 +3394,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                   const newSku=swapLR(f.sku);
                   const newName=swapLR(f.name);
                   const newCd=swapLR(f.chinese_desc);
-                  setOppConfirm({sku:newSku,name:newName,chineseDesc:newCd,fitCount:myFitments.length,originalPart:part,originalF:f});
+                  setOppConfirm({sku:newSku,name:newName,chineseDesc:newCd,fitCount:myFitments.length,originalPart:part,originalF:f,flipPhoto:!!f.image_url});
                 }}>
                 🔄 對應零件
               </button>

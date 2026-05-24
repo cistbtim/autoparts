@@ -971,18 +971,93 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       }
     }
   };
-  const createOpposite=async({sku,name,chineseDesc,originalPart,originalF})=>{
+  const _getFlippedBase64=(url)=>new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.crossOrigin="anonymous";
+    img.onload=()=>{
+      try{
+        const w=img.naturalWidth||200,h=img.naturalHeight||200;
+        const cv=document.createElement("canvas");
+        cv.width=w;cv.height=h;
+        const ctx=cv.getContext("2d");
+        ctx.translate(w,0);ctx.scale(-1,1);
+        ctx.drawImage(img,0,0);
+        resolve(cv.toDataURL("image/png")); // throws SecurityError if canvas tainted
+      }catch(e){reject(e);}
+    };
+    img.onerror=(e)=>reject(e);
+    // cache-bust so browser re-fetches with CORS headers (not from opaque cache)
+    img.src=url+(url.includes("?")?"&":"?")+"_cb="+Date.now();
+  });
+  const _flipAndUpload=async(srcUrl,sku)=>{
+    const SCRIPT_URL=(window._APPS_SCRIPT_URL?.trim())||(window._VEHICLE_SCRIPT_URL?.trim())||"";
+    if(!SCRIPT_URL){showToast("No Apps Script URL set — photo not flipped","warn");return srcUrl;}
+    let base64=null;
+    // Approach 1: fetch as blob → create object URL → draw to canvas (no CORS taint)
+    try{
+      const r=await fetch(srcUrl,{credentials:"omit"});
+      if(r.ok){
+        const blob=await r.blob();
+        if(blob.type.startsWith("image/")){
+          const objUrl=URL.createObjectURL(blob);
+          base64=await new Promise((res,rej)=>{
+            const img=new Image();
+            img.onload=()=>{
+              URL.revokeObjectURL(objUrl);
+              try{
+                const w=img.naturalWidth||200,h=img.naturalHeight||200;
+                const cv=document.createElement("canvas");
+                cv.width=w;cv.height=h;
+                const ctx=cv.getContext("2d");
+                ctx.translate(w,0);ctx.scale(-1,1);
+                ctx.drawImage(img,0,0);
+                res(cv.toDataURL("image/png"));
+              }catch(e){URL.revokeObjectURL(objUrl);rej(e);}
+            };
+            img.onerror=()=>{URL.revokeObjectURL(objUrl);rej(new Error("blob img load failed"));};
+            img.src=objUrl;
+          });
+        }
+      }
+    }catch(e){console.warn("Flip fetch approach failed:",e);}
+    // Approach 2: crossOrigin image element (works when Drive files are publicly shared)
+    if(!base64){
+      try{base64=await _getFlippedBase64(srcUrl);}
+      catch(e){console.warn("Flip crossOrigin approach failed:",e);}
+    }
+    if(!base64){
+      showToast("Could not flip photo (browser security) — upload manually on Photo tab","warn");
+      return srcUrl;
+    }
+    try{
+      const up=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({image:base64,filename:`${sku}_flipped.png`,mimeType:"image/png"})});
+      const result=await up.json();
+      if(result.success&&result.url) return result.url;
+      console.warn("Flip upload result:",result);
+      showToast("Photo flip upload failed — upload manually on Photo tab","warn");
+      return srcUrl;
+    }catch(e){console.warn("Flip upload error:",e);showToast("Photo flip upload error — upload manually","warn");return srcUrl;}
+  };
+  const createOpposite=async({sku,name,chineseDesc,originalPart,originalF,flipPhoto})=>{
     if(parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase())){
       showToast(`SKU "${sku}" already exists`,"err"); return;
     }
     setBusyMsg(`Creating ${sku}…`);
     try{
+      let finalImageUrl=toSaveUrl(originalF.image_url||"");
+      if(flipPhoto&&originalF.image_url){
+        setBusyMsg(`Flipping photo for ${sku}…`);
+        const srcUrl=toImgUrl(originalF.image_url)||originalF.image_url;
+        finalImageUrl=await _flipAndUpload(srcUrl,sku.trim());
+        finalImageUrl=toSaveUrl(finalImageUrl)||finalImageUrl;
+        setBusyMsg(`Creating ${sku}…`);
+      }
       const newData={
         sku:sku.trim(), name:name.trim(), chinese_desc:chineseDesc||"",
         brand:originalF.brand||"", category:originalF.category||"Engine",
         price:+originalF.price||0, cost_price:+originalF.cost_price||0,
         stock:0, min_stock:+originalF.minStock||0,
-        image_url:toSaveUrl(originalF.image_url||""),
+        image_url:finalImageUrl,
         make:originalF.make||"", model:originalF.model||"",
         year_range:originalF.year_range||"", oe_number:originalF.oe_number||"",
         bin_location:originalF.bin_location||"",

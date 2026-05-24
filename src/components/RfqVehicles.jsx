@@ -880,6 +880,7 @@ export function PickingPage({orders=[], parts=[], onComplete, onRefresh, t, lang
 // ═══════════════════════════════════════════════════════════════
 export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
   const [uploading, setUploading] = useState(false);
+  const [flipping, setFlipping]   = useState(false);
   const [dragOver, setDragOver]   = useState(false);
   const [error, setError]         = useState(null);
   const [zoomed, setZoomed]       = useState(false);
@@ -955,6 +956,67 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
     setUploading(false);
   };
 
+  const flipPhoto = async () => {
+    if (!imageUrl || !SCRIPT_URL) { setError("No photo or Apps Script URL not configured"); return; }
+    setFlipping(true); setError(null);
+    const srcUrl = toImgUrl(imageUrl) || imageUrl;
+    const getBase64 = (url) => new Promise((res, rej) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const w = img.naturalWidth||200, h = img.naturalHeight||200;
+          const cv = document.createElement("canvas");
+          cv.width = w; cv.height = h;
+          const ctx = cv.getContext("2d");
+          ctx.translate(w, 0); ctx.scale(-1, 1);
+          ctx.drawImage(img, 0, 0);
+          res(cv.toDataURL("image/png"));
+        } catch(e) { rej(e); }
+      };
+      img.onerror = (e) => rej(e);
+      img.src = url + (url.includes("?") ? "&" : "?") + "_cb=" + Date.now();
+    });
+    try {
+      let base64 = null;
+      // Approach 1: fetch as blob (avoids canvas CORS taint)
+      try {
+        const r = await fetch(srcUrl, { credentials: "omit" });
+        if (r.ok) {
+          const blob = await r.blob();
+          if (blob.type.startsWith("image/")) {
+            const objUrl = URL.createObjectURL(blob);
+            base64 = await new Promise((res, rej) => {
+              const img = new Image();
+              img.onload = () => {
+                URL.revokeObjectURL(objUrl);
+                try {
+                  const w = img.naturalWidth||200, h = img.naturalHeight||200;
+                  const cv = document.createElement("canvas");
+                  cv.width = w; cv.height = h;
+                  const ctx = cv.getContext("2d");
+                  ctx.translate(w, 0); ctx.scale(-1, 1);
+                  ctx.drawImage(img, 0, 0);
+                  res(cv.toDataURL("image/png"));
+                } catch(e) { URL.revokeObjectURL(objUrl); rej(e); }
+              };
+              img.onerror = () => { URL.revokeObjectURL(objUrl); rej(new Error("blob img failed")); };
+              img.src = objUrl;
+            });
+          }
+        }
+      } catch(e) { console.warn("Flip fetch approach:", e); }
+      // Approach 2: crossOrigin image element
+      if (!base64) { try { base64 = await getBase64(srcUrl); } catch(e) { console.warn("Flip crossOrigin approach:", e); } }
+      if (!base64) { setError("Could not access image — check Drive sharing permissions"); setFlipping(false); return; }
+      const resp = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ image: base64, filename: `${sku||"part"}_flipped.png`, mimeType: "image/png" }) });
+      const result = await resp.json();
+      if (result.success && result.url) { onChange(result.url); setError(null); }
+      else setError("Flip upload failed: " + (result.error||"unknown"));
+    } catch(e) { setError("Flip error: " + e.message); }
+    setFlipping(false);
+  };
+
   const preview = imageUrl ? toImgUrl(imageUrl) : null;
 
   return (
@@ -987,6 +1049,15 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
                 style={{width:80,height:80,objectFit:"contain",borderRadius:8,background:"var(--surface3)",cursor:"zoom-in",display:"block"}}
                 onClick={e=>{e.stopPropagation();setZoomed(true);}}/>
               <div style={{position:"absolute",bottom:2,right:2,background:"rgba(0,0,0,.55)",borderRadius:4,padding:"1px 4px",fontSize:9,color:"#fff",pointerEvents:"none"}}>🔍</div>
+              <button
+                title="Flip photo horizontally"
+                disabled={flipping||uploading}
+                onClick={e=>{e.stopPropagation();flipPhoto();}}
+                style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.6)",border:"none",borderRadius:4,
+                  padding:"2px 5px",fontSize:11,color:"#fff",cursor:"pointer",lineHeight:1.2,
+                  opacity:(flipping||uploading)?0.5:1}}>
+                {flipping?"⏳":"↔"}
+              </button>
             </div>
             <div style={{textAlign:"left"}}>
               <div style={{fontSize:13,fontWeight:600,color:"var(--green)"}}>✅ {t.phuUploaded}</div>
@@ -1083,6 +1154,12 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 
   const linked    = partFitments; // already filtered by part_id
   const linkedIds = new Set(linked.map(f => String(f.vehicle_id)));
+
+  // Derive vehicle code from SKU prefix (e.g. "BM01C" from "BM01C-054GL")
+  const skuCode = (part.sku||"").split(/[-\s]/)[0].toUpperCase();
+  const skuMatches = skuCode.length >= 3
+    ? vehicles.filter(v => v.code && v.code.toUpperCase() === skuCode && !linkedIds.has(String(v.id)) && !pending.has(String(v.id)))
+    : [];
 
   const filtered = vehicles.filter(v => {
     if(linkedIds.has(String(v.id))) return false; // already linked
@@ -1209,6 +1286,37 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
           );
         })}
       </div>
+
+      {/* ── SKU auto-match suggestion ── */}
+      {skuMatches.length > 0 && (
+        <div style={{marginBottom:14,padding:"10px 12px",background:"rgba(52,211,153,.07)",border:"1px solid rgba(52,211,153,.3)",borderRadius:9}}>
+          <div style={{fontSize:11,fontWeight:700,color:"var(--green)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
+            🎯 SKU prefix "{skuCode}" matches {skuMatches.length} vehicle{skuMatches.length!==1?"s":""}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            {skuMatches.map(v => (
+              <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"7px 10px",borderRadius:7,background:"rgba(52,211,153,.06)",border:"1px solid rgba(52,211,153,.15)"}}>
+                <div style={{fontSize:13}}>
+                  <span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",marginRight:6}}>{v.code}</span>
+                  <span style={{fontWeight:600}}>{v.make} {v.model}</span>
+                  {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
+                  <span style={{fontSize:12,color:"var(--text3)",marginLeft:8}}>{v.year_from}–{v.year_to||"now"}</span>
+                  {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
+                </div>
+                <button className="btn btn-ghost btn-xs" style={{color:"var(--green)",borderColor:"rgba(52,211,153,.4)",flexShrink:0}}
+                  onClick={()=>toggle(String(v.id))}>+ Add</button>
+              </div>
+            ))}
+          </div>
+          {skuMatches.length > 1 && (
+            <button className="btn btn-ghost btn-sm" style={{marginTop:8,color:"var(--green)",borderColor:"rgba(52,211,153,.4)",width:"100%"}}
+              onClick={()=>skuMatches.forEach(v=>toggle(String(v.id)))}>
+              + Add All {skuMatches.length} Matches
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Search & select ── */}
       <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>

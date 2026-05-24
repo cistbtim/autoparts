@@ -3553,6 +3553,21 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
               );
             })()}
             {!vehicleRecord&&<div style={{fontSize:12,color:"var(--text3)",textAlign:"center",padding:"8px 0"}}>{t.wsNoPhotos||"No photos — tap Edit Photos to add"}</div>}
+            {job.vin&&job.vin.length>=12&&(
+              <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
+                <button
+                  onClick={()=>{ setMatchModelSearch((job.vehicle_model||job.vehicle_make||"").trim()); setMatchModelOpen(true); }}
+                  style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,fontWeight:700,color:"var(--blue)",
+                    background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.35)",borderRadius:20,
+                    padding:"4px 12px",cursor:"pointer",letterSpacing:".02em"}}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                  </svg>
+                  Match Model Code
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Complaint / Diagnosis / Return Reason / Notes */}
@@ -3635,7 +3650,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                 <span style={{fontSize:15}}>🚗</span>
                 <span style={{fontSize:11,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".1em"}}>Car Details</span>
               </div>
-              {wsRole!=="mechanic"&&<button onClick={()=>setEditJob(true)} style={{fontSize:11,padding:"4px 12px",background:"rgba(255,255,255,.2)",border:"1px solid rgba(255,255,255,.35)",borderRadius:8,cursor:"pointer",color:"#fff",fontWeight:700}}>✏️ Edit</button>}
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                {wsRole!=="mechanic"&&<button onClick={()=>setEditJob(true)} style={{fontSize:11,padding:"4px 12px",background:"rgba(255,255,255,.2)",border:"1px solid rgba(255,255,255,.35)",borderRadius:8,cursor:"pointer",color:"#fff",fontWeight:700}}>✏️ Edit</button>}
+              </div>
             </div>
             <div style={{padding:"12px 14px",background:"var(--surface2)",borderLeft:"3px solid #2563eb"}}>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:8}}>
@@ -3664,14 +3681,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                   </div>
                 )}
               </div>
-              {job.vin&&job.vin.length>=12&&(
-                <div style={{marginBottom:8}}>
-                  <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)",fontSize:12}}
-                    onClick={()=>setMatchModelOpen(true)}>
-                    🔗 Match model code from VIN
-                  </button>
-                </div>
-              )}
               {(vehicleRecord?.licence_disc_expiry||job?.licence_disc_expiry)&&(()=>{
                 const exp=vehicleRecord?.licence_disc_expiry||job.licence_disc_expiry;
                 const expired=new Date(exp)<new Date();
@@ -3762,7 +3771,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                     <span style={{fontSize:20}}>🛢️</span>
                     <span>WolfOil</span>
                   </button>
-                  <button onClick={()=>setMatchModelOpen(true)}
+                  <button onClick={()=>{ setMatchModelSearch((job.vehicle_model||job.vehicle_make||"").trim()); setMatchModelOpen(true); }}
                     style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
                       background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:10,
                       color:"var(--blue)",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>

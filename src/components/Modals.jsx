@@ -2609,7 +2609,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -2623,12 +2623,13 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", bin_location:"", is_quantum:false, is_hiace:false,
     auto_reorder:false, reorder_point:0, reorder_qty:1, preferred_supplier_id:"",
   };
-  const [f,setF]=useState(()=>makeF(part));
+  const [f,setF]=useState(()=>initialF?{...makeF(part),...initialF}:makeF(part));
   const [ptab, setPtab] = useState(initialTab||"info");
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [oppConfirm, setOppConfirm] = useState(null);
+  const [newPartConfirm, setNewPartConfirm] = useState(null); // {copyFits, copyVehicleInfo}
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
   const [catalogSearch,setCatalogSearch]=useState("");
   const [suppId,setSuppId]=useState("");
@@ -3332,7 +3333,27 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             <span style={{color:"var(--text3)"}}>新 SKU</span><span style={{fontWeight:600,fontFamily:"monospace"}}>{oppConfirm.sku}</span>
             <span style={{color:"var(--text3)"}}>新名稱</span><span>{oppConfirm.name}</span>
             {oppConfirm.chineseDesc&&<><span style={{color:"var(--text3)"}}>中文說明</span><span>{oppConfirm.chineseDesc}</span></>}
-            <span style={{color:"var(--text3)"}}>車型符合</span><span>{oppConfirm.fitCount} 筆複製</span>
+          </div>
+          <div style={{marginBottom:10,padding:"10px 12px",background:"rgba(139,92,246,.06)",borderRadius:8,border:"1px solid rgba(139,92,246,.2)"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--purple)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Copy from original part?</div>
+            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,cursor:"pointer",marginBottom:6}}>
+              <input type="checkbox" checked={oppConfirm.copyFits||false}
+                onChange={e=>setOppConfirm(p=>({...p,copyFits:e.target.checked}))}
+                style={{width:15,height:15,accentColor:"var(--purple)",cursor:"pointer",flexShrink:0}}/>
+              <span>
+                <span style={{fontWeight:600}}>Vehicle Fits</span>
+                <span style={{color:"var(--text3)",fontSize:11,marginLeft:6}}>({oppConfirm.fitCount} fit{oppConfirm.fitCount!==1?"s":""} linked)</span>
+              </span>
+            </label>
+            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,cursor:"pointer"}}>
+              <input type="checkbox" checked={oppConfirm.copyVehicleInfo||false}
+                onChange={e=>setOppConfirm(p=>({...p,copyVehicleInfo:e.target.checked}))}
+                style={{width:15,height:15,accentColor:"var(--purple)",cursor:"pointer",flexShrink:0}}/>
+              <span>
+                <span style={{fontWeight:600}}>Vehicle Info</span>
+                <span style={{color:"var(--text3)",fontSize:11,marginLeft:6}}>(make / model / year range)</span>
+              </span>
+            </label>
           </div>
           {oppConfirm.originalF?.image_url&&(
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"8px 10px",background:"rgba(139,92,246,.06)",borderRadius:7,border:"1px solid rgba(139,92,246,.2)"}}>
@@ -3353,6 +3374,39 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             <button className="btn btn-sm" style={{flex:2,background:"var(--purple)",color:"#fff",border:"none"}}
               onClick={()=>{ onCreateOpposite(oppConfirm); setOppConfirm(null); }}>
               ✅ 確認建立
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* New Part copy dialog */}
+      {newPartConfirm&&(
+        <div style={{marginTop:14,background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.3)",borderRadius:10,padding:"12px 14px"}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:"var(--green)"}}>+ New Part — Copy from this part?</div>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,cursor:"pointer",marginBottom:8}}>
+            <input type="checkbox" checked={newPartConfirm.copyFits||false}
+              onChange={e=>setNewPartConfirm(p=>({...p,copyFits:e.target.checked}))}
+              style={{width:15,height:15,accentColor:"var(--green)",cursor:"pointer",flexShrink:0}}/>
+            <span>
+              <span style={{fontWeight:600}}>Vehicle Fits</span>
+              <span style={{color:"var(--text3)",fontSize:11,marginLeft:6}}>({myFitments.length} fit{myFitments.length!==1?"s":""} linked)</span>
+            </span>
+          </label>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,cursor:"pointer",marginBottom:12}}>
+            <input type="checkbox" checked={newPartConfirm.copyVehicleInfo||false}
+              onChange={e=>setNewPartConfirm(p=>({...p,copyVehicleInfo:e.target.checked}))}
+              style={{width:15,height:15,accentColor:"var(--green)",cursor:"pointer",flexShrink:0}}/>
+            <span>
+              <span style={{fontWeight:600}}>Vehicle Info</span>
+              <span style={{color:"var(--text3)",fontSize:11,marginLeft:6}}>(make / model / year range)</span>
+            </span>
+          </label>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setNewPartConfirm(null)}>Cancel</button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{ onAddNewPart({}); setNewPartConfirm(null); }}>Skip — blank</button>
+            <button className="btn btn-sm" style={{flex:2,background:"var(--green)",color:"#fff",border:"none"}}
+              onClick={()=>{ onAddNewPart(newPartConfirm); setNewPartConfirm(null); }}>
+              ✅ Create New Part
             </button>
           </div>
         </div>
@@ -3381,6 +3435,12 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
           )}
           <div style={{display:"flex",gap:10,marginTop:10}}>
             <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{t.cancel}</button>
+            {onAddNewPart&&(
+              <button className="btn btn-ghost" style={{flexShrink:0,borderColor:"var(--green)",color:"var(--green)",fontWeight:700}}
+                onClick={()=>setNewPartConfirm({copyFits:myFitments.length>0,copyVehicleInfo:!!(f.make||f.model||f.year_range)})}>
+                + New Part
+              </button>
+            )}
             {part&&onGoSupplier&&(
               <button className="btn btn-ghost" style={{flexShrink:0,borderColor:"var(--blue)",color:"var(--blue)"}}
                 onClick={()=>onGoSupplier(part)}>
@@ -3394,7 +3454,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                   const newSku=swapLR(f.sku);
                   const newName=swapLR(f.name);
                   const newCd=swapLR(f.chinese_desc);
-                  setOppConfirm({sku:newSku,name:newName,chineseDesc:newCd,fitCount:myFitments.length,originalPart:part,originalF:f,flipPhoto:!!f.image_url});
+                  setOppConfirm({sku:newSku,name:newName,chineseDesc:newCd,fitCount:myFitments.length,originalPart:part,originalF:f,flipPhoto:!!f.image_url,copyFits:myFitments.length>0,copyVehicleInfo:!!(f.make||f.model||f.year_range)});
                 }}>
                 🔄 對應零件
               </button>

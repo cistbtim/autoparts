@@ -98,6 +98,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":isBranchUser?"inventory":role==="demo"?"inventory":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
+  const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
+  const [newPartInitialF,setNewPartInitialF]=useState(null); // prefill values for next new part form
   const [parts,setParts]=useState([]);
   const [orders,setOrders]=useState([]);
   const [customers,setCustomers]=useState([]);
@@ -956,8 +958,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       setBusyMsg(`Saving ${d2.sku||"new part"}…`);
       try {
         const r=await api.upsert("parts",d2);
-        const newPart=Array.isArray(r)&&r[0]?r[0]:d2;
+        const newPart=Array.isArray(r)&&r[0]?r[0]:null;
+        if(!newPart?.id){showToast("Failed to create part — check SKU/name","err");return;}
         await logInv(newPart,0,d2.stock,"New Part","Added");
+        const copyFromId=pendingFitsCopy;
+        setPendingFitsCopy(null);
+        setNewPartInitialF(null);
+        if(copyFromId){
+          // Fetch fresh fitments from DB for the source part to avoid stale local state
+          api.cacheInvalidate("part_fitments");
+          const freshFits=await api.get("part_fitments",`part_id=eq.${copyFromId}&select=*`).catch(()=>[]);
+          for(const fit of freshFits)
+            await api.upsert("part_fitments",{part_id:newPart.id,vehicle_id:fit.vehicle_id,notes:fit.notes||""});
+          await refreshTables("part_fitments");
+          if(freshFits.length>0) showToast(`✅ Copied ${freshFits.length} vehicle fit${freshFits.length!==1?"s":""}`);
+        }
         setParts(prev=>[...prev,newPart]);
         closeM("editPart");
         // Navigate to inventory, filter to new SKU, then re-open for photo + fitment editing
@@ -1038,7 +1053,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       return srcUrl;
     }catch(e){console.warn("Flip upload error:",e);showToast("Photo flip upload error — upload manually","warn");return srcUrl;}
   };
-  const createOpposite=async({sku,name,chineseDesc,originalPart,originalF,flipPhoto})=>{
+  const createOpposite=async({sku,name,chineseDesc,originalPart,originalF,flipPhoto,copyFits=true,copyVehicleInfo=true})=>{
     if(parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase())){
       showToast(`SKU "${sku}" already exists`,"err"); return;
     }
@@ -1058,15 +1073,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         price:+originalF.price||0, cost_price:+originalF.cost_price||0,
         stock:0, min_stock:+originalF.minStock||0,
         image_url:finalImageUrl,
-        make:originalF.make||"", model:originalF.model||"",
-        year_range:originalF.year_range||"", oe_number:originalF.oe_number||"",
+        make:copyVehicleInfo?(originalF.make||""):"", model:copyVehicleInfo?(originalF.model||""):"",
+        year_range:copyVehicleInfo?(originalF.year_range||""):"", oe_number:originalF.oe_number||"",
         bin_location:originalF.bin_location||"",
       };
       const r=await api.upsert("parts",newData);
       const newPart=Array.isArray(r)&&r[0]?r[0]:null;
       if(!newPart?.id){showToast("Failed to create part","err");return;}
       await logInv(newPart,0,0,"New Part","Opposite side copy");
-      const srcFits=partFitments.filter(f=>String(f.part_id)===String(originalPart.id));
+      const srcFits=copyFits?partFitments.filter(f=>String(f.part_id)===String(originalPart.id)):[];
       for(const fit of srcFits)
         await api.upsert("part_fitments",{part_id:newPart.id,vehicle_id:fit.vehicle_id,notes:fit.notes||""});
       const srcSupps=partSuppliers.filter(ps=>String(ps.part_id)===String(originalPart.id));
@@ -3302,7 +3317,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             )}
             <PH title={t.inventory} subtitle={`${parts.length} parts · ${lowStock.length} low`}
               action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <button className="btn btn-ghost btn-sm" disabled={invRefreshing} onClick={async()=>{setInvRefreshing(true);try{api.cacheInvalidate("parts");api.cacheInvalidate("branch_stock");await refreshTables("parts","branch_stock","part_fitments","part_suppliers");}finally{setInvRefreshing(false);}}} title="Refresh inventory data only">
+                <button className="btn btn-ghost btn-sm" disabled={invRefreshing} onClick={async()=>{setInvRefreshing(true);try{api.cacheInvalidate("parts");api.cacheInvalidate("branch_stock");await refreshTables("parts","branch_stock","part_fitments","part_suppliers","vehicles","orders","customers","suppliers","inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes","inventory_logs","customer_queries","workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes","workshop_customers","workshop_vehicles","workshop_stock","workshop_services","workshop_suppliers","ws_supplier_requests","ws_supplier_quotes","ws_supplier_invoices","ws_supplier_invoice_items","ws_supplier_payments","ws_supplier_returns","ws_purchase_orders","ws_po_items");}finally{setInvRefreshing(false);}}} title="Reload all data">
                   <span style={invRefreshing?{display:"inline-block",animation:"spin 1s linear infinite"}:{}}>{invRefreshing?"⟳":"↻"}</span> {invRefreshing?"Refreshing…":"Refresh"}
                 </button>
                 {role==="admin"&&branches.length>1&&<button className={`btn btn-sm ${showCrossBranch?"btn-primary":"btn-ghost"}`} onClick={()=>setShowCrossBranch(v=>!v)} title="Cross-branch stock search">🏢 {t.branchCrossBtn}</button>}
@@ -5024,8 +5039,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           branches={branches} currentBranch={currentBranch} allParts={parts}
           branchSkuPrefix={currentBranch?.sku_prefix||""}
           partSuppliers={getPartSupps(ep?.id)} suppliers={suppliers} allPartSuppliers={partSuppliers}
+          initialF={newPartInitialF}
           onSavePartSupplier={savePartSupplier} onDeletePartSupplier={deletePartSupplier} onUpdatePartSupplier={updatePartSupplier} onLoadSuppliers={loadPartSuppliers}
           onRequestNewPart={role==="branch_admin"?()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);closeM("editPart");openM("partRequest");}:null}
+          onAddNewPart={(role==="admin"||role==="demo")?({copyFits,copyVehicleInfo}={})=>{
+            const cur=mData("editPart");
+            if(cur?.id) releaseLock("part",cur.id);
+            if(copyVehicleInfo&&(cur?.make||cur?.model||cur?.year_range))
+              setNewPartInitialF({make:cur?.make||"",model:cur?.model||"",year_range:cur?.year_range||""});
+            else setNewPartInitialF(null);
+            if(copyFits&&cur?.id) setPendingFitsCopy(cur.id); else setPendingFitsCopy(null);
+            closeM("editPart");
+            setTimeout(()=>openM("editPart",null),50);
+          }:null}
           onClose={()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);closeM("editPart");}}
           t={t}/>;
       })()}

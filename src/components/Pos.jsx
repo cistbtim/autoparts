@@ -149,7 +149,11 @@ function PosVehicleFilter({ vehicles, partFitments, onFilter, onZoom }) {
       if (v.code) map[v.model].add(v.code);
     }
     return Object.entries(map)
-      .sort((a, b) => a[0].localeCompare(b[0]))
+      .sort((a, b) => {
+        const ca = [...a[1]].sort()[0] || a[0];
+        const cb = [...b[1]].sort()[0] || b[0];
+        return ca.localeCompare(cb);
+      })
       .map(([m, codes]) => ({ model: m, label: codes.size > 0 ? `${m} [${[...codes].sort().join(" / ")}]` : m }));
   })();
   const modelOptions = modelRows.map(r => r.label);

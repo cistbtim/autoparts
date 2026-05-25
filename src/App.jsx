@@ -146,6 +146,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [filterBranch,setFilterBranch]=useState("__all__"); // __all__ | "main" | branch_id
   const [filterQuantum,setFilterQuantum]=useState(false);
   const [filterInStock,setFilterInStock]=useState(false);
+  const [filterNoPhoto,setFilterNoPhoto]=useState(false);
+  const [filterSupplier,setFilterSupplier]=useState("__all__");
   const [invRefreshing,setInvRefreshing]=useState(false);
   const [filterHiace,setFilterHiace]=useState(false);
   const [branchMatchedOnly,setBranchMatchedOnly]=useState("matched"); // "matched"|"own"|"all"
@@ -211,7 +213,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   },[searchPart]);
 
   // Reset page when filters change
-  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock]);
+  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier]);
   useEffect(()=>{ setShopPage(0); },[searchPart]);
   // Modals
   const [M,setM]=useState({});
@@ -2471,6 +2473,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(filterQuantum&&!p.is_quantum)return false;
     if(filterHiace&&!p.is_hiace)return false;
     if(filterInStock&&!(p.stock>0))return false;
+    if(filterNoPhoto&&(p.image_url||p.image_data))return false;
+    if(filterSupplier!=="__all__"&&!partSuppliers.some(ps=>String(ps.supplier_id)===filterSupplier&&String(ps.part_id)===String(p.id)))return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
     if(filterFits!=="__all__"){
       const hasFit=partFitments.some(f=>String(f.part_id)===String(p.id));
@@ -3501,8 +3505,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               <button className="btn btn-sm" onClick={()=>setFilterQuantum(v=>!v)} style={{whiteSpace:"nowrap",background:filterQuantum?"rgba(249,115,22,.18)":"var(--surface2)",color:filterQuantum?"var(--accent)":"var(--text2)",border:filterQuantum?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:filterQuantum?700:400}}>🚐 Quantum{filterQuantum?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterHiace(v=>!v)} style={{whiteSpace:"nowrap",background:filterHiace?"rgba(59,130,246,.18)":"var(--surface2)",color:filterHiace?"var(--blue)":"var(--text2)",border:filterHiace?"1.5px solid var(--blue)":"1px solid var(--border)",fontWeight:filterHiace?700:400}}>🚐 Hiace{filterHiace?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterInStock(v=>!v)} style={{whiteSpace:"nowrap",background:filterInStock?"rgba(52,211,153,.18)":"var(--surface2)",color:filterInStock?"var(--green)":"var(--text2)",border:filterInStock?"1.5px solid var(--green)":"1px solid var(--border)",fontWeight:filterInStock?700:400}}>✅ In Stock{filterInStock?" ✓":""}</button>
-              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace||filterInStock)&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setFilterInStock(false);setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
+              <button className="btn btn-sm" onClick={()=>setFilterNoPhoto(v=>!v)} style={{whiteSpace:"nowrap",background:filterNoPhoto?"rgba(248,113,113,.18)":"var(--surface2)",color:filterNoPhoto?"var(--red)":"var(--text2)",border:filterNoPhoto?"1.5px solid var(--red)":"1px solid var(--border)",fontWeight:filterNoPhoto?700:400}}>📷 No Photo{filterNoPhoto?" ✓":""}</button>
+              <select className="inp" value={filterSupplier} onChange={e=>setFilterSupplier(e.target.value)}
+                style={{minWidth:130,maxWidth:200,borderColor:filterSupplier!=="__all__"?"var(--purple)":undefined,color:filterSupplier!=="__all__"?"var(--purple)":undefined}}>
+                <option value="__all__">🏭 All Suppliers</option>
+                {suppliers.sort((a,b)=>a.name.localeCompare(b.name)).map(s=><option key={s.id} value={String(s.id)}>{s.name}</option>)}
+              </select>
+              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace||filterInStock||filterNoPhoto||filterSupplier!=="__all__")&&(
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setFilterInStock(false);setFilterNoPhoto(false);setFilterSupplier("__all__");setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
             </div>
             {/* ── Top pagination bar (between search and table) ── */}

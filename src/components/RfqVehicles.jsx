@@ -875,6 +875,9 @@ export function PickingPage({orders=[], parts=[], onComplete, onRefresh, t, lang
 }
 
 // ═══════════════════════════════════════════════════════════════
+// In-app photo clipboard — persists across modal opens within the session
+let _appPhotoClip = null; // { url, fromSku }
+
 // PART PHOTO UPLOADER
 // Uses Google Apps Script Web App to upload to Google Drive
 // ═══════════════════════════════════════════════════════════════
@@ -884,7 +887,9 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
   const [error, setError]         = useState(null);
   const [zoomed, setZoomed]       = useState(false);
   const [showFlipPopup, setShowFlipPopup] = useState(false);
-  const [flipWorking, setFlipWorking] = useState(false); // save or copy in progress
+  const [flipWorking, setFlipWorking] = useState(false);
+  const [copied, setCopied]       = useState(false);
+  const [hasClip, setHasClip]     = useState(!!_appPhotoClip);
   const fileRef = useRef(null);
 
   // ⚙️ Paste your Apps Script Web App URL here after deploying
@@ -1031,18 +1036,13 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
     setFlipWorking(false);
   };
 
-  const copyFlippedToClipboard = async () => {
-    setFlipWorking(true); setError(null);
-    try {
-      const base64 = await getFlippedBase64();
-      if (!base64) { setError("Could not read image — Drive sharing permissions may block this."); setFlipWorking(false); return; }
-      const data = base64.split(",")[1];
-      const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
-      const blob = new Blob([bytes], {type:"image/png"});
-      await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
-      setShowFlipPopup(false);
-    } catch(e) { setError("Copy failed: " + e.message); }
-    setFlipWorking(false);
+  const copyFlippedToClipboard = () => {
+    _appPhotoClip = {url: imageUrl, fromSku: sku};
+    setHasClip(true);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+    setShowFlipPopup(false);
+    setError(null);
   };
 
   const preview = imageUrl ? toImgUrl(imageUrl) : null;
@@ -1106,25 +1106,46 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
         )}
       </div>
 
+      {/* Copied toast */}
+      {copied&&(
+        <div style={{fontSize:11,color:"var(--green)",background:"rgba(34,197,94,.1)",border:"1px solid rgba(34,197,94,.3)",borderRadius:7,padding:"6px 10px",marginBottom:6,textAlign:"center",fontWeight:600}}>
+          ✓ Saved! Open the other part and click Paste Photo
+        </div>
+      )}
+
       {/* Action strip */}
       <div style={{display:"flex",gap:5,marginBottom:7}}>
-        <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:11,gap:4}}
-          onClick={async()=>{
-            try{
-              const items = await navigator.clipboard.read();
-              for(const item of items){
-                const imgType = item.types.find(t=>t.startsWith("image/"));
-                if(imgType){
-                  const blob = await item.getType(imgType);
-                  uploadToGDrive(new File([blob],`${sku||"part"}.png`,{type:"image/png"}));
-                  return;
+        {/* App clipboard paste — shown when a photo was copied via Flip */}
+        {hasClip&&!imageUrl&&(
+          <button className="btn btn-sm" style={{flex:1,fontSize:11,background:"rgba(34,197,94,.12)",borderColor:"rgba(34,197,94,.4)",color:"var(--green)",fontWeight:700}}
+            onClick={()=>{
+              onChange(_appPhotoClip.url);
+              _appPhotoClip=null;
+              setHasClip(false);
+            }}>
+            📋 Paste Photo{_appPhotoClip?.fromSku?" ("+_appPhotoClip.fromSku+")":""}
+          </button>
+        )}
+        {/* System clipboard / browse */}
+        {(!hasClip||imageUrl)&&(
+          <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:11}}
+            onClick={async()=>{
+              try{
+                const items = await navigator.clipboard.read();
+                for(const item of items){
+                  const imgType = item.types.find(t=>t.startsWith("image/"));
+                  if(imgType){
+                    const blob = await item.getType(imgType);
+                    uploadToGDrive(new File([blob],`${sku||"part"}.png`,{type:"image/png"}));
+                    return;
+                  }
                 }
-              }
-              fileRef.current?.click();
-            }catch{ fileRef.current?.click(); }
-          }}>
-          📋 {t.phuPasteClipboard||"Paste"}
-        </button>
+                fileRef.current?.click();
+              }catch{ fileRef.current?.click(); }
+            }}>
+            📋 {t.phuPasteClipboard||"Paste"}
+          </button>
+        )}
         {imageUrl&&(
           <button className="btn btn-ghost btn-sm" style={{fontSize:11,color:"var(--red)",flexShrink:0}}
             title="Remove photo"
@@ -1168,10 +1189,9 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
               <button className="btn btn-ghost btn-sm" style={{flex:1}}
                 disabled={flipWorking}
                 onClick={()=>{setShowFlipPopup(false);setError(null);}}>✕ Cancel</button>
-              <button className="btn btn-ghost btn-sm" style={{flex:1,color:"var(--blue)"}}
-                disabled={flipWorking}
+              <button className="btn btn-ghost btn-sm" style={{flex:1,color:"var(--green)",fontWeight:700}}
                 onClick={copyFlippedToClipboard}>
-                {flipWorking?"⏳…":"📋 Copy"}
+                📋 Copy to Other Part
               </button>
               {SCRIPT_URL&&(
                 <button className="btn btn-primary btn-sm" style={{flex:1}}

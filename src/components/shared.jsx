@@ -63,11 +63,11 @@ export const FD = ({children}) => <div style={{marginBottom:14}}>{children}</div
 
 // Reliable Google Drive image with multi-format fallback:
 // tries thumbnail sz=w800 → sz=w400 → uc?export=view → hide
-export function DriveImg({url, alt, style, onClick}) {
+export function DriveImg({url, alt, style, onClick, eager}) {
   const id = extractDriveId(url);
   const urls = id ? [
-    `https://drive.google.com/thumbnail?id=${id}&sz=w800`,
     `https://drive.google.com/thumbnail?id=${id}&sz=w400`,
+    `https://drive.google.com/thumbnail?id=${id}&sz=w800`,
     `https://drive.google.com/uc?export=view&id=${id}`,
   ] : (url ? [url] : []);
   const [idx, setIdx] = useState(0);
@@ -79,6 +79,7 @@ export function DriveImg({url, alt, style, onClick}) {
       alt={alt||""}
       style={style}
       onClick={onClick}
+      loading={eager ? "eager" : "lazy"}
       referrerPolicy="no-referrer"
       onError={()=>{
         if(idx < urls.length - 1) setIdx(i => i + 1);

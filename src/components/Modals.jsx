@@ -19,9 +19,9 @@ const _LR_MAP = {
   'Driver':'Passenger','Passenger':'Driver','driver':'passenger','passenger':'driver','DRIVER':'PASSENGER','PASSENGER':'DRIVER',
 };
 const _LR_RE = /(?<![A-Za-z])(Left|Right|left|right|LEFT|RIGHT|LH|RH|Driver|Passenger|driver|passenger|DRIVER|PASSENGER)(?![A-Za-z])|左|右/g;
-// _SINGLE_LR: swap terminal L/R when preceded by digit+letter (e.g. 054GL→054GR)
-// Requires the letter before L/R is not itself L or R to avoid double-swapping LH/RH
-const _SINGLE_LR_RE = /(?<=\d[A-KM-QS-Za-km-qs-z])[LRlr](?=[^A-Za-z]|$)/g;
+// _SINGLE_LR: swap terminal L/R in SKU codes (e.g. 054GL→054GR, 089BHL→089BHR)
+// Requires digit before letters, and letter before L/R is not itself L or R to avoid double-swapping LH/RH
+const _SINGLE_LR_RE = /(?:(?<=\d[A-KM-QS-Za-km-qs-z])[LRlr]|(?<=\d[A-Za-z][A-KM-QS-Za-km-qs-z])[LRlr])(?=[^A-Za-z]|$)/g;
 function swapLR(str){
   return (str||"")
     .replace(_LR_RE, m => _LR_MAP[m]||m)

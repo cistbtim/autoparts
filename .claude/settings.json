@@ -109,7 +109,13 @@
       "Bash(grep -v \"//\")",
       "Bash(grep -v \"partId\\\\|partName\\\\|partQty\\\\|partPrice\\\\|part_id\\\\|part_name\\\\|\\\\\\\\.part\\\\b\\\\|parts\\\\b\")",
       "Bash(gh auth *)",
-      "Bash(git symbolic-ref *)"
+      "Bash(git symbolic-ref *)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(/c/Users/Tim/.claude/skills/gstack/browse/dist/browse goto *)",
+      "Bash(/c/Users/Tim/.claude/skills/gstack/browse/dist/browse handoff *)",
+      "WebFetch(domain:aceauto.co.za)",
+      "Bash(/c/Users/Tim/.claude/skills/gstack/browse/dist/browse url *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory",

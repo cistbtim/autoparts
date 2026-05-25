@@ -887,7 +887,6 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
   const [error, setError]         = useState(null);
   const [zoomed, setZoomed]       = useState(false);
   const [showFlipPopup, setShowFlipPopup] = useState(false);
-  const [flipWorking, setFlipWorking] = useState(false);
   const [copied, setCopied]       = useState(false);
   const [hasClip, setHasClip]     = useState(!!_appPhotoClip);
   const fileRef = useRef(null);
@@ -967,73 +966,6 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
     if (!imageUrl) return;
     setError(null);
     setShowFlipPopup(true);
-  };
-
-  // Generate flipped base64 by fetching the image (used for save + copy)
-  const getFlippedBase64 = async () => {
-    const srcUrl = toImgUrl(imageUrl) || imageUrl;
-    let base64 = null;
-    try {
-      const r = await fetch(srcUrl, {credentials:"omit"});
-      if (r.ok) {
-        const blob = await r.blob();
-        if (blob.type.startsWith("image/")) {
-          const objUrl = URL.createObjectURL(blob);
-          base64 = await new Promise((res, rej) => {
-            const img = new Image();
-            img.onload = () => {
-              URL.revokeObjectURL(objUrl);
-              try {
-                const w = img.naturalWidth||200, h = img.naturalHeight||200;
-                const cv = document.createElement("canvas");
-                cv.width = w; cv.height = h;
-                const ctx = cv.getContext("2d");
-                ctx.translate(w, 0); ctx.scale(-1, 1);
-                ctx.drawImage(img, 0, 0);
-                res(cv.toDataURL("image/png"));
-              } catch(e) { URL.revokeObjectURL(objUrl); rej(e); }
-            };
-            img.onerror = () => { URL.revokeObjectURL(objUrl); rej(new Error("load failed")); };
-            img.src = objUrl;
-          });
-        }
-      }
-    } catch(e) { console.warn("Flip fetch:", e); }
-    if (!base64) {
-      // Fallback: crossOrigin canvas
-      base64 = await new Promise((res, rej) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-          try {
-            const w = img.naturalWidth||200, h = img.naturalHeight||200;
-            const cv = document.createElement("canvas");
-            cv.width = w; cv.height = h;
-            const ctx = cv.getContext("2d");
-            ctx.translate(w, 0); ctx.scale(-1, 1);
-            ctx.drawImage(img, 0, 0);
-            res(cv.toDataURL("image/png"));
-          } catch(e) { rej(e); }
-        };
-        img.onerror = rej;
-        img.src = srcUrl + (srcUrl.includes("?")?"&":"?") + "_cb=" + Date.now();
-      }).catch(() => null);
-    }
-    return base64;
-  };
-
-  const saveFlippedPhoto = async () => {
-    if (!SCRIPT_URL) { setError("Apps Script URL not configured in Settings"); return; }
-    setFlipWorking(true); setError(null);
-    try {
-      const base64 = await getFlippedBase64();
-      if (!base64) { setError("Could not read image — Drive sharing permissions may block this. Try downloading and re-uploading the photo."); setFlipWorking(false); return; }
-      const resp = await fetch(SCRIPT_URL, {method:"POST", body:JSON.stringify({image:base64, filename:`${sku||"part"}_flipped.png`, mimeType:"image/png"})});
-      const result = await resp.json();
-      if (result.success && result.url) { onChange(result.url); setShowFlipPopup(false); setError(null); }
-      else setError("Upload failed: " + (result.error||"unknown"));
-    } catch(e) { setError("Error: " + e.message); }
-    setFlipWorking(false);
   };
 
   const copyFlippedToClipboard = () => {
@@ -1184,22 +1116,13 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
                 style={{maxWidth:"100%",maxHeight:200,objectFit:"contain",transform:"scaleX(-1)",display:"block"}}
                 onError={e=>e.target.style.opacity="0.3"}/>
             </div>
-            {error&&<div style={{fontSize:11,color:"var(--red)",marginBottom:10,padding:"6px 10px",background:"rgba(248,113,113,.1)",borderRadius:7}}>{error}</div>}
             <div style={{display:"flex",gap:8}}>
               <button className="btn btn-ghost btn-sm" style={{flex:1}}
-                disabled={flipWorking}
                 onClick={()=>{setShowFlipPopup(false);setError(null);}}>✕ Cancel</button>
-              <button className="btn btn-ghost btn-sm" style={{flex:1,color:"var(--green)",fontWeight:700}}
+              <button className="btn btn-primary btn-sm" style={{flex:2,background:"var(--green)",border:"none"}}
                 onClick={copyFlippedToClipboard}>
                 📋 Copy to Other Part
               </button>
-              {SCRIPT_URL&&(
-                <button className="btn btn-primary btn-sm" style={{flex:1}}
-                  disabled={flipWorking}
-                  onClick={saveFlippedPhoto}>
-                  {flipWorking?"⏳ Saving…":"✓ Save as Photo"}
-                </button>
-              )}
             </div>
           </div>
         </div>

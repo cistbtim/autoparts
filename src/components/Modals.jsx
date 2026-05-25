@@ -2624,7 +2624,10 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     auto_reorder:false, reorder_point:0, reorder_qty:1, preferred_supplier_id:"",
   };
   const [f,setF]=useState(()=>initialF?{...makeF(part),...initialF}:makeF(part));
-  const [ptab, setPtab] = useState(initialTab||"info");
+  const [ptab, setPtab] = useState(()=>{
+    if(!initialTab||initialTab==="info"||initialTab==="photo") return "stock";
+    return initialTab;
+  });
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -2692,8 +2695,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     }
     setErrors(e);
     if(Object.keys(e).length>0){
-      if(e.sku||e.name||e.dupSku) setPtab("info");
-      else if(e.price) setPtab("stock");
+      if(e.price) setPtab("stock");
       return false;
     }
     return true;
@@ -2705,8 +2707,6 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
   const partSessionQuotes = rfqQuotes.filter(q=>partItemIds.includes(q.rfq_item_id));
   const rfqTotal = partRfqs.length + partSessionQuotes.length;
   const TABS = [
-    {id:"info",    label:`📋 ${t.pmTabInfo}`},
-    {id:"photo",   label:`📸 ${t.pmTabPhoto}`},
     {id:"stock",   label:`💰 ${t.stock}`},
     {id:"vehicle", label:`🚗 ${t.pmTabVehicle}`},
     {id:"fitment", label:`🔗 ${t.pmTabFits}`},
@@ -2758,25 +2758,10 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
         </div>
       )}
 
-      {/* Tab bar */}
-      <div className="tabs" style={{marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
-        {TABS.map(tab=>(
-          <button key={tab.id}
-            className={`tab ${ptab===tab.id?"on":""}`}
-            style={{fontSize:13,padding:"8px 14px"}}
-            onClick={()=>{if(tab.id==="supplier")onLoadSuppliers?.();setPtab(tab.id);}}>
-            {tab.label}
-            {/* Red dot if tab has error */}
-            {((tab.id==="info"&&(errors.sku||errors.name))||(tab.id==="stock"&&errors.price))&&(
-              <span style={{width:6,height:6,background:"var(--red)",borderRadius:"50%",display:"inline-block",marginLeft:5,verticalAlign:"middle"}}/>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* ── TAB: INFO ── */}
-      {ptab==="info"&&(
-        <div>
+      {/* ── ALWAYS VISIBLE: Info + Photo ── */}
+      <div style={{display:"flex",gap:18,marginBottom:18,alignItems:"flex-start"}}>
+        {/* LEFT: Info fields */}
+        <div style={{flex:"1 1 0",minWidth:0}}>
           <FG>
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
@@ -2809,8 +2794,6 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
               {(()=>{
                 if(part) return null;
                 const typed=f.sku.trim();
-                // For branch prefix: show branch-scoped SKUs
-                // For main/no-prefix: show all SKUs filtered by what user is typing
                 let skuList;
                 if(!typed) return null;
                 if(branchSkuPrefix){
@@ -2871,60 +2854,62 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)} placeholder="OE number / OEM reference"/>
           </FD>
           <FD><FL label={t.chineseDesc}/><input className="inp" value={f.chinese_desc} onChange={e=>s("chinese_desc",e.target.value)} placeholder="零件中文說明"/></FD>
-          <FD>
-            <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+          <div style={{display:"flex",gap:16,flexWrap:"wrap",marginTop:8}}>
+            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",userSelect:"none",flex:"1 1 auto"}}>
               <div onClick={()=>s("is_quantum",!f.is_quantum)} style={{
-                width:42,height:24,borderRadius:12,background:f.is_quantum?"var(--accent)":"var(--surface3)",
+                width:38,height:22,borderRadius:11,background:f.is_quantum?"var(--accent)":"var(--surface3)",
                 border:`1.5px solid ${f.is_quantum?"var(--accent)":"var(--border)"}`,
                 position:"relative",transition:"background .18s,border-color .18s",flexShrink:0,cursor:"pointer"
               }}>
-                <div style={{
-                  position:"absolute",top:2,left:f.is_quantum?20:2,width:16,height:16,
-                  borderRadius:"50%",background:"#fff",transition:"left .18s",
-                  boxShadow:"0 1px 3px rgba(0,0,0,.3)"
-                }}/>
+                <div style={{position:"absolute",top:2,left:f.is_quantum?18:2,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left .18s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/>
               </div>
               <div>
-                <div style={{fontWeight:600,fontSize:13}}>🚐 Toyota Quantum Part</div>
-                <div style={{fontSize:11,color:"var(--text3)"}}>Mark this part as Quantum-specific stock</div>
+                <div style={{fontWeight:600,fontSize:12}}>🚐 Toyota Quantum</div>
+                <div style={{fontSize:10,color:"var(--text3)"}}>Quantum-specific stock</div>
               </div>
             </label>
-          </FD>
-          <FD>
-            <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",userSelect:"none",flex:"1 1 auto"}}>
               <div onClick={()=>s("is_hiace",!f.is_hiace)} style={{
-                width:42,height:24,borderRadius:12,background:f.is_hiace?"var(--blue)":"var(--surface3)",
+                width:38,height:22,borderRadius:11,background:f.is_hiace?"var(--blue)":"var(--surface3)",
                 border:`1.5px solid ${f.is_hiace?"var(--blue)":"var(--border)"}`,
                 position:"relative",transition:"background .18s,border-color .18s",flexShrink:0,cursor:"pointer"
               }}>
-                <div style={{
-                  position:"absolute",top:2,left:f.is_hiace?20:2,width:16,height:16,
-                  borderRadius:"50%",background:"#fff",transition:"left .18s",
-                  boxShadow:"0 1px 3px rgba(0,0,0,.3)"
-                }}/>
+                <div style={{position:"absolute",top:2,left:f.is_hiace?18:2,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left .18s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/>
               </div>
               <div>
-                <div style={{fontWeight:600,fontSize:13}}>🚐 Toyota Hiace Part</div>
-                <div style={{fontSize:11,color:"var(--text3)"}}>Mark this part as Hiace-specific stock</div>
+                <div style={{fontWeight:600,fontSize:12}}>🚐 Toyota Hiace</div>
+                <div style={{fontSize:10,color:"var(--text3)"}}>Hiace-specific stock</div>
               </div>
             </label>
-          </FD>
+          </div>
         </div>
-      )}
-
-      {/* ── TAB: PHOTO ── */}
-      {ptab==="photo"&&(
-        <div>
-          {part&&<div style={{fontSize:12,color:"var(--green)",marginBottom:10,background:"rgba(34,197,94,.08)",borderRadius:8,padding:"6px 10px"}}>✅ {t.phuAutoSave}</div>}
+        {/* RIGHT: Photo */}
+        <div style={{flexShrink:0,width:210}}>
+          {part&&<div style={{fontSize:11,color:"var(--green)",marginBottom:8,background:"rgba(34,197,94,.08)",borderRadius:7,padding:"5px 9px"}}>✅ {t.phuAutoSave}</div>}
           <PartPhotoUploader imageUrl={f.image_url} onChange={handlePhotoChange} sku={f.sku} t={t}/>
           {part&&onSavePartSupplier&&partSuppliers.length===0&&(
-            <div style={{marginTop:14,background:"rgba(96,165,250,.07)",border:"1px dashed rgba(96,165,250,.35)",borderRadius:10,padding:14,textAlign:"center"}}>
-              <div style={{fontSize:13,fontWeight:600,color:"var(--blue)",marginBottom:6}}>🏭 No supplier linked yet</div>
-              <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)"}} onClick={()=>{onLoadSuppliers?.();setPtab("supplier");}}>Link a Supplier →</button>
+            <div style={{marginTop:10,background:"rgba(96,165,250,.07)",border:"1px dashed rgba(96,165,250,.35)",borderRadius:9,padding:"10px 12px",textAlign:"center"}}>
+              <div style={{fontSize:12,fontWeight:600,color:"var(--blue)",marginBottom:5}}>🏭 No supplier linked</div>
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",fontSize:11}} onClick={()=>{onLoadSuppliers?.();setPtab("supplier");}}>Link a Supplier →</button>
             </div>
           )}
         </div>
-      )}
+      </div>
+
+      {/* Bottom tab bar: Stock, Vehicle, Fits, RFQ, Suppliers, Reorder */}
+      <div className="tabs" style={{marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
+        {TABS.map(tab=>(
+          <button key={tab.id}
+            className={`tab ${ptab===tab.id?"on":""}`}
+            style={{fontSize:13,padding:"8px 14px"}}
+            onClick={()=>{if(tab.id==="supplier")onLoadSuppliers?.();setPtab(tab.id);}}>
+            {tab.label}
+            {(tab.id==="stock"&&errors.price)&&(
+              <span style={{width:6,height:6,background:"var(--red)",borderRadius:"50%",display:"inline-block",marginLeft:5,verticalAlign:"middle"}}/>
+            )}
+          </button>
+        ))}
+      </div>
 
       {/* ── TAB: STOCK ── */}
       {ptab==="stock"&&(

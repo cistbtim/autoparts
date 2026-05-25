@@ -1021,61 +1021,68 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
 
   return (
     <div>
-      {/* Drop zone / click to upload */}
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
+        onChange={e => uploadToGDrive(e.target.files[0])}/>
+
+      {/* Photo zone */}
       <div
-        onClick={() => !uploading && fileRef.current?.click()}
+        onClick={() => !uploading && !preview && fileRef.current?.click()}
         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={e => { e.preventDefault(); setDragOver(false); uploadToGDrive(e.dataTransfer.files[0]); }}
         style={{
-          border: `2px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`,
-          borderRadius: 10, padding: "16px", textAlign: "center",
-          cursor: uploading ? "wait" : "pointer",
-          background: dragOver ? "rgba(251,146,60,.06)" : "var(--surface2)",
-          marginBottom: 10, transition: "all .15s"
+          borderRadius: 10,
+          height: 150,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: uploading ? "wait" : preview ? "default" : "pointer",
+          background: dragOver ? "rgba(251,146,60,.07)" : "var(--surface2)",
+          border: `2px dashed ${dragOver ? "var(--accent)" : preview ? "transparent" : "var(--border)"}`,
+          position: "relative", overflow: "hidden", marginBottom: 8,
+          transition: "border-color .15s, background .15s",
         }}>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
-          onChange={e => uploadToGDrive(e.target.files[0])}/>
-
         {uploading ? (
-          <div style={{color:"var(--accent)",fontSize:14}}>
-            <div style={{width:24,height:24,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 8px"}}/>
-            {t.phuUploading}
+          <div style={{textAlign:"center",color:"var(--accent)"}}>
+            <div style={{width:26,height:26,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 8px"}}/>
+            <div style={{fontSize:12}}>{t.phuUploading}</div>
           </div>
         ) : preview ? (
-          <div style={{display:"flex",alignItems:"center",gap:12,justifyContent:"center"}}>
-            <div style={{position:"relative",flexShrink:0}} onClick={e=>e.stopPropagation()}>
-              <img src={preview} alt="part"
-                style={{width:80,height:80,objectFit:"contain",borderRadius:8,background:"var(--surface3)",cursor:"zoom-in",display:"block"}}
-                onClick={e=>{e.stopPropagation();setZoomed(true);}}/>
-              <div style={{position:"absolute",bottom:2,right:2,background:"rgba(0,0,0,.55)",borderRadius:4,padding:"1px 4px",fontSize:9,color:"#fff",pointerEvents:"none"}}>🔍</div>
-              <button
-                title="Flip photo horizontally"
-                disabled={flipping||uploading}
-                onClick={e=>{e.stopPropagation();flipPhoto();}}
-                style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.6)",border:"none",borderRadius:4,
-                  padding:"2px 5px",fontSize:11,color:"#fff",cursor:"pointer",lineHeight:1.2,
-                  opacity:(flipping||uploading)?0.5:1}}>
-                {flipping?"⏳":"↔"}
-              </button>
+          <>
+            <img src={preview} alt="part"
+              style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",cursor:"zoom-in",display:"block"}}
+              onClick={e=>{e.stopPropagation();setZoomed(true);}}
+              onError={e=>e.target.style.display="none"}/>
+            <button
+              title="Flip photo horizontally"
+              disabled={flipping}
+              onClick={e=>{e.stopPropagation();flipPhoto();}}
+              style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.58)",border:"none",
+                borderRadius:6,padding:"3px 8px",fontSize:12,color:"#fff",cursor:"pointer",
+                opacity:flipping?0.5:1,transition:"opacity .15s"}}>
+              {flipping?"⏳":"↔ Flip"}
+            </button>
+            <button
+              onClick={e=>{e.stopPropagation();fileRef.current?.click();}}
+              style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,.48)",border:"none",
+                borderRadius:6,padding:"3px 8px",fontSize:11,color:"#fff",cursor:"pointer"}}>
+              🔄 Replace
+            </button>
+            <div style={{position:"absolute",bottom:6,left:6,background:"rgba(0,0,0,.38)",
+              borderRadius:5,padding:"2px 6px",fontSize:10,color:"rgba(255,255,255,.8)",pointerEvents:"none"}}>
+              🔍 click to zoom
             </div>
-            <div style={{textAlign:"left"}}>
-              <div style={{fontSize:13,fontWeight:600,color:"var(--green)"}}>✅ {t.phuUploaded}</div>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{t.phuClickEnlarge}</div>
-            </div>
-          </div>
+          </>
         ) : (
-          <div>
-            <div style={{fontSize:26,marginBottom:6}}>📷</div>
-            <div style={{fontSize:14,fontWeight:600}}>{t.phuDrop}</div>
-            <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>{t.phuAutoUpload}</div>
+          <div style={{textAlign:"center",color:"var(--text3)",pointerEvents:"none"}}>
+            <div style={{fontSize:30,marginBottom:6}}>📷</div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:2}}>{t.phuDrop||"Click or drop photo"}</div>
+            <div style={{fontSize:11,opacity:.7}}>{t.phuAutoUpload||"Auto-uploaded to Drive"}</div>
           </div>
         )}
       </div>
 
-      {/* Paste from clipboard (mobile copy image support) */}
-      <div style={{display:"flex",gap:6,marginBottom:8}}>
-        <button className="btn btn-ghost btn-sm" style={{flex:1}}
+      {/* Action strip */}
+      <div style={{display:"flex",gap:5,marginBottom:7}}>
+        <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:11,gap:4}}
           onClick={async()=>{
             try{
               const items = await navigator.clipboard.read();
@@ -1083,48 +1090,38 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
                 const imgType = item.types.find(t=>t.startsWith("image/"));
                 if(imgType){
                   const blob = await item.getType(imgType);
-                  const file = new File([blob], `${sku||"part"}.png`, {type:"image/png"});
-                  uploadToGDrive(file);
+                  uploadToGDrive(new File([blob],`${sku||"part"}.png`,{type:"image/png"}));
                   return;
                 }
               }
-              alert("No image found in clipboard. Copy an image first.");
-            }catch(e){
-              // Fallback: open file picker
               fileRef.current?.click();
-            }
+            }catch{ fileRef.current?.click(); }
           }}>
-          📋 {t.phuPasteClipboard}
+          📋 {t.phuPasteClipboard||"Paste"}
         </button>
-        <button className="btn btn-ghost btn-sm" onClick={()=>fileRef.current?.click()}>
-          📁 {t.phuBrowse}
-        </button>
-      </div>
-
-      {/* Error message */}
-      {error && (
-        <div style={{fontSize:12,color:"var(--red)",marginBottom:8,padding:"8px 12px",background:"rgba(248,113,113,.1)",borderRadius:8}}>
-          {error}
-        </div>
-      )}
-
-      {/* Manual URL input */}
-      <div style={{display:"flex",gap:6,alignItems:"center"}}>
-        <input className="inp" type="url" value={imageUrl||""} style={{fontSize:12,flex:1}}
-          onChange={e => onChange(e.target.value)}
-          placeholder={t.phuUrlPlaceholder}/>
-        <button className="cp-btn"
-          onClick={async()=>{try{const t2=await navigator.clipboard.readText();if(t2)onChange(t2);}catch{}}}>
-          📥 {t.phuPaste}
-        </button>
-        {imageUrl && (
-          <button className="cp-btn" style={{color:"var(--red)"}}
+        {imageUrl&&(
+          <button className="btn btn-ghost btn-sm" style={{fontSize:11,color:"var(--red)",flexShrink:0}}
+            title="Remove photo"
             onClick={()=>onChange("")}>🗑</button>
         )}
       </div>
 
-      {imageUrl && (
-        <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>{t.gdrive_hint}</div>
+      {/* URL strip */}
+      <div style={{display:"flex",gap:5,alignItems:"center"}}>
+        <input className="inp" type="url" value={imageUrl||""} style={{fontSize:11,flex:1,padding:"6px 9px"}}
+          onChange={e=>onChange(e.target.value)}
+          placeholder={t.phuUrlPlaceholder||"Paste Drive share link…"}/>
+        <button className="cp-btn" title="Paste URL from clipboard"
+          onClick={async()=>{try{const u=await navigator.clipboard.readText();if(u)onChange(u);}catch{}}}>
+          📥
+        </button>
+      </div>
+      {imageUrl&&<div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>{t.gdrive_hint}</div>}
+
+      {error&&(
+        <div style={{fontSize:11,color:"var(--red)",marginTop:7,padding:"6px 10px",background:"rgba(248,113,113,.1)",borderRadius:7}}>
+          {error}
+        </div>
       )}
 
       {/* Fullscreen lightbox */}

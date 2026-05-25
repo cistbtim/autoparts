@@ -5027,8 +5027,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
         const modelCards=sorted.filter(v=>{
           if(!v.model) return false;
           if(scannedMake&&!(v.make||"").toLowerCase().includes(scannedMake)) return false;
-          if(seen.has(v.model)) return false;
-          seen.add(v.model);
+          const dedupKey=v.code?`code:${v.code}`:`model:${v.model}`;
+          if(seen.has(dedupKey)) return false;
+          seen.add(dedupKey);
           if(sq&&!`${v.model} ${v.make} ${v.code||""} ${v.variant||""}`.toLowerCase().includes(sq)) return false;
           return true;
         });

@@ -2435,6 +2435,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   // Multi-word search using DEBOUNCED value — fast typing won't lag UI
   const suppNoByPart={};
   partSuppliers.forEach(ps=>{if(ps.supplier_part_no)suppNoByPart[ps.part_id]=(suppNoByPart[ps.part_id]||[]).concat(ps.supplier_part_no.toLowerCase());});
+  const supplierFilterPartIds=filterSupplier!=="__all__"
+    ?new Set(partSuppliers.filter(ps=>String(ps.supplier_id)===filterSupplier).map(ps=>String(ps.part_id)))
+    :null;
   const fp=displayParts.filter(p=>{
     // role-based access filter
     if(role==="branch_admin"){
@@ -2474,7 +2477,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(filterHiace&&!p.is_hiace)return false;
     if(filterInStock&&!(p.stock>0))return false;
     if(filterNoPhoto&&(p.image_url||p.image_data))return false;
-    if(filterSupplier!=="__all__"&&!partSuppliers.some(ps=>String(ps.supplier_id)===filterSupplier&&String(ps.part_id)===String(p.id)))return false;
+    if(supplierFilterPartIds&&!supplierFilterPartIds.has(String(p.id)))return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
     if(filterFits!=="__all__"){
       const hasFit=partFitments.some(f=>String(f.part_id)===String(p.id));

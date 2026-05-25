@@ -884,6 +884,9 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
   const [dragOver, setDragOver]   = useState(false);
   const [error, setError]         = useState(null);
   const [zoomed, setZoomed]       = useState(false);
+  const [flipPreview, setFlipPreview] = useState(null); // base64 of flipped image
+  const [copying, setCopying]     = useState(false);
+  const [savingFlip, setSavingFlip] = useState(false);
   const fileRef = useRef(null);
 
   // ⚙️ Paste your Apps Script Web App URL here after deploying
@@ -957,7 +960,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
   };
 
   const flipPhoto = async () => {
-    if (!imageUrl || !SCRIPT_URL) { setError("No photo or Apps Script URL not configured"); return; }
+    if (!imageUrl) { setError("No photo to flip"); return; }
     setFlipping(true); setError(null);
     const srcUrl = toImgUrl(imageUrl) || imageUrl;
     const getBase64 = (url) => new Promise((res, rej) => {
@@ -979,7 +982,6 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
     });
     try {
       let base64 = null;
-      // Approach 1: fetch as blob (avoids canvas CORS taint)
       try {
         const r = await fetch(srcUrl, { credentials: "omit" });
         if (r.ok) {
@@ -1006,15 +1008,40 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
           }
         }
       } catch(e) { console.warn("Flip fetch approach:", e); }
-      // Approach 2: crossOrigin image element
       if (!base64) { try { base64 = await getBase64(srcUrl); } catch(e) { console.warn("Flip crossOrigin approach:", e); } }
       if (!base64) { setError("Could not access image — check Drive sharing permissions"); setFlipping(false); return; }
-      const resp = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ image: base64, filename: `${sku||"part"}_flipped.png`, mimeType: "image/png" }) });
-      const result = await resp.json();
-      if (result.success && result.url) { onChange(result.url); setError(null); }
-      else setError("Flip upload failed: " + (result.error||"unknown"));
+      // Show preview instead of auto-uploading
+      setFlipPreview(base64);
     } catch(e) { setError("Flip error: " + e.message); }
     setFlipping(false);
+  };
+
+  const b64ToBlob = (b64) => {
+    const data = b64.split(",")[1];
+    const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+    return new Blob([bytes], {type:"image/png"});
+  };
+
+  const saveFlippedPhoto = async () => {
+    if (!flipPreview || !SCRIPT_URL) { setError("Apps Script URL not configured"); return; }
+    setSavingFlip(true);
+    try {
+      const resp = await fetch(SCRIPT_URL, {method:"POST", body:JSON.stringify({image:flipPreview, filename:`${sku||"part"}_flipped.png`, mimeType:"image/png"})});
+      const result = await resp.json();
+      if (result.success && result.url) { onChange(result.url); setFlipPreview(null); setError(null); }
+      else setError("Upload failed: " + (result.error||"unknown"));
+    } catch(e) { setError("Upload error: " + e.message); }
+    setSavingFlip(false);
+  };
+
+  const copyFlippedToClipboard = async () => {
+    setCopying(true);
+    try {
+      const blob = b64ToBlob(flipPreview);
+      await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
+      setFlipPreview(null);
+    } catch(e) { setError("Copy failed: " + e.message); }
+    setCopying(false);
   };
 
   const preview = imageUrl ? toImgUrl(imageUrl) : null;
@@ -1121,6 +1148,33 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
       {error&&(
         <div style={{fontSize:11,color:"var(--red)",marginTop:7,padding:"6px 10px",background:"rgba(248,113,113,.1)",borderRadius:7}}>
           {error}
+        </div>
+      )}
+
+      {/* Flip preview popup */}
+      {flipPreview&&(
+        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:"var(--surface)",borderRadius:16,padding:24,maxWidth:340,width:"90vw",boxShadow:"0 16px 48px rgba(0,0,0,.5)"}}>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:4,textAlign:"center"}}>↔ Flipped Preview</div>
+            <div style={{fontSize:12,color:"var(--text3)",textAlign:"center",marginBottom:14}}>Save as this part's photo, or copy to clipboard to paste into another part</div>
+            <img src={flipPreview} alt="flipped"
+              style={{width:"100%",maxHeight:220,objectFit:"contain",borderRadius:10,background:"var(--surface2)",marginBottom:16,display:"block"}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setFlipPreview(null)}>✕ Cancel</button>
+              <button className="btn btn-ghost btn-sm" style={{flex:1,color:"var(--blue)"}}
+                disabled={copying}
+                onClick={copyFlippedToClipboard}>
+                {copying?"⏳ Copying…":"📋 Copy to Clipboard"}
+              </button>
+              {SCRIPT_URL&&(
+                <button className="btn btn-primary btn-sm" style={{flex:1}}
+                  disabled={savingFlip}
+                  onClick={saveFlippedPhoto}>
+                  {savingFlip?"⏳ Saving…":"✓ Save as Photo"}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

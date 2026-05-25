@@ -2775,7 +2775,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
   const [showVinSearch, setShowVinSearch] = useState(false);
   const [matchModelOpen, setMatchModelOpen] = useState(false);
   const [matchModelSearch, setMatchModelSearch] = useState("");
-  const [matchModelLightbox, setMatchModelLightbox] = useState(null); // null | index
+  const [matchModelLightbox, setMatchModelLightbox] = useState(null); // null | index — for selected vehicle
+  const [matchJobCarLightbox, setMatchJobCarLightbox] = useState(null); // null | index — for job car photos at top
   const [matchModelSelected, setMatchModelSelected] = useState(null);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
   const [refreshing,    setRefreshing]    = useState(false);
@@ -5047,7 +5048,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
         };
         return(
           <Overlay onClose={()=>setMatchModelOpen(false)} wide>
-            <MHead title="🔗 Match Vehicle Model" onClose={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelLightbox(null); }}/>
+            <MHead title="🔗 Match Vehicle Model" onClose={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelLightbox(null); setMatchJobCarLightbox(null); }}/>
             {/* Job car photos for comparison */}
             {(()=>{
               const photos=[
@@ -5058,12 +5059,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
               if(!photos.length) return null;
               return(
                 <>
-                  {matchModelLightbox!==null&&(
+                  {matchJobCarLightbox!==null&&(
                     <ImgLightbox
                       urls={photos.map(p=>p.src)}
                       labels={photos.map(p=>p.label)}
-                      startIdx={matchModelLightbox}
-                      onClose={()=>setMatchModelLightbox(null)}/>
+                      startIdx={matchJobCarLightbox}
+                      onClose={()=>setMatchJobCarLightbox(null)}/>
                   )}
                   <div style={{marginBottom:12}}>
                     <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>
@@ -5072,7 +5073,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                     <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,gap:6}}>
                       {photos.map((p,i)=>(
                         <div key={p.label} style={{position:"relative",borderRadius:8,overflow:"hidden",cursor:"zoom-in",border:"2px solid var(--accent)"}}
-                          onClick={()=>setMatchModelLightbox(i)}>
+                          onClick={()=>setMatchJobCarLightbox(i)}>
                           <img src={p.src} alt={p.label} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}
                             onError={e=>e.target.parentNode.style.display="none"}/>
                           <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"2px 7px",background:"rgba(0,0,0,.55)",fontSize:10,fontWeight:700,color:"#fff",textAlign:"center"}}>

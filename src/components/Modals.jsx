@@ -7256,6 +7256,395 @@ export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// WORKSHOP REQUESTS PAGE  (spare-shop side)
+// ═══════════════════════════════════════════════════════════════
+export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onReply,onRefresh,userRole="",userBranchId=null}) {
+  const [selId,    setSelId]    = useState(null);
+  const [filter,   setFilter]   = useState("pending");
+  const [refreshing,setRefreshing]=useState(false);
+
+  const pendingCount=wsShopRequests.filter(r=>r.status==="pending").length;
+  const visible=wsShopRequests
+    .filter(r=>filter==="all"?true:r.status===filter)
+    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const selected=selId?wsShopRequests.find(r=>r.id===selId)||null:null;
+
+  const doRefresh=async()=>{setRefreshing(true);try{await onRefresh();}finally{setRefreshing(false);}};
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18,flexWrap:"wrap"}}>
+        <div style={{fontWeight:800,fontSize:20,flex:1}}>🏪 Workshop Parts Requests</div>
+        <button className="btn btn-ghost btn-sm" disabled={refreshing} onClick={doRefresh}>↻ Refresh</button>
+      </div>
+
+      {/* Filter tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:16}}>
+        {[["pending",`⏳ Pending${pendingCount>0?` (${pendingCount})`:""}`],["replied","✅ Replied"],["all","All"]].map(([v,lbl])=>(
+          <button key={v} onClick={()=>{setFilter(v);setSelId(null);}}
+            style={{padding:"6px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
+              background:filter===v?"var(--accent)":"var(--surface2)",color:filter===v?"#fff":"var(--text3)"}}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      {/* Detail panel (shown when a request is selected) */}
+      {selected&&(
+        <div style={{marginBottom:20,border:"2px solid var(--accent)",borderRadius:14,overflow:"hidden"}}>
+          <div style={{padding:"10px 16px",background:"rgba(251,146,60,.08)",display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontWeight:700,flex:1}}>Reviewing: {selected.workshop_name} — {selected.job_car||"—"}</span>
+            <button onClick={()=>setSelId(null)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:18,padding:"0 4px"}}>✕</button>
+          </div>
+          <WsShopRequestDetail req={selected} parts={parts} settings={settings} onReply={async(...a)=>{await onReply(...a);setSelId(null);}} userRole={userRole} userBranchId={userBranchId}/>
+        </div>
+      )}
+
+      {/* Request list */}
+      {visible.length===0
+        ? <div style={{textAlign:"center",padding:"48px 0",color:"var(--text3)",fontSize:14}}>No {filter==="all"?"":filter} requests</div>
+        : <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {visible.map(req=>{
+              const items=(() => {try{return JSON.parse(req.items||"[]");}catch{return [];}})();
+              const isSel=selId===req.id;
+              return (
+                <div key={req.id}
+                  style={{padding:"14px 16px",borderRadius:12,cursor:"pointer",
+                    border:`2px solid ${isSel?"var(--accent)":"var(--border)"}`,
+                    background:isSel?"rgba(251,146,60,.06)":"var(--surface2)",transition:"all .15s"}}
+                  onClick={()=>setSelId(isSel?null:req.id)}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:200}}>
+                      <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>🔧 {req.workshop_name||"Workshop"}{req.requester_name?` · ${req.requester_name}`:""}</div>
+                      <div style={{fontSize:12,color:"var(--text3)"}}>{req.job_car||"—"}{req.job_complaint?` · ${req.job_complaint}`:""}</div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{items.length} part{items.length!==1?"s":""} · {req.created_at?new Date(req.created_at).toLocaleString():"—"}</div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                      <span style={{fontSize:11,padding:"3px 10px",borderRadius:99,fontWeight:600,
+                        background:req.status==="pending"?"rgba(251,146,60,.15)":"rgba(52,211,153,.15)",
+                        color:req.status==="pending"?"#f59e0b":"#34d399"}}>
+                        {req.status==="pending"?"⏳ Pending":"✅ Replied"}
+                      </span>
+                      <span style={{fontSize:12,color:"var(--accent)",fontWeight:600}}>{isSel?"▲ Close":"▼ Review"}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+      }
+    </div>
+  );
+}
+
+function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", userBranchId=null}) {
+  const reqItems = (() => {try{return JSON.parse(req.items||"[]");}catch{return [];}})();
+  const existingReply = (() => {try{return JSON.parse(req.reply_items||"[]");}catch{return [];}})();
+
+  const [replyLines, setReplyLines] = useState(()=>
+    reqItems.map((item,i)=>({
+      description: item.description||"",
+      sku: item.sku||"",
+      qty: item.qty||1,
+      price: existingReply[i]?.price||"",
+      available: existingReply[i]?.available!==false,
+      part_id: existingReply[i]?.part_id||null,
+      notes: existingReply[i]?.notes||"",
+    }))
+  );
+  const [replyNotes, setReplyNotes] = useState(req.reply_notes||"");
+  const [saving, setSaving] = useState(false);
+  const [partSearch, setPartSearch] = useState({}); // {lineIdx: searchStr}
+  const [creating, setCreating] = useState(null);   // lineIdx currently creating a new part
+  const [newPart, setNewPart] = useState({name:"",sku:"",cost:"",price:""});
+  const [createSaving, setCreateSaving] = useState(false);
+  const [lightbox, setLightbox] = useState(null);
+
+  const Cs = C();
+
+  const updateLine=(idx,patch)=>setReplyLines(prev=>prev.map((l,i)=>i===idx?{...l,...patch}:l));
+
+  const searchResults=(idx)=>{
+    const q=(partSearch[idx]||"").toLowerCase().trim();
+    if(!q) return [];
+    return parts.filter(p=>{
+      const hay=`${p.name||""} ${p.sku||""} ${p.oe_number||""}`.toLowerCase();
+      return q.split(/\s+/).every(w=>hay.includes(w));
+    }).slice(0,8);
+  };
+
+  const pickPart=(idx,p)=>{
+    updateLine(idx,{part_id:String(p.id),price:String(p.price||""),description:p.name,sku:p.sku||"",notes:""});
+    setPartSearch(prev=>({...prev,[idx]:""}));
+  };
+
+  const handleCreatePart=async(idx)=>{
+    if(!newPart.name.trim()||!newPart.price){alert("Name and sell price required");return;}
+    // Duplicate detection — check exact SKU/OE match and similar name
+    const skuTrimmed=newPart.sku.trim().toLowerCase();
+    const nameTrimmed=newPart.name.trim().toLowerCase();
+    const exactSku=skuTrimmed?parts.find(p=>(p.sku||"").toLowerCase()===skuTrimmed||(p.oe_number||"").toLowerCase()===skuTrimmed):null;
+    const sameName=parts.find(p=>(p.name||"").toLowerCase()===nameTrimmed);
+    const dupe=exactSku||sameName;
+    if(dupe){
+      const ok=window.confirm(`⚠️ Possible duplicate detected!\n\n"${dupe.name}"${dupe.sku?` · SKU: ${dupe.sku}`:""}\nalready exists in inventory.\n\nSearch for it above and link it instead, or click OK to create a new part anyway.`);
+      if(!ok)return;
+    }
+    setCreateSaving(true);
+    try{
+      const needsReview=!!(userBranchId&&userRole!=="admin"&&userRole!=="manager");
+      const payload={name:newPart.name.trim(),sku:newPart.sku.trim()||null,
+        price:+newPart.price||0,cost_price:+newPart.cost||0,stock:0,min_stock:0,
+        ...(needsReview?{review_status:"pending",created_by_branch_id:String(userBranchId)}:{})};
+      const res=await api.insert("parts",payload);
+      if(res?.code){alert("Failed: "+res.message);return;}
+      const newId=Array.isArray(res)&&res[0]?String(res[0].id):null;
+      if(!newId){alert("Part saved but could not get ID — please search for it manually.");return;}
+      updateLine(idx,{part_id:newId,price:String(newPart.price),description:newPart.name.trim(),sku:newPart.sku.trim()||"",notes:needsReview?"Pending admin approval":""});
+      setCreating(null);
+      setNewPart({name:"",sku:"",cost:"",price:""});
+    }finally{setCreateSaving(false);}
+  };
+
+  const handleReply=async()=>{
+    setSaving(true);
+    try{
+      const payload=replyLines.map((l)=>{
+        const linkedPart=parts.find(p=>String(p.id)===String(l.part_id))||null;
+        const photos=(() => {try{return JSON.parse(linkedPart?.photos||"[]");}catch{return [];}})();
+        return {
+          description:l.description,sku:l.sku,qty:l.qty,
+          price:+l.price||0,available:l.available,part_id:l.part_id||null,
+          notes:l.notes||"",
+          part_photo:photos[0]||linkedPart?.photo_url||"",
+          part_name:linkedPart?.name||l.description,
+        };
+      });
+      await onReply(req.id, payload, replyNotes);
+    }finally{setSaving(false);}
+  };
+
+  const waMsg=`Hi 👋\n\nParts request reply from *${settings.shop_name||"Spare Shop"}*\n\nJob: ${req.job_car||"—"}\n\n`+
+    replyLines.map((l,i)=>
+      `${i+1}. ${l.description}${l.sku?` (${l.sku})`:""}  —  ${l.available?`✅ Available @ ${settings.currency_symbol||"R"}${l.price||"0"}`:"❌ Not available"}${l.notes?`  (${l.notes})`:""}`
+    ).join("\n")+
+    (replyNotes?`\n\nNotes: ${replyNotes}`:"")+"\n\nPlease check your workshop app for details.";
+  const workshopPhone=req.workshop_phone||"";
+
+  return (
+    <div style={{padding:"20px 24px"}}>
+      {/* Header */}
+      <div style={{marginBottom:20,paddingBottom:16,borderBottom:"1px solid var(--border)"}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{fontWeight:800,fontSize:18,marginBottom:4}}>🔧 {req.workshop_name||"Workshop"}</div>
+            {req.requester_name&&<div style={{fontSize:13,color:"var(--text3)"}}>👤 Requested by: <strong style={{color:"var(--text)"}}>{req.requester_name}</strong></div>}
+            {req.job_car&&<div style={{fontSize:13,color:"var(--text3)"}}>🚗 Vehicle: <strong style={{color:"var(--text)"}}>{req.job_car}</strong></div>}
+            {req.job_complaint&&<div style={{fontSize:13,color:"var(--text3)"}}>⚠️ Issue: <em>{req.job_complaint}</em></div>}
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Received: {req.created_at?new Date(req.created_at).toLocaleString():"—"}</div>
+          </div>
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            {workshopPhone&&<a href={`https://wa.me/${workshopPhone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer"
+              style={{padding:"6px 12px",borderRadius:8,background:"#25D366",color:"#fff",fontWeight:700,fontSize:12,textDecoration:"none"}}>
+              💬 WhatsApp Workshop</a>}
+            <span style={{padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:600,
+              background:req.status==="pending"?"rgba(251,146,60,.15)":"rgba(52,211,153,.15)",
+              color:req.status==="pending"?"#f59e0b":"#34d399"}}>
+              {req.status==="pending"?"⏳ Pending Reply":"✅ Replied"}
+            </span>
+          </div>
+        </div>
+        {req.notes&&<div style={{marginTop:10,padding:"8px 12px",background:"var(--surface2)",borderRadius:8,fontSize:12,color:"var(--text2)",border:"1px solid var(--border)"}}>📝 Workshop note: {req.notes}</div>}
+
+        {/* VIN Search & Tools */}
+        {(req.vin||req.engine_no)&&(
+          <div style={{marginTop:12,padding:"12px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>🔍 VIN Search &amp; Tools</div>
+            <div style={{display:"flex",gap:10,marginBottom:req.vin?10:0,flexWrap:"wrap",alignItems:"center"}}>
+              {req.vin&&<>
+                <code style={{fontFamily:"DM Mono,monospace",fontSize:13,fontWeight:700,padding:"4px 10px",borderRadius:6,background:"var(--surface)",border:"1px solid var(--border)",letterSpacing:"1px"}}>{req.vin}</code>
+                <button onClick={()=>navigator.clipboard.writeText(req.vin).then(()=>alert("VIN copied!"))}
+                  style={{fontSize:11,padding:"4px 8px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,cursor:"pointer",color:"var(--text3)"}}>📋 Copy VIN</button>
+              </>}
+              {req.engine_no&&<span style={{fontSize:12,color:"var(--text2)"}}>Engine #: <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,color:"var(--text)"}}>{req.engine_no}</code></span>}
+            </div>
+            {req.vin&&(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                {[
+                  {label:"CatCar",    icon:"🐱", color:"#f97316", bg:"rgba(249,115,22,.13)", href:`https://catcar.info/?lang=en&vin=${encodeURIComponent(req.vin)}`},
+                  {label:"PartsOuq",  icon:"🔩", color:"#60a5fa", bg:"rgba(96,165,250,.13)",  href:`https://partsouq.com/en/search/all?q=${encodeURIComponent(req.vin)}`},
+                  {label:"RealOEM",   icon:"🚗", color:"#34d399", bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(req.vin)}`},
+                  {label:"VIN Decode",icon:"🔎", color:"#fbbf24", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(req.vin)}`},
+                  {label:"17VIN",     icon:"🆔", color:"#94a3b8", bg:"rgba(148,163,184,.13)", href:`https://en.17vin.com/vin/${encodeURIComponent(req.vin)}`},
+                  {label:"Willard",   icon:"🔋", color:"#ef4444", bg:"rgba(220,38,38,.11)",   href:"https://willard.co.za/battery-selection-tool/"},
+                  {label:"VARTA",     icon:"⚡", color:"#6366f1", bg:"rgba(99,102,241,.11)",  href:"https://www.varta-automotive.com/battery-finder"},
+                  {label:"Safeline",  icon:"🛑", color:"#dc2626", bg:"rgba(220,38,38,.09)",   href:"https://safelinebrakes.co.za/"},
+                  {label:"AutoZone",  icon:"🔴", color:"#dc2626", bg:"rgba(220,38,38,.12)",   href:`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(req.vin)}`},
+                  {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)",  href:"https://www.amayama.com"},
+                  {label:"WolfOil",   icon:"🛢️", color:"#f97316", bg:"rgba(249,115,22,.12)",  href:"https://za.wolfoil.com/en-us/oil-finder"},
+                ].map(lk=>(
+                  <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
+                      background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:10,
+                      color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                    <span style={{fontSize:20}}>{lk.icon}</span>
+                    <span>{lk.label}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Parts list */}
+      <div style={{marginBottom:20}}>
+        <div style={{fontWeight:700,fontSize:13,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>
+          Parts Needed ({reqItems.length})
+        </div>
+        {replyLines.map((line,idx)=>{
+          const reqItem=reqItems[idx]||{};
+          const linkedPart=line.part_id?parts.find(p=>String(p.id)===String(line.part_id)):null;
+          const partPhotos=(() => {try{return JSON.parse(linkedPart?.photos||"[]");}catch{return [];}})();
+          const reqPhoto=reqItem.photo_url||"";
+          const results=searchResults(idx);
+          const isCreating=creating===idx;
+
+          return (
+            <div key={idx} style={{marginBottom:14,padding:14,borderRadius:12,border:"1px solid var(--border)",background:"var(--surface2)"}}>
+              {/* Part header row */}
+              <div style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:10}}>
+                {/* Workshop photo (if sent) */}
+                {reqPhoto&&(
+                  <img src={toImgUrl(reqPhoto)} alt="" onClick={()=>setLightbox(reqPhoto)}
+                    style={{width:64,height:64,objectFit:"cover",borderRadius:8,cursor:"pointer",flexShrink:0,border:"1px solid var(--border)"}}/>
+                )}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{reqItem.description||line.description}</div>
+                  {reqItem.sku&&<code style={{fontSize:11,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{reqItem.sku}</code>}
+                  <div style={{fontSize:11,color:"var(--text3)"}}>Qty needed: {line.qty}</div>
+                </div>
+                {/* Linked part photo */}
+                {linkedPart&&(partPhotos[0]||linkedPart.photo_url)&&(
+                  <img src={toImgUrl(partPhotos[0]||linkedPart.photo_url)} alt=""
+                    onClick={()=>setLightbox(partPhotos[0]||linkedPart.photo_url)}
+                    style={{width:56,height:56,objectFit:"cover",borderRadius:8,cursor:"pointer",flexShrink:0,border:"2px solid var(--accent)"}}/>
+                )}
+              </div>
+
+              {/* Linked part chip */}
+              {linkedPart&&(
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,padding:"6px 10px",background:"rgba(52,211,153,.1)",borderRadius:8,border:"1px solid rgba(52,211,153,.25)"}}>
+                  <span style={{fontSize:12,color:"#34d399",flex:1}}>✅ Linked: <strong>{linkedPart.name}</strong>{linkedPart.sku?` · ${linkedPart.sku}`:""}</span>
+                  <button onClick={()=>updateLine(idx,{part_id:null})} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,padding:"0 2px"}}>✕</button>
+                </div>
+              )}
+
+              {/* Search inventory */}
+              {!linkedPart&&!isCreating&&(
+                <div style={{marginBottom:8,position:"relative"}}>
+                  <input className="inp" placeholder="🔍 Search inventory by name or SKU…"
+                    value={partSearch[idx]||""} onChange={e=>setPartSearch(p=>({...p,[idx]:e.target.value}))}
+                    style={{fontSize:12}}/>
+                  {results.length>0&&(
+                    <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:99,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.25)",maxHeight:200,overflowY:"auto"}}>
+                      {results.map(p=>{
+                        const ph=(() => {try{return JSON.parse(p.photos||"[]");}catch{return [];}})();
+                        return (
+                          <div key={p.id} onClick={()=>pickPart(idx,p)}
+                            style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer",borderBottom:"1px solid var(--border2)"}}>
+                            {(ph[0]||p.photo_url)&&<img src={toImgUrl(ph[0]||p.photo_url)} alt="" style={{width:32,height:32,objectFit:"cover",borderRadius:4,flexShrink:0}}/>}
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                              <div style={{fontSize:10,color:"var(--text3)"}}>{p.sku||""} · {C()}{fmtAmt(p.price)}</div>
+                            </div>
+                            <span style={{fontSize:11,color:p.stock>0?"#34d399":"var(--red)",fontWeight:600}}>{p.stock>0?`In stock (${p.stock})`:"Out"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Create new part inline */}
+              {!linkedPart&&!isCreating&&(
+                <button onClick={()=>{setCreating(idx);setNewPart({name:reqItem.description||"",sku:reqItem.sku||"",cost:"",price:""}); setPartSearch(p=>({...p,[idx]:""}));}}
+                  style={{fontSize:11,color:"var(--blue)",background:"none",border:"1px dashed rgba(96,165,250,.4)",borderRadius:6,padding:"4px 10px",cursor:"pointer",marginBottom:8}}>
+                  ➕ Create new part in inventory
+                </button>
+              )}
+
+              {isCreating&&(
+                <div style={{padding:10,background:"rgba(96,165,250,.07)",borderRadius:8,border:"1px solid rgba(96,165,250,.25)",marginBottom:8}}>
+                  <div style={{fontWeight:600,fontSize:12,color:"var(--blue)",marginBottom:8}}>New Part</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}>
+                    <div><div style={{fontSize:10,color:"var(--text3)",marginBottom:2}}>Name *</div>
+                      <input className="inp" value={newPart.name} onChange={e=>setNewPart(p=>({...p,name:e.target.value}))} placeholder="Part name" style={{fontSize:12}}/></div>
+                    <div><div style={{fontSize:10,color:"var(--text3)",marginBottom:2}}>SKU / OE Number</div>
+                      <input className="inp" value={newPart.sku} onChange={e=>setNewPart(p=>({...p,sku:e.target.value}))} placeholder="Optional" style={{fontSize:12}}/></div>
+                    <div><div style={{fontSize:10,color:"var(--text3)",marginBottom:2}}>Cost</div>
+                      <input className="inp" type="number" value={newPart.cost} onChange={e=>setNewPart(p=>({...p,cost:e.target.value}))} placeholder="0" style={{fontSize:12}}/></div>
+                    <div><div style={{fontSize:10,color:"var(--text3)",marginBottom:2}}>Sell Price *</div>
+                      <input className="inp" type="number" value={newPart.price} onChange={e=>setNewPart(p=>({...p,price:e.target.value}))} placeholder="0" style={{fontSize:12}}/></div>
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>setCreating(null)} style={{flex:1,padding:"6px",borderRadius:6,border:"1px solid var(--border)",background:"none",cursor:"pointer",fontSize:11}}>Cancel</button>
+                    <button onClick={()=>handleCreatePart(idx)} disabled={createSaving||!newPart.name.trim()||!newPart.price}
+                      style={{flex:2,padding:"6px",borderRadius:6,border:"none",background:"var(--blue)",color:"#fff",cursor:"pointer",fontWeight:600,fontSize:11,opacity:createSaving||!newPart.name.trim()||!newPart.price?0.5:1}}>
+                      {createSaving?"Saving…":"✅ Create & Link"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Reply fields: price + availability + notes */}
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer"}}>
+                  <input type="checkbox" checked={line.available} onChange={e=>updateLine(idx,{available:e.target.checked})} style={{accentColor:"#34d399",width:14,height:14}}/>
+                  <span style={{fontSize:11,fontWeight:600,color:line.available?"#34d399":"var(--red)"}}>
+                    {line.available?"✅ Available":"❌ Not available"}
+                  </span>
+                </label>
+                <input className="inp" type="number" min="0" step="0.01"
+                  value={line.price} onChange={e=>updateLine(idx,{price:e.target.value})}
+                  placeholder="Price" disabled={!line.available}
+                  style={{width:110,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,opacity:line.available?1:0.4}}/>
+                <input className="inp" value={line.notes} onChange={e=>updateLine(idx,{notes:e.target.value})}
+                  placeholder="Note (condition, ETA…)" style={{flex:1,minWidth:140,fontSize:12}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Reply notes + send */}
+      <div style={{padding:16,background:"var(--surface2)",borderRadius:12,border:"1px solid var(--border)"}}>
+        <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>Reply Notes (optional)</div>
+        <textarea className="inp" rows={2} value={replyNotes} onChange={e=>setReplyNotes(e.target.value)}
+          placeholder="Overall notes for workshop…" style={{width:"100%",resize:"vertical",marginBottom:12}}/>
+        <div style={{display:"flex",gap:8}}>
+          {workshopPhone&&(
+            <a href={`https://wa.me/${workshopPhone.replace(/\D/g,"")}?text=${encodeURIComponent(waMsg)}`}
+              target="_blank" rel="noreferrer"
+              style={{padding:"10px 16px",borderRadius:10,background:"#25D366",color:"#fff",fontWeight:700,fontSize:13,textDecoration:"none",display:"flex",alignItems:"center",gap:6}}>
+              💬 Send via WhatsApp
+            </a>
+          )}
+          <button onClick={handleReply} disabled={saving}
+            style={{flex:1,padding:"10px 16px",borderRadius:10,border:"none",background:"var(--accent)",color:"#fff",fontWeight:700,fontSize:13,cursor:saving?"not-allowed":"pointer",opacity:saving?0.7:1}}>
+            {saving?"Sending…":"✅ Send Reply to Workshop"}
+          </button>
+        </div>
+      </div>
+
+      {lightbox&&<ImgLightbox src={toImgUrl(lightbox)} onClose={()=>setLightbox(null)}/>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // PRINT SHELF LABEL MODAL
 // ═══════════════════════════════════════════════════════════════
 export function PrintShelfLabelModal({settings,onClose}) {

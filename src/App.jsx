@@ -8,7 +8,7 @@ import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./l
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { PosPage } from "./components/Pos.jsx";
@@ -129,6 +129,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [partRequests,setPartRequests]=useState([]);
   const [branchStock,setBranchStock]=useState([]);
   const [branchStockRequests,setBranchStockRequests]=useState([]);
+  const [wsShopRequests,setWsShopRequests]=useState([]);
+  const wsShopReqSeenRef=useRef(null);
   const [wsReadyPopup,setWsReadyPopup]=useState(null); // confirmed BSRs to show after invoice save
   // Sync settings state from _settings cache after it loads from DB
   useEffect(()=>{ setSettings({...getSettings()}); },[]);
@@ -142,6 +144,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [searchDebounced,setSearchDebounced]=useState("");
   const [filterCat,setFilterCat]=useState("__all__");
   const [filterLow,setFilterLow]=useState(false);
+  const [filterPendingReview,setFilterPendingReview]=useState(false);
   const [filterFits,setFilterFits]=useState("__all__"); // __all__ | none | has
   const [filterBranch,setFilterBranch]=useState("__all__"); // __all__ | "main" | branch_id
   const [filterQuantum,setFilterQuantum]=useState(false);
@@ -213,7 +216,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   },[searchPart]);
 
   // Reset page when filters change
-  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier]);
+  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier,filterPendingReview]);
   useEffect(()=>{ setShopPage(0); },[searchPart]);
   // Modals
   const [M,setM]=useState({});
@@ -290,6 +293,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   },[]);
 
   const showToast=(msg,type="ok")=>{setToast({msg,type});setTimeout(()=>setToast(null),2800);};
+
+  // Alarm: notify admin/manager when new workshop parts requests arrive
+  useEffect(()=>{
+    if(!["admin","manager","branch_admin","branch_manager"].includes(role)) return;
+    const pending=wsShopRequests.filter(r=>r.status==="pending");
+    if(wsShopReqSeenRef.current===null){wsShopReqSeenRef.current=new Set(pending.map(r=>r.id));return;}
+    const newOnes=pending.filter(r=>!wsShopReqSeenRef.current.has(r.id));
+    if(newOnes.length){
+      const first=newOnes[0];
+      showToast(`📬 Workshop request from ${first.workshop_name||"Workshop"} — ${newOnes.length} new`);
+      newOnes.forEach(r=>wsShopReqSeenRef.current.add(r.id));
+    }
+  },[wsShopRequests]);
 
   // Demo mode — block all writes, show toast
   const isDemo = user?.role==="demo";
@@ -627,6 +643,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       stock_takes:              ["select=*&order=created_at.desc",                   d=>setStockTakes(Array.isArray(d)?d:[])],
       part_requests:            [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setPartRequests(Array.isArray(d)?d:[])],
       branch_stock_requests:    [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`or=(requesting_branch_id.eq.${user.branch_id},supplying_branch_id.eq.${user.branch_id})&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setBranchStockRequests(Array.isArray(d)?d:[])],
+      ws_shop_requests:         [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setWsShopRequests(Array.isArray(d)?d:[])],
       branch_stock:             [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*`:"select=*", d=>setBranchStock(Array.isArray(d)?d:[])],
       workshop_jobs:            [`select=*&order=date_in.desc${wsF}`,                d=>setWorkshopJobs(Array.isArray(d)?d:[])],
       workshop_job_items:       [`select=*${wsF}`,                                   d=>setWorkshopJobItems(Array.isArray(d)?d:[])],
@@ -1700,6 +1717,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     await refreshTables("vehicles"); showToast("Deleted","err");
   };
   const deletePart=async(id)=>{const p=parts.find(pt=>pt.id===id);setBusyMsg(`Deleting ${p?.sku||""}${p?.name?" · "+p.name:""}`);try{if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await api.delete("parts","id",id);await refreshTables("parts","inventory_logs");showToast("Deleted","err");}finally{setBusyMsg(null);}};
+  const approvePart=async(id)=>{await api.patch("parts","id",id,{review_status:null,created_by_branch_id:null});await refreshTables("parts");showToast("✅ Part approved");};
   const applyAdjust=async(part,nq,reason)=>{
     await api.patch("parts","id",part.id,{stock:nq});
     await logInv(part,part.stock,nq,"Manual Adj.",reason||"Manual");
@@ -2432,6 +2450,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     :parts;
   const pendingPartRequests=partRequests.filter(r=>r.status==="pending").length||0;
   const pendingTransferRequests=branchStockRequests.filter(r=>r.status==="pending"||r.status==="quoted"||r.status==="confirmed"||r.status==="dispatched").length||0;
+  const pendingWsShopRequests=wsShopRequests.filter(r=>r.status==="pending").length||0;
   // Multi-word search using DEBOUNCED value — fast typing won't lag UI
   const suppNoByPart={};
   partSuppliers.forEach(ps=>{if(ps.supplier_part_no)suppNoByPart[ps.part_id]=(suppNoByPart[ps.part_id]||[]).concat(ps.supplier_part_no.toLowerCase());});
@@ -2478,6 +2497,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(filterInStock&&!(p.stock>0))return false;
     if(filterNoPhoto&&(p.image_url||p.image_data))return false;
     if(supplierFilterPartIds&&!supplierFilterPartIds.has(String(p.id)))return false;
+    if(filterPendingReview&&p.review_status!=="pending")return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
     if(filterFits!=="__all__"){
       const hasFit=partFitments.some(f=>String(f.part_id)===String(p.id));
@@ -2509,6 +2529,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(branchId&&c.branch_id!==branchId)return false;
     return c.name?.includes(searchCust)||c.phone?.includes(searchCust);
   });
+  const pendingPartsReview=(role==="admin"||role==="manager")?parts.filter(p=>p.review_status==="pending").length:0;
   const lowStock=displayParts.filter(p=>{
     if(role==="branch_admin"){const isMain=!p.branch_id||p.branch_id===mainBranchId;const isOwn=p.branch_id===branchId;return (isMain||isOwn)&&p.stock<=p.min_stock;}
     return (branchId?p.branch_id===branchId:true)&&p.stock<=p.min_stock;
@@ -2545,6 +2566,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       ];
   const sub=getSubInfo(user);
 
+  const saveWsShopRequest=async(data)=>{
+    const res=await api.upsert("ws_shop_requests",data);
+    if(res?.code){showToast(`Error: ${res.message||res.code}`,"err");return;}
+    await refreshTables("ws_shop_requests");
+    showToast("📬 Parts request sent to spare shop");
+  };
+  const replyWsShopRequest=async(id,replyItems,replyNotes)=>{
+    const res=await api.patch("ws_shop_requests","id",id,{reply_items:JSON.stringify(replyItems),reply_notes:replyNotes||null,status:"replied",replied_at:new Date().toISOString()});
+    if(res?.code){showToast(`Error: ${res.message||res.code}`,"err");return;}
+    await refreshTables("ws_shop_requests");
+    showToast("✅ Reply sent to workshop");
+  };
+
   // Grouped nav for sidebar
   const navGroups=[
     {
@@ -2563,6 +2597,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager","branch_admin"]},
         {id:"partRequests",icon:"📬",label:"Part Requests",roles:["admin"],badge:pendingPartRequests},
         {id:"transferRequests",icon:"🔄",label:"Transfer Requests",roles:["admin","branch_admin","branch_manager"],badge:pendingTransferRequests},
+        {id:"wsShopRequests",icon:"🏪",label:"Workshop Requests",roles:["admin","manager"],badge:pendingWsShopRequests},
       ]
     },
     {
@@ -3322,6 +3357,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 </span>
               </div>
             )}
+            {(role==="admin"||role==="manager")&&pendingPartsReview>0&&(
+              <div onClick={()=>setFilterPendingReview(f=>!f)} style={{
+                background:filterPendingReview?"rgba(251,191,36,.18)":"rgba(251,191,36,.07)",
+                border:`1px solid ${filterPendingReview?"rgba(251,191,36,.7)":"rgba(251,191,36,.3)"}`,
+                borderRadius:10,padding:"10px 16px",marginBottom:14,
+                display:"flex",alignItems:"center",gap:10,cursor:"pointer",transition:"all .15s"
+              }}>
+                <span style={{fontSize:18}}>🕵️</span>
+                <div style={{flex:1,fontSize:13}}>
+                  <span style={{fontWeight:700,color:"#fbbf24"}}>{pendingPartsReview} part{pendingPartsReview!==1?"s":""} pending review</span>
+                  <span style={{color:"var(--text3)",marginLeft:8}}>Created by branch — need admin approval</span>
+                </div>
+                <span style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",
+                  color:filterPendingReview?"#fbbf24":"var(--text3)",
+                  background:filterPendingReview?"rgba(251,191,36,.15)":"var(--surface2)",
+                  padding:"3px 10px",borderRadius:99,border:`1px solid ${filterPendingReview?"rgba(251,191,36,.5)":"var(--border)"}`}}>
+                  {filterPendingReview?"✓ Showing pending":"Review"}
+                </span>
+              </div>
+            )}
             <PH title={t.inventory} subtitle={`${parts.length} parts · ${lowStock.length} low`}
               action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <button className="btn btn-ghost btn-sm" disabled={invRefreshing} onClick={async()=>{setInvRefreshing(true);try{api.cacheInvalidate("parts");api.cacheInvalidate("branch_stock");await refreshTables("parts","branch_stock","part_fitments","part_suppliers","vehicles","orders","customers","suppliers","inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes","inventory_logs","customer_queries","workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes","workshop_customers","workshop_vehicles","workshop_stock","workshop_services","workshop_suppliers","ws_supplier_requests","ws_supplier_quotes","ws_supplier_invoices","ws_supplier_invoice_items","ws_supplier_payments","ws_supplier_returns","ws_purchase_orders","ws_po_items");}finally{setInvRefreshing(false);}}} title="Reload all data">
@@ -3515,7 +3570,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 {suppliers.sort((a,b)=>a.name.localeCompare(b.name)).map(s=><option key={s.id} value={String(s.id)}>{s.name}</option>)}
               </select>
               {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace||filterInStock||filterNoPhoto||filterSupplier!=="__all__")&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setFilterInStock(false);setFilterNoPhoto(false);setFilterSupplier("__all__");setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterPendingReview(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setFilterInStock(false);setFilterNoPhoto(false);setFilterSupplier("__all__");setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
             </div>
             {/* ── Top pagination bar (between search and table) ── */}
@@ -3569,6 +3624,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                           <span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)",opacity:.55}}>#{p.id}</span>
                           {p.bin_location&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)",background:"rgba(96,165,250,.1)",padding:"1px 7px",borderRadius:5}}>📦 {p.bin_location}</span>}
                           {p.category&&<span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:10}}>{p.category}</span>}
+                          {p.review_status==="pending"&&<span className="badge" style={{background:"rgba(251,191,36,.18)",color:"#fbbf24",fontSize:10,border:"1px solid rgba(251,191,36,.4)"}}>⏳ Pending Review</span>}
                           {p.is_quantum&&<span className="badge" style={{background:"rgba(249,115,22,.12)",color:"var(--accent)",fontSize:10}}>🚐 Quantum</span>}
                           {p.is_hiace&&<span className="badge" style={{background:"rgba(59,130,246,.12)",color:"var(--blue)",fontSize:10}}>🚐 Hiace</span>}
                         </div>
@@ -3612,6 +3668,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                             <button className="btn btn-ghost btn-xs" onClick={()=>openM("partSupplier",p)}>🏭 Supp</button>
                             <button className="btn btn-ghost btn-xs" onClick={()=>{setLogSearch(p.sku||"");setTab("logs");}}>📝 Logs</button>
                             <button className="btn btn-ghost btn-xs" onClick={()=>openM("printPartLabel",p)}>🏷️ Label</button>
+                            {p.review_status==="pending"&&<button className="btn btn-xs" style={{background:"rgba(52,211,153,.15)",color:"#34d399",border:"1px solid rgba(52,211,153,.4)"}} onClick={()=>approvePart(p.id)}>✅ Approve</button>}
                             <button className="btn btn-danger btn-xs" onClick={()=>deletePart(p.id)}>🗑</button>
                           </>
                         ):(
@@ -4756,6 +4813,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             onRefreshBookings={refreshWsBookings}
             onRefresh={refreshWorkshopData}
             wsProfile={workshopProfile}
+            wsShopRequests={wsShopRequests}
+            onSaveWsShopRequest={saveWsShopRequest}
             branches={branches}
             onPlaceShopOrder={async({localItems,mainItems,requestItems,notes,linkedBranchId,mainBranchId})=>{
               let localOid=null,bsrId=null,linkedBsrId=null;
@@ -4818,6 +4877,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
 
         {tab==="transferRequests"&&(role==="admin"||role==="branch_admin")&&(
           <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} onRefresh={()=>refreshTables("branch_stock_requests")}/>
+        )}
+
+        {tab==="wsShopRequests"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
+          <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} onReply={replyWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
         )}
 
         {tab==="settings"&&role==="admin"&&(

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
@@ -2730,7 +2730,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[],wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,vehicles=[],wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -2783,6 +2783,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
   const [matchJobCarLightbox, setMatchJobCarLightbox] = useState(null); // null | index — for job car photos at top
   const [matchModelSelected, setMatchModelSelected] = useState(null);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
+  // Local spare-shop reply state — fetched fresh every time this job opens so
+  // we are never blocked on the parent's stale wsShopRequests prop.
+  const [localShopRequests, setLocalShopRequests] = useState(wsShopRequests);
+  const refreshLocalShopRequests = useCallback(async()=>{
+    api.cacheInvalidate("ws_shop_requests");
+    const d = await api.getFirst("ws_shop_requests",`job_id=eq.${job.id}&select=*&order=created_at.desc`,50).catch(()=>null);
+    if(Array.isArray(d)) setLocalShopRequests(d);
+  },[job.id]);
+  useEffect(()=>{
+    refreshLocalShopRequests();
+  },[refreshLocalShopRequests]);
   const [refreshing,    setRefreshing]    = useState(false);
   const [noteEdit,      setNoteEdit]      = useState(false);
   const [noteVal,       setNoteVal]       = useState(job.notes||"");
@@ -4092,16 +4103,66 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
             });
           });
           // Add spare shop reply prices to cost map
-          wsShopRequests.forEach(req=>{
-            const replyItems=(()=>{try{return JSON.parse(req.reply_items||"[]");}catch{return[];}})();
-            replyItems.forEach(ri=>{
+          // safeJ handles both jsonb (already-parsed array) and text columns
+          const safeJ=(v)=>{if(Array.isArray(v))return v;if(v&&typeof v==="object")return[v];try{return JSON.parse(v||"[]");}catch{return[];};};
+          localShopRequests.forEach(req=>{
+            const replyItems=safeJ(req.reply_items);
+            // Also load original requested items so we can match by index (the spare shop
+            // may have changed ri.description when linking an inventory part, so we fall
+            // back to the original job-item description stored in req.items).
+            const reqOrigItems=safeJ(req.items);
+            replyItems.forEach((ri,idx)=>{
               if(!ri.available||!(+ri.price>0)) return;
-              const key=(ri.description||"").toLowerCase().trim();
+              // Prefer original job-item description (positional match) so the key always
+              // lines up with item.description in the parts list, even when the spare shop
+              // linked a differently-named inventory part.
+              const origDesc=reqOrigItems[idx]?.description||"";
+              const key=(origDesc||ri.description||"").toLowerCase().trim();
+              if(!key) return;
               if(!supCostMap[key]) supCostMap[key]=[];
-              supCostMap[key].push({name:"Spare Shop",price:+ri.price,isShop:true,part_id:ri.part_id,part_photo:ri.part_photo,part_name:ri.part_name||ri.description,notes:ri.notes||""});
+              // Look up linked inventory part for live photo + SKU (in case reply_items
+              // was saved before the photo/sku fix, or the part has since been updated).
+              const linkedPart=ri.part_id?parts.find(p=>String(p.id)===String(ri.part_id)):null;
+              const linkedPhotos=safeJ(linkedPart?.photos);
+              const resolvedPhoto=ri.part_photo||linkedPhotos[0]||linkedPart?.photo_url||"";
+              const resolvedSku=ri.sku||linkedPart?.sku||linkedPart?.oe_number||"";
+              supCostMap[key].push({name:"Spare Shop",price:+ri.price,isShop:true,part_id:ri.part_id,sku:resolvedSku,part_photo:resolvedPhoto,part_name:ri.part_name||linkedPart?.name||ri.description,notes:ri.notes||"",req_id:req.id,reply_idx:idx});
             });
           });
           const getSupCosts = (desc) => supCostMap[(desc||"").toLowerCase().trim()] || [];
+
+          // ── Order from spare shop (Option A + B) ────────────────────
+          const orderFromSpareShop = async (item, sc, markupPct) => {
+            const mu = +markupPct||0;
+            const sellP = +(sc.price*(1+mu/100)).toFixed(2);
+            // A) Apply price to job item
+            await onSaveItem({...item, cost_price:sc.price, markup_pct:mu, unit_price:sellP, total:sellP*(+item.qty||1)});
+            // B) Create Purchase Order for the spare shop
+            if(onSaveWsPurchaseOrder){
+              const shopName = wsProfile?.linked_branch_name||wsProfile?.spare_shop_name||"Spare Shop";
+              try{
+                await onSaveWsPurchaseOrder(
+                  {supplier_id:null, supplier_name:shopName, job_id:job.id, status:"draft",
+                   supplier_quote_ref:sc.req_id||null,
+                   notes:"Auto-created from spare shop reply"},
+                  [{description:item.description, sku:item.part_sku||sc.part_name||"",
+                    supplier_part_no:"", qty:+item.qty||1, unit_price:sc.price, condition:"in_stock"}]
+                );
+              }catch(e){console.warn("PO create failed",e);}
+            }
+            // A) Mark request as ordered in DB
+            if(sc.req_id){
+              await api.patch("ws_shop_requests","id",sc.req_id,{status:"ordered"}).catch(()=>{});
+              await refreshLocalShopRequests();
+            }
+            // A) WhatsApp to spare shop
+            const shopPhone=(wsProfile?.spare_shop_wa||wsProfile?.spare_shop_phone||settings?.spare_shop_wa||"").replace(/\D/g,"");
+            const jobCar=[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ");
+            const msg=`🔧 *Order — ${wsProfile?.name||"Workshop"}*\n\n🚗 ${jobCar||job.complaint||""}\nJob: ${job.id}\n\n*Ordering:*\n• ${item.description}${item.part_sku?` (${item.part_sku})`:""} ×${+item.qty||1} @ ${fmtAmt(sc.price)}\n\nPlease confirm and advise delivery time.`;
+            window.open(`https://wa.me/${shopPhone}?text=${encodeURIComponent(msg)}`,"_blank");
+            setPricePopup(null);
+          };
+          // ────────────────────────────────────────────────────────────
 
           return (<>
         {/* ── Supplier price popup ── */}
@@ -4150,22 +4211,40 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                   style={{width:80,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:16,fontWeight:700,padding:"4px 8px",borderRadius:8,border:"1px solid #f59e0b",background:"var(--surface)",color:"#f59e0b"}}/>
                 <span style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>%</span>
               </div>
-              <button
-                disabled={pricePopup.selIdx===null}
-                onClick={async()=>{
-                  const sc=pricePopup.costs[pricePopup.selIdx];
-                  const markup=+pricePopup.markup||0;
-                  const sellP=+(sc.price*(1+markup/100)).toFixed(2);
-                  await onSaveItem({...pricePopup.item,cost_price:sc.price,markup_pct:markup,unit_price:sellP,total:sellP*(+pricePopup.item.qty||1)});
-                  setPricePopup(null);
-                }}
-                style={{width:"100%",padding:"10px",borderRadius:10,border:"none",
-                  cursor:pricePopup.selIdx===null?"not-allowed":"pointer",
-                  background:pricePopup.selIdx===null?"var(--border)":"#f59e0b",
-                  color:pricePopup.selIdx===null?"var(--text3)":"#000",
-                  fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif"}}>
-                Apply to Quote
-              </button>
+              {(()=>{
+                const sc=pricePopup.selIdx!==null?pricePopup.costs[pricePopup.selIdx]:null;
+                const disabled=!sc;
+                const isShopSel=!!sc?.isShop;
+                return (
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {isShopSel&&(
+                      <button disabled={disabled}
+                        onClick={()=>orderFromSpareShop(pricePopup.item,sc,pricePopup.markup)}
+                        style={{width:"100%",padding:"11px",borderRadius:10,border:"none",
+                          cursor:disabled?"not-allowed":"pointer",
+                          background:disabled?"var(--border)":"#16a34a",
+                          color:disabled?"var(--text3)":"#000",
+                          fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif"}}>
+                        🏪 Order from Spare Shop
+                      </button>
+                    )}
+                    <button disabled={disabled}
+                      onClick={async()=>{
+                        const markup=+pricePopup.markup||0;
+                        const sellP=+(sc.price*(1+markup/100)).toFixed(2);
+                        await onSaveItem({...pricePopup.item,cost_price:sc.price,markup_pct:markup,unit_price:sellP,total:sellP*(+pricePopup.item.qty||1)});
+                        setPricePopup(null);
+                      }}
+                      style={{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${isShopSel?"rgba(22,163,74,.4)":"transparent"}`,
+                        cursor:disabled?"not-allowed":"pointer",
+                        background:disabled?"var(--border)":isShopSel?"rgba(22,163,74,.1)":"#f59e0b",
+                        color:disabled?"var(--text3)":isShopSel?"#16a34a":"#000",
+                        fontWeight:700,fontSize:isShopSel?13:15,fontFamily:"Rajdhani,sans-serif"}}>
+                      {isShopSel?"Apply Price Only (no order)":"Apply to Quote"}
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -4173,21 +4252,33 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
         {wsShopPartView&&(
           <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
             onClick={()=>setWsShopPartView(null)}>
-            <div style={{background:"var(--surface)",borderRadius:16,width:"100%",maxWidth:400,padding:20,boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}
+            <div style={{background:"var(--surface)",borderRadius:16,width:"100%",maxWidth:420,padding:20,boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}
               onClick={e=>e.stopPropagation()}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
                 <div style={{fontSize:11,color:"#34d399",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>🏪 Spare Shop Part</div>
                 <button onClick={()=>setWsShopPartView(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--text3)",padding:4}}>✕</button>
               </div>
-              {wsShopPartView.part_photo&&(
+              {wsShopPartView.part_photo&&(()=>{
+                const _toImg=(u)=>{if(!u)return null;const m=u.match(/\/file\/d\/([^/]+)/);if(m)return`https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;const m2=u.match(/[?&]id=([^&]+)/);if(m2)return`https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;if(u.match(/^https?:\/\//))return u;if(u.match(/^[A-Za-z0-9_-]{20,}$/))return`https://drive.google.com/thumbnail?id=${u}&sz=w400`;return null;};
+                const imgSrc=_toImg(wsShopPartView.part_photo);
+                return imgSrc?(
                 <div style={{marginBottom:14,textAlign:"center"}}>
-                  <img src={toImgUrl(wsShopPartView.part_photo)} alt=""
-                    style={{maxWidth:"100%",maxHeight:200,borderRadius:10,objectFit:"contain",border:"1px solid var(--border)"}}/>
+                  <img src={imgSrc} alt=""
+                    style={{maxWidth:"100%",maxHeight:220,borderRadius:10,objectFit:"contain",border:"1px solid var(--border)",cursor:"pointer"}}
+                    onClick={()=>window.open(imgSrc,"_blank")}/>
+                </div>
+                ):null;
+              })()}
+              <div style={{fontWeight:700,fontSize:16,marginBottom:4}}>{wsShopPartView.part_name}</div>
+              {wsShopPartView.sku&&(
+                <div style={{marginBottom:8}}>
+                  <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.2)",borderRadius:5,padding:"2px 8px"}}>
+                    # {wsShopPartView.sku}
+                  </code>
                 </div>
               )}
-              <div style={{fontWeight:700,fontSize:16,marginBottom:4}}>{wsShopPartView.part_name}</div>
               {wsShopPartView.notes&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>{wsShopPartView.notes}</div>}
-              <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"rgba(52,211,153,.1)",borderRadius:10,border:"1px solid rgba(52,211,153,.25)",marginBottom:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"rgba(52,211,153,.1)",borderRadius:10,border:"1px solid rgba(52,211,153,.25)",marginBottom:12}}>
                 <span style={{fontSize:12,color:"var(--text3)",flex:1}}>Spare Shop Price</span>
                 <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:22,color:"#34d399"}}>{fmtAmt(wsShopPartView.price)}</span>
               </div>
@@ -4195,12 +4286,18 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                 const markup=defaultMarkup||0;
                 const sellP=+(wsShopPartView.price*(1+markup/100)).toFixed(2);
                 return (
-                  <button onClick={async()=>{
-                    await onSaveItem({...wsShopPartView.currentItem,cost_price:wsShopPartView.price,markup_pct:markup,unit_price:sellP,total:sellP*(+wsShopPartView.currentItem.qty||1)});
-                    setWsShopPartView(null);
-                  }} style={{width:"100%",padding:"10px",borderRadius:10,border:"none",background:"#34d399",color:"#000",fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:"pointer"}}>
-                    Apply to Quote (+{markup}% = {fmtAmt(sellP)})
-                  </button>
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <button onClick={()=>orderFromSpareShop(wsShopPartView.currentItem,wsShopPartView,markup)}
+                      style={{width:"100%",padding:"11px",borderRadius:10,border:"none",background:"#16a34a",color:"#000",fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:"pointer"}}>
+                      🏪 Order from Spare Shop
+                    </button>
+                    <button onClick={async()=>{
+                      await onSaveItem({...wsShopPartView.currentItem,cost_price:wsShopPartView.price,markup_pct:markup,unit_price:sellP,total:sellP*(+wsShopPartView.currentItem.qty||1)});
+                      setWsShopPartView(null);
+                    }} style={{width:"100%",padding:"10px",borderRadius:10,border:"1px solid rgba(22,163,74,.4)",background:"rgba(22,163,74,.1)",color:"#16a34a",fontWeight:700,fontSize:13,fontFamily:"Rajdhani,sans-serif",cursor:"pointer"}}>
+                      Apply Price Only (+{markup}% = {fmtAmt(sellP)})
+                    </button>
+                  </div>
                 );
               })()}
             </div>
@@ -4433,7 +4530,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
             ) : (
               /* ── Desktop table ── */
               <table className="tbl" style={{width:"100%"}}>
-                <thead><tr>{["",t.wsqtType,t.wsqPdfDescription,t.qty,t.unitPrice,t.total,""].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{["",t.wsqtType,t.wsqPdfDescription,t.qty,t.unitPrice,t.total,""].map((h,i)=><th key={i}>{h}</th>)}</tr></thead>
                 <tbody>
                   {items.map(item=>{
                     const supCosts = getSupCosts(item.description);
@@ -4452,11 +4549,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
                             {supCosts.map((sc,i)=>{
                               const sellP=+(sc.price*(1+defaultMarkup/100)).toFixed(2);
+                              const isShop=!!sc.isShop;
                               return (
-                              <span key={i} title={defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price"}
-                                onClick={()=>setPricePopup({item, costs:getSupCosts(item.description), markup:String(defaultMarkup), selIdx:i})}
-                                style={{fontSize:10,color:"#f59e0b",fontWeight:600,cursor:"pointer",background:"rgba(251,191,36,.1)",borderRadius:4,padding:"1px 6px",border:"1px solid rgba(251,191,36,.25)"}}>
-                                💰 {sc.name}: {fmtAmt(sc.price)}
+                              <span key={i} title={isShop?(sc.part_id?`Part# ${sc.part_id} — click for details`:"Click for spare shop details"):(defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price")}
+                                onClick={()=>isShop
+                                  ?setWsShopPartView({...sc,currentItem:item})
+                                  :setPricePopup({item, costs:getSupCosts(item.description), markup:String(defaultMarkup), selIdx:i})}
+                                style={{fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,padding:"1px 6px",
+                                  background:isShop?"rgba(22,163,74,.15)":"rgba(251,191,36,.1)",
+                                  color:isShop?"#000":"#f59e0b",
+                                  border:isShop?"1px solid rgba(22,163,74,.4)":"1px solid rgba(251,191,36,.25)"}}>
+                                {isShop?"🏪":"💰"} {sc.name}: {fmtAmt(sc.price)}{isShop&&sc.sku?<> · <code style={{fontFamily:"DM Mono,monospace",fontSize:9}}>{sc.sku}</code></>:""}
                               </span>
                               );
                             })}
@@ -4583,13 +4686,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
                 );
               })()}
               {wsProfile?.linked_branch_id&&onSaveWsShopRequest&&(()=>{
-                const pending=wsShopRequests.filter(r=>r.status==="pending");
-                const replied=wsShopRequests.filter(r=>r.status==="replied");
+                const pending=localShopRequests.filter(r=>r.status==="pending");
+                const replied=localShopRequests.filter(r=>r.status==="replied");
+                const ordered=localShopRequests.filter(r=>r.status==="ordered");
                 return (
                   <button className="btn btn-ghost btn-sm"
-                    style={{color:"#34d399",borderColor:"rgba(52,211,153,.35)",position:"relative"}}
+                    style={{color:ordered.length>0?"#16a34a":replied.length>0?"#34d399":"inherit",borderColor:ordered.length>0?"rgba(22,163,74,.4)":replied.length>0?"rgba(52,211,153,.35)":"rgba(52,211,153,.35)",position:"relative"}}
                     onClick={()=>setWsShopReqModal(true)}>
-                    📦 Spare Shop{replied.length>0?` ✅`:pending.length>0?` ⏳`:""}
+                    📦 Spare Shop{ordered.length>0?" 🛒":replied.length>0?" ✅":pending.length>0?" ⏳":""}
                   </button>
                 );
               })()}
@@ -5088,9 +5192,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],settings,vehicles=[]
       {wsShopReqModal&&onSaveWsShopRequest&&(
         <WsShopRequestModal
           job={job} items={items} wsProfile={wsProfile}
-          existingRequests={wsShopRequests}
+          existingRequests={localShopRequests}
+          parts={parts}
           settings={settings}
-          onSend={async(data)=>{ await onSaveWsShopRequest(data); setWsShopReqModal(false); }}
+          onSend={async(data)=>{ await onSaveWsShopRequest(data); await refreshLocalShopRequests(); setWsShopReqModal(false); }}
+          onRefresh={async()=>{ if(onRefresh) await onRefresh(); await refreshLocalShopRequests(); }}
           onClose={()=>setWsShopReqModal(false)}/>
       )}
 
@@ -7107,16 +7213,48 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
 // ═══════════════════════════════════════════════════════════════
 // WS SHOP REQUEST MODAL — workshop sends parts request to spare shop
 // ═══════════════════════════════════════════════════════════════
-function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], settings={}, onSend, onClose}) {
+function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], parts=[], settings={}, onSend, onClose, onRefresh}) {
   const partItems = items.filter(i=>i.type==="part"&&i.description?.trim());
   const [selected, setSelected] = useState(()=>new Set(partItems.map(i=>i.id)));
   const [photoUrls, setPhotoUrls] = useState({}); // {item.id: url}
   const [notes, setNotes] = useState("");
   const [phone, setPhone] = useState(settings.whatsapp||"");
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const hasPending = existingRequests.some(r=>r.status==="pending");
   const hasReplied = existingRequests.some(r=>r.status==="replied");
+  const hasOrdered = existingRequests.some(r=>r.status==="ordered");
+  const hasAnyReply = hasReplied||hasOrdered;
+
+  // Build reply lookup: description (lower) → {available, price, notes, part_name, part_id, part_photo}
+  const _safeJ=(v)=>{if(Array.isArray(v))return v;if(v&&typeof v==="object")return[v];try{return JSON.parse(v||"[]");}catch{return[];};};
+  const replyMap={};
+  existingRequests.forEach(req=>{
+    const origItems=_safeJ(req.items);
+    const replyItems=_safeJ(req.reply_items);
+    replyItems.forEach((ri,idx)=>{
+      const desc=(origItems[idx]?.description||ri.description||"").toLowerCase().trim();
+      if(!desc) return;
+      // Live lookup: resolve photo + SKU directly from the linked inventory part
+      const linkedPart=ri.part_id?parts.find(p=>String(p.id)===String(ri.part_id)):null;
+      const linkedPhotos=_safeJ(linkedPart?.photos);
+      const resolvedPhoto=ri.part_photo||linkedPhotos[0]||linkedPart?.photo_url||"";
+      const resolvedSku=ri.sku||linkedPart?.sku||linkedPart?.oe_number||"";
+      if(!replyMap[desc]||+ri.price>0) replyMap[desc]={
+        available:!!ri.available, price:+ri.price||0,
+        notes:ri.notes||"", part_name:ri.part_name||linkedPart?.name||ri.description||"",
+        sku:resolvedSku, part_id:ri.part_id||"", part_photo:resolvedPhoto,
+      };
+    });
+  });
+  const [modalPartDetail, setModalPartDetail] = useState(null);
+
+  const handleRefresh = async () => {
+    if(!onRefresh) return;
+    setRefreshing(true);
+    try { await onRefresh(); } finally { setRefreshing(false); }
+  };
 
   const toggleItem=(id)=>setSelected(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
 
@@ -7159,8 +7297,18 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], s
       <MHead title="📦 Request Parts from Spare Shop" onClose={onClose}/>
 
       {/* Status banner */}
-      {hasReplied&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)",fontSize:12,color:"#34d399",fontWeight:600}}>✅ Spare shop has replied — check price chips on each item</div>}
-      {hasPending&&!hasReplied&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(251,146,60,.12)",border:"1px solid rgba(251,146,60,.3)",fontSize:12,color:"#f59e0b",fontWeight:600}}>⏳ Request already sent — waiting for spare shop reply</div>}
+      {hasOrdered&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(22,163,74,.12)",border:"1px solid rgba(22,163,74,.35)",fontSize:12,color:"#16a34a",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+        <span style={{flex:1}}>🛒 Order placed — PO created &amp; WhatsApp sent to spare shop</span>
+        {onRefresh&&<button onClick={handleRefresh} disabled={refreshing} style={{padding:"2px 10px",borderRadius:6,border:"1px solid rgba(22,163,74,.4)",background:"none",color:"#16a34a",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}}>{refreshing?"…":"↻ Refresh"}</button>}
+      </div>}
+      {hasReplied&&!hasOrdered&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)",fontSize:12,color:"#34d399",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+        <span style={{flex:1}}>✅ Spare shop has replied — click the 🏪 green chip on a part then tap &ldquo;Order from Spare Shop&rdquo;</span>
+        {onRefresh&&<button onClick={handleRefresh} disabled={refreshing} style={{padding:"2px 10px",borderRadius:6,border:"1px solid rgba(52,211,153,.4)",background:"none",color:"#34d399",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}}>{refreshing?"…":"↻ Refresh"}</button>}
+      </div>}
+      {hasPending&&!hasReplied&&!hasOrdered&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(251,146,60,.12)",border:"1px solid rgba(251,146,60,.3)",fontSize:12,color:"#f59e0b",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+        <span style={{flex:1}}>⏳ Request sent — waiting for spare shop to reply</span>
+        {onRefresh&&<button onClick={handleRefresh} disabled={refreshing} style={{padding:"2px 10px",borderRadius:6,border:"1px solid rgba(251,146,60,.4)",background:"none",color:"#f59e0b",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}}>{refreshing?"…":"↻ Check"}</button>}
+      </div>}
 
       {/* Part list */}
       <div style={{marginBottom:12}}>
@@ -7168,6 +7316,7 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], s
         {partItems.length===0&&<div style={{color:"var(--text3)",fontSize:13,padding:"12px 0"}}>No parts on this job yet</div>}
         {partItems.map(item=>{
           const isSel=selected.has(item.id);
+          const reply=replyMap[(item.description||"").toLowerCase().trim()];
           return (
             <div key={item.id} onClick={()=>toggleItem(item.id)}
               style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 12px",borderRadius:8,marginBottom:6,cursor:"pointer",
@@ -7178,9 +7327,37 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], s
                 <div style={{fontWeight:600,fontSize:13}}>{item.description}</div>
                 {item.part_sku&&<code style={{fontSize:10,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{item.part_sku}</code>}
                 <div style={{fontSize:10,color:"var(--text3)"}}>Qty: {item.qty}</div>
+                {/* Spare shop reply */}
+                {hasAnyReply&&reply&&(
+                  <div style={{marginTop:5,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    {reply.available&&reply.price>0
+                      ? <span onClick={e=>{e.stopPropagation();setModalPartDetail(reply);}}
+                          style={{fontSize:12,fontWeight:700,color:"#ef4444",background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.3)",borderRadius:5,padding:"2px 8px",cursor:"pointer"}}>
+                          🏪 R{reply.price.toLocaleString()}
+                        </span>
+                      : <span style={{fontSize:11,fontWeight:600,color:"#9ca3af",background:"rgba(156,163,175,.1)",border:"1px solid rgba(156,163,175,.25)",borderRadius:5,padding:"2px 8px"}}>
+                          ✗ Not available
+                        </span>
+                    }
+                    {reply.sku&&reply.available&&(
+                      <code onClick={e=>{e.stopPropagation();setModalPartDetail(reply);}}
+                        style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--blue)",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.2)",borderRadius:5,padding:"2px 7px",cursor:"pointer"}}>
+                        # {reply.sku}
+                      </code>
+                    )}
+                    {reply.notes&&<span style={{fontSize:10,color:"var(--text3)",fontStyle:"italic"}}>{reply.notes}</span>}
+                  </div>
+                )}
+                {hasAnyReply&&!reply&&<div style={{marginTop:4,fontSize:10,color:"var(--text3)"}}>— no reply for this part</div>}
               </div>
+              {/* Spare shop part photo thumbnail (when replied) */}
+              {hasAnyReply&&reply?.part_photo&&reply?.available&&(
+                <img src={toImgUrl(reply.part_photo)} alt=""
+                  onClick={e=>{e.stopPropagation();setModalPartDetail(reply);}}
+                  style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:"2px solid rgba(239,68,68,.35)",flexShrink:0,cursor:"pointer"}}/>
+              )}
               {/* Optional photo URL per item */}
-              {isSel&&(
+              {isSel&&!hasAnyReply&&(
                 <input className="inp" placeholder="Photo URL (optional)" value={photoUrls[item.id]||""}
                   onChange={e=>{e.stopPropagation();setPhotoUrls(p=>({...p,[item.id]:e.target.value}));}}
                   onClick={e=>e.stopPropagation()}
@@ -7205,6 +7382,44 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], s
           {saving?"Sending…":"📦 Send to Spare Shop"}
         </button>
       </div>
+
+      {/* Part detail popup */}
+      {modalPartDetail&&(
+        <div style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,.65)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
+          onClick={()=>setModalPartDetail(null)}>
+          <div style={{background:"var(--surface)",borderRadius:16,width:"100%",maxWidth:380,padding:20,boxShadow:"0 8px 40px rgba(0,0,0,.45)"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+              <div style={{fontSize:11,color:"#34d399",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>🏪 Spare Shop Part</div>
+              <button onClick={()=>setModalPartDetail(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--text3)",padding:4}}>✕</button>
+            </div>
+            {modalPartDetail.part_photo&&(()=>{
+              const _toImg=(u)=>{if(!u)return null;const m=u.match(/\/file\/d\/([^/]+)/);if(m)return`https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;const m2=u.match(/[?&]id=([^&]+)/);if(m2)return`https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;if(u.match(/^https?:\/\//))return u;if(u.match(/^[A-Za-z0-9_-]{20,}$/))return`https://drive.google.com/thumbnail?id=${u}&sz=w400`;return null;};
+              const imgSrc=_toImg(modalPartDetail.part_photo);
+              return imgSrc?(
+              <div style={{marginBottom:14,textAlign:"center"}}>
+                <img src={imgSrc} alt=""
+                  style={{maxWidth:"100%",maxHeight:220,borderRadius:10,objectFit:"contain",border:"1px solid var(--border)",cursor:"pointer"}}
+                  onClick={()=>window.open(imgSrc,"_blank")}/>
+              </div>
+              ):null;
+            })()}
+            <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>{modalPartDetail.part_name}</div>
+            {modalPartDetail.sku&&(
+              <div style={{marginBottom:8}}>
+                <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.2)",borderRadius:5,padding:"2px 8px"}}>
+                  # {modalPartDetail.sku}
+                </code>
+              </div>
+            )}
+            {modalPartDetail.notes&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>{modalPartDetail.notes}</div>}
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"rgba(239,68,68,.1)",borderRadius:10,border:"1px solid rgba(239,68,68,.3)"}}>
+              <span style={{fontSize:12,color:"var(--text3)",flex:1}}>Spare Shop Price</span>
+              <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:22,color:"#ef4444"}}>R{(+modalPartDetail.price||0).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </Overlay>
   );
 }

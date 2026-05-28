@@ -714,18 +714,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setWsSupplierInvItems(Array.isArray(wsInvItems)?wsInvItems:[]);
     setWsSupplierPayments(Array.isArray(wsPayms)?wsPayms:[]);
     setWsSupplierReturns(Array.isArray(wsRets)?wsRets:[]);
-    const [sqReps,wsPOs,wsPOItems,wsLicRen,wsBk]=await Promise.all([
+    const [sqReps,wsPOs,wsPOItems,wsLicRen,wsBk,wsShopReqs]=await Promise.all([
       api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
       api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
       api.get("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
+      api.get("ws_shop_requests",role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user?.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:`select=*&order=created_at.desc`).catch(()=>[]),
     ]);
     setWsSqReplies(Array.isArray(sqReps)?sqReps:[]);
     setWsPurchaseOrders(Array.isArray(wsPOs)?wsPOs:[]);
     setWsPoItems(Array.isArray(wsPOItems)?wsPOItems:[]);
     setWsLicenceRenewals(Array.isArray(wsLicRen)?wsLicRen:[]);
     setWsBookings(Array.isArray(wsBk)?wsBk:[]);
+    setWsShopRequests(Array.isArray(wsShopReqs)?wsShopReqs:[]);
     if(wsId){
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});

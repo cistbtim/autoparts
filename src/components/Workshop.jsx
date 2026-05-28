@@ -4120,12 +4120,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
               const key=(origDesc||ri.description||"").toLowerCase().trim();
               if(!key) return;
               if(!supCostMap[key]) supCostMap[key]=[];
-              // Look up linked inventory part for live photo + SKU (in case reply_items
-              // was saved before the photo/sku fix, or the part has since been updated).
-              const linkedPart=ri.part_id?parts.find(p=>String(p.id)===String(ri.part_id)):null;
+              // Look up linked inventory part — try by ID first, then by SKU/OE number
+              const skuHint=(ri.sku||reqOrigItems[idx]?.sku||"").toLowerCase().trim();
+              const linkedById=ri.part_id?parts.find(p=>String(p.id)===String(ri.part_id)):null;
+              const linkedBySku=!linkedById&&skuHint?parts.find(p=>(p.sku||"").toLowerCase()===skuHint||(p.oe_number||"").toLowerCase()===skuHint):null;
+              const linkedPart=linkedById||linkedBySku;
               const linkedPhotos=safeJ(linkedPart?.photos);
-              const resolvedPhoto=ri.part_photo||linkedPhotos[0]||linkedPart?.photo_url||"";
-              const resolvedSku=ri.sku||linkedPart?.sku||linkedPart?.oe_number||"";
+              const resolvedPhoto=linkedPhotos[0]||linkedPart?.photo_url||ri.part_photo||"";
+              const resolvedSku=linkedPart?.sku||linkedPart?.oe_number||ri.sku||"";
               supCostMap[key].push({name:"Spare Shop",price:+ri.price,isShop:true,part_id:ri.part_id,sku:resolvedSku,part_photo:resolvedPhoto,part_name:ri.part_name||linkedPart?.name||ri.description,notes:ri.notes||"",req_id:req.id,reply_idx:idx});
             });
           });
@@ -7236,11 +7238,14 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
     replyItems.forEach((ri,idx)=>{
       const desc=(origItems[idx]?.description||ri.description||"").toLowerCase().trim();
       if(!desc) return;
-      // Live lookup: resolve photo + SKU directly from the linked inventory part
-      const linkedPart=ri.part_id?parts.find(p=>String(p.id)===String(ri.part_id)):null;
+      // Live lookup — try by ID first, then by SKU/OE number
+      const skuHint2=(ri.sku||origItems[idx]?.sku||"").toLowerCase().trim();
+      const linkedById2=ri.part_id?parts.find(p=>String(p.id)===String(ri.part_id)):null;
+      const linkedBySku2=!linkedById2&&skuHint2?parts.find(p=>(p.sku||"").toLowerCase()===skuHint2||(p.oe_number||"").toLowerCase()===skuHint2):null;
+      const linkedPart=linkedById2||linkedBySku2;
       const linkedPhotos=_safeJ(linkedPart?.photos);
-      const resolvedPhoto=ri.part_photo||linkedPhotos[0]||linkedPart?.photo_url||"";
-      const resolvedSku=ri.sku||linkedPart?.sku||linkedPart?.oe_number||"";
+      const resolvedPhoto=linkedPhotos[0]||linkedPart?.photo_url||ri.part_photo||"";
+      const resolvedSku=linkedPart?.sku||linkedPart?.oe_number||ri.sku||"";
       if(!replyMap[desc]||+ri.price>0) replyMap[desc]={
         available:!!ri.available, price:+ri.price||0,
         notes:ri.notes||"", part_name:ri.part_name||linkedPart?.name||ri.description||"",

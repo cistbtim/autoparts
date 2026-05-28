@@ -4276,17 +4276,13 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
                 <div style={{fontSize:11,color:"#34d399",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>🏪 Spare Shop Part</div>
                 <button onClick={()=>setWsShopPartView(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--text3)",padding:4}}>✕</button>
               </div>
-              {wsShopPartView.part_photo&&(()=>{
-                const _toImg=(u)=>{if(!u)return null;const m=u.match(/\/file\/d\/([^/]+)/);if(m)return`https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;const m2=u.match(/[?&]id=([^&]+)/);if(m2)return`https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;if(u.match(/^https?:\/\//))return u;if(u.match(/^[A-Za-z0-9_-]{20,}$/))return`https://drive.google.com/thumbnail?id=${u}&sz=w400`;return null;};
-                const imgSrc=_toImg(wsShopPartView.part_photo);
-                return imgSrc?(
+              {wsShopPartView.part_photo&&(
                 <div style={{marginBottom:14,textAlign:"center"}}>
-                  <img src={imgSrc} alt=""
+                  <DriveImg url={wsShopPartView.part_photo} alt="" eager
                     style={{maxWidth:"100%",maxHeight:220,borderRadius:10,objectFit:"contain",border:"1px solid var(--border)",cursor:"pointer"}}
-                    onClick={()=>window.open(imgSrc,"_blank")}/>
+                    onClick={()=>window.open(wsShopPartView.part_photo,"_blank")}/>
                 </div>
-                ):null;
-              })()}
+              )}
               <div style={{fontWeight:700,fontSize:16,marginBottom:4}}>{wsShopPartView.part_name}</div>
               {wsShopPartView.sku&&(
                 <div style={{marginBottom:8}}>
@@ -7414,17 +7410,13 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
               <div style={{fontSize:11,color:"#34d399",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>🏪 Spare Shop Part</div>
               <button onClick={()=>setModalPartDetail(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--text3)",padding:4}}>✕</button>
             </div>
-            {modalPartDetail.part_photo&&(()=>{
-              const _toImg=(u)=>{if(!u)return null;const m=u.match(/\/file\/d\/([^/]+)/);if(m)return`https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;const m2=u.match(/[?&]id=([^&]+)/);if(m2)return`https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;if(u.match(/^https?:\/\//))return u;if(u.match(/^[A-Za-z0-9_-]{20,}$/))return`https://drive.google.com/thumbnail?id=${u}&sz=w400`;return null;};
-              const imgSrc=_toImg(modalPartDetail.part_photo);
-              return imgSrc?(
+            {modalPartDetail.part_photo&&(
               <div style={{marginBottom:14,textAlign:"center"}}>
-                <img src={imgSrc} alt=""
+                <DriveImg url={modalPartDetail.part_photo} alt="" eager
                   style={{maxWidth:"100%",maxHeight:220,borderRadius:10,objectFit:"contain",border:"1px solid var(--border)",cursor:"pointer"}}
-                  onClick={()=>window.open(imgSrc,"_blank")}/>
+                  onClick={()=>window.open(modalPartDetail.part_photo,"_blank")}/>
               </div>
-              ):null;
-            })()}
+            )}
             <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>{modalPartDetail.part_name}</div>
             {modalPartDetail.sku&&(
               <div style={{marginBottom:8}}>

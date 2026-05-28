@@ -7245,6 +7245,7 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
   const [phone, setPhone] = useState(settings.whatsapp||"");
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [modalPartPhotoLightbox, setModalPartPhotoLightbox] = useState(null);
 
   const hasPending = existingRequests.some(r=>r.status==="pending");
   const hasReplied = existingRequests.some(r=>r.status==="replied");
@@ -7266,7 +7267,12 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
       const linkedBySku2=!linkedById2&&skuHint2?parts.find(p=>(p.sku||"").toLowerCase()===skuHint2||(p.oe_number||"").toLowerCase()===skuHint2):null;
       const linkedPart=linkedById2||linkedBySku2;
       const linkedPhotos=_safeJ(linkedPart?.photos);
-      const resolvedPhoto=linkedPhotos[0]||linkedPart?.photo_url||ri.part_photo||"";
+      const resolvedPhoto=linkedPhotos[0]
+        || linkedPart?.photo_url
+        || linkedPart?.image_url
+        || linkedPart?.image_1
+        || ri.part_photo
+        || "";
       const resolvedSku=linkedPart?.sku||linkedPart?.oe_number||ri.sku||"";
       if(!replyMap[desc]||+ri.price>0) replyMap[desc]={
         available:!!ri.available, price:+ri.price||0,
@@ -7424,7 +7430,7 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
               <div style={{marginBottom:14,textAlign:"center"}}>
                 <DriveImg url={modalPartDetail.part_photo} alt="" eager
                   style={{maxWidth:"100%",maxHeight:220,borderRadius:10,objectFit:"contain",border:"1px solid var(--border)",cursor:"pointer"}}
-                  onClick={()=>window.open(modalPartDetail.part_photo,"_blank")}/>
+                  onClick={()=>setModalPartPhotoLightbox(modalPartDetail.part_photo)}/>
               </div>
             )}
             <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>{modalPartDetail.part_name}</div>
@@ -7442,6 +7448,9 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
             </div>
           </div>
         </div>
+      )}
+      {modalPartPhotoLightbox && (
+        <ImgLightbox url={modalPartPhotoLightbox} onClose={()=>setModalPartPhotoLightbox(null)}/>
       )}
     </Overlay>
   );

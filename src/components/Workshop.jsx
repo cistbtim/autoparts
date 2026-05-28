@@ -4272,17 +4272,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
             onClick={()=>setWsShopPartView(null)}>
             <div style={{background:"var(--surface)",borderRadius:16,width:"100%",maxWidth:420,padding:20,boxShadow:"0 8px 40px rgba(0,0,0,.4)"}}
               onClick={e=>e.stopPropagation()}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                <div style={{fontSize:11,color:"#34d399",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>🏪 Spare Shop Part</div>
-                <button onClick={()=>setWsShopPartView(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--text3)",padding:4}}>✕</button>
-              </div>
-              {wsShopPartView.part_photo&&(
-                <div style={{marginBottom:14,textAlign:"center"}}>
-                  <DriveImg url={wsShopPartView.part_photo} alt="" eager
-                    style={{maxWidth:"100%",maxHeight:220,borderRadius:10,objectFit:"contain",border:"1px solid var(--border)",cursor:"pointer"}}
-                    onClick={()=>window.open(wsShopPartView.part_photo,"_blank")}/>
+              <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:14}}>
+                <div style={{flex:1,paddingTop:2}}>
+                  <div style={{fontSize:11,color:"#34d399",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>🏪 Spare Shop Part</div>
                 </div>
-              )}
+                {wsShopPartView.part_photo&&(
+                  <DriveImg url={wsShopPartView.part_photo} alt="" eager
+                    style={{width:90,height:90,borderRadius:10,objectFit:"contain",border:"1px solid var(--border)",cursor:"pointer",flexShrink:0,background:"var(--surface2)"}}
+                    onClick={()=>window.open(wsShopPartView.part_photo,"_blank")}/>
+                )}
+                <button onClick={()=>setWsShopPartView(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--text3)",padding:4,flexShrink:0}}>✕</button>
+              </div>
               <div style={{fontWeight:700,fontSize:16,marginBottom:4}}>{wsShopPartView.part_name}</div>
               {wsShopPartView.sku&&(
                 <div style={{marginBottom:8}}>

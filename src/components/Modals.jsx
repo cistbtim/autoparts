@@ -7411,26 +7411,17 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
     setSaving(true);
     try{
       const payload=replyLines.map((l)=>{
-        const linkedPart=parts.find(p=>String(p.id)===String(l.part_id))||null;
-        const photos=(() => {try{return JSON.parse(linkedPart?.photos||"[]");}catch{return [];}})();
-        // toImgUrl handles drive share links; also handle plain Drive file IDs
-        const rawPhoto=photos[0]||linkedPart?.photo_url||"";
-        const toViewUrl=(u)=>{
-          if(!u) return "";
-          if(u.match(/\/file\/d\/([^/]+)/)) return `https://drive.google.com/thumbnail?id=${u.match(/\/file\/d\/([^/]+)/)[1]}&sz=w400`;
-          if(u.match(/[?&]id=([^&]+)/)) return `https://drive.google.com/thumbnail?id=${u.match(/[?&]id=([^&]+)/)[1]}&sz=w400`;
-          if(u.match(/^https?:\/\//)) return u;
-          // plain file ID
-          if(u.match(/^[A-Za-z0-9_-]{20,}$/)) return `https://drive.google.com/thumbnail?id=${u}&sz=w400`;
-          return u;
-        };
+        const skuHint=(l.sku||"").toLowerCase().trim();
+        const linkedById=l.part_id?parts.find(p=>String(p.id)===String(l.part_id)):null;
+        const linkedBySku=!linkedById&&skuHint?parts.find(p=>(p.sku||"").toLowerCase()===skuHint||(p.oe_number||"").toLowerCase()===skuHint):null;
+        const linkedPart=linkedById||linkedBySku;
         return {
           description:l.description,
           sku:linkedPart?.sku||linkedPart?.oe_number||l.sku||"",
           qty:l.qty,
-          price:+l.price||0,available:l.available,part_id:l.part_id||null,
+          price:+l.price||0,available:l.available,
+          part_id:linkedPart?String(linkedPart.id):l.part_id||null,
           notes:l.notes||"",
-          part_photo:toViewUrl(rawPhoto),
           part_name:linkedPart?.name||l.description,
         };
       });

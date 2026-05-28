@@ -2794,6 +2794,22 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
   useEffect(()=>{
     refreshLocalShopRequests();
   },[refreshLocalShopRequests]);
+  // When spare shop part popup opens with a part_id but no photo,
+  // fetch the latest part row directly so a recently-added photo shows immediately.
+  useEffect(()=>{
+    if(!wsShopPartView) return;
+    if(wsShopPartView.part_photo) return; // already have photo
+    const pid=wsShopPartView.part_id;
+    if(!pid) return;
+    api.cacheInvalidate("parts");
+    api.getFirst("parts",`id=eq.${pid}&select=id,photos,photo_url,sku,oe_number`,1).then(rows=>{
+      const p=Array.isArray(rows)?rows[0]:null;
+      if(!p) return;
+      const ph=(()=>{if(Array.isArray(p.photos))return p.photos;try{return JSON.parse(p.photos||"[]");}catch{return[];}})();
+      const photo=ph[0]||p.photo_url||"";
+      if(photo) setWsShopPartView(prev=>prev?{...prev,part_photo:photo,sku:prev.sku||p.sku||p.oe_number||""}:prev);
+    }).catch(()=>{});
+  },[wsShopPartView?.part_id]);
   const [refreshing,    setRefreshing]    = useState(false);
   const [noteEdit,      setNoteEdit]      = useState(false);
   const [noteVal,       setNoteVal]       = useState(job.notes||"");

@@ -39,7 +39,10 @@ export const extractDriveId = (url) => {
   const m = url.match(/thumbnail[?]id=([^&]+)/) ||
             url.match(/\/file\/d\/([^/?]+)/)     ||
             url.match(/[?&]id=([^&]+)/);
-  return m ? m[1] : null;
+  if (m) return m[1];
+  // Plain Drive file ID stored without a URL wrapper (25–44 base64url chars)
+  if (/^[A-Za-z0-9_-]{25,}$/.test(url.trim())) return url.trim();
+  return null;
 };
 
 // Strip cache-buster &t=... from Drive URLs before saving to DB

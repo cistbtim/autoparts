@@ -7415,6 +7415,7 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
         const linkedById=l.part_id?parts.find(p=>String(p.id)===String(l.part_id)):null;
         const linkedBySku=!linkedById&&skuHint?parts.find(p=>(p.sku||"").toLowerCase()===skuHint||(p.oe_number||"").toLowerCase()===skuHint):null;
         const linkedPart=linkedById||linkedBySku;
+        const lPhotos=Array.isArray(linkedPart?.photos)?linkedPart.photos:(()=>{try{return JSON.parse(linkedPart?.photos||"[]");}catch{return[];}})();
         return {
           description:l.description,
           sku:linkedPart?.sku||linkedPart?.oe_number||l.sku||"",
@@ -7423,6 +7424,7 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
           part_id:linkedPart?String(linkedPart.id):l.part_id||null,
           notes:l.notes||"",
           part_name:linkedPart?.name||l.description,
+          part_photo:lPhotos[0]||linkedPart?.photo_url||"",
         };
       });
       await onReply(req.id, payload, replyNotes);

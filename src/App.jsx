@@ -2084,6 +2084,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(Array.isArray(existing)&&existing.length>0){
       res=await api.patch("workshop_profiles","id",wsId,payload);
     } else {
+      // New profile — seed name from the logged-in user if not provided
+      if(!payload.name) payload.name = user.name||"";
       res=await api.insert("workshop_profiles",payload);
     }
     // Show actual Supabase error if save failed

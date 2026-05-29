@@ -6901,6 +6901,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     return()=>clearInterval(timer);
   },[wsId]);
   const [shopParts,setShopParts]=useState([]);
+  const [branchFitments,setBranchFitments]=useState([]);
   const [page,setPage]=useState(0);
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [stockOnly,setStockOnly]=useState(false);
@@ -6908,6 +6909,12 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const [refreshKey,setRefreshKey]=useState(0);
   const [refreshing,setRefreshing]=useState(false);
   const Cs=curSym(settings?.currency||"ZAR R");
+
+  // Load branch's own part fitments so vehicle filter matches branch parts, not just workshop parts
+  useEffect(()=>{
+    if(!linkedBranchId){setBranchFitments([]);return;}
+    api.get("part_fitments","select=*&order=make.asc").catch(()=>[]).then(r=>setBranchFitments(Array.isArray(r)?r:[]));
+  },[linkedBranchId,refreshKey]);
 
   useEffect(()=>{
     if(!linkedBranchId){setLoading(false);setShopParts([]);return;}
@@ -7147,7 +7154,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       </div>
 
       {/* Vehicle filter */}
-      <VehicleSearchBar vehicles={vehicles} partFitments={partFitments} parts={shopParts}
+      <VehicleSearchBar vehicles={vehicles} partFitments={branchFitments.length?branchFitments:partFitments} parts={shopParts}
         t={{}} initialMake={initialMake} initialModel={initialModel} onFilter={(ids)=>{setVehicleFilterIds(ids);setPage(0);}}/>
 
       {vehicleFilterIds&&<div style={{fontSize:12,color:"var(--blue)",marginBottom:12,fontWeight:600}}>

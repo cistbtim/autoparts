@@ -15,7 +15,7 @@ import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
-import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage } from "./pages/PublicPages.jsx";
+import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage } from "./pages/PublicPages.jsx";
 
 // ── Trap browser back button so the page never goes blank ─────
 if(window.history.state?.appLoaded !== true){
@@ -77,8 +77,11 @@ export default function App() {
   if(activateBranch) return <BranchActivatePage/>;
   const bsrConfirmToken = new URLSearchParams(window.location.search).get("bsr_confirm");
   if(bsrConfirmToken) return <BranchStockRequestConfirmPage token={bsrConfirmToken}/>;
+  const wsRegToken = new URLSearchParams(window.location.search).get("ws_register");
+  if(wsRegToken) return <WorkshopRegisterPage token={wsRegToken}/>;
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
-  if(!user) return <LoginPage onLogin={handleLogin} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs}/>;
+  const wsLoginOnly = !!new URLSearchParams(window.location.search).get("ws_login");
+  if(!user) return <LoginPage onLogin={handleLogin} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs} wsLoginOnly={wsLoginOnly}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={handleLogout} lang={lang}/>;
   return <MainApp user={user} onLogout={handleLogout} t={t} lang={lang} setLang={changeLang} langs={availLangs}/>;
 }
@@ -4729,7 +4732,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           <WsSubscriptionExpiredPage expiresAt={subStatus.expiresAt} onLogout={()=>{onLogout();setTab("workshop");setSubStatus(null);}} settings={wsDisplaySettings}/>
         )}
         {tab==="wsprofile"&&role==="workshop"&&!subStatus?.expired&&(
-          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId} branches={branches}/>
+          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId} branches={branches} user={user}/>
         )}
         {tab==="wssubscriptions"&&role==="admin"&&(
           <WsSubscriptionsPage settings={settings}/>

@@ -36,7 +36,7 @@ function detectSide(sku, name) {
   return null;
 }
 
-export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=[]}) {
+export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=[],user=null}) {
   const [pTab,setPTab]=useState("profile"); // "profile" | "users"
   const [f,setF]=useState({
     name:"", vat_number:"", phone:"", whatsapp:"", email:"",
@@ -223,6 +223,17 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
           </div>
         </div>
 
+        {/* Locked spare shop banner — only shown when registered via QR */}
+        {user?.spare_shop_name&&(
+          <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(37,99,235,.07)",border:"1px solid rgba(37,99,235,.2)",borderRadius:10,padding:"10px 14px",marginBottom:4}}>
+            <span style={{fontSize:16}}>🏪</span>
+            <div>
+              <div style={{fontSize:10,fontWeight:700,color:"rgba(37,99,235,.7)",textTransform:"uppercase",letterSpacing:".06em"}}>Spare Shop Partner (locked)</div>
+              <div style={{fontSize:14,fontWeight:700,color:"var(--text)"}}>{user.spare_shop_name}</div>
+            </div>
+            <span style={{marginLeft:"auto",fontSize:12}}>🔒</span>
+          </div>
+        )}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
           <div style={{gridColumn:"1/-1"}}><FL label="Workshop Name *"/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
           <div><FL label="VAT / Tax Number"/><input className="inp" value={f.vat_number} onChange={e=>s("vat_number",e.target.value)}/></div>
@@ -1261,7 +1272,7 @@ export function SettingsPage({settings,onSave,t}) {
     onSave({categories:JSON.stringify(updated)});
   };
 
-  const TABS=[["shop","🏪 Shop"],["billing","💰 Billing"],["inventory","🏷️ Inventory"],["pos","🖥️ POS"],["languages","🌐 Languages"]];
+  const TABS=[["shop","🏪 Shop"],["billing","💰 Billing"],["inventory","🏷️ Inventory"],["pos","🖥️ POS"],["languages","🌐 Languages"],["partners","🔗 Workshop QR"]];
 
   return (
     <div className="fu">
@@ -1515,6 +1526,124 @@ export function SettingsPage({settings,onSave,t}) {
 
       {/* ── TAB: LANGUAGES ── */}
       {sTab==="languages"&&<LangManagerSection/>}
+
+      {/* ── TAB: WORKSHOP QR / PARTNERS ── */}
+      {sTab==="partners"&&<WorkshopQRSection settings={f}/>}
+    </div>
+  );
+}
+
+function WorkshopQRSection({settings, shopId=1}) {
+  const shopName = settings.shop_name || "AutoParts";
+  const token = btoa(JSON.stringify({id:shopId, name:shopName}));
+  const baseUrl = `${window.location.origin}${window.location.pathname}`;
+  const regUrl  = `${baseUrl}?ws_register=${token}`;
+  const loginUrl= `${baseUrl}?ws_login=1`;
+  const qrSize  = 260;
+  const qrSrc   = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(regUrl)}&format=png&margin=2`;
+  const [copied, setCopied] = useState(false);
+
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(regUrl); setCopied(true); setTimeout(()=>setCopied(false),2000); } catch {}
+  };
+
+  const waPhone = settings.whatsapp || settings.phone || "";
+  const waText  = `Register your workshop with ${shopName}:\n${regUrl}`;
+  const waHref  = waLink(waPhone, waText);
+
+  const printQR = () => {
+    const win = window.open("","_blank","width=400,height=500");
+    if(!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Workshop QR — ${shopName}</title>
+    <style>body{margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:'DM Sans',Arial,sans-serif;background:#fff;padding:24px;box-sizing:border-box}
+    .shop{font-size:22px;font-weight:800;margin-bottom:6px;text-align:center}.sub{font-size:13px;color:#666;margin-bottom:20px;text-align:center}
+    .qr{border:3px solid #f97316;border-radius:14px;padding:10px;background:#fff;margin-bottom:18px}
+    .url{font-size:9px;color:#888;word-break:break-all;max-width:280px;text-align:center;margin-top:8px}
+    .badge{background:#fff7ed;border:1.5px solid #f97316;border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;color:#ea580c;margin-bottom:10px}</style>
+    </head><body>
+    <div class="badge">Workshop Registration</div>
+    <div class="shop">${shopName}</div>
+    <div class="sub">Scan to register your workshop</div>
+    <div class="qr"><img src="${qrSrc}" width="${qrSize}" height="${qrSize}" alt="QR"/></div>
+    <div class="url">${regUrl}</div>
+    </body></html>`);
+    win.document.close();
+    win.onload = () => { win.print(); };
+  };
+
+  return (
+    <div style={{maxWidth:600}}>
+      <div className="card" style={{padding:24}}>
+        <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>🔗 Workshop Registration QR</h3>
+        <p style={{fontSize:13,color:"var(--text3)",marginBottom:20}}>Share this QR code or link with workshops. When they scan it, they'll be sent to a registration page with your shop name pre-filled and locked — they cannot change it.</p>
+
+        {/* Spare shop name badge */}
+        <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(249,115,22,.07)",border:"1px solid rgba(249,115,22,.2)",borderRadius:10,padding:"10px 14px",marginBottom:20}}>
+          <span style={{fontSize:18}}>🏪</span>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--accent)",textTransform:"uppercase",letterSpacing:".06em"}}>Your Spare Shop Name (locked in QR)</div>
+            <div style={{fontSize:16,fontWeight:800,color:"var(--text)"}}>{shopName}</div>
+          </div>
+          <span style={{marginLeft:"auto",fontSize:12}}>🔒</span>
+        </div>
+
+        <div style={{display:"flex",gap:24,alignItems:"flex-start",flexWrap:"wrap"}}>
+          {/* QR code */}
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,flexShrink:0}}>
+            <div style={{border:"3px solid var(--accent)",borderRadius:12,padding:8,background:"#fff"}}>
+              <img src={qrSrc} width={qrSize} height={qrSize} alt="Workshop registration QR" style={{display:"block"}}/>
+            </div>
+            <div style={{fontSize:11,color:"var(--text3)",textAlign:"center"}}>Scan to register</div>
+          </div>
+
+          {/* Actions */}
+          <div style={{flex:1,minWidth:220,display:"flex",flexDirection:"column",gap:12}}>
+            <div>
+              <FL label="Registration Link"/>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <input readOnly value={regUrl} style={{flex:1,fontSize:11,padding:"8px 10px",borderRadius:8,border:"1px solid var(--border2)",background:"var(--surface2)",color:"var(--text3)",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis"}}/>
+                <button className="btn btn-ghost" style={{flexShrink:0,padding:"8px 12px",fontSize:12}} onClick={copyLink}>
+                  {copied?"✅ Copied":"📋 Copy"}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <FL label="Workshop Login Link"/>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <input readOnly value={loginUrl} style={{flex:1,fontSize:11,padding:"8px 10px",borderRadius:8,border:"1px solid var(--border2)",background:"var(--surface2)",color:"var(--text3)",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis"}}/>
+                <button className="btn btn-ghost" style={{flexShrink:0,padding:"8px 12px",fontSize:12}} onClick={async()=>{try{await navigator.clipboard.writeText(loginUrl);}catch{}}}>
+                  📋 Copy
+                </button>
+              </div>
+            </div>
+
+            <button className="btn btn-primary" style={{height:40,fontWeight:700,fontSize:13}} onClick={printQR}>
+              🖨️ Print QR Card
+            </button>
+
+            {waPhone ? (
+              <a href={waHref} target="_blank" rel="noreferrer"
+                style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,height:40,borderRadius:9,background:"#25D366",color:"#fff",fontWeight:700,fontSize:13,textDecoration:"none"}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                Share via WhatsApp
+              </a>
+            ) : (
+              <div style={{fontSize:12,color:"var(--text3)",background:"var(--surface2)",borderRadius:8,padding:"8px 12px"}}>
+                💡 Add your WhatsApp number in Shop settings to enable the WhatsApp share button.
+              </div>
+            )}
+
+            <div style={{fontSize:11,color:"var(--text3)",lineHeight:1.5,background:"var(--surface2)",borderRadius:8,padding:"10px 12px"}}>
+              <strong>How it works:</strong><br/>
+              1. Print or share the QR code / link with workshop owners<br/>
+              2. They scan or click → fill in their details → register<br/>
+              3. Your shop name is permanently locked in their account<br/>
+              4. They log in at the Workshop Login link above
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -6584,9 +6713,12 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
           </div>
         </div>
       </div>
-      <button className="btn btn-primary" onClick={save} disabled={busy} style={{width:"100%"}}>
+      <button className="btn btn-primary" onClick={save} disabled={busy} style={{width:"100%",marginBottom:24}}>
         {busy?"Saving…":"💾 Save Branch Profile"}
       </button>
+
+      {/* Workshop QR — generate registration QR for this branch */}
+      <WorkshopQRSection settings={{shop_name:f.shop_name||branch?.name||"Branch", whatsapp:f.phone||""}} shopId={branch?.id||1}/>
     </div>
   );
 }

@@ -1685,3 +1685,144 @@ export function BranchStockRequestConfirmPage({token}) {
     </div>
   );
 }
+
+// ─── Workshop Register Page (reached via QR code from spare shop) ──────────────
+export function WorkshopRegisterPage({ token }) {
+  // token = btoa(JSON.stringify({id, name}))
+  let shopId = 1, shopName = "Spare Shop";
+  try {
+    const d = JSON.parse(atob(token));
+    shopId = d.id || 1;
+    shopName = d.name || "Spare Shop";
+  } catch { /* invalid token – use defaults */ }
+
+  const [f, setF] = useState({
+    workshop_name: "", username: "", password: "", password2: "",
+    phone: "", email: "", city: "", country: "",
+  });
+  const [step, setStep] = useState("form"); // form | submitting | done
+  const [errMsg, setErrMsg] = useState("");
+  const upd = (k, v) => setF(p => ({...p, [k]: v}));
+
+  const submit = async () => {
+    if (!f.workshop_name.trim()) return setErrMsg("Workshop name is required");
+    if (!f.username.trim())      return setErrMsg("Username is required");
+    if (!f.password)             return setErrMsg("Password is required");
+    if (f.password.length < 4)  return setErrMsg("Password must be at least 4 characters");
+    if (f.password !== f.password2) return setErrMsg("Passwords don't match");
+    if (!f.city.trim())          return setErrMsg("City is required");
+    if (!f.country.trim())       return setErrMsg("Country is required");
+    setErrMsg(""); setStep("submitting");
+    try {
+      const ex = await api.get("users", `username=eq.${encodeURIComponent(f.username.trim())}&select=id`).catch(() => []);
+      if (Array.isArray(ex) && ex.length > 0) {
+        setErrMsg("Username already taken — choose another"); setStep("form"); return;
+      }
+      const wsId = `WS${Date.now()}`;
+      const today = new Date().toISOString().slice(0, 10);
+      const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const r1 = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({
+          id: wsId, username: f.username.trim(), password: f.password,
+          name: f.workshop_name.trim(), role: "workshop",
+          phone: f.phone.trim() || "", email: f.email.trim() || "",
+          spare_shop_id: shopId, spare_shop_name: shopName,
+        }),
+      });
+      if (!r1.ok) { const txt = await r1.text(); throw new Error(txt); }
+      await fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({
+          id: wsId, name: f.workshop_name.trim(), phone: f.phone.trim() || "",
+          email: f.email.trim() || "", city: f.city.trim(), country: f.country.trim(),
+          trial_start: today, subscription_status: "trial", subscription_expires_at: trialEnd,
+        }),
+      }).catch(() => {});
+      setStep("done");
+    } catch (e) {
+      setErrMsg(e.message || "Registration failed. Please try again.");
+      setStep("form");
+    }
+  };
+
+  const loginUrl = `${window.location.origin}${window.location.pathname}?ws_login=1`;
+  const inp = { width:"100%", padding:"11px 14px", borderRadius:9, border:"1.5px solid var(--border2)", background:"var(--surface)", color:"var(--text)", fontSize:14, boxSizing:"border-box", outline:"none", fontFamily:"inherit" };
+  const lockedInp = {...inp, background:"rgba(37,99,235,.04)", borderColor:"rgba(37,99,235,.3)", color:"var(--text2)", cursor:"not-allowed"};
+  const Lbl = ({label}) => <label style={{fontSize:10,fontWeight:700,color:"var(--text3)",letterSpacing:".08em",textTransform:"uppercase",display:"block",marginBottom:5}}>{label}</label>;
+
+  return (
+    <div style={{fontFamily:"'DM Sans',sans-serif",background:"var(--bg)",minHeight:"100vh",color:"var(--text)",display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 16px"}}>
+      <style>{CSS}</style>
+      <div style={{width:"100%",maxWidth:500}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{fontSize:28,marginBottom:8}}>🔧</div>
+          <div style={{fontSize:22,fontWeight:800}}>Workshop Registration</div>
+          <div style={{fontSize:13,color:"var(--text3)",marginTop:6}}>Create your workshop account</div>
+        </div>
+
+        {/* Locked spare shop banner */}
+        <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(37,99,235,.07)",border:"1px solid rgba(37,99,235,.2)",borderRadius:10,padding:"10px 14px",marginBottom:18}}>
+          <span style={{fontSize:18}}>🏪</span>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:"rgba(37,99,235,.8)",textTransform:"uppercase",letterSpacing:".06em"}}>Spare Shop Partner</div>
+            <div style={{fontSize:14,fontWeight:700,color:"var(--text)"}}>{shopName}</div>
+          </div>
+          <span style={{marginLeft:"auto",fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:4}}>🔒 Locked</span>
+        </div>
+
+        {step === "done" ? (
+          <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:14,padding:"32px 24px",textAlign:"center"}}>
+            <div style={{fontSize:40,marginBottom:12}}>✅</div>
+            <div style={{fontSize:18,fontWeight:700,color:"var(--green)",marginBottom:8}}>Registration Complete!</div>
+            <div style={{fontSize:14,color:"var(--text2)",marginBottom:20}}>
+              <strong>{f.workshop_name}</strong> has been registered and linked to <strong>{shopName}</strong>.<br/>
+              Your 30-day trial has started.
+            </div>
+            <a href={loginUrl} style={{display:"inline-block",padding:"12px 28px",background:"var(--accent)",color:"#fff",borderRadius:10,fontWeight:700,fontSize:14,textDecoration:"none"}}>
+              Log In Now →
+            </a>
+          </div>
+        ) : (
+          <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:"24px 20px"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div><Lbl label="Workshop Name *"/><input style={inp} value={f.workshop_name} onChange={e=>upd("workshop_name",e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div><Lbl label="City *"/><input style={inp} value={f.city} onChange={e=>upd("city",e.target.value)} placeholder="Cape Town"/></div>
+                <div><Lbl label="Country *"/><input style={inp} value={f.country} onChange={e=>upd("country",e.target.value)} placeholder="South Africa"/></div>
+              </div>
+              <div><Lbl label="Phone"/><input style={inp} type="tel" value={f.phone} onChange={e=>upd("phone",e.target.value)} placeholder="+27 82 000 0000"/></div>
+              <div><Lbl label="Email"/><input style={inp} type="email" value={f.email} onChange={e=>upd("email",e.target.value)} placeholder="workshop@email.com"/></div>
+              <div style={{borderTop:"1px solid var(--border)",paddingTop:14,marginTop:2}}>
+                <div style={{fontSize:12,fontWeight:700,color:"var(--text2)",marginBottom:12}}>Login Credentials</div>
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  <div><Lbl label="Username *"/><input style={inp} value={f.username} onChange={e=>upd("username",e.target.value)} placeholder="Your login username" autoCapitalize="none"/></div>
+                  <div><Lbl label="Password *"/><input style={inp} type="password" value={f.password} onChange={e=>upd("password",e.target.value)} placeholder="Min. 4 characters"/></div>
+                  <div><Lbl label="Confirm Password *"/><input style={inp} type="password" value={f.password2} onChange={e=>upd("password2",e.target.value)} placeholder="Repeat password"/></div>
+                </div>
+              </div>
+              {/* Read-only locked spare shop */}
+              <div>
+                <Lbl label="Spare Shop Partner (locked)"/>
+                <div style={{...lockedInp,display:"flex",alignItems:"center",justifyContent:"space-between",borderRadius:9,padding:"11px 14px"}}>
+                  <span>{shopName}</span><span style={{fontSize:12}}>🔒</span>
+                </div>
+              </div>
+              {errMsg && <div style={{color:"var(--red)",fontSize:13,background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.3)",borderRadius:8,padding:"8px 12px"}}>{errMsg}</div>}
+              <button
+                style={{width:"100%",padding:13,borderRadius:10,background:"var(--accent)",color:"#fff",border:"none",fontSize:15,fontWeight:700,cursor:step==="submitting"?"not-allowed":"pointer",opacity:step==="submitting"?0.7:1}}
+                onClick={submit} disabled={step==="submitting"}>
+                {step==="submitting" ? "Registering…" : "Register Workshop →"}
+              </button>
+              <div style={{textAlign:"center",fontSize:13,color:"var(--text3)"}}>
+                Already have an account? <a href={loginUrl} style={{color:"var(--accent)",fontWeight:600}}>Log in here</a>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

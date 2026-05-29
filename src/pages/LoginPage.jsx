@@ -48,8 +48,8 @@ const IcUser   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="non
 const IcLock   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
 const IcGrid   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
 
-export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
-  const [authTab,setAuthTab] = useState("branch");
+export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLoginOnly=false}) {
+  const [authTab,setAuthTab] = useState(wsLoginOnly?"workshop":"branch");
   // branch
   const [branchName,setBranchName] = useState("");
   const [branchUser,setBranchUser] = useState(""); const [branchPass,setBranchPass] = useState("");
@@ -301,7 +301,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
           </div>
         </div>
 
-        {/* Module tabs — SVG icons, outlined style */}
+        {/* Module tabs — hidden in workshop-only mode */}
+        {!wsLoginOnly&&(
         <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,marginBottom:14}}>
           {TAB_BTNS.map(({id,Icon,label})=>(
             <button key={id} onClick={()=>switchTab(id)} style={{
@@ -321,6 +322,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[]}) {
             </button>
           ))}
         </div>
+        )}
 
         {/* Card */}
         <div style={{background:"var(--surface)",borderRadius:16,border:"1px solid var(--border2)",boxShadow:"var(--shadow-lg)",padding:"28px 26px",overflow:"hidden"}}>

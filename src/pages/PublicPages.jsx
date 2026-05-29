@@ -1728,7 +1728,7 @@ export function WorkshopRegisterPage({ token }) {
           username: f.username.trim(), password: f.password,
           name: f.workshop_name.trim(), role: "workshop",
           phone: f.phone.trim() || "", email: f.email.trim() || "",
-          spare_shop_id: shopId, spare_shop_name: shopName,
+          spare_shop_name: shopName,
         }),
       });
       if (!r1.ok) { const txt = await r1.text(); throw new Error(txt); }

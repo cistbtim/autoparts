@@ -1718,25 +1718,27 @@ export function WorkshopRegisterPage({ token }) {
       if (Array.isArray(ex) && ex.length > 0) {
         setErrMsg("Username already taken — choose another"); setStep("form"); return;
       }
-      const wsId = `WS${Date.now()}`;
       const today = new Date().toISOString().slice(0, 10);
       const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      // Don't set id — let DB auto-generate; use return=representation to get it back
       const r1 = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
         method: "POST",
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
         body: JSON.stringify({
-          id: wsId, username: f.username.trim(), password: f.password,
+          username: f.username.trim(), password: f.password,
           name: f.workshop_name.trim(), role: "workshop",
           phone: f.phone.trim() || "", email: f.email.trim() || "",
           spare_shop_id: shopId, spare_shop_name: shopName,
         }),
       });
       if (!r1.ok) { const txt = await r1.text(); throw new Error(txt); }
+      const created = await r1.json();
+      const newId = Array.isArray(created) ? created[0]?.id : created?.id;
       await fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles`, {
         method: "POST",
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
         body: JSON.stringify({
-          id: wsId, name: f.workshop_name.trim(), phone: f.phone.trim() || "",
+          id: newId, name: f.workshop_name.trim(), phone: f.phone.trim() || "",
           email: f.email.trim() || "", city: f.city.trim(), country: f.country.trim(),
           trial_start: today, subscription_status: "trial", subscription_expires_at: trialEnd,
         }),

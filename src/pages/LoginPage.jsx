@@ -6,16 +6,22 @@ import { ShopLogo, FL } from "../components/shared.jsx";
 import { makeId, detectGeoLocation, waLink } from "../lib/helpers.js";
 import { getSubInfo } from "../lib/constants.js";
 
-// Attach spare_shop_name from localStorage if DB doesn't have it yet (e.g. column not yet migrated)
+// Attach spare_shop_name + queue linked_branch_id from localStorage (set during QR registration)
 const applyPendingSpareShop = (userObj) => {
-  if (userObj.spare_shop_name) return userObj; // already set in DB
   try {
-    const pending = localStorage.getItem("ap_pending_spare_shop");
-    if (!pending) return userObj;
+    const raw = localStorage.getItem("ap_pending_spare_shop");
+    if (!raw) return userObj;
+    let data;
+    try { data = JSON.parse(raw); } catch { data = {name: raw, branch_id: null}; }
+    const shopName = data.name || raw;
+    const branchId = data.branch_id || null;
     localStorage.removeItem("ap_pending_spare_shop");
-    // Best-effort DB update — works once spare_shop_name column exists
-    api.patch("users","id",String(userObj.id),{spare_shop_name:pending}).catch(()=>{});
-    return {...userObj, spare_shop_name: pending};
+    if (branchId) {
+      try { localStorage.setItem("ap_pending_linked_branch", branchId); } catch {}
+    }
+    if (userObj.spare_shop_name === shopName) return userObj;
+    api.patch("users","id",String(userObj.id),{spare_shop_name:shopName}).catch(()=>{});
+    return {...userObj, spare_shop_name: shopName};
   } catch { return userObj; }
 };
 

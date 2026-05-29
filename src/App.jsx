@@ -2074,6 +2074,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
 
   const saveWorkshopProfile=async(data)=>{
     const payload={...data, id:wsId};
+    // Auto-apply pending linked branch from QR registration if not already set
+    if (!payload.linked_branch_id) {
+      try { const pb=localStorage.getItem("ap_pending_linked_branch"); if(pb){payload.linked_branch_id=pb;localStorage.removeItem("ap_pending_linked_branch");} } catch {}
+    }
     // Check if row already exists
     const existing=await api.get("workshop_profiles",`id=eq.${wsId}&select=id`).catch(()=>[]);
     let res;
@@ -5434,7 +5438,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {showLocationSetup&&<WsLocationSetupModal
         profile={workshopProfile}
         onSave={async(city,country)=>{
-          await saveWorkshopProfile({...workshopProfile,city,country});
+          const extra = {};
+          try {
+            const pb = localStorage.getItem("ap_pending_linked_branch");
+            if (pb && !workshopProfile.linked_branch_id) { extra.linked_branch_id = pb; localStorage.removeItem("ap_pending_linked_branch"); }
+          } catch {}
+          await saveWorkshopProfile({...workshopProfile,city,country,...extra});
           setShowLocationSetup(false);
           showToast("✅ Location saved");
         }}

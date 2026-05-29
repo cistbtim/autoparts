@@ -1730,8 +1730,8 @@ export function WorkshopRegisterPage({ token }) {
         }),
       });
       if (!r1.ok) { const txt = await r1.text(); throw new Error(txt); }
-      // Save spare shop name to localStorage so login can pick it up even if DB column doesn't exist yet
-      try { localStorage.setItem("ap_pending_spare_shop", shopName); } catch {}
+      // Save spare shop info to localStorage so login can apply it even if DB column isn't migrated yet
+      try { localStorage.setItem("ap_pending_spare_shop", JSON.stringify({name: shopName, branch_id: shopId !== 1 ? String(shopId) : null})); } catch {}
       setStep("done");
     } catch (e) {
       setErrMsg(e.message || "Registration failed. Please try again.");

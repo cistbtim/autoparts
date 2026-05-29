@@ -1528,7 +1528,12 @@ export function SettingsPage({settings,onSave,t}) {
       {sTab==="languages"&&<LangManagerSection/>}
 
       {/* ── TAB: WORKSHOP QR / PARTNERS ── */}
-      {sTab==="partners"&&<WorkshopQRSection settings={f}/>}
+      {sTab==="partners"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:24}}>
+          <WorkshopQRSection settings={f}/>
+          <LinkedWorkshopsList shopName={f.shop_name||""}/>
+        </div>
+      )}
     </div>
   );
 }
@@ -1644,6 +1649,64 @@ function WorkshopQRSection({settings, shopId=1}) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function LinkedWorkshopsList({shopName}) {
+  const [workshops, setWorkshops] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!shopName) { setLoading(false); return; }
+    (async () => {
+      setLoading(true);
+      // Fetch all users with role=workshop linked to this spare shop name or spare_shop_id=1
+      const res = await api.get("users",
+        `role=eq.workshop&or=(spare_shop_name.eq.${encodeURIComponent(shopName)},spare_shop_id.eq.1)&select=id,name,username,phone,email,spare_shop_name,created_at&order=created_at.desc`
+      ).catch(() => []);
+      // Also fetch via workshop_profiles linked_branch_id approach
+      setWorkshops(Array.isArray(res) ? res.filter(w => w.spare_shop_name === shopName || w.spare_shop_id === 1) : []);
+      setLoading(false);
+    })();
+  }, [shopName]);
+
+  if (loading) return <div style={{fontSize:13,color:"var(--text3)"}}>Loading linked workshops…</div>;
+
+  return (
+    <div className="card" style={{padding:24}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:2}}>🔧 Linked Workshops</h3>
+          <div style={{fontSize:12,color:"var(--text3)"}}>Workshops that registered via your QR code</div>
+        </div>
+        <div style={{background:"var(--accent)",color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:700}}>{workshops.length}</div>
+      </div>
+
+      {workshops.length === 0 ? (
+        <div style={{textAlign:"center",padding:"28px 16px",color:"var(--text3)",fontSize:13,background:"var(--surface2)",borderRadius:10}}>
+          No workshops linked yet. Share your QR code so workshops can register.
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {workshops.map(w => (
+            <div key={w.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)"}}>
+              <div style={{width:36,height:36,borderRadius:"50%",background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>🔧</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:700,color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{w.name||w.username}</div>
+                <div style={{fontSize:11,color:"var(--text3)",display:"flex",gap:10,marginTop:2,flexWrap:"wrap"}}>
+                  {w.username&&<span>👤 {w.username}</span>}
+                  {w.phone&&<span>📞 {w.phone}</span>}
+                  {w.email&&<span>✉ {w.email}</span>}
+                </div>
+              </div>
+              <div style={{fontSize:10,color:"var(--text3)",flexShrink:0,textAlign:"right"}}>
+                {w.created_at ? new Date(w.created_at).toLocaleDateString() : ""}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -6719,6 +6782,9 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
 
       {/* Workshop QR — generate registration QR for this branch */}
       <WorkshopQRSection settings={{shop_name:f.shop_name||branch?.name||"Branch", whatsapp:f.phone||""}} shopId={branch?.id||1}/>
+      <div style={{marginTop:24}}>
+        <LinkedWorkshopsList shopName={f.shop_name||branch?.name||""}/>
+      </div>
     </div>
   );
 }

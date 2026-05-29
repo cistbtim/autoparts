@@ -1718,12 +1718,10 @@ export function WorkshopRegisterPage({ token }) {
       if (Array.isArray(ex) && ex.length > 0) {
         setErrMsg("Username already taken — choose another"); setStep("form"); return;
       }
-      const today = new Date().toISOString().slice(0, 10);
-      const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      // Don't set id — let DB auto-generate; use return=representation to get it back
+      // Don't set id — let DB auto-generate
       const r1 = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
         method: "POST",
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
         body: JSON.stringify({
           username: f.username.trim(), password: f.password,
           name: f.workshop_name.trim(), role: "workshop",
@@ -1732,17 +1730,8 @@ export function WorkshopRegisterPage({ token }) {
         }),
       });
       if (!r1.ok) { const txt = await r1.text(); throw new Error(txt); }
-      const created = await r1.json();
-      const newId = Array.isArray(created) ? created[0]?.id : created?.id;
-      await fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles`, {
-        method: "POST",
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-        body: JSON.stringify({
-          id: newId, name: f.workshop_name.trim(), phone: f.phone.trim() || "",
-          email: f.email.trim() || "", city: f.city.trim(), country: f.country.trim(),
-          trial_start: today, subscription_status: "trial", subscription_expires_at: trialEnd,
-        }),
-      }).catch(() => {});
+      // workshop_profiles is created by the workshop on first login (city/country prompt)
+      // Attempting it here causes id-type mismatch between users.id (uuid) and workshop_profiles.id (integer)
       setStep("done");
     } catch (e) {
       setErrMsg(e.message || "Registration failed. Please try again.");

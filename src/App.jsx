@@ -3100,7 +3100,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           <div style={{background:"var(--surface2)",borderRadius:9,padding:"8px 10px",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <div style={{width:30,height:30,borderRadius:"50%",background:ROLES[role]?.bg,border:`1.5px solid ${ROLES[role]?.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{ROLES[role]?.icon}</div>
-              <div><div style={{fontSize:13,fontWeight:600}}>{user.name||user.username}</div><span className="badge" style={{background:ROLES[role]?.bg,color:ROLES[role]?.color,fontSize:10,padding:"1px 7px"}}>{t[role]||role}</span></div>
+              <div>
+                <div style={{fontSize:13,fontWeight:600}}>{user.name||user.username}</div>
+                <span className="badge" style={{background:ROLES[role]?.bg,color:ROLES[role]?.color,fontSize:10,padding:"1px 7px"}}>{t[role]||role}</span>
+                {user.spare_shop_name&&<div style={{fontSize:11,color:"rgba(37,99,235,.8)",marginTop:2,display:"flex",alignItems:"center",gap:3}}>🏪 {user.spare_shop_name} 🔒</div>}
+              </div>
             </div>
           </div>
           <div style={{display:"flex",gap:5,justifyContent:"center"}}>
@@ -3194,6 +3198,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 <div style={{flex:1}}>
                   <div style={{fontSize:13,fontWeight:700,color:"var(--text)"}}>{user.name||user.username}</div>
                   <span className="badge" style={{background:ROLES[role]?.bg,color:ROLES[role]?.color,fontSize:10,padding:"1px 8px"}}>{wsRole}</span>
+                  {user.spare_shop_name&&<div style={{fontSize:11,color:"rgba(37,99,235,.8)",marginTop:3,display:"flex",alignItems:"center",gap:4}}>🏪 {user.spare_shop_name} <span style={{fontSize:10}}>🔒</span></div>}
                 </div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                   {langs.map(l=>(

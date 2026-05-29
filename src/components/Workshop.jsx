@@ -6922,9 +6922,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     const fetches=[
       api.get("parts",`branch_id=eq.${linkedBranchId}&select=*&order=name.asc`).catch(()=>[]),
       api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=*`).catch(()=>[]),
-      mainBranchId&&mainBranchId!==linkedBranchId
-        ?api.get("parts",`branch_id=eq.${mainBranchId}&select=*&order=name.asc`).catch(()=>[])
-        :Promise.resolve([]),
+      // Load ALL parts as the main catalog (not just by mainBranchId which may be null or mismatched)
+      api.get("parts","select=*&order=name.asc").catch(()=>[]),
     ];
     Promise.all(fetches).then(async([ownParts,bStock,mainParts])=>{
       const bStockArr=Array.isArray(bStock)?bStock:[];

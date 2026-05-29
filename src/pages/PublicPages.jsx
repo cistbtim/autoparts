@@ -1727,6 +1727,8 @@ export function WorkshopRegisterPage({ token }) {
           name: f.workshop_name.trim(), role: "workshop",
           phone: f.phone.trim() || "", email: f.email.trim() || "",
           spare_shop_name: shopName,
+          // spare_shop_id only when integer (admin QR = 1); branch QR uses uuid which can't fit int4
+          ...(Number.isInteger(shopId) ? {spare_shop_id: shopId} : {}),
         }),
       });
       if (!r1.ok) { const txt = await r1.text(); throw new Error(txt); }

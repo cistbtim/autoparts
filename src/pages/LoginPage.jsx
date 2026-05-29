@@ -6,6 +6,19 @@ import { ShopLogo, FL } from "../components/shared.jsx";
 import { makeId, detectGeoLocation, waLink } from "../lib/helpers.js";
 import { getSubInfo } from "../lib/constants.js";
 
+// Attach spare_shop_name from localStorage if DB doesn't have it yet (e.g. column not yet migrated)
+const applyPendingSpareShop = (userObj) => {
+  if (userObj.spare_shop_name) return userObj; // already set in DB
+  try {
+    const pending = localStorage.getItem("ap_pending_spare_shop");
+    if (!pending) return userObj;
+    localStorage.removeItem("ap_pending_spare_shop");
+    // Best-effort DB update — works once spare_shop_name column exists
+    api.patch("users","id",String(userObj.id),{spare_shop_name:pending}).catch(()=>{});
+    return {...userObj, spare_shop_name: pending};
+  } catch { return userObj; }
+};
+
 const checkAccess = (u) => {
   const si = getSubInfo(u);
   if (si.status === "expired") return "Subscription expired — contact admin to renew";
@@ -136,7 +149,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(Array.isArray(res)&&res.length>0){
       const accErr=checkAccess(res[0]);
       if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username,company:res[0].name});setLoading(false);return;}
-      await logLogin(res[0]);onLogin(res[0]);setLoading(false);return;
+      const userObj = applyPendingSpareShop(res[0]);
+      await logLogin(userObj);onLogin(userObj);setLoading(false);return;
     }
     // Check workshop sub-users
     let suQ = `username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&is_active=eq.true&select=*`;

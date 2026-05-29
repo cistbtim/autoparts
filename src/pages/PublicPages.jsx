@@ -1730,8 +1730,8 @@ export function WorkshopRegisterPage({ token }) {
         }),
       });
       if (!r1.ok) { const txt = await r1.text(); throw new Error(txt); }
-      // workshop_profiles is created by the workshop on first login (city/country prompt)
-      // Attempting it here causes id-type mismatch between users.id (uuid) and workshop_profiles.id (integer)
+      // Save spare shop name to localStorage so login can pick it up even if DB column doesn't exist yet
+      try { localStorage.setItem("ap_pending_spare_shop", shopName); } catch {}
       setStep("done");
     } catch (e) {
       setErrMsg(e.message || "Registration failed. Please try again.");

@@ -597,10 +597,10 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                 <div style={{position:"relative",height:90,background:"var(--surface2)",overflow:"hidden"}}>
                   {fp
                     ? <>
-                        <img src={toImgUrl(fp)} alt="car" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+                        <img src={toImgUrl(fp)} alt="car" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}
                           referrerPolicy="no-referrer"
                           onError={e=>{e.target.style.display="none";}}/>
-                        <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.72) 0%,rgba(0,0,0,.08) 55%,transparent 100%)"}}/>
+                        <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.4) 0%,transparent 60%)"}}/>
                       </>
                     : <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"linear-gradient(135deg,var(--surface2) 0%,var(--surface3) 100%)"}}>
                         <svg width="42" height="25" viewBox="0 0 38 22" fill="none" xmlns="http://www.w3.org/2000/svg" style={{opacity:.2}}>

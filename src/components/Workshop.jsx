@@ -4715,7 +4715,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
                   <button className="btn btn-ghost btn-sm"
                     style={{color:ordered.length>0?"#16a34a":replied.length>0?"#34d399":"inherit",borderColor:ordered.length>0?"rgba(22,163,74,.4)":replied.length>0?"rgba(52,211,153,.35)":"rgba(52,211,153,.35)",position:"relative"}}
                     onClick={()=>setWsShopReqModal(true)}>
-                    📦 Spare Shop Special Request{ordered.length>0?" 🛒":replied.length>0?" ✅":pending.length>0?" ⏳":""}
+                    📦 Linked Shop Request{ordered.length>0?" 🛒":replied.length>0?" ✅":pending.length>0?" ⏳":""}
                   </button>
                 );
               })()}

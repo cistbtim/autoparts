@@ -254,16 +254,16 @@ export function AdBanner({ads=[], page="shop"}) {
       onClick={()=>ad.link_url&&window.open(ad.link_url,"_blank")}>
       {ad.image_url
         ? <img src={ad.image_url} alt={ad.title||"Ad"}
-            style={{width:"100%",maxHeight:110,objectFit:"cover",display:"block"}}
+            style={{width:"100%",maxHeight:56,objectFit:"cover",display:"block"}}
             onError={e=>e.target.style.display="none"}/>
-        : <div style={{height:80,display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:15,fontWeight:700,color:"var(--text2)",padding:"0 20px",textAlign:"center"}}>
+        : <div style={{height:44,display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
             {ad.title}
           </div>}
       {ad.title&&ad.image_url&&(
         <div style={{position:"absolute",bottom:0,left:0,right:0,
           background:"linear-gradient(transparent,rgba(0,0,0,.65))",
-          padding:"22px 12px 8px",color:"#fff",fontSize:13,fontWeight:700}}>
+          padding:"14px 10px 5px",color:"#fff",fontSize:11,fontWeight:700}}>
           {ad.title}
         </div>
       )}
@@ -292,14 +292,14 @@ export function AdGridCard({ad}) {
       onClick={()=>ad.link_url&&window.open(ad.link_url,"_blank")}>
       {ad.image_url&&(
         <img src={ad.image_url} alt={ad.title||"Ad"}
-          style={{width:"100%",height:120,objectFit:"cover",display:"block"}}
+          style={{width:"100%",height:64,objectFit:"cover",display:"block"}}
           onError={e=>e.target.style.display="none"}/>
       )}
-      <div style={{padding:"10px 12px",flex:1,display:"flex",flexDirection:"column",gap:4}}>
-        {ad.title&&<div style={{fontSize:13,fontWeight:700,lineHeight:1.3,color:"var(--text)"}}>{ad.title}</div>}
-        {ad.description&&<div style={{fontSize:11,color:"var(--text3)",flex:1}}>{ad.description}</div>}
+      <div style={{padding:"7px 10px",flex:1,display:"flex",flexDirection:"column",gap:2}}>
+        {ad.title&&<div style={{fontSize:12,fontWeight:700,lineHeight:1.3,color:"var(--text)"}}>{ad.title}</div>}
+        {ad.description&&<div style={{fontSize:10,color:"var(--text3)"}}>{ad.description}</div>}
         {ad.cta_text&&(
-          <button className="btn btn-primary" style={{width:"100%",fontSize:12,marginTop:6}}
+          <button className="btn btn-primary" style={{width:"100%",fontSize:11,padding:"4px 8px",marginTop:4}}
             onClick={e=>{e.stopPropagation();ad.link_url&&window.open(ad.link_url,"_blank");}}>
             {ad.cta_text}
           </button>

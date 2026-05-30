@@ -256,9 +256,9 @@ export function AdBanner({ads=[], page="shop"}) {
       onClick={()=>ad.link_url&&window.open(ad.link_url,"_blank")}>
       {ad.image_url
         ? <img src={ad.image_url} alt={ad.title||"Ad"}
-            style={{width:"100%",maxHeight:56,objectFit:"cover",display:"block"}}
+            style={{width:"100%",maxHeight:120,objectFit:"contain",display:"block",background:"var(--surface2)"}}
             onError={e=>e.target.style.display="none"}/>
-        : <div style={{height:44,display:"flex",alignItems:"center",justifyContent:"center",
+        : <div style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",
             fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
             {ad.title}
           </div>}

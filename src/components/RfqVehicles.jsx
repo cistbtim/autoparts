@@ -1629,7 +1629,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
             return (
             <div key={v.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
               {/* Photo thumbnail */}
-              <div style={{flexShrink:0,width:64,height:64,borderRadius:8,overflow:"hidden",
+              <div style={{flexShrink:0,width:160,height:160,borderRadius:10,overflow:"hidden",
                 background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",
                 cursor:hasPhotos?"zoom-in":"default"}}
                 onClick={()=>hasPhotos&&openVehicleLightbox(v,"photo_front")}>

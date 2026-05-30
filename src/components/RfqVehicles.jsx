@@ -1492,7 +1492,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
                     background:"var(--surface3)",height:130}}>
                     {url
                       ? <DriveImg url={url} alt={label}
-                          style={{width:"100%",height:"100%",objectFit:"cover",cursor:"zoom-in"}}
+                          style={{width:"100%",height:"100%",objectFit:"contain",cursor:"zoom-in"}}
                           onClick={()=>window.open(toFullUrl(url),"_blank")}/>
                       : <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",
                           justifyContent:"center",color:"var(--text3)",fontSize:11}}>No photo</div>}

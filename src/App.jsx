@@ -6,7 +6,7 @@ import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFul
 import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
 import { CSS } from "./styles.js";
-import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "./components/shared.jsx";
+import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AdBanner, AdGridCard } from "./components/shared.jsx";
 
 import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
@@ -120,6 +120,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [customerReturns,setCustomerReturns]=useState([]);
   const [vehicles,setVehicles]=useState([]);
   const [partFitments,setPartFitments]=useState([]);
+  const [ads,setAds]=useState([]);
   const [payments,setPayments]=useState([]);
   const [rfqSessions,setRfqSessions]=useState([]);
   const [rfqItems,setRfqItems]=useState([]);
@@ -538,6 +539,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setAllScrapParts(Array.isArray(rest[29])?rest[29]:[]);
     setAllScrapProfiles(Array.isArray(rest[30])?rest[30]:[]);
     setBgLoading(0); // all background tables done
+    // Ads — load for everyone, fail silently if table doesn't exist yet
+    api.get("ads","select=*&active=eq.true&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAds(r);});
     // Check for overdue auto-RFQs on every app load (runs after state is set)
     if(!isSalesman) setTimeout(()=>checkStaleRfqs(),2000);
     // Part requests: admin sees all, branch users see their own
@@ -4077,6 +4080,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {/* ── SHOP ── */}
         {tab==="shop"&&(
           <div className="fu">
+            {/* 📢 Top ad banner */}
+            <AdBanner ads={ads} page="shop"/>
+
             {/* ⚠ Disclaimer banner */}
             <div style={{background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.25)",
               borderRadius:10,padding:"10px 14px",marginBottom:12,
@@ -4146,7 +4152,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               🚗 {fp.filter(p=>vehicleFilterIds.has(String(p.id))).length} parts match your vehicle
             </div>}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14}}>
-              {fp.filter(p=>!vehicleFilterIds||vehicleFilterIds.has(String(p.id))).slice(shopPage*PAGE_SIZE,(shopPage+1)*PAGE_SIZE).map(p=>{
+              {(()=>{
+                const gridAds=ads.filter(a=>a.active&&(a.page==="shop"||a.page==="all")&&a.position==="grid");
+                const visibleParts=fp.filter(p=>!vehicleFilterIds||vehicleFilterIds.has(String(p.id))).slice(shopPage*PAGE_SIZE,(shopPage+1)*PAGE_SIZE);
+                const items=[];
+                visibleParts.forEach((p,i)=>{
+                  items.push({type:"part",data:p});
+                  if(gridAds.length&&(i+1)%8===0) items.push({type:"ad",data:gridAds[Math.floor((i+1)/8-1)%gridAds.length]});
+                });
+                return items;
+              })().map((item,i)=>{
+                if(item.type==="ad") return <AdGridCard key={"ad-"+i} ad={item.data}/>;
+                const p=item.data;
                 const inCart=cart.find(i=>i.id===p.id);
                 const img=toImgUrl(p.image_url);
                 return (
@@ -4900,7 +4917,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {tab==="settings"&&role==="admin"&&(
-          <SettingsPage settings={settings} onSave={saveSettings} t={t}/>
+          <SettingsPage settings={settings} onSave={saveSettings} t={t}
+            ads={ads}
+            onSaveAd={async(ad)=>{
+              const res=ad.id?await api.patch("ads","id",ad.id,ad):await api.insert("ads",{...ad,clicks:0});
+              if(res?.code){showToast("Error saving ad: "+(res.message||res.code),"err");return;}
+              await api.get("ads","select=*&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAds(r);});
+              showToast("Ad saved");
+            }}
+            onDeleteAd={async(id)=>{
+              await api.delete("ads","id",id);
+              setAds(prev=>prev.filter(a=>a.id!==id));
+              showToast("Ad deleted");
+            }}/>
         )}
 
         {/* ── REPORTS ── */}

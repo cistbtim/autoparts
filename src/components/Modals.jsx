@@ -1253,7 +1253,7 @@ function LangManagerSection() {
   );
 }
 
-export function SettingsPage({settings,onSave,t}) {
+export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
   const [f,setF]=useState({...settings});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const [sTab,setSTab]=useState("shop");
@@ -1272,7 +1272,20 @@ export function SettingsPage({settings,onSave,t}) {
     onSave({categories:JSON.stringify(updated)});
   };
 
-  const TABS=[["shop","🏪 Shop"],["billing","💰 Billing"],["inventory","🏷️ Inventory"],["pos","🖥️ POS"],["languages","🌐 Languages"],["partners","🔗 Workshop QR"]];
+  // Ads form state
+  const AD_BLANK={title:"",description:"",image_url:"",link_url:"",cta_text:"Learn More",page:"shop",position:"banner",active:true};
+  const [adForm,setAdForm]=useState(AD_BLANK);
+  const [editingAd,setEditingAd]=useState(null);
+  const af=(k,v)=>setAdForm(p=>({...p,[k]:v}));
+  const startEditAd=(ad)=>{setAdForm({...ad});setEditingAd(ad.id);};
+  const cancelEditAd=()=>{setAdForm(AD_BLANK);setEditingAd(null);};
+  const submitAd=async()=>{
+    if(!adForm.title.trim()){return;}
+    await onSaveAd(editingAd?{...adForm,id:editingAd}:adForm);
+    cancelEditAd();
+  };
+
+  const TABS=[["shop","🏪 Shop"],["billing","💰 Billing"],["inventory","🏷️ Inventory"],["pos","🖥️ POS"],["languages","🌐 Languages"],["partners","🔗 Workshop QR"],["ads","📢 Ads"]];
 
   return (
     <div className="fu">
@@ -1532,6 +1545,93 @@ export function SettingsPage({settings,onSave,t}) {
         <div style={{display:"flex",flexDirection:"column",gap:24}}>
           <WorkshopQRSection settings={f}/>
           <LinkedWorkshopsList shopName={f.shop_name||""}/>
+        </div>
+      )}
+
+      {/* ── TAB: ADS ── */}
+      {sTab==="ads"&&(
+        <div style={{maxWidth:720}}>
+          <div style={{marginBottom:20,padding:"12px 16px",background:"rgba(249,115,22,.07)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,fontSize:13,color:"var(--text2)"}}>
+            📢 Ads appear in the <strong>Customer Shop</strong>. <strong>Banner</strong> ads show at the top of the page. <strong>Grid</strong> ads appear every 8 parts in the catalogue.
+          </div>
+
+          {/* Ad form */}
+          <div style={{background:"var(--surface2)",borderRadius:12,padding:16,marginBottom:20,border:"1px solid var(--border)"}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>{editingAd?"✏️ Edit Ad":"➕ New Ad"}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Title *</div>
+                <input className="inp" value={adForm.title} onChange={e=>af("title",e.target.value)} placeholder="e.g. 50% off brake pads this week"/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Link URL</div>
+                <input className="inp" value={adForm.link_url} onChange={e=>af("link_url",e.target.value)} placeholder="https://..."/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Image URL</div>
+                <input className="inp" value={adForm.image_url} onChange={e=>af("image_url",e.target.value)} placeholder="Google Drive or https://..."/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Button Text</div>
+                <input className="inp" value={adForm.cta_text} onChange={e=>af("cta_text",e.target.value)} placeholder="Learn More"/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Description</div>
+                <input className="inp" value={adForm.description} onChange={e=>af("description",e.target.value)} placeholder="Optional short description"/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Page</div>
+                  <select className="inp" value={adForm.page} onChange={e=>af("page",e.target.value)}>
+                    <option value="shop">Customer Shop</option>
+                    <option value="all">All Pages</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Position</div>
+                  <select className="inp" value={adForm.position} onChange={e=>af("position",e.target.value)}>
+                    <option value="banner">Top Banner</option>
+                    <option value="grid">In Grid</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                <input type="checkbox" checked={adForm.active} onChange={e=>af("active",e.target.checked)}/> Active
+              </label>
+              <div style={{flex:1}}/>
+              {editingAd&&<button className="btn btn-ghost btn-sm" onClick={cancelEditAd}>Cancel</button>}
+              <button className="btn btn-primary" onClick={submitAd} disabled={!adForm.title.trim()}>
+                {editingAd?"💾 Save Changes":"➕ Add Ad"}
+              </button>
+            </div>
+          </div>
+
+          {/* Existing ads list */}
+          {ads.length===0
+            ? <div style={{textAlign:"center",padding:40,color:"var(--text3)",fontSize:13}}>No ads yet — create your first ad above.</div>
+            : <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {ads.map(ad=>(
+                  <div key={ad.id} style={{display:"flex",gap:12,alignItems:"center",padding:"10px 14px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10}}>
+                    {ad.image_url&&<img src={ad.image_url} alt="" style={{width:60,height:40,objectFit:"cover",borderRadius:6,flexShrink:0,border:"1px solid var(--border)"}} onError={e=>e.target.style.display="none"}/>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>{ad.title}</div>
+                      <div style={{fontSize:11,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap"}}>
+                        <span style={{padding:"1px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{ad.position==="banner"?"📢 Banner":"🔲 Grid"}</span>
+                        <span style={{padding:"1px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{ad.page==="all"?"🌐 All pages":"🛍️ Shop"}</span>
+                        {ad.clicks>0&&<span style={{color:"var(--blue)"}}>👆 {ad.clicks} clicks</span>}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:ad.active?"#22c55e":"var(--border)",flexShrink:0}}/>
+                      <button className="btn btn-ghost btn-xs" onClick={()=>startEditAd(ad)}>✏️</button>
+                      <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteAd(ad.id)}>🗑</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+          }
         </div>
       )}
     </div>

@@ -235,3 +235,79 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
     </div>
   );
 }
+
+// ── Advertisement components ──────────────────────────────────────────────────
+
+export function AdBanner({ads=[], page="shop"}) {
+  const [idx, setIdx] = useState(0);
+  const active = ads.filter(a=>a.active && (a.page===page||a.page==="all") && a.position==="banner");
+  useEffect(()=>{
+    if(active.length<=1) return;
+    const t=setInterval(()=>setIdx(i=>(i+1)%active.length), 6000);
+    return ()=>clearInterval(t);
+  },[active.length]);
+  if(!active.length) return null;
+  const ad = active[idx % active.length];
+  return (
+    <div style={{position:"relative",marginBottom:14,borderRadius:12,overflow:"hidden",
+      cursor:ad.link_url?"pointer":"default",border:"1px solid var(--border)",background:"var(--surface2)",flexShrink:0}}
+      onClick={()=>ad.link_url&&window.open(ad.link_url,"_blank")}>
+      {ad.image_url
+        ? <img src={ad.image_url} alt={ad.title||"Ad"}
+            style={{width:"100%",maxHeight:110,objectFit:"cover",display:"block"}}
+            onError={e=>e.target.style.display="none"}/>
+        : <div style={{height:80,display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:15,fontWeight:700,color:"var(--text2)",padding:"0 20px",textAlign:"center"}}>
+            {ad.title}
+          </div>}
+      {ad.title&&ad.image_url&&(
+        <div style={{position:"absolute",bottom:0,left:0,right:0,
+          background:"linear-gradient(transparent,rgba(0,0,0,.65))",
+          padding:"22px 12px 8px",color:"#fff",fontSize:13,fontWeight:700}}>
+          {ad.title}
+        </div>
+      )}
+      <div style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.55)",
+        color:"#fff",fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,
+        letterSpacing:".05em",userSelect:"none"}}>AD</div>
+      {active.length>1&&(
+        <div style={{position:"absolute",bottom:6,left:"50%",transform:"translateX(-50%)",
+          display:"flex",gap:4}}>
+          {active.map((_,i)=>(
+            <div key={i} onClick={e=>{e.stopPropagation();setIdx(i);}}
+              style={{width:6,height:6,borderRadius:"50%",cursor:"pointer",
+                background:i===idx?"#fff":"rgba(255,255,255,.45)"}}/>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AdGridCard({ad}) {
+  if(!ad) return null;
+  return (
+    <div style={{position:"relative",borderRadius:12,overflow:"hidden",border:"2px solid rgba(249,115,22,.35)",
+      background:"var(--surface)",cursor:ad.link_url?"pointer":"default",display:"flex",flexDirection:"column"}}
+      onClick={()=>ad.link_url&&window.open(ad.link_url,"_blank")}>
+      {ad.image_url&&(
+        <img src={ad.image_url} alt={ad.title||"Ad"}
+          style={{width:"100%",height:120,objectFit:"cover",display:"block"}}
+          onError={e=>e.target.style.display="none"}/>
+      )}
+      <div style={{padding:"10px 12px",flex:1,display:"flex",flexDirection:"column",gap:4}}>
+        {ad.title&&<div style={{fontSize:13,fontWeight:700,lineHeight:1.3,color:"var(--text)"}}>{ad.title}</div>}
+        {ad.description&&<div style={{fontSize:11,color:"var(--text3)",flex:1}}>{ad.description}</div>}
+        {ad.cta_text&&(
+          <button className="btn btn-primary" style={{width:"100%",fontSize:12,marginTop:6}}
+            onClick={e=>{e.stopPropagation();ad.link_url&&window.open(ad.link_url,"_blank");}}>
+            {ad.cta_text}
+          </button>
+        )}
+      </div>
+      <div style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.55)",
+        color:"#fff",fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,
+        letterSpacing:".05em",userSelect:"none"}}>AD</div>
+    </div>
+  );
+}

@@ -4696,8 +4696,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
           })()}
           <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{display:"flex",gap:6}}>
-              <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("part")}>+ {t.wsqtPart}</button>
-              <button className="btn btn-ghost btn-sm" onClick={()=>setAddingItem("labour")}>+ {t.wsqtLabour}</button>
               {wsProfile?.linked_branch_id&&job.vehicle_make&&onGoToSpareShop&&(()=>{
                 const mv=vehicles.find(v=>v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()&&(v.model?.toLowerCase()===job.vehicle_model?.toLowerCase()||v.code?.toLowerCase()===job.vehicle_model?.toLowerCase()));
                 const displayCode=mv?.code||job.vehicle_model||"";

@@ -248,12 +248,17 @@ export function AdBanner({ads=[], page="shop"}) {
   },[active.length]);
   if(!active.length) return null;
   const ad = active[idx % active.length];
+  const openLink=(url)=>{
+    if(!url) return;
+    const href=url.match(/^https?:\/\//)?url:"https://"+url;
+    window.open(href,"_blank","noopener,noreferrer");
+  };
   return (
     <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
     <div style={{position:"relative",borderRadius:10,overflow:"hidden",
       cursor:ad.link_url?"pointer":"default",border:"1px solid var(--border)",background:"var(--surface2)",
       width:"100%",maxWidth:680,flexShrink:0}}
-      onClick={()=>ad.link_url&&window.open(ad.link_url,"_blank")}>
+      onClick={()=>openLink(ad.link_url)}>
       {ad.image_url
         ? <img src={ad.image_url} alt={ad.title||"Ad"}
             style={{width:"100%",maxHeight:120,objectFit:"contain",display:"block",background:"var(--surface2)"}}
@@ -287,12 +292,14 @@ export function AdBanner({ads=[], page="shop"}) {
   );
 }
 
+const adOpen=(url)=>{if(!url)return;const h=url.match(/^https?:\/\//)?url:"https://"+url;window.open(h,"_blank","noopener,noreferrer");};
+
 export function AdGridCard({ad}) {
   if(!ad) return null;
   return (
     <div style={{position:"relative",borderRadius:12,overflow:"hidden",border:"2px solid rgba(249,115,22,.35)",
       background:"var(--surface)",cursor:ad.link_url?"pointer":"default",display:"flex",flexDirection:"column"}}
-      onClick={()=>ad.link_url&&window.open(ad.link_url,"_blank")}>
+      onClick={()=>adOpen(ad.link_url)}>
       {ad.image_url&&(
         <img src={ad.image_url} alt={ad.title||"Ad"}
           style={{width:"100%",height:64,objectFit:"cover",display:"block"}}
@@ -303,7 +310,7 @@ export function AdGridCard({ad}) {
         {ad.description&&<div style={{fontSize:10,color:"var(--text3)"}}>{ad.description}</div>}
         {ad.cta_text&&(
           <button className="btn btn-primary" style={{width:"100%",fontSize:11,padding:"4px 8px",marginTop:4}}
-            onClick={e=>{e.stopPropagation();ad.link_url&&window.open(ad.link_url,"_blank");}}>
+            onClick={e=>{e.stopPropagation();adOpen(ad.link_url);}}>
             {ad.cta_text}
           </button>
         )}

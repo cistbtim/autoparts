@@ -249,8 +249,10 @@ export function AdBanner({ads=[], page="shop"}) {
   if(!active.length) return null;
   const ad = active[idx % active.length];
   return (
-    <div style={{position:"relative",marginBottom:14,borderRadius:12,overflow:"hidden",
-      cursor:ad.link_url?"pointer":"default",border:"1px solid var(--border)",background:"var(--surface2)",flexShrink:0}}
+    <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
+    <div style={{position:"relative",borderRadius:10,overflow:"hidden",
+      cursor:ad.link_url?"pointer":"default",border:"1px solid var(--border)",background:"var(--surface2)",
+      width:"100%",maxWidth:680,flexShrink:0}}
       onClick={()=>ad.link_url&&window.open(ad.link_url,"_blank")}>
       {ad.image_url
         ? <img src={ad.image_url} alt={ad.title||"Ad"}
@@ -280,6 +282,7 @@ export function AdBanner({ads=[], page="shop"}) {
           ))}
         </div>
       )}
+    </div>
     </div>
   );
 }

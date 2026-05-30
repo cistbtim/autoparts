@@ -540,7 +540,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setAllScrapProfiles(Array.isArray(rest[30])?rest[30]:[]);
     setBgLoading(0); // all background tables done
     // Ads — load for everyone, fail silently if table doesn't exist yet
-    api.get("ads","select=*&active=eq.true&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAds(r);});
+    api.get("ads","select=*&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAds(r);});
     // Check for overdue auto-RFQs on every app load (runs after state is set)
     if(!isSalesman) setTimeout(()=>checkStaleRfqs(),2000);
     // Part requests: admin sees all, branch users see their own
@@ -4920,7 +4920,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           <SettingsPage settings={settings} onSave={saveSettings} t={t}
             ads={ads}
             onSaveAd={async(ad)=>{
-              const res=ad.id?await api.patch("ads","id",ad.id,ad):await api.insert("ads",{...ad,clicks:0});
+              const {id:adId,...adData}=ad;
+              const res=adId?await api.patch("ads","id",adId,adData):await api.insert("ads",{...adData,clicks:0});
               if(res?.code){showToast("Error saving ad: "+(res.message||res.code),"err");return;}
               await api.get("ads","select=*&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAds(r);});
               showToast("Ad saved");

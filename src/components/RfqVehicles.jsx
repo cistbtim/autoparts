@@ -1489,7 +1489,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
                   {url:photos.photo_side,  label:"Side"},
                 ].map(({url,label})=>(
                   <div key={label} style={{position:"relative",borderRadius:8,overflow:"hidden",
-                    background:"var(--surface3)",height:130}}>
+                    background:"var(--surface3)",height:195}}>
                     {url
                       ? <DriveImg url={url} alt={label}
                           style={{width:"100%",height:"100%",objectFit:"contain",cursor:"zoom-in"}}

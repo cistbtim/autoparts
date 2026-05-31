@@ -4770,6 +4770,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           <WorkshopPage
             key={tab}
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":"report"}
+            ads={ads}
             jobs={workshopJobs}
             jobItems={workshopJobItems}
             invoices={workshopInvoices}

@@ -1552,7 +1552,7 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
       {sTab==="ads"&&(
         <div style={{maxWidth:720}}>
           <div style={{marginBottom:20,padding:"12px 16px",background:"rgba(249,115,22,.07)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,fontSize:13,color:"var(--text2)"}}>
-            📢 Ads appear in the <strong>Customer Shop</strong>. <strong>Banner</strong> ads show at the top of the page. <strong>Grid</strong> ads appear every 8 parts in the catalogue.
+            📢 Ads appear in the <strong>Customer Shop</strong>, <strong>Workshop</strong>, and <strong>Spare Shop</strong>. <strong>Banner</strong> ads show at the top of the page. <strong>Grid</strong> ads appear every 8 parts in the catalogue.
           </div>
 
           {/* Ad form */}
@@ -1584,6 +1584,8 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
                   <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Page</div>
                   <select className="inp" value={adForm.page} onChange={e=>af("page",e.target.value)}>
                     <option value="shop">Customer Shop</option>
+                    <option value="workshop">Workshop</option>
+                    <option value="spareshop">Spare Shop</option>
                     <option value="all">All Pages</option>
                   </select>
                 </div>
@@ -1619,7 +1621,7 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
                       <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>{ad.title}</div>
                       <div style={{fontSize:11,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap"}}>
                         <span style={{padding:"1px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{ad.position==="banner"?"📢 Banner":"🔲 Grid"}</span>
-                        <span style={{padding:"1px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{ad.page==="all"?"🌐 All pages":"🛍️ Shop"}</span>
+                        <span style={{padding:"1px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{ad.page==="all"?"🌐 All pages":ad.page==="workshop"?"🔧 Workshop":ad.page==="spareshop"?"🏪 Spare Shop":"🛍️ Shop"}</span>
                         {ad.clicks>0&&<span style={{color:"var(--blue)"}}>👆 {ad.clicks} clicks</span>}
                       </div>
                     </div>

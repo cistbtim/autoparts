@@ -8,7 +8,7 @@ import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./l
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AdBanner, AdGridCard } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { PosPage } from "./components/Pos.jsx";
@@ -112,6 +112,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [loginLogs,setLoginLogs]=useState([]);
   const [adClicks,setAdClicks]=useState([]);
   const [adClicksLoading,setAdClicksLoading]=useState(false);
+  const [adContracts,setAdContracts]=useState([]);
   const [suppliers,setSuppliers]=useState([]);
   const [partSuppliers,setPartSuppliers]=useState([]);
   const [inquiries,setInquiries]=useState([]);
@@ -545,6 +546,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     api.get("ads","select=*&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAds(r);});
     // Ad clicks — admin only
     if(needsAdmin) api.get("ad_clicks","select=*&order=clicked_at.desc&limit=500").catch(()=>[]).then(r=>{if(Array.isArray(r))setAdClicks(r);});
+    if(needsAdmin) api.get("ad_contracts","select=*&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAdContracts(r);});
 
     // Check for overdue auto-RFQs on every app load (runs after state is set)
     if(!isSalesman) setTimeout(()=>checkStaleRfqs(),2000);
@@ -2611,6 +2613,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {id:"dashboard",icon:"📊",label:t.dashboard,roles:["admin"]},
         {id:"loginlogs",icon:"🌍",label:t.loginLogs,roles:["admin"]},
         {id:"adclicks",icon:"📢",label:"Ad Clicks",roles:["admin"]},
+        {id:"adcontracts",icon:"📑",label:"Ad Contracts",roles:["admin"]},
       ]
     },
     {
@@ -2765,7 +2768,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     children:g.children.filter(c=>{
       if(isBranchUser){
         // branch users see admin tabs scoped to their role
-        const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","branches","settings","users","wssubscriptions"]);
+        const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","adcontracts","branches","settings","users","wssubscriptions"]);
         if(!c.roles.includes("admin")||BA_HIDE.has(c.id)) return false;
         // branchAdminOnly items only visible to branch_admin
         if(c.branchAdminOnly && role!=="branch_admin") return false;
@@ -4821,6 +4824,28 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           );
         })()}
 
+        {/* ── AD CONTRACTS ── */}
+        {tab==="adcontracts"&&role==="admin"&&(
+          <AdContractsPage
+            ads={ads}
+            adContracts={adContracts}
+            onSaveContract={async(c)=>{
+              const {id:cId,...cData}=c;
+              const r=cId?await api.patch("ad_contracts","id",cId,cData):await api.insert("ad_contracts",cData);
+              if(r?.code){showToast("Error: "+(r.message||r.code),"err");return;}
+              api.get("ad_contracts","select=*&order=created_at.desc").catch(()=>[]).then(res=>{if(Array.isArray(res))setAdContracts(res);});
+              showToast("Contract saved");
+            }}
+            onDeleteContract={async(id)=>{
+              const linked=ads.filter(a=>String(a.contract_id)===String(id));
+              if(linked.length){showToast(`Unlink ${linked.length} ad(s) before deleting this contract`,"err");return;}
+              await api.delete("ad_contracts","id",id);
+              setAdContracts(prev=>prev.filter(c=>c.id!==id));
+              showToast("Contract deleted");
+            }}
+          />
+        )}
+
         {/* ── SETTINGS ── */}
         {/* ── VEHICLES ── */}
         {/* ── WORKSHOP (all sub-tabs) ── */}
@@ -4990,6 +5015,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {tab==="settings"&&role==="admin"&&(
           <SettingsPage settings={settings} onSave={saveSettings} t={t}
             ads={ads}
+            adContracts={adContracts}
             onSaveAd={async(ad)=>{
               const {id:adId,...adData}=ad;
               const res=adId?await api.patch("ads","id",adId,adData):await api.insert("ads",{...adData,clicks:0});

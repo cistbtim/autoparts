@@ -1253,7 +1253,7 @@ function LangManagerSection() {
   );
 }
 
-export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
+export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,onDeleteAd}) {
   const [f,setF]=useState({...settings});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const [sTab,setSTab]=useState("shop");
@@ -1273,7 +1273,7 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
   };
 
   // Ads form state
-  const AD_BLANK={title:"",description:"",image_url:"",link_url:"",cta_text:"Learn More",page:"shop",position:"banner",weather_condition:"any",active:true};
+  const AD_BLANK={title:"",description:"",image_url:"",link_url:"",cta_text:"Learn More",page:"shop",position:"banner",weather_condition:"any",contract_id:null,active:true};
   const [adForm,setAdForm]=useState(AD_BLANK);
   const [editingAd,setEditingAd]=useState(null);
   const af=(k,v)=>setAdForm(p=>({...p,[k]:v}));
@@ -1610,6 +1610,15 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
                   </select>
                 </div>
               </div>
+              {adContracts.length>0&&(
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>📑 Contract</div>
+                  <select className="inp" value={adForm.contract_id||""} onChange={e=>af("contract_id",e.target.value?+e.target.value:null)}>
+                    <option value="">No contract</option>
+                    {adContracts.map(c=><option key={c.id} value={c.id}>{c.advertiser_name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
@@ -1636,6 +1645,7 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
                         <span style={{padding:"1px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{ad.position==="banner"?"📢 Banner":"🔲 Grid"}</span>
                         <span style={{padding:"1px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{ad.page==="all"?"🌐 All pages":ad.page==="workshop"?"🔧 Workshop":ad.page==="spareshop"?"🏪 Spare Shop":ad.page==="scrapyard"?"🚗 Scrapyard":"🛍️ Shop"}</span>
                         {ad.weather_condition&&ad.weather_condition!=="any"&&<span style={{padding:"1px 7px",borderRadius:4,background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",color:"var(--blue)"}}>{ad.weather_condition==="rain"?"🌧 Rain":ad.weather_condition==="hot"?"🌡️ Hot":ad.weather_condition==="cold"?"🧊 Cold":ad.weather_condition==="snow"?"❄️ Snow":ad.weather_condition==="fog"?"🌫 Fog":ad.weather_condition==="clear"?"☀️ Clear":ad.weather_condition}</span>}
+                        {ad.contract_id&&(()=>{const c=adContracts.find(x=>x.id===ad.contract_id||String(x.id)===String(ad.contract_id));return c?<span style={{padding:"1px 7px",borderRadius:4,background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",color:"var(--green)"}}>📑 {c.advertiser_name}</span>:null;})()}
                         {ad.clicks>0&&<span style={{color:"var(--blue)"}}>👆 {ad.clicks} clicks</span>}
                       </div>
                     </div>
@@ -8003,5 +8013,214 @@ export function PrintShelfLabelModal({settings,onClose}) {
         <button className="btn btn-primary" style={{flex:2}} onClick={handlePrint} disabled={!binName.trim()}>🖨️ Open Print Window</button>
       </div>
     </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AD CONTRACTS PAGE
+// ═══════════════════════════════════════════════════════════════
+export function AdContractsPage({ads=[],adContracts=[],onSaveContract,onDeleteContract}) {
+  const BLANK={advertiser_name:"",advertiser_contact:"",amount:"",currency:"ZAR",start_date:"",end_date:"",status:"active",payment_status:"unpaid",amount_paid:"",notes:""};
+  const [form,setForm]=useState(BLANK);
+  const [editingId,setEditingId]=useState(null);
+  const [expanded,setExpanded]=useState(null);
+  const [contractClicks,setContractClicks]=useState([]);
+  const [clicksLoading,setClicksLoading]=useState(false);
+  const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+
+  const startEdit=(c)=>{setForm({...c,amount:c.amount||"",amount_paid:c.amount_paid||""});setEditingId(c.id);setExpanded(null);};
+  const cancel=()=>{setForm(BLANK);setEditingId(null);};
+  const submit=async()=>{
+    if(!form.advertiser_name.trim())return;
+    await onSaveContract(editingId?{...form,id:editingId}:form);
+    cancel();
+  };
+
+  const toggleExpand=async(c)=>{
+    if(expanded===c.id){setExpanded(null);setContractClicks([]);return;}
+    setExpanded(c.id);
+    const adIds=ads.filter(a=>String(a.contract_id)===String(c.id)).map(a=>a.id);
+    if(!adIds.length){setContractClicks([]);return;}
+    setClicksLoading(true);
+    try{
+      const r=await api.get("ad_clicks",`ad_id=in.(${adIds.join(',')})&select=*&order=clicked_at.desc`);
+      setContractClicks(Array.isArray(r)?r:[]);
+    }catch{setContractClicks([]);}
+    finally{setClicksLoading(false);}
+  };
+
+  const STATUS_COLOR={active:"var(--green)",expired:"var(--text3)",draft:"var(--yellow)",cancelled:"var(--red)"};
+  const PAY_COLOR={paid:"var(--green)",partial:"var(--yellow)",unpaid:"var(--red)"};
+  const today=new Date().toISOString().slice(0,10);
+
+  return (
+    <div className="fu">
+      <h1 style={{fontSize:20,fontWeight:700,marginBottom:18}}>📑 Ad Contracts</h1>
+
+      {/* Form */}
+      <div style={{background:"var(--surface2)",borderRadius:12,padding:16,marginBottom:20,border:"1px solid var(--border)"}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>{editingId?"✏️ Edit Contract":"➕ New Contract"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div>
+            <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Advertiser Name *</div>
+            <input className="inp" value={form.advertiser_name} onChange={e=>f("advertiser_name",e.target.value)} placeholder="e.g. Oscar Lubricants"/>
+          </div>
+          <div>
+            <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Contact</div>
+            <input className="inp" value={form.advertiser_contact} onChange={e=>f("advertiser_contact",e.target.value)} placeholder="email or phone"/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:6}}>
+            <div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Contract Amount</div>
+              <input className="inp" type="number" value={form.amount} onChange={e=>f("amount",e.target.value)} placeholder="0"/>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Currency</div>
+              <select className="inp" value={form.currency} onChange={e=>f("currency",e.target.value)}>
+                <option value="ZAR">ZAR</option>
+                <option value="USD">USD</option>
+                <option value="TWD">TWD</option>
+              </select>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+            <div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Start Date</div>
+              <input className="inp" type="date" value={form.start_date} onChange={e=>f("start_date",e.target.value)}/>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>End Date</div>
+              <input className="inp" type="date" value={form.end_date} onChange={e=>f("end_date",e.target.value)}/>
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Status</div>
+            <select className="inp" value={form.status} onChange={e=>f("status",e.target.value)}>
+              <option value="active">Active</option>
+              <option value="draft">Draft</option>
+              <option value="expired">Expired</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+            <div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Payment</div>
+              <select className="inp" value={form.payment_status} onChange={e=>f("payment_status",e.target.value)}>
+                <option value="unpaid">Unpaid</option>
+                <option value="partial">Partial</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Amount Paid</div>
+              <input className="inp" type="number" value={form.amount_paid} onChange={e=>f("amount_paid",e.target.value)} placeholder="0"/>
+            </div>
+          </div>
+          <div style={{gridColumn:"span 2"}}>
+            <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Notes</div>
+            <input className="inp" value={form.notes} onChange={e=>f("notes",e.target.value)} placeholder="Optional notes"/>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          {editingId&&<button className="btn btn-ghost btn-sm" onClick={cancel}>Cancel</button>}
+          <button className="btn btn-primary" onClick={submit} disabled={!form.advertiser_name.trim()}>
+            {editingId?"💾 Save Changes":"➕ Add Contract"}
+          </button>
+        </div>
+      </div>
+
+      {/* Contract list */}
+      {adContracts.length===0
+        ? <div style={{textAlign:"center",padding:48,color:"var(--text3)",fontSize:14}}>No contracts yet — add your first above.</div>
+        : <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {adContracts.map(c=>{
+              const linkedAds=ads.filter(a=>String(a.contract_id)===String(c.id));
+              const isExpanded=expanded===c.id;
+              const isExpired=c.end_date&&c.end_date<today;
+              const pct=c.amount>0?Math.min(100,Math.round((+c.amount_paid/+c.amount)*100)):0;
+              return (
+                <div key={c.id} style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:12,overflow:"hidden"}}>
+                  <div style={{padding:"14px 16px",display:"flex",gap:12,alignItems:"center"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>{c.advertiser_name}</div>
+                      <div style={{fontSize:12,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                        {c.start_date&&c.end_date&&<span>{c.start_date} → {c.end_date}{isExpired?" ⚠️":""}</span>}
+                        <span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{c.currency} {(+c.amount||0).toLocaleString()}</span>
+                        <span style={{padding:"1px 8px",borderRadius:5,fontSize:11,fontWeight:700,background:`${STATUS_COLOR[c.status]}22`,color:STATUS_COLOR[c.status]}}>{c.status}</span>
+                        <span style={{padding:"1px 8px",borderRadius:5,fontSize:11,fontWeight:700,background:`${PAY_COLOR[c.payment_status]}22`,color:PAY_COLOR[c.payment_status]}}>{c.payment_status}</span>
+                        <span style={{color:"var(--text3)"}}>{linkedAds.length} ad{linkedAds.length!==1?"s":""}</span>
+                      </div>
+                      {c.amount>0&&(
+                        <div style={{marginTop:8,height:4,borderRadius:2,background:"var(--border)",overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"var(--green)":"var(--accent)",borderRadius:2}}/>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>toggleExpand(c)}>{isExpanded?"▲":"▼"} Details</button>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>startEdit(c)}>✏️</button>
+                      <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>onDeleteContract(c.id)}>🗑</button>
+                    </div>
+                  </div>
+
+                  {isExpanded&&(
+                    <div style={{borderTop:"1px solid var(--border)",padding:"14px 16px",background:"var(--surface2)"}}>
+                      {/* Linked ads */}
+                      <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>Linked Ads</div>
+                      {linkedAds.length===0
+                        ? <div style={{fontSize:13,color:"var(--text3)",marginBottom:14}}>No ads linked yet. Go to Settings → Ads and select this contract on an ad.</div>
+                        : <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
+                            {linkedAds.map(a=>(
+                              <div key={a.id} style={{padding:"4px 12px",borderRadius:8,background:"var(--surface)",border:"1px solid var(--border)",fontSize:13}}>
+                                {a.title} <span style={{fontSize:11,color:"var(--text3)"}}>{a.page} · {a.position}</span>
+                              </div>
+                            ))}
+                          </div>
+                      }
+
+                      {/* Click stats */}
+                      <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>
+                        Click Analytics {clicksLoading&&"⏳"}
+                      </div>
+                      {!clicksLoading&&contractClicks.length===0
+                        ? <div style={{fontSize:13,color:"var(--text3)"}}>No clicks recorded yet.</div>
+                        : !clicksLoading&&(
+                          <div>
+                            <div style={{display:"flex",gap:16,marginBottom:12}}>
+                              <div style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:22,color:"var(--accent)"}}>{contractClicks.length} <span style={{fontSize:13,color:"var(--text3)",fontFamily:"inherit",fontWeight:400}}>total clicks</span></div>
+                            </div>
+                            <div className="card" style={{overflow:"hidden"}}>
+                              <div className="tbl-wrap">
+                                <table className="tbl">
+                                  <thead><tr>{["Time","Ad","Page","User","City","Country","Weather"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                                  <tbody>
+                                    {contractClicks.slice(0,50).map((cl,i)=>(
+                                      <tr key={cl.id||i}>
+                                        <td style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{new Date(cl.clicked_at).toLocaleString()}</td>
+                                        <td style={{fontSize:13,fontWeight:600}}>{cl.ad_title||"—"}</td>
+                                        <td style={{fontSize:12}}>{cl.page||"—"}</td>
+                                        <td style={{fontSize:13}}>{cl.user_name||"—"}</td>
+                                        <td style={{fontSize:13,color:"var(--text3)"}}>{cl.city||"—"}</td>
+                                        <td style={{fontSize:13}}>{cl.country||"—"}</td>
+                                        <td style={{fontSize:13}}>{cl.weather||"—"}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                            {contractClicks.length>50&&<div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>Showing 50 of {contractClicks.length} clicks</div>}
+                          </div>
+                        )
+                      }
+                      {c.notes&&<div style={{marginTop:14,fontSize:13,color:"var(--text3)",fontStyle:"italic"}}>📝 {c.notes}</div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+      }
+    </div>
   );
 }

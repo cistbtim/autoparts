@@ -110,6 +110,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [logs,setLogs]=useState([]);
   const [logSearch,setLogSearch]=useState("");
   const [loginLogs,setLoginLogs]=useState([]);
+  const [adClicks,setAdClicks]=useState([]);
   const [suppliers,setSuppliers]=useState([]);
   const [partSuppliers,setPartSuppliers]=useState([]);
   const [inquiries,setInquiries]=useState([]);
@@ -541,6 +542,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setBgLoading(0); // all background tables done
     // Ads — load for everyone, fail silently if table doesn't exist yet
     api.get("ads","select=*&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAds(r);});
+    // Ad clicks — admin only
+    if(needsAdmin) api.get("ad_clicks","select=*&order=clicked_at.desc&limit=500").catch(()=>[]).then(r=>{if(Array.isArray(r))setAdClicks(r);});
     // Check for overdue auto-RFQs on every app load (runs after state is set)
     if(!isSalesman) setTimeout(()=>checkStaleRfqs(),2000);
     // Part requests: admin sees all, branch users see their own
@@ -2600,6 +2603,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       children:[
         {id:"dashboard",icon:"📊",label:t.dashboard,roles:["admin"]},
         {id:"loginlogs",icon:"🌍",label:t.loginLogs,roles:["admin"]},
+        {id:"adclicks",icon:"📢",label:"Ad Clicks",roles:["admin"]},
       ]
     },
     {
@@ -2754,7 +2758,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     children:g.children.filter(c=>{
       if(isBranchUser){
         // branch users see admin tabs scoped to their role
-        const BA_HIDE=new Set(["dashboard","loginlogs","branches","settings","users","wssubscriptions"]);
+        const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","branches","settings","users","wssubscriptions"]);
         if(!c.roles.includes("admin")||BA_HIDE.has(c.id)) return false;
         // branchAdminOnly items only visible to branch_admin
         if(c.branchAdminOnly && role!=="branch_admin") return false;
@@ -3884,7 +3888,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {/* ── SCRAPYARD AD BANNER ── */}
-        {tab.startsWith("sy_")&&<AdBanner ads={ads} page="scrapyard"/>}
+        {tab.startsWith("sy_")&&<AdBanner ads={ads} page="scrapyard" userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}/>}
 
         {/* ── SCRAPYARD DASHBOARD ── */}
         {tab==="sy_dashboard"&&role==="scrapyard"&&(
@@ -4084,7 +4088,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {tab==="shop"&&(
           <div className="fu">
             {/* 📢 Top ad banner */}
-            <AdBanner ads={ads} page="shop"/>
+            <AdBanner ads={ads} page="shop" userCtx={{id:String(user.id),name:user.username||user.phone||"",role:user.role}}/>
 
             {/* ⚠ Disclaimer banner */}
             <div style={{background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.25)",
@@ -4755,6 +4759,56 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           </div>
         )}
 
+        {/* ── AD CLICKS ── */}
+        {tab==="adclicks"&&role==="admin"&&(()=>{
+          const PAGE_LABELS={"shop":"🛍️ Shop","workshop":"🔧 Workshop","spareshop":"🏪 Spare Shop","scrapyard":"🚗 Scrapyard"};
+          const byPage=adClicks.reduce((a,c)=>{const p=c.page||"?";a[p]=(a[p]||0)+1;return a;},{});
+          const byAd=adClicks.reduce((a,c)=>{const k=c.ad_title||"?";a[k]=(a[k]||0)+1;return a;},{});
+          const topAd=Object.entries(byAd).sort((a,b)=>b[1]-a[1])[0];
+          const byCountry=adClicks.reduce((a,c)=>{const k=c.country||"?";a[k]=(a[k]||0)+1;return a;},{});
+          const topCountry=Object.entries(byCountry).sort((a,b)=>b[1]-a[1])[0];
+          return (
+            <div className="fu">
+              <PH title="📢 Ad Clicks" subtitle={`${adClicks.length} total clicks recorded`}/>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
+                <SC label="Total Clicks" value={adClicks.length} icon="👆" color="var(--accent)"/>
+                <SC label="Top Ad" value={topAd?topAd[0]:"—"} icon="📣" color="var(--blue)"/>
+                <SC label="Top Country" value={topCountry?topCountry[0]:"—"} icon="🌍" color="var(--green)"/>
+                <SC label="Pages" value={Object.keys(byPage).length} icon="📄" color="var(--yellow)"/>
+              </div>
+              <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
+                {Object.entries(byPage).sort((a,b)=>b[1]-a[1]).map(([p,n])=>(
+                  <span key={p} className="badge" style={{background:"var(--surface2)",color:"var(--text2)",padding:"5px 13px",fontSize:13}}>{PAGE_LABELS[p]||p} · {n}</span>
+                ))}
+              </div>
+              <div className="card" style={{overflow:"hidden"}}>
+                <div className="tbl-wrap">
+                  <table className="tbl">
+                    <thead><tr>{["Time","Ad","Page","User","Role","City","Country","Weather"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {adClicks.length===0
+                        ? <tr><td colSpan={8} style={{textAlign:"center",color:"var(--text3)",padding:32}}>No clicks recorded yet</td></tr>
+                        : adClicks.map((c,i)=>(
+                          <tr key={c.id||i}>
+                            <td style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{new Date(c.clicked_at).toLocaleString()}</td>
+                            <td style={{fontWeight:600,fontSize:13}}>{c.ad_title||"—"}</td>
+                            <td><span style={{padding:"2px 8px",borderRadius:5,fontSize:11,fontWeight:700,background:"var(--surface2)",border:"1px solid var(--border)"}}>{PAGE_LABELS[c.page]||c.page||"—"}</span></td>
+                            <td style={{fontSize:13}}>{c.user_name||"—"}</td>
+                            <td>{c.user_role&&<span className="badge" style={{background:ROLES[c.user_role]?.bg||"var(--surface3)",color:ROLES[c.user_role]?.color||"var(--text2)",fontSize:11}}>{ROLES[c.user_role]?.icon} {c.user_role}</span>}</td>
+                            <td style={{fontSize:13,color:"var(--text3)"}}>{c.city||"—"}</td>
+                            <td style={{fontSize:13}}>{c.country||"—"}</td>
+                            <td style={{fontSize:13}}>{c.weather||"—"}</td>
+                          </tr>
+                        ))
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── SETTINGS ── */}
         {/* ── VEHICLES ── */}
         {/* ── WORKSHOP (all sub-tabs) ── */}
@@ -4774,6 +4828,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             key={tab}
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":"report"}
             ads={ads}
+            userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}
             jobs={workshopJobs}
             jobItems={workshopJobItems}
             invoices={workshopInvoices}

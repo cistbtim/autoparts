@@ -1,6 +1,7 @@
 import { useState, useEffect, Component } from "react";
-import { toLogoUrl, extractDriveId } from "../lib/helpers.js";
+import { toLogoUrl, extractDriveId, detectGeoLocation, fetchWeather } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
+import { api } from "../lib/api.js";
 
 export class ErrorBoundary extends Component {
   constructor(props){ super(props); this.state={err:null}; }
@@ -238,7 +239,20 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
 
 // ── Advertisement components ──────────────────────────────────────────────────
 
-export function AdBanner({ads=[], page="shop"}) {
+// Cache geo+weather for the session so we only fetch once
+let _envCtxPromise = null;
+const getEnvCtx = () => {
+  if (!_envCtxPromise) _envCtxPromise = (async () => {
+    try {
+      const geo = await detectGeoLocation();
+      const weather = geo.lat ? await fetchWeather(geo.lat, geo.lon) : "";
+      return { city: geo.city||"", country: geo.countryFull||geo.country||"", weather };
+    } catch { return { city:"", country:"", weather:"" }; }
+  })();
+  return _envCtxPromise;
+};
+
+export function AdBanner({ads=[], page="shop", userCtx=null}) {
   const [idx, setIdx] = useState(0);
   const active = ads.filter(a=>a.active && (a.page===page||a.page==="all") && a.position==="banner");
   useEffect(()=>{
@@ -248,10 +262,24 @@ export function AdBanner({ads=[], page="shop"}) {
   },[active.length]);
   if(!active.length) return null;
   const ad = active[idx % active.length];
-  const openLink=(url)=>{
+  const openLink=async(url)=>{
     if(!url) return;
     const href=url.match(/^https?:\/\//)?url:"https://"+url;
     window.open(href,"_blank","noopener,noreferrer");
+    try {
+      const env = await getEnvCtx();
+      await api.insert("ad_clicks",{
+        ad_id: ad.id||null,
+        ad_title: ad.title||"",
+        page,
+        user_id: userCtx?.id ? String(userCtx.id) : null,
+        user_name: userCtx?.name || null,
+        user_role: userCtx?.role || null,
+        city: env.city||null,
+        country: env.country||null,
+        weather: env.weather||null,
+      });
+    } catch {}
   };
   return (
     <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>

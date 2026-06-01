@@ -68,7 +68,24 @@ export const makeId = (prefix) => { _idCounter++; return `${prefix}-${Date.now()
 export const makeToken = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 export const detectGeoLocation = async () => {
   const g = await (await fetch("https://ipapi.co/json/")).json();
-  return { city: g.city || "", country: g.country_name || "" };
+  return {
+    city: g.city || "",
+    country: g.country_name || "",
+    countryFull: `${g.country_name||""}${g.country_flag_emoji?" "+g.country_flag_emoji:""}`.trim(),
+    lat: g.latitude || null,
+    lon: g.longitude || null,
+    ip: g.ip || ""
+  };
+};
+
+const WX_CODE = {0:"☀️ Clear",1:"🌤 Mainly clear",2:"⛅ Partly cloudy",3:"☁️ Overcast",45:"🌫 Fog",48:"🌫 Rime fog",51:"🌦 Light drizzle",53:"🌧 Drizzle",55:"🌧 Heavy drizzle",61:"🌧 Light rain",63:"🌧 Rain",65:"🌧 Heavy rain",71:"🌨 Light snow",73:"🌨 Snow",75:"❄️ Heavy snow",80:"🌦 Showers",81:"🌧 Heavy showers",82:"⛈ Violent showers",95:"⛈ Thunderstorm",96:"⛈ Thunderstorm",99:"⛈ Thunderstorm"};
+export const fetchWeather = async (lat, lon) => {
+  try {
+    const r = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)).json();
+    const cw = r.current_weather;
+    if (!cw) return "";
+    return `${WX_CODE[cw.weathercode] || "🌡️"} ${cw.temperature}°C`;
+  } catch { return ""; }
 };
 
 export const waLink = (phone, msg) => `https://wa.me/${(phone || "").replace(/[^0-9+]/g, "")}?text=${encodeURIComponent(msg)}`;

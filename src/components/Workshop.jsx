@@ -360,7 +360,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         </select>
       </div>
 
-      <AdBanner ads={ads} page="workshop"/>
+      {wsTab!=="spareshop"&&<AdBanner ads={ads} page="workshop"/>}
 
       {/* ── Resume Job banner (navigated away via Go to Stock / View POs) ── */}
       {activeJob&&view==="list"&&(

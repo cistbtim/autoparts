@@ -111,6 +111,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [logSearch,setLogSearch]=useState("");
   const [loginLogs,setLoginLogs]=useState([]);
   const [adClicks,setAdClicks]=useState([]);
+  const [adClicksLoading,setAdClicksLoading]=useState(false);
   const [suppliers,setSuppliers]=useState([]);
   const [partSuppliers,setPartSuppliers]=useState([]);
   const [inquiries,setInquiries]=useState([]);
@@ -544,6 +545,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     api.get("ads","select=*&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAds(r);});
     // Ad clicks — admin only
     if(needsAdmin) api.get("ad_clicks","select=*&order=clicked_at.desc&limit=500").catch(()=>[]).then(r=>{if(Array.isArray(r))setAdClicks(r);});
+
     // Check for overdue auto-RFQs on every app load (runs after state is set)
     if(!isSalesman) setTimeout(()=>checkStaleRfqs(),2000);
     // Part requests: admin sees all, branch users see their own
@@ -741,6 +743,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
     }
+  },[]);
+
+  const refreshAdClicks=useCallback(async()=>{
+    setAdClicksLoading(true);
+    try { const r=await api.get("ad_clicks","select=*&order=clicked_at.desc&limit=500").catch(()=>[]); if(Array.isArray(r))setAdClicks(r); } finally { setAdClicksLoading(false); }
   },[]);
 
   const refreshScrapyardData=useCallback(async()=>{
@@ -4769,7 +4776,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           const topCountry=Object.entries(byCountry).sort((a,b)=>b[1]-a[1])[0];
           return (
             <div className="fu">
-              <PH title="📢 Ad Clicks" subtitle={`${adClicks.length} total clicks recorded`}/>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18}}>
+                <PH title="📢 Ad Clicks" subtitle={`${adClicks.length} total clicks recorded`}/>
+                <button className="btn btn-ghost" disabled={adClicksLoading} onClick={refreshAdClicks} style={{marginTop:4}}>
+                  <span style={{display:"inline-block",animation:adClicksLoading?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span> Refresh
+                </button>
+              </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
                 <SC label="Total Clicks" value={adClicks.length} icon="👆" color="var(--accent)"/>
                 <SC label="Top Ad" value={topAd?topAd[0]:"—"} icon="📣" color="var(--blue)"/>

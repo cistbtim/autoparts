@@ -1,5 +1,5 @@
 import { useState, useEffect, Component } from "react";
-import { toLogoUrl, extractDriveId, detectGeoLocation, fetchWeather } from "../lib/helpers.js";
+import { toLogoUrl, extractDriveId, detectGeoLocation, fetchWeather, classifyWeather } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { api } from "../lib/api.js";
 
@@ -245,16 +245,32 @@ const getEnvCtx = () => {
   if (!_envCtxPromise) _envCtxPromise = (async () => {
     try {
       const geo = await detectGeoLocation();
-      const weather = geo.lat ? await fetchWeather(geo.lat, geo.lon) : "";
-      return { city: geo.city||"", country: geo.countryFull||geo.country||"", weather };
-    } catch { return { city:"", country:"", weather:"" }; }
+      const wx = geo.lat ? await fetchWeather(geo.lat, geo.lon) : { label:"", code:null, temp:null };
+      const weatherCond = classifyWeather(wx.code, wx.temp);
+      return { city:geo.city||"", country:geo.countryFull||geo.country||"", weather:wx.label, weatherCond };
+    } catch { return { city:"", country:"", weather:"", weatherCond:null }; }
   })();
   return _envCtxPromise;
 };
 
 export function AdBanner({ads=[], page="shop", userCtx=null}) {
   const [idx, setIdx] = useState(0);
-  const active = ads.filter(a=>a.active && (a.page===page||a.page==="all") && a.position==="banner");
+  const [envCtx, setEnvCtx] = useState(null);
+
+  // Fetch geo+weather once; drives weather-targeted ad prioritisation
+  useEffect(()=>{ getEnvCtx().then(setEnvCtx); }, []);
+
+  const weatherCond = envCtx?.weatherCond || null;
+
+  // Pool: page-matched, active banners
+  const pool = ads.filter(a=>a.active && (a.page===page||a.page==="all") && a.position==="banner");
+
+  // When weather is known: show weather-matched ads + "any"/unset ads; sort matched first
+  const active = weatherCond
+    ? [...pool.filter(a=>!a.weather_condition||a.weather_condition==="any"||a.weather_condition===weatherCond)]
+        .sort((a,b)=>(b.weather_condition===weatherCond?1:0)-(a.weather_condition===weatherCond?1:0))
+    : pool;
+
   useEffect(()=>{
     if(active.length<=1) return;
     const t=setInterval(()=>setIdx(i=>(i+1)%active.length), 6000);
@@ -267,7 +283,7 @@ export function AdBanner({ads=[], page="shop", userCtx=null}) {
     const href=url.match(/^https?:\/\//)?url:"https://"+url;
     window.open(href,"_blank","noopener,noreferrer");
     try {
-      const env = await getEnvCtx();
+      const env = envCtx || await getEnvCtx();
       await api.insert("ad_clicks",{
         ad_id: ad.id||null,
         ad_title: ad.title||"",

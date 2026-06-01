@@ -83,9 +83,23 @@ export const fetchWeather = async (lat, lon) => {
   try {
     const r = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)).json();
     const cw = r.current_weather;
-    if (!cw) return "";
-    return `${WX_CODE[cw.weathercode] || "🌡️"} ${cw.temperature}°C`;
-  } catch { return ""; }
+    if (!cw) return { label:"", code:null, temp:null };
+    return { label:`${WX_CODE[cw.weathercode]||"🌡️"} ${cw.temperature}°C`, code:cw.weathercode, temp:cw.temperature };
+  } catch { return { label:"", code:null, temp:null }; }
+};
+
+// Maps weather code + temperature to a named condition used for ad targeting
+export const classifyWeather = (code, temp) => {
+  if (code == null) return "any";
+  if (code >= 95) return "rain";   // thunderstorm
+  if (code >= 80) return "rain";   // showers
+  if (code >= 71) return "snow";   // snow
+  if (code >= 51) return "rain";   // drizzle / rain
+  if (code >= 45) return "fog";    // fog
+  if (temp != null && temp >= 32) return "hot";
+  if (temp != null && temp <= 5)  return "cold";
+  if (code <= 1)  return "clear";  // clear/sunny
+  return "any";
 };
 
 export const waLink = (phone, msg) => `https://wa.me/${(phone || "").replace(/[^0-9+]/g, "")}?text=${encodeURIComponent(msg)}`;

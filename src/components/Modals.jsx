@@ -1273,7 +1273,7 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
   };
 
   // Ads form state
-  const AD_BLANK={title:"",description:"",image_url:"",link_url:"",cta_text:"Learn More",page:"shop",position:"banner",active:true};
+  const AD_BLANK={title:"",description:"",image_url:"",link_url:"",cta_text:"Learn More",page:"shop",position:"banner",weather_condition:"any",active:true};
   const [adForm,setAdForm]=useState(AD_BLANK);
   const [editingAd,setEditingAd]=useState(null);
   const af=(k,v)=>setAdForm(p=>({...p,[k]:v}));
@@ -1552,7 +1552,7 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
       {sTab==="ads"&&(
         <div style={{maxWidth:720}}>
           <div style={{marginBottom:20,padding:"12px 16px",background:"rgba(249,115,22,.07)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,fontSize:13,color:"var(--text2)"}}>
-            📢 Ads appear in the <strong>Customer Shop</strong>, <strong>Workshop</strong>, <strong>Spare Shop</strong>, and <strong>Scrapyard</strong>. <strong>Banner</strong> ads show at the top of the page. <strong>Grid</strong> ads appear every 8 parts in the catalogue.
+            📢 Ads appear in the <strong>Customer Shop</strong>, <strong>Workshop</strong>, <strong>Spare Shop</strong>, and <strong>Scrapyard</strong>. <strong>Banner</strong> ads show at the top of the page. <strong>Grid</strong> ads appear every 8 parts in the catalogue. Use <strong>🌦 Weather Target</strong> to show rain ads (wipers, bulbs) when it's raining, hot-weather ads (coolant, AC) when it's hot, and so on — weather-matched ads always appear first.
           </div>
 
           {/* Ad form */}
@@ -1579,7 +1579,7 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
                 <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Description</div>
                 <input className="inp" value={adForm.description} onChange={e=>af("description",e.target.value)} placeholder="Optional short description"/>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                 <div>
                   <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Page</div>
                   <select className="inp" value={adForm.page} onChange={e=>af("page",e.target.value)}>
@@ -1595,6 +1595,18 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
                   <select className="inp" value={adForm.position} onChange={e=>af("position",e.target.value)}>
                     <option value="banner">Top Banner</option>
                     <option value="grid">In Grid</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>🌦 Weather Target</div>
+                  <select className="inp" value={adForm.weather_condition||"any"} onChange={e=>af("weather_condition",e.target.value)}>
+                    <option value="any">Any weather</option>
+                    <option value="rain">🌧 Rain / Storm</option>
+                    <option value="hot">🌡️ Hot (32°C+)</option>
+                    <option value="cold">🧊 Cold (5°C−)</option>
+                    <option value="snow">❄️ Snow</option>
+                    <option value="fog">🌫 Fog</option>
+                    <option value="clear">☀️ Clear / Sunny</option>
                   </select>
                 </div>
               </div>
@@ -1623,6 +1635,7 @@ export function SettingsPage({settings,onSave,t,ads=[],onSaveAd,onDeleteAd}) {
                       <div style={{fontSize:11,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap"}}>
                         <span style={{padding:"1px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{ad.position==="banner"?"📢 Banner":"🔲 Grid"}</span>
                         <span style={{padding:"1px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{ad.page==="all"?"🌐 All pages":ad.page==="workshop"?"🔧 Workshop":ad.page==="spareshop"?"🏪 Spare Shop":ad.page==="scrapyard"?"🚗 Scrapyard":"🛍️ Shop"}</span>
+                        {ad.weather_condition&&ad.weather_condition!=="any"&&<span style={{padding:"1px 7px",borderRadius:4,background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",color:"var(--blue)"}}>{ad.weather_condition==="rain"?"🌧 Rain":ad.weather_condition==="hot"?"🌡️ Hot":ad.weather_condition==="cold"?"🧊 Cold":ad.weather_condition==="snow"?"❄️ Snow":ad.weather_condition==="fog"?"🌫 Fog":ad.weather_condition==="clear"?"☀️ Clear":ad.weather_condition}</span>}
                         {ad.clicks>0&&<span style={{color:"var(--blue)"}}>👆 {ad.clicks} clicks</span>}
                       </div>
                     </div>

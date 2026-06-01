@@ -3883,6 +3883,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           </div>
         )}
 
+        {/* ── SCRAPYARD AD BANNER ── */}
+        {tab.startsWith("sy_")&&<AdBanner ads={ads} page="scrapyard"/>}
+
         {/* ── SCRAPYARD DASHBOARD ── */}
         {tab==="sy_dashboard"&&role==="scrapyard"&&(
           <SyDashboardPage

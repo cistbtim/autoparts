@@ -1610,15 +1610,13 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
                   </select>
                 </div>
               </div>
-              {adContracts.length>0&&(
-                <div>
-                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>📑 Contract</div>
-                  <select className="inp" value={adForm.contract_id||""} onChange={e=>af("contract_id",e.target.value?+e.target.value:null)}>
-                    <option value="">No contract</option>
-                    {adContracts.map(c=><option key={c.id} value={c.id}>{c.advertiser_name}</option>)}
-                  </select>
-                </div>
-              )}
+              <div>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>📑 Contract</div>
+                <select className="inp" value={adForm.contract_id||""} onChange={e=>af("contract_id",e.target.value?+e.target.value:null)}>
+                  <option value="">No contract</option>
+                  {adContracts.map(c=><option key={c.id} value={c.id}>{c.advertiser_name}</option>)}
+                </select>
+              </div>
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>

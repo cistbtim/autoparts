@@ -8031,7 +8031,14 @@ export function AdContractsPage({ads=[],adContracts=[],onSaveContract,onDeleteCo
   const cancel=()=>{setForm(BLANK);setEditingId(null);};
   const submit=async()=>{
     if(!form.advertiser_name.trim())return;
-    await onSaveContract(editingId?{...form,id:editingId}:form);
+    const clean={
+      ...form,
+      amount: form.amount===''?0:+form.amount,
+      amount_paid: form.amount_paid===''?0:+form.amount_paid,
+      start_date: form.start_date||null,
+      end_date: form.end_date||null,
+    };
+    await onSaveContract(editingId?{...clean,id:editingId}:clean);
     cancel();
   };
 

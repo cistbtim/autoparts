@@ -124,6 +124,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [vehicles,setVehicles]=useState([]);
   const [partFitments,setPartFitments]=useState([]);
   const [ads,setAds]=useState([]);
+  // Ads whose linked contract (if any) hasn't expired or been cancelled
+  const _today=new Date().toISOString().slice(0,10);
+  const liveAds=ads.filter(a=>{
+    if(!a.contract_id) return true;
+    const c=adContracts.find(x=>String(x.id)===String(a.contract_id));
+    if(!c) return true;
+    if(c.status==="cancelled") return false;
+    if(c.end_date&&c.end_date<_today) return false;
+    return true;
+  });
   const [payments,setPayments]=useState([]);
   const [rfqSessions,setRfqSessions]=useState([]);
   const [rfqItems,setRfqItems]=useState([]);
@@ -3898,7 +3908,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {/* ── SCRAPYARD AD BANNER ── */}
-        {tab.startsWith("sy_")&&<AdBanner ads={ads} page="scrapyard" userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}/>}
+        {tab.startsWith("sy_")&&<AdBanner ads={liveAds} page="scrapyard" userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}/>}
 
         {/* ── SCRAPYARD DASHBOARD ── */}
         {tab==="sy_dashboard"&&role==="scrapyard"&&(
@@ -4098,7 +4108,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {tab==="shop"&&(
           <div className="fu">
             {/* 📢 Top ad banner */}
-            <AdBanner ads={ads} page="shop" userCtx={{id:String(user.id),name:user.username||user.phone||"",role:user.role}}/>
+            <AdBanner ads={liveAds} page="shop" userCtx={{id:String(user.id),name:user.username||user.phone||"",role:user.role}}/>
 
             {/* ⚠ Disclaimer banner */}
             <div style={{background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.25)",
@@ -4864,7 +4874,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           <WorkshopPage
             key={tab}
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":"report"}
-            ads={ads}
+            ads={liveAds}
             userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}
             jobs={workshopJobs}
             jobItems={workshopJobItems}

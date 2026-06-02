@@ -8019,6 +8019,7 @@ export function PrintShelfLabelModal({settings,onClose}) {
 // ═══════════════════════════════════════════════════════════════
 export function AdContractsPage({ads=[],adContracts=[],onSaveContract,onDeleteContract}) {
   const BLANK={advertiser_name:"",advertiser_contact:"",amount:"",currency:"ZAR",start_date:"",end_date:"",status:"active",payment_status:"unpaid",amount_paid:"",notes:""};
+  const expiredContracts=adContracts.filter(c=>(c.end_date&&c.end_date<new Date().toISOString().slice(0,10)&&c.status==="active"));
   const [form,setForm]=useState(BLANK);
   const [editingId,setEditingId]=useState(null);
   const [expanded,setExpanded]=useState(null);
@@ -8127,6 +8128,15 @@ export function AdContractsPage({ads=[],adContracts=[],onSaveContract,onDeleteCo
         </div>
       </div>
 
+      {/* Expired alert */}
+      {expiredContracts.length>0&&(
+        <div style={{marginBottom:16,padding:"12px 16px",background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.4)",borderRadius:10,fontSize:13}}>
+          ⚠️ <strong>{expiredContracts.length} contract{expiredContracts.length!==1?"s":""} expired</strong> — linked ads are now hidden from all pages.{" "}
+          {expiredContracts.map(c=><span key={c.id} style={{marginLeft:8,fontWeight:600,color:"var(--red)"}}>{c.advertiser_name}</span>)}
+          <span style={{marginLeft:8,color:"var(--text3)"}}>Edit the contract to extend the end date and reactivate.</span>
+        </div>
+      )}
+
       {/* Contract list */}
       {adContracts.length===0
         ? <div style={{textAlign:"center",padding:48,color:"var(--text3)",fontSize:14}}>No contracts yet — add your first above.</div>
@@ -8137,7 +8147,7 @@ export function AdContractsPage({ads=[],adContracts=[],onSaveContract,onDeleteCo
               const isExpired=c.end_date&&c.end_date<today;
               const pct=c.amount>0?Math.min(100,Math.round((+c.amount_paid/+c.amount)*100)):0;
               return (
-                <div key={c.id} style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:12,overflow:"hidden"}}>
+                <div key={c.id} style={{background:"var(--surface)",border:`1px solid ${isExpired?"rgba(248,113,113,.5)":"var(--border)"}`,borderRadius:12,overflow:"hidden",opacity:isExpired?.75:1}}>
                   <div style={{padding:"14px 16px",display:"flex",gap:12,alignItems:"center"}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>{c.advertiser_name}</div>
@@ -8156,6 +8166,12 @@ export function AdContractsPage({ads=[],adContracts=[],onSaveContract,onDeleteCo
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0}}>
                       <button className="btn btn-ghost btn-sm" onClick={()=>toggleExpand(c)}>{isExpanded?"▲":"▼"} Details</button>
+                      {isExpired&&(
+                        <button className="btn btn-sm" style={{background:"var(--accent)",color:"#fff",border:"none"}} onClick={()=>{
+                          const d=new Date(c.end_date||today);d.setMonth(d.getMonth()+3);
+                          onSaveContract({...c,end_date:d.toISOString().slice(0,10),status:"active"});
+                        }}>+3 months</button>
+                      )}
                       <button className="btn btn-ghost btn-sm" onClick={()=>startEdit(c)}>✏️</button>
                       <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>onDeleteContract(c.id)}>🗑</button>
                     </div>

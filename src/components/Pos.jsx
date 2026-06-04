@@ -191,8 +191,9 @@ function PosVehicleFilter({ vehicles, partFitments, parts, onFilter, onZoom }) {
 
   const handleMake = (v) => { setMake(v); setModel(""); setCode(""); apply(v, "", ""); };
   const handleModel = (label) => {
-    // strip the "[codes]" suffix to get raw model name
-    const raw = label.replace(/\s*\[.*\]$/, "");
+    // look up raw model name from modelRows to avoid stripping year/code from label
+    const row = modelRows.find(r => r.label === label);
+    const raw = row ? row.model : label.replace(/\s*\(.*?\)\s*$/, "").replace(/\s*\[.*\]$/, "").trim();
     setModel(raw); setCode(""); apply(make, raw, "");
   };
   const handleCode = (v) => { setCode(v); apply(make, model, v); };

@@ -34,6 +34,12 @@ const _cInvalidate = (table) => {
     /* ignore storage cleanup failures */
   }
 };
+
+const _cClearAll = () => {
+  try {
+    Object.keys(localStorage).filter(k => k.startsWith(CACHE_PFX)).forEach(k => localStorage.removeItem(k));
+  } catch { /* ignore */ }
+};
 // ─────────────────────────────────────────────────────────────────────────────
 
 const fetchAll = async (table, query = "") => {
@@ -108,6 +114,7 @@ export const api = {
   cacheGet: (t, q) => _cRead(_cKey(t, q)),
   cacheSet: (t, q, data) => _cWrite(_cKey(t, q), data),
   cacheInvalidate: (t) => _cInvalidate(t),
+  cacheClearAll: () => _cClearAll(),
 
   upsert: async (t, d) => {
     if (_demoMode) return _demoBlock();

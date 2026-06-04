@@ -36,7 +36,7 @@ export default function App() {
   const [user,setUser] = useState(()=>{
     try{const s=localStorage.getItem("ap_user");return s?JSON.parse(s):null;}catch{return null;}
   });
-  const handleLogin=(u)=>{setUser(u);try{localStorage.setItem("ap_user",JSON.stringify(u));}catch{}};
+  const handleLogin=(u)=>{api.cacheClearAll();setUser(u);try{localStorage.setItem("ap_user",JSON.stringify(u));}catch{}};
   const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");};
   const [settingsLoaded,setSettingsLoaded] = useState(false);
   const [availLangs,setAvailLangs] = useState(getLangs());
@@ -694,6 +694,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     };
     await Promise.all(names.map(async name=>{
       const def=D[name]; if(!def) return;
+      api.cacheInvalidate(name); // always fetch fresh — never serve stale cache on explicit refresh
       const data=await api.get(name,def[0]).catch(()=>[]);
       def[1](data);
     }));

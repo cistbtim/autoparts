@@ -1375,22 +1375,20 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 // ═══════════════════════════════════════════════════════════════
 // VEHICLE SEARCH BAR — in Shop for customers
 // ═══════════════════════════════════════════════════════════════
-export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, initialMake="", initialModel="", initialYear=""}) {
-  const [selMake,   setSelMake]   = useState(initialMake);
-  const [selModel,  setSelModel]  = useState(initialModel);
-  const [selYear,   setSelYear]   = useState(initialYear);
-  const [selEngine, setSelEngine] = useState("");
-  const [active,    setActive]    = useState(false);
+export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, initialMake="", initialModel=""}) {
+  const [selMake,  setSelMake]  = useState(initialMake);
+  const [selModel, setSelModel] = useState(initialModel);
+  const [active,   setActive]   = useState(false);
 
   // Auto-apply filter when pre-populated from vehicle management
   useEffect(()=>{
-    if(initialMake && vehicles.length > 0) applyFilter(initialMake, initialModel, initialYear, "");
+    if(initialMake && vehicles.length > 0) applyFilter(initialMake, initialModel);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[vehicles.length > 0]);
 
   // Derived lists
-  const makes   = [...new Set(vehicles.map(v => v.make))].sort();
-  const models  = (() => {
+  const makes  = [...new Set(vehicles.map(v => v.make))].sort();
+  const models = (() => {
     const filtered = vehicles.filter(v => !selMake || v.make === selMake);
     const map = {};
     for (const v of filtered) {
@@ -1403,35 +1401,11 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
     }
     return Object.entries(map).map(([model, {yearFrom, yearTo, code}]) => ({model, yearFrom, yearTo, code})).sort((a,b)=>(a.code||a.model).localeCompare(b.code||b.model));
   })();
-  const years = (() => {
-    if (!selModel) return [];
-    const matchVehicles = vehicles.filter(v =>
-      (!selMake || v.make === selMake) && v.model === selModel && v.year_from
-    );
-    const curYear = new Date().getFullYear();
-    const ySet = new Set();
-    matchVehicles.forEach(v => {
-      const from = parseInt(v.year_from);
-      const to   = parseInt(v.year_to) || curYear;
-      for (let y = from; y <= to; y++) ySet.add(y);
-    });
-    return [...ySet].sort((a,b)=>a-b);
-  })();
-  const engines = [...new Set(
-    vehicles
-      .filter(v => (!selMake || v.make === selMake) && (!selModel || v.model === selModel))
-      .map(v => v.engine || "")
-      .filter(Boolean)
-  )].sort();
 
-  const applyFilter = (make, model, year, engine) => {
+  const applyFilter = (make, model) => {
     if (!make) { onFilter(null); setActive(false); return; }
-    const yr = year ? parseInt(year) : null;
     const matchVehicles = vehicles.filter(v =>
-      v.make === make &&
-      (!model  || v.model  === model) &&
-      (!engine || v.engine === engine) &&
-      (!yr || (v.year_from && parseInt(v.year_from) <= yr && (v.year_to ? parseInt(v.year_to) >= yr : true)))
+      v.make === make && (!model || v.model === model)
     );
     const vehicleIds = new Set(matchVehicles.map(v => String(v.id)));
     const matchFitments = partFitments.filter(f => vehicleIds.has(String(f.vehicle_id)));
@@ -1441,7 +1415,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
   };
 
   const clear = () => {
-    setSelMake(""); setSelModel(""); setSelYear(""); setSelEngine("");
+    setSelMake(""); setSelModel("");
     onFilter(null); setActive(false);
   };
 
@@ -1457,7 +1431,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
         {/* Make */}
         <select className="inp" value={selMake} style={{flex:"1 1 120px",minWidth:100}}
-          onChange={e=>{ const v=e.target.value; setSelMake(v); setSelModel(""); setSelYear(""); setSelEngine(""); applyFilter(v,"","",""); }}>
+          onChange={e=>{ const v=e.target.value; setSelMake(v); setSelModel(""); applyFilter(v,""); }}>
           <option value="">{t.selectMake||"Select Make"}</option>
           {makes.map(m=><option key={m}>{m}</option>)}
         </select>
@@ -1465,30 +1439,13 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
         {/* Model */}
         <select className="inp" value={selModel} style={{flex:"1 1 160px",minWidth:130}}
           disabled={!selMake}
-          onChange={e=>{ const v=e.target.value; setSelModel(v); setSelYear(""); setSelEngine(""); applyFilter(selMake,v,"",""); }}>
+          onChange={e=>{ const v=e.target.value; setSelModel(v); applyFilter(selMake,v); }}>
           <option value="">{t.selectModel||"Select Model"}</option>
           {models.map(({model, yearFrom, yearTo, code})=>(
             <option key={model} value={model}>
               {code?`[${code}] `:""}{model}{yearFrom ? ` (${yearFrom}–${yearTo||"present"})` : ""}
             </option>
           ))}
-        </select>
-
-        {/* Year */}
-        {years.length > 0 && (
-          <select className="inp" value={selYear} style={{flex:"1 1 90px",minWidth:80}}
-            onChange={e=>{ const v=e.target.value; setSelYear(v); setSelEngine(""); applyFilter(selMake,selModel,v,""); }}>
-            <option value="">All Years</option>
-            {years.map(y=><option key={y} value={String(y)}>{y}</option>)}
-          </select>
-        )}
-
-        {/* Engine */}
-        <select className="inp" value={selEngine} style={{flex:"1 1 100px",minWidth:80}}
-          disabled={!selModel}
-          onChange={e=>{ const v=e.target.value; setSelEngine(v); applyFilter(selMake,selModel,selYear,v); }}>
-          <option value="">Engine</option>
-          {engines.map(e=><option key={e}>{e}</option>)}
         </select>
       </div>
 
@@ -1530,7 +1487,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
               </div>
             )}
             <div style={{fontSize:12,color:"var(--blue)",fontWeight:600,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span>🔍 {codeLabel ? `${codeLabel} · ` : ""}{selMake} {selModel}{selYear ? ` (${selYear})` : variantLabel ? ` ${variantLabel}` : ""}{selEngine ? ` · ${selEngine}` : ""}</span>
+              <span>🔍 {codeLabel ? `${codeLabel} · ` : ""}{selMake} {selModel}{variantLabel ? ` ${variantLabel}` : ""}</span>
               <button className="btn btn-ghost btn-xs" style={{color:"var(--text3)"}} onClick={clear}>✕ Show all parts</button>
             </div>
           </div>

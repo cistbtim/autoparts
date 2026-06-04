@@ -180,7 +180,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const PAGE_SIZE=20;
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
-  const [shopVehicleFilter,setShopVehicleFilter]=useState({make:"",model:"",year:""});
+  const [shopVehicleFilter,setShopVehicleFilter]=useState({make:"",model:""});
   const [workshopJobs,setWorkshopJobs]=useState([]);
   const [workshopJobItems,setWorkshopJobItems]=useState([]);
   const [workshopInvoices,setWorkshopInvoices]=useState([]);
@@ -4173,13 +4173,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             </div>
             {/* 🚗 Vehicle Search Bar */}
             <VehicleSearchBar
-              key={shopVehicleFilter.make+"|"+shopVehicleFilter.model+"|"+shopVehicleFilter.year}
+              key={shopVehicleFilter.make+"|"+shopVehicleFilter.model}
               vehicles={vehicles}
               partFitments={partFitments}
               parts={parts}
               initialMake={shopVehicleFilter.make}
               initialModel={shopVehicleFilter.model}
-              initialYear={shopVehicleFilter.year}
               onFilter={(ids)=>{setVehicleFilterIds(ids);setShopPage(0);}}
               t={t}/>
 

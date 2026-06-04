@@ -4743,8 +4743,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
               </div>
             );
           })()}
-          <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{display:"flex",gap:6}}>
+          <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {wsProfile?.linked_branch_id&&job.vehicle_make&&onGoToSpareShop&&(()=>{
                 const mv=vehicles.find(v=>v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()&&(v.model?.toLowerCase()===job.vehicle_model?.toLowerCase()||v.code?.toLowerCase()===job.vehicle_model?.toLowerCase()));
                 const displayCode=mv?.code||job.vehicle_model||"";
@@ -4775,7 +4775,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
               )}
             </div>
             {items.length>0&&(
-              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
                 <div style={{fontSize:13,color:"var(--text3)"}}>{t.subtotal}: <strong style={{color:"var(--text)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(subtotal)}</strong></div>
                 {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(tax)}</strong></div>}
                 <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{t.total}: {fmtAmt(total)}</div>

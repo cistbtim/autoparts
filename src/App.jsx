@@ -169,7 +169,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [filterInStock,setFilterInStock]=useState(false);
   const [filterNoPhoto,setFilterNoPhoto]=useState(false);
   const [filterSupplier,setFilterSupplier]=useState("__all__");
-  const [invVehicleFilterIds,setInvVehicleFilterIds]=useState(null);
+  const [invVehicleFilterIds,setInvVehicleFilterIds]=useState(null); // Set of part IDs (fitments, shop)
+  const [invVehicleCodes,setInvVehicleCodes]=useState(null);         // Set of vehicle codes (inventory)
   const [invRefreshing,setInvRefreshing]=useState(false);
   const [filterHiace,setFilterHiace]=useState(false);
   const [branchMatchedOnly,setBranchMatchedOnly]=useState("matched"); // "matched"|"own"|"all"
@@ -235,7 +236,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   },[searchPart]);
 
   // Reset page when filters change
-  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier,filterPendingReview,invVehicleFilterIds]);
+  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier,filterPendingReview,invVehicleFilterIds,invVehicleCodes]);
   useEffect(()=>{ setShopPage(0); },[searchPart]);
   // Modals
   const [M,setM]=useState({});
@@ -2539,6 +2540,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(filterPendingReview&&p.review_status!=="pending")return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
     if(invVehicleFilterIds&&!invVehicleFilterIds.has(String(p.id)))return false;
+    if(invVehicleCodes){
+      // Match part via vehicle code: SKU starts with "CODE-" or model contains "[CODE]"
+      const sku=(p.sku||"").toUpperCase();
+      const mod=(p.model||"").toUpperCase();
+      const matched=[...invVehicleCodes].some(c=>{
+        const cu=c.toUpperCase();
+        return sku.startsWith(cu+"-")||sku.startsWith(cu+" ")||sku===cu||mod.includes("["+cu+"]")||mod.includes(cu);
+      });
+      if(!matched) return false;
+    }
     if(filterFits!=="__all__"){
       const hasFit=partFitments.some(f=>String(f.part_id)===String(p.id));
       if(filterFits==="none"&&hasFit)return false;
@@ -3511,7 +3522,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               vehicles={vehicles}
               partFitments={partFitments}
               parts={parts}
-              onVehicleChange={({partIds})=>{setInvVehicleFilterIds(partIds||null);setInvPage(0);}}
+              onVehicleChange={(matchedVehicles)=>{
+                if(!matchedVehicles){setInvVehicleCodes(null);setInvPage(0);return;}
+                const codes=new Set(matchedVehicles.map(v=>v.code).filter(Boolean));
+                setInvVehicleCodes(codes.size>0?codes:null);
+                setInvPage(0);
+              }}
               t={t}/>
             <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
               <div style={{position:"relative",flex:"1 1 220px",maxWidth:340}}>

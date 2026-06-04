@@ -1407,30 +1407,33 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
   const applyFilter = (make, model) => {
     if (!make) {
       if(onFilter) onFilter(null);
-      if(onVehicleChange) onVehicleChange({make:"",model:"",partIds:null});
+      if(onVehicleChange) onVehicleChange(null);
       setActive(false);
       return;
     }
     const matchVehicles = vehicles.filter(v =>
       v.make === make && (!model || v.model === model)
     );
+
+    if(onVehicleChange){
+      // Inventory mode — pass matched vehicles so parent can filter by code/SKU prefix
+      onVehicleChange(matchVehicles.length > 0 ? matchVehicles : null);
+      setActive(true);
+      return;
+    }
+
+    // Shop mode — filter by fitments
     const vehicleIds = new Set(matchVehicles.map(v => String(v.id)));
     const matchFitments = partFitments.filter(f => vehicleIds.has(String(f.vehicle_id)));
     const partIds = new Set(matchFitments.map(f => String(f.part_id)));
-    if(onVehicleChange){
-      // Inventory mode — pass part IDs (null if none found, so page doesn't blank)
-      onVehicleChange({make, model, partIds: partIds.size > 0 ? partIds : null});
-    } else if(onFilter){
-      // Shop mode — strict fitment filter
-      onFilter(partIds.size > 0 ? partIds : new Set(["__none__"]));
-    }
+    onFilter(partIds.size > 0 ? partIds : new Set(["__none__"]));
     setActive(true);
   };
 
   const clear = () => {
     setSelMake(""); setSelModel("");
     if(onFilter) onFilter(null);
-    if(onVehicleChange) onVehicleChange({make:"",model:""});
+    if(onVehicleChange) onVehicleChange(null);
     setActive(false);
   };
 

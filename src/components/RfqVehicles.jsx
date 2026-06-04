@@ -1388,21 +1388,29 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[vehicles.length > 0]);
 
-  // Derived lists
-  const makes  = [...new Set(vehicles.map(v => v.make))].sort();
-  const models = (() => {
-    const filtered = vehicles.filter(v => !selMake || v.make === selMake);
-    const map = {};
-    for (const v of filtered) {
-      if (!map[v.model]) map[v.model] = { yearFrom: v.year_from, yearTo: v.year_to, code: v.code||"" };
-      else {
-        if (v.year_from && (!map[v.model].yearFrom || v.year_from < map[v.model].yearFrom)) map[v.model].yearFrom = v.year_from;
-        if (!v.year_to || !map[v.model].yearTo || v.year_to > map[v.model].yearTo) map[v.model].yearTo = v.year_to;
-        if (v.code && !map[v.model].code) map[v.model].code = v.code;
-      }
-    }
-    return Object.entries(map).map(([model, {yearFrom, yearTo, code}]) => ({model, yearFrom, yearTo, code})).sort((a,b)=>(a.code||a.model).localeCompare(b.code||b.model));
-  })();
+  // Inventory mode: derive makes/models from parts.make / parts.model directly
+  // Shop mode: derive from vehicles table (with codes + year ranges)
+  const invMode = !!onVehicleChange;
+
+  const makes = invMode
+    ? [...new Set((parts||[]).map(p=>p.make).filter(Boolean))].sort()
+    : [...new Set(vehicles.map(v => v.make))].sort();
+
+  const models = invMode
+    ? [...new Set((parts||[]).filter(p=>!selMake||(p.make||"").toLowerCase()===selMake.toLowerCase()).map(p=>p.model).filter(Boolean))].sort().map(m=>({model:m,yearFrom:null,yearTo:null,code:""}))
+    : (()=>{
+        const filtered = vehicles.filter(v => !selMake || v.make === selMake);
+        const map = {};
+        for (const v of filtered) {
+          if (!map[v.model]) map[v.model] = { yearFrom: v.year_from, yearTo: v.year_to, code: v.code||"" };
+          else {
+            if (v.year_from && (!map[v.model].yearFrom || v.year_from < map[v.model].yearFrom)) map[v.model].yearFrom = v.year_from;
+            if (!v.year_to || !map[v.model].yearTo || v.year_to > map[v.model].yearTo) map[v.model].yearTo = v.year_to;
+            if (v.code && !map[v.model].code) map[v.model].code = v.code;
+          }
+        }
+        return Object.entries(map).map(([model, {yearFrom, yearTo, code}]) => ({model, yearFrom, yearTo, code})).sort((a,b)=>(a.code||a.model).localeCompare(b.code||b.model));
+      })();
 
   const applyFilter = (make, model) => {
     if (!make) {

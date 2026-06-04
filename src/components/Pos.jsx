@@ -139,22 +139,29 @@ function PosVehicleFilter({ vehicles, partFitments, onFilter, onZoom }) {
 
   const makes = [...new Set(vehicles.map(v => v.make).filter(Boolean))].sort();
 
-  // Models for selected make — include codes in label
+  // Models for selected make — include codes + year range in label
   const modelRows = (() => {
     const filtered = vehicles.filter(v => !make || v.make === make);
     const map = {};
     for (const v of filtered) {
       if (!v.model) continue;
-      if (!map[v.model]) map[v.model] = new Set();
-      if (v.code) map[v.model].add(v.code);
+      if (!map[v.model]) map[v.model] = { codes: new Set(), yearFrom: null, yearTo: null };
+      if (v.code) map[v.model].codes.add(v.code);
+      const yf = parseInt(v.year_from); const yt = parseInt(v.year_to);
+      if (yf > 1900 && (!map[v.model].yearFrom || yf < map[v.model].yearFrom)) map[v.model].yearFrom = yf;
+      if (yt > 1900 && (!map[v.model].yearTo   || yt > map[v.model].yearTo))   map[v.model].yearTo   = yt;
     }
     return Object.entries(map)
       .sort((a, b) => {
-        const ca = [...a[1]].sort()[0] || a[0];
-        const cb = [...b[1]].sort()[0] || b[0];
+        const ca = [...a[1].codes].sort()[0] || a[0];
+        const cb = [...b[1].codes].sort()[0] || b[0];
         return ca.localeCompare(cb);
       })
-      .map(([m, codes]) => ({ model: m, label: codes.size > 0 ? `${m} [${[...codes].sort().join(" / ")}]` : m }));
+      .map(([m, { codes, yearFrom, yearTo }]) => {
+        const yr = yearFrom ? ` (${yearFrom}–${yearTo || "present"})` : "";
+        const cd = codes.size > 0 ? ` [${[...codes].sort().join(" / ")}]` : "";
+        return { model: m, label: `${m}${yr}${cd}` };
+      });
   })();
   const modelOptions = modelRows.map(r => r.label);
 

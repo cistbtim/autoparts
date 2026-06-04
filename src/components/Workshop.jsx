@@ -2785,6 +2785,48 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
   const [matchModelLightbox, setMatchModelLightbox] = useState(null); // null | index — for selected vehicle
   const [matchJobCarLightbox, setMatchJobCarLightbox] = useState(null); // null | index — for job car photos at top
   const [matchModelSelected, setMatchModelSelected] = useState(null);
+  const [matchAutoSuggestion, setMatchAutoSuggestion] = useState(null); // { vehicle, source: 'cache'|'year', yearDecoded? }
+
+  useEffect(()=>{
+    if(!matchModelOpen){ setMatchAutoSuggestion(null); return; }
+    const scannedMake=(job.vehicle_make||"").toLowerCase().split(" ")[0];
+
+    const tryYearMatch=()=>{
+      if(!job.vin) return;
+      const d=decodeVin(job.vin);
+      if(!d||d.year==="?") return;
+      // For dual-year VINs (e.g. "2013 / 1983") pick the later year as more likely
+      const yearStr=d.year.includes("/")?d.year.split("/").map(s=>s.trim()).sort((a,b)=>b-a)[0]:d.year;
+      const year=parseInt(yearStr);
+      if(isNaN(year)) return;
+      const match=vehicles.find(v=>{
+        if(!v.model||!v.year_from) return false;
+        if(scannedMake&&!(v.make||"").toLowerCase().includes(scannedMake)) return false;
+        const from=parseInt(v.year_from);
+        const to=v.year_to?parseInt(v.year_to):new Date().getFullYear()+1;
+        return year>=from&&year<=to;
+      });
+      if(match) setMatchAutoSuggestion({vehicle:match,source:"year",yearDecoded:year});
+    };
+
+    if(job.vin&&job.vin.length>=12){
+      const vin_prefix=job.vin.slice(0,12).toUpperCase();
+      api.get("ws_vin_model_cache",`vin_prefix=eq.${vin_prefix}&limit=1`)
+        .then(rows=>{
+          if(rows&&rows.length>0){
+            const cached=rows[0];
+            const v=vehicles.find(v=>v.model===cached.model&&
+              (!scannedMake||(v.make||"").toLowerCase().includes(scannedMake)));
+            if(v){ setMatchAutoSuggestion({vehicle:v,source:"cache"}); return; }
+          }
+          tryYearMatch();
+        })
+        .catch(()=>tryYearMatch());
+    } else {
+      tryYearMatch();
+    }
+  },[matchModelOpen]);
+
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<=700);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
   // Local spare-shop reply state — fetched fresh every time this job opens so
   // we are never blocked on the parent's stale wsShopRequests prop.
@@ -5258,7 +5300,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         };
         return(
           <Overlay onClose={()=>setMatchModelOpen(false)} wide>
-            <MHead title="🔗 Match Vehicle Model" onClose={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelLightbox(null); setMatchJobCarLightbox(null); }}/>
+            <MHead title="🔗 Match Vehicle Model" onClose={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelLightbox(null); setMatchJobCarLightbox(null); setMatchAutoSuggestion(null); }}/>
             {/* Job car photos for comparison */}
             {(()=>{
               const photos=[
@@ -5344,6 +5386,43 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
                 </div>
               );
             })()}
+            {/* Auto-suggestion banner */}
+            {matchAutoSuggestion&&!matchModelSelected&&(()=>{
+              const sv=matchAutoSuggestion.vehicle;
+              const img=toImgUrl(sv.photo_front||"");
+              const isCurrent=sv.model===job.vehicle_model;
+              const sourceLabel=matchAutoSuggestion.source==="cache"
+                ? "Previously matched on a vehicle with the same VIN prefix"
+                : `VIN decodes to ${matchAutoSuggestion.yearDecoded} — fits ${sv.year_from||"?"}${sv.year_to&&sv.year_to!==sv.year_from?`–${sv.year_to}`:"+"} range`;
+              return(
+                <div style={{marginBottom:14,padding:12,background:"rgba(52,211,153,.08)",border:"2px solid rgba(52,211,153,.45)",borderRadius:12}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"var(--green)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
+                    {matchAutoSuggestion.source==="cache"?"🧠 Auto-match — VIN cache":"📅 Auto-match — year range"}
+                  </div>
+                  <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
+                    {img
+                      ?<img src={img} alt={sv.model} style={{width:72,height:52,objectFit:"cover",borderRadius:8,flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+                      :<div style={{width:72,height:52,background:"var(--surface3)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>🚗</div>
+                    }
+                    <div>
+                      <div style={{fontWeight:700,fontSize:14}}>{sv.model}{isCurrent?" ✓":""}</div>
+                      {sv.code&&<div style={{fontSize:11,color:"var(--accent)",fontWeight:600}}>{sv.code}</div>}
+                      <div style={{fontSize:11,color:"var(--text3)"}}>{sv.make}</div>
+                      {(sv.year_from||sv.year_to)&&<div style={{fontSize:11,color:"var(--blue)"}}>{sv.year_from||"?"}{sv.year_to&&sv.year_to!==sv.year_from?`–${sv.year_to}`:""}</div>}
+                    </div>
+                  </div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>{sourceLabel}</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button className="btn btn-primary" style={{flex:2,fontSize:13}} onClick={()=>{ pickModel(sv.model); setMatchAutoSuggestion(null); }}>
+                      ✅ Use this match
+                    </button>
+                    <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setMatchAutoSuggestion(null)}>
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
             <div style={{marginBottom:12,display:"flex",gap:8,alignItems:"center"}}>
               <input className="inp" autoFocus value={matchModelSearch} onChange={e=>setMatchModelSearch(e.target.value)}
                 placeholder="Search model, code…" style={{flex:1}}/>
@@ -5421,7 +5500,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
                 </div>
               );
             })()}
-            <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelSelected(null); }}>Cancel</button>
+            <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelSelected(null); setMatchAutoSuggestion(null); }}>Cancel</button>
           </Overlay>
         );
       })()}

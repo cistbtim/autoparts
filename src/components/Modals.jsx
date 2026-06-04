@@ -2931,12 +2931,13 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
     image_url:p.image_url||"", chinese_desc:p.chinese_desc||"",
     make:p.make||"", model:p.model||"", year_range:p.year_range||"", oe_number:p.oe_number||"",
+    reference_url:p.reference_url||"",
     bin_location:p.bin_location||"", is_quantum:p.is_quantum||false, is_hiace:p.is_hiace||false,
     auto_reorder:p.auto_reorder||false, reorder_point:p.reorder_point??0, reorder_qty:p.reorder_qty??1,
     preferred_supplier_id:p.preferred_supplier_id||"",
   }:{
     sku:branchSkuPrefix?branchSkuPrefix+"-":"", name:"", category:"Engine", brand:"", price:"", cost_price:"", stock:"", minStock:"",
-    image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", bin_location:"", is_quantum:false, is_hiace:false,
+    image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", reference_url:"", bin_location:"", is_quantum:false, is_hiace:false,
     auto_reorder:false, reorder_point:0, reorder_qty:1, preferred_supplier_id:"",
   };
   const [f,setF]=useState(()=>initialF?{...makeF(part),...initialF}:makeF(part));
@@ -2978,6 +2979,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     price:+fv.price, cost_price:+fv.cost_price||0, stock:+fv.stock, min_stock:+fv.minStock,
     image_url:fv.image_url, chinese_desc:fv.chinese_desc,
     make:fv.make, model:fv.model, year_range:fv.year_range, oe_number:fv.oe_number,
+    reference_url:fv.reference_url||"",
     bin_location:fv.bin_location||"", is_quantum:!!fv.is_quantum, is_hiace:!!fv.is_hiace,
     auto_reorder:!!fv.auto_reorder, reorder_point:+fv.reorder_point||0, reorder_qty:+fv.reorder_qty||1,
     preferred_supplier_id:fv.preferred_supplier_id?+fv.preferred_supplier_id:null,
@@ -3168,6 +3170,14 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
               {f.oe_number&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.oe_number)}>📋 Copy OE</button>}
             </div>
             <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)} placeholder="OE number / OEM reference"/>
+          </FD>
+          <FD>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+              <FL label="REFERENCE URL"/>
+              {f.reference_url&&<a href={f.reference_url} target="_blank" rel="noopener noreferrer"
+                className="cp-btn" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)",textDecoration:"none"}}>🔗 Open</a>}
+            </div>
+            <input className="inp" value={f.reference_url} onChange={e=>s("reference_url",e.target.value)} placeholder="Paste catalogue or reference link…"/>
           </FD>
           <FD><FL label={t.chineseDesc}/><input className="inp" value={f.chinese_desc} onChange={e=>s("chinese_desc",e.target.value)} placeholder="零件中文說明"/></FD>
           <div style={{display:"flex",gap:16,flexWrap:"wrap",marginTop:8}}>

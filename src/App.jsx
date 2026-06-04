@@ -823,6 +823,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     tabRef.current === "wsstatement" ||
     tabRef.current === "wsreport" ||
     tabRef.current === "suppliers" ||   // always pause on suppliers
+    tabRef.current === "pos" ||         // manual refresh only on POS
     tabRef.current === "shop" ||        // manual refresh only on shop
     tabRef.current === "inventory" ||   // manual refresh only on inventory
     tabRef.current === "settings" ||    // always pause on settings page
@@ -4102,7 +4103,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             suppliers={suppliers}
             partSuppliers={partSuppliers}
             settings={settings}
-            onSave={savePosInvoice}/>
+            onSave={savePosInvoice}
+            onRefresh={()=>refreshTables("parts","customers","vehicles","part_fitments","part_suppliers")}/>
         )}
 
         {/* ── MY SALES STATEMENT (branch_salesman) ── */}

@@ -3249,7 +3249,15 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             </div>
             <div>
               <FL label={`💰 ${t.costPrice}`}/>
-              <input className="inp" type="number" value={f.cost_price} onChange={e=>s("cost_price",e.target.value)} placeholder="0.00"/>
+              <input className="inp" type="number" value={f.cost_price} onChange={e=>{
+                const cost=parseFloat(e.target.value)||0;
+                s("cost_price",e.target.value);
+                if(cost>0&&!(+f.price>0)){
+                  const taxRate=getSettings().tax_rate||0;
+                  const autoPrice=Math.round(cost*(1+taxRate/100)*1.35*100)/100;
+                  s("price",autoPrice);
+                }
+              }} placeholder="0.00"/>
               {f.cost_price>0&&f.price>0&&<div style={{fontSize:11,color:"var(--green)",marginTop:3}}>Margin: {(((+f.price-(+f.cost_price))/(+f.price))*100).toFixed(1)}%</div>}
             </div>
           </FG>

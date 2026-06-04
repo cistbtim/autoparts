@@ -450,9 +450,126 @@ function PosDone({ sale, onNewSale }) {
   );
 }
 
+// ── Multi-part supplier enquiry modal ─────────────────────────────────────────
+function AskMultiOverlay({ parts, suppliers, partSuppliers, selectedIds, sym, settings, onToggle, onClose }) {
+  const shopName = settings?.shop_name || "AutoParts";
+  const selectedParts = parts.filter(p => selectedIds.has(p.id));
+
+  const linkedSupIds = new Set(
+    partSuppliers.filter(ps => selectedIds.has(Number(ps.part_id))).map(ps => String(ps.supplier_id))
+  );
+  const linkedSuppliers = suppliers.filter(s => linkedSupIds.has(String(s.id)));
+  const otherSuppliers  = suppliers.filter(s => s.name && !linkedSupIds.has(String(s.id)));
+
+  const [chosenSupId, setChosenSupId] = useState(linkedSuppliers[0]?.id ? String(linkedSuppliers[0].id) : "");
+
+  const buildMsg = (supId) => {
+    const sup = suppliers.find(s => String(s.id) === String(supId));
+    if (!sup) return "";
+    const lines = [`Hi ${sup.name},`, "", "Could you please check stock and best prices for the following parts:"];
+    selectedParts.forEach((p, i) => {
+      lines.push("");
+      lines.push(`${i + 1}. ${p.name}${p.sku ? ` (${p.sku})` : ""}`);
+      const ps = partSuppliers.find(x => String(x.part_id) === String(p.id) && String(x.supplier_id) === String(supId));
+      if (ps?.supplier_part_no) lines.push(`   Code: ${ps.supplier_part_no}`);
+      if (p.oe_number) lines.push(`   OE: ${p.oe_number}`);
+      const veh = [p.make, p.model, p.year_range].filter(Boolean).join(" ");
+      if (veh) lines.push(`   Vehicle: ${veh}`);
+      lines.push(`   Stock: ${p.stock || 0}  Price: ${sym}${(p.price || 0).toFixed(2)}`);
+    });
+    lines.push("", `Thank you,\n${shopName}`);
+    return lines.join("\n");
+  };
+
+  const chosenSup = suppliers.find(s => String(s.id) === String(chosenSupId));
+  const msg = buildMsg(chosenSupId);
+
+  return (
+    <div className="overlay" onClick={onClose}
+      style={{ zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background: "var(--surface)", borderRadius: 14, padding: 20, width: "100%", maxWidth: 520, maxHeight: "88vh", overflow: "auto", boxShadow: "0 8px 40px rgba(0,0,0,.35)", border: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>📤 Ask Supplier — {selectedParts.length} part{selectedParts.length !== 1 ? "s" : ""}</div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>Send a stock &amp; price enquiry for all selected parts</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "var(--text3)", lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* Part list */}
+        <div style={{ background: "var(--surface2)", borderRadius: 8, padding: "8px 12px", marginBottom: 14, maxHeight: 180, overflow: "auto" }}>
+          {selectedParts.map(p => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: "1px solid var(--border)", fontSize: 13 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontWeight: 700 }}>{p.name}</span>
+                {p.sku && <span style={{ fontFamily: "DM Mono,monospace", fontSize: 12, color: "var(--blue)", marginLeft: 6 }}>{p.sku}</span>}
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 800, color: p.stock > 0 ? "var(--green)" : "var(--red)", whiteSpace: "nowrap" }}>Qty: {p.stock || 0}</span>
+              <span style={{ fontSize: 11, color: "var(--text3)", whiteSpace: "nowrap" }}>{sym}{(p.price || 0).toFixed(2)}</span>
+              <button onClick={() => onToggle(p.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 12, padding: "0 2px" }}>✕</button>
+            </div>
+          ))}
+        </div>
+
+        {/* Supplier picker */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Choose Supplier</div>
+          <select value={chosenSupId} onChange={e => setChosenSupId(e.target.value)} className="inp" style={{ width: "100%", fontSize: 13 }}>
+            <option value="">— select supplier —</option>
+            {linkedSuppliers.length > 0 && (
+              <optgroup label="Linked suppliers">
+                {linkedSuppliers.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+              </optgroup>
+            )}
+            {otherSuppliers.length > 0 && (
+              <optgroup label="All other suppliers">
+                {otherSuppliers.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+              </optgroup>
+            )}
+          </select>
+        </div>
+
+        {chosenSupId && chosenSup && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Message Preview</div>
+            <textarea readOnly value={msg}
+              style={{ width: "100%", height: 140, resize: "vertical", fontFamily: "DM Mono,monospace", fontSize: 11, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface2)", padding: "8px 10px", color: "var(--text2)", boxSizing: "border-box" }} />
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              {chosenSup.phone && (
+                <a href={waLink(chosenSup.phone, msg)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                  <button style={{ background: "#25D366", border: "none", color: "#fff", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    💬 WhatsApp
+                  </button>
+                </a>
+              )}
+              {chosenSup.email && (
+                <a href={mailLink(chosenSup.email, `Stock & price check — ${selectedParts.length} part${selectedParts.length !== 1 ? "s" : ""}`, msg)} style={{ textDecoration: "none" }}>
+                  <button style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text2)", borderRadius: 8, padding: "9px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                    ✉ Email
+                  </button>
+                </a>
+              )}
+              {!chosenSup.phone && !chosenSup.email && (
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>No contact details for this supplier.</div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main POS page ─────────────────────────────────────────────────────────────
-export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, branchId = null, suppliers = [], partSuppliers = [], settings = {} }) {
+export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, onRefresh, branchId = null, suppliers = [], partSuppliers = [], settings = {} }) {
   const sym = C();
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try { await onRefresh(); } finally { setRefreshing(false); }
+  };
 
   // Parts filter — searchInput updates instantly (for the input box display),
   // search is debounced 200ms so the expensive filter only runs after typing pauses
@@ -481,6 +598,13 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
   // Ask-supplier modal
   const [askPart, setAskPart] = useState(null);
+
+  // Multi-select enquiry
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [askMulti, setAskMulti] = useState(false);
+  const toggleSelectMode = () => { setSelectMode(v => !v); setSelectedIds(new Set()); setAskMulti(false); };
+  const toggleSelect = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   // UI
   const [saving, setSaving] = useState(false);
@@ -801,6 +925,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
     );
   })();
 
+
   const S = { // shared style tokens for the right panel
     panel:  { background: "var(--surface)", borderLeft: "2px solid var(--border)" },
     label:  { fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: "var(--text3)", textTransform: "uppercase", marginBottom: 5 },
@@ -815,6 +940,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       {showPin && <PinModal onSuccess={() => { setDiscLocked(false); setShowPin(false); }} onClose={() => setShowPin(false)} />}
       {Lightbox}
       {AskSupplierModal}
+      {askMulti && <AskMultiOverlay parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} selectedIds={selectedIds} sym={sym} settings={settings} onToggle={toggleSelect} onClose={() => setAskMulti(false)} />}
 
       {mobView === "catalog" ? (
         <>
@@ -837,6 +963,14 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                 <option value="__all__">All Cat.</option>
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
+              <button onClick={handleRefresh} disabled={refreshing} title="Refresh parts"
+                style={{ flexShrink: 0, background: "var(--surface)", border: "2px solid var(--border)", borderRadius: 8, padding: "0 10px", cursor: refreshing ? "default" : "pointer", fontSize: 15, opacity: refreshing ? .5 : 1, transition: "opacity .2s" }}>
+                {refreshing ? "⏳" : "🔄"}
+              </button>
+              <button onClick={toggleSelectMode} title={selectMode ? "Exit select mode" : "Select parts to enquire"}
+                style={{ flexShrink: 0, background: selectMode ? "var(--blue)" : "var(--surface)", border: `2px solid ${selectMode ? "var(--blue)" : "var(--border)"}`, borderRadius: 8, padding: "0 10px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: selectMode ? "#fff" : "var(--text2)", whiteSpace: "nowrap" }}>
+                {selectMode ? "✕ Done" : "☑ Select"}
+              </button>
             </div>
             <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} parts={parts} onFilter={setVehicleFilter2} onZoom={setLightbox} />
           </div>
@@ -859,8 +993,17 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                   const inCart = cart.find(i => i.part_id === p.id);
                   const img = toImgUrl(p.image_url);
                   const codes = partCodeMap[String(p.id)];
+                  const isSelected = selectedIds.has(p.id);
+                  const isEnquirableMob = p.stock <= 0 || !p.price || p.price === 0;
+                  const handleMobClick = selectMode ? () => toggleSelect(p.id) : (p.stock <= 0 ? undefined : () => addToCart(p));
                   return (
-                    <div key={p.id} onClick={() => addToCart(p)} style={{ display: "flex", gap: 10, padding: "10px 12px", borderBottom: "1px solid var(--border)", background: inCart ? "rgba(249,115,22,.08)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)", borderLeft: inCart ? "3px solid var(--accent)" : "3px solid transparent", opacity: p.stock <= 0 ? 0.5 : 1, cursor: p.stock <= 0 ? "not-allowed" : "pointer" }}>
+                    <div key={p.id} onClick={handleMobClick} style={{ display: "flex", gap: 10, padding: "10px 12px", borderBottom: "1px solid var(--border)", background: isSelected ? "rgba(96,165,250,.1)" : inCart ? "rgba(249,115,22,.08)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)", borderLeft: isSelected ? "3px solid var(--blue)" : inCart ? "3px solid var(--accent)" : "3px solid transparent", opacity: selectMode ? 1 : (p.stock <= 0 ? 0.5 : 1), cursor: selectMode ? "pointer" : (p.stock <= 0 ? "not-allowed" : "pointer") }}>
+                      {selectMode && (
+                        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.id)} onClick={e => e.stopPropagation()}
+                            style={{ width: 18, height: 18, cursor: "pointer", accentColor: "var(--blue)" }} />
+                        </div>
+                      )}
                       {img
                         ? <div style={{ width: 64, height: 64, borderRadius: 8, background: "#fff", border: "1px solid #e2e8f0", flexShrink: 0, overflow: "hidden" }}
                             onClick={e => { e.stopPropagation(); setLightbox({ photos: [{ url: img, name: p.name }], index: 0 }); }}>
@@ -877,6 +1020,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                           <span style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 800, fontSize: 17, color: "var(--accent)" }}>{sym}{(p.price || 0).toFixed(2)}</span>
                           <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 7px", borderRadius: 6, background: p.stock > 0 ? "rgba(52,211,153,.15)" : "rgba(248,113,113,.15)", color: p.stock > 0 ? "var(--green)" : "var(--red)", border: `1px solid ${p.stock > 0 ? "rgba(52,211,153,.3)" : "rgba(248,113,113,.3)"}` }}>{p.stock || 0}</span>
                           {inCart && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>+{inCart.qty} in cart</span>}
+                          {selectMode && isEnquirableMob && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--blue)" }}>📤</span>}
                         </div>
                       </div>
                     </div>
@@ -892,6 +1036,15 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               </>
             )}
           </div>
+
+          {/* Supplier enquiry bar — shown when items selected in select mode */}
+          {selectMode && selectedIds.size > 0 && (
+            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "rgba(37,99,235,.95)", borderTop: "2px solid rgba(96,165,250,.4)" }}>
+              <span style={{ flex: 1, fontWeight: 700, fontSize: 13, color: "#fff" }}>📤 {selectedIds.size} part{selectedIds.size !== 1 ? "s" : ""} selected</span>
+              <button onClick={() => setSelectedIds(new Set())} style={{ background: "rgba(255,255,255,.15)", border: "none", color: "#fff", borderRadius: 7, padding: "6px 10px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Clear</button>
+              <button onClick={() => setAskMulti(true)} style={{ background: "#fff", border: "none", color: "var(--blue)", borderRadius: 7, padding: "6px 12px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Ask Supplier →</button>
+            </div>
+          )}
 
           {/* Cart summary bar — always visible at bottom */}
           <button onClick={() => setMobView("cart")}
@@ -1075,6 +1228,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       {showPin && <PinModal onSuccess={() => { setDiscLocked(false); setShowPin(false); }} onClose={() => setShowPin(false)} />}
       {Lightbox}
       {AskSupplierModal}
+      {askMulti && <AskMultiOverlay parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} selectedIds={selectedIds} sym={sym} settings={settings} onToggle={toggleSelect} onClose={() => setAskMulti(false)} />}
 
       {/* ══ LEFT: Parts catalog ══ */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", background: "var(--bg)" }}>
@@ -1099,6 +1253,14 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               <option value="__all__">All Categories</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+            <button onClick={handleRefresh} disabled={refreshing} title="Refresh parts"
+              style={{ flexShrink: 0, background: "var(--surface)", border: "2px solid var(--border)", borderRadius: 8, padding: "0 12px", cursor: refreshing ? "default" : "pointer", fontSize: 15, opacity: refreshing ? .5 : 1, transition: "opacity .2s" }}>
+              {refreshing ? "⏳" : "🔄"}
+            </button>
+            <button onClick={toggleSelectMode} title={selectMode ? "Exit select mode" : "Select parts to enquire"}
+              style={{ flexShrink: 0, background: selectMode ? "var(--blue)" : "var(--surface)", border: `2px solid ${selectMode ? "var(--blue)" : "var(--border)"}`, borderRadius: 8, padding: "0 14px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: selectMode ? "#fff" : "var(--text2)", whiteSpace: "nowrap", height: 38 }}>
+              {selectMode ? "✕ Done" : "☑ Select"}
+            </button>
           </div>
           <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} parts={parts} onFilter={setVehicleFilter2} onZoom={setLightbox} />
         </div>
@@ -1121,6 +1283,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <thead>
                   <tr style={{ background: "var(--surface2)", position: "sticky", top: 0, zIndex: 2 }}>
+                    {selectMode && <th style={{ width: 36, padding: "8px 4px 8px 10px" }}></th>}
                     <th style={{ width: 96, padding: "8px 8px" }}></th>
                     <th style={{ padding: "8px 10px", textAlign: "left", fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: ".04em" }}>PART</th>
                     <th style={{ width: 100, padding: "8px 10px", textAlign: "right", fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: ".04em" }}>PRICE</th>
@@ -1133,13 +1296,23 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                     const inCart = cart.find(i => i.part_id === p.id);
                     const img = toImgUrl(p.image_url);
                     const codes = partCodeMap[String(p.id)];
+                    const isSelected = selectedIds.has(p.id);
+                    const isEnquirable = p.stock <= 0 || !p.price || p.price === 0;
                     return (
-                      <tr key={p.id} style={{
-                        opacity: p.stock <= 0 ? 0.5 : 1,
-                        background: inCart ? "rgba(249,115,22,.07)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.018)",
-                        borderLeft: inCart ? "3px solid var(--accent)" : "3px solid transparent",
+                      <tr key={p.id} onClick={selectMode ? () => toggleSelect(p.id) : undefined} style={{
+                        opacity: selectMode ? 1 : (p.stock <= 0 ? 0.5 : 1),
+                        background: isSelected ? "rgba(96,165,250,.1)" : inCart ? "rgba(249,115,22,.07)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.018)",
+                        borderLeft: isSelected ? "3px solid var(--blue)" : inCart ? "3px solid var(--accent)" : "3px solid transparent",
                         transition: "background .1s",
+                        cursor: selectMode ? "pointer" : "default",
                       }}>
+                        {selectMode && (
+                          <td style={{ padding: "6px 4px 6px 10px", verticalAlign: "middle" }}>
+                            <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.id)}
+                              onClick={e => e.stopPropagation()}
+                              style={{ width: 18, height: 18, cursor: "pointer", accentColor: "var(--blue)" }} />
+                          </td>
+                        )}
                         <td style={{ padding: "6px 8px", verticalAlign: "middle" }}>
                           {img
                             ? <div style={{ width: 80, height: 80, borderRadius: 8, background: "#fff", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in", overflow: "hidden" }}
@@ -1166,6 +1339,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                             const show = list.slice(0, 4);
                             return <div style={{ fontSize: 11, fontFamily: "DM Mono,monospace", color: "var(--accent)", fontWeight: 700 }}>{show.join(" · ")}{list.length > 4 ? ` +${list.length - 4}` : ""}</div>;
                           })()}
+                          {selectMode && isEnquirable && <div style={{ fontSize: 10, fontWeight: 700, color: "var(--blue)", marginTop: 2 }}>📤 No stock / price</div>}
                         </td>
                         <td style={{ textAlign: "right", fontFamily: "Rajdhani,sans-serif", fontWeight: 800, fontSize: 17, color: "var(--accent)", padding: "8px 10px", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                           {sym}{(p.price || 0).toFixed(2)}
@@ -1199,6 +1373,13 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                 </tbody>
               </table>
 
+              {selectMode && selectedIds.size > 0 && (
+                <div style={{ position: "sticky", bottom: totalPages > 1 ? 41 : 0, zIndex: 5, display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "rgba(37,99,235,.95)", borderTop: "2px solid rgba(96,165,250,.4)", backdropFilter: "blur(4px)" }}>
+                  <span style={{ flex: 1, fontWeight: 700, fontSize: 13, color: "#fff" }}>📤 {selectedIds.size} part{selectedIds.size !== 1 ? "s" : ""} selected</span>
+                  <button onClick={() => setSelectedIds(new Set())} style={{ background: "rgba(255,255,255,.15)", border: "none", color: "#fff", borderRadius: 7, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Clear</button>
+                  <button onClick={() => setAskMulti(true)} style={{ background: "#fff", border: "none", color: "var(--blue)", borderRadius: 7, padding: "6px 14px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Ask Supplier →</button>
+                </div>
+              )}
               {totalPages > 1 && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px", borderTop: "1px solid var(--border)", background: "var(--surface2)", position: "sticky", bottom: 0 }}>
                   <button className="btn btn-ghost btn-sm" disabled={safePage === 0} onClick={() => setPage(p => p - 1)}>← Prev</button>

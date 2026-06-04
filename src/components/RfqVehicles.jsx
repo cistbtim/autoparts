@@ -1441,11 +1441,16 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
           disabled={!selMake}
           onChange={e=>{ const v=e.target.value; setSelModel(v); applyFilter(selMake,v); }}>
           <option value="">{t.selectModel||"Select Model"}</option>
-          {models.map(({model, yearFrom, yearTo, code})=>(
-            <option key={model} value={model}>
-              {code?`[${code}] `:""}{model}{yearFrom ? ` (${yearFrom}–${yearTo||"present"})` : ""}
-            </option>
-          ))}
+          {models.map(({model, yearFrom, yearTo, code})=>{
+            const yf=yearFrom?String(yearFrom).slice(0,4):"";
+            const yt=yearTo?String(yearTo).slice(0,4):"";
+            const yr=yf?` (${yf}–${yt||"present"})`:"";
+            return(
+              <option key={model} value={model}>
+                {code?`[${code}] `:""}{model}{yr}
+              </option>
+            );
+          })}
         </select>
       </div>
 

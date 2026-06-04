@@ -132,7 +132,7 @@ function Combo({ value, options, placeholder, disabled, onChange, monoFont }) {
 }
 
 // ── Inline vehicle filter ─────────────────────────────────────────────────────
-function PosVehicleFilter({ vehicles, partFitments, onFilter, onZoom }) {
+function PosVehicleFilter({ vehicles, partFitments, parts, onFilter, onZoom }) {
   const [make, setMake]   = useState("");
   const [model, setModel] = useState("");
   const [code, setCode]   = useState("");
@@ -837,7 +837,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} onFilter={setVehicleFilter2} onZoom={setLightbox} />
+            <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} parts={parts} onFilter={setVehicleFilter2} onZoom={setLightbox} />
           </div>
 
           {/* Parts list */}
@@ -1099,7 +1099,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} onFilter={setVehicleFilter2} onZoom={setLightbox} />
+          <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} parts={parts} onFilter={setVehicleFilter2} onZoom={setLightbox} />
         </div>
 
         {/* Parts table */}

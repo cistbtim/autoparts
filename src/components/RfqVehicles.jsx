@@ -1462,8 +1462,8 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
           <option value="">{t.selectModel||"Select Model"}</option>
           {models.map(({model, yearFrom, yearTo, code})=>{
             const val=code||model;
-            const yf=yearFrom?String(yearFrom).slice(0,4):"";
-            const yt=yearTo?String(yearTo).slice(0,4):"";
+            const yf=parseInt(yearFrom)>1900?String(parseInt(yearFrom)):"";
+            const yt=parseInt(yearTo)>1900?String(parseInt(yearTo)):"";
             const yr=yf?` (${yf}–${yt||"present"})`:"";
             return(
               <option key={val} value={val}>

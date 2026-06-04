@@ -2792,12 +2792,16 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
     const scannedMake=(job.vehicle_make||"").toLowerCase().split(" ")[0];
 
     const tryYearMatch=()=>{
-      if(!job.vin) return;
-      const d=decodeVin(job.vin);
-      if(!d||d.year==="?") return;
-      // For dual-year VINs (e.g. "2013 / 1983") pick the later year as more likely
-      const yearStr=d.year.includes("/")?d.year.split("/").map(s=>s.trim()).sort((a,b)=>b-a)[0]:d.year;
-      const year=parseInt(yearStr);
+      // job.vehicle_year is the most reliable source; fall back to VIN decode
+      let year=parseInt(job.vehicle_year);
+      if(isNaN(year)&&job.vin){
+        const d=decodeVin(job.vin);
+        if(d&&d.year&&d.year!=="?"){
+          // For dual-year VINs (e.g. "2013 / 1983") pick the later year as more likely
+          const yearStr=d.year.includes("/")?d.year.split("/").map(s=>s.trim()).sort((a,b)=>b-a)[0]:d.year;
+          year=parseInt(yearStr);
+        }
+      }
       if(isNaN(year)) return;
       const match=vehicles.find(v=>{
         if(!v.model||!v.year_from) return false;

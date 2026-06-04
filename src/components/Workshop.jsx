@@ -2849,8 +2849,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
 
   const handleVehiclePhotoChange = async (field, key, url) => {
     setLocalPhotoOverrides(p=>({...p,[key]:url}));
-    if(vehicleRecord) {
-      try { await onSaveWsVehicle({...vehicleRecord,[field]:url}); }
+    const vehId = vehicleRecord?.id || job.workshop_vehicle_id;
+    if(vehId) {
+      try { await api.patch("workshop_vehicles","id",vehId,{[field]:url}); }
       catch(e) { console.error("Photo save failed",e); }
     }
   };
@@ -3558,7 +3559,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
               )}
             </div>
             {editPhotos&&vehicleRecord?(
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10,maxWidth:720}}>
                 {[
                   {field:"photo_front",key:"front",label:"Front"},
                   {field:"photo_rear", key:"rear", label:"Rear"},

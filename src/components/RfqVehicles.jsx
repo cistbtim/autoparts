@@ -1423,11 +1423,25 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
       return;
     }
 
-    // Shop mode — filter by fitments
+    // Shop mode — fitments + SKU/code prefix matching (union, so both paths work)
     const vehicleIds = new Set(matchVehicles.map(v => String(v.id)));
-    const matchFitments = partFitments.filter(f => vehicleIds.has(String(f.vehicle_id)));
-    const partIds = new Set(matchFitments.map(f => String(f.part_id)));
-    onFilter(partIds.size > 0 ? partIds : new Set(["__none__"]));
+    const fitmentIds = new Set(
+      partFitments.filter(f => vehicleIds.has(String(f.vehicle_id))).map(f => String(f.part_id))
+    );
+    const codes = new Set(matchVehicles.map(v => v.code).filter(Boolean));
+    const codeIds = new Set(
+      (parts||[]).filter(p => {
+        if(!codes.size) return false;
+        const sku=(p.sku||"").toUpperCase();
+        const mod=(p.model||"").toUpperCase();
+        return [...codes].some(c=>{
+          const cu=c.toUpperCase();
+          return sku.startsWith(cu+"-")||sku.startsWith(cu+" ")||sku===cu||mod.includes("["+cu+"]")||mod.includes(cu);
+        });
+      }).map(p=>String(p.id))
+    );
+    const allIds = new Set([...fitmentIds, ...codeIds]);
+    onFilter(allIds.size > 0 ? allIds : new Set(["__none__"]));
     setActive(true);
   };
 

@@ -1375,7 +1375,9 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 // ═══════════════════════════════════════════════════════════════
 // VEHICLE SEARCH BAR — in Shop for customers
 // ═══════════════════════════════════════════════════════════════
-export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, initialMake="", initialModel=""}) {
+// onFilter   — fitment-based filter (shop/POS): passes a Set of part IDs
+// onVehicleChange — direct make/model filter (inventory): passes {make, model}
+export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, t, initialMake="", initialModel=""}) {
   const [selMake,  setSelMake]  = useState(initialMake);
   const [selModel, setSelModel] = useState(initialModel);
   const [active,   setActive]   = useState(false);
@@ -1403,20 +1405,34 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, t, in
   })();
 
   const applyFilter = (make, model) => {
-    if (!make) { onFilter(null); setActive(false); return; }
+    if (!make) {
+      if(onFilter) onFilter(null);
+      if(onVehicleChange) onVehicleChange({make:"",model:""});
+      setActive(false);
+      return;
+    }
+    // Inventory mode: filter parts directly by make/model fields
+    if(onVehicleChange){
+      onVehicleChange({make, model});
+      setActive(true);
+      return;
+    }
+    // Shop mode: filter by fitments
     const matchVehicles = vehicles.filter(v =>
       v.make === make && (!model || v.model === model)
     );
     const vehicleIds = new Set(matchVehicles.map(v => String(v.id)));
     const matchFitments = partFitments.filter(f => vehicleIds.has(String(f.vehicle_id)));
     const partIds = new Set(matchFitments.map(f => String(f.part_id)));
-    onFilter(partIds.size > 0 ? partIds : new Set(["__none__"]));
+    if(onFilter) onFilter(partIds.size > 0 ? partIds : new Set(["__none__"]));
     setActive(true);
   };
 
   const clear = () => {
     setSelMake(""); setSelModel("");
-    onFilter(null); setActive(false);
+    if(onFilter) onFilter(null);
+    if(onVehicleChange) onVehicleChange({make:"",model:""});
+    setActive(false);
   };
 
   return (

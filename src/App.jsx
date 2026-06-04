@@ -169,7 +169,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [filterInStock,setFilterInStock]=useState(false);
   const [filterNoPhoto,setFilterNoPhoto]=useState(false);
   const [filterSupplier,setFilterSupplier]=useState("__all__");
-  const [invVehicleFilterIds,setInvVehicleFilterIds]=useState(null); // null = no vehicle filter
+  const [invVehicleFilterIds,setInvVehicleFilterIds]=useState(null); // null = no vehicle filter (shop/fitment mode — unused in inventory)
+  const [filterInvMake,setFilterInvMake]=useState("");
+  const [filterInvModel,setFilterInvModel]=useState("");
   const [invRefreshing,setInvRefreshing]=useState(false);
   const [filterHiace,setFilterHiace]=useState(false);
   const [branchMatchedOnly,setBranchMatchedOnly]=useState("matched"); // "matched"|"own"|"all"
@@ -235,7 +237,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   },[searchPart]);
 
   // Reset page when filters change
-  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier,filterPendingReview,invVehicleFilterIds]);
+  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier,filterPendingReview,filterInvMake,filterInvModel]);
   useEffect(()=>{ setShopPage(0); },[searchPart]);
   // Modals
   const [M,setM]=useState({});
@@ -2538,7 +2540,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(supplierFilterPartIds&&!supplierFilterPartIds.has(String(p.id)))return false;
     if(filterPendingReview&&p.review_status!=="pending")return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
-    if(invVehicleFilterIds&&!invVehicleFilterIds.has(String(p.id)))return false;
+    if(filterInvMake&&(p.make||"").toLowerCase()!==filterInvMake.toLowerCase())return false;
+    if(filterInvModel&&(p.model||"").toLowerCase()!==filterInvModel.toLowerCase())return false;
     if(filterFits!=="__all__"){
       const hasFit=partFitments.some(f=>String(f.part_id)===String(p.id));
       if(filterFits==="none"&&hasFit)return false;
@@ -3511,7 +3514,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               vehicles={vehicles}
               partFitments={partFitments}
               parts={parts}
-              onFilter={(ids)=>{setInvVehicleFilterIds(ids);setInvPage(0);}}
+              onVehicleChange={({make,model})=>{setFilterInvMake(make);setFilterInvModel(model);setInvPage(0);}}
               t={t}/>
             <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
               <div style={{position:"relative",flex:"1 1 220px",maxWidth:340}}>

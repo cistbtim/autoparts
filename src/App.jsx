@@ -169,6 +169,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [filterInStock,setFilterInStock]=useState(false);
   const [filterNoPhoto,setFilterNoPhoto]=useState(false);
   const [filterSupplier,setFilterSupplier]=useState("__all__");
+  const [filterInvMake,setFilterInvMake]=useState("__all__");
+  const [filterInvModel,setFilterInvModel]=useState("__all__");
   const [invRefreshing,setInvRefreshing]=useState(false);
   const [filterHiace,setFilterHiace]=useState(false);
   const [branchMatchedOnly,setBranchMatchedOnly]=useState("matched"); // "matched"|"own"|"all"
@@ -234,7 +236,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   },[searchPart]);
 
   // Reset page when filters change
-  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier,filterPendingReview]);
+  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier,filterPendingReview,filterInvMake,filterInvModel]);
   useEffect(()=>{ setShopPage(0); },[searchPart]);
   // Modals
   const [M,setM]=useState({});
@@ -2537,6 +2539,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(supplierFilterPartIds&&!supplierFilterPartIds.has(String(p.id)))return false;
     if(filterPendingReview&&p.review_status!=="pending")return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
+    if(filterInvMake!=="__all__"&&(p.make||"").toLowerCase()!==(filterInvMake).toLowerCase())return false;
+    if(filterInvModel!=="__all__"&&(p.model||"").toLowerCase()!==(filterInvModel).toLowerCase())return false;
     if(filterFits!=="__all__"){
       const hasFit=partFitments.some(f=>String(f.part_id)===String(p.id));
       if(filterFits==="none"&&hasFit)return false;
@@ -3614,8 +3618,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 <option value="__all__">🏭 All Suppliers</option>
                 {suppliers.sort((a,b)=>a.name.localeCompare(b.name)).map(s=><option key={s.id} value={String(s.id)}>{s.name}</option>)}
               </select>
-              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace||filterInStock||filterNoPhoto||filterSupplier!=="__all__")&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterPendingReview(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setFilterInStock(false);setFilterNoPhoto(false);setFilterSupplier("__all__");setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
+              {(()=>{
+                const invMakes=[...new Set(parts.map(p=>p.make).filter(Boolean))].sort();
+                const invModels=[...new Set(parts.filter(p=>filterInvMake==="__all__"||(p.make||"").toLowerCase()===filterInvMake.toLowerCase()).map(p=>p.model).filter(Boolean))].sort();
+                return(<>
+                  <select className="inp" value={filterInvMake} onChange={e=>{setFilterInvMake(e.target.value);setFilterInvModel("__all__");}}
+                    style={{minWidth:110,maxWidth:160,borderColor:filterInvMake!=="__all__"?"var(--blue)":undefined,color:filterInvMake!=="__all__"?"var(--blue)":undefined}}>
+                    <option value="__all__">🚗 All Makes</option>
+                    {invMakes.map(m=><option key={m} value={m}>{m}</option>)}
+                  </select>
+                  {filterInvMake!=="__all__"&&(
+                    <select className="inp" value={filterInvModel} onChange={e=>setFilterInvModel(e.target.value)}
+                      style={{minWidth:110,maxWidth:180,borderColor:filterInvModel!=="__all__"?"var(--blue)":undefined,color:filterInvModel!=="__all__"?"var(--blue)":undefined}}>
+                      <option value="__all__">All Models</option>
+                      {invModels.map(m=><option key={m} value={m}>{m}</option>)}
+                    </select>
+                  )}
+                </>);
+              })()}
+              {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace||filterInStock||filterNoPhoto||filterSupplier!=="__all__"||filterInvMake!=="__all__"||filterInvModel!=="__all__")&&(
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterPendingReview(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setFilterInStock(false);setFilterNoPhoto(false);setFilterSupplier("__all__");setFilterInvMake("__all__");setFilterInvModel("__all__");setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
             </div>
             {/* ── Top pagination bar (between search and table) ── */}

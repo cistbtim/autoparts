@@ -1423,13 +1423,9 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
       return;
     }
 
-    // Shop mode — fitments + SKU/code prefix matching (union, so both paths work)
-    const vehicleIds = new Set(matchVehicles.map(v => String(v.id)));
-    const fitmentIds = new Set(
-      partFitments.filter(f => vehicleIds.has(String(f.vehicle_id))).map(f => String(f.part_id))
-    );
+    // Shop mode — match by vehicle code against SKU prefix and model field
     const codes = new Set(matchVehicles.map(v => v.code).filter(Boolean));
-    const codeIds = new Set(
+    const matchedIds = new Set(
       (parts||[]).filter(p => {
         if(!codes.size) return false;
         const sku=(p.sku||"").toUpperCase();
@@ -1440,8 +1436,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
         });
       }).map(p=>String(p.id))
     );
-    const allIds = new Set([...fitmentIds, ...codeIds]);
-    onFilter(allIds.size > 0 ? allIds : new Set(["__none__"]));
+    onFilter(matchedIds.size > 0 ? matchedIds : new Set(["__none__"]));
     setActive(true);
   };
 

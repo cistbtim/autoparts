@@ -1392,16 +1392,17 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
   const makes = [...new Set(vehicles.map(v => v.make))].sort();
   const models = (() => {
     const filtered = vehicles.filter(v => !selMake || v.make === selMake);
+    // Deduplicate by code (if present) or model name — keeps each generation separate
     const map = {};
     for (const v of filtered) {
-      if (!map[v.model]) map[v.model] = { yearFrom: v.year_from, yearTo: v.year_to, code: v.code||"" };
+      const key = v.code ? `code:${v.code}` : `model:${v.model}`;
+      if (!map[key]) map[key] = { model: v.model, yearFrom: v.year_from, yearTo: v.year_to, code: v.code||"" };
       else {
-        if (v.year_from && (!map[v.model].yearFrom || v.year_from < map[v.model].yearFrom)) map[v.model].yearFrom = v.year_from;
-        if (!v.year_to || !map[v.model].yearTo || v.year_to > map[v.model].yearTo) map[v.model].yearTo = v.year_to;
-        if (v.code && !map[v.model].code) map[v.model].code = v.code;
+        if (v.year_from && (!map[key].yearFrom || v.year_from < map[key].yearFrom)) map[key].yearFrom = v.year_from;
+        if (!v.year_to || !map[key].yearTo || v.year_to > map[key].yearTo) map[key].yearTo = v.year_to;
       }
     }
-    return Object.entries(map).map(([model, {yearFrom, yearTo, code}]) => ({model, yearFrom, yearTo, code})).sort((a,b)=>(a.code||a.model).localeCompare(b.code||b.model));
+    return Object.values(map).sort((a,b)=>(a.code||a.model).localeCompare(b.code||b.model));
   })();
 
   const applyFilter = (make, model) => {
@@ -1412,7 +1413,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
       return;
     }
     const matchVehicles = vehicles.filter(v =>
-      v.make === make && (!model || v.model === model)
+      v.make === make && (!model || v.code === model || v.model === model)
     );
 
     if(onVehicleChange){
@@ -1454,17 +1455,18 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
           {makes.map(m=><option key={m}>{m}</option>)}
         </select>
 
-        {/* Model */}
+        {/* Model — value is "code||model" so same-named generations stay distinct */}
         <select className="inp" value={selModel} style={{flex:"1 1 160px",minWidth:130}}
           disabled={!selMake}
           onChange={e=>{ const v=e.target.value; setSelModel(v); applyFilter(selMake,v); }}>
           <option value="">{t.selectModel||"Select Model"}</option>
           {models.map(({model, yearFrom, yearTo, code})=>{
+            const val=code||model;
             const yf=yearFrom?String(yearFrom).slice(0,4):"";
             const yt=yearTo?String(yearTo).slice(0,4):"";
             const yr=yf?` (${yf}–${yt||"present"})`:"";
             return(
-              <option key={model} value={model}>
+              <option key={val} value={val}>
                 {code?`[${code}] `:""}{model}{yr}
               </option>
             );

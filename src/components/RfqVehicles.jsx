@@ -1388,51 +1388,42 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[vehicles.length > 0]);
 
-  // Inventory mode: derive makes/models from parts.make / parts.model directly
-  // Shop mode: derive from vehicles table (with codes + year ranges)
-  const invMode = !!onVehicleChange;
-
-  const makes = invMode
-    ? [...new Set((parts||[]).map(p=>p.make).filter(Boolean))].sort()
-    : [...new Set(vehicles.map(v => v.make))].sort();
-
-  const models = invMode
-    ? [...new Set((parts||[]).filter(p=>!selMake||(p.make||"").toLowerCase()===selMake.toLowerCase()).map(p=>p.model).filter(Boolean))].sort().map(m=>({model:m,yearFrom:null,yearTo:null,code:""}))
-    : (()=>{
-        const filtered = vehicles.filter(v => !selMake || v.make === selMake);
-        const map = {};
-        for (const v of filtered) {
-          if (!map[v.model]) map[v.model] = { yearFrom: v.year_from, yearTo: v.year_to, code: v.code||"" };
-          else {
-            if (v.year_from && (!map[v.model].yearFrom || v.year_from < map[v.model].yearFrom)) map[v.model].yearFrom = v.year_from;
-            if (!v.year_to || !map[v.model].yearTo || v.year_to > map[v.model].yearTo) map[v.model].yearTo = v.year_to;
-            if (v.code && !map[v.model].code) map[v.model].code = v.code;
-          }
-        }
-        return Object.entries(map).map(([model, {yearFrom, yearTo, code}]) => ({model, yearFrom, yearTo, code})).sort((a,b)=>(a.code||a.model).localeCompare(b.code||b.model));
-      })();
+  // Always derive makes/models from the vehicles table (clean data with codes)
+  const makes = [...new Set(vehicles.map(v => v.make))].sort();
+  const models = (() => {
+    const filtered = vehicles.filter(v => !selMake || v.make === selMake);
+    const map = {};
+    for (const v of filtered) {
+      if (!map[v.model]) map[v.model] = { yearFrom: v.year_from, yearTo: v.year_to, code: v.code||"" };
+      else {
+        if (v.year_from && (!map[v.model].yearFrom || v.year_from < map[v.model].yearFrom)) map[v.model].yearFrom = v.year_from;
+        if (!v.year_to || !map[v.model].yearTo || v.year_to > map[v.model].yearTo) map[v.model].yearTo = v.year_to;
+        if (v.code && !map[v.model].code) map[v.model].code = v.code;
+      }
+    }
+    return Object.entries(map).map(([model, {yearFrom, yearTo, code}]) => ({model, yearFrom, yearTo, code})).sort((a,b)=>(a.code||a.model).localeCompare(b.code||b.model));
+  })();
 
   const applyFilter = (make, model) => {
     if (!make) {
       if(onFilter) onFilter(null);
-      if(onVehicleChange) onVehicleChange({make:"",model:""});
+      if(onVehicleChange) onVehicleChange({make:"",model:"",partIds:null});
       setActive(false);
       return;
     }
-    // Inventory mode: filter parts directly by make/model fields
-    if(onVehicleChange){
-      onVehicleChange({make, model});
-      setActive(true);
-      return;
-    }
-    // Shop mode: filter by fitments
     const matchVehicles = vehicles.filter(v =>
       v.make === make && (!model || v.model === model)
     );
     const vehicleIds = new Set(matchVehicles.map(v => String(v.id)));
     const matchFitments = partFitments.filter(f => vehicleIds.has(String(f.vehicle_id)));
     const partIds = new Set(matchFitments.map(f => String(f.part_id)));
-    if(onFilter) onFilter(partIds.size > 0 ? partIds : new Set(["__none__"]));
+    if(onVehicleChange){
+      // Inventory mode — pass part IDs (null if none found, so page doesn't blank)
+      onVehicleChange({make, model, partIds: partIds.size > 0 ? partIds : null});
+    } else if(onFilter){
+      // Shop mode — strict fitment filter
+      onFilter(partIds.size > 0 ? partIds : new Set(["__none__"]));
+    }
     setActive(true);
   };
 

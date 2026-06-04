@@ -1416,16 +1416,15 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
       v.make === make && (!model || v.code === model || v.model === model)
     );
 
-    if(onVehicleChange){
-      // Inventory mode — pass matched vehicles so parent can filter by code/SKU prefix
-      onVehicleChange(matchVehicles.length > 0 ? matchVehicles : null);
-      setActive(true);
-      return;
-    }
+    // 1. Fitment-linked part IDs (part_fitments table)
+    const vehicleIds = new Set(matchVehicles.map(v => String(v.id)));
+    const fitmentIds = new Set(
+      partFitments.filter(f => vehicleIds.has(String(f.vehicle_id))).map(f => String(f.part_id))
+    );
 
-    // Shop mode — match by vehicle code against SKU prefix and model field
+    // 2. Code/SKU prefix matched part IDs
     const codes = new Set(matchVehicles.map(v => v.code).filter(Boolean));
-    const matchedIds = new Set(
+    const codeIds = new Set(
       (parts||[]).filter(p => {
         if(!codes.size) return false;
         const sku=(p.sku||"").toUpperCase();
@@ -1436,7 +1435,17 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
         });
       }).map(p=>String(p.id))
     );
-    onFilter(matchedIds.size > 0 ? matchedIds : new Set(["__none__"]));
+
+    // Union of both
+    const allIds = new Set([...fitmentIds, ...codeIds]);
+
+    if(onVehicleChange){
+      // Inventory mode — null = no filter (show all) when nothing matches
+      onVehicleChange(allIds.size > 0 ? allIds : null);
+    } else if(onFilter){
+      // Shop mode — empty sentinel when nothing matches
+      onFilter(allIds.size > 0 ? allIds : new Set(["__none__"]));
+    }
     setActive(true);
   };
 

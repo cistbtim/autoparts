@@ -172,12 +172,21 @@ function PosVehicleFilter({ vehicles, partFitments, onFilter, onZoom }) {
 
   const apply = (mk, md, cd) => {
     if (!mk) { onFilter(null); return; }
-    const vIds = new Set(
-      vehicles.filter(v => v.make === mk && (!md || v.model === md) && (!cd || v.code === cd))
-        .map(v => String(v.id))
+    const matchVehicles = vehicles.filter(v => v.make === mk && (!md || v.model === md) && (!cd || v.code === cd));
+    // 1. Fitment-linked parts
+    const vIds = new Set(matchVehicles.map(v => String(v.id)));
+    const fitmentIds = new Set(partFitments.filter(f => vIds.has(String(f.vehicle_id))).map(f => String(f.part_id)));
+    // 2. Code/SKU prefix matched parts
+    const codes = new Set(matchVehicles.map(v => v.code).filter(Boolean));
+    const codeIds = new Set(
+      parts.filter(p => {
+        if(!codes.size) return false;
+        const sku=(p.sku||"").toUpperCase(), mod=(p.model||"").toUpperCase();
+        return [...codes].some(c=>{ const cu=c.toUpperCase(); return sku.startsWith(cu+"-")||sku.startsWith(cu+" ")||sku===cu||mod.includes("["+cu+"]")||mod.includes(cu); });
+      }).map(p=>String(p.id))
     );
-    const pIds = new Set(partFitments.filter(f => vIds.has(String(f.vehicle_id))).map(f => String(f.part_id)));
-    onFilter(pIds.size > 0 ? pIds : new Set(["__none__"]));
+    const allIds = new Set([...fitmentIds, ...codeIds]);
+    onFilter(allIds.size > 0 ? allIds : new Set(["__none__"]));
   };
 
   const handleMake = (v) => { setMake(v); setModel(""); setCode(""); apply(v, "", ""); };

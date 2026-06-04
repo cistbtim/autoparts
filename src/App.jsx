@@ -4232,21 +4232,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 );
               })}
             </div>
-            {/* Shop pagination */}
-            {fp.length>PAGE_SIZE&&(
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:14,flexWrap:"wrap",gap:10}}>
-                <div style={{fontSize:13,color:"var(--text3)"}}>
-                  Showing {shopPage*PAGE_SIZE+1}–{Math.min((shopPage+1)*PAGE_SIZE,fp.length)} of <strong style={{color:"var(--text)"}}>{fp.length}</strong> parts
+            {/* Shop pagination — use vehicle-filtered count when a vehicle is selected */}
+            {(()=>{
+              const shopFp=vehicleFilterIds?fp.filter(p=>vehicleFilterIds.has(String(p.id))):fp;
+              if(shopFp.length===0) return null;
+              return shopFp.length>PAGE_SIZE?(
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:14,flexWrap:"wrap",gap:10}}>
+                  <div style={{fontSize:13,color:"var(--text3)"}}>
+                    Showing {shopPage*PAGE_SIZE+1}–{Math.min((shopPage+1)*PAGE_SIZE,shopFp.length)} of <strong style={{color:"var(--text)"}}>{shopFp.length}</strong> parts
+                  </div>
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <button className="btn btn-ghost btn-sm" disabled={shopPage===0} onClick={()=>setShopPage(p=>p-1)}>← Prev</button>
+                    <span style={{fontSize:13,color:"var(--text2)",fontWeight:600,minWidth:80,textAlign:"center"}}>
+                      Page {shopPage+1} / {Math.ceil(shopFp.length/PAGE_SIZE)}
+                    </span>
+                    <button className="btn btn-ghost btn-sm" disabled={(shopPage+1)*PAGE_SIZE>=shopFp.length} onClick={()=>setShopPage(p=>p+1)}>Next →</button>
+                  </div>
                 </div>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <button className="btn btn-ghost btn-sm" disabled={shopPage===0} onClick={()=>setShopPage(p=>p-1)}>← Prev</button>
-                  <span style={{fontSize:13,color:"var(--text2)",fontWeight:600,minWidth:80,textAlign:"center"}}>
-                    Page {shopPage+1} / {Math.ceil(fp.length/PAGE_SIZE)}
-                  </span>
-                  <button className="btn btn-ghost btn-sm" disabled={(shopPage+1)*PAGE_SIZE>=fp.length} onClick={()=>setShopPage(p=>p+1)}>Next →</button>
-                </div>
-              </div>
-            )}
+              ):null;
+            })()}
           </div>
         )}
 

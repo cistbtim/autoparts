@@ -5343,6 +5343,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
               <span>🚗 {job.vehicle_reg}</span>
               {job.vehicle_make&&<span>Make: <strong>{job.vehicle_make}</strong></span>}
               {job.vehicle_model&&<span>Current model: <strong>{job.vehicle_model}</strong></span>}
+              {job.vehicle_year&&<span>Year: <strong>{job.vehicle_year}</strong></span>}
               {job.vin&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11}}>VIN: {job.vin}</span>}
             </div>
             {/* VIN decoded info */}

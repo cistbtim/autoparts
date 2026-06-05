@@ -1377,7 +1377,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 // ═══════════════════════════════════════════════════════════════
 // onFilter   — fitment-based filter (shop/POS): passes a Set of part IDs
 // onVehicleChange — direct make/model filter (inventory): passes {make, model}
-export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, t, initialMake="", initialModel=""}) {
+export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onAddPart, t, initialMake="", initialModel=""}) {
   const [selMake,  setSelMake]  = useState(initialMake);
   const [selModel, setSelModel] = useState(initialModel);
   const [active,   setActive]   = useState(false);
@@ -1530,7 +1530,13 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
             )}
             <div style={{fontSize:12,color:"var(--blue)",fontWeight:600,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span>🔍 {codeLabel ? `${codeLabel} · ` : ""}{selMake} {selModel}{variantLabel ? ` ${variantLabel}` : ""}</span>
-              <button className="btn btn-ghost btn-xs" style={{color:"var(--text3)"}} onClick={clear}>✕ Show all parts</button>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                {onAddPart&&<button className="btn btn-primary btn-xs" onClick={()=>{
+                  const ids=vehicles.filter(v=>v.make===selMake&&(!selModel||v.code===selModel||v.model===selModel)).map(v=>v.id);
+                  onAddPart(ids);
+                }}>+ Add Part</button>}
+                <button className="btn btn-ghost btn-xs" style={{color:"var(--text3)"}} onClick={clear}>✕ Show all parts</button>
+              </div>
             </div>
           </div>
         );

@@ -103,6 +103,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [tab,setTab] = useState(initTab);
   // Data
   const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
+  const [pendingVehicleIds,setPendingVehicleIds]=useState(null); // vehicle IDs to auto-link on next new-part save
   const [newPartInitialF,setNewPartInitialF]=useState(null); // prefill values for next new part form
   const [parts,setParts]=useState([]);
   const [orders,setOrders]=useState([]);
@@ -1017,7 +1018,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         if(!newPart?.id){showToast("Failed to create part — check SKU/name","err");return;}
         await logInv(newPart,0,d2.stock,"New Part","Added");
         const copyFromId=pendingFitsCopy;
+        const vehIds=pendingVehicleIds;
         setPendingFitsCopy(null);
+        setPendingVehicleIds(null);
         setNewPartInitialF(null);
         if(copyFromId){
           // Fetch fresh fitments from DB for the source part to avoid stale local state
@@ -1028,14 +1031,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           await refreshTables("part_fitments");
           if(freshFits.length>0) showToast(`✅ Copied ${freshFits.length} vehicle fit${freshFits.length!==1?"s":""}`);
         }
-        setParts(prev=>[...prev,newPart]);
-        closeM("editPart");
-        // Navigate to inventory, filter to new SKU, then re-open for photo + fitment editing
-        setTab("inventory");
-        setSearchPart(newPart.sku||d2.sku||"");
-        setSearchDebounced(newPart.sku||d2.sku||"");
-        showToast(`✅ ${d2.sku} added — add photos & vehicle fits`);
-        setTimeout(()=>openM("editPart",{...newPart,_tab:"photo"}),300);
+        if(vehIds&&vehIds.length>0){
+          for(const vid of vehIds)
+            await api.upsert("part_fitments",{part_id:newPart.id,vehicle_id:vid,notes:""});
+          await refreshTables("part_fitments");
+          setParts(prev=>[...prev,newPart]);
+          // Add new part to active vehicle filter so it appears immediately in shop
+          setVehicleFilterIds(prev=>{ const s=new Set(prev||[]); s.add(String(newPart.id)); return s; });
+          closeM("editPart");
+          showToast(`✅ ${d2.sku} added`);
+          // Stay on shop — do not navigate away
+        } else {
+          setParts(prev=>[...prev,newPart]);
+          closeM("editPart");
+          // Navigate to inventory, filter to new SKU, then re-open for photo + fitment editing
+          setTab("inventory");
+          setSearchPart(newPart.sku||d2.sku||"");
+          setSearchDebounced(newPart.sku||d2.sku||"");
+          showToast(`✅ ${d2.sku} added — add photos & vehicle fits`);
+          setTimeout(()=>openM("editPart",{...newPart,_tab:"photo"}),300);
+        }
       } finally {
         setBusyMsg(null);
       }
@@ -4189,6 +4204,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               initialMake={shopVehicleFilter.make}
               initialModel={shopVehicleFilter.model}
               onFilter={(ids)=>{setVehicleFilterIds(ids);setShopPage(0);}}
+              onAddPart={(role==="admin"||role==="manager"||role==="demo")?((vehIds)=>{
+                setNewPartInitialF({price:0,cost_price:0});
+                setPendingVehicleIds(vehIds);
+                openM("editPart",null);
+              }):undefined}
               t={t}/>
 
             {searchDebounced&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>

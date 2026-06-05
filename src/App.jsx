@@ -177,6 +177,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [invReport,setInvReport]=useState(null); // null | "quantum" | "hiace" | "others"
   const [activePicker,setActivePicker]=useState(null); // {userId, date} — inline expiry date picker in Users table
   const [shopPage,setShopPage]=useState(0); // shop page
+  const [shopSort,setShopSort]=useState("default"); // "default"|"sku"
   const PAGE_SIZE=20;
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
@@ -4164,6 +4165,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                   <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");}} style={{color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear</button>
                 )}
                 <button className="btn btn-ghost btn-sm" onClick={loadAll} title="Refresh stock & prices" style={{flexShrink:0}}>↻</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setShopSort(s=>s==="sku"?"default":"sku");setShopPage(0);}} style={{flexShrink:0,borderColor:shopSort==="sku"?"var(--accent)":"var(--border)",color:shopSort==="sku"?"var(--accent)":undefined}} title="Sort by SKU">
+                  {shopSort==="sku"?"SKU ↑":"Sort: SKU"}
+                </button>
                 {isDemo
                   ? <span style={{marginLeft:"auto",flexShrink:0,fontSize:12,color:"var(--text3)",padding:"6px 12px",border:"1px solid var(--border)",borderRadius:8}}>🔒 Demo — orders disabled</span>
                   : <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}}
@@ -4193,7 +4197,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14}}>
               {(()=>{
                 const gridAds=ads.filter(a=>a.active&&(a.page==="shop"||a.page==="all")&&a.position==="grid");
-                const visibleParts=fp.filter(p=>!vehicleFilterIds||vehicleFilterIds.has(String(p.id))).slice(shopPage*PAGE_SIZE,(shopPage+1)*PAGE_SIZE);
+                const shopFpFiltered=fp.filter(p=>!vehicleFilterIds||vehicleFilterIds.has(String(p.id)));
+                const shopFpSorted=shopSort==="sku"?[...shopFpFiltered].sort((a,b)=>(a.sku||"").localeCompare(b.sku||"")):shopFpFiltered;
+                const visibleParts=shopFpSorted.slice(shopPage*PAGE_SIZE,(shopPage+1)*PAGE_SIZE);
                 const items=[];
                 visibleParts.forEach((p,i)=>{
                   items.push({type:"part",data:p});

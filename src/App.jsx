@@ -174,6 +174,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [filterHiace,setFilterHiace]=useState(false);
   const [branchMatchedOnly,setBranchMatchedOnly]=useState("matched"); // "matched"|"own"|"all"
   const [invPage,setInvPage]=useState(0);   // inventory page
+  const [invSort,setInvSort]=useState("default"); // "default"|"sku"
   const [invReport,setInvReport]=useState(null); // null | "quantum" | "hiace" | "others"
   const [activePicker,setActivePicker]=useState(null); // {userId, date} — inline expiry date picker in Users table
   const [shopPage,setShopPage]=useState(0); // shop page
@@ -2555,6 +2556,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     ].map(v=>(v||"").toLowerCase()).join(" ");
     return words.every(w=>fields.includes(w));
   });
+  const invSortedFp=invSort==="sku"?[...fp].sort((a,b)=>(a.sku||"").localeCompare(b.sku||"")):fp;
   const fo=orders.filter(o=>{
     if(branchId&&o.branch_id!==branchId)return false;
     if(filterOS==="__all__") return true;
@@ -3619,6 +3621,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               <button className="btn btn-sm" onClick={()=>setFilterHiace(v=>!v)} style={{whiteSpace:"nowrap",background:filterHiace?"rgba(59,130,246,.18)":"var(--surface2)",color:filterHiace?"var(--blue)":"var(--text2)",border:filterHiace?"1.5px solid var(--blue)":"1px solid var(--border)",fontWeight:filterHiace?700:400}}>🚐 Hiace{filterHiace?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterInStock(v=>!v)} style={{whiteSpace:"nowrap",background:filterInStock?"rgba(52,211,153,.18)":"var(--surface2)",color:filterInStock?"var(--green)":"var(--text2)",border:filterInStock?"1.5px solid var(--green)":"1px solid var(--border)",fontWeight:filterInStock?700:400}}>✅ In Stock{filterInStock?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterNoPhoto(v=>!v)} style={{whiteSpace:"nowrap",background:filterNoPhoto?"rgba(248,113,113,.18)":"var(--surface2)",color:filterNoPhoto?"var(--red)":"var(--text2)",border:filterNoPhoto?"1.5px solid var(--red)":"1px solid var(--border)",fontWeight:filterNoPhoto?700:400}}>📷 No Photo{filterNoPhoto?" ✓":""}</button>
+              <button className="btn btn-sm" onClick={()=>{setInvSort(s=>s==="sku"?"default":"sku");setInvPage(0);}} style={{whiteSpace:"nowrap",background:invSort==="sku"?"rgba(249,115,22,.12)":"var(--surface2)",color:invSort==="sku"?"var(--accent)":"var(--text2)",border:invSort==="sku"?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:invSort==="sku"?700:400}}>SKU {invSort==="sku"?"↑":""}</button>
               <select className="inp" value={filterSupplier} onChange={e=>setFilterSupplier(e.target.value)}
                 style={{minWidth:130,maxWidth:200,borderColor:filterSupplier!=="__all__"?"var(--purple)":undefined,color:filterSupplier!=="__all__"?"var(--purple)":undefined}}>
                 <option value="__all__">🏭 All Suppliers</option>
@@ -3652,7 +3655,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             </div>}
             {/* ── MOBILE INVENTORY CARDS ── */}
             <div className="mob-cards">
-              {fp.slice(invPage*PAGE_SIZE,(invPage+1)*PAGE_SIZE).map(p=>{
+              {invSortedFp.slice(invPage*PAGE_SIZE,(invPage+1)*PAGE_SIZE).map(p=>{
                 const img=toImgUrl(p.image_url);
                 const ps=getPartSupps(p.id);
                 return (
@@ -3761,7 +3764,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                     {(role==="admin"||role==="branch_admin")&&<th style={{position:"sticky",right:0,background:"var(--surface2)",zIndex:2,boxShadow:"-2px 0 8px rgba(0,0,0,.3)"}}>{t.actions||"Actions"}</th>}
                   </tr></thead>
                   <tbody>
-                    {fp.slice(invPage*PAGE_SIZE,(invPage+1)*PAGE_SIZE).map(p=>{
+                    {invSortedFp.slice(invPage*PAGE_SIZE,(invPage+1)*PAGE_SIZE).map(p=>{
                       const img=toImgUrl(p.image_url);
                       const ps=getPartSupps(p.id);
                       return (

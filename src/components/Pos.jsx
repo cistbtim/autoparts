@@ -611,6 +611,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const [done, setDone] = useState(null);
   const [lightbox, setLightbox] = useState(null); // {photos:[{url,name}], index}
   const [page, setPage] = useState(0);
+  const [posSort, setPosSort] = useState("default"); // "default"|"sku"
   const [mobView, setMobView] = useState("catalog"); // "catalog" | "cart"
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 700);
   useEffect(() => {
@@ -689,9 +690,10 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   }, [parts, searchIndex, vehicleFilterIds, filterCat, lq, search]);
 
   const PAGE_SIZE = 15;
-  const totalPages = Math.ceil(filteredParts.length / PAGE_SIZE);
+  const sortedParts = posSort === "sku" ? [...filteredParts].sort((a, b) => (a.sku || "").localeCompare(b.sku || "")) : filteredParts;
+  const totalPages = Math.ceil(sortedParts.length / PAGE_SIZE);
   const safePage = Math.min(page, Math.max(0, totalPages - 1));
-  const pageParts = filteredParts.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+  const pageParts = sortedParts.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   // Debounced setter — input box updates immediately, filter waits 200ms
   const setSearch2 = (v) => {
@@ -1256,6 +1258,10 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             <button onClick={handleRefresh} disabled={refreshing} title="Refresh parts"
               style={{ flexShrink: 0, background: "var(--surface)", border: "2px solid var(--border)", borderRadius: 8, padding: "0 12px", cursor: refreshing ? "default" : "pointer", fontSize: 15, opacity: refreshing ? .5 : 1, transition: "opacity .2s" }}>
               {refreshing ? "⏳" : "🔄"}
+            </button>
+            <button onClick={() => { setPosSort(s => s === "sku" ? "default" : "sku"); setPage(0); }} title="Sort by SKU"
+              style={{ flexShrink: 0, background: posSort === "sku" ? "rgba(249,115,22,.12)" : "var(--surface)", border: `2px solid ${posSort === "sku" ? "var(--accent)" : "var(--border)"}`, borderRadius: 8, padding: "0 12px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: posSort === "sku" ? "var(--accent)" : "var(--text2)", height: 38, whiteSpace: "nowrap" }}>
+              SKU {posSort === "sku" ? "↑" : ""}
             </button>
             <button onClick={toggleSelectMode} title={selectMode ? "Exit select mode" : "Select parts to enquire"}
               style={{ flexShrink: 0, background: selectMode ? "var(--blue)" : "var(--surface)", border: `2px solid ${selectMode ? "var(--blue)" : "var(--border)"}`, borderRadius: 8, padding: "0 14px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: selectMode ? "#fff" : "var(--text2)", whiteSpace: "nowrap", height: 38 }}>

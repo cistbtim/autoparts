@@ -1261,7 +1261,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             </button>
             <button onClick={() => { setPosSort(s => s === "sku" ? "default" : "sku"); setPage(0); }} title="Sort by SKU"
               style={{ flexShrink: 0, background: posSort === "sku" ? "rgba(249,115,22,.12)" : "var(--surface)", border: `2px solid ${posSort === "sku" ? "var(--accent)" : "var(--border)"}`, borderRadius: 8, padding: "0 12px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: posSort === "sku" ? "var(--accent)" : "var(--text2)", height: 38, whiteSpace: "nowrap" }}>
-              SKU {posSort === "sku" ? "↑" : ""}
+              Sort by SKU{posSort === "sku" ? " ↑" : ""}
             </button>
             <button onClick={toggleSelectMode} title={selectMode ? "Exit select mode" : "Select parts to enquire"}
               style={{ flexShrink: 0, background: selectMode ? "var(--blue)" : "var(--surface)", border: `2px solid ${selectMode ? "var(--blue)" : "var(--border)"}`, borderRadius: 8, padding: "0 14px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: selectMode ? "#fff" : "var(--text2)", whiteSpace: "nowrap", height: 38 }}>

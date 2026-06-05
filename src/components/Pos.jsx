@@ -611,7 +611,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const [done, setDone] = useState(null);
   const [lightbox, setLightbox] = useState(null); // {photos:[{url,name}], index}
   const [page, setPage] = useState(0);
-  const [posSort, setPosSort] = useState("default"); // "default"|"sku"
+  const [posSort, setPosSort] = useState("sku"); // "default"|"sku"
   const [mobView, setMobView] = useState("catalog"); // "catalog" | "cart"
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 700);
   useEffect(() => {

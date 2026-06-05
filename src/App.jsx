@@ -174,11 +174,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [filterHiace,setFilterHiace]=useState(false);
   const [branchMatchedOnly,setBranchMatchedOnly]=useState("matched"); // "matched"|"own"|"all"
   const [invPage,setInvPage]=useState(0);   // inventory page
-  const [invSort,setInvSort]=useState("default"); // "default"|"sku"
+  const [invSort,setInvSort]=useState("sku"); // "default"|"sku"
   const [invReport,setInvReport]=useState(null); // null | "quantum" | "hiace" | "others"
   const [activePicker,setActivePicker]=useState(null); // {userId, date} — inline expiry date picker in Users table
   const [shopPage,setShopPage]=useState(0); // shop page
-  const [shopSort,setShopSort]=useState("default"); // "default"|"sku"
+  const [shopSort,setShopSort]=useState("sku"); // "default"|"sku"
   const PAGE_SIZE=20;
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);

@@ -1565,7 +1565,29 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
     return `${v.model} ${v.variant||""} ${v.code||""} ${v.engine||""} ${v.year_from||""} ${v.year_to||""}`.toLowerCase().includes(s);
   }).sort((a,b)=>(a.code||"￿").localeCompare(b.code||"￿")||(a.model||"").localeCompare(b.model||""));
 
-  const newVehicleDefaults = { make: selMake||"GWM", model:"", code:"", year_from:"", year_to:"", engine:"", variant:"" };
+  const nextCodeFromList = (vList, make) => {
+    const m = make || vList[0]?.make || '';
+    if (!m) return '';
+    const prefix = m.replace(/\s+/g,'').slice(0,2).toUpperCase();
+    const codes = vList
+      .map(v=>(v.code||'').toUpperCase())
+      .filter(c=>c.startsWith(prefix))
+      .sort();
+    if (!codes.length) return prefix + '01A';
+    const last = codes[codes.length-1];
+    const lastChar = last.slice(-1);
+    if (lastChar >= 'A' && lastChar < 'Z') return last.slice(0,-1) + String.fromCharCode(lastChar.charCodeAt(0)+1);
+    const num = parseInt(last.slice(2,-1),10)||1;
+    return prefix + String(num+1).padStart(2,'0') + 'A';
+  };
+  // When search is active, base the new code on the visible filtered group (e.g. searching "x1" → BM01G → BM01H).
+  // When no search, fall back to all vehicles for the make.
+  const nextCodeForMake = (make) => nextCodeFromList(
+    search.trim() && filtered.length ? filtered : inMake.length ? inMake : vehicles.filter(v=>v.make===make),
+    make
+  );
+
+  const newVehicleDefaults = { make: selMake||"GWM", model:"", code: nextCodeForMake(selMake||"GWM"), year_from:"", year_to:"", engine:"", variant:"" };
 
   const openVehicleLightbox = (v, startKey) => {
     const entries = [
@@ -1693,12 +1715,20 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
         </div>
       </>)}
 
+      {selMake&&(
+        <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
+          <button className="btn btn-primary" onClick={()=>setEditV(newVehicleDefaults)}>
+            + {t.addVehicle||"Add Vehicle"}
+          </button>
+        </div>
+      )}
+
     </div>
 
     {editV&&(
       <ErrorBoundary name="VehicleModal">
         <VehicleModal vehicle={editV} onSave={async(data)=>{ await onSave(data); setEditV(null); }}
-          onClose={()=>setEditV(null)} t={t}/>
+          onClose={()=>setEditV(null)} t={t} nextCodeForMake={nextCodeForMake}/>
       </ErrorBoundary>
     )}
   </>
@@ -1706,7 +1736,8 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
 }
 
 // ── Vehicle Add/Edit Modal ──
-function VehicleModal({vehicle, onSave, onClose, t}) {
+function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
+  const isNew = !vehicle.id;
   const [f, setF] = useState({
     id:          vehicle.id||null,
     make:        vehicle.make||"GWM",
@@ -1720,7 +1751,14 @@ function VehicleModal({vehicle, onSave, onClose, t}) {
     photo_rear:  vehicle.photo_rear||"",
     photo_side:  vehicle.photo_side||"",
   });
-  const s = (k,v) => setF(p=>({...p,[k]:v}));
+  const codeUserEdited = useRef(false);
+  const s = (k,v) => {
+    if (k==="code") codeUserEdited.current = true;
+    if (k==="make" && isNew && !codeUserEdited.current && nextCodeForMake)
+      setF(p=>({...p, make:v, code: nextCodeForMake(v)}));
+    else
+      setF(p=>({...p,[k]:v}));
+  };
   const [err, setErr] = useState({});
 
   const validate = () => {

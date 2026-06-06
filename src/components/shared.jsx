@@ -306,11 +306,15 @@ export function AdBanner({ads=[], page="shop", userCtx=null}) {
       {ad.image_url
         ? <img src={ad.image_url} alt={ad.title||"Ad"}
             style={{width:"100%",maxHeight:120,objectFit:"contain",display:"block",background:"var(--surface2)"}}
-            onError={e=>e.target.style.display="none"}/>
+            onError={e=>{e.target.style.display="none";const p=e.target.parentElement;if(p){p.style.minHeight="56px";const fb=p.querySelector('.ad-fb');if(fb)fb.style.display="flex";}}}/>
         : <div style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",
             fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
             {ad.title}
           </div>}
+      {ad.image_url&&<div className="ad-fb" style={{display:"none",minHeight:56,alignItems:"center",justifyContent:"center",
+          fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
+        {ad.title}
+      </div>}
       {ad.title&&ad.image_url&&(
         <div style={{position:"absolute",bottom:0,left:0,right:0,
           background:"linear-gradient(transparent,rgba(0,0,0,.65))",

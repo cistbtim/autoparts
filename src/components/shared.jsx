@@ -317,13 +317,13 @@ export function AdBanner({ads=[], page="shop", userCtx=null}) {
     <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
     <div style={{position:"relative",borderRadius:10,overflow:"hidden",
       cursor:ad.link_url?"pointer":"default",border:"1px solid var(--border)",background:"var(--surface2)",
-      width:"100%",maxWidth:680,flexShrink:0}}
+      width:"100%",maxWidth:680,flexShrink:0,height:140}}
       onClick={()=>{ if(!didSwipe.current) openLink(ad.link_url); }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}>
       {ad.image_url
         ? <img src={ad.image_url} alt={ad.title||"Ad"}
-            style={{display:"block",width:"auto",height:"auto",maxWidth:"100%",maxHeight:200,margin:"0 auto"}}
+            style={{display:"block",width:"100%",height:"100%",objectFit:"contain"}}
             onError={e=>{e.target.style.display="none";const p=e.target.parentElement;if(p){p.style.minHeight="56px";const fb=p.querySelector('.ad-fb');if(fb)fb.style.display="flex";}}}/>
         : <div style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",
             fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>

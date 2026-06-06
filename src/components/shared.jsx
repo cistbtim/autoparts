@@ -1,4 +1,4 @@
-import { useState, useEffect, Component } from "react";
+import { useState, useEffect, useRef, Component } from "react";
 import { toLogoUrl, extractDriveId, detectGeoLocation, fetchWeather, classifyWeather } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { api } from "../lib/api.js";
@@ -256,6 +256,9 @@ const getEnvCtx = () => {
 export function AdBanner({ads=[], page="shop", userCtx=null}) {
   const [idx, setIdx] = useState(0);
   const [envCtx, setEnvCtx] = useState(null);
+  const [timerKey, setTimerKey] = useState(0);
+  const touchX = useRef(null);
+  const didSwipe = useRef(false);
 
   // Fetch geo+weather once; drives weather-targeted ad prioritisation
   useEffect(()=>{ getEnvCtx().then(setEnvCtx); }, []);
@@ -275,7 +278,20 @@ export function AdBanner({ads=[], page="shop", userCtx=null}) {
     if(active.length<=1) return;
     const t=setInterval(()=>setIdx(i=>(i+1)%active.length), 6000);
     return ()=>clearInterval(t);
-  },[active.length]);
+  },[active.length, timerKey]);
+
+  const goTo=(i)=>{ setIdx(i); setTimerKey(k=>k+1); };
+  const handleTouchStart=(e)=>{ touchX.current=e.touches[0].clientX; didSwipe.current=false; };
+  const handleTouchEnd=(e)=>{
+    if(touchX.current===null||active.length<=1) return;
+    const dx=touchX.current-e.changedTouches[0].clientX;
+    if(Math.abs(dx)>40){
+      didSwipe.current=true;
+      goTo(dx>0 ? (idx+1)%active.length : (idx-1+active.length)%active.length);
+    }
+    touchX.current=null;
+  };
+
   if(!active.length) return null;
   const ad = active[idx % active.length];
   const openLink=async(url)=>{
@@ -302,7 +318,9 @@ export function AdBanner({ads=[], page="shop", userCtx=null}) {
     <div style={{position:"relative",borderRadius:10,overflow:"hidden",
       cursor:ad.link_url?"pointer":"default",border:"1px solid var(--border)",background:"var(--surface2)",
       width:"100%",maxWidth:680,flexShrink:0}}
-      onClick={()=>openLink(ad.link_url)}>
+      onClick={()=>{ if(!didSwipe.current) openLink(ad.link_url); }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}>
       {ad.image_url
         ? <img src={ad.image_url} alt={ad.title||"Ad"}
             style={{width:"100%",height:140,objectFit:"cover",display:"block"}}
@@ -329,7 +347,7 @@ export function AdBanner({ads=[], page="shop", userCtx=null}) {
         <div style={{position:"absolute",bottom:6,left:"50%",transform:"translateX(-50%)",
           display:"flex",gap:4}}>
           {active.map((_,i)=>(
-            <div key={i} onClick={e=>{e.stopPropagation();setIdx(i);}}
+            <div key={i} onClick={e=>{e.stopPropagation();goTo(i);}}
               style={{width:6,height:6,borderRadius:"50%",cursor:"pointer",
                 background:i===idx?"#fff":"rgba(255,255,255,.45)"}}/>
           ))}

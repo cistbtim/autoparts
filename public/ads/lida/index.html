@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LIDA Products — Automotive & Home Care</title>
-  <meta name="description" content="Premium LIDA automotive and home care spray products. Wholesale to dealers and retailers.">
+  <title>LIDA Products — Automotive, Home Care & Spray Paint</title>
+  <meta name="description" content="Premium LIDA automotive, home care and aerosol spray paint products. Wholesale to dealers and retailers.">
   <style>
     *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 
@@ -67,7 +67,7 @@
       letter-spacing:-.5px;margin-bottom:14px;
     }
     .hero h1 em{color:#fca5a5;font-style:normal}
-    .hero p{color:#cbd5e1;font-size:15px;max-width:480px;margin:0 auto 32px;line-height:1.7}
+    .hero p{color:#cbd5e1;font-size:15px;max-width:520px;margin:0 auto 32px;line-height:1.7}
     .hero-pills{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
     .hero-pill{
       background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
@@ -134,7 +134,7 @@
     /* Product grid */
     .product-grid{
       display:grid;
-      grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+      grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
       gap:14px;
     }
 
@@ -166,13 +166,22 @@
       transition:transform .25s;
     }
     .card:hover .card-img img{transform:scale(1.06)}
-    /* Placeholder for products without photos */
     .card-img-placeholder{
       width:100%;height:100%;
       display:flex;align-items:center;justify-content:center;
       font-size:42px;
     }
-    /* Category colour stripe at top of image */
+    /* Colour swatch for paint products */
+    .card-swatch{
+      width:100%;height:100%;
+    }
+    /* Label badge on swatch */
+    .swatch-badge{
+      position:absolute;bottom:6px;right:7px;
+      background:rgba(0,0,0,.45);backdrop-filter:blur(4px);
+      color:#fff;font-size:9px;font-weight:700;
+      padding:2px 6px;border-radius:4px;letter-spacing:.04em;
+    }
     .card-stripe{
       position:absolute;top:0;left:0;right:0;
       height:3px;
@@ -251,17 +260,19 @@
 <section class="hero">
   <div class="hero-eyebrow">Wholesale Catalogue</div>
   <h1>Premium <em>Car Care</em><br>Products</h1>
-  <p>Professional-grade automotive and home care sprays. Trusted by workshops, dealers and retailers.</p>
+  <p>Professional-grade automotive, home care and aerosol spray paint products. Trusted by workshops, dealers and retailers.</p>
   <div class="hero-pills">
     <span class="hero-pill">✔ Automotive Cleaners</span>
     <span class="hero-pill">✔ Air Fresheners</span>
     <span class="hero-pill">✔ Sealants &amp; Repair</span>
     <span class="hero-pill">✔ Home Care</span>
+    <span class="hero-pill">✔ Aerosol Spray Paint</span>
   </div>
   <div class="hero-stats">
-    <div class="hero-stat"><strong>50+</strong><span>Products</span></div>
-    <div class="hero-stat"><strong>7</strong><span>Categories</span></div>
+    <div class="hero-stat"><strong>110+</strong><span>Products</span></div>
+    <div class="hero-stat"><strong>8</strong><span>Categories</span></div>
     <div class="hero-stat"><strong>Bulk</strong><span>Wholesale</span></div>
+    <div class="hero-stat"><strong>500°C</strong><span>Heat Resist</span></div>
   </div>
 </section>
 
@@ -280,6 +291,7 @@
       <button class="f-btn" onclick="setFilter(this,'fresh')">🌸 Air Fresheners</button>
       <button class="f-btn" onclick="setFilter(this,'seal')">🔩 Sealants &amp; Repair</button>
       <button class="f-btn" onclick="setFilter(this,'home')">🏠 Home Care</button>
+      <button class="f-btn" onclick="setFilter(this,'paint')">🎨 Spray Paint</button>
     </div>
   </div>
 </div>
@@ -315,18 +327,22 @@
 
 <script>
 const CATS = {
-  auto:  {label:'Auto Cleaners',       color:'#dc2626', bg:'#fef2f2'},
-  tyre:  {label:'Tyre Care',           color:'#334155', bg:'#f1f5f9'},
-  dash:  {label:'Dashboard & Polish',  color:'#7c3aed', bg:'#faf5ff'},
-  lube:  {label:'Lubricants & Sprays', color:'#ea580c', bg:'#fff7ed'},
-  fresh: {label:'Air Fresheners',      color:'#16a34a', bg:'#f0fdf4'},
-  seal:  {label:'Sealants & Repair',   color:'#2563eb', bg:'#eff6ff'},
-  home:  {label:'Home Care',           color:'#0d9488', bg:'#f0fdfa'},
+  auto:      {label:'Auto Cleaners',                   color:'#dc2626', bg:'#fef2f2'},
+  tyre:      {label:'Tyre Care',                       color:'#334155', bg:'#f1f5f9'},
+  dash:      {label:'Dashboard & Polish',              color:'#7c3aed', bg:'#faf5ff'},
+  lube:      {label:'Lubricants & Sprays',             color:'#ea580c', bg:'#fff7ed'},
+  fresh:     {label:'Air Fresheners',                  color:'#16a34a', bg:'#f0fdf4'},
+  seal:      {label:'Sealants & Repair',               color:'#2563eb', bg:'#eff6ff'},
+  home:      {label:'Home Care',                       color:'#0d9488', bg:'#f0fdfa'},
+  'paint-std':{label:'Aerosol Spray Paint — Standard Colors (66001)', color:'#475569', bg:'#f8fafc'},
+  'paint-met':{label:'Aerosol Spray Paint — Metallic (66050)',        color:'#d97706', bg:'#fffbeb'},
+  'paint-plt':{label:'Aerosol Spray Paint — Plating Effect (66060)',  color:'#a16207', bg:'#fef9c3'},
+  'paint-ht': {label:'Aerosol Spray Paint — High Temp 500°C (66070)', color:'#dc2626', bg:'#fef2f2'},
+  'paint-flu':{label:'Aerosol Spray Paint — Fluorescent (66080)',     color:'#7c3aed', bg:'#faf5ff'},
 };
 
-// img: filename in imgs/ folder, or null for fallback emoji
 const PRODUCTS = [
-  // AUTO CLEANERS
+  // ── AUTO CLEANERS ────────────────────────────────────────────────
   {ref:'66101',   name:'DE-RUST LUBRICANT',          size:'450ml', qty:'24', cat:'auto',  img:'66101.jpg',   icon:'🔧'},
   {ref:'66301',   name:'CARBURETOR & CHOKE CLEANER', size:'450ml', qty:'24', cat:'auto',  img:'66301.jpg',   icon:'🔬'},
   {ref:'66501',   name:'AIR CONDITIONER CLEANER',    size:'450ml', qty:'24', cat:'auto',  img:'66501.jpg',   icon:'❄️'},
@@ -338,35 +354,34 @@ const PRODUCTS = [
   {ref:'69501',   name:'STARTING FLUID',             size:'450ml', qty:'48', cat:'auto',  img:null,          icon:'🔋'},
   {ref:'69801',   name:'COPPER GASKET SEALANT',      size:'450ml', qty:'24', cat:'auto',  img:null,          icon:'🔩'},
   {ref:'69901',   name:'WHEEL HUB CLEANER',          size:'450ml', qty:'48', cat:'auto',  img:'69901.jpg',   icon:'⭕'},
-  // TYRE CARE
+  // ── TYRE CARE ────────────────────────────────────────────────────
   {ref:'66901',   name:'TIRE FOAM CLEANER',          size:'650ml', qty:'24', cat:'tyre',  img:'66901.jpg',   icon:'🔄'},
   {ref:'67001',   name:'TYRE SEALER & INFLATOR',     size:'650ml', qty:'24', cat:'tyre',  img:'67001.jpg',   icon:'🚗'},
-  // DASHBOARD & POLISH
+  // ── DASHBOARD & POLISH ───────────────────────────────────────────
   {ref:'66401-1', name:'DASHBOARD LEATHER POLISH — Lemon',      size:'450ml', qty:'24', cat:'dash', img:'66401-1.jpg', icon:'🍋'},
   {ref:'66401-2', name:'DASHBOARD LEATHER POLISH — Strawberry', size:'450ml', qty:'24', cat:'dash', img:'66401-2.jpg', icon:'🍓'},
   {ref:'66401-3', name:'DASHBOARD LEATHER POLISH — Cherry',     size:'450ml', qty:'24', cat:'dash', img:'66401-3.jpg', icon:'🍒'},
   {ref:'66401-4', name:'DASHBOARD LEATHER POLISH — New Car',    size:'450ml', qty:'24', cat:'dash', img:'66401-4.jpg', icon:'✨'},
-  // LUBRICANTS & SPRAYS
+  // ── LUBRICANTS & SPRAYS ──────────────────────────────────────────
   {ref:'67901',   name:'GREASE SPRAY',               size:'450ml', qty:'24', cat:'lube',  img:'67901.jpg',   icon:'💧'},
   {ref:'69001',   name:'RUBBER SILICONE SPRAY',      size:'450ml', qty:'24', cat:'lube',  img:'69001.jpg',   icon:'🛡️'},
   {ref:'69701',   name:'OIL TREATMENT',              size:'450ml', qty:'24', cat:'lube',  img:'69701.jpg',   icon:'🛢️'},
-  // AIR FRESHENERS — auto refills
-  {ref:'67101-1', name:'AUTO AIR FRESHENER REFILL — Lemon',     size:'300ml', qty:'48', cat:'fresh', img:'67101-1.jpg', icon:'🍋'},
-  {ref:'67101-2', name:'AUTO AIR FRESHENER REFILL — Jasmine',   size:'300ml', qty:'48', cat:'fresh', img:'67101-2.jpg', icon:'🌼'},
-  {ref:'67101-3', name:'AUTO AIR FRESHENER REFILL — Lavender',  size:'300ml', qty:'48', cat:'fresh', img:'67101-3.jpg', icon:'💜'},
-  {ref:'67101-4', name:'AUTO AIR FRESHENER REFILL — Rose',      size:'300ml', qty:'48', cat:'fresh', img:'67101-4.jpg', icon:'🌹'},
-  {ref:'67101-5', name:'AUTO AIR FRESHENER REFILL — Strawberry',size:'300ml', qty:'48', cat:'fresh', img:'67101-5.jpg', icon:'🍓'},
-  {ref:'67101-6', name:'AUTO AIR FRESHENER REFILL — Floral',    size:'300ml', qty:'48', cat:'fresh', img:'67101-6.jpg', icon:'🌸'},
-  // AIR FRESHENERS — spray cans
+  // ── AIR FRESHENERS ───────────────────────────────────────────────
+  {ref:'67101-1', name:'AUTO AIR FRESHENER REFILL — Lemon',      size:'300ml', qty:'48', cat:'fresh', img:'67101-1.jpg', icon:'🍋'},
+  {ref:'67101-2', name:'AUTO AIR FRESHENER REFILL — Jasmine',    size:'300ml', qty:'48', cat:'fresh', img:'67101-2.jpg', icon:'🌼'},
+  {ref:'67101-3', name:'AUTO AIR FRESHENER REFILL — Lavender',   size:'300ml', qty:'48', cat:'fresh', img:'67101-3.jpg', icon:'💜'},
+  {ref:'67101-4', name:'AUTO AIR FRESHENER REFILL — Rose',       size:'300ml', qty:'48', cat:'fresh', img:'67101-4.jpg', icon:'🌹'},
+  {ref:'67101-5', name:'AUTO AIR FRESHENER REFILL — Strawberry', size:'300ml', qty:'48', cat:'fresh', img:'67101-5.jpg', icon:'🍓'},
+  {ref:'67101-6', name:'AUTO AIR FRESHENER REFILL — Floral',     size:'300ml', qty:'48', cat:'fresh', img:'67101-6.jpg', icon:'🌸'},
   {ref:'67201-1', name:'AIR FRESHENER — Lemon',      size:'300ml', qty:'48', cat:'fresh', img:'67201-1.jpg', icon:'🍋'},
   {ref:'67201-2', name:'AIR FRESHENER — Jasmine',    size:'300ml', qty:'48', cat:'fresh', img:'67201-2.jpg', icon:'🌼'},
   {ref:'67201-3', name:'AIR FRESHENER — Lavender',   size:'300ml', qty:'48', cat:'fresh', img:'67201-3.jpg', icon:'💜'},
   {ref:'67201-4', name:'AIR FRESHENER — Rose',       size:'300ml', qty:'48', cat:'fresh', img:'67201-4.jpg', icon:'🌹'},
   {ref:'67201-5', name:'AIR FRESHENER — Strawberry', size:'300ml', qty:'48', cat:'fresh', img:'67201-5.jpg', icon:'🍓'},
   {ref:'67201-6', name:'AIR FRESHENER — Floral',     size:'300ml', qty:'48', cat:'fresh', img:'67201-6.jpg', icon:'🌸'},
-  {ref:'67401',   name:'AUTO PERFUME MACHINE — With Button',    qty:'50', cat:'fresh', img:'67401.jpg',   icon:'🎀'},
-  {ref:'67402',   name:'AUTO PERFUME MACHINE — No Button',      qty:'50', cat:'fresh', img:'67402.jpg',   icon:'🎀'},
-  // SEALANTS & REPAIR
+  {ref:'67401',   name:'AUTO PERFUME MACHINE — With Button', qty:'50', cat:'fresh', img:'67401.jpg', icon:'🎀'},
+  {ref:'67402',   name:'AUTO PERFUME MACHINE — No Button',   qty:'50', cat:'fresh', img:'67402.jpg', icon:'🎀'},
+  // ── SEALANTS & REPAIR ────────────────────────────────────────────
   {ref:'67301-1', name:'SILICONE SEALANT — Clear',   size:'450ml', qty:'24', cat:'seal',  img:'67301-1.jpg', icon:'🪟'},
   {ref:'67301-2', name:'SILICONE SEALANT — White',   size:'450ml', qty:'24', cat:'seal',  img:'67301-2.jpg', icon:'⬜'},
   {ref:'67301-3', name:'SILICONE SEALANT — Black',   size:'450ml', qty:'24', cat:'seal',  img:'67301-3.jpg', icon:'⬛'},
@@ -377,7 +392,7 @@ const PRODUCTS = [
   {ref:'68401-3', name:'LEAK REPAIR WATERPROOF — Grey', size:'450ml',qty:'24',cat:'seal', img:'68401-3.jpg', icon:'🩶'},
   {ref:'68501',   name:'PAINT REMOVER',              size:'450ml', qty:'24', cat:'seal',  img:null,          icon:'🎨'},
   {ref:'68801',   name:'STICKER REMOVER CLEANER',    size:'450ml', qty:'24', cat:'seal',  img:'68801.jpg',   icon:'📋'},
-  // HOME CARE
+  // ── HOME CARE ────────────────────────────────────────────────────
   {ref:'66201',   name:'MULTI PURPOSE FOAM CLEANER', size:'650ml', qty:'24', cat:'home',  img:'66201.jpg',   icon:'🧽'},
   {ref:'67501',   name:'KITCHEN CLEANER',            size:'450ml', qty:'24', cat:'home',  img:'67501.jpg',   icon:'🍳'},
   {ref:'67601',   name:'CARPET CLEANER',             size:'450ml', qty:'24', cat:'home',  img:null,          icon:'🧹'},
@@ -385,8 +400,82 @@ const PRODUCTS = [
   {ref:'67801',   name:'OVEN CLEANER',               size:'450ml', qty:'24', cat:'home',  img:'67801.jpg',   icon:'🔥'},
   {ref:'68101',   name:'FURNITURE POLISH',           size:'450ml', qty:'24', cat:'home',  img:'68101.jpg',   icon:'🪑'},
   {ref:'68201',   name:'BATHROOM CLEANER',           size:'450ml', qty:'24', cat:'home',  img:'68201.jpg',   icon:'🚿'},
+
+  // ── SPRAY PAINT — STANDARD COLORS (66001) ────────────────────────
+  {ref:'#004',  name:'MATT BLACK',              size:'450ml', qty:'24', cat:'paint-std', swatch:'#1c1c1c'},
+  {ref:'#039',  name:'BLACK',                   size:'450ml', qty:'24', cat:'paint-std', swatch:'#0a0a0a'},
+  {ref:'#096',  name:'MATT BLACK GREY',          size:'450ml', qty:'24', cat:'paint-std', swatch:'#3d3d3d'},
+  {ref:'#1007', name:'MATT WHITE',              size:'450ml', qty:'24', cat:'paint-std', swatch:'#e0e0e0'},
+  {ref:'#040',  name:'WHITE',                   size:'450ml', qty:'24', cat:'paint-std', swatch:'#f5f5f5'},
+  {ref:'#043',  name:'CREAM WHITE',             size:'450ml', qty:'24', cat:'paint-std', swatch:'#faf6ee'},
+  {ref:'#107',  name:'TOYOTA WHITE',            size:'450ml', qty:'24', cat:'paint-std', swatch:'#f0f0ec'},
+  {ref:'#190',  name:'LACQUER CLEAR',           size:'450ml', qty:'24', cat:'paint-std', swatch:'repeating-linear-gradient(45deg,#e5e7eb 0,#e5e7eb 2px,#f9fafb 2px,#f9fafb 8px)'},
+  {ref:'#191',  name:'MATT LACQUER',            size:'450ml', qty:'24', cat:'paint-std', swatch:'repeating-linear-gradient(45deg,#d1d5db 0,#d1d5db 2px,#f3f4f6 2px,#f3f4f6 8px)'},
+  {ref:'#005',  name:'RED',                     size:'450ml', qty:'24', cat:'paint-std', swatch:'#c62828'},
+  {ref:'#014',  name:'JIALING RED',             size:'450ml', qty:'24', cat:'paint-std', swatch:'#b71c1c'},
+  {ref:'#023',  name:'SCARLET RED',             size:'450ml', qty:'24', cat:'paint-std', swatch:'#e53935'},
+  {ref:'#030',  name:'PEACH RED',               size:'450ml', qty:'24', cat:'paint-std', swatch:'#e91e8c'},
+  {ref:'#313',  name:'LIGHT PINK',              size:'450ml', qty:'24', cat:'paint-std', swatch:'#f48fb1'},
+  {ref:'#672',  name:'ENGINEERING ORANGE RED',  size:'450ml', qty:'24', cat:'paint-std', swatch:'#e64a19'},
+  {ref:'#025',  name:'MEDIUM YELLOW',           size:'450ml', qty:'24', cat:'paint-std', swatch:'#fdd835'},
+  {ref:'#031',  name:'DEEP YELLOW',             size:'450ml', qty:'24', cat:'paint-std', swatch:'#f9a825'},
+  {ref:'#033',  name:'CREAM YELLOW',            size:'450ml', qty:'24', cat:'paint-std', swatch:'#fff8e1'},
+  {ref:'#041',  name:'CANARY YELLOW',           size:'450ml', qty:'24', cat:'paint-std', swatch:'#ffee58'},
+  {ref:'#068',  name:'ORANGE YELLOW',           size:'450ml', qty:'24', cat:'paint-std', swatch:'#fb8c00'},
+  {ref:'#315',  name:'CREAM YELLOW (CRAIN)',    size:'450ml', qty:'24', cat:'paint-std', swatch:'#fff8dc'},
+  {ref:'#671',  name:'ENG. ORANGE YELLOW',      size:'450ml', qty:'24', cat:'paint-std', swatch:'#e65100'},
+  {ref:'#015',  name:'SKY BLUE',                size:'450ml', qty:'24', cat:'paint-std', swatch:'#42a5f5'},
+  {ref:'#019',  name:'LIGHT BLUE',              size:'450ml', qty:'24', cat:'paint-std', swatch:'#90caf9'},
+  {ref:'#021',  name:'MEDIUM BLUE',             size:'450ml', qty:'24', cat:'paint-std', swatch:'#1976d2'},
+  {ref:'#028',  name:'DEEP BLUE',               size:'450ml', qty:'24', cat:'paint-std', swatch:'#0d47a1'},
+  {ref:'#133',  name:'DIAMOND BLUE',            size:'450ml', qty:'24', cat:'paint-std', swatch:'#1565c0'},
+  {ref:'#142',  name:'JIEFANG BLUE',            size:'450ml', qty:'24', cat:'paint-std', swatch:'#1a3a5c'},
+  {ref:'#083',  name:'VIOLET',                  size:'450ml', qty:'24', cat:'paint-std', swatch:'#6a1b9a'},
+  {ref:'#326',  name:'MEDIUM VIOLET',           size:'450ml', qty:'24', cat:'paint-std', swatch:'#9575cd'},
+  {ref:'#011',  name:'NAVAL GREY',              size:'450ml', qty:'24', cat:'paint-std', swatch:'#546e7a'},
+  {ref:'#022',  name:'MEDIUM GREY',             size:'450ml', qty:'24', cat:'paint-std', swatch:'#9e9e9e'},
+  {ref:'#036',  name:'SILVER',                  size:'450ml', qty:'24', cat:'paint-std', swatch:'#c0c0c0'},
+  {ref:'#125',  name:'SILVER GREY',             size:'450ml', qty:'24', cat:'paint-std', swatch:'#b0bec5'},
+  {ref:'#301',  name:'GREY',                    size:'450ml', qty:'24', cat:'paint-std', swatch:'#757575'},
+  {ref:'#029',  name:'MISSION BROWN',           size:'450ml', qty:'24', cat:'paint-std', swatch:'#6d4c41'},
+  {ref:'#138',  name:'ANTIRUST PRIMER',         size:'450ml', qty:'24', cat:'paint-std', swatch:'#8b4513'},
+  {ref:'#027',  name:'LEAF GREEN',              size:'450ml', qty:'24', cat:'paint-std', swatch:'#2e7d32'},
+  {ref:'#037',  name:'GRASS GREEN',             size:'450ml', qty:'24', cat:'paint-std', swatch:'#388e3c'},
+  {ref:'#061',  name:'BLACKISH GREEN',          size:'450ml', qty:'24', cat:'paint-std', swatch:'#1b5e20'},
+  {ref:'#101',  name:'JADE GREEN',              size:'450ml', qty:'24', cat:'paint-std', swatch:'#43a047'},
+
+  // ── SPRAY PAINT — METALLIC (66050) ───────────────────────────────
+  {ref:'#035',  name:'GOLD',             size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#b8860b,#ffd700,#daa520)'},
+  {ref:'#139',  name:'GREEN GOLD',       size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#8b7536,#b5a642,#9c8c30)'},
+  {ref:'#176',  name:'FLASH GOLD',       size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#daa520,#ffca28,#f0b429)'},
+  {ref:'#188',  name:'18K GOLD',         size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#b8860b,#d4af37,#c4972a)'},
+  {ref:'#100',  name:'TEJI SILVER',      size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#a8a8a8,#e8e8e8,#c0c0c0)'},
+  {ref:'#1580', name:'FLASH SILVER',     size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#c8c8c8,#f5f5f5,#d8d8d8)'},
+  {ref:'#341',  name:'FLASH LIGHT BLUE', size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#4fc3f7,#81d4fa,#64b5f6)'},
+  {ref:'#343',  name:'FLASH BLUE',       size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#1565c0,#1e88e5,#1976d2)'},
+  {ref:'#130',  name:'PEARL WHITE',      size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#ede7f6,#f8f0ff,#e8e0f4)'},
+  {ref:'#1139', name:'SILVER BLACK',     size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#1a1a2e,#424242,#2d2d2d)'},
+  {ref:'#132',  name:'BRONZE',           size:'450ml', qty:'24', cat:'paint-met', swatch:'linear-gradient(135deg,#8d5524,#cd7f32,#a0522d)'},
+
+  // ── SPRAY PAINT — PLATING (66060) ────────────────────────────────
+  {ref:'#318',  name:'PLATING CHROME',   size:'450ml', qty:'24', cat:'paint-plt', swatch:'linear-gradient(110deg,#6e6e6e 0%,#e0e0e0 30%,#fff 50%,#e0e0e0 70%,#6e6e6e 100%)'},
+  {ref:'#319',  name:'PLATING GOLD',     size:'450ml', qty:'24', cat:'paint-plt', swatch:'linear-gradient(110deg,#b8860b 0%,#ffd700 35%,#fff9c4 50%,#ffd700 65%,#b8860b 100%)'},
+
+  // ── SPRAY PAINT — HIGH TEMP 500°C (66070) ────────────────────────
+  {ref:'#1200', name:'HIGH TEMP BLACK — 500°C',  size:'450ml', qty:'24', cat:'paint-ht', swatch:'#111111'},
+  {ref:'#1300', name:'HIGH TEMP SILVER — 500°C', size:'450ml', qty:'24', cat:'paint-ht', swatch:'linear-gradient(135deg,#9e9e9e,#e0e0e0)'},
+  {ref:'#1700', name:'HIGH TEMP WHITE — 500°C',  size:'450ml', qty:'24', cat:'paint-ht', swatch:'#f5f5f5'},
+
+  // ── SPRAY PAINT — FLUORESCENT (66080) ────────────────────────────
+  {ref:'#1001', name:'FLUORESCENT RED',    size:'450ml', qty:'24', cat:'paint-flu', swatch:'#ff1744'},
+  {ref:'#1002', name:'FLUORESCENT PINK',   size:'450ml', qty:'24', cat:'paint-flu', swatch:'#ff4081'},
+  {ref:'#1003', name:'FLUORESCENT GREEN',  size:'450ml', qty:'24', cat:'paint-flu', swatch:'#76ff03'},
+  {ref:'#1004', name:'FLUORESCENT BLUE',   size:'450ml', qty:'24', cat:'paint-flu', swatch:'#00e5ff'},
+  {ref:'#1005', name:'FLUORESCENT YELLOW', size:'450ml', qty:'24', cat:'paint-flu', swatch:'#ffea00'},
+  {ref:'#1006', name:'FLUORESCENT ORANGE', size:'450ml', qty:'24', cat:'paint-flu', swatch:'#ff6d00'},
 ];
 
+const CAT_ORDER = ['auto','tyre','dash','lube','fresh','seal','home','paint-std','paint-met','paint-plt','paint-ht','paint-flu'];
 let activeCat = 'all';
 
 function setFilter(btn, cat) {
@@ -399,7 +488,10 @@ function setFilter(btn, cat) {
 function applyFilters() {
   const q = document.getElementById('searchInput').value.toLowerCase().trim();
   const filtered = PRODUCTS.filter(p => {
-    const catOk = activeCat === 'all' || p.cat === activeCat;
+    const isPaint = p.cat.startsWith('paint-');
+    const catOk = activeCat === 'all'
+      || p.cat === activeCat
+      || (activeCat === 'paint' && isPaint);
     const searchOk = !q || p.name.toLowerCase().includes(q) || p.ref.toLowerCase().includes(q);
     return catOk && searchOk;
   });
@@ -420,13 +512,12 @@ function render(list) {
   noResults.style.display = 'none';
   count.innerHTML = `Showing <span>${list.length}</span> product${list.length !== 1 ? 's' : ''}`;
 
-  const catOrder = Object.keys(CATS);
   const groups = {};
-  catOrder.forEach(c => { groups[c] = []; });
-  list.forEach(p => groups[p.cat].push(p));
+  CAT_ORDER.forEach(c => { groups[c] = []; });
+  list.forEach(p => { if (groups[p.cat]) groups[p.cat].push(p); });
 
   let html = '';
-  catOrder.forEach(cat => {
+  CAT_ORDER.forEach(cat => {
     const items = groups[cat];
     if (!items.length) return;
     const {label, color, bg} = CATS[cat];
@@ -440,9 +531,14 @@ function render(list) {
       <div class="product-grid">`;
 
     items.forEach(p => {
-      const imgHtml = p.img
-        ? `<img src="imgs/${p.img}" alt="${p.name}" loading="lazy">`
-        : `<div class="card-img-placeholder" style="background:${bg}">${p.icon}</div>`;
+      let imgHtml;
+      if (p.swatch) {
+        imgHtml = `<div class="card-swatch" style="background:${p.swatch}"></div>`;
+      } else if (p.img) {
+        imgHtml = `<img src="imgs/${p.img}" alt="${p.name}" loading="lazy">`;
+      } else {
+        imgHtml = `<div class="card-img-placeholder" style="background:${bg}">${p.icon}</div>`;
+      }
 
       html += `
         <div class="card">

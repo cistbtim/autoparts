@@ -1636,6 +1636,22 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
             </div>
           </div>
 
+          {/* Ad preview */}
+          {(adForm.title||adForm.image_url)&&(
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Preview</div>
+              <div style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface2)",width:"100%",height:220}}>
+                {adForm.image_url
+                  ? <img src={adForm.image_url} alt={adForm.title||"Ad"} style={{display:"block",width:"100%",height:"100%",objectFit:"contain"}}
+                      onError={e=>{e.target.style.display="none";}}/>
+                  : <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
+                      {adForm.title}
+                    </div>}
+                {adForm.cta_text&&<div style={{position:"absolute",bottom:10,right:12,background:"var(--accent)",color:"#fff",fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:6,pointerEvents:"none"}}>{adForm.cta_text}</div>}
+              </div>
+            </div>
+          )}
+
           {/* Existing ads list */}
           {ads.length===0
             ? <div style={{textAlign:"center",padding:40,color:"var(--text3)",fontSize:13}}>No ads yet — create your first ad above.</div>

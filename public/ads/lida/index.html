@@ -171,16 +171,22 @@
       display:flex;align-items:center;justify-content:center;
       font-size:42px;
     }
-    /* Colour swatch for paint products */
-    .card-swatch{
-      width:100%;height:100%;
+    /* Paint card: can on top, colour chip below */
+    .paint-card-img{
+      flex-direction:column;
+      align-items:stretch;
+      justify-content:flex-start;
+      background:#fff;
     }
-    /* Label badge on swatch */
-    .swatch-badge{
-      position:absolute;bottom:6px;right:7px;
-      background:rgba(0,0,0,.45);backdrop-filter:blur(4px);
-      color:#fff;font-size:9px;font-weight:700;
-      padding:2px 6px;border-radius:4px;letter-spacing:.04em;
+    .can-wrap{
+      flex:1;
+      display:flex;align-items:center;justify-content:center;
+      padding:10px;min-height:0;
+    }
+    .can-wrap svg{height:100%;max-height:110px;width:auto}
+    .swatch-strip{
+      height:36px;width:100%;flex-shrink:0;
+      border-top:1px solid rgba(0,0,0,.07);
     }
     .card-stripe{
       position:absolute;top:0;left:0;right:0;
@@ -478,6 +484,32 @@ const PRODUCTS = [
 const CAT_ORDER = ['auto','tyre','dash','lube','fresh','seal','home','paint-std','paint-met','paint-plt','paint-ht','paint-flu'];
 let activeCat = 'all';
 
+function getCanColor(swatch) {
+  if (!swatch) return '#888';
+  if (swatch.startsWith('#')) return swatch;
+  if (swatch.startsWith('repeating')) return '#d4d4d4'; // lacquer — frosted
+  const m = swatch.match(/#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}/g);
+  if (m && m.length) return m[Math.floor(m.length / 2)];
+  return '#888';
+}
+
+function makeCanSvg(fill) {
+  return `<svg viewBox="0 0 90 115" xmlns="http://www.w3.org/2000/svg">
+    <rect x="21" y="34" width="44" height="71" rx="8" fill="${fill}"/>
+    <rect x="29" y="21" width="28" height="15" rx="4" fill="${fill}"/>
+    <rect x="22" y="9" width="42" height="14" rx="6" fill="#1f2937"/>
+    <rect x="58" y="13" width="16" height="7" rx="3.5" fill="#374151"/>
+    <circle cx="78" cy="10" r="2.2" fill="${fill}" opacity=".8"/>
+    <circle cx="83" cy="15.5" r="1.6" fill="${fill}" opacity=".55"/>
+    <circle cx="80" cy="21" r="1.1" fill="${fill}" opacity=".35"/>
+    <rect x="25" y="38" width="7" height="42" rx="3.5" fill="rgba(255,255,255,.2)"/>
+    <rect x="24" y="50" width="38" height="40" rx="2" fill="rgba(0,0,0,.22)"/>
+    <text x="43" y="66" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="9.5" font-weight="900" fill="white" letter-spacing="1.8">LIDA</text>
+    <text x="43" y="77" text-anchor="middle" font-family="Arial,sans-serif" font-size="5.2" fill="rgba(255,255,255,.85)">AEROSOL SPRAY</text>
+    <text x="43" y="86" text-anchor="middle" font-family="Arial,sans-serif" font-size="4.8" fill="rgba(255,255,255,.65)">450ml</text>
+  </svg>`;
+}
+
 function setFilter(btn, cat) {
   activeCat = cat;
   document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
@@ -531,9 +563,11 @@ function render(list) {
       <div class="product-grid">`;
 
     items.forEach(p => {
-      let imgHtml;
+      let imgHtml, cardImgClass = 'card-img';
       if (p.swatch) {
-        imgHtml = `<div class="card-swatch" style="background:${p.swatch}"></div>`;
+        cardImgClass = 'card-img paint-card-img';
+        imgHtml = `<div class="can-wrap">${makeCanSvg(getCanColor(p.swatch))}</div>
+          <div class="swatch-strip" style="background:${p.swatch}"></div>`;
       } else if (p.img) {
         imgHtml = `<img src="imgs/${p.img}" alt="${p.name}" loading="lazy">`;
       } else {
@@ -542,7 +576,7 @@ function render(list) {
 
       html += `
         <div class="card">
-          <div class="card-img">
+          <div class="${cardImgClass}">
             <div class="card-stripe" style="background:${color}"></div>
             ${imgHtml}
           </div>

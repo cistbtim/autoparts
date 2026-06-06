@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LIDA Products — Automotive & Home Care</title>
+  <meta name="description" content="Premium LIDA automotive and home care spray products. Wholesale to dealers and retailers.">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+    :root{
+      --red:#c62828;
+      --dark:#111827;
+      --text:#1f2937;
+      --muted:#6b7280;
+      --border:#e5e7eb;
+      --bg:#f3f4f6;
+      --white:#fff;
+      --radius:14px;
+    }
+
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      -webkit-font-smoothing:antialiased;
+    }
+
+    /* ── HEADER ── */
+    header{
+      background:var(--dark);
+      position:sticky;top:0;z-index:200;
+      box-shadow:0 2px 16px rgba(0,0,0,.4);
+    }
+    .header-inner{
+      max-width:1280px;margin:0 auto;padding:0 24px;
+      height:62px;display:flex;align-items:center;justify-content:space-between;gap:16px;
+    }
+    .logo{display:flex;align-items:center;gap:12px;text-decoration:none}
+    .logo-mark{
+      background:var(--red);color:#fff;font-size:20px;font-weight:900;
+      letter-spacing:3px;padding:5px 14px;border-radius:8px;line-height:1;
+    }
+    .logo-sub{color:#9ca3af;font-size:12px;letter-spacing:.8px;text-transform:uppercase}
+    @media(max-width:480px){.logo-sub{display:none}}
+    .header-cta{
+      background:var(--red);color:#fff;font-size:13px;font-weight:700;
+      padding:9px 20px;border-radius:8px;text-decoration:none;white-space:nowrap;
+      transition:background .15s;letter-spacing:.3px;
+    }
+    .header-cta:hover{background:#b71c1c}
+
+    /* ── HERO ── */
+    .hero{
+      background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 45%,#450a0a 100%);
+      padding:56px 24px 48px;text-align:center;color:#fff;
+    }
+    .hero-eyebrow{
+      display:inline-block;
+      background:rgba(198,40,40,.25);border:1px solid rgba(239,83,80,.3);
+      color:#fca5a5;font-size:11px;font-weight:700;letter-spacing:2px;
+      text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:18px;
+    }
+    .hero h1{
+      font-size:clamp(26px,5vw,50px);font-weight:800;line-height:1.15;
+      letter-spacing:-.5px;margin-bottom:14px;
+    }
+    .hero h1 em{color:#fca5a5;font-style:normal}
+    .hero p{color:#cbd5e1;font-size:15px;max-width:480px;margin:0 auto 32px;line-height:1.7}
+    .hero-pills{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+    .hero-pill{
+      background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
+      color:#e2e8f0;font-size:12px;font-weight:600;padding:6px 16px;border-radius:100px;
+    }
+    .hero-stats{
+      display:flex;justify-content:center;margin-top:36px;
+      border-top:1px solid rgba(255,255,255,.08);padding-top:28px;flex-wrap:wrap;
+    }
+    .hero-stat{padding:0 28px;text-align:center;border-right:1px solid rgba(255,255,255,.1)}
+    .hero-stat:last-child{border-right:none}
+    .hero-stat strong{display:block;font-size:28px;font-weight:800;color:#fca5a5;line-height:1}
+    .hero-stat span{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:4px;display:block}
+
+    /* ── FILTER BAR ── */
+    .bar-wrap{
+      background:var(--white);border-bottom:1px solid var(--border);
+      position:sticky;top:62px;z-index:100;
+    }
+    .bar-inner{
+      max-width:1280px;margin:0 auto;padding:10px 24px;
+      display:flex;flex-direction:column;gap:8px;
+    }
+    .search-box{
+      display:flex;align-items:center;gap:8px;
+      background:var(--bg);border:1.5px solid var(--border);
+      border-radius:10px;padding:7px 14px;
+    }
+    .search-box svg{color:#9ca3af;flex-shrink:0}
+    .search-box input{
+      border:none;background:transparent;font-size:14px;width:100%;
+      outline:none;color:var(--text);
+    }
+    .search-box input::placeholder{color:#9ca3af}
+    .filter-row{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+    .filter-row::-webkit-scrollbar{display:none}
+    .f-btn{
+      white-space:nowrap;padding:6px 14px;border-radius:100px;
+      border:1.5px solid var(--border);background:var(--white);
+      font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;
+      color:var(--muted);display:flex;align-items:center;gap:5px;
+    }
+    .f-btn:hover{border-color:var(--red);color:var(--red)}
+    .f-btn.active{background:var(--red);border-color:var(--red);color:#fff}
+
+    /* ── MAIN ── */
+    main{max-width:1280px;margin:0 auto;padding:32px 24px 72px}
+    .results-count{font-size:13px;color:var(--muted);margin-bottom:20px;font-weight:500}
+    .results-count span{color:var(--text);font-weight:700}
+
+    /* Category section */
+    .cat-section{margin-bottom:52px}
+    .section-hdr{
+      display:flex;align-items:center;gap:12px;
+      margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid var(--border);
+    }
+    .section-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .section-label{font-size:17px;font-weight:800;letter-spacing:-.2px}
+    .section-tally{
+      margin-left:auto;background:var(--bg);border-radius:100px;
+      padding:2px 10px;font-size:11px;font-weight:700;color:var(--muted);
+    }
+
+    /* Product grid */
+    .product-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+      gap:14px;
+    }
+
+    /* Product card */
+    .card{
+      background:var(--white);border-radius:var(--radius);
+      border:1px solid var(--border);overflow:hidden;
+      box-shadow:0 1px 3px rgba(0,0,0,.07);
+      transition:transform .18s,box-shadow .18s;
+      display:flex;flex-direction:column;
+    }
+    .card:hover{
+      transform:translateY(-5px);
+      box-shadow:0 12px 32px rgba(0,0,0,.13);
+    }
+
+    /* Image area */
+    .card-img{
+      width:100%;aspect-ratio:1/1;
+      display:flex;align-items:center;justify-content:center;
+      overflow:hidden;background:#f8f8f8;
+      border-bottom:1px solid var(--border);
+      position:relative;
+    }
+    .card-img img{
+      width:100%;height:100%;
+      object-fit:contain;
+      padding:10px;
+      transition:transform .25s;
+    }
+    .card:hover .card-img img{transform:scale(1.06)}
+    /* Placeholder for products without photos */
+    .card-img-placeholder{
+      width:100%;height:100%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:42px;
+    }
+    /* Category colour stripe at top of image */
+    .card-stripe{
+      position:absolute;top:0;left:0;right:0;
+      height:3px;
+    }
+
+    /* Card body */
+    .card-body{padding:12px 12px 10px;flex:1;display:flex;flex-direction:column}
+    .card-name{
+      font-size:12px;font-weight:700;line-height:1.4;
+      color:var(--text);margin-bottom:8px;flex:1;
+    }
+    .card-foot{
+      display:flex;align-items:center;justify-content:space-between;gap:6px;
+      border-top:1px solid var(--border);padding-top:8px;margin-top:auto;
+    }
+    .card-ref{
+      font-family:'SF Mono',Consolas,monospace;font-size:10px;font-weight:700;
+      padding:3px 7px;border-radius:6px;background:var(--bg);color:var(--muted);
+      white-space:nowrap;
+    }
+    .card-qty{font-size:10.5px;color:var(--muted);white-space:nowrap;text-align:right}
+
+    /* No results */
+    .no-results{text-align:center;padding:64px 24px;color:var(--muted)}
+    .no-results p{font-size:15px;margin-top:8px}
+
+    /* ── CTA ── */
+    .cta-band{
+      background:linear-gradient(135deg,#1e1b4b,#450a0a);
+      color:#fff;text-align:center;padding:56px 24px;
+    }
+    .cta-band h2{font-size:clamp(22px,4vw,36px);font-weight:800;margin-bottom:10px}
+    .cta-band p{color:#cbd5e1;font-size:15px;margin-bottom:28px}
+    .cta-buttons{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+    .cta-btn{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:13px 28px;border-radius:10px;font-size:14px;font-weight:700;
+      text-decoration:none;transition:all .15s;letter-spacing:.2px;
+    }
+    .cta-btn-primary{background:var(--red);color:#fff}
+    .cta-btn-primary:hover{background:#b71c1c}
+    .cta-btn-secondary{
+      background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);color:#fff;
+    }
+    .cta-btn-secondary:hover{background:rgba(255,255,255,.18)}
+
+    /* ── FOOTER ── */
+    footer{
+      background:var(--dark);color:#6b7280;
+      text-align:center;padding:24px;font-size:12px;line-height:1.7;
+    }
+    footer strong{color:#e5e7eb}
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:600px){
+      .hero{padding:40px 16px 36px}
+      .hero-stat{padding:0 14px}
+      main{padding:24px 14px 48px}
+      .product-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+      .bar-inner{padding:8px 14px}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="logo" href="#">
+      <span class="logo-mark">LIDA</span>
+      <span class="logo-sub">Automotive &amp; Home Care</span>
+    </a>
+    <a class="header-cta" href="#contact">Contact to Order</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-eyebrow">Wholesale Catalogue</div>
+  <h1>Premium <em>Car Care</em><br>Products</h1>
+  <p>Professional-grade automotive and home care sprays. Trusted by workshops, dealers and retailers.</p>
+  <div class="hero-pills">
+    <span class="hero-pill">✔ Automotive Cleaners</span>
+    <span class="hero-pill">✔ Air Fresheners</span>
+    <span class="hero-pill">✔ Sealants &amp; Repair</span>
+    <span class="hero-pill">✔ Home Care</span>
+  </div>
+  <div class="hero-stats">
+    <div class="hero-stat"><strong>50+</strong><span>Products</span></div>
+    <div class="hero-stat"><strong>7</strong><span>Categories</span></div>
+    <div class="hero-stat"><strong>Bulk</strong><span>Wholesale</span></div>
+  </div>
+</section>
+
+<div class="bar-wrap">
+  <div class="bar-inner">
+    <div class="search-box">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="searchInput" placeholder="Search by name or ref…" oninput="applyFilters()">
+    </div>
+    <div class="filter-row">
+      <button class="f-btn active" onclick="setFilter(this,'all')">All Products</button>
+      <button class="f-btn" onclick="setFilter(this,'auto')">🔧 Auto Cleaners</button>
+      <button class="f-btn" onclick="setFilter(this,'tyre')">🚗 Tyre Care</button>
+      <button class="f-btn" onclick="setFilter(this,'dash')">✨ Dashboard &amp; Polish</button>
+      <button class="f-btn" onclick="setFilter(this,'lube')">💧 Lubricants</button>
+      <button class="f-btn" onclick="setFilter(this,'fresh')">🌸 Air Fresheners</button>
+      <button class="f-btn" onclick="setFilter(this,'seal')">🔩 Sealants &amp; Repair</button>
+      <button class="f-btn" onclick="setFilter(this,'home')">🏠 Home Care</button>
+    </div>
+  </div>
+</div>
+
+<main id="main">
+  <div class="results-count" id="resultsCount"></div>
+  <div id="catalog"></div>
+  <div class="no-results" id="noResults" style="display:none">
+    <div style="font-size:40px">🔍</div>
+    <p>No products found. Try a different search or category.</p>
+  </div>
+</main>
+
+<section class="cta-band" id="contact">
+  <h2>Ready to Stock Up?</h2>
+  <p>Contact us for wholesale pricing, minimum order quantities and delivery options.</p>
+  <div class="cta-buttons">
+    <a class="cta-btn cta-btn-primary" href="tel:+27833927725">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.18 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      Call Us
+    </a>
+    <a class="cta-btn cta-btn-secondary" href="mailto:cistbspeed@gmail.com">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+      Email Enquiry
+    </a>
+  </div>
+</section>
+
+<footer>
+  <strong>LIDA Automotive &amp; Home Care Products</strong><br>
+  Wholesale enquiries welcome · Prices available on request
+</footer>
+
+<script>
+const CATS = {
+  auto:  {label:'Auto Cleaners',       color:'#dc2626', bg:'#fef2f2'},
+  tyre:  {label:'Tyre Care',           color:'#334155', bg:'#f1f5f9'},
+  dash:  {label:'Dashboard & Polish',  color:'#7c3aed', bg:'#faf5ff'},
+  lube:  {label:'Lubricants & Sprays', color:'#ea580c', bg:'#fff7ed'},
+  fresh: {label:'Air Fresheners',      color:'#16a34a', bg:'#f0fdf4'},
+  seal:  {label:'Sealants & Repair',   color:'#2563eb', bg:'#eff6ff'},
+  home:  {label:'Home Care',           color:'#0d9488', bg:'#f0fdfa'},
+};
+
+// img: filename in imgs/ folder, or null for fallback emoji
+const PRODUCTS = [
+  // AUTO CLEANERS
+  {ref:'66101',   name:'DE-RUST LUBRICANT',          size:'450ml', qty:'24', cat:'auto',  img:'66101.jpg',   icon:'🔧'},
+  {ref:'66301',   name:'CARBURETOR & CHOKE CLEANER', size:'450ml', qty:'24', cat:'auto',  img:'66301.jpg',   icon:'🔬'},
+  {ref:'66501',   name:'AIR CONDITIONER CLEANER',    size:'450ml', qty:'24', cat:'auto',  img:'66501.jpg',   icon:'❄️'},
+  {ref:'66601',   name:'CONTACT ELECTRIC CLEANER',   size:'450ml', qty:'24', cat:'auto',  img:'66601.jpg',   icon:'⚡'},
+  {ref:'66701',   name:'BRAKE CLEANER',              size:'450ml', qty:'24', cat:'auto',  img:'66701.jpg',   icon:'🛑'},
+  {ref:'66801',   name:'ENGINE DEGREASE CLEANER',    size:'650ml', qty:'24', cat:'auto',  img:'66801.jpg',   icon:'⚙️'},
+  {ref:'69301',   name:'HEADLIGHT RENOVATION',       size:'450ml', qty:'24', cat:'auto',  img:'69301.jpg',   icon:'💡'},
+  {ref:'69401',   name:'FUEL INJECTION CLEANER',     size:'450ml', qty:'24', cat:'auto',  img:'69401.jpg',   icon:'⛽'},
+  {ref:'69501',   name:'STARTING FLUID',             size:'450ml', qty:'48', cat:'auto',  img:null,          icon:'🔋'},
+  {ref:'69801',   name:'COPPER GASKET SEALANT',      size:'450ml', qty:'24', cat:'auto',  img:null,          icon:'🔩'},
+  {ref:'69901',   name:'WHEEL HUB CLEANER',          size:'450ml', qty:'48', cat:'auto',  img:'69901.jpg',   icon:'⭕'},
+  // TYRE CARE
+  {ref:'66901',   name:'TIRE FOAM CLEANER',          size:'650ml', qty:'24', cat:'tyre',  img:'66901.jpg',   icon:'🔄'},
+  {ref:'67001',   name:'TYRE SEALER & INFLATOR',     size:'650ml', qty:'24', cat:'tyre',  img:'67001.jpg',   icon:'🚗'},
+  // DASHBOARD & POLISH
+  {ref:'66401-1', name:'DASHBOARD LEATHER POLISH — Lemon',      size:'450ml', qty:'24', cat:'dash', img:'66401-1.jpg', icon:'🍋'},
+  {ref:'66401-2', name:'DASHBOARD LEATHER POLISH — Strawberry', size:'450ml', qty:'24', cat:'dash', img:'66401-2.jpg', icon:'🍓'},
+  {ref:'66401-3', name:'DASHBOARD LEATHER POLISH — Cherry',     size:'450ml', qty:'24', cat:'dash', img:'66401-3.jpg', icon:'🍒'},
+  {ref:'66401-4', name:'DASHBOARD LEATHER POLISH — New Car',    size:'450ml', qty:'24', cat:'dash', img:'66401-4.jpg', icon:'✨'},
+  // LUBRICANTS & SPRAYS
+  {ref:'67901',   name:'GREASE SPRAY',               size:'450ml', qty:'24', cat:'lube',  img:'67901.jpg',   icon:'💧'},
+  {ref:'69001',   name:'RUBBER SILICONE SPRAY',      size:'450ml', qty:'24', cat:'lube',  img:'69001.jpg',   icon:'🛡️'},
+  {ref:'69701',   name:'OIL TREATMENT',              size:'450ml', qty:'24', cat:'lube',  img:'69701.jpg',   icon:'🛢️'},
+  // AIR FRESHENERS — auto refills
+  {ref:'67101-1', name:'AUTO AIR FRESHENER REFILL — Lemon',     size:'300ml', qty:'48', cat:'fresh', img:'67101-1.jpg', icon:'🍋'},
+  {ref:'67101-2', name:'AUTO AIR FRESHENER REFILL — Jasmine',   size:'300ml', qty:'48', cat:'fresh', img:'67101-2.jpg', icon:'🌼'},
+  {ref:'67101-3', name:'AUTO AIR FRESHENER REFILL — Lavender',  size:'300ml', qty:'48', cat:'fresh', img:'67101-3.jpg', icon:'💜'},
+  {ref:'67101-4', name:'AUTO AIR FRESHENER REFILL — Rose',      size:'300ml', qty:'48', cat:'fresh', img:'67101-4.jpg', icon:'🌹'},
+  {ref:'67101-5', name:'AUTO AIR FRESHENER REFILL — Strawberry',size:'300ml', qty:'48', cat:'fresh', img:'67101-5.jpg', icon:'🍓'},
+  {ref:'67101-6', name:'AUTO AIR FRESHENER REFILL — Floral',    size:'300ml', qty:'48', cat:'fresh', img:'67101-6.jpg', icon:'🌸'},
+  // AIR FRESHENERS — spray cans
+  {ref:'67201-1', name:'AIR FRESHENER — Lemon',      size:'300ml', qty:'48', cat:'fresh', img:'67201-1.jpg', icon:'🍋'},
+  {ref:'67201-2', name:'AIR FRESHENER — Jasmine',    size:'300ml', qty:'48', cat:'fresh', img:'67201-2.jpg', icon:'🌼'},
+  {ref:'67201-3', name:'AIR FRESHENER — Lavender',   size:'300ml', qty:'48', cat:'fresh', img:'67201-3.jpg', icon:'💜'},
+  {ref:'67201-4', name:'AIR FRESHENER — Rose',       size:'300ml', qty:'48', cat:'fresh', img:'67201-4.jpg', icon:'🌹'},
+  {ref:'67201-5', name:'AIR FRESHENER — Strawberry', size:'300ml', qty:'48', cat:'fresh', img:'67201-5.jpg', icon:'🍓'},
+  {ref:'67201-6', name:'AIR FRESHENER — Floral',     size:'300ml', qty:'48', cat:'fresh', img:'67201-6.jpg', icon:'🌸'},
+  {ref:'67401',   name:'AUTO PERFUME MACHINE — With Button',    qty:'50', cat:'fresh', img:'67401.jpg',   icon:'🎀'},
+  {ref:'67402',   name:'AUTO PERFUME MACHINE — No Button',      qty:'50', cat:'fresh', img:'67402.jpg',   icon:'🎀'},
+  // SEALANTS & REPAIR
+  {ref:'67301-1', name:'SILICONE SEALANT — Clear',   size:'450ml', qty:'24', cat:'seal',  img:'67301-1.jpg', icon:'🪟'},
+  {ref:'67301-2', name:'SILICONE SEALANT — White',   size:'450ml', qty:'24', cat:'seal',  img:'67301-2.jpg', icon:'⬜'},
+  {ref:'67301-3', name:'SILICONE SEALANT — Black',   size:'450ml', qty:'24', cat:'seal',  img:'67301-3.jpg', icon:'⬛'},
+  {ref:'68001',   name:'PU FOAM',                    size:'750ml', qty:'15', cat:'seal',  img:'68001.jpg',   icon:'🫧'},
+  {ref:'68301',   name:'RUBBERIZED UNDERCOAT',        size:'450ml', qty:'24', cat:'seal',  img:'68301.jpg',   icon:'🛡️'},
+  {ref:'68401-1', name:'LEAK REPAIR WATERPROOF — Black',size:'450ml',qty:'24',cat:'seal', img:'68401-1.jpg', icon:'🖤'},
+  {ref:'68401-2', name:'LEAK REPAIR WATERPROOF — White',size:'450ml',qty:'24',cat:'seal', img:'68401-2.jpg', icon:'🤍'},
+  {ref:'68401-3', name:'LEAK REPAIR WATERPROOF — Grey', size:'450ml',qty:'24',cat:'seal', img:'68401-3.jpg', icon:'🩶'},
+  {ref:'68501',   name:'PAINT REMOVER',              size:'450ml', qty:'24', cat:'seal',  img:null,          icon:'🎨'},
+  {ref:'68801',   name:'STICKER REMOVER CLEANER',    size:'450ml', qty:'24', cat:'seal',  img:'68801.jpg',   icon:'📋'},
+  // HOME CARE
+  {ref:'66201',   name:'MULTI PURPOSE FOAM CLEANER', size:'650ml', qty:'24', cat:'home',  img:'66201.jpg',   icon:'🧽'},
+  {ref:'67501',   name:'KITCHEN CLEANER',            size:'450ml', qty:'24', cat:'home',  img:'67501.jpg',   icon:'🍳'},
+  {ref:'67601',   name:'CARPET CLEANER',             size:'450ml', qty:'24', cat:'home',  img:null,          icon:'🧹'},
+  {ref:'67701',   name:'GLASS CLEANER',              size:'450ml', qty:'24', cat:'home',  img:'67701.jpg',   icon:'🪟'},
+  {ref:'67801',   name:'OVEN CLEANER',               size:'450ml', qty:'24', cat:'home',  img:'67801.jpg',   icon:'🔥'},
+  {ref:'68101',   name:'FURNITURE POLISH',           size:'450ml', qty:'24', cat:'home',  img:'68101.jpg',   icon:'🪑'},
+  {ref:'68201',   name:'BATHROOM CLEANER',           size:'450ml', qty:'24', cat:'home',  img:'68201.jpg',   icon:'🚿'},
+];
+
+let activeCat = 'all';
+
+function setFilter(btn, cat) {
+  activeCat = cat;
+  document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  const filtered = PRODUCTS.filter(p => {
+    const catOk = activeCat === 'all' || p.cat === activeCat;
+    const searchOk = !q || p.name.toLowerCase().includes(q) || p.ref.toLowerCase().includes(q);
+    return catOk && searchOk;
+  });
+  render(filtered);
+}
+
+function render(list) {
+  const catalog = document.getElementById('catalog');
+  const noResults = document.getElementById('noResults');
+  const count = document.getElementById('resultsCount');
+
+  if (!list.length) {
+    catalog.innerHTML = '';
+    noResults.style.display = 'block';
+    count.textContent = '';
+    return;
+  }
+  noResults.style.display = 'none';
+  count.innerHTML = `Showing <span>${list.length}</span> product${list.length !== 1 ? 's' : ''}`;
+
+  const catOrder = Object.keys(CATS);
+  const groups = {};
+  catOrder.forEach(c => { groups[c] = []; });
+  list.forEach(p => groups[p.cat].push(p));
+
+  let html = '';
+  catOrder.forEach(cat => {
+    const items = groups[cat];
+    if (!items.length) return;
+    const {label, color, bg} = CATS[cat];
+
+    html += `<div class="cat-section">
+      <div class="section-hdr">
+        <span class="section-dot" style="background:${color}"></span>
+        <span class="section-label">${label}</span>
+        <span class="section-tally">${items.length}</span>
+      </div>
+      <div class="product-grid">`;
+
+    items.forEach(p => {
+      const imgHtml = p.img
+        ? `<img src="imgs/${p.img}" alt="${p.name}" loading="lazy">`
+        : `<div class="card-img-placeholder" style="background:${bg}">${p.icon}</div>`;
+
+      html += `
+        <div class="card">
+          <div class="card-img">
+            <div class="card-stripe" style="background:${color}"></div>
+            ${imgHtml}
+          </div>
+          <div class="card-body">
+            <div class="card-name">${p.name}</div>
+            <div class="card-foot">
+              <span class="card-ref">${p.ref}</span>
+              <span class="card-qty">${p.size ? p.size + ' · ' : ''}${p.qty}/ctn</span>
+            </div>
+          </div>
+        </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  catalog.innerHTML = html;
+}
+
+applyFilters();
+</script>
+</body>
+</html>

@@ -3133,7 +3133,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           })}
         </nav>
         {/* ── Open-a-Shop promo — separate from rotated ads ── */}
-        <a href="/spares-shop.html" target="_blank" rel="noopener noreferrer"
+        <a href={`${import.meta.env.BASE_URL}spares-shop.html`} target="_blank" rel="noopener noreferrer"
           style={{display:"block",margin:"0 10px 8px",padding:"10px 12px",borderRadius:10,
             background:"linear-gradient(135deg,rgba(249,115,22,.15),rgba(249,115,22,.06))",
             border:"1px solid rgba(249,115,22,.3)",textDecoration:"none",cursor:"pointer",transition:"all .18s"}}
@@ -3202,7 +3202,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           })}
         </nav>
         {/* Drawer footer */}
-        <a href="/spares-shop.html" target="_blank" rel="noopener noreferrer"
+        <a href={`${import.meta.env.BASE_URL}spares-shop.html`} target="_blank" rel="noopener noreferrer"
           style={{display:"block",margin:"8px 10px 0",padding:"10px 12px",borderRadius:10,
             background:"linear-gradient(135deg,rgba(249,115,22,.15),rgba(249,115,22,.06))",
             border:"1px solid rgba(249,115,22,.3)",textDecoration:"none"}}>

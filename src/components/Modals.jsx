@@ -1273,7 +1273,7 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
   };
 
   // Ads form state
-  const AD_BLANK={title:"",description:"",image_url:"",link_url:"",cta_text:"Learn More",page:"shop",position:"banner",weather_condition:"any",contract_id:null,active:true};
+  const AD_BLANK={title:"",description:"",image_url:"",link_url:"",cta_text:"Learn More",page:"shop",position:"banner",weather_condition:"any",contract_id:null,duration:6,active:true};
   const [adForm,setAdForm]=useState(AD_BLANK);
   const [editingAd,setEditingAd]=useState(null);
   const af=(k,v)=>setAdForm(p=>({...p,[k]:v}));
@@ -1610,12 +1610,18 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
                   </select>
                 </div>
               </div>
-              <div>
-                <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>📑 Contract</div>
-                <select className="inp" value={adForm.contract_id||""} onChange={e=>af("contract_id",e.target.value?+e.target.value:null)}>
-                  <option value="">No contract</option>
-                  {adContracts.map(c=><option key={c.id} value={c.id}>{c.advertiser_name}</option>)}
-                </select>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>📑 Contract</div>
+                  <select className="inp" value={adForm.contract_id||""} onChange={e=>af("contract_id",e.target.value?+e.target.value:null)}>
+                    <option value="">No contract</option>
+                    {adContracts.map(c=><option key={c.id} value={c.id}>{c.advertiser_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>⏱ Stay time (sec)</div>
+                  <input className="inp" type="number" min={1} max={120} value={adForm.duration??6} onChange={e=>af("duration",Math.max(1,+e.target.value))}/>
+                </div>
               </div>
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>

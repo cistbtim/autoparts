@@ -276,8 +276,19 @@ export function AdBanner({ads=[], page="shop", userCtx=null}) {
 
   useEffect(()=>{
     if(active.length<=1) return;
-    const t=setInterval(()=>setIdx(i=>(i+1)%active.length), 6000);
-    return ()=>clearInterval(t);
+    let cancelled=false;
+    const schedule=(i)=>{
+      const dur=((active[i]?.duration)||6)*1000;
+      const t=setTimeout(()=>{
+        if(cancelled) return;
+        const next=(i+1)%active.length;
+        setIdx(next);
+        schedule(next);
+      }, dur);
+      return t;
+    };
+    const t=schedule(idx);
+    return ()=>{ cancelled=true; clearTimeout(t); };
   },[active.length, timerKey]);
 
   const goTo=(i)=>{ setIdx(i); setTimerKey(k=>k+1); };

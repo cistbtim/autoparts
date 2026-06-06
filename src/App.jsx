@@ -3132,6 +3132,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             );
           })}
         </nav>
+        {/* ── Open-a-Shop promo — separate from rotated ads ── */}
+        <a href="/spares-shop.html" target="_blank" rel="noopener noreferrer"
+          style={{display:"block",margin:"0 10px 8px",padding:"10px 12px",borderRadius:10,
+            background:"linear-gradient(135deg,rgba(249,115,22,.15),rgba(249,115,22,.06))",
+            border:"1px solid rgba(249,115,22,.3)",textDecoration:"none",cursor:"pointer",transition:"all .18s"}}
+          onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(249,115,22,.6)"}
+          onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(249,115,22,.3)"}>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--accent)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:3}}>🔧 Start Your Own Shop</div>
+          <div style={{fontSize:11,color:"var(--text2)",lineHeight:1.45}}>Open or modernise a spare parts shop — 3 months free</div>
+          <div style={{fontSize:10,color:"var(--accent)",fontWeight:600,marginTop:5}}>Learn more →</div>
+        </a>
         <div style={{padding:"9px 12px 14px",borderTop:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:5}}>
           {(role==="admin"||role==="customer")&&(
             <button className="btn btn-primary btn-sm" style={{width:"100%",position:"relative"}} onClick={()=>openM("checkout")}>
@@ -3191,6 +3202,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           })}
         </nav>
         {/* Drawer footer */}
+        <a href="/spares-shop.html" target="_blank" rel="noopener noreferrer"
+          style={{display:"block",margin:"8px 10px 0",padding:"10px 12px",borderRadius:10,
+            background:"linear-gradient(135deg,rgba(249,115,22,.15),rgba(249,115,22,.06))",
+            border:"1px solid rgba(249,115,22,.3)",textDecoration:"none"}}>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--accent)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:3}}>🔧 Start Your Own Shop</div>
+          <div style={{fontSize:11,color:"var(--text2)",lineHeight:1.4}}>3 months free · R499/mo after</div>
+          <div style={{fontSize:10,color:"var(--accent)",fontWeight:600,marginTop:4}}>Learn more →</div>
+        </a>
         <div style={{padding:"10px 10px 16px",borderTop:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:6}}>
           {(role==="admin"||role==="customer")&&(
             <button className="btn btn-primary btn-sm" style={{width:"100%"}} onClick={()=>{openM("checkout");setDrawerOpen(false);}}>

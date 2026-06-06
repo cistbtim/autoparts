@@ -323,7 +323,7 @@ export function AdBanner({ads=[], page="shop", userCtx=null}) {
       onTouchEnd={handleTouchEnd}>
       {ad.image_url
         ? <img src={ad.image_url} alt={ad.title||"Ad"}
-            style={{width:"100%",height:140,objectFit:"cover",display:"block"}}
+            style={{display:"block",width:"auto",height:"auto",maxWidth:"100%",maxHeight:200,margin:"0 auto"}}
             onError={e=>{e.target.style.display="none";const p=e.target.parentElement;if(p){p.style.minHeight="56px";const fb=p.querySelector('.ad-fb');if(fb)fb.style.display="flex";}}}/>
         : <div style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",
             fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>

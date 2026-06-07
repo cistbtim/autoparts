@@ -2245,6 +2245,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
   const [manualPhone, setManualPhone] = useState("");
   const [customNote,  setCustomNote]  = useState("");
   const [copied,      setCopied]      = useState(false);
+  const [typeFilter,  setTypeFilter]  = useState("");
   const [quoteTarget, setQuoteTarget] = useState(null); // { request, existingQuote }
   const [localReplies,setLocalReplies]= useState(sqReplies);
   const [refreshing,  setRefreshing]  = useState(false);
@@ -2413,17 +2414,32 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 
       {/* Supplier selector */}
       <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",margin:"14px 0 6px"}}>Supplier</div>
-      {wsSuppliers.length > 0
-        ? <select className="inp" value={supplierId} onChange={e=>{setSupplierId(e.target.value);setManualPhone("");}} style={{marginBottom:8}}>
+      {wsSuppliers.length > 0 && (
+        <div style={{display:"flex",gap:8,marginBottom:8}}>
+          <select className="inp" style={{flex:"0 0 auto",width:150}} value={typeFilter}
+            onChange={e=>{setTypeFilter(e.target.value);setSupplierId("");}}>
+            <option value="">All Types</option>
+            <option value="New Spares">New Spares</option>
+            <option value="Used Parts">Used Parts</option>
+            <option value="Dealer">Dealer</option>
+          </select>
+          <select className="inp" style={{flex:1}} value={supplierId} onChange={e=>{setSupplierId(e.target.value);setManualPhone("");}}>
             <option value="">— Select supplier —</option>
-            {wsSuppliers.map(s=>(
+            {wsSuppliers.filter(s=>{
+              if(!typeFilter) return true;
+              const types=s.supplier_type?(Array.isArray(s.supplier_type)?s.supplier_type:(()=>{try{return JSON.parse(s.supplier_type);}catch{return [];}})()):[];
+              return types.includes(typeFilter);
+            }).map(s=>(
               <option key={s.id} value={s.id}>{s.name}{s.phone?` · ${s.phone}`:""}</option>
             ))}
           </select>
-        : <div style={{fontSize:12,color:"var(--text3)",marginBottom:6,padding:"8px 12px",background:"var(--surface2)",borderRadius:8}}>
-            No suppliers saved yet — go to <strong>WS → Suppliers</strong> tab to add them, or type a number below
-          </div>
-      }
+        </div>
+      )}
+      {wsSuppliers.length === 0 && (
+        <div style={{fontSize:12,color:"var(--text3)",marginBottom:6,padding:"8px 12px",background:"var(--surface2)",borderRadius:8}}>
+          No suppliers saved yet — go to <strong>WS → Suppliers</strong> tab to add them, or type a number below
+        </div>
+      )}
       <input className="inp" placeholder="Or enter phone number: +27 83 123 4567"
         value={manualPhone} onChange={e=>{setManualPhone(e.target.value);setSupplierId("");}}
         style={{marginBottom:14}}/>

@@ -374,11 +374,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     // Branch filter prefix — limits fetch to this branch's records for branch users
     const bF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
     const isSalesman=role==="branch_salesman"; // POS-only role — skip unneeded tables
-    setLoading(true);
-    setLoadingItems([]);
+    const isInitial=!firstLoadDoneRef.current;
+    if(isInitial){ setLoading(true); setLoadingItems([]); }
 
-    // Wrap a get call with per-table timing tracking
+    // Wrap a get call with per-table timing tracking (initial load only)
     const track=(label,promise)=>{
+      if(!isInitial) return promise;
       const t0=Date.now();
       setLoadingItems(prev=>[...prev,{label,status:'loading',ms:null,rows:null}]);
       return promise.then(data=>{
@@ -445,7 +446,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       // Also refresh categories from DB
       try{ if(st[0].categories){ const c=typeof st[0].categories==="string"?JSON.parse(st[0].categories):st[0].categories; if(Array.isArray(c)&&c.length) updateSettings({categories:st[0].categories}); } }catch{}
     }
-    setLoading(false); // ← show UI immediately after critical data
+    if(isInitial) setLoading(false); // ← show UI immediately after critical data (initial load only)
 
     // Background load remaining parts pages (only when cache was cold)
     if(!cachedParts){

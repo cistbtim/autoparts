@@ -1,11 +1,24 @@
 import { useState } from "react";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 
+const SUPPLIER_TYPES=["New Spares","Used Parts","Dealer"];
+
+function parseTypes(v){
+  if(!v) return [];
+  if(Array.isArray(v)) return v;
+  try{ return JSON.parse(v); }catch{ return []; }
+}
+
 export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete}) {
   const [modal,setModal]=useState(null);
   const [search,setSearch]=useState("");
+  const [typeFilter,setTypeFilter]=useState("");
 
   const filtered=wsSuppliers.filter(s=>{
+    if(typeFilter){
+      const types=parseTypes(s.supplier_type);
+      if(!types.includes(typeFilter)) return false;
+    }
     if(!search.trim()) return true;
     const h=`${s.name||""} ${s.phone||""} ${s.email||""} ${s.notes||""}`.toLowerCase();
     return search.trim().toLowerCase().split(/\s+/).every(w=>h.includes(w));
@@ -14,7 +27,11 @@ export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete}) {
   return (
     <div>
       <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
-        <input className="inp" style={{flex:1,minWidth:200}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search suppliers..."/>
+        <input className="inp" style={{flex:1,minWidth:160}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search suppliers..."/>
+        <select className="inp" style={{width:150}} value={typeFilter} onChange={e=>setTypeFilter(e.target.value)}>
+          <option value="">All Types</option>
+          {SUPPLIER_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+        </select>
         <button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Supplier</button>
       </div>
 
@@ -30,7 +47,15 @@ export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete}) {
               <div key={s.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                 <div style={{width:38,height:38,borderRadius:10,background:"rgba(37,211,102,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🏪</div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:14}}>{s.name}</div>
+                  <div style={{fontWeight:700,fontSize:14,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    {s.name}
+                    {parseTypes(s.supplier_type).map(tp=>(
+                      <span key={tp} style={{fontSize:10,fontWeight:600,padding:"1px 6px",borderRadius:10,
+                        background:tp==="New Spares"?"rgba(99,102,241,.12)":tp==="Used Parts"?"rgba(234,179,8,.12)":"rgba(34,197,94,.12)",
+                        color:tp==="New Spares"?"var(--accent)":tp==="Used Parts"?"#b45309":"#16a34a",
+                        whiteSpace:"nowrap"}}>{tp}</span>
+                    ))}
+                  </div>
                   <div style={{fontSize:12,color:"var(--text3)",display:"flex",gap:10,flexWrap:"wrap",marginTop:2}}>
                     {s.phone&&<span>📲 {s.phone}</span>}
                     {s.group_link&&<span style={{color:"#25D366"}}>👥 Group</span>}
@@ -74,8 +99,11 @@ export function WsSupplierModal({item,onSave,onClose}) {
   const [email,        setEmail]        = useState(item?.email||"");
   const [notes,        setNotes]        = useState(item?.notes||"");
   const [vatInclusive, setVatInclusive] = useState(item?.vat_inclusive||false);
+  const [supTypes,     setSupTypes]     = useState(()=>parseTypes(item?.supplier_type));
   const [saving,       setSaving]       = useState(false);
   const isEdit=!!item;
+
+  const toggleType=(tp)=>setSupTypes(p=>p.includes(tp)?p.filter(x=>x!==tp):[...p,tp]);
 
   const handleSave=async()=>{
     if(!name.trim()){alert("Name is required");return;}
@@ -89,6 +117,7 @@ export function WsSupplierModal({item,onSave,onClose}) {
         email:email.trim()||null,
         notes:notes.trim()||null,
         vat_inclusive:vatInclusive,
+        supplier_type:supTypes.length?JSON.stringify(supTypes):null,
       });
     }catch(e){alert("Save failed: "+e.message);}
     finally{setSaving(false);}
@@ -108,6 +137,18 @@ export function WsSupplierModal({item,onSave,onClose}) {
         <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Paste the group invite link — tap ⋮ in WhatsApp group → Invite via link → Copy link</div>
       </FD>
       <FD><FL label="Notes (optional)"/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. BMW specialist, fast delivery"/></FD>
+      <FD>
+        <FL label="Supplier Type"/>
+        <div style={{display:"flex",gap:16,flexWrap:"wrap",padding:"8px 0"}}>
+          {SUPPLIER_TYPES.map(tp=>(
+            <label key={tp} style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:13,fontWeight:500}}>
+              <input type="checkbox" checked={supTypes.includes(tp)} onChange={()=>toggleType(tp)} style={{width:16,height:16,cursor:"pointer",accentColor:"var(--accent)"}}/>
+              {tp}
+            </label>
+          ))}
+        </div>
+        <div style={{fontSize:11,color:"var(--text3)"}}>Select all that apply — a supplier can sell multiple types</div>
+      </FD>
       <FD>
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0"}}>
           <input type="checkbox" id="vatIncl" checked={vatInclusive} onChange={e=>setVatInclusive(e.target.checked)} style={{width:16,height:16,cursor:"pointer"}}/>

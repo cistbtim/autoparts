@@ -7002,7 +7002,6 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     return()=>clearInterval(timer);
   },[wsId]);
   const [shopParts,setShopParts]=useState([]);
-  const [branchFitments,setBranchFitments]=useState([]);
   const [page,setPage]=useState(0);
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [stockOnly,setStockOnly]=useState(false);
@@ -7011,20 +7010,14 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const [refreshing,setRefreshing]=useState(false);
   const Cs=curSym(settings?.currency||"ZAR R");
 
-  // Load branch's own part fitments so vehicle filter matches branch parts, not just workshop parts
-  useEffect(()=>{
-    if(!linkedBranchId){setBranchFitments([]);return;}
-    api.get("part_fitments","select=*&order=make.asc").catch(()=>[]).then(r=>setBranchFitments(Array.isArray(r)?r:[]));
-  },[linkedBranchId,refreshKey]);
-
   useEffect(()=>{
     if(!linkedBranchId){setLoading(false);setShopParts([]);return;}
     setLoading(true);
     const fetches=[
       api.get("parts",`branch_id=eq.${linkedBranchId}&select=*&order=name.asc`).catch(()=>[]),
       api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=*`).catch(()=>[]),
-      // Load ALL parts as the main catalog (not just by mainBranchId which may be null or mismatched)
-      api.get("parts","select=*&order=name.asc").catch(()=>[]),
+      // Only load main branch parts if mainBranchId is known — avoids fetching entire table
+      mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&select=*&order=name.asc`).catch(()=>[]):Promise.resolve([]),
     ];
     Promise.all(fetches).then(async([ownParts,bStock,mainParts])=>{
       const bStockArr=Array.isArray(bStock)?bStock:[];
@@ -7255,7 +7248,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       </div>
 
       {/* Vehicle filter */}
-      <VehicleSearchBar vehicles={vehicles} partFitments={branchFitments.length?branchFitments:partFitments} parts={shopParts}
+      <VehicleSearchBar vehicles={vehicles} partFitments={partFitments} parts={shopParts}
         t={{}} initialMake={initialMake} initialModel={initialModel} onFilter={(ids)=>{setVehicleFilterIds(ids);setPage(0);}}/>
 
       {vehicleFilterIds&&<div style={{fontSize:12,color:"var(--blue)",marginBottom:12,fontWeight:600}}>

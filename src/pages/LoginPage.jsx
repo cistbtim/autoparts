@@ -301,11 +301,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
         {/* Logo card */}
         <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:14,padding:"20px",textAlign:"center",marginBottom:18,boxShadow:"var(--shadow)"}}>
-          {(loadedSettings?.logo_url||loadedSettings?.logo_data)
-            ? <div style={{display:"flex",justifyContent:"center",marginBottom:8}}><ShopLogo settings={loadedSettings} size="lg"/></div>
-            : <MotorDeskBanner/>
-          }
-          <div style={{color:"var(--text3)",fontSize:12,fontWeight:500,marginTop:4}}>{(loadedSettings?.logo_url||loadedSettings?.logo_data)?"Powered by MotorDesk":(t.appSub||"Automotive Workshop Management")}</div>
+          {(loadedSettings?.logo_url||loadedSettings?.logo_data)&&(
+            <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><ShopLogo settings={loadedSettings} size="lg"/></div>
+          )}
+          <MotorDeskBanner/>
           {langs.length>1&&(
             <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:10}}>
               {langs.map(l=>(

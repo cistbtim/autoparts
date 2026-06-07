@@ -3201,7 +3201,10 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             </div>
             <input className="inp" value={f.reference_url} onChange={e=>s("reference_url",e.target.value)} placeholder="Paste catalogue or reference link…"/>
           </FD>
-          <FD><FL label={t.chineseDesc}/><input className="inp" value={f.chinese_desc} onChange={e=>s("chinese_desc",e.target.value)} placeholder="零件中文說明"/></FD>
+          <FG cols="1fr 1fr">
+            <div><FL label={t.chineseDesc}/><input className="inp" value={f.chinese_desc} onChange={e=>s("chinese_desc",e.target.value)} placeholder="零件中文說明"/></div>
+            <div><FL label={t.category}/><select className="inp" value={f.category} onChange={e=>s("category",e.target.value)}>{getCategories().map(c=><option key={c}>{c}</option>)}</select></div>
+          </FG>
           <div style={{display:"flex",gap:16,flexWrap:"wrap",marginTop:8}}>
             <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",userSelect:"none",flex:"1 1 auto"}}>
               <div onClick={()=>s("is_quantum",!f.is_quantum)} style={{
@@ -3287,12 +3290,6 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             <div><FL label={t.stock}/><input className="inp" type="number" value={f.stock} onChange={e=>s("stock",e.target.value)} placeholder="0"/></div>
             <div><FL label={t.minStock}/><input className="inp" type="number" value={f.minStock} onChange={e=>s("minStock",e.target.value)} placeholder="1"/></div>
           </FG>
-          <FD>
-            <FL label={t.category}/>
-            <select className="inp" value={f.category} onChange={e=>s("category",e.target.value)}>
-              {getCategories().map(c=><option key={c}>{c}</option>)}
-            </select>
-          </FD>
         </div>
       )}
 

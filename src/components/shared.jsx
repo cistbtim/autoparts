@@ -46,7 +46,8 @@ export const ShopLogo = ({settings, size="md", style={}}) => {
 };
 
 export const MotorDeskBanner = () => (
-  <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e293b 100%)",borderRadius:12,padding:"18px 24px",display:"flex",alignItems:"center",gap:16,marginBottom:4}}>
+  <div style={{display:"flex",justifyContent:"center",marginBottom:4}}>
+  <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e293b 100%)",borderRadius:12,padding:"18px 24px",display:"inline-flex",alignItems:"center",gap:16,width:"fit-content"}}>
     <svg width="54" height="54" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
       <circle cx="32" cy="32" r="30" fill="rgba(249,115,22,0.12)"/>
       <g transform="translate(32,32)">
@@ -72,6 +73,7 @@ export const MotorDeskBanner = () => (
       <div style={{fontSize:32,fontWeight:900,fontFamily:"Rajdhani,sans-serif",letterSpacing:"-0.5px",lineHeight:1,background:"linear-gradient(90deg,#f97316,#fb923c)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>MotorDesk</div>
       <div style={{fontSize:10,color:"rgba(255,255,255,0.45)",letterSpacing:".12em",textTransform:"uppercase",fontWeight:600,marginTop:4}}>Automotive Workshop Management</div>
     </div>
+  </div>
   </div>
 );
 

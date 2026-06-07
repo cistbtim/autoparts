@@ -1,7 +1,7 @@
 // English is the hardcoded fallback — all other languages load from app_translations DB table.
 export const T = {
   en: {
-    appSub: "Parts Management System", dashboard: "Dashboard", inventory: "Inventory",
+    appSub: "Automotive Workshop Management", dashboard: "Dashboard", inventory: "Inventory",
     systemOverview: "System overview", recentOrders: "Recent Orders", viewAll: "View all",
     lowStockAlert: "Low Stock", manage: "Manage", orderStatus: "Order Status",
     connected: "Connected", s_processing: "Processing", s_shipped: "Ready to Ship",

@@ -45,6 +45,36 @@ export const ShopLogo = ({settings, size="md", style={}}) => {
   return null;
 };
 
+export const MotorDeskBanner = () => (
+  <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e293b 100%)",borderRadius:12,padding:"18px 24px",display:"flex",alignItems:"center",gap:16,marginBottom:4}}>
+    <svg width="54" height="54" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
+      <circle cx="32" cy="32" r="30" fill="rgba(249,115,22,0.12)"/>
+      <g transform="translate(32,32)">
+        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316"/>
+        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(45)"/>
+        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(90)"/>
+        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(135)"/>
+        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(180)"/>
+        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(225)"/>
+        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(270)"/>
+        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(315)"/>
+        <circle r="14" fill="#f97316"/>
+        <circle r="5.5" fill="#0f172a"/>
+      </g>
+      <g transform="translate(32,32) rotate(-45)">
+        <rect x="-13" y="-27" width="8" height="22" rx="3" fill="white" opacity="0.9"/>
+        <rect x="5" y="-27" width="8" height="22" rx="3" fill="white" opacity="0.9"/>
+        <rect x="-13" y="-8" width="26" height="9" fill="white" opacity="0.9"/>
+        <rect x="-5" y="-1" width="10" height="30" rx="5" fill="white" opacity="0.9"/>
+      </g>
+    </svg>
+    <div style={{textAlign:"left"}}>
+      <div style={{fontSize:32,fontWeight:900,fontFamily:"Rajdhani,sans-serif",letterSpacing:"-0.5px",lineHeight:1,background:"linear-gradient(90deg,#f97316,#fb923c)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>MotorDesk</div>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.45)",letterSpacing:".12em",textTransform:"uppercase",fontWeight:600,marginTop:4}}>Automotive Workshop Management</div>
+    </div>
+  </div>
+);
+
 export const Overlay = ({onClose,children,wide}) => (
   <div className="overlay" onClick={onClose}>
     <div className={`modal${wide?" modal-wide":""}`} onClick={e=>e.stopPropagation()}>{children}</div>

@@ -21,7 +21,7 @@ const CHECKLIST_ITEMS=[
 
 export function printStockLabel(p, settings, labelType="shop") {
   const sym = curSym(settings?.currency||"R");
-  const shopName = settings?.shop_name||"AutoParts";
+  const shopName = settings?.shop_name||"MotorDesk";
   const isWs = labelType==="ws";
   const lw = (settings?.label_w||50)+"mm";
   const lh = (settings?.label_h||50)+"mm";
@@ -61,7 +61,7 @@ export function printStockLabel(p, settings, labelType="shop") {
 }
 
 export function printChecklistReport(job, checklist, settings) {
-  const shopName = settings?.shop_name||"AutoParts";
+  const shopName = settings?.shop_name||"MotorDesk";
   const now = new Date().toLocaleString();
   const statusIcon = s => s==="ok"?"✓":s==="issue"?"✗":s==="na"?"—":"·";
   const statusColor = s => s==="ok"?"#16a34a":s==="issue"?"#dc2626":s==="na"?"#6b7280":"#9ca3af";
@@ -263,7 +263,7 @@ export function printJobCardSheet(job, items=[], settings) {
 }
 
 export function printJobCardLabel(job, settings) {
-  const shopName = settings?.shop_name||"AutoParts";
+  const shopName = settings?.shop_name||"MotorDesk";
   const w = window.open("","_blank","width=480,height=360");
   if(!w) return;
   w.document.write(`<!DOCTYPE html><html><head><title>Job Card Label</title>

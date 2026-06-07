@@ -988,7 +988,7 @@ export function WsSupplierQuoteReplyPage({token}) {
           {saving?"Submitting…":"✅ Submit Quote"}
         </button>
         <div style={{textAlign:"center",fontSize:11,color:"#475569",marginTop:12}}>
-          Powered by AutoParts Workshop
+          Powered by MotorDesk
         </div>
       </div>
     </div>

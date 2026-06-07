@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { api, SUPABASE_URL } from "../lib/api.js";
 import { getSettings } from "../lib/settings.js";
 import { CSS } from "../styles.js";
-import { ShopLogo, FL } from "../components/shared.jsx";
+import { ShopLogo, FL, MotorDeskBanner } from "../components/shared.jsx";
 import { makeId, detectGeoLocation, waLink } from "../lib/helpers.js";
 import { getSubInfo } from "../lib/constants.js";
 
@@ -301,10 +301,11 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
         {/* Logo card */}
         <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:14,padding:"20px",textAlign:"center",marginBottom:18,boxShadow:"var(--shadow)"}}>
-          <div style={{display:"flex",justifyContent:"center",marginBottom:8}}>
-            <ShopLogo settings={loadedSettings||getSettings()} size="lg"/>
-          </div>
-          <div style={{color:"var(--text3)",fontSize:13,fontWeight:500}}>{t.appSub||"Parts Management System"}</div>
+          {(loadedSettings?.logo_url||loadedSettings?.logo_data)
+            ? <div style={{display:"flex",justifyContent:"center",marginBottom:8}}><ShopLogo settings={loadedSettings} size="lg"/></div>
+            : <MotorDeskBanner/>
+          }
+          <div style={{color:"var(--text3)",fontSize:12,fontWeight:500,marginTop:4}}>{(loadedSettings?.logo_url||loadedSettings?.logo_data)?"Powered by MotorDesk":(t.appSub||"Automotive Workshop Management")}</div>
           {langs.length>1&&(
             <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:10}}>
               {langs.map(l=>(

@@ -1,7 +1,7 @@
 import { api } from "./api.js";
 
 let _settings = {
-  shop_name: "AutoParts", logo_url: "", logo_data: "", logo_h_login: 140,
+  shop_name: "MotorDesk", logo_url: "", logo_data: "", logo_h_login: 140,
   logo_h_sidebar: 36, logo_h_pdf: 70, logo_blend: "normal", currency: "TWD NT$",
   whatsapp: "", email: "", phone: "", address: "", city: "", country: "",
   tax_rate: 0, vat_number: "",

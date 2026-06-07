@@ -282,7 +282,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
             const quotedCount=suppQuotes.filter(q=>q.status==="quoted"||q.status==="selected").length;
             const suppData=suppliers.find(x=>String(x.id)===String(s.id));
             const itemsList=sessionItems.map((item,i)=>`${i+1}. ${item.part_name} (${item.part_sku||"—"}) × ${item.qty_needed}`).join("\n");
-            const waMsg=`Hi ${s.name},\n\nWe have an RFQ for ${sessionItems.length} parts. Please click the link below to view the list and submit all quotes at once:\n\n${batchUrl}\n\nParts:\n${itemsList}\n\nDeadline: ${activeSession.deadline||"ASAP"}\nThank you,\n${settings?.shop_name||"AutoParts"}`;
+            const waMsg=`Hi ${s.name},\n\nWe have an RFQ for ${sessionItems.length} parts. Please click the link below to view the list and submit all quotes at once:\n\n${batchUrl}\n\nParts:\n${itemsList}\n\nDeadline: ${activeSession.deadline||"ASAP"}\nThank you,\n${settings?.shop_name||"MotorDesk"}`;
             return (
               <div key={s.id} style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",border:`1px solid ${quotedCount===suppQuotes.length&&suppQuotes.length>0?"rgba(52,211,153,.35)":"var(--border)"}`,flex:"1 1 240px",minWidth:220}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>

@@ -1564,7 +1564,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
   });
 
   // ── Level 2: models for selected make (with optional search) ─
-  const inMake = selMake ? vehicles.filter(v=>v.make===selMake) : [];
+  const inMake = selMake!==null ? vehicles.filter(v=>v.make===selMake) : [];
   const filtered = inMake.filter(v=>{
     if(!search.trim()) return true;
     const s=search.toLowerCase();
@@ -1593,7 +1593,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
     make
   );
 
-  const newVehicleDefaults = { make: selMake||"GWM", model:"", code: nextCodeForMake(selMake||"GWM"), year_from:"", year_to:"", engine:"", variant:"" };
+  const newVehicleDefaults = { make: selMake!==null?selMake:"GWM", model:"", code: nextCodeForMake(selMake!==null?selMake:"GWM"), year_from:"", year_to:"", engine:"", variant:"" };
 
   const openVehicleLightbox = (v, startKey) => {
     const entries = [
@@ -1619,17 +1619,17 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
       {/* ── Header ── */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          {selMake&&(
+          {selMake!==null&&(
             <button className="btn btn-ghost btn-sm" onClick={()=>{setSelMake(null);setSearch("");}}>
               ← Back
             </button>
           )}
           <div>
             <h1 style={{fontSize:20,fontWeight:700}}>
-              🚗 {selMake ? selMake : (t.vehicleMgmt||"Vehicle Management")}
+              🚗 {selMake!==null ? (selMake||"(No Make)") : (t.vehicleMgmt||"Vehicle Management")}
             </h1>
             <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
-              {selMake
+              {selMake!==null
                 ? `${inMake.length} model${inMake.length!==1?"s":""}`
                 : `${makeStats.length} makes · ${vehicles.length} vehicles`}
             </p>
@@ -1641,7 +1641,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
       </div>
 
       {/* ── Level 1: Makes grid ── */}
-      {!selMake&&(
+      {selMake===null&&(
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:12}}>
           {makeStats.map(({make,count,links})=>(
             <div key={make} className="card card-hover" style={{padding:"16px 18px",cursor:"pointer"}}
@@ -1660,7 +1660,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
       )}
 
       {/* ── Level 2: Models for selected make ── */}
-      {selMake&&(<>
+      {selMake!==null&&(<>
         {/* Search within make */}
         <div style={{position:"relative",marginBottom:16}}>
           <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
@@ -1721,7 +1721,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
         </div>
       </>)}
 
-      {selMake&&(
+      {selMake!==null&&(
         <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
           <button className="btn btn-primary" onClick={()=>setEditV(newVehicleDefaults)}>
             + {t.addVehicle||"Add Vehicle"}

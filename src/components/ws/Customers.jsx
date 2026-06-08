@@ -5,7 +5,7 @@ import { makeId } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, DriveImg } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 
-export function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,onDeleteCustomer,onSaveVehicle,onDeleteVehicle,onOpenJob,t}) {
+export function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,onDeleteCustomer,onSaveVehicle,onDeleteVehicle,onOpenJob,t,wsLocked=false}) {
   const [view,setView]=useState("list"); // list | customer
   const [activeCust,setActiveCust]=useState(null);
   const [editCust,setEditCust]=useState(null);
@@ -113,14 +113,14 @@ export function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCust
             <h1 style={{fontSize:18,fontWeight:700}}>{activeCust.name}</h1>
             <div style={{fontSize:12,color:"var(--text3)"}}>{activeCust.phone}{activeCust.email&&` · ${activeCust.email}`}</div>
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={()=>setEditCust(activeCust)}>✏️ Edit</button>
-          <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={async()=>{if(window.confirm("Delete customer?")){ await onDeleteCustomer(activeCust.id); setView("list"); setActiveCust(null); }}}>🗑️</button>
+          {!wsLocked&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditCust(activeCust)}>✏️ Edit</button>}
+          {!wsLocked&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={async()=>{if(window.confirm("Delete customer?")){ await onDeleteCustomer(activeCust.id); setView("list"); setActiveCust(null); }}}>🗑️</button>}
         </div>
 
         {/* Vehicles */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <div style={{fontWeight:700,fontSize:14}}>🚗 Vehicles ({custVehicles.length})</div>
-          <button className="btn btn-ghost btn-sm" onClick={()=>setEditVehicle({workshop_customer_id:activeCust.id,reg:"",make:"",model:"",year:"",color:"",notes:""})}>+ {t.wsAddVehicle}</button>
+          {!wsLocked&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditVehicle({workshop_customer_id:activeCust.id,reg:"",make:"",model:"",year:"",color:"",notes:""})}>+ {t.wsAddVehicle}</button>}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:10,marginBottom:20}}>
           {custVehicles.length===0&&<div className="card" style={{padding:20,color:"var(--text3)",textAlign:"center",gridColumn:"1/-1"}}>{t.wsNoVehicles}</div>}
@@ -136,8 +136,8 @@ export function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCust
                     {v.color&&<div style={{fontSize:11,color:"var(--text3)"}}>{v.color}</div>}
                   </div>
                   <div style={{display:"flex",gap:5}}>
-                    <button className="btn btn-ghost btn-xs" onClick={()=>setEditVehicle(v)}>✏️</button>
-                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={async()=>{if(window.confirm("Delete vehicle?")) await onDeleteVehicle(v.id);}}>✕</button>
+                    {!wsLocked&&<button className="btn btn-ghost btn-xs" onClick={()=>setEditVehicle(v)}>✏️</button>}
+                    {!wsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={async()=>{if(window.confirm("Delete vehicle?")) await onDeleteVehicle(v.id);}}>✕</button>}
                   </div>
                 </div>
                 {[v.photo_front,v.photo_rear,v.photo_side].some(Boolean)&&(
@@ -263,7 +263,7 @@ export function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCust
           <h1 style={{fontSize:20,fontWeight:700}}>👤 {t.wsCustomers}</h1>
           <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{wsCustomers.length} {t.wsCountCustomers} · {wsVehicles.length} {t.wsCountVehicles}</p>
         </div>
-        <button className="btn btn-primary" onClick={()=>setEditCust({name:"",phone:"",email:"",notes:""})}>+ {t.wsNewCustomer}</button>
+        {!wsLocked&&<button className="btn btn-primary" onClick={()=>setEditCust({name:"",phone:"",email:"",notes:""})}>+ {t.wsNewCustomer}</button>}
       </div>
 
       <div style={{position:"relative",marginBottom:14,maxWidth:320}}>
@@ -499,7 +499,7 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
   );
 }
 
-export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUpdate}) {
+export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUpdate, wsLocked=false}) {
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState("all");
   const C = curSym(settings?.currency||getSettings().currency);
@@ -515,7 +515,7 @@ export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUp
           <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🪪 Licence Renewals</div>
           <div style={{fontSize:13,color:"var(--text3)"}}>{renewals.length} total · {unpaidComm.length} awaiting commission</div>
         </div>
-        <button className="btn btn-primary" onClick={()=>setShowModal(true)}>+ New Renewal Request</button>
+        {!wsLocked&&<button className="btn btn-primary" onClick={()=>setShowModal(true)}>+ New Renewal Request</button>}
       </div>
 
       {unpaidComm.length>0&&(

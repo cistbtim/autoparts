@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fmtAmt } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 
-export function WsStockPage({wsStock=[],onSave,onDelete,onAdjust}) {
+export function WsStockPage({wsStock=[],onSave,onDelete,onAdjust,wsLocked=false}) {
   const [search,setSearch]=useState("");
   const [modal,setModal]=useState(null); // null | {mode:"add"|"edit"|"adjust", item?}
 
@@ -31,7 +31,7 @@ export function WsStockPage({wsStock=[],onSave,onDelete,onAdjust}) {
 
       <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
         <input className="inp" style={{flex:1,minWidth:200}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search workshop stock..."/>
-        <button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Stock Item</button>
+        {!wsLocked&&<button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Stock Item</button>}
       </div>
 
       {filtered.length===0
@@ -63,9 +63,9 @@ export function WsStockPage({wsStock=[],onSave,onDelete,onAdjust}) {
                       <td style={{fontSize:12,color:"var(--text3)"}}>{low>0?low:"—"}</td>
                       <td>
                         <div style={{display:"flex",gap:4}}>
-                          <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"adjust",item:p})}>±</button>
-                          <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:p})}>✏️</button>
-                          <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete this stock item?"))onDelete(p.id);}}>🗑</button>
+                          {!wsLocked&&<button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"adjust",item:p})}>±</button>}
+                          {!wsLocked&&<button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:p})}>✏️</button>}
+                          {!wsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete this stock item?"))onDelete(p.id);}}>🗑</button>}
                         </div>
                       </td>
                     </tr>

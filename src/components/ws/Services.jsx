@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fmtAmt } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 
-export function WsServicesPage({wsServices=[],onSave,onDelete}) {
+export function WsServicesPage({wsServices=[],onSave,onDelete,wsLocked=false}) {
   const [modal,setModal]=useState(null);
   const [search,setSearch]=useState("");
 
@@ -16,7 +16,7 @@ export function WsServicesPage({wsServices=[],onSave,onDelete}) {
     <div>
       <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
         <input className="inp" style={{flex:1,minWidth:200}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search services..."/>
-        <button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Service</button>
+        {!wsLocked&&<button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Service</button>}
       </div>
 
       {filtered.length===0
@@ -38,8 +38,8 @@ export function WsServicesPage({wsServices=[],onSave,onDelete}) {
                     <td style={{fontSize:12,color:"var(--text3)"}}>{s.unit||"job"}</td>
                     <td>
                       <div style={{display:"flex",gap:4}}>
-                        <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:s})}>✏️</button>
-                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete service preset?"))onDelete(s.id);}}>🗑</button>
+                        {!wsLocked&&<button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:s})}>✏️</button>}
+                        {!wsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete service preset?"))onDelete(s.id);}}>🗑</button>}
                       </div>
                     </td>
                   </tr>

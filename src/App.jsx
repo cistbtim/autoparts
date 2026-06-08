@@ -4927,18 +4927,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {/* ── SETTINGS ── */}
         {/* ── VEHICLES ── */}
         {/* ── WORKSHOP (all sub-tabs) ── */}
-        {/* Subscription expired block */}
-        {role==="workshop"&&subStatus?.expired&&(
-          <WsSubscriptionExpiredPage expiresAt={subStatus.expiresAt} onLogout={()=>{onLogout();setTab("workshop");setSubStatus(null);}} settings={wsDisplaySettings}/>
-        )}
-        {tab==="wsprofile"&&role==="workshop"&&!subStatus?.expired&&(
+        {tab==="wsprofile"&&role==="workshop"&&(
           <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId} branches={branches} user={user}/>
         )}
         {tab==="wssubscriptions"&&role==="admin"&&(
           <WsSubscriptionsPage settings={settings}/>
         )}
 
-        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop"].includes(tab)&&(role==="admin"||role==="manager"||(role==="workshop"&&!subStatus?.expired))&&(
+        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop"].includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
           <WorkshopPage
             key={tab}
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":"report"}
@@ -5054,6 +5050,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               }
               return {localOid,bsrId:bsrId||linkedBsrId};
             }}
+            wsLocked={role==="workshop"&&!!subStatus?.expired}
+            wsDaysLeft={role==="workshop"&&subStatus?.daysLeft!=null?subStatus.daysLeft:null}
+            wsExpiresAt={role==="workshop"&&subStatus?.expiresAt?subStatus.expiresAt:null}
+            wsSubStatus={role==="workshop"?subStatus?.status:null}
             t={t} lang={lang}/>
         )}
 

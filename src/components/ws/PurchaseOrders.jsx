@@ -258,7 +258,7 @@ export function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierReques
   );
 }
 
-export function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsStock=[],settings,wsSupplierQuotes=[],wsSqReplies=[],wsSupplierRequests=[],initialViewPoId=null,onClearInitialView,onSave,onDelete,onReceive}) {
+export function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[],wsStock=[],settings,wsSupplierQuotes=[],wsSqReplies=[],wsSupplierRequests=[],initialViewPoId=null,onClearInitialView,onSave,onDelete,onReceive,wsLocked=false}) {
   const C=curSym(settings?.currency||getSettings().currency);
   const fmt=v=>`${C}${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [modal,setModal]=useState(null); // null | {mode:"add"|"edit"|"view"|"receive", po?}
@@ -308,7 +308,7 @@ export function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[
           <option value="__all__">All Status</option>
           {["draft","sent","partial","received","cancelled"].map(s=><option key={s}>{s}</option>)}
         </select>
-        <button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ New PO</button>
+        {!wsLocked&&<button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ New PO</button>}
       </div>
       {/* List */}
       {filtered.length===0
@@ -347,13 +347,13 @@ export function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[
                   </div>
                 )}
                 <div style={{display:"flex",gap:6,marginTop:8}} onClick={e=>e.stopPropagation()}>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>setModal({mode:"edit",po})}>✏️ Edit</button>
-                  {po.status!=="received"&&po.status!=="cancelled"&&(
+                  {!wsLocked&&<button className="btn btn-ghost btn-sm" onClick={()=>setModal({mode:"edit",po})}>✏️ Edit</button>}
+                  {!wsLocked&&po.status!=="received"&&po.status!=="cancelled"&&(
                     <button className="btn btn-sm" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",border:"1px solid rgba(52,211,153,.3)"}}
                       onClick={()=>setModal({mode:"receive",po})}>📥 Receive Goods</button>
                   )}
-                  <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",marginLeft:"auto"}}
-                    onClick={()=>{if(window.confirm("Delete this PO?"))onDelete(po.id);}}>🗑️</button>
+                  {!wsLocked&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)",marginLeft:"auto"}}
+                    onClick={()=>{if(window.confirm("Delete this PO?"))onDelete(po.id);}}>🗑️</button>}
                 </div>
               </div>
             );

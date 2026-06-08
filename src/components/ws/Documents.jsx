@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { FL, FD } from "../shared.jsx";
 
-export function WsDocumentsPage({docs=[],onSave,onDelete}) {
+export function WsDocumentsPage({docs=[],onSave,onDelete,wsLocked=false}) {
   // ── Upload section state ──────────────────────────────────────
   const [name,setName]=useState("");
   const [notes,setNotes]=useState("");
@@ -83,7 +83,7 @@ export function WsDocumentsPage({docs=[],onSave,onDelete}) {
   return (
     <div>
       {/* ── UPLOAD SECTION ── */}
-      <div className="card" style={{padding:16,marginBottom:20,borderLeft:"3px solid var(--accent)"}}>
+      {!wsLocked&&<div className="card" style={{padding:16,marginBottom:20,borderLeft:"3px solid var(--accent)"}}>
         <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>⬆️ Upload New Document</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
           <div>
@@ -117,7 +117,7 @@ export function WsDocumentsPage({docs=[],onSave,onDelete}) {
             <img src={preview} alt="preview" style={{maxHeight:140,maxWidth:"100%",borderRadius:8,border:"1px solid var(--border)"}}/>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* ── DISPLAY SECTION ── */}
       <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center"}}>
@@ -152,8 +152,8 @@ export function WsDocumentsPage({docs=[],onSave,onDelete}) {
                     {!isPdf&&(
                       <button className="btn btn-ghost btn-xs" style={{flex:1}} onClick={()=>setViewDoc(d)}>🖼️ Preview</button>
                     )}
-                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
-                      onClick={()=>{if(window.confirm("Delete this document?"))onDelete(d.id);}}>🗑</button>
+                    {!wsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
+                      onClick={()=>{if(window.confirm("Delete this document?"))onDelete(d.id);}}>🗑</button>}
                   </div>
                 </div>
               );

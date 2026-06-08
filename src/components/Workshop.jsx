@@ -27,7 +27,7 @@ import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, Wor
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -272,6 +272,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         sourceBooking={wsBookings.find(bk=>bk.id===activeJob.booking_id)||null}
         initialTab={jobDetailTab}
         onRefresh={onRefresh}
+        wsLocked={wsLocked}
         t={t} lang={lang}/>
     );
   }
@@ -307,6 +308,40 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
   return (
     <div className="fu">
+      {wsLocked&&(
+        <div style={{marginBottom:14,padding:"16px 20px",background:"rgba(239,68,68,.1)",border:"2px solid rgba(239,68,68,.4)",borderRadius:14,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+          <span style={{fontSize:28,flexShrink:0}}>🔒</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:800,fontSize:15,color:"var(--red)",marginBottom:2}}>Subscription Expired</div>
+            <div style={{fontSize:12,color:"var(--text3)"}}>Book In Car &amp; Photos still available. Contact admin to renew and unlock all features.</div>
+            {wsExpiresAt&&<div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Expired: {wsExpiresAt}</div>}
+          </div>
+          {wsDaysLeft!==null&&(
+            <div style={{flexShrink:0,textAlign:"center",background:"rgba(239,68,68,.15)",border:"2px solid rgba(239,68,68,.5)",borderRadius:12,padding:"10px 18px",minWidth:90}}>
+              <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:48,lineHeight:1,color:"#ef4444"}}>{Math.abs(wsDaysLeft)}</div>
+              <div style={{fontWeight:700,fontSize:11,color:"#ef4444",textTransform:"uppercase",letterSpacing:".06em",marginTop:2}}>DAYS OVERDUE</div>
+            </div>
+          )}
+        </div>
+      )}
+      {!wsLocked&&wsExpiresAt&&wsDaysLeft!==null&&(()=>{
+        const d=wsDaysLeft;
+        const col=d<=3?"#ef4444":d<=7?"#f97316":d<=14?"#eab308":"#22c55e";
+        const bg=d<=3?"rgba(239,68,68,.08)":d<=7?"rgba(249,115,22,.08)":d<=14?"rgba(234,179,8,.08)":"rgba(34,197,94,.08)";
+        const bdr=d<=3?"rgba(239,68,68,.35)":d<=7?"rgba(249,115,22,.35)":d<=14?"rgba(234,179,8,.35)":"rgba(34,197,94,.35)";
+        return (
+          <div style={{marginBottom:14,padding:"12px 18px",background:bg,border:`2px solid ${bdr}`,borderRadius:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:700,fontSize:13,color:col}}>{wsSubStatus==="trial"?"Free Trial":"Subscription"}</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>Expires: {wsExpiresAt}</div>
+            </div>
+            <div style={{flexShrink:0,textAlign:"center",background:`rgba(0,0,0,.04)`,border:`2px solid ${bdr}`,borderRadius:12,padding:"8px 16px",minWidth:80}}>
+              <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:42,lineHeight:1,color:col}}>{d<=0?"Today":d}</div>
+              {d>0&&<div style={{fontWeight:700,fontSize:10,color:col,textTransform:"uppercase",letterSpacing:".06em",marginTop:1}}>DAYS LEFT</div>}
+            </div>
+          </div>
+        );
+      })()}
       {/* ── Page header ── */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div>
@@ -318,12 +353,12 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         {wsTab==="jobs"&&(
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <button className="btn btn-primary" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
-            <button className="btn btn-ghost" onClick={()=>setEditJob({
+            {!wsLocked&&<button className="btn btn-ghost" onClick={()=>setEditJob({
               customer_name:"",customer_phone:"",vehicle_reg:"",vehicle_make:"",
               vehicle_model:"",vehicle_year:"",vehicle_color:"",vin:"",engine_no:"",mileage:"",
               complaint:"",diagnosis:"",mechanic:"",date_in:new Date().toISOString().slice(0,10),
               date_out:"",notes:"",status:"Pending"
-            })}>+ Manual</button>
+            })}>+ Manual</button>}
             <button className="btn btn-ghost" title="Refresh jobs" disabled={jobsRefreshing}
               onClick={async()=>{if(!onRefresh)return;setJobsRefreshing(true);try{await onRefresh();}finally{setJobsRefreshing(false);}}}
               style={{opacity:jobsRefreshing?.6:1}}>
@@ -587,7 +622,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             const canFlag   = col.id!=="paid"&&col.id!=="problem";
             const canUnflag = col.id==="problem";
             const canInvoice= col.id==="done";
-            const isDraggable = DRAGGABLE_COLS.includes(col.id);
+            const isDraggable = !wsLocked && DRAGGABLE_COLS.includes(col.id);
             return (
               <div className="kb-card"
                 draggable={isDraggable}
@@ -661,7 +696,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                       <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
                     </div>
                   )}
-                  {(col.nextStatus||canInvoice||col.id==="wip"||col.id==="invoiced")&&(
+                  {!wsLocked&&(col.nextStatus||canInvoice||col.id==="wip"||col.id==="invoiced")&&(
                     <div style={{marginTop:4}} onClick={e=>e.stopPropagation()}>
                       {col.id==="wip"&&(
                         <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:10,padding:"5px 0",marginBottom:3}}
@@ -806,7 +841,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           onSaveCustomer={onSaveWsCustomer} onDeleteCustomer={onDeleteWsCustomer}
           onSaveVehicle={onSaveWsVehicle} onDeleteVehicle={onDeleteWsVehicle}
           onOpenJob={(j)=>{ setWsTab("jobs"); setActiveJob(j); setView("job"); }}
-          settings={settings} embedded t={t}/>
+          settings={settings} embedded wsLocked={wsLocked} t={t}/>
       )}
 
       {/* ══════════════ QUOTATIONS TAB ══════════════ */}
@@ -1238,13 +1273,13 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       {/* ══════════════ WS STOCK TAB ══════════════ */}
       {wsTab==="wsstock"&&(
         <WsStockPage wsStock={wsStock} settings={settings}
-          onSave={onSaveWsStock} onDelete={onDeleteWsStock} onAdjust={onAdjustWsStock}/>
+          onSave={onSaveWsStock} onDelete={onDeleteWsStock} onAdjust={onAdjustWsStock} wsLocked={wsLocked}/>
       )}
 
       {/* ══════════════ WS SERVICES TAB ══════════════ */}
       {wsTab==="wsservices"&&(
         <WsServicesPage wsServices={wsServices} settings={settings}
-          onSave={onSaveWsService} onDelete={onDeleteWsService}/>
+          onSave={onSaveWsService} onDelete={onDeleteWsService} wsLocked={wsLocked}/>
       )}
 
       {/* ══════════════ WS PURCHASE ORDERS TAB ══════════════ */}
@@ -1257,13 +1292,13 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           initialViewPoId={pendingViewPoId}
           onClearInitialView={()=>setPendingViewPoId(null)}
           onSave={onSaveWsPurchaseOrder} onDelete={onDeleteWsPurchaseOrder}
-          onReceive={onReceiveWsPurchaseOrder}/>
+          onReceive={onReceiveWsPurchaseOrder} wsLocked={wsLocked}/>
       )}
 
       {/* ══════════════ WS SUPPLIERS TAB ══════════════ */}
       {wsTab==="wssuppliers"&&(
         <WsSuppliersPage wsSuppliers={wsSuppliers}
-          onSave={onSaveWsSupplier} onDelete={onDeleteWsSupplier}/>
+          onSave={onSaveWsSupplier} onDelete={onDeleteWsSupplier} wsLocked={wsLocked}/>
       )}
 
       {/* ══════════════ WS SUPPLIER INVOICES TAB ══════════════ */}
@@ -1280,13 +1315,13 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           onDeleteInvoice={onDeleteWsSupplierInvoice}
           onSavePayment={onSaveWsSupplierPayment}
           onDeletePayment={onDeleteWsSupplierPayment}
-          onSaveReturn={onSaveWsSupplierReturn}/>
+          onSaveReturn={onSaveWsSupplierReturn} wsLocked={wsLocked}/>
       )}
 
       {/* ══════════════ WS TRANSFER TAB ══════════════ */}
       {wsTab==="wstransfer"&&(
         <WsTransferPage parts={parts} wsStock={wsStock} settings={settings}
-          onSave={onSaveWsTransfer}/>
+          onSave={onSaveWsTransfer} wsLocked={wsLocked}/>
       )}
 
       {/* ══════════════ SPARE SHOP TAB ══════════════ */}
@@ -1301,13 +1336,13 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
           </div>
         );
-        return <WsSpareShopTab key={`${spareShopFilter.make}|${spareShopFilter.model}`} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} ads={ads} userCtx={userCtx}/>;
+        return <WsSpareShopTab key={`${spareShopFilter.make}|${spareShopFilter.model}`} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} ads={ads} userCtx={userCtx} wsLocked={wsLocked}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
       {wsTab==="wsdocs"&&(
         <WsDocumentsPage docs={wsDocs} settings={settings}
-          onSave={onSaveWsDoc} onDelete={onDeleteWsDoc}/>
+          onSave={onSaveWsDoc} onDelete={onDeleteWsDoc} wsLocked={wsLocked}/>
       )}
 
       {/* ══════════════ LICENCE RENEWALS TAB ══════════════ */}
@@ -1315,7 +1350,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         <WsLicenceRenewalsPage
           renewals={wsLicenceRenewals} settings={settings} wsId={wsId}
           onSave={onSaveWsLicenceRenewal}
-          onUpdate={onUpdateWsLicenceRenewal}/>
+          onUpdate={onUpdateWsLicenceRenewal} wsLocked={wsLocked}/>
       )}
 
       {/* ══════════════ STATEMENT TAB ══════════════ */}
@@ -2748,7 +2783,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,vehicles=[],wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,vehicles=[],wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,wsLocked=false,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -3520,7 +3555,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         <div className="card" style={{padding:16,marginBottom:14}}>
           {/* Action buttons */}
           <div style={{position:"relative",display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
-            {wsRole!=="mechanic"&&<button className="btn" onClick={()=>setEditJob(true)} style={{flex:1,background:"linear-gradient(135deg,#fbbf24 0%,#f97316 55%,#ef4444 100%)",color:"#fff",padding:"13px 20px",fontSize:15,fontWeight:700,letterSpacing:"0.4px",borderRadius:12,boxShadow:"0 4px 24px rgba(249,115,22,0.55),inset 0 1px 0 rgba(255,255,255,0.18)",textShadow:"0 1px 3px rgba(0,0,0,0.25)",border:"none"}}>✏️ {t.edit}</button>}
+            {wsRole!=="mechanic"&&!wsLocked&&<button className="btn" onClick={()=>setEditJob(true)} style={{flex:1,background:"linear-gradient(135deg,#fbbf24 0%,#f97316 55%,#ef4444 100%)",color:"#fff",padding:"13px 20px",fontSize:15,fontWeight:700,letterSpacing:"0.4px",borderRadius:12,boxShadow:"0 4px 24px rgba(249,115,22,0.55),inset 0 1px 0 rgba(255,255,255,0.18)",textShadow:"0 1px 3px rgba(0,0,0,0.25)",border:"none"}}>✏️ {t.edit}</button>}
             {/* Print dropdown */}
             <div style={{position:"relative"}}>
               <button className="btn" onClick={()=>{setShowPrintMenu(p=>!p);setShowJobMenu(false);}} style={{background:"linear-gradient(135deg,#1d4ed8,#7c3aed)",color:"#fff",padding:"13px 16px",fontSize:15,fontWeight:700,borderRadius:12,boxShadow:"0 4px 20px rgba(99,102,241,0.45),inset 0 1px 0 rgba(255,255,255,0.15)",border:"none",gap:6,display:"flex",alignItems:"center"}}>🖨️ Print <span style={{fontSize:12}}>▾</span></button>
@@ -3543,7 +3578,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
                   <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);setDeliveryModal(true);}}>🚗 {t.wsCollect}</button>
                   {wsRole==="main"&&onMoveJob&&wsProfile?.move_pin&&<button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--yellow)"}} onClick={()=>{setShowJobMenu(false);setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}}>🔀 {t.wsMove}</button>}
                   <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);const lines=["============================","  VEHICLE INFO","============================",`Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,`Model    : ${job.vehicle_model||"—"}`,`Year     : ${job.vehicle_year||"—"}`,`Color    : ${job.vehicle_color||"—"}`,`Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,job.vin?`VIN      : ${job.vin}`:"",job.engine_no?`Engine No: ${job.engine_no}`:"","============================"].filter(Boolean).join("\r\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`;a.click();}}>⬇️ {t.wsInfoBtn}</button>
-                  {wsRole==="main"&&onDeleteJob&&<><div style={{height:1,background:"var(--border)",margin:"4px 8px"}}/><button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--red)"}} onClick={()=>{setShowJobMenu(false);if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button></>}
+                  {wsRole==="main"&&onDeleteJob&&!wsLocked&&<><div style={{height:1,background:"var(--border)",margin:"4px 8px"}}/><button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--red)"}} onClick={()=>{setShowJobMenu(false);if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button></>}
                 </div>
               </>
             )}
@@ -4487,8 +4522,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
               )}
             </div>
             <div style={{display:"flex",gap:6}}>
-              <button className="btn btn-sm" onClick={()=>setAddingItem("part")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtPart}</button>
-              <button className="btn btn-sm" onClick={()=>setAddingItem("labour")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtLabour}</button>
+              {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("part")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtPart}</button>}
+              {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("labour")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtLabour}</button>}
             </div>
           </div>
           {/* Items body */}
@@ -4891,24 +4926,24 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
                 window.location.href=`mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
               }}>✉️ Email</button>
             )}
-            {quote.status!=="converted"&&quote.status!=="declined"&&(
+            {!wsLocked&&quote.status!=="converted"&&quote.status!=="declined"&&(
               <button className={`btn btn-xs ${quote.status==="accepted"?"btn-ghost":"btn-success"}`}
                 onClick={()=>onSaveQuote({...quote,status:quote.status==="accepted"?"sent":"accepted"})}>
                 {quote.status==="accepted"?"↩ "+t.wsqtUnaccept:"✅ "+t.wsqtMarkAccepted}
               </button>
             )}
-            {quote.status!=="converted"&&(
+            {!wsLocked&&quote.status!=="converted"&&(
               <button className="btn btn-ghost btn-xs" onClick={()=>setQuoteModal(true)}>✏️ Edit</button>
             )}
-            {!invoice&&quote.status==="accepted"&&(
+            {!wsLocked&&!invoice&&quote.status==="accepted"&&(
               <button className="btn btn-primary btn-sm" onClick={()=>{ setQuoteSrcForInv(quote); setCreatingInv(true); }}>🧾 {t.wsqtConvertInv}</button>
             )}
-            <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",marginLeft:"auto"}}
-              onClick={()=>setDeletingQuote(true)}>🗑️</button>
+            {!wsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)",marginLeft:"auto"}}
+              onClick={()=>setDeletingQuote(true)}>🗑️</button>}
           </div>
         </div>
       ) : (
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+        !wsLocked&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
           <button className="btn btn-ghost" style={{width:"100%",padding:12,fontSize:14,fontWeight:600,border:"2px dashed var(--border)"}}
             onClick={()=>setQuoteModal(true)}>
             📝 Create Quotation for Customer
@@ -4924,21 +4959,21 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
       {quote&&(
         <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:8}}>
           {/* Step 1 — Done */}
-          {!["Done","Delivered"].includes(job.status)&&(
+          {!wsLocked&&!["Done","Delivered"].includes(job.status)&&(
             <button className="btn btn-success" style={{width:"100%",padding:11,fontSize:14,fontWeight:700}}
               onClick={()=>onSaveJob({...job,status:"Done"})}>
               ✅ Mark Job as Done
             </button>
           )}
           {/* Step 2 — Create Invoice (job done, no invoice yet) */}
-          {["Done","Delivered"].includes(job.status)&&!invoice&&(
+          {!wsLocked&&["Done","Delivered"].includes(job.status)&&!invoice&&(
             <button className="btn btn-primary" style={{width:"100%",padding:11,fontSize:14,fontWeight:700}}
               onClick={()=>{ setQuoteSrcForInv(quote); setCreatingInv(true); }}>
               🧾 Create Invoice
             </button>
           )}
           {/* Step 3 — Payment (invoice exists and not fully paid) */}
-          {invoice&&invoice.status!=="paid"&&(
+          {!wsLocked&&invoice&&invoice.status!=="paid"&&(
             <button className="btn btn-success" style={{width:"100%",padding:11,fontSize:14,fontWeight:700}}
               onClick={()=>setPaymentModal(true)}>
               💳 Record Payment
@@ -4984,10 +5019,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
           {/* Action buttons */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
             <button className="btn btn-ghost btn-sm" onClick={()=>setStatementModal(true)}>📋 Statement</button>
-            {invoice.status!=="paid"&&(
+            {!wsLocked&&invoice.status!=="paid"&&(
               <button className="btn btn-success btn-sm" onClick={()=>setPaymentModal(true)}>💳 Payment</button>
             )}
-            <button className="btn btn-ghost btn-sm" onClick={()=>setEditingInv(true)}>✏️ Edit</button>
+            {!wsLocked&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditingInv(true)}>✏️ Edit</button>}
             <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos)}>🖨️ Print</button>
             {(invoice.inv_phone||job.customer_phone)&&(
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
@@ -5023,11 +5058,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
                 window.location.href=`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
               }}>✉️ Email</button>
             )}
-            <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",marginLeft:"auto"}}
-              onClick={()=>setDeletingInv(true)}>🗑️ Delete</button>
+            {!wsLocked&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)",marginLeft:"auto"}}
+              onClick={()=>setDeletingInv(true)}>🗑️ Delete</button>}
           </div>
         </div>
-      ) : items.length>0&&wsRole!=="mechanic"&&(
+      ) : !wsLocked&&items.length>0&&wsRole!=="mechanic"&&(
         quote?.status==="converted"
           ? <div style={{background:"rgba(251,191,36,.12)",border:"1px solid rgba(251,191,36,.4)",borderRadius:8,padding:"12px 14px",marginBottom:4}}>
               <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>⚠️ This quote was already converted to an invoice.</div>
@@ -5085,7 +5120,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
             )}
           </div>
           {invoice.status!=="paid"
-            ? <button className="btn btn-success" style={{width:"100%",padding:13,fontSize:15,fontWeight:700}} onClick={()=>setPaymentModal(true)}>💳 Record Payment</button>
+            ? !wsLocked&&<button className="btn btn-success" style={{width:"100%",padding:13,fontSize:15,fontWeight:700}} onClick={()=>setPaymentModal(true)}>💳 Record Payment</button>
             : <div style={{textAlign:"center",padding:"14px",background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",borderRadius:10,fontSize:14,fontWeight:700,color:"var(--green)"}}>✅ Fully Paid{invoice.payment_date&&<span style={{fontSize:12,fontWeight:400,color:"var(--text3)",marginLeft:8}}>{invoice.payment_method} · {invoice.payment_date}</span>}</div>
           }
           <div style={{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>

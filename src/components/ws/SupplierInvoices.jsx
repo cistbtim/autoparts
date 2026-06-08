@@ -2,7 +2,7 @@ import { useState } from "react";
 import { getSettings, curSym } from "../../lib/settings.js";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 
-export function WsSupplierInvoicesPage({invoices=[],invItems=[],payments=[],returns=[],wsSuppliers=[],wsStock=[],settings,onSaveInvoice,onDeleteInvoice,onSavePayment,onSaveReturn}) {
+export function WsSupplierInvoicesPage({invoices=[],invItems=[],payments=[],returns=[],wsSuppliers=[],wsStock=[],settings,onSaveInvoice,onDeleteInvoice,onSavePayment,onSaveReturn,wsLocked=false}) {
   const C = curSym(settings?.currency||getSettings().currency);
   const fmt = v=>`${C}${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [modal,setModal]=useState(null); // null | {mode:"add"|"edit"|"view"|"pay"|"return", item?}
@@ -56,7 +56,7 @@ export function WsSupplierInvoicesPage({invoices=[],invItems=[],payments=[],retu
           <option value="__all__">All Status</option>
           {["pending","partial","paid","overdue"].map(s=><option key={s}>{s}</option>)}
         </select>
-        <button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ New Invoice</button>
+        {!wsLocked&&<button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ New Invoice</button>}
       </div>
 
       {/* Invoice list */}
@@ -84,10 +84,10 @@ export function WsSupplierInvoicesPage({invoices=[],invItems=[],payments=[],retu
                     <td>
                       <div style={{display:"flex",gap:4}}>
                         <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"view",item:inv})} title="View">👁</button>
-                        <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"pay",item:inv})} title="Record payment" style={{color:"var(--green)"}}>💳</button>
-                        <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"return",item:inv})} title="Return items" style={{color:"var(--yellow)"}}>↩️</button>
-                        <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:inv})} title="Edit">✏️</button>
-                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{ if(window.confirm("Delete this invoice? Stock will NOT be reversed.")) onDeleteInvoice(inv.id); }} title="Delete">🗑</button>
+                        {!wsLocked&&<button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"pay",item:inv})} title="Record payment" style={{color:"var(--green)"}}>💳</button>}
+                        {!wsLocked&&<button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"return",item:inv})} title="Return items" style={{color:"var(--yellow)"}}>↩️</button>}
+                        {!wsLocked&&<button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:inv})} title="Edit">✏️</button>}
+                        {!wsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{ if(window.confirm("Delete this invoice? Stock will NOT be reversed.")) onDeleteInvoice(inv.id); }} title="Delete">🗑</button>}
                       </div>
                     </td>
                   </tr>

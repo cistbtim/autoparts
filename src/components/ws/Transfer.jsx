@@ -3,7 +3,7 @@ import { fmtAmt } from "../../lib/helpers.js";
 import { getSettings, curSym } from "../../lib/settings.js";
 import { FL, FD } from "../shared.jsx";
 
-export function WsTransferPage({parts=[],wsStock=[],settings,onSave}) {
+export function WsTransferPage({parts=[],wsStock=[],settings,onSave,wsLocked=false}) {
   const [items,setItems]=useState([]); // [{part_id,ws_stock_id,name,sku,qty,cost_price}]
   const [notes,setNotes]=useState("");
   const [search,setSearch]=useState("");
@@ -47,6 +47,14 @@ export function WsTransferPage({parts=[],wsStock=[],settings,onSave}) {
     }catch(e){alert("Transfer failed: "+e.message);}
     finally{setSaving(false);}
   };
+
+  if(wsLocked) return (
+    <div className="card" style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
+      <div style={{fontSize:32,marginBottom:10}}>🔒</div>
+      <div style={{fontWeight:700,fontSize:16,marginBottom:6}}>Transfer Locked</div>
+      <div style={{fontSize:13}}>Renew your subscription to transfer parts to workshop stock.</div>
+    </div>
+  );
 
   return (
     <div>

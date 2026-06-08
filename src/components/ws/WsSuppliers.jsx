@@ -9,7 +9,7 @@ function parseTypes(v){
   try{ return JSON.parse(v); }catch{ return []; }
 }
 
-export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete}) {
+export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete,wsLocked=false}) {
   const [modal,setModal]=useState(null);
   const [search,setSearch]=useState("");
   const [typeFilter,setTypeFilter]=useState("");
@@ -32,7 +32,7 @@ export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete}) {
           <option value="">All Types</option>
           {SUPPLIER_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
         </select>
-        <button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Supplier</button>
+        {!wsLocked&&<button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Supplier</button>}
       </div>
 
       {filtered.length===0
@@ -74,8 +74,8 @@ export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete}) {
                       <button className="btn btn-ghost btn-xs" style={{color:"#25D366"}}>👥 Group</button>
                     </a>
                   )}
-                  <button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:s})}>✏️</button>
-                  <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete ${s.name}?`))onDelete(s.id);}}>🗑</button>
+                  {!wsLocked&&<button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:s})}>✏️</button>}
+                  {!wsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete ${s.name}?`))onDelete(s.id);}}>🗑</button>}
                 </div>
               </div>
             ))}

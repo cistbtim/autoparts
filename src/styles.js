@@ -95,7 +95,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes wsSubFlash{0%{opacity:1}50%{opacity:0}100%{opacity:1}}
-.wsFlash{animation:wsSubFlash 1s linear infinite}
+.wsFlash{animation:wsSubFlash 2.5s ease-in-out infinite}
 @keyframes raceCar{0%{transform:translateX(-180px)}100%{transform:translateX(420px)}}
 @keyframes roadScroll{from{transform:translateX(0)}to{transform:translateX(-40px)}}
 .fu{animation:fadeUp .2s ease}

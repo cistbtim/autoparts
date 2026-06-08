@@ -1760,8 +1760,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   };
   const saveVehicle=async(v)=>{
     const {id, ...data} = v;
-    if(id) await api.patch("vehicles","id",id,data);
-    else await api.insert("vehicles",data);
+    const res = id ? await api.patch("vehicles","id",id,data) : await api.insert("vehicles",data);
+    if(res?.code||res?.message){showToast("Unable to save vehicle","err");throw new Error("save failed");}
     await refreshTables("vehicles"); showToast("Vehicle saved");
   };
   const deleteVehicle=async(id)=>{

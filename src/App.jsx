@@ -5052,9 +5052,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               return {localOid,bsrId:bsrId||linkedBsrId};
             }}
             wsLocked={role==="workshop"&&!!subStatus?.expired}
-            wsDaysLeft={role==="workshop"&&subStatus?.daysLeft!=null?subStatus.daysLeft:null}
-            wsExpiresAt={role==="workshop"&&subStatus?.expiresAt?subStatus.expiresAt:null}
-            wsSubStatus={role==="workshop"?subStatus?.status:null}
+            wsDaysLeft={role==="workshop"?(subStatus?.daysLeft??sub?.daysLeft??null):null}
+            wsExpiresAt={role==="workshop"?(subStatus?.expiresAt??sub?.expiresAt??null):null}
+            wsSubStatus={role==="workshop"?(subStatus?.status??sub?.status??null):null}
             t={t} lang={lang}/>
         )}
 

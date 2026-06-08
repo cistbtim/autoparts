@@ -46,34 +46,46 @@ export const ShopLogo = ({settings, size="md", style={}}) => {
 };
 
 export const MotorDeskBanner = () => (
-  <div style={{display:"flex",justifyContent:"center",marginBottom:4}}>
-  <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e293b 100%)",borderRadius:12,padding:"18px 24px",display:"inline-flex",alignItems:"center",gap:16,width:"fit-content"}}>
-    <svg width="54" height="54" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
-      <circle cx="32" cy="32" r="30" fill="rgba(249,115,22,0.12)"/>
-      <g transform="translate(32,32)">
-        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316"/>
-        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(45)"/>
-        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(90)"/>
-        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(135)"/>
-        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(180)"/>
-        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(225)"/>
-        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(270)"/>
-        <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(315)"/>
-        <circle r="14" fill="#f97316"/>
-        <circle r="5.5" fill="#0f172a"/>
-      </g>
-      <g transform="translate(32,32) rotate(-45)">
-        <rect x="-13" y="-27" width="8" height="22" rx="3" fill="white" opacity="0.9"/>
-        <rect x="5" y="-27" width="8" height="22" rx="3" fill="white" opacity="0.9"/>
-        <rect x="-13" y="-8" width="26" height="9" fill="white" opacity="0.9"/>
-        <rect x="-5" y="-1" width="10" height="30" rx="5" fill="white" opacity="0.9"/>
-      </g>
-    </svg>
-    <div style={{textAlign:"left"}}>
-      <div style={{fontSize:32,fontWeight:900,fontFamily:"Rajdhani,sans-serif",letterSpacing:"-0.5px",lineHeight:1,background:"linear-gradient(90deg,#f97316,#fb923c)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>MotorDesk</div>
-      <div style={{fontSize:10,color:"rgba(255,255,255,0.45)",letterSpacing:".12em",textTransform:"uppercase",fontWeight:600,marginTop:4}}>Automotive Workshop Management</div>
+  <div style={{position:"relative",background:"linear-gradient(135deg,#080d14 0%,#111827 55%,#0c1420 100%)",borderRadius:12,padding:"28px 24px 20px",overflow:"hidden",textAlign:"center"}}>
+    {/* Ambient glow circles */}
+    <div style={{position:"absolute",top:-40,right:-40,width:180,height:180,borderRadius:"50%",background:"rgba(249,115,22,0.07)",pointerEvents:"none"}}/>
+    <div style={{position:"absolute",bottom:-50,left:-50,width:200,height:200,borderRadius:"50%",background:"rgba(249,115,22,0.04)",pointerEvents:"none"}}/>
+    {/* Icon + name row */}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:18,marginBottom:10,position:"relative"}}>
+      <svg width="52" height="52" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0,filter:"drop-shadow(0 0 10px rgba(249,115,22,0.5))"}}>
+        <circle cx="32" cy="32" r="30" fill="rgba(249,115,22,0.12)"/>
+        <g transform="translate(32,32)">
+          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316"/>
+          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(45)"/>
+          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(90)"/>
+          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(135)"/>
+          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(180)"/>
+          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(225)"/>
+          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(270)"/>
+          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(315)"/>
+          <circle r="14" fill="#f97316"/>
+          <circle r="5.5" fill="#0f172a"/>
+        </g>
+        <g transform="translate(32,32) rotate(-45)">
+          <rect x="-13" y="-27" width="8" height="22" rx="3" fill="white" opacity="0.9"/>
+          <rect x="5" y="-27" width="8" height="22" rx="3" fill="white" opacity="0.9"/>
+          <rect x="-13" y="-8" width="26" height="9" fill="white" opacity="0.9"/>
+          <rect x="-5" y="-1" width="10" height="30" rx="5" fill="white" opacity="0.9"/>
+        </g>
+      </svg>
+      <div style={{textAlign:"left"}}>
+        <div style={{fontSize:46,fontWeight:900,fontFamily:"Rajdhani,sans-serif",letterSpacing:"1px",lineHeight:1,background:"linear-gradient(90deg,#f97316 0%,#fb923c 60%,#fdba74 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>MotorDesk</div>
+        <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",letterSpacing:".18em",textTransform:"uppercase",fontWeight:700,marginTop:3}}>Automotive Workshop Management</div>
+      </div>
     </div>
-  </div>
+    {/* Divider */}
+    <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(249,115,22,0.5),transparent)",margin:"14px 0 12px",position:"relative"}}/>
+    {/* Feature badges */}
+    <div style={{display:"flex",justifyContent:"center",gap:20,flexWrap:"wrap",position:"relative"}}>
+      {["BOOK IN","QUOTATION","INVOICE","REPORTS"].map(b=>(
+        <span key={b} style={{fontSize:9,fontWeight:800,color:"rgba(255,255,255,0.35)",letterSpacing:".14em"}}>{b}</span>
+      ))}
+    </div>
   </div>
 );
 

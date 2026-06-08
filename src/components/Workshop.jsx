@@ -329,7 +329,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         const col=d<=3?"#ef4444":d<=7?"#f97316":d<=14?"#eab308":"#22c55e";
         const bg=d<=3?"rgba(239,68,68,.08)":d<=7?"rgba(249,115,22,.08)":d<=14?"rgba(234,179,8,.08)":"rgba(34,197,94,.08)";
         const bdr=d<=3?"rgba(239,68,68,.35)":d<=7?"rgba(249,115,22,.35)":d<=14?"rgba(234,179,8,.35)":"rgba(34,197,94,.35)";
-        const flash=d<=7?"wsSubFlash 0.8s step-end infinite":undefined;
+        const flash=d<=7?"wsSubFlash 1s linear infinite":undefined;
         return (
           <div style={{marginBottom:14,padding:"12px 18px",background:bg,border:`2px solid ${bdr}`,borderRadius:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",animation:flash}}>
             <div style={{flex:1,minWidth:0}}>

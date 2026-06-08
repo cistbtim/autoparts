@@ -285,7 +285,7 @@ const getEnvCtx = () => {
   return _envCtxPromise;
 };
 
-export function AdBanner({ads=[], page="shop", userCtx=null}) {
+export function AdBanner({ads=[], page="shop", userCtx=null, height=220}) {
   const [idx, setIdx] = useState(0);
   const [envCtx, setEnvCtx] = useState(null);
   const [timerKey, setTimerKey] = useState(0);
@@ -360,7 +360,7 @@ export function AdBanner({ads=[], page="shop", userCtx=null}) {
     <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
     <div style={{position:"relative",borderRadius:10,overflow:"hidden",
       cursor:ad.link_url?"pointer":"default",border:"1px solid var(--border)",background:"var(--surface2)",
-      width:"100%",flexShrink:0,height:220}}
+      width:"100%",flexShrink:0,height}}
       onClick={()=>{ if(!didSwipe.current) openLink(ad.link_url); }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}>

@@ -309,36 +309,22 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   return (
     <div className="fu">
       {wsLocked&&(
-        <div style={{marginBottom:14,padding:"16px 20px",background:"rgba(239,68,68,.1)",border:"2px solid rgba(239,68,68,.4)",borderRadius:14,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-          <span style={{fontSize:28,flexShrink:0}}>🔒</span>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:800,fontSize:15,color:"var(--red)",marginBottom:2}}>Subscription Expired</div>
-            <div style={{fontSize:12,color:"var(--text3)"}}>Book In Car &amp; Photos still available. Contact admin to renew and unlock all features.</div>
-            {wsExpiresAt&&<div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Expired: {wsExpiresAt}</div>}
-          </div>
-          {wsDaysLeft!==null&&(
-            <div style={{flexShrink:0,textAlign:"center",background:"rgba(239,68,68,.15)",border:"2px solid rgba(239,68,68,.5)",borderRadius:12,padding:"10px 18px",minWidth:90}}>
-              <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:48,lineHeight:1,color:"#ef4444"}}>{Math.abs(wsDaysLeft)}</div>
-              <div style={{fontWeight:700,fontSize:11,color:"#ef4444",textTransform:"uppercase",letterSpacing:".06em",marginTop:2}}>DAYS OVERDUE</div>
-            </div>
-          )}
+        <div style={{marginBottom:8,padding:"6px 12px",background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.4)",borderRadius:8,display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:14,flexShrink:0}}>🔒</span>
+          <div style={{flex:1,fontSize:12,fontWeight:700,color:"var(--red)"}}>Expired{wsDaysLeft!==null?` · ${Math.abs(wsDaysLeft)}d overdue`:""}</div>
+          <div style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>Book In &amp; Photos still work</div>
         </div>
       )}
       {!wsLocked&&wsExpiresAt&&wsDaysLeft!==null&&(()=>{
         const d=wsDaysLeft;
         const col=d<=3?"#ef4444":d<=7?"#f97316":d<=14?"#eab308":"#22c55e";
         const bg=d<=3?"rgba(239,68,68,.08)":d<=7?"rgba(249,115,22,.08)":d<=14?"rgba(234,179,8,.08)":"rgba(34,197,94,.08)";
-        const bdr=d<=3?"rgba(239,68,68,.35)":d<=7?"rgba(249,115,22,.35)":d<=14?"rgba(234,179,8,.35)":"rgba(34,197,94,.35)";
+        const bdr=d<=3?"rgba(239,68,68,.3)":d<=7?"rgba(249,115,22,.3)":d<=14?"rgba(234,179,8,.3)":"rgba(34,197,94,.3)";
         return (
-          <div className={d<=7?"wsFlash":undefined} style={{marginBottom:14,padding:"12px 18px",background:bg,border:`2px solid ${bdr}`,borderRadius:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:700,fontSize:13,color:col}}>{wsSubStatus==="trial"?"Free Trial":"Subscription"}</div>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>Expires: {wsExpiresAt}</div>
-            </div>
-            <div style={{flexShrink:0,textAlign:"center",background:`rgba(0,0,0,.04)`,border:`2px solid ${bdr}`,borderRadius:12,padding:"8px 16px",minWidth:80}}>
-              <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:42,lineHeight:1,color:col}}>{d<=0?"Today":d}</div>
-              {d>0&&<div style={{fontWeight:700,fontSize:10,color:col,textTransform:"uppercase",letterSpacing:".06em",marginTop:1}}>DAYS LEFT</div>}
-            </div>
+          <div className={d<=7?"wsFlash":undefined} style={{marginBottom:8,padding:"5px 12px",background:bg,border:`1px solid ${bdr}`,borderRadius:8,display:"flex",alignItems:"center",gap:10}}>
+            <div style={{flex:1,fontSize:12,fontWeight:600,color:col}}>{wsSubStatus==="trial"?"Free Trial":"Subscription"} · {wsExpiresAt}</div>
+            <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:20,lineHeight:1,color:col}}>{d<=0?"Today":d}</div>
+            <div style={{fontSize:11,fontWeight:700,color:col}}>{d>0?"d left":"OVERDUE"}</div>
           </div>
         );
       })()}
@@ -402,7 +388,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         </select>
       </div>
 
-      {wsTab!=="spareshop"&&<AdBanner ads={ads} page="workshop" userCtx={userCtx}/>}
+      {wsTab!=="spareshop"&&<AdBanner ads={ads} page="workshop" userCtx={userCtx} height={140}/>}
 
       {/* ── Resume Job banner (navigated away via Go to Stock / View POs) ── */}
       {activeJob&&view==="list"&&(

@@ -1761,7 +1761,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const saveVehicle=async(v)=>{
     const {id, ...data} = v;
     const res = id ? await api.patch("vehicles","id",id,data) : await api.insert("vehicles",data);
-    if(res?.code||res?.message){showToast("Unable to save vehicle","err");throw new Error("save failed");}
+    if(res?.code||res?.message){
+      if(res.code==="23505"&&(res.message||"").includes("code")){throw new Error("code_exists");}
+      showToast("Unable to save vehicle","err");throw new Error("save failed");
+    }
     await refreshTables("vehicles"); showToast("Vehicle saved");
   };
   const deleteVehicle=async(id)=>{

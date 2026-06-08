@@ -1766,6 +1766,7 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
       setF(p=>({...p,[k]:v}));
   };
   const [err, setErr] = useState({});
+  const [codeErr, setCodeErr] = useState("");
 
   const validate = () => {
     const e={};
@@ -1784,11 +1785,13 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
           <FL label="Make *"/>
           <input className="inp" value={f.make} onChange={e=>s("make",e.target.value)}
             placeholder="GWM, Toyota, Ford..." style={{borderColor:err.make?"var(--red)":undefined}}/>
+          {err.make&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {err.make}</div>}
         </div>
         <div>
           <FL label="Model *"/>
           <input className="inp" value={f.model} onChange={e=>s("model",e.target.value)}
             placeholder="P-Series, Hilux..." style={{borderColor:err.model?"var(--red)":undefined}}/>
+          {err.model&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {err.model}</div>}
         </div>
       </FG>
       <FG>
@@ -1796,6 +1799,7 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
           <FL label="Year From *"/>
           <input className="inp" type="number" value={f.year_from} onChange={e=>s("year_from",+e.target.value)}
             placeholder="2020" style={{borderColor:err.year_from?"var(--red)":undefined}}/>
+          {err.year_from&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {err.year_from}</div>}
         </div>
         <div>
           <FL label="Year To"/>
@@ -1806,8 +1810,9 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
       <FG>
         <div>
           <FL label="Model Code"/>
-          <input className="inp" value={f.code} onChange={e=>s("code",e.target.value)}
-            placeholder="FD50A, BA3, GJ..."/>
+          <input className="inp" value={f.code} onChange={e=>{s("code",e.target.value);setCodeErr("");}}
+            placeholder="FD50A, BA3, GJ..." style={{borderColor:codeErr?"var(--red)":undefined}}/>
+          {codeErr&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {codeErr}</div>}
         </div>
         <div>
           <FL label="Variant"/>
@@ -1843,7 +1848,11 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
 
       <div style={{display:"flex",gap:10,marginTop:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={()=>{ if(validate()) onSave(f); }}>
+        <button className="btn btn-primary" style={{flex:2}} onClick={async()=>{
+          if(!validate()) return;
+          try{ await onSave(f); }
+          catch(e){ if(e.message==="code_exists") setCodeErr("Code already exists in database"); }
+        }}>
           💾 {t.save}
         </button>
       </div>

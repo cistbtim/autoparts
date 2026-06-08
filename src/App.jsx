@@ -3182,6 +3182,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               </button>
             ))}
           </div>
+          {role!=="admin"&&sub?.label&&<div className={sub.daysLeft!=null&&sub.daysLeft<=7?"wsFlash":undefined} style={{marginTop:8,background:"rgba(249,115,22,.15)",borderRadius:7,padding:"4px 10px",fontSize:12,color:"var(--accent)",fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
         </div>
         {/* Drawer nav groups */}
         <nav style={{flex:1,padding:"8px 6px",overflowY:"auto"}}>

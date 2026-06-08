@@ -3085,7 +3085,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             </div>
           )}
         </div>
-        {role!=="admin"&&sub?.label&&<div style={{margin:"0 12px 8px",background:"rgba(249,115,22,.15)",borderRadius:7,padding:"3px 9px",fontSize:11,color:"var(--accent)",fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
+        {role!=="admin"&&sub?.label&&<div className={sub.daysLeft!=null&&sub.daysLeft<=7?"wsFlash":undefined} style={{margin:"0 12px 8px",background:"rgba(249,115,22,.15)",borderRadius:7,padding:"3px 9px",fontSize:11,color:"var(--accent)",fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
 
         {branches.length>0&&(
           <div style={{margin:"0 12px 8px"}}>

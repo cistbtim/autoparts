@@ -350,7 +350,13 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             {jobs.length} jobs · {jobs.filter(j=>j.status==="In Progress").length} in progress · {invoices.filter(i=>i.status!=="paid").length} unpaid invoices
           </p>
         </div>
-        {wsTab==="jobs"&&(
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
+          {wsDaysLeft!==null&&(()=>{
+            const col=wsLocked?"#ef4444":wsDaysLeft<=3?"#ef4444":wsDaysLeft<=7?"#f97316":"#22c55e";
+            const label=wsLocked?`🔒 ${Math.abs(wsDaysLeft)}d overdue`:wsDaysLeft<=0?"⚠️ Today":`✅ ${wsDaysLeft}d left`;
+            return <span className={!wsLocked&&wsDaysLeft<=7?"wsFlash":undefined} style={{background:col+"22",border:`1px solid ${col}66`,borderRadius:99,padding:"3px 12px",fontSize:12,color:col,fontWeight:700,whiteSpace:"nowrap"}}>{label}</span>;
+          })()}
+          {wsTab==="jobs"&&(
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <button className="btn btn-primary" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
             {!wsLocked&&<button className="btn btn-ghost" onClick={()=>setEditJob({
@@ -369,7 +375,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
               <button title="Board view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:kanbanView?"var(--accent)":"transparent",color:kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(true)}>⬜</button>
             </div>
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ── Sub-navigation (desktop) ── */}

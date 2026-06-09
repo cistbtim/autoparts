@@ -1496,7 +1496,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
       {active && (()=>{
         const matchV = vehicles.filter(v=>
           v.make===selMake &&
-          (!selModel||v.model===selModel)
+          (!selModel||v.code===selModel||v.model===selModel)
         );
         const variants = [...new Set(matchV.map(v=>v.variant).filter(Boolean))];
         const variantLabel = variants.length === 1 ? variants[0] : "";

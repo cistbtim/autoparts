@@ -2958,7 +2958,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
     auto_reorder:p.auto_reorder||false, reorder_point:p.reorder_point??0, reorder_qty:p.reorder_qty??1,
     preferred_supplier_id:p.preferred_supplier_id||"",
   }:{
-    sku:branchSkuPrefix?branchSkuPrefix+"-":"", name:"", category:"Engine", brand:"", price:"", cost_price:"", stock:"", minStock:"",
+    sku:branchSkuPrefix?branchSkuPrefix+"-":"", name:"", category:"Engine", brand:"", price:0, cost_price:0, stock:"", minStock:"",
     image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", reference_url:"", bin_location:"", is_quantum:false, is_hiace:false,
     auto_reorder:false, reorder_point:0, reorder_qty:1, preferred_supplier_id:"",
   };

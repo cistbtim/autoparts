@@ -2947,7 +2947,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -3550,7 +3550,10 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                   <FL label="Link New Supplier"/>
                   <div style={{background:"var(--surface2)",borderRadius:11,padding:15,border:"1px solid var(--border)"}}>
                     <FD>
-                      <FL label="Supplier *"/>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <FL label="Supplier *"/>
+                        {onAddSupplier&&<button type="button" className="btn btn-ghost btn-xs" style={{marginBottom:4}} onClick={onAddSupplier}>+ Supplier</button>}
+                      </div>
                       <select className="inp" value={suppId} onChange={e=>{setSuppId(e.target.value);setSuppPartNoErr("");}}>
                         <option value="">Select supplier...</option>
                         {avail.map(s=>(
@@ -3918,7 +3921,7 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
   );
 }
 
-export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],partFitments=[],onSave,onDelete,onUpdate,onClose,onEditPart,onMergePart,branches=[],allParts=[],onGoToMainPart,t}) {
+export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],partFitments=[],onSave,onDelete,onUpdate,onClose,onEditPart,onMergePart,branches=[],allParts=[],onGoToMainPart,onAddSupplier,t}) {
   const [suppId,setSuppId]=useState("");
   const [price,setPrice]=useState("");
   const [lead,setLead]=useState("");
@@ -4103,7 +4106,10 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
             <FL label="Link New Supplier"/>
             <div style={{background:"var(--surface2)",borderRadius:11,padding:15,border:"1px solid var(--border)"}}>
               <FD>
-                <FL label="Supplier *"/>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <FL label="Supplier *"/>
+                  {onAddSupplier&&<button type="button" className="btn btn-ghost btn-xs" style={{marginBottom:4}} onClick={onAddSupplier}>+ Supplier</button>}
+                </div>
                 <select className="inp" value={suppId} onChange={e=>setSuppId(e.target.value)}>
                   <option value="">Select supplier...</option>
                   {avail.map(s=>(

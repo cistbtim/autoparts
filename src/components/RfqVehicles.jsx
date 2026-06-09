@@ -1551,8 +1551,14 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, t}) {
   const [selMake, setSelMake] = useState(null);  // null = makes level
   const [search,  setSearch]  = useState("");
+  const [searchD, setSearchD] = useState("");
   const [editV,   setEditV]   = useState(null);
   const [lightbox, setLightbox] = useState(null); // {urls,labels,idx}
+
+  useEffect(()=>{
+    const t=setTimeout(()=>setSearchD(search),300);
+    return()=>clearTimeout(t);
+  },[search]);
 
   const fitCount = (vid) => partFitments.filter(f=>String(f.vehicle_id)===String(vid)).length;
 
@@ -1566,8 +1572,8 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
   // ── Level 2: models for selected make (with optional search) ─
   const inMake = selMake!==null ? vehicles.filter(v=>v.make===selMake) : [];
   const filtered = inMake.filter(v=>{
-    if(!search.trim()) return true;
-    const s=search.toLowerCase();
+    if(!searchD.trim()) return true;
+    const s=searchD.toLowerCase();
     return `${v.model} ${v.variant||""} ${v.code||""} ${v.engine||""} ${v.year_from||""} ${v.year_to||""}`.toLowerCase().includes(s);
   }).sort((a,b)=>(a.code||"￿").localeCompare(b.code||"￿")||(a.model||"").localeCompare(b.model||""));
 
@@ -1620,7 +1626,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           {selMake!==null&&(
-            <button className="btn btn-ghost btn-sm" onClick={()=>{setSelMake(null);setSearch("");}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setSelMake(null);setSearch("");setSearchD("");}}>
               ← Back
             </button>
           )}
@@ -1665,7 +1671,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
         <div style={{position:"relative",marginBottom:16}}>
           <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
             placeholder={`Search in ${selMake}...`}/>
-          {search&&<button onClick={()=>setSearch("")}
+          {search&&<button onClick={()=>{setSearch("");setSearchD("");}}
             style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16}}>✕</button>}
         </div>
 

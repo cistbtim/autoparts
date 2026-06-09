@@ -1440,8 +1440,8 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
     const allIds = new Set([...fitmentIds, ...codeIds]);
 
     if(onVehicleChange){
-      // Inventory mode — null = no filter (show all) when nothing matches
-      onVehicleChange(allIds.size > 0 ? allIds : null);
+      // Always pass a Set so the filter stays active; empty Set (sentinel) = 0 results, not "show all"
+      onVehicleChange(allIds.size > 0 ? allIds : new Set(["__none__"]));
     } else if(onFilter){
       // Shop mode — empty sentinel when nothing matches
       onFilter(allIds.size > 0 ? allIds : new Set(["__none__"]));

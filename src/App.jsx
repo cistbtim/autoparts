@@ -1045,7 +1045,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         } else {
           setParts(prev=>[...prev,newPart]);
           closeM("editPart");
-          // Navigate to inventory, filter to new SKU, then re-open for photo + fitment editing
+          // Navigate to inventory, clear filters that could hide a new 0-stock/no-fitment part
+          setFilterInStock(false);setFilterFits("__all__");setInvVehicleFilterIds(null);setFilterSupplier("__all__");
           setTab("inventory");
           setSearchPart(newPart.sku||d2.sku||"");
           setSearchDebounced(newPart.sku||d2.sku||"");
@@ -1161,6 +1162,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       await refreshTables("parts","part_fitments");
       if(srcSupps.length>0) await reloadPartSuppliers();
       closeM("editPart");
+      setFilterInStock(false);setFilterFits("__all__");setInvVehicleFilterIds(null);setFilterSupplier("__all__");
       setTab("inventory");
       setSearchPart(newPart.sku);
       setSearchDebounced(newPart.sku);

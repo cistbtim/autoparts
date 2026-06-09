@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
 import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, extractDriveId } from "../lib/helpers.js";
@@ -1562,20 +1562,31 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
 
   const fitCount = (vid) => partFitments.filter(f=>String(f.vehicle_id)===String(vid)).length;
 
-  // ── Level 1: makes summary ──────────────────────────────────
-  const makeStats = [...new Set(vehicles.map(v=>v.make))].sort().map(make=>{
-    const mvs   = vehicles.filter(v=>v.make===make);
-    const links = partFitments.filter(f=>mvs.some(v=>String(v.id)===String(f.vehicle_id))).length;
-    return { make, count: mvs.length, links };
-  });
+  // ── Level 1: makes summary ── only computed when at top level or data changes
+  const makeStats = useMemo(()=>{
+    if(selMake!==null) return [];
+    const vIds = new Set(vehicles.map(v=>String(v.id)));
+    const fitByVehicle = {};
+    for(const f of partFitments){ const k=String(f.vehicle_id); fitByVehicle[k]=(fitByVehicle[k]||0)+1; }
+    return [...new Set(vehicles.map(v=>v.make))].sort().map(make=>{
+      const mvs = vehicles.filter(v=>v.make===make);
+      const links = mvs.reduce((n,v)=>(fitByVehicle[String(v.id)]||0)+n,0);
+      return { make, count: mvs.length, links };
+    });
+  },[vehicles, partFitments, selMake]);
 
   // ── Level 2: models for selected make (with optional search) ─
-  const inMake = selMake!==null ? vehicles.filter(v=>v.make===selMake) : [];
-  const filtered = inMake.filter(v=>{
-    if(!searchD.trim()) return true;
-    const s=searchD.toLowerCase();
-    return `${v.model} ${v.variant||""} ${v.code||""} ${v.engine||""} ${v.year_from||""} ${v.year_to||""}`.toLowerCase().includes(s);
-  }).sort((a,b)=>(a.code||"￿").localeCompare(b.code||"￿")||(a.model||"").localeCompare(b.model||""));
+  const inMake = useMemo(()=>
+    selMake!==null ? vehicles.filter(v=>v.make===selMake) : []
+  ,[vehicles, selMake]);
+
+  const filtered = useMemo(()=>
+    inMake.filter(v=>{
+      if(!searchD.trim()) return true;
+      const s=searchD.toLowerCase();
+      return `${v.model} ${v.variant||""} ${v.code||""} ${v.engine||""} ${v.year_from||""} ${v.year_to||""}`.toLowerCase().includes(s);
+    }).sort((a,b)=>(a.code||"￿").localeCompare(b.code||"￿")||(a.model||"").localeCompare(b.model||""))
+  ,[inMake, searchD]);
 
   const nextCodeFromList = (vList, make) => {
     const m = make || vList[0]?.make || '';

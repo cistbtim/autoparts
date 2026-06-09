@@ -1771,7 +1771,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     await api.delete("vehicles","id",id);
     await refreshTables("vehicles"); showToast("Deleted","err");
   };
-  const deletePart=async(id)=>{const p=parts.find(pt=>pt.id===id);setBusyMsg(`Deleting ${p?.sku||""}${p?.name?" · "+p.name:""}`);try{if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await Promise.all([api.delete("part_suppliers","part_id",id),api.delete("part_fitments","part_id",id)]);await api.delete("parts","id",id);await refreshTables("parts","inventory_logs","part_suppliers","part_fitments");showToast("Deleted","err");}finally{setBusyMsg(null);}};
+  const deletePart=async(id)=>{const p=parts.find(pt=>pt.id===id);setBusyMsg(`Deleting ${p?.sku||""}${p?.name?" · "+p.name:""}`);try{if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await Promise.all([api.delete("part_suppliers","part_id",id),api.delete("part_fitments","part_id",id)]);await api.delete("parts","id",id);setPartSuppliers(prev=>prev.filter(ps=>String(ps.part_id)!==String(id)));setPartFitments(prev=>prev.filter(f=>String(f.part_id)!==String(id)));await refreshTables("parts","inventory_logs");showToast("Deleted","err");}finally{setBusyMsg(null);}};
   const approvePart=async(id)=>{await api.patch("parts","id",id,{review_status:null,created_by_branch_id:null});await refreshTables("parts");showToast("✅ Part approved");};
   const applyAdjust=async(part,nq,reason)=>{
     await api.patch("parts","id",part.id,{stock:nq});

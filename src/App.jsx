@@ -768,7 +768,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
 
   const refreshLoginLogs=useCallback(async()=>{
     setLoginLogsLoading(true);
-    try { const r=await api.get("login_logs","select=*&order=created_at.desc&limit=200").catch(()=>[]); if(Array.isArray(r))setLoginLogs(r); } finally { setLoginLogsLoading(false); }
+    try { api.cacheInvalidate("login_logs"); const r=await api.get("login_logs","select=*&order=created_at.desc&limit=200").catch(()=>[]); if(Array.isArray(r))setLoginLogs(r); } finally { setLoginLogsLoading(false); }
   },[]);
 
   const refreshAdClicks=useCallback(async()=>{

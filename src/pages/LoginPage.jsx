@@ -383,9 +383,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
           {authTab==="workshop"&&(
             <div style={{display:"flex",flexDirection:"column",gap:0}}>
               <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:18}}>
-                {[["login",t.signIn||"Sign In"],["signup",t.registerWorkshop||"Register"]].map(([id,lb])=>(
-                  <button key={id} className={`auth-tab ${wsTab===id?"on":""}`} onClick={()=>{setWsTab(id);setErr("");}}>{lb}</button>
-                ))}
+                <button className="auth-tab on">{t.signIn||"Sign In"}</button>
               </div>
 
               {wsTab==="login"&&(

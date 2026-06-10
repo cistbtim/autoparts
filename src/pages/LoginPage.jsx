@@ -108,8 +108,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
   const logLogin = async (u) => {
     try {
-      const g = await (await fetch("https://ipapi.co/json/")).json();
-      await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:`${g.country_name||"?"} ${g.country_flag_emoji||""}`.trim(),city:g.city||"",device:navigator.userAgent.slice(0,100),status:"success"});
+      const g = await detectGeoLocation();
+      await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:g.countryFull||"?",city:g.city||"",device:navigator.userAgent.slice(0,100),status:"success"});
     } catch {}
   };
 

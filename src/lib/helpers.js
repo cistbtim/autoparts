@@ -67,15 +67,52 @@ let _idCounter = 0;
 export const makeId = (prefix) => { _idCounter++; return `${prefix}-${Date.now()}-${_idCounter}`; };
 export const makeToken = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 export const detectGeoLocation = async () => {
-  const g = await (await fetch("https://ipapi.co/json/")).json();
-  return {
-    city: g.city || "",
-    country: g.country_name || "",
-    countryFull: `${g.country_name||""}${g.country_flag_emoji?" "+g.country_flag_emoji:""}`.trim(),
-    lat: g.latitude || null,
-    lon: g.longitude || null,
-    ip: g.ip || ""
-  };
+  // Try browser GPS/WiFi positioning first — gives the real physical city.
+  // IP-based lookup is unreliable in SA: mobile carriers route through Johannesburg
+  // so every mobile user appears to be in Johannesburg regardless of actual location.
+  const tryBrowserGeo = () => new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
+      reject,
+      { timeout: 8000, maximumAge: 300000 }   // cache result for 5 min
+    );
+  });
+
+  try {
+    const { lat, lon } = await tryBrowserGeo();
+    // Reverse geocode with OpenStreetMap Nominatim (free, no API key needed)
+    const r = await (await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+      { headers: { "Accept-Language": "en" } }
+    )).json();
+    const a = r.address || {};
+    const city = a.city || a.town || a.village || a.suburb || a.county || "";
+    const countryName = a.country || "";
+    const cc = (a.country_code || "").toUpperCase();
+    const flag = cc.length === 2
+      ? String.fromCodePoint(...[...cc].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)))
+      : "";
+    // Still fetch IP for the ip_address field
+    let ip = "";
+    try { ip = (await (await fetch("https://ipapi.co/json/")).json()).ip || ""; } catch {}
+    return { city, country: countryName, countryFull: flag ? `${countryName} ${flag}` : countryName, lat, lon, ip };
+  } catch {
+    // User denied permission or browser geo failed — fall back to IP-based lookup
+    try {
+      const g = await (await fetch("https://ipapi.co/json/")).json();
+      return {
+        city: g.city || "",
+        country: g.country_name || "",
+        countryFull: `${g.country_name||""}${g.country_flag_emoji?" "+g.country_flag_emoji:""}`.trim(),
+        lat: g.latitude || null,
+        lon: g.longitude || null,
+        ip: g.ip || ""
+      };
+    } catch {
+      return { city: "", country: "", countryFull: "", lat: null, lon: null, ip: "" };
+    }
+  }
 };
 
 const WX_CODE = {0:"☀️ Clear",1:"🌤 Mainly clear",2:"⛅ Partly cloudy",3:"☁️ Overcast",45:"🌫 Fog",48:"🌫 Rime fog",51:"🌦 Light drizzle",53:"🌧 Drizzle",55:"🌧 Heavy drizzle",61:"🌧 Light rain",63:"🌧 Rain",65:"🌧 Heavy rain",71:"🌨 Light snow",73:"🌨 Snow",75:"❄️ Heavy snow",80:"🌦 Showers",81:"🌧 Heavy showers",82:"⛈ Violent showers",95:"⛈ Thunderstorm",96:"⛈ Thunderstorm",99:"⛈ Thunderstorm"};

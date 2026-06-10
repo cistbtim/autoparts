@@ -4888,17 +4888,39 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 if(cn&&CTY_LL[cn])return CTY_LL[cn];
                 return null;
               };
+              // Detailed continent outlines [lat,lon] — Natural Earth simplified
               const LAND=[
-                [[37,-5],[36,10],[33,25],[31,34],[12,51],[10,51],[5,41],[-4,40],[-10,38],[-26,33],[-35,20],[-34,18],[-22,14],[-16,12],[4,-8],[5,-15],[15,-17],[37,-5]],
-                [[36,-9],[36,28],[40,36],[42,50],[55,22],[60,25],[65,15],[70,20],[70,30],[58,14],[56,10],[54,10],[51,2],[48,-5],[43,-9],[36,-9]],
-                [[37,36],[37,60],[28,60],[22,115],[22,122],[35,140],[60,130],[70,130],[72,140],[72,100],[60,60],[42,50],[40,36]],
-                [[28,65],[28,75],[22,80],[10,80],[8,77],[8,72],[14,74],[22,72],[28,65]],
-                [[22,100],[22,110],[10,105],[1,104],[5,100],[22,100]],
-                [[70,-140],[70,-60],[55,-65],[47,-53],[43,-65],[35,-75],[25,-80],[15,-87],[8,-77],[22,-105],[30,-110],[35,-120],[45,-125],[60,-140],[70,-140]],
-                [[10,-75],[8,-63],[5,-52],[-5,-35],[-15,-38],[-23,-43],[-34,-53],[-55,-68],[-55,-70],[-43,-73],[-18,-70],[-5,-80],[0,-75],[5,-77],[10,-75]],
-                [[-15,130],[-15,152],[-22,152],[-38,148],[-38,140],[-28,115],[-22,114],[-15,124],[-15,130]],
-                [[60,-45],[60,-18],[78,-18],[83,-28],[83,-45],[60,-45]],
+                // Africa
+                [[37,-6],[37,9],[34,12],[32,25],[30,33],[22,37],[15,43],[12,45],[11,51],[10,51],[1,42],[-1,41],[-5,40],[-11,38],[-15,35],[-20,35],[-26,33],[-32,28],[-34,27],[-35,20],[-34,18],[-30,17],[-22,15],[-17,12],[-6,12],[0,9],[3,10],[5,3],[5,-1],[4,-8],[5,-15],[10,-15],[15,-17],[22,-17],[37,-6]],
+                // Europe (inc Iberian, Italy, Balkans, Scandinavia)
+                [[36,-9],[36,0],[38,2],[41,2],[43,6],[43,8],[38,16],[38,15],[37,14],[40,18],[44,14],[45,14],[46,13],[47,19],[46,30],[44,38],[42,28],[40,26],[37,22],[38,23],[40,24],[42,28],[45,29],[47,38],[55,22],[57,8],[58,6],[51,3],[48,-2],[44,-2],[43,-9],[36,-9]],
+                // Scandinavia
+                [[57,8],[58,6],[58,5],[60,5],[62,7],[65,14],[68,16],[70,28],[70,30],[67,26],[60,25],[59,24],[57,22],[55,21],[54,10],[57,8]],
+                // Asia main
+                [[42,28],[42,50],[55,60],[70,102],[72,140],[60,130],[35,140],[22,121],[22,115],[28,60],[37,60],[42,50],[40,36],[42,28]],
+                // India
+                [[28,65],[28,77],[22,81],[10,80],[8,77],[8,72],[22,72],[28,65]],
+                // SE Asia
+                [[22,100],[22,112],[15,100],[10,105],[1,104],[5,100],[22,100]],
+                // Japan
+                [[31,131],[33,131],[35,136],[38,141],[41,141],[43,141],[45,142],[43,140],[38,139],[35,136],[33,131],[31,131]],
+                // North America
+                [[71,-157],[71,-60],[55,-65],[47,-53],[42,-65],[35,-75],[25,-80],[20,-87],[10,-83],[8,-77],[15,-87],[20,-105],[22,-108],[30,-110],[32,-117],[34,-120],[48,-125],[60,-138],[71,-157]],
+                // Greenland
+                [[61,-45],[61,-18],[76,-18],[83,-28],[83,-45],[61,-45]],
+                // South America
+                [[10,-75],[8,-62],[5,-52],[-5,-35],[-15,-38],[-23,-43],[-34,-53],[-55,-67],[-55,-70],[-43,-73],[-18,-70],[-5,-80],[0,-75],[5,-77],[10,-75]],
+                // Australia
+                [[-15,129],[-15,137],[-12,136],[-12,141],[-18,147],[-22,150],[-28,153],[-38,147],[-38,140],[-36,137],[-32,115],[-22,114],[-20,120],[-15,129]],
+                // New Zealand (N island approx)
+                [[-34,172],[-34,178],[-41,176],[-41,172],[-34,172]],
+                // British Isles
+                [[50,-6],[51,2],[56,0],[58,-3],[58,-6],[54,-8],[52,-10],[50,-6]],
+                // Iceland
+                [[63,-24],[65,-14],[66,-14],[66,-20],[64,-24],[63,-24]],
               ];
+              // South Africa highlighted separately
+              const SA_POLY=[[-22.5,29.3],[-22.5,33.0],[-27.0,33.0],[-30.0,30.5],[-34.4,26.2],[-34.8,20.0],[-29.0,16.5],[-22.2,20.0],[-18.3,20.0],[-22.5,29.3]];
               const seenU=new Set();
               const locMap={};// key→{lat,lon,label,count,users[]}
               const byCt={};
@@ -4924,16 +4946,34 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                     <span style={{fontSize:12,color:"var(--text3)"}}>{seenU.size} unique user{seenU.size!==1?"s":""} · {Object.keys(byCt).length} countr{Object.keys(byCt).length!==1?"ies":"y"}</span>
                   </div>
                   <svg viewBox={`0 0 ${MW} ${MH}`} style={{width:"100%",height:"auto",display:"block"}}>
-                    <rect width={MW} height={MH} fill="#0d1b2a"/>
+                    <defs>
+                      <radialGradient id="oceanGrad" cx="50%" cy="50%" r="70%">
+                        <stop offset="0%" stopColor="#0f2744"/>
+                        <stop offset="100%" stopColor="#060e1a"/>
+                      </radialGradient>
+                      <filter id="pinGlow" x="-80%" y="-80%" width="260%" height="260%">
+                        <feGaussianBlur stdDeviation="4" result="blur"/>
+                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                      </filter>
+                      <filter id="saGlow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="3" result="blur"/>
+                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                      </filter>
+                    </defs>
+                    <rect width={MW} height={MH} fill="url(#oceanGrad)"/>
+                    {/* subtle grid */}
                     {[-60,-30,0,30,60].map(lat=>(
-                      <line key={`lat${lat}`} x1={0} y1={mY(lat).toFixed(1)} x2={MW} y2={mY(lat).toFixed(1)} stroke="#162232" strokeWidth={lat===0?1.2:0.5}/>
+                      <line key={`lat${lat}`} x1={0} y1={mY(lat).toFixed(1)} x2={MW} y2={mY(lat).toFixed(1)} stroke="#1a3050" strokeWidth={lat===0?1:0.4} strokeDasharray={lat===0?"":"4,8"}/>
                     ))}
                     {[-120,-60,0,60,120].map(lon=>(
-                      <line key={`lon${lon}`} x1={mX(lon).toFixed(1)} y1={0} x2={mX(lon).toFixed(1)} y2={MH} stroke="#162232" strokeWidth={0.5}/>
+                      <line key={`lon${lon}`} x1={mX(lon).toFixed(1)} y1={0} x2={mX(lon).toFixed(1)} y2={MH} stroke="#1a3050" strokeWidth={0.4} strokeDasharray="4,8"/>
                     ))}
+                    {/* Continents */}
                     {LAND.map((pts,i)=>(
-                      <polygon key={i} points={poly(pts)} fill="#1a3a28" stroke="#2a5a3a" strokeWidth={0.8} strokeLinejoin="round"/>
+                      <polygon key={i} points={poly(pts)} fill="#1e4535" stroke="#2d6648" strokeWidth={0.7} strokeLinejoin="round"/>
                     ))}
+                    {/* South Africa highlighted */}
+                    <polygon points={poly(SA_POLY)} fill="#1a6640" stroke="#4ade80" strokeWidth={1} filter="url(#saGlow)" strokeLinejoin="round"/>
                     {pins.map((p,i)=>{
                       const r=Math.max(10,8+Math.sqrt(p.count/maxCount)*14);
                       const cx=+mX(p.lon).toFixed(1);
@@ -4945,10 +4985,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         <g key={i} transform={`translate(${cx},${cy})`}>
                           <title>{p.label}: {p.count} user{p.count!==1?"s":""}{"\n"}{p.users.join(", ")}</title>
                           {/* glow rings */}
-                          <circle r={r+8} fill="rgba(251,191,36,0.07)"/>
-                          <circle r={r+3} fill="rgba(251,191,36,0.18)"/>
+                          <circle r={r+10} fill="rgba(251,191,36,0.05)"/>
+                          <circle r={r+5} fill="rgba(251,191,36,0.12)"/>
                           {/* main pin */}
-                          <circle r={r} fill="#d97706" stroke="#fbbf24" strokeWidth={1.5}/>
+                          <circle r={r} fill="#d97706" stroke="#fef08a" strokeWidth={1.5} filter="url(#pinGlow)"/>
                           <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={p.count>9?r*0.75:r*0.85} fontWeight="700" fontFamily="DM Mono,monospace">{p.count}</text>
                           {/* label box below pin */}
                           <rect x={-lblW/2} y={r+5} width={lblW} height={p.province?26:15} rx={4} fill="rgba(13,27,42,0.85)" stroke="rgba(251,191,36,0.3)" strokeWidth={0.8}/>

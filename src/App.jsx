@@ -114,6 +114,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [loginLogs,setLoginLogs]=useState([]);
   const [adClicks,setAdClicks]=useState([]);
   const [adClicksLoading,setAdClicksLoading]=useState(false);
+  const [loginLogsLoading,setLoginLogsLoading]=useState(false);
   const [adContracts,setAdContracts]=useState([]);
   const [suppliers,setSuppliers]=useState([]);
   const [partSuppliers,setPartSuppliers]=useState([]);
@@ -762,6 +763,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
     }
+  },[]);
+
+  const refreshLoginLogs=useCallback(async()=>{
+    setLoginLogsLoading(true);
+    try { const r=await api.get("login_logs","select=*&order=created_at.desc&limit=200").catch(()=>[]); if(Array.isArray(r))setLoginLogs(r); } finally { setLoginLogsLoading(false); }
   },[]);
 
   const refreshAdClicks=useCallback(async()=>{
@@ -4807,7 +4813,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {/* ── LOGIN LOGS ── */}
         {tab==="loginlogs"&&role==="admin"&&(
           <div className="fu">
-            <PH title={`🌍 ${t.loginLogs}`} subtitle={`${loginLogs.length} ${t.llEvents}`}/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+              <PH title={`🌍 ${t.loginLogs}`} subtitle={`${loginLogs.length} ${t.llEvents}`}/>
+              <button className="btn btn-ghost" disabled={loginLogsLoading} onClick={refreshLoginLogs} style={{marginTop:4}}>
+                <span style={{display:"inline-block",animation:loginLogsLoading?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span> Refresh
+              </button>
+            </div>
             <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
               {Object.entries(loginLogs.reduce((a,l)=>{const c=l.country||"?";a[c]=(a[c]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>(
                 <span key={c} className="badge" style={{background:"var(--surface2)",color:"var(--text2)",padding:"5px 13px",fontSize:13}}>{c} · {n}</span>

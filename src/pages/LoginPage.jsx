@@ -110,7 +110,13 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     try {
       const g = await detectGeoLocation();
       const wx = g.lat ? await fetchWeather(g.lat, g.lon).catch(()=>({label:""})) : {label:""};
-      await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:g.countryFull||"?",city:g.city||"",weather:wx.label||null,device:navigator.userAgent.slice(0,100),status:"success"});
+      const ua=navigator.userAgent;
+      const mob=/Mobile|Android|iPhone|iPad/i.test(ua);
+      const os=/Windows/.test(ua)?"Windows":/Android/.test(ua)?"Android":/iPhone/.test(ua)?"iPhone":/iPad/.test(ua)?"iPad":/Mac/.test(ua)?"macOS":/Linux/.test(ua)?"Linux":"Unknown";
+      const br=/Edg\//.test(ua)?"Edge":/Chrome\//.test(ua)?"Chrome":/Firefox\//.test(ua)?"Firefox":/Safari\//.test(ua)?"Safari":/OPR\/|Opera\//.test(ua)?"Opera":"Browser";
+      const bv=(ua.match(/(?:Chrome|Firefox|Edg|OPR)\/(\d+)/)||[])[1]||"";
+      const device=`${br}${bv?" "+bv:""} · ${os}${mob?" (mobile)":""}`;
+      await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:g.countryFull||"?",city:g.city||"",weather:wx.label||null,device,status:"success"});
     } catch {}
   };
 

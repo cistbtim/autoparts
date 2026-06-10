@@ -4827,7 +4827,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
-                  <thead><tr>{[t.time,t.user,t.role,t.country,t.city,"IP","Weather",t.status].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{[t.time,t.user,t.role,t.country,t.city,"IP","Device","Weather",t.status].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {loginLogs.map(l=>(
                       <tr key={l.id}>
@@ -4837,6 +4837,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         <td style={{fontSize:13}}>{l.country||"—"}</td>
                         <td style={{fontSize:13,color:"var(--text3)"}}>{l.city||"—"}</td>
                         <td style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{l.ip_address||"—"}</td>
+                        <td style={{fontSize:12,color:"var(--text2)",whiteSpace:"nowrap"}}>{l.device||"—"}</td>
                         <td style={{fontSize:13,whiteSpace:"nowrap"}}>{l.weather||"—"}</td>
                         <td><span className="badge" style={{background:l.status==="success"?"rgba(52,211,153,.12)":"rgba(248,113,113,.12)",color:l.status==="success"?"var(--green)":"var(--red)"}}>{l.status}</span></td>
                       </tr>

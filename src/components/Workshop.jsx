@@ -7041,11 +7041,23 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   useEffect(()=>{
     if(!linkedBranchId){setLoading(false);setShopParts([]);return;}
     setLoading(true);
+    // Only fetch columns shown in the UI — avoids transferring large unused fields over mobile data
+    const COLS="id,sku,name,brand,stock,price,image_url,image,bin_location,category,chinese_desc,make,model,year_range,oe_number";
+    // When coming from a job card (initialMake set), pre-filter by vehicle fitments so we only
+    // download parts that fit the vehicle instead of the entire catalog — critical on SA mobile data
+    let idFilter=null;
+    if(initialMake&&partFitments.length>0&&vehicles.length>0){
+      const matchV=vehicles.filter(v=>v.make===initialMake&&(!initialModel||v.code===initialModel||v.model===initialModel));
+      const vIds=new Set(matchV.map(v=>String(v.id)));
+      const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
+      if(fitIds.length>0&&fitIds.length<=400) idFilter=fitIds;
+    }
+    const idClause=idFilter?`or=(${idFilter.map(id=>`id.eq.${id}`).join(",")})&`:"";
     const fetches=[
-      api.get("parts",`branch_id=eq.${linkedBranchId}&select=*&order=name.asc`).catch(()=>[]),
-      api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=*`).catch(()=>[]),
+      api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}select=${COLS}&order=name.asc`).catch(()=>[]),
+      api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=id,part_id,stock,price,bin_location`).catch(()=>[]),
       // Only load main branch parts if mainBranchId is known — avoids fetching entire table
-      mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&select=*&order=name.asc`).catch(()=>[]):Promise.resolve([]),
+      mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&${idClause}select=${COLS}&order=name.asc`).catch(()=>[]):Promise.resolve([]),
     ];
     Promise.all(fetches).then(async([ownParts,bStock,mainParts])=>{
       const bStockArr=Array.isArray(bStock)?bStock:[];
@@ -7053,10 +7065,11 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const mainArr=Array.isArray(mainParts)?mainParts:[];
       let catalogParts=[];
       if(bStockArr.length){
-        const ids=bStockArr.map(bs=>bs.part_id).filter(Boolean);
-        if(ids.length){
-          const orFilter=ids.map(id=>`id.eq.${id}`).join(",");
-          catalogParts=await api.get("parts",`or=(${orFilter})&select=*`).catch(()=>[]);
+        const allBsIds=bStockArr.map(bs=>bs.part_id).filter(Boolean);
+        const filteredBsIds=idFilter?allBsIds.filter(id=>idFilter.includes(String(id))):allBsIds;
+        if(filteredBsIds.length){
+          const orFilter=filteredBsIds.map(id=>`id.eq.${id}`).join(",");
+          catalogParts=await api.get("parts",`or=(${orFilter})&select=${COLS}`).catch(()=>[]);
           if(!Array.isArray(catalogParts))catalogParts=[];
         }
       }

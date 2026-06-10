@@ -2947,6 +2947,100 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// GRAB IMAGE OVERLAY — opens supplier page + waits for Ctrl+V paste
+// ═══════════════════════════════════════════════════════════════
+function GrabImageOverlay({supplierUrl,partSku,onSave,onClose}) {
+  const [status,setStatus]=useState("waiting"); // waiting|uploading|done|err
+  const [errMsg,setErrMsg]=useState("");
+  const SCRIPT_URL=(typeof window._VEHICLE_SCRIPT_URL==="string"&&window._VEHICLE_SCRIPT_URL)||(typeof window._APPS_SCRIPT_URL==="string"&&window._APPS_SCRIPT_URL)||"";
+
+  const upload=async(file)=>{
+    if(!file||!file.type.startsWith("image/"))return;
+    if(!SCRIPT_URL){setErrMsg("Apps Script URL not configured in Settings → System");setStatus("err");return;}
+    setStatus("uploading");
+    try{
+      const MAX=1200;
+      const base64=await new Promise((resolve,reject)=>{
+        const reader=new FileReader();
+        reader.onload=ev=>{
+          const img=new Image();
+          img.onload=()=>{
+            const canvas=document.createElement("canvas");
+            let w=img.width,h=img.height;
+            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+            canvas.width=w;canvas.height=h;
+            canvas.getContext("2d").drawImage(img,0,0,w,h);
+            resolve(canvas.toDataURL("image/png"));
+          };
+          img.onerror=reject;
+          img.src=ev.target.result;
+        };
+        reader.onerror=reject;
+        reader.readAsDataURL(file);
+      });
+      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({image:base64,filename:`${partSku||"part"}.png`,mimeType:"image/png"})});
+      const result=await resp.json();
+      if(result.success){setStatus("done");onSave(result.url);setTimeout(onClose,1400);}
+      else{setErrMsg(result.error||"Upload failed");setStatus("err");}
+    }catch(e){setErrMsg(String(e));setStatus("err");}
+  };
+
+  useEffect(()=>{
+    const onPaste=async(e)=>{
+      if(status!=="waiting")return;
+      const items=e.clipboardData?.items;
+      if(!items)return;
+      for(const item of items){
+        if(item.type.startsWith("image/")){
+          const file=item.getAsFile();
+          if(file){upload(file);return;}
+        }
+      }
+    };
+    document.addEventListener("paste",onPaste);
+    return()=>document.removeEventListener("paste",onPaste);
+  },[status]);
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center"}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:"var(--surface)",borderRadius:18,padding:32,maxWidth:440,width:"90vw",boxShadow:"0 20px 60px rgba(0,0,0,.6)",textAlign:"center"}}>
+        {status==="waiting"&&<>
+          <div style={{fontSize:40,marginBottom:10}}>🖼</div>
+          <div style={{fontWeight:700,fontSize:17,marginBottom:8}}>Grab Image from Supplier</div>
+          <div style={{fontSize:13,color:"var(--text2)",marginBottom:20,lineHeight:1.7}}>
+            The supplier page opened in a new tab.<br/>
+            <strong>Right-click the product image → Copy image</strong><br/>
+            then press <kbd style={{background:"var(--surface2)",borderRadius:4,padding:"2px 7px",fontFamily:"DM Mono,monospace",fontSize:12,border:"1px solid var(--border2)"}}>Ctrl+V</kbd> anywhere here
+          </div>
+          <div style={{background:"var(--surface2)",border:"2px dashed var(--border2)",borderRadius:12,padding:"22px 16px",marginBottom:18,fontSize:13,color:"var(--text3)"}}>
+            ⏳ Waiting for paste…
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+        </>}
+        {status==="uploading"&&<>
+          <div style={{fontSize:40,marginBottom:10}}>⏳</div>
+          <div style={{fontWeight:700,fontSize:16}}>Uploading to Google Drive…</div>
+        </>}
+        {status==="done"&&<>
+          <div style={{fontSize:40,marginBottom:10}}>✅</div>
+          <div style={{fontWeight:700,fontSize:16,color:"var(--green)"}}>Image saved!</div>
+        </>}
+        {status==="err"&&<>
+          <div style={{fontSize:40,marginBottom:10}}>❌</div>
+          <div style={{fontWeight:700,fontSize:15,color:"var(--red)",marginBottom:8}}>Upload failed</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>{errMsg}</div>
+          <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setStatus("waiting")}>Try again</button>
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+          </div>
+        </>}
+      </div>
+    </div>
+  );
+}
+
 // Smart image preview with clear status feedback
 export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier}) {
   const makeF = (p) => p?{
@@ -2991,6 +3085,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
       .then(d=>setSuppDupLinks(Array.isArray(d)?d:[]))
       .catch(()=>{});
   },[suppId]);
+  const [grabImg,setGrabImg]=useState(null); // {url,partNo,suppName} — triggers GrabImageOverlay
   const mainBranch=branches.find(b=>b.is_main);
   const isNonMainBranch=!part&&currentBranch&&mainBranch&&currentBranch.id!==mainBranch.id;
 
@@ -3513,13 +3608,20 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
                             ? ps.supplier.search_url.replace("{sku}", encodeURIComponent(ps.supplier_part_no))
                             : `https://www.google.com/search?q=${encodeURIComponent(ps.supplier_part_no)}`;
                           const isGoogle = !ps.supplier?.search_url;
-                          return (
+                          return (<>
                             <button className="btn btn-ghost btn-xs" title={isGoogle?"Search on Google":ps.supplier.name}
                               style={{color:"var(--blue)"}}
                               onClick={()=>window.open(searchUrl,"_blank")}>
                               {isGoogle?"🔍 Google":"🔍 Search"}
                             </button>
-                          );
+                            {!isGoogle&&(
+                              <button className="btn btn-ghost btn-xs" title="Open supplier page and grab product image"
+                                style={{color:"var(--green)",fontWeight:600}}
+                                onClick={()=>{window.open(searchUrl,"_blank");setGrabImg({url:searchUrl,partNo:ps.supplier_part_no,suppName:ps.supplier?.name||""});}}>
+                                🖼 Get Image
+                              </button>
+                            )}
+                          </>);
                         })()}
                         <button className="btn btn-ghost btn-xs" style={{color:"var(--accent)"}}
                           onClick={()=>{setEditingPsId(ps.id);setEditPsPartNo(ps.supplier_part_no||"");}}>✏️ Edit</button>
@@ -3753,6 +3855,8 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
           </div>
         </div>
       )}
+
+      {grabImg&&<GrabImageOverlay supplierUrl={grabImg.url} partSku={f.sku} onSave={url=>{handlePhotoChange(url);}} onClose={()=>setGrabImg(null)}/>}
 
       {/* Saved banner */}
       {saved&&(

@@ -4826,7 +4826,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             </div>
             <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
               {(()=>{
-                const dt=loginLogs.reduce((a,l)=>{const d=l.device||"";const k=d.includes("(mobile)")?"📱 Mobile":/Chrome|Safari|Firefox|Edge|Opera|Browser/.test(d)?"🖥 Desktop":"❓ Other";a[k]=(a[k]||0)+1;return a;},{});
+                const dt=loginLogs.reduce((a,l)=>{const d=l.device||"";const mob=d.includes("(mobile)")||/Mobile|Android|iPhone|iPad/i.test(d);const k=mob?"📱 Mobile":/Chrome|Safari|Firefox|Edge|Opera|Browser/.test(d)?"🖥 Desktop":"❓ Other";a[k]=(a[k]||0)+1;return a;},{});
                 return [["📱 Mobile","rgba(99,102,241,.12)","#818cf8"],["🖥 Desktop","rgba(52,211,153,.12)","var(--green)"],["❓ Other","var(--surface2)","var(--text3)"]].map(([k,bg,col])=>dt[k]?(<span key={k} className="badge" style={{background:bg,color:col,padding:"5px 13px",fontSize:13}}>{k} · {dt[k]}</span>):null);
               })()}
             </div>
@@ -4843,7 +4843,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         <td style={{fontSize:13}}>{l.country||"—"}</td>
                         <td style={{fontSize:13,color:"var(--text3)"}}>{l.city||"—"}</td>
                         <td style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{l.ip_address||"—"}</td>
-                        <td style={{whiteSpace:"nowrap"}}>{l.device?(()=>{const mob=l.device.includes("(mobile)");const oth=!/Chrome|Safari|Firefox|Edge|Opera|Browser/.test(l.device)&&!mob;return(<><span className="badge" style={{background:mob?"rgba(99,102,241,.12)":oth?"var(--surface2)":"rgba(52,211,153,.12)",color:mob?"#818cf8":oth?"var(--text3)":"var(--green)",fontSize:11,marginRight:5}}>{mob?"📱 Mobile":oth?"❓ Other":"🖥 Desktop"}</span><span style={{fontSize:11,color:"var(--text3)"}}>{l.device.replace(" (mobile)","")}</span></>);})():"—"}</td>
+                        <td style={{whiteSpace:"nowrap"}}>{l.device?(()=>{
+                          const d=l.device;
+                          const mob=d.includes("(mobile)")||/Mobile|Android|iPhone|iPad/i.test(d);
+                          let display=d;
+                          if(d.startsWith("Mozilla")){
+                            const os=/Windows/.test(d)?"Windows":/Android/.test(d)?"Android":/iPhone/.test(d)?"iPhone":/iPad/.test(d)?"iPad":/Mac/.test(d)?"macOS":/Linux/.test(d)?"Linux":"Unknown";
+                            const br=/Edg\//.test(d)?"Edge":/Chrome\//.test(d)?"Chrome":/Firefox\//.test(d)?"Firefox":/Safari\//.test(d)?"Safari":/OPR\/|Opera\//.test(d)?"Opera":"Browser";
+                            const bv=(d.match(/(?:Chrome|Firefox|Edg|OPR)\/(\d+)/)||[])[1]||"";
+                            display=`${br}${bv?" "+bv:""} · ${os}`;
+                          } else {
+                            display=d.replace(" (mobile)","");
+                          }
+                          const oth=!mob&&!/Chrome|Safari|Firefox|Edge|Opera|Browser/.test(display);
+                          return(<><span className="badge" style={{background:mob?"rgba(99,102,241,.12)":oth?"var(--surface2)":"rgba(52,211,153,.12)",color:mob?"#818cf8":oth?"var(--text3)":"var(--green)",fontSize:11,marginRight:5}}>{mob?"📱 Mobile":oth?"❓ Other":"🖥 Desktop"}</span><span style={{fontSize:11,color:"var(--text3)"}}>{display}</span></>);
+                        })():"—"}</td>
                         <td style={{fontSize:13,whiteSpace:"nowrap"}}>{l.weather||"—"}</td>
                         <td><span className="badge" style={{background:l.status==="success"?"rgba(52,211,153,.12)":"rgba(248,113,113,.12)",color:l.status==="success"?"var(--green)":"var(--red)"}}>{l.status}</span></td>
                       </tr>

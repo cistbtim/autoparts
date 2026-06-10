@@ -4904,6 +4904,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               const byCt={};
               loginLogs.forEach(l=>{
                 if(seenU.has(l.username))return;
+                if(l.user_role==="admin"||l.user_role==="demo")return;
                 seenU.add(l.username);
                 const cn=stripFlag(l.country)||"Unknown";
                 byCt[cn]=(byCt[cn]||0)+1;

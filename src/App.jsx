@@ -1955,14 +1955,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     // Use branch_admin's own branch (_bId) OR the currently-selected branch (branchId for admin viewing a branch)
     const effectiveBranchId=_bId||branchId||null;
     const inv={...invRaw,...(effectiveBranchId?{branch_id:effectiveBranchId}:{})};
-    await api.upsert("supplier_invoices",inv);
+    const saved=await api.upsert("supplier_invoices",inv);
     // Delete all existing line items then re-insert — handles row deletions correctly
     if(!isNew) await api.delete("supplier_invoice_items","invoice_id",inv.id);
     if(items.length){
       const rows=items.map(item=>{const {id:_id,_k,_st,_hits,_drop,_skuPart,_skuLinks,_needsBranchSetup,...clean}=item;return{...clean,invoice_id:inv.id,part_id:clean.part_id?+clean.part_id:null,qty:+clean.qty||1,unit_cost:+clean.unit_cost||0,total:(+clean.qty||1)*(+clean.unit_cost||0)};});
       await api.insert("supplier_invoice_items",rows);
     }
-    await refreshTables("supplier_invoices");closeM("supplierInvoice");showToast(isNew?"Invoice saved":"Invoice updated");
+    const savedInv=Array.isArray(saved)&&saved[0]?saved[0]:inv;
+    if(isNew) setSupplierInvoices(prev=>[savedInv,...prev]);
+    else setSupplierInvoices(prev=>prev.map(si=>si.id===inv.id?{...si,...savedInv}:si));
+    closeM("supplierInvoice");showToast(isNew?"Invoice saved":"Invoice updated");
   };
   const stockInInvoice=async(inv)=>{
     const rows=await api.get("supplier_invoice_items",`invoice_id=eq.${encodeURIComponent(inv.id)}&select=*`);

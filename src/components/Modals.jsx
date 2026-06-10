@@ -2339,8 +2339,9 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
   },[]);
 
   // Reset match state on supplier change (new invoices only)
+  // Skip rows that already have a supplier_part_id — they stay linked
   useEffect(()=>{
-    if(isNew&&suppId) setItems(p=>p.map(r=>({...r,_st:"idle",part_id:null,part_name:"",part_sku:"",_hits:[],_drop:false})));
+    if(isNew&&suppId) setItems(p=>p.map(r=>(r.supplier_part_id||"").trim()?r:{...r,_st:"idle",part_id:null,part_name:"",part_sku:"",_hits:[],_drop:false}));
   },[suppId]);
 
   const handleSave=async()=>{

@@ -4853,35 +4853,64 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               const mX=lon=>((lon+180)/360*MW);
               const mY=lat=>((90-lat)/180*MH);
               const poly=pts=>pts.map(([la,lo])=>`${mX(lo).toFixed(1)},${mY(la).toFixed(1)}`).join(" ");
+              // Province → [lat, lon] — SA provinces + major world regions
+              const PROV_LL={
+                "Gauteng":[-26.0,28.0],"Western Cape":[-33.9,18.4],"KwaZulu-Natal":[-29.8,31.0],
+                "Eastern Cape":[-32.8,27.0],"Free State":[-29.0,26.0],"Limpopo":[-23.9,29.5],
+                "Mpumalanga":[-25.5,30.5],"North West":[-25.8,25.5],"Northern Cape":[-28.7,24.8],
+                // Zimbabwe provinces
+                "Harare":[-17.8,31.0],"Bulawayo":[-20.1,28.6],
+                // Zambia
+                "Lusaka":[-15.4,28.3],
+              };
+              // Country → [lat, lon] fallback (strip flag emoji first)
+              const CTY_LL={
+                "South Africa":[-29.0,25.0],"Zimbabwe":[-20.0,30.0],"Zambia":[-15.0,28.0],
+                "Mozambique":[-18.0,35.0],"Botswana":[-22.0,24.0],"Namibia":[-22.0,17.0],
+                "Lesotho":[-29.5,28.2],"Swaziland":[-26.5,31.5],"Eswatini":[-26.5,31.5],
+                "Tanzania":[-6.0,35.0],"Kenya":[1.0,38.0],"Uganda":[1.0,32.0],
+                "Nigeria":[9.0,8.0],"Ghana":[8.0,-1.0],"Ethiopia":[9.0,40.0],
+                "Egypt":[26.0,30.0],"Morocco":[32.0,-6.0],
+                "United Kingdom":[51.5,-0.1],"Ireland":[53.3,-8.0],
+                "United States":[38.0,-97.0],"Canada":[56.0,-96.0],
+                "Australia":[-25.0,133.0],"New Zealand":[-41.0,174.0],
+                "Germany":[51.0,10.0],"France":[46.0,2.0],"Netherlands":[52.0,5.0],
+                "China":[35.0,105.0],"India":[20.0,77.0],"Japan":[36.0,138.0],
+                "Brazil":[-10.0,-55.0],"Argentina":[-34.0,-64.0],
+              };
+              // Deterministic jitter so dots for same province don't stack
+              const jit=(str,range)=>{let h=0;for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))&0xfffff;return((h%1000)/1000-0.5)*range;};
+              const stripFlag=s=>(s||"").replace(/[\u{1F1E0}-\u{1F1FF}]{2}/gu,"").trim();
+              const resolveLL=l=>{
+                if(l.lat&&l.lon)return[+l.lat,+l.lon];
+                if(l.province&&PROV_LL[l.province])return PROV_LL[l.province];
+                const cn=stripFlag(l.country);
+                if(cn&&CTY_LL[cn])return CTY_LL[cn];
+                return null;
+              };
               const LAND=[
-                // Africa
                 [[37,-5],[36,10],[33,25],[31,34],[12,51],[10,51],[5,41],[-4,40],[-10,38],[-26,33],[-35,20],[-34,18],[-22,14],[-16,12],[4,-8],[5,-15],[15,-17],[37,-5]],
-                // Europe
                 [[36,-9],[36,28],[40,36],[42,50],[55,22],[60,25],[65,15],[70,20],[70,30],[58,14],[56,10],[54,10],[51,2],[48,-5],[43,-9],[36,-9]],
-                // Asia main
                 [[37,36],[37,60],[28,60],[22,115],[22,122],[35,140],[60,130],[70,130],[72,140],[72,100],[60,60],[42,50],[40,36]],
-                // India
                 [[28,65],[28,75],[22,80],[10,80],[8,77],[8,72],[14,74],[22,72],[28,65]],
-                // SE Asia
                 [[22,100],[22,110],[10,105],[1,104],[5,100],[22,100]],
-                // North America
                 [[70,-140],[70,-60],[55,-65],[47,-53],[43,-65],[35,-75],[25,-80],[15,-87],[8,-77],[22,-105],[30,-110],[35,-120],[45,-125],[60,-140],[70,-140]],
-                // South America
                 [[10,-75],[8,-63],[5,-52],[-5,-35],[-15,-38],[-23,-43],[-34,-53],[-55,-68],[-55,-70],[-43,-73],[-18,-70],[-5,-80],[0,-75],[5,-77],[10,-75]],
-                // Australia
                 [[-15,130],[-15,152],[-22,152],[-38,148],[-38,140],[-28,115],[-22,114],[-15,124],[-15,130]],
-                // Greenland
                 [[60,-45],[60,-18],[78,-18],[83,-28],[83,-45],[60,-45]],
               ];
               const seenU=new Set();
-              const uniqueUsers=[];
+              const dots=[];
               const byCt={};
+              const byProv={};
               loginLogs.forEach(l=>{
                 if(seenU.has(l.username))return;
                 seenU.add(l.username);
-                const c=l.country||"Unknown";
-                byCt[c]=(byCt[c]||0)+1;
-                if(l.lat&&l.lon)uniqueUsers.push(l);
+                const cn=stripFlag(l.country)||"Unknown";
+                byCt[cn]=(byCt[cn]||0)+1;
+                if(l.province){const pk=`${cn} › ${l.province}`;byProv[pk]=(byProv[pk]||0)+1;}
+                const ll=resolveLL(l);
+                if(ll)dots.push({lat:ll[0]+jit(l.username,0.6),lon:ll[1]+jit(l.username+"_",0.6),label:l.province||cn,user:l.username});
               });
               return(
                 <div className="card" style={{overflow:"hidden",marginBottom:16,padding:0}}>
@@ -4900,8 +4929,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                     {LAND.map((pts,i)=>(
                       <polygon key={i} points={poly(pts)} fill="#1a3a28" stroke="#2a5a3a" strokeWidth={0.8} strokeLinejoin="round"/>
                     ))}
-                    {uniqueUsers.map((l,i)=>(
-                      <g key={i} transform={`translate(${mX(l.lon).toFixed(1)},${mY(l.lat).toFixed(1)})`}>
+                    {dots.map((d,i)=>(
+                      <g key={i} transform={`translate(${mX(d.lon).toFixed(1)},${mY(d.lat).toFixed(1)})`}>
+                        <title>{d.user} · {d.label}</title>
                         <circle r={14} fill="rgba(251,191,36,0.06)"/>
                         <circle r={8} fill="rgba(251,191,36,0.15)"/>
                         <circle r={4} fill="rgba(251,191,36,0.5)"/>
@@ -4909,17 +4939,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         <circle r={1} fill="white"/>
                       </g>
                     ))}
-                    {uniqueUsers.length===0&&(
-                      <text x={MW/2} y={MH/2} textAnchor="middle" fill="#334155" fontSize={14}>No coordinate data yet — users need to re-login to record GPS position</text>
-                    )}
+                    {dots.length===0&&<text x={MW/2} y={MH/2} textAnchor="middle" fill="#334155" fontSize={13}>No location data found</text>}
                   </svg>
-                  {Object.keys(byCt).length>0&&(
-                    <div style={{padding:"10px 18px 14px",display:"flex",gap:16,flexWrap:"wrap",borderTop:"1px solid var(--border)"}}>
-                      {Object.entries(byCt).sort((a,b)=>b[1]-a[1]).map(([c,n])=>(
-                        <span key={c} style={{fontSize:13,color:"var(--text2)"}}><span style={{color:"#fbbf24",marginRight:5}}>●</span>{c}: <strong>{n}</strong> user{n!==1?"s":""}</span>
-                      ))}
-                    </div>
-                  )}
+                  <div style={{padding:"10px 18px 14px",display:"flex",gap:12,flexWrap:"wrap",borderTop:"1px solid var(--border)"}}>
+                    {Object.entries(Object.keys(byProv).length?byProv:byCt).sort((a,b)=>b[1]-a[1]).map(([k,n])=>(
+                      <span key={k} style={{fontSize:12,color:"var(--text2)"}}><span style={{color:"#fbbf24",marginRight:4}}>●</span>{k}: <strong>{n}</strong></span>
+                    ))}
+                  </div>
                 </div>
               );
             })()}

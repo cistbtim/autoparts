@@ -4900,18 +4900,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 [[60,-45],[60,-18],[78,-18],[83,-28],[83,-45],[60,-45]],
               ];
               const seenU=new Set();
-              const dots=[];
+              const locMap={};// key→{lat,lon,label,count,users[]}
               const byCt={};
-              const byProv={};
               loginLogs.forEach(l=>{
                 if(seenU.has(l.username))return;
                 seenU.add(l.username);
                 const cn=stripFlag(l.country)||"Unknown";
                 byCt[cn]=(byCt[cn]||0)+1;
-                if(l.province){const pk=`${cn} › ${l.province}`;byProv[pk]=(byProv[pk]||0)+1;}
                 const ll=resolveLL(l);
-                if(ll)dots.push({lat:ll[0]+jit(l.username,0.6),lon:ll[1]+jit(l.username+"_",0.6),label:l.province||cn,user:l.username});
+                if(!ll)return;
+                const key=l.province?`${cn}|${l.province}`:cn;
+                if(!locMap[key])locMap[key]={lat:ll[0],lon:ll[1],label:l.province||cn,count:0,users:[]};
+                locMap[key].count++;
+                locMap[key].users.push(l.username);
               });
+              const pins=Object.values(locMap);
+              const maxCount=pins.reduce((m,p)=>Math.max(m,p.count),1);
               return(
                 <div className="card" style={{overflow:"hidden",marginBottom:16,padding:0}}>
                   <div style={{padding:"12px 18px 8px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -4929,21 +4933,28 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                     {LAND.map((pts,i)=>(
                       <polygon key={i} points={poly(pts)} fill="#1a3a28" stroke="#2a5a3a" strokeWidth={0.8} strokeLinejoin="round"/>
                     ))}
-                    {dots.map((d,i)=>(
-                      <g key={i} transform={`translate(${mX(d.lon).toFixed(1)},${mY(d.lat).toFixed(1)})`}>
-                        <title>{d.user} · {d.label}</title>
-                        <circle r={14} fill="rgba(251,191,36,0.06)"/>
-                        <circle r={8} fill="rgba(251,191,36,0.15)"/>
-                        <circle r={4} fill="rgba(251,191,36,0.5)"/>
-                        <circle r={2.5} fill="#fbbf24"/>
-                        <circle r={1} fill="white"/>
-                      </g>
-                    ))}
-                    {dots.length===0&&<text x={MW/2} y={MH/2} textAnchor="middle" fill="#334155" fontSize={13}>No location data found</text>}
+                    {pins.map((p,i)=>{
+                      const r=Math.max(10,8+Math.sqrt(p.count/maxCount)*14);
+                      const cx=mX(p.lon).toFixed(1);
+                      const cy=mY(p.lat).toFixed(1);
+                      return(
+                        <g key={i} transform={`translate(${cx},${cy})`}>
+                          <title>{p.label}: {p.count} user{p.count!==1?"s":""}{"\n"}{p.users.join(", ")}</title>
+                          <circle r={r+8} fill="rgba(251,191,36,0.07)"/>
+                          <circle r={r+3} fill="rgba(251,191,36,0.18)"/>
+                          <circle r={r} fill="#d97706" stroke="#fbbf24" strokeWidth={1.5}/>
+                          <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={p.count>9?r*0.75:r*0.85} fontWeight="700" fontFamily="DM Mono,monospace">{p.count}</text>
+                        </g>
+                      );
+                    })}
+                    {pins.length===0&&<text x={MW/2} y={MH/2} textAnchor="middle" fill="#334155" fontSize={13}>No location data found</text>}
                   </svg>
                   <div style={{padding:"10px 18px 14px",display:"flex",gap:12,flexWrap:"wrap",borderTop:"1px solid var(--border)"}}>
-                    {Object.entries(Object.keys(byProv).length?byProv:byCt).sort((a,b)=>b[1]-a[1]).map(([k,n])=>(
-                      <span key={k} style={{fontSize:12,color:"var(--text2)"}}><span style={{color:"#fbbf24",marginRight:4}}>●</span>{k}: <strong>{n}</strong></span>
+                    {pins.sort((a,b)=>b.count-a.count).map((p,i)=>(
+                      <span key={i} style={{fontSize:12,color:"var(--text2)",display:"flex",alignItems:"center",gap:5}}>
+                        <span style={{background:"#d97706",color:"white",borderRadius:"50%",width:18,height:18,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700}}>{p.count}</span>
+                        {p.label}
+                      </span>
                     ))}
                   </div>
                 </div>

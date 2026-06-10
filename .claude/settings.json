@@ -155,12 +155,20 @@
       "Bash(grep -v \"//\\\\|function\\\\|modal\\\\|Modal\\\\|open\\\\|Open\\\\|setReturn\\\\|setSupplier\\\\|SupplierQuote\")",
       "Bash(grep -v \"//\\\\|function\\\\|Modal\\\\|modal\\\\|open\\\\|Open\\\\|set[A-Z]\")",
       "Bash(awk -F: '$2 >= 4740 && $2 <= 4785')",
-      "Bash(grep -v \"//\\\\|setReturn\\\\|setSupplier\\\\|Title\\\\|title\")"
+      "Bash(grep -v \"//\\\\|setReturn\\\\|setSupplier\\\\|Title\\\\|title\")",
+      "Bash(gh pr *)",
+      "Bash(gh repo *)",
+      "Bash(mkdir -p \"c:\\\\Users\\\\Tim\\\\car-parts-app\\\\public\\\\ads\\\\lida\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Tim\" -Recurse -Filter \"*.pdf\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object FullName)",
+      "Read(//c/Users/Tim/**)",
+      "Bash(python -c \"import fitz; print\\('pymupdf ok', fitz.__version__\\)\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory",
       "C:\\Users\\Tim\\.gstack\\projects\\cistbtim-autoparts",
-      "C:\\Users\\Tim\\AppData\\Local\\Temp"
+      "C:\\Users\\Tim\\AppData\\Local\\Temp",
+      "c:\\Users\\Tim\\car-parts-app\\public\\ads"
     ]
   }
 }

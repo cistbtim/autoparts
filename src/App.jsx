@@ -4828,7 +4828,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {tab==="loginlogs"&&role==="admin"&&(
           <div className="fu">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
-              <PH title={`🌍 ${t.loginLogs}`} subtitle={`${loginLogs.length} ${t.llEvents}`}/>
+              <PH title={`🌍 ${t.loginLogs}`} subtitle={`${loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").length} ${t.llEvents}`}/>
               <button className="btn btn-ghost" disabled={loginLogsLoading} onClick={()=>setConfirmRefreshLogs(true)} style={{marginTop:4}}>
                 <span style={{display:"inline-block",animation:loginLogsLoading?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span> Refresh
               </button>
@@ -4843,7 +4843,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               </div>
             )}
             <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
-              {Object.entries(loginLogs.reduce((a,l)=>{const c=l.country||"?";a[c]=(a[c]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>(
+              {Object.entries(loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").reduce((a,l)=>{const c=l.country||"?";a[c]=(a[c]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>(
                 <span key={c} className="badge" style={{background:"var(--surface2)",color:"var(--text2)",padding:"5px 13px",fontSize:13}}>{c} · {n}</span>
               ))}
             </div>
@@ -4968,7 +4968,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 {key:"Desktop",   icon:"🖥",  color:"#60a5fa", bg:"rgba(96,165,250,.12)"},
                 {key:"Other Mobile",icon:"📱",color:"#fb923c", bg:"rgba(251,146,60,.12)"},
               ];
-              const counts=loginLogs.reduce((a,l)=>{
+              const counts=loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").reduce((a,l)=>{
                 const raw=l.device_type||(()=>{const d=l.device||"";return /Android/i.test(d)?"Android":/iPhone|iPad/i.test(d)?"Apple iOS":/Mobile/i.test(d)?"Other Mobile":"Desktop";})();
                 a[raw]=(a[raw]||0)+1;return a;
               },{});
@@ -5002,7 +5002,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 <table className="tbl">
                   <thead><tr>{[t.time,t.user,t.role,t.country,"Province",t.city,"IP","Device","Weather",t.status].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {loginLogs.map(l=>(
+                    {loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").map(l=>(
                       <tr key={l.id}>
                         <td style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{new Date(l.created_at).toLocaleString()}</td>
                         <td style={{fontWeight:600}}>{l.username}</td>

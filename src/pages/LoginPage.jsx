@@ -116,7 +116,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       const br=/Edg\//.test(ua)?"Edge":/Chrome\//.test(ua)?"Chrome":/Firefox\//.test(ua)?"Firefox":/Safari\//.test(ua)?"Safari":/OPR\/|Opera\//.test(ua)?"Opera":"Browser";
       const bv=(ua.match(/(?:Chrome|Firefox|Edg|OPR)\/(\d+)/)||[])[1]||"";
       const device=`${br}${bv?" "+bv:""} · ${os}${mob?" (mobile)":""}`;
-      await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:g.countryFull||"?",city:g.city||"",weather:wx.label||null,device,status:"success"});
+      const device_type=/Android/i.test(ua)?"Android":/iPhone|iPad|iPod/i.test(ua)?"Apple iOS":mob?"Other Mobile":"Desktop";
+      await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:g.countryFull||"?",city:g.city||"",weather:wx.label||null,device,device_type,status:"success"});
     } catch {}
   };
 

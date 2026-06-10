@@ -4819,17 +4819,47 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 <span style={{display:"inline-block",animation:loginLogsLoading?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span> Refresh
               </button>
             </div>
-            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:8}}>
+            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
               {Object.entries(loginLogs.reduce((a,l)=>{const c=l.country||"?";a[c]=(a[c]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>(
                 <span key={c} className="badge" style={{background:"var(--surface2)",color:"var(--text2)",padding:"5px 13px",fontSize:13}}>{c} · {n}</span>
               ))}
             </div>
-            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
-              {(()=>{
-                const dt=loginLogs.reduce((a,l)=>{const d=l.device||"";const mob=d.includes("(mobile)")||/Mobile|Android|iPhone|iPad/i.test(d);const k=mob?"📱 Mobile":/Chrome|Safari|Firefox|Edge|Opera|Browser/.test(d)?"🖥 Desktop":"❓ Other";a[k]=(a[k]||0)+1;return a;},{});
-                return [["📱 Mobile","rgba(99,102,241,.12)","#818cf8"],["🖥 Desktop","rgba(52,211,153,.12)","var(--green)"],["❓ Other","var(--surface2)","var(--text3)"]].map(([k,bg,col])=>dt[k]?(<span key={k} className="badge" style={{background:bg,color:col,padding:"5px 13px",fontSize:13}}>{k} · {dt[k]}</span>):null);
-              })()}
-            </div>
+            {(()=>{
+              const cfg=[
+                {key:"Android",   icon:"🤖", color:"#4ade80", bg:"rgba(74,222,128,.12)"},
+                {key:"Apple iOS", icon:"🍎", color:"#a78bfa", bg:"rgba(167,139,250,.12)"},
+                {key:"Desktop",   icon:"🖥",  color:"#60a5fa", bg:"rgba(96,165,250,.12)"},
+                {key:"Other Mobile",icon:"📱",color:"#fb923c", bg:"rgba(251,146,60,.12)"},
+              ];
+              const counts=loginLogs.reduce((a,l)=>{
+                const raw=l.device_type||(()=>{const d=l.device||"";return /Android/i.test(d)?"Android":/iPhone|iPad/i.test(d)?"Apple iOS":/Mobile/i.test(d)?"Other Mobile":"Desktop";})();
+                a[raw]=(a[raw]||0)+1;return a;
+              },{});
+              const total=loginLogs.length||1;
+              const rows=cfg.filter(c=>counts[c.key]);
+              if(!rows.length)return null;
+              return(
+                <div className="card" style={{padding:"16px 20px",marginBottom:16}}>
+                  <div style={{fontWeight:600,fontSize:13,marginBottom:12,color:"var(--text2)"}}>Device Popularity</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    {rows.sort((a,b)=>(counts[b.key]||0)-(counts[a.key]||0)).map(c=>{
+                      const n=counts[c.key]||0;
+                      const pct=Math.round(n/total*100);
+                      return(
+                        <div key={c.key} style={{display:"grid",gridTemplateColumns:"120px 1fr 60px 40px",alignItems:"center",gap:10}}>
+                          <span style={{fontSize:13,fontWeight:500}}>{c.icon} {c.key}</span>
+                          <div style={{background:"var(--surface2)",borderRadius:6,height:10,overflow:"hidden"}}>
+                            <div style={{width:`${pct}%`,height:"100%",background:c.color,borderRadius:6,transition:"width .4s"}}/>
+                          </div>
+                          <span style={{fontSize:12,color:"var(--text3)",textAlign:"right"}}>{pct}%</span>
+                          <span className="badge" style={{background:c.bg,color:c.color,fontSize:11,textAlign:"center"}}>{n}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
@@ -4843,21 +4873,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         <td style={{fontSize:13}}>{l.country||"—"}</td>
                         <td style={{fontSize:13,color:"var(--text3)"}}>{l.city||"—"}</td>
                         <td style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{l.ip_address||"—"}</td>
-                        <td style={{whiteSpace:"nowrap"}}>{l.device?(()=>{
-                          const d=l.device;
-                          const mob=d.includes("(mobile)")||/Mobile|Android|iPhone|iPad/i.test(d);
+                        <td style={{whiteSpace:"nowrap"}}>{(()=>{
+                          const d=l.device||"";
+                          const dtCfg={
+                            "Android":     {icon:"🤖",bg:"rgba(74,222,128,.12)",  color:"#4ade80"},
+                            "Apple iOS":   {icon:"🍎",bg:"rgba(167,139,250,.12)", color:"#a78bfa"},
+                            "Desktop":     {icon:"🖥", bg:"rgba(96,165,250,.12)",  color:"#60a5fa"},
+                            "Other Mobile":{icon:"📱",bg:"rgba(251,146,60,.12)",  color:"#fb923c"},
+                          };
+                          const dt=l.device_type||(()=>{return /Android/i.test(d)?"Android":/iPhone|iPad/i.test(d)?"Apple iOS":/Mobile/i.test(d)?"Other Mobile":d?"Desktop":null;})();
+                          if(!dt&&!d)return "—";
                           let display=d;
                           if(d.startsWith("Mozilla")){
                             const os=/Windows/.test(d)?"Windows":/Android/.test(d)?"Android":/iPhone/.test(d)?"iPhone":/iPad/.test(d)?"iPad":/Mac/.test(d)?"macOS":/Linux/.test(d)?"Linux":"Unknown";
                             const br=/Edg\//.test(d)?"Edge":/Chrome\//.test(d)?"Chrome":/Firefox\//.test(d)?"Firefox":/Safari\//.test(d)?"Safari":/OPR\/|Opera\//.test(d)?"Opera":"Browser";
                             const bv=(d.match(/(?:Chrome|Firefox|Edg|OPR)\/(\d+)/)||[])[1]||"";
                             display=`${br}${bv?" "+bv:""} · ${os}`;
-                          } else {
-                            display=d.replace(" (mobile)","");
-                          }
-                          const oth=!mob&&!/Chrome|Safari|Firefox|Edge|Opera|Browser/.test(display);
-                          return(<><span className="badge" style={{background:mob?"rgba(99,102,241,.12)":oth?"var(--surface2)":"rgba(52,211,153,.12)",color:mob?"#818cf8":oth?"var(--text3)":"var(--green)",fontSize:11,marginRight:5}}>{mob?"📱 Mobile":oth?"❓ Other":"🖥 Desktop"}</span><span style={{fontSize:11,color:"var(--text3)"}}>{display}</span></>);
-                        })():"—"}</td>
+                          } else { display=d.replace(" (mobile)",""); }
+                          const c=dtCfg[dt]||{icon:"❓",bg:"var(--surface2)",color:"var(--text3)"};
+                          return(<><span className="badge" style={{background:c.bg,color:c.color,fontSize:11,marginRight:5}}>{c.icon} {dt||"Other"}</span><span style={{fontSize:11,color:"var(--text3)"}}>{display}</span></>);
+                        })()}</td>
                         <td style={{fontSize:13,whiteSpace:"nowrap"}}>{l.weather||"—"}</td>
                         <td><span className="badge" style={{background:l.status==="success"?"rgba(52,211,153,.12)":"rgba(248,113,113,.12)",color:l.status==="success"?"var(--green)":"var(--red)"}}>{l.status}</span></td>
                       </tr>

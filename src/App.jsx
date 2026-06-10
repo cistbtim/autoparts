@@ -115,6 +115,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [adClicks,setAdClicks]=useState([]);
   const [adClicksLoading,setAdClicksLoading]=useState(false);
   const [loginLogsLoading,setLoginLogsLoading]=useState(false);
+  const [confirmRefreshLogs,setConfirmRefreshLogs]=useState(false);
   const [adContracts,setAdContracts]=useState([]);
   const [suppliers,setSuppliers]=useState([]);
   const [partSuppliers,setPartSuppliers]=useState([]);
@@ -4815,10 +4816,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           <div className="fu">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
               <PH title={`🌍 ${t.loginLogs}`} subtitle={`${loginLogs.length} ${t.llEvents}`}/>
-              <button className="btn btn-ghost" disabled={loginLogsLoading} onClick={refreshLoginLogs} style={{marginTop:4}}>
+              <button className="btn btn-ghost" disabled={loginLogsLoading} onClick={()=>setConfirmRefreshLogs(true)} style={{marginTop:4}}>
                 <span style={{display:"inline-block",animation:loginLogsLoading?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span> Refresh
               </button>
             </div>
+            {confirmRefreshLogs&&(
+              <div style={{background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.4)",borderRadius:10,padding:"12px 16px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                <span style={{fontSize:13,color:"var(--text1)"}}>⚠️ This will reload all login records from the database. Continue?</span>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn btn-ghost" style={{fontSize:12,padding:"5px 14px"}} onClick={()=>setConfirmRefreshLogs(false)}>Cancel</button>
+                  <button className="btn" style={{fontSize:12,padding:"5px 14px",background:"var(--accent)"}} onClick={()=>{setConfirmRefreshLogs(false);refreshLoginLogs();}}>Yes, Refresh</button>
+                </div>
+              </div>
+            )}
             <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
               {Object.entries(loginLogs.reduce((a,l)=>{const c=l.country||"?";a[c]=(a[c]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>(
                 <span key={c} className="badge" style={{background:"var(--surface2)",color:"var(--text2)",padding:"5px 13px",fontSize:13}}>{c} · {n}</span>

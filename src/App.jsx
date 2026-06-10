@@ -4911,7 +4911,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 const ll=resolveLL(l);
                 if(!ll)return;
                 const key=l.province?`${cn}|${l.province}`:cn;
-                if(!locMap[key])locMap[key]={lat:ll[0],lon:ll[1],label:l.province||cn,count:0,users:[]};
+                if(!locMap[key])locMap[key]={lat:ll[0],lon:ll[1],label:l.province||cn,province:l.province||"",country:cn,count:0,users:[]};
                 locMap[key].count++;
                 locMap[key].users.push(l.username);
               });
@@ -4936,15 +4936,24 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                     ))}
                     {pins.map((p,i)=>{
                       const r=Math.max(10,8+Math.sqrt(p.count/maxCount)*14);
-                      const cx=mX(p.lon).toFixed(1);
-                      const cy=mY(p.lat).toFixed(1);
+                      const cx=+mX(p.lon).toFixed(1);
+                      const cy=+mY(p.lat).toFixed(1);
+                      const provLine=p.province||p.country;
+                      const ctryLine=p.province?p.country:"";
+                      const lblW=Math.max(provLine.length,ctryLine.length)*5.5+10;
                       return(
                         <g key={i} transform={`translate(${cx},${cy})`}>
                           <title>{p.label}: {p.count} user{p.count!==1?"s":""}{"\n"}{p.users.join(", ")}</title>
+                          {/* glow rings */}
                           <circle r={r+8} fill="rgba(251,191,36,0.07)"/>
                           <circle r={r+3} fill="rgba(251,191,36,0.18)"/>
+                          {/* main pin */}
                           <circle r={r} fill="#d97706" stroke="#fbbf24" strokeWidth={1.5}/>
                           <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={p.count>9?r*0.75:r*0.85} fontWeight="700" fontFamily="DM Mono,monospace">{p.count}</text>
+                          {/* label box below pin */}
+                          <rect x={-lblW/2} y={r+5} width={lblW} height={p.province?26:15} rx={4} fill="rgba(13,27,42,0.85)" stroke="rgba(251,191,36,0.3)" strokeWidth={0.8}/>
+                          <text y={r+15} textAnchor="middle" fill="#fbbf24" fontSize={9} fontWeight="700">{provLine}</text>
+                          {ctryLine&&<text y={r+25} textAnchor="middle" fill="#94a3b8" fontSize={7.5}>{ctryLine}</text>}
                         </g>
                       );
                     })}

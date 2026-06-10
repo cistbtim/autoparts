@@ -33,14 +33,27 @@ const APP_UPDATE_DATE = "2026-05-21";
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
   const [lang,setLang] = useState(localStorage.getItem("ap_lang")||"en");
+  const _today = ()=>new Date().toISOString().slice(0,10);
+  const _sessionValid = ()=>{
+    try{return localStorage.getItem("ap_login_date")===_today();}catch{return false;}
+  };
   const [user,setUser] = useState(()=>{
-    try{const s=localStorage.getItem("ap_user");return s?JSON.parse(s):null;}catch{return null;}
+    try{
+      if(!_sessionValid()){localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");return null;}
+      const s=localStorage.getItem("ap_user");return s?JSON.parse(s):null;
+    }catch{return null;}
   });
-  const handleLogin=(u)=>{api.cacheClearAll();setUser(u);try{localStorage.setItem("ap_user",JSON.stringify(u));}catch{}};
-  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");};
+  const handleLogin=(u)=>{api.cacheClearAll();setUser(u);try{localStorage.setItem("ap_user",JSON.stringify(u));localStorage.setItem("ap_login_date",_today());}catch{}};
+  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");};
   const [settingsLoaded,setSettingsLoaded] = useState(false);
   const [availLangs,setAvailLangs] = useState(getLangs());
   useEffect(()=>{ document.documentElement.setAttribute("data-theme","light"); localStorage.removeItem("ap_theme"); },[]);
+  // Force re-login if the calendar day changes while the app is open (e.g. left open overnight)
+  useEffect(()=>{
+    const check=()=>{if(user&&!_sessionValid()){setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");}};
+    document.addEventListener("visibilitychange",check);
+    return()=>document.removeEventListener("visibilitychange",check);
+  },[user]);
   const changeLang = (l)=>{setLang(l);localStorage.setItem("ap_lang",l);api.patch("settings","id",1,{default_lang:l}).catch(()=>{});};
   const t = T[lang] || T.en;
 

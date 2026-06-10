@@ -129,7 +129,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [adClicksLoading,setAdClicksLoading]=useState(false);
   const [loginLogsLoading,setLoginLogsLoading]=useState(false);
   const [confirmRefreshLogs,setConfirmRefreshLogs]=useState(false);
-  const [selectedMapPin,setSelectedMapPin]=useState(null);
+  const [selectedMapCountry,setSelectedMapCountry]=useState(null);
   const [adContracts,setAdContracts]=useState([]);
   const [suppliers,setSuppliers]=useState([]);
   const [partSuppliers,setPartSuppliers]=useState([]);
@@ -4849,225 +4849,214 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               ))}
             </div>
             {(()=>{
-              /* ── World Map ── */
+              /* ── World Map (2-level: country → province drill-down) ── */
               const MW=1000,MH=480;
               const mX=lon=>((lon+180)/360*MW);
               const mY=lat=>((90-lat)/180*MH);
               const poly=pts=>pts.map(([la,lo])=>`${mX(lo).toFixed(1)},${mY(la).toFixed(1)}`).join(" ");
-              // Province → [lat, lon] — SA provinces + major world regions
-              const PROV_LL={
-                "Gauteng":[-26.0,28.0],"Western Cape":[-33.9,18.4],"KwaZulu-Natal":[-29.8,31.0],
-                "Eastern Cape":[-32.8,27.0],"Free State":[-29.0,26.0],"Limpopo":[-23.9,29.5],
-                "Mpumalanga":[-25.5,30.5],"North West":[-25.8,25.5],"Northern Cape":[-28.7,24.8],
-                // Zimbabwe provinces
-                "Harare":[-17.8,31.0],"Bulawayo":[-20.1,28.6],
-                // Zambia
-                "Lusaka":[-15.4,28.3],
-              };
-              // Country → [lat, lon] fallback (strip flag emoji first)
-              const CTY_LL={
-                "South Africa":[-29.0,25.0],"Zimbabwe":[-20.0,30.0],"Zambia":[-15.0,28.0],
-                "Mozambique":[-18.0,35.0],"Botswana":[-22.0,24.0],"Namibia":[-22.0,17.0],
-                "Lesotho":[-29.5,28.2],"Swaziland":[-26.5,31.5],"Eswatini":[-26.5,31.5],
-                "Tanzania":[-6.0,35.0],"Kenya":[1.0,38.0],"Uganda":[1.0,32.0],
-                "Nigeria":[9.0,8.0],"Ghana":[8.0,-1.0],"Ethiopia":[9.0,40.0],
-                "Egypt":[26.0,30.0],"Morocco":[32.0,-6.0],
-                "United Kingdom":[51.5,-0.1],"Ireland":[53.3,-8.0],
-                "United States":[38.0,-97.0],"Canada":[56.0,-96.0],
-                "Australia":[-25.0,133.0],"New Zealand":[-41.0,174.0],
-                "Germany":[51.0,10.0],"France":[46.0,2.0],"Netherlands":[52.0,5.0],
-                "China":[35.0,105.0],"India":[20.0,77.0],"Japan":[36.0,138.0],
-                "Brazil":[-10.0,-55.0],"Argentina":[-34.0,-64.0],
-              };
-              // Deterministic jitter so dots for same province don't stack
-              const jit=(str,range)=>{let h=0;for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))&0xfffff;return((h%1000)/1000-0.5)*range;};
               const stripFlag=s=>(s||"").replace(/[\u{1F1E0}-\u{1F1FF}]{2}/gu,"").trim();
-              const resolveLL=l=>{
-                if(l.lat&&l.lon)return[+l.lat,+l.lon];
-                if(l.province&&PROV_LL[l.province])return PROV_LL[l.province];
-                const cn=stripFlag(l.country);
-                if(cn&&CTY_LL[cn])return CTY_LL[cn];
-                return null;
-              };
-              // Detailed continent outlines [lat,lon] — Natural Earth simplified
+              const PROV_LL={"Gauteng":[-26.0,28.0],"Western Cape":[-33.9,18.4],"KwaZulu-Natal":[-29.8,31.0],"Eastern Cape":[-32.8,27.0],"Free State":[-29.0,26.0],"Limpopo":[-23.9,29.5],"Mpumalanga":[-25.5,30.5],"North West":[-25.8,25.5],"Northern Cape":[-28.7,24.8],"Harare":[-17.8,31.0],"Bulawayo":[-20.1,28.6],"Lusaka":[-15.4,28.3]};
+              const CTY_LL={"South Africa":[-29.0,25.0],"Zimbabwe":[-20.0,30.0],"Zambia":[-15.0,28.0],"Mozambique":[-18.0,35.0],"Botswana":[-22.0,24.0],"Namibia":[-22.0,17.0],"Lesotho":[-29.5,28.2],"Eswatini":[-26.5,31.5],"Tanzania":[-6.0,35.0],"Kenya":[1.0,38.0],"Uganda":[1.0,32.0],"Nigeria":[9.0,8.0],"Ghana":[8.0,-1.0],"Ethiopia":[9.0,40.0],"Egypt":[26.0,30.0],"Morocco":[32.0,-6.0],"United Kingdom":[51.5,-0.1],"Ireland":[53.3,-8.0],"United States":[38.0,-97.0],"Canada":[56.0,-96.0],"Australia":[-25.0,133.0],"New Zealand":[-41.0,174.0],"Germany":[51.0,10.0],"France":[46.0,2.0],"Netherlands":[52.0,5.0],"China":[35.0,105.0],"India":[20.0,77.0],"Japan":[36.0,138.0],"Brazil":[-10.0,-55.0],"Argentina":[-34.0,-64.0]};
+              const BBOX={"South Africa":[-35,-22,15,34],"Zimbabwe":[-23,-15,25,34],"Zambia":[-19,-8,21,34],"Mozambique":[-27,-10,32,41],"Botswana":[-27,-17,19,30],"Namibia":[-29,-17,10,26],"Tanzania":[-12,-1,29,41],"Kenya":[-5,5,33,42],"Nigeria":[4,14,2,15],"Ghana":[5,11,-4,2],"Egypt":[22,32,24,37],"United Kingdom":[49,59,-9,3],"United States":[24,50,-126,-65],"Australia":[-44,-10,112,155],"Germany":[47,55,5,16],"France":[42,52,-6,9],"China":[18,54,72,136],"India":[6,37,67,98],"Brazil":[-35,6,-74,-33],"Argentina":[-56,-21,-74,-52]};
               const LAND=[
-                // Africa
                 [[37,-6],[37,9],[34,12],[32,25],[30,33],[22,37],[15,43],[12,45],[11,51],[10,51],[1,42],[-1,41],[-5,40],[-11,38],[-15,35],[-20,35],[-26,33],[-32,28],[-34,27],[-35,20],[-34,18],[-30,17],[-22,15],[-17,12],[-6,12],[0,9],[3,10],[5,3],[5,-1],[4,-8],[5,-15],[10,-15],[15,-17],[22,-17],[37,-6]],
-                // Europe (inc Iberian, Italy, Balkans, Scandinavia)
                 [[36,-9],[36,0],[38,2],[41,2],[43,6],[43,8],[38,16],[38,15],[37,14],[40,18],[44,14],[45,14],[46,13],[47,19],[46,30],[44,38],[42,28],[40,26],[37,22],[38,23],[40,24],[42,28],[45,29],[47,38],[55,22],[57,8],[58,6],[51,3],[48,-2],[44,-2],[43,-9],[36,-9]],
-                // Scandinavia
-                [[57,8],[58,6],[58,5],[60,5],[62,7],[65,14],[68,16],[70,28],[70,30],[67,26],[60,25],[59,24],[57,22],[55,21],[54,10],[57,8]],
-                // Asia main
+                [[57,8],[58,5],[60,5],[62,7],[65,14],[68,16],[70,28],[70,30],[67,26],[60,25],[59,24],[57,22],[55,21],[54,10],[57,8]],
                 [[42,28],[42,50],[55,60],[70,102],[72,140],[60,130],[35,140],[22,121],[22,115],[28,60],[37,60],[42,50],[40,36],[42,28]],
-                // India
                 [[28,65],[28,77],[22,81],[10,80],[8,77],[8,72],[22,72],[28,65]],
-                // SE Asia
                 [[22,100],[22,112],[15,100],[10,105],[1,104],[5,100],[22,100]],
-                // Japan
-                [[31,131],[33,131],[35,136],[38,141],[41,141],[43,141],[45,142],[43,140],[38,139],[35,136],[33,131],[31,131]],
-                // North America
+                [[31,131],[33,131],[35,136],[38,141],[43,141],[45,142],[43,140],[38,139],[35,136],[33,131],[31,131]],
                 [[71,-157],[71,-60],[55,-65],[47,-53],[42,-65],[35,-75],[25,-80],[20,-87],[10,-83],[8,-77],[15,-87],[20,-105],[22,-108],[30,-110],[32,-117],[34,-120],[48,-125],[60,-138],[71,-157]],
-                // Greenland
                 [[61,-45],[61,-18],[76,-18],[83,-28],[83,-45],[61,-45]],
-                // South America
                 [[10,-75],[8,-62],[5,-52],[-5,-35],[-15,-38],[-23,-43],[-34,-53],[-55,-67],[-55,-70],[-43,-73],[-18,-70],[-5,-80],[0,-75],[5,-77],[10,-75]],
-                // Australia
                 [[-15,129],[-15,137],[-12,136],[-12,141],[-18,147],[-22,150],[-28,153],[-38,147],[-38,140],[-36,137],[-32,115],[-22,114],[-20,120],[-15,129]],
-                // New Zealand (N island approx)
                 [[-34,172],[-34,178],[-41,176],[-41,172],[-34,172]],
-                // British Isles
                 [[50,-6],[51,2],[56,0],[58,-3],[58,-6],[54,-8],[52,-10],[50,-6]],
-                // Iceland
                 [[63,-24],[65,-14],[66,-14],[66,-20],[64,-24],[63,-24]],
               ];
-              // South Africa highlighted separately
               const SA_POLY=[[-22.5,29.3],[-22.5,33.0],[-27.0,33.0],[-30.0,30.5],[-34.4,26.2],[-34.8,20.0],[-29.0,16.5],[-22.2,20.0],[-18.3,20.0],[-22.5,29.3]];
+              const currentMonth=new Date().toISOString().slice(0,7);
+              // Account creation date per user from users table (created_at = when account was registered)
+              const firstLogin={};
+              users.forEach(u=>{if(u.username&&u.created_at)firstLogin[u.username]=u.created_at;});
+              // Build country-level data
               const seenU=new Set();
-              const locMap={};// key→{lat,lon,label,count,users[]}
-              const byCt={};
-              loginLogs.forEach(l=>{
+              const ctData={};
+              loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").forEach(l=>{
                 if(seenU.has(l.username))return;
-                if(l.user_role==="admin"||l.user_role==="demo")return;
                 seenU.add(l.username);
                 const cn=stripFlag(l.country)||"Unknown";
-                byCt[cn]=(byCt[cn]||0)+1;
-                const ll=resolveLL(l);
-                if(!ll)return;
-                const key=l.province?`${cn}|${l.province}`:cn;
-                if(!locMap[key])locMap[key]={lat:ll[0],lon:ll[1],label:l.province||cn,province:l.province||"",country:cn,count:0,users:[]};
-                locMap[key].count++;
-                locMap[key].users.push(l.username);
+                const ll=CTY_LL[cn]||null;
+                if(!ctData[cn])ctData[cn]={count:0,ll,users:[],provinces:{},newCount:0,oldCount:0};
+                ctData[cn].count++;
+                ctData[cn].users.push(l.username);
+                if(l.province)ctData[cn].provinces[l.province]=(ctData[cn].provinces[l.province]||0)+1;
+                const fd=firstLogin[l.username]||"";
+                if(fd.startsWith(currentMonth))ctData[cn].newCount++; else ctData[cn].oldCount++;
               });
-              const pins=Object.values(locMap);
-              const maxCount=pins.reduce((m,p)=>Math.max(m,p.count),1);
+              const ctPins=Object.entries(ctData).filter(([,d])=>d.ll).map(([cn,d])=>({country:cn,...d}));
+              const maxCt=ctPins.reduce((m,p)=>Math.max(m,p.count),1);
+              const sc=selectedMapCountry;
+              const scd=sc?ctData[sc]:null;
+              const getVB=cn=>{
+                const b=BBOX[cn];
+                if(b){const pad=3,x=mX(b[2]-pad),y=mY(b[1]+pad),w=mX(b[3]+pad)-x,h=mY(b[0]-pad)-y;return`${x.toFixed(1)} ${y.toFixed(1)} ${Math.max(w,60).toFixed(1)} ${Math.max(h,40).toFixed(1)}`;}
+                const ll=CTY_LL[cn];if(!ll)return`0 0 ${MW} ${MH}`;
+                const vbW=MW/4,vbH=MH/4;return`${(mX(ll[1])-vbW/2).toFixed(1)} ${(mY(ll[0])-vbH/2).toFixed(1)} ${vbW} ${vbH}`;
+              };
+              const dtCfg={"Android":{icon:"🤖",color:"#4ade80"},"Apple iOS":{icon:"🍎",color:"#a78bfa"},"Desktop":{icon:"🖥",color:"#60a5fa"},"Other Mobile":{icon:"📱",color:"#fb923c"}};
+              const SVG_DEFS=(
+                <defs>
+                  <radialGradient id="oceanGrad" cx="50%" cy="50%" r="70%"><stop offset="0%" stopColor="#0f2744"/><stop offset="100%" stopColor="#060e1a"/></radialGradient>
+                  <filter id="pinGlow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                  <filter id="saGlow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                </defs>
+              );
+              const MapBase=({viewBox:vb,children})=>(
+                <svg viewBox={vb||`0 0 ${MW} ${MH}`} style={{width:"100%",height:"auto",display:"block"}}>
+                  {SVG_DEFS}
+                  <rect width={MW} height={MH} fill="url(#oceanGrad)"/>
+                  {[-60,-30,0,30,60].map(lat=>(<line key={`g${lat}`} x1={0} y1={mY(lat).toFixed(1)} x2={MW} y2={mY(lat).toFixed(1)} stroke="#1a3050" strokeWidth={lat===0?1:0.4} strokeDasharray={lat===0?"":"4,8"}/>))}
+                  {[-120,-60,0,60,120].map(lon=>(<line key={`g${lon}`} x1={mX(lon).toFixed(1)} y1={0} x2={mX(lon).toFixed(1)} y2={MH} stroke="#1a3050" strokeWidth={0.4} strokeDasharray="4,8"/>))}
+                  {LAND.map((pts,i)=>(<polygon key={i} points={poly(pts)} fill="#1e4535" stroke="#2d6648" strokeWidth={0.7} strokeLinejoin="round"/>))}
+                  <polygon points={poly(SA_POLY)} fill="#1a6640" stroke="#4ade80" strokeWidth={1} filter="url(#saGlow)" strokeLinejoin="round"/>
+                  {children}
+                </svg>
+              );
               return(
                 <div className="card" style={{overflow:"hidden",marginBottom:16,padding:0}}>
-                  <div style={{padding:"12px 18px 8px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <span style={{fontWeight:600,fontSize:14}}>🌍 Global User Map</span>
-                    <span style={{fontSize:12,color:"var(--text3)"}}>{seenU.size} unique user{seenU.size!==1?"s":""} · {Object.keys(byCt).length} countr{Object.keys(byCt).length!==1?"ies":"y"}</span>
+                  {/* ── Header ── */}
+                  <div style={{padding:"12px 18px 8px",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#080f1a",borderBottom:"1px solid #0f1e2e"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      {sc&&<button className="btn btn-ghost" style={{fontSize:12,padding:"4px 10px"}} onClick={()=>setSelectedMapCountry(null)}>← World</button>}
+                      <span style={{fontWeight:700,fontSize:14,color:"#e2e8f0"}}>{sc?`🗺 ${sc}`:"🌍 Global User Map"}</span>
+                    </div>
+                    <span style={{fontSize:12,color:"#64748b"}}>{seenU.size} user{seenU.size!==1?"s":""} · {Object.keys(ctData).length} countr{Object.keys(ctData).length!==1?"ies":"y"}</span>
                   </div>
-                  <svg viewBox={`0 0 ${MW} ${MH}`} style={{width:"100%",height:"auto",display:"block"}}>
-                    <defs>
-                      <radialGradient id="oceanGrad" cx="50%" cy="50%" r="70%">
-                        <stop offset="0%" stopColor="#0f2744"/>
-                        <stop offset="100%" stopColor="#060e1a"/>
-                      </radialGradient>
-                      <filter id="pinGlow" x="-80%" y="-80%" width="260%" height="260%">
-                        <feGaussianBlur stdDeviation="4" result="blur"/>
-                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                      </filter>
-                      <filter id="saGlow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feGaussianBlur stdDeviation="3" result="blur"/>
-                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                      </filter>
-                    </defs>
-                    <rect width={MW} height={MH} fill="url(#oceanGrad)"/>
-                    {/* subtle grid */}
-                    {[-60,-30,0,30,60].map(lat=>(
-                      <line key={`lat${lat}`} x1={0} y1={mY(lat).toFixed(1)} x2={MW} y2={mY(lat).toFixed(1)} stroke="#1a3050" strokeWidth={lat===0?1:0.4} strokeDasharray={lat===0?"":"4,8"}/>
-                    ))}
-                    {[-120,-60,0,60,120].map(lon=>(
-                      <line key={`lon${lon}`} x1={mX(lon).toFixed(1)} y1={0} x2={mX(lon).toFixed(1)} y2={MH} stroke="#1a3050" strokeWidth={0.4} strokeDasharray="4,8"/>
-                    ))}
-                    {/* Continents */}
-                    {LAND.map((pts,i)=>(
-                      <polygon key={i} points={poly(pts)} fill="#1e4535" stroke="#2d6648" strokeWidth={0.7} strokeLinejoin="round"/>
-                    ))}
-                    {/* South Africa highlighted */}
-                    <polygon points={poly(SA_POLY)} fill="#1a6640" stroke="#4ade80" strokeWidth={1} filter="url(#saGlow)" strokeLinejoin="round"/>
-                    {pins.map((p,i)=>{
-                      const r=Math.max(10,8+Math.sqrt(p.count/maxCount)*14);
-                      const cx=+mX(p.lon).toFixed(1);
-                      const cy=+mY(p.lat).toFixed(1);
-                      const provLine=p.province||p.country;
-                      const ctryLine=p.province?p.country:"";
-                      const lblW=Math.max(provLine.length,ctryLine.length)*5.5+10;
-                      return(
-                        <g key={i} transform={`translate(${cx},${cy})`} onClick={()=>setSelectedMapPin(p)} style={{cursor:"pointer"}}>
-                          <title>{p.label}: {p.count} user{p.count!==1?"s":""}{"\n"}{p.users.join(", ")}</title>
-                          {/* glow rings */}
-                          <circle r={r+10} fill="rgba(251,191,36,0.05)"/>
-                          <circle r={r+5} fill="rgba(251,191,36,0.12)"/>
-                          {/* main pin */}
-                          <circle r={r} fill="#d97706" stroke="#fef08a" strokeWidth={1.5} filter="url(#pinGlow)"/>
-                          <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={p.count>9?r*0.75:r*0.85} fontWeight="700" fontFamily="DM Mono,monospace">{p.count}</text>
-                          {/* label box below pin */}
-                          <rect x={-lblW/2} y={r+5} width={lblW} height={p.province?26:15} rx={4} fill="rgba(13,27,42,0.85)" stroke="rgba(251,191,36,0.3)" strokeWidth={0.8}/>
-                          <text y={r+15} textAnchor="middle" fill="#fbbf24" fontSize={9} fontWeight="700">{provLine}</text>
-                          {ctryLine&&<text y={r+25} textAnchor="middle" fill="#94a3b8" fontSize={7.5}>{ctryLine}</text>}
-                        </g>
-                      );
-                    })}
-                    {pins.length===0&&<text x={MW/2} y={MH/2} textAnchor="middle" fill="#334155" fontSize={13}>No location data found</text>}
-                  </svg>
-                  <div style={{padding:"10px 18px 14px",display:"flex",gap:12,flexWrap:"wrap",borderTop:"1px solid var(--border)"}}>
-                    {pins.sort((a,b)=>b.count-a.count).map((p,i)=>(
-                      <span key={i} onClick={()=>setSelectedMapPin(p)} style={{fontSize:12,color:"var(--text2)",display:"flex",alignItems:"center",gap:5,cursor:"pointer",padding:"3px 8px",borderRadius:6,background:selectedMapPin?.label===p.label?"rgba(217,119,6,.15)":"transparent",border:selectedMapPin?.label===p.label?"1px solid rgba(251,191,36,.4)":"1px solid transparent"}}>
-                        <span style={{background:"#d97706",color:"white",borderRadius:"50%",width:18,height:18,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700}}>{p.count}</span>
-                        {p.label}
-                      </span>
-                    ))}
-                  </div>
-                  {/* ── Drill-down panel ── */}
-                  {selectedMapPin&&(()=>{
-                    const sp=selectedMapPin;
-                    const zoom=3.5;
-                    const vbW=MW/zoom, vbH=MH/zoom;
-                    const vbX=Math.max(0,Math.min(MW-vbW, mX(sp.lon)-vbW/2));
-                    const vbY=Math.max(0,Math.min(MH-vbH, mY(sp.lat)-vbH/2));
-                    const pinUsers=loginLogs.filter(l=>sp.users.includes(l.username)).reduce((a,l)=>{
-                      if(!a[l.username]||l.created_at>a[l.username].created_at)a[l.username]=l;
-                      return a;
-                    },{});
-                    const dtCfg={"Android":{icon:"🤖",color:"#4ade80"},"Apple iOS":{icon:"🍎",color:"#a78bfa"},"Desktop":{icon:"🖥",color:"#60a5fa"},"Other Mobile":{icon:"📱",color:"#fb923c"}};
-                    return(
-                      <div style={{borderTop:"2px solid rgba(251,191,36,.4)",background:"#080f1a"}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 18px 10px"}}>
-                          <div>
-                            <span style={{fontWeight:700,fontSize:15,color:"#fbbf24"}}>{sp.province||sp.country}</span>
-                            {sp.province&&<span style={{fontSize:12,color:"#94a3b8",marginLeft:8}}>{sp.country}</span>}
-                            <span style={{fontSize:12,color:"#64748b",marginLeft:10}}>{sp.count} user{sp.count!==1?"s":""}</span>
-                          </div>
-                          <button className="btn btn-ghost" style={{fontSize:12,padding:"4px 12px"}} onClick={()=>setSelectedMapPin(null)}>✕ Close</button>
-                        </div>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
-                          {/* Zoomed map */}
-                          <svg viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`} style={{width:"100%",height:"auto",display:"block",background:"#060e1a"}}>
-                            {[-60,-30,0,30,60].map(lat=>(
-                              <line key={lat} x1={0} y1={mY(lat)} x2={MW} y2={mY(lat)} stroke="#1a3050" strokeWidth={0.4} strokeDasharray="4,8"/>
-                            ))}
-                            {LAND.map((pts,i)=>(<polygon key={i} points={poly(pts)} fill="#1e4535" stroke="#2d6648" strokeWidth={0.7} strokeLinejoin="round"/>))}
-                            <polygon points={poly(SA_POLY)} fill="#1a6640" stroke="#4ade80" strokeWidth={1} strokeLinejoin="round"/>
-                            <g transform={`translate(${mX(sp.lon)},${mY(sp.lat)})`}>
-                              <circle r={10} fill="rgba(251,191,36,0.15)"/>
-                              <circle r={6} fill="rgba(251,191,36,0.3)"/>
-                              <circle r={3.5} fill="#d97706" stroke="#fef08a" strokeWidth={1}/>
+
+                  {!sc?(
+                    /* ══ LEVEL 1: World Map ══ */
+                    <>
+                      <MapBase>
+                        {ctPins.map((p,i)=>{
+                          const r=Math.max(11,9+Math.sqrt(p.count/maxCt)*16);
+                          const cx=+mX(p.ll[1]).toFixed(1), cy=+mY(p.ll[0]).toFixed(1);
+                          const lbl=p.country; const lblW=lbl.length*5.2+14;
+                          return(
+                            <g key={i} transform={`translate(${cx},${cy})`} onClick={()=>setSelectedMapCountry(p.country)} style={{cursor:"pointer"}}>
+                              <title>Click to explore {p.country}</title>
+                              <circle r={r+10} fill="rgba(251,191,36,0.05)"/>
+                              <circle r={r+4} fill="rgba(251,191,36,0.13)"/>
+                              <circle r={r} fill="#d97706" stroke="#fef08a" strokeWidth={1.5} filter="url(#pinGlow)"/>
+                              <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={p.count>9?r*0.72:r*0.85} fontWeight="700" fontFamily="DM Mono,monospace">{p.count}</text>
+                              <rect x={-lblW/2} y={r+4} width={lblW} height={14} rx={4} fill="rgba(8,15,26,0.9)" stroke="rgba(251,191,36,0.25)" strokeWidth={0.7}/>
+                              <text y={r+13} textAnchor="middle" fill="#fbbf24" fontSize={8.5} fontWeight="600">{lbl}</text>
                             </g>
-                          </svg>
-                          {/* User list */}
-                          <div style={{overflowY:"auto",maxHeight:220,padding:"8px 0"}}>
-                            {Object.values(pinUsers).sort((a,b)=>b.created_at?.localeCompare(a.created_at||"")||0).map((l,i)=>{
-                              const dt=l.device_type||(l.device&&/Android/i.test(l.device)?"Android":/iPhone|iPad/i.test(l.device||"")?"Apple iOS":"Desktop");
-                              const dc=dtCfg[dt]||{icon:"❓",color:"#94a3b8"};
-                              return(
-                                <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 18px",borderBottom:"1px solid #0f1e2e"}}>
-                                  <div style={{width:32,height:32,borderRadius:"50%",background:"rgba(217,119,6,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fbbf24",flexShrink:0}}>{(l.username||"?")[0].toUpperCase()}</div>
-                                  <div style={{flex:1,minWidth:0}}>
-                                    <div style={{fontWeight:600,fontSize:13,color:"#e2e8f0"}}>{l.username}</div>
-                                    <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{l.city||l.province||"—"} · {new Date(l.created_at).toLocaleDateString()}</div>
+                          );
+                        })}
+                        {ctPins.length===0&&<text x={MW/2} y={MH/2} textAnchor="middle" fill="#334155" fontSize={13}>No location data found</text>}
+                      </MapBase>
+                      <div style={{padding:"10px 18px 12px",display:"flex",gap:10,flexWrap:"wrap",borderTop:"1px solid #0f1e2e",background:"#080f1a"}}>
+                        {ctPins.sort((a,b)=>b.count-a.count).map((p,i)=>(
+                          <span key={i} onClick={()=>setSelectedMapCountry(p.country)} style={{fontSize:12,color:"#94a3b8",display:"flex",alignItems:"center",gap:5,cursor:"pointer",padding:"3px 10px",borderRadius:6,background:"#0f1e2e",border:"1px solid #1a3050"}}>
+                            <span style={{background:"#d97706",color:"white",borderRadius:"50%",width:17,height:17,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700}}>{p.count}</span>
+                            {p.country}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  ):(
+                    /* ══ LEVEL 2: Country Detail ══ */
+                    <div style={{background:"#080f1a"}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+                        {/* Left: zoomed map with province pins */}
+                        <MapBase viewBox={getVB(sc)}>
+                          {scd&&Object.entries(scd.provinces).map(([prov,cnt],i)=>{
+                            const ll=PROV_LL[prov];if(!ll)return null;
+                            const r=Math.max(9,7+Math.sqrt(cnt/(Math.max(...Object.values(scd.provinces))))*12);
+                            const cx=+mX(ll[1]).toFixed(1),cy=+mY(ll[0]).toFixed(1);
+                            return(
+                              <g key={i} transform={`translate(${cx},${cy})`}>
+                                <circle r={r+6} fill="rgba(251,191,36,0.08)"/>
+                                <circle r={r} fill="#d97706" stroke="#fef08a" strokeWidth={1.2} filter="url(#pinGlow)"/>
+                                <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={r*0.85} fontWeight="700" fontFamily="DM Mono,monospace">{cnt}</text>
+                                <text y={r+10} textAnchor="middle" fill="#fbbf24" fontSize={7} fontWeight="600">{prov}</text>
+                              </g>
+                            );
+                          })}
+                          {/* fallback pin if no province data */}
+                          {scd&&Object.keys(scd.provinces).length===0&&CTY_LL[sc]&&(
+                            <g transform={`translate(${mX(CTY_LL[sc][1]).toFixed(1)},${mY(CTY_LL[sc][0]).toFixed(1)})`}>
+                              <circle r={14} fill="rgba(251,191,36,0.15)"/>
+                              <circle r={9} fill="#d97706" stroke="#fef08a" strokeWidth={1.5}/>
+                              <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={9} fontWeight="700">{scd?.count||0}</text>
+                            </g>
+                          )}
+                        </MapBase>
+                        {/* Right: stats + user list */}
+                        <div style={{display:"flex",flexDirection:"column",borderLeft:"1px solid #0f1e2e"}}>
+                          {/* New vs Old stat cards */}
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",borderBottom:"1px solid #0f1e2e"}}>
+                            <div style={{padding:"14px 16px",borderRight:"1px solid #0f1e2e",textAlign:"center"}}>
+                              <div style={{fontSize:28,fontWeight:800,color:"#4ade80"}}>{scd?.newCount||0}</div>
+                              <div style={{fontSize:11,color:"#64748b",marginTop:2}}>New this month</div>
+                              <div style={{fontSize:10,color:"#1e4535",marginTop:1}}>{currentMonth}</div>
+                            </div>
+                            <div style={{padding:"14px 16px",textAlign:"center"}}>
+                              <div style={{fontSize:28,fontWeight:800,color:"#60a5fa"}}>{scd?.oldCount||0}</div>
+                              <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Existing users</div>
+                              <div style={{fontSize:10,color:"#1e3050",marginTop:1}}>before {currentMonth}</div>
+                            </div>
+                          </div>
+                          {/* Province breakdown */}
+                          {scd&&Object.keys(scd.provinces).length>0&&(
+                            <div style={{padding:"10px 14px",borderBottom:"1px solid #0f1e2e"}}>
+                              <div style={{fontSize:11,fontWeight:600,color:"#64748b",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Province Breakdown</div>
+                              {Object.entries(scd.provinces).sort((a,b)=>b[1]-a[1]).map(([prov,cnt])=>(
+                                <div key={prov} style={{display:"grid",gridTemplateColumns:"1fr 32px",alignItems:"center",gap:8,marginBottom:6}}>
+                                  <div>
+                                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                                      <span style={{fontSize:11,color:"#94a3b8"}}>{prov}</span>
+                                      <span style={{fontSize:11,fontWeight:700,color:"#fbbf24"}}>{cnt}</span>
+                                    </div>
+                                    <div style={{background:"#0f1e2e",borderRadius:4,height:5,overflow:"hidden"}}>
+                                      <div style={{width:`${Math.round(cnt/scd.count*100)}%`,height:"100%",background:"#d97706",borderRadius:4}}/>
+                                    </div>
                                   </div>
-                                  <div style={{textAlign:"right",flexShrink:0}}>
-                                    <div style={{fontSize:11,color:dc.color}}>{dc.icon} {dt||"—"}</div>
-                                    <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{l.weather||"—"}</div>
-                                  </div>
+                                  <span style={{fontSize:10,color:"#64748b",textAlign:"right"}}>{Math.round(cnt/scd.count*100)}%</span>
                                 </div>
-                              );
-                            })}
+                              ))}
+                            </div>
+                          )}
+                          {/* User list */}
+                          <div style={{overflowY:"auto",flex:1,maxHeight:200}}>
+                            {loginLogs.filter(l=>scd?.users.includes(l.username)).reduce((a,l)=>{if(!a[l.username]||l.created_at>a[l.username].created_at)a[l.username]=l;return a;},{})&&
+                              Object.values(loginLogs.filter(l=>scd?.users.includes(l.username)).reduce((a,l)=>{if(!a[l.username]||l.created_at>a[l.username].created_at)a[l.username]=l;return a;},{}))
+                              .sort((a,b)=>(b.created_at||"").localeCompare(a.created_at||""))
+                              .map((l,i)=>{
+                                const dt=l.device_type||(l.device&&/Android/i.test(l.device)?"Android":/iPhone|iPad/i.test(l.device||"")?"Apple iOS":"Desktop");
+                                const dc=dtCfg[dt]||{icon:"❓",color:"#94a3b8"};
+                                const isNew=(firstLogin[l.username]||"").startsWith(currentMonth);
+                                return(
+                                  <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 14px",borderBottom:"1px solid #0a1525"}}>
+                                    <div style={{width:28,height:28,borderRadius:"50%",background:isNew?"rgba(74,222,128,.2)":"rgba(96,165,250,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:isNew?"#4ade80":"#60a5fa",flexShrink:0}}>{(l.username||"?")[0].toUpperCase()}</div>
+                                    <div style={{flex:1,minWidth:0}}>
+                                      <div style={{fontSize:12,fontWeight:600,color:"#e2e8f0",display:"flex",alignItems:"center",gap:5}}>
+                                        {l.username}
+                                        <span style={{fontSize:9,padding:"1px 5px",borderRadius:3,background:isNew?"rgba(74,222,128,.15)":"rgba(96,165,250,.1)",color:isNew?"#4ade80":"#60a5fa"}}>{isNew?"NEW":"returning"}</span>
+                                      </div>
+                                      <div style={{fontSize:10,color:"#475569",marginTop:1}}>{l.province||l.city||"—"} · {new Date(l.created_at).toLocaleDateString()}</div>
+                                    </div>
+                                    <div style={{fontSize:10,color:dc.color,flexShrink:0}}>{dc.icon}</div>
+                                  </div>
+                                );
+                              })
+                            }
                           </div>
                         </div>
                       </div>
-                    );
-                  })()}
+                    </div>
+                  )}
                 </div>
               );
             })()}

@@ -88,6 +88,7 @@ export const detectGeoLocation = async () => {
     )).json();
     const a = r.address || {};
     const city = a.city || a.town || a.village || a.suburb || a.county || "";
+    const province = a.state || a.state_district || "";
     const countryName = a.country || "";
     const cc = (a.country_code || "").toUpperCase();
     const flag = cc.length === 2
@@ -96,13 +97,14 @@ export const detectGeoLocation = async () => {
     // Still fetch IP for the ip_address field
     let ip = "";
     try { ip = (await (await fetch("https://ipapi.co/json/")).json()).ip || ""; } catch {}
-    return { city, country: countryName, countryFull: flag ? `${countryName} ${flag}` : countryName, lat, lon, ip };
+    return { city, province, country: countryName, countryFull: flag ? `${countryName} ${flag}` : countryName, lat, lon, ip };
   } catch {
     // User denied permission or browser geo failed — fall back to IP-based lookup
     try {
       const g = await (await fetch("https://ipapi.co/json/")).json();
       return {
         city: g.city || "",
+        province: g.region || "",
         country: g.country_name || "",
         countryFull: `${g.country_name||""}${g.country_flag_emoji?" "+g.country_flag_emoji:""}`.trim(),
         lat: g.latitude || null,
@@ -110,7 +112,7 @@ export const detectGeoLocation = async () => {
         ip: g.ip || ""
       };
     } catch {
-      return { city: "", country: "", countryFull: "", lat: null, lon: null, ip: "" };
+      return { city: "", province: "", country: "", countryFull: "", lat: null, lon: null, ip: "" };
     }
   }
 };

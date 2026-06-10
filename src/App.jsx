@@ -4819,10 +4819,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 <span style={{display:"inline-block",animation:loginLogsLoading?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span> Refresh
               </button>
             </div>
-            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
+            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:8}}>
               {Object.entries(loginLogs.reduce((a,l)=>{const c=l.country||"?";a[c]=(a[c]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>(
                 <span key={c} className="badge" style={{background:"var(--surface2)",color:"var(--text2)",padding:"5px 13px",fontSize:13}}>{c} · {n}</span>
               ))}
+            </div>
+            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
+              {(()=>{
+                const dt=loginLogs.reduce((a,l)=>{const d=l.device||"";const k=d.includes("(mobile)")?"📱 Mobile":/Chrome|Safari|Firefox|Edge|Opera|Browser/.test(d)?"🖥 Desktop":"❓ Other";a[k]=(a[k]||0)+1;return a;},{});
+                return [["📱 Mobile","rgba(99,102,241,.12)","#818cf8"],["🖥 Desktop","rgba(52,211,153,.12)","var(--green)"],["❓ Other","var(--surface2)","var(--text3)"]].map(([k,bg,col])=>dt[k]?(<span key={k} className="badge" style={{background:bg,color:col,padding:"5px 13px",fontSize:13}}>{k} · {dt[k]}</span>):null);
+              })()}
             </div>
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
@@ -4837,7 +4843,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         <td style={{fontSize:13}}>{l.country||"—"}</td>
                         <td style={{fontSize:13,color:"var(--text3)"}}>{l.city||"—"}</td>
                         <td style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{l.ip_address||"—"}</td>
-                        <td style={{fontSize:12,color:"var(--text2)",whiteSpace:"nowrap"}}>{l.device||"—"}</td>
+                        <td style={{whiteSpace:"nowrap"}}>{l.device?(()=>{const mob=l.device.includes("(mobile)");const oth=!/Chrome|Safari|Firefox|Edge|Opera|Browser/.test(l.device)&&!mob;return(<><span className="badge" style={{background:mob?"rgba(99,102,241,.12)":oth?"var(--surface2)":"rgba(52,211,153,.12)",color:mob?"#818cf8":oth?"var(--text3)":"var(--green)",fontSize:11,marginRight:5}}>{mob?"📱 Mobile":oth?"❓ Other":"🖥 Desktop"}</span><span style={{fontSize:11,color:"var(--text3)"}}>{l.device.replace(" (mobile)","")}</span></>);})():"—"}</td>
                         <td style={{fontSize:13,whiteSpace:"nowrap"}}>{l.weather||"—"}</td>
                         <td><span className="badge" style={{background:l.status==="success"?"rgba(52,211,153,.12)":"rgba(248,113,113,.12)",color:l.status==="success"?"var(--green)":"var(--red)"}}>{l.status}</span></td>
                       </tr>

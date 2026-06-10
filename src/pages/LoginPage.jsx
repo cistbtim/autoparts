@@ -3,7 +3,7 @@ import { api, SUPABASE_URL } from "../lib/api.js";
 import { getSettings } from "../lib/settings.js";
 import { CSS } from "../styles.js";
 import { ShopLogo, FL, MotorDeskBanner } from "../components/shared.jsx";
-import { makeId, detectGeoLocation, waLink } from "../lib/helpers.js";
+import { makeId, detectGeoLocation, fetchWeather, waLink } from "../lib/helpers.js";
 import { getSubInfo } from "../lib/constants.js";
 
 // Attach spare_shop_name + queue linked_branch_id from localStorage (set during QR registration)
@@ -109,7 +109,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const logLogin = async (u) => {
     try {
       const g = await detectGeoLocation();
-      await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:g.countryFull||"?",city:g.city||"",device:navigator.userAgent.slice(0,100),status:"success"});
+      const wx = g.lat ? await fetchWeather(g.lat, g.lon).catch(()=>({label:""})) : {label:""};
+      await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:g.countryFull||"?",city:g.city||"",weather:wx.label||null,device:navigator.userAgent.slice(0,100),status:"success"});
     } catch {}
   };
 

@@ -297,7 +297,7 @@ const getEnvCtx = () => {
   return _envCtxPromise;
 };
 
-export function AdBanner({ads=[], page="shop", userCtx=null, height=220}) {
+export function AdBanner({ads=[], page="shop", userCtx=null, height=220, staticSlides=[]}) {
   const [idx, setIdx] = useState(0);
   const [envCtx, setEnvCtx] = useState(null);
   const [timerKey, setTimerKey] = useState(0);
@@ -313,10 +313,13 @@ export function AdBanner({ads=[], page="shop", userCtx=null, height=220}) {
   const pool = ads.filter(a=>a.active && (a.page===page||a.page==="all") && a.position==="banner");
 
   // When weather is known: show weather-matched ads + "any"/unset ads; sort matched first
-  const active = weatherCond
+  const dbActive = weatherCond
     ? [...pool.filter(a=>!a.weather_condition||a.weather_condition==="any"||a.weather_condition===weatherCond)]
         .sort((a,b)=>(b.weather_condition===weatherCond?1:0)-(a.weather_condition===weatherCond?1:0))
     : pool;
+
+  // Merge hardcoded static slides (first) with DB ads
+  const active = [...staticSlides.map(s=>({...s,_static:true})), ...dbActive];
 
   useEffect(()=>{
     if(active.length<=1) return;
@@ -353,6 +356,7 @@ export function AdBanner({ads=[], page="shop", userCtx=null, height=220}) {
     if(!url) return;
     const href=url.match(/^https?:\/\//)?url:"https://"+url;
     window.open(href,"_blank","noopener,noreferrer");
+    if(ad._static) return;
     try {
       const env = envCtx || await getEnvCtx();
       await api.insert("ad_clicks",{
@@ -376,19 +380,21 @@ export function AdBanner({ads=[], page="shop", userCtx=null, height=220}) {
       onClick={()=>{ if(!didSwipe.current) openLink(ad.link_url); }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}>
-      {ad.image_url
-        ? <img src={ad.image_url} alt={ad.title||"Ad"}
-            style={{display:"block",width:"100%",height:"100%",objectFit:"contain"}}
-            onError={e=>{e.target.style.display="none";const p=e.target.parentElement;if(p){p.style.minHeight="56px";const fb=p.querySelector('.ad-fb');if(fb)fb.style.display="flex";}}}/>
-        : <div style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
-            {ad.title}
-          </div>}
-      {ad.image_url&&<div className="ad-fb" style={{display:"none",minHeight:56,alignItems:"center",justifyContent:"center",
+      {ad._static
+        ? ad.render
+        : ad.image_url
+          ? <img src={ad.image_url} alt={ad.title||"Ad"}
+              style={{display:"block",width:"100%",height:"100%",objectFit:"contain"}}
+              onError={e=>{e.target.style.display="none";const p=e.target.parentElement;if(p){p.style.minHeight="56px";const fb=p.querySelector('.ad-fb');if(fb)fb.style.display="flex";}}}/>
+          : <div style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
+              {ad.title}
+            </div>}
+      {!ad._static&&ad.image_url&&<div className="ad-fb" style={{display:"none",minHeight:56,alignItems:"center",justifyContent:"center",
           fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
         {ad.title}
       </div>}
-      {ad.title&&ad.image_url&&(
+      {!ad._static&&ad.title&&ad.image_url&&(
         <div style={{position:"absolute",bottom:0,left:0,right:0,
           background:"linear-gradient(transparent,rgba(0,0,0,.65))",
           padding:"14px 10px 5px",color:"#fff",fontSize:11,fontWeight:700}}>

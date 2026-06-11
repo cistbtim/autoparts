@@ -4900,7 +4900,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               const scd=sc?ctData[sc]:null;
               const getVB=cn=>{
                 const b=BBOX[cn];
-                if(b){const pad=3,x=mX(b[2]-pad),y=mY(b[1]+pad),w=mX(b[3]+pad)-x,h=mY(b[0]-pad)-y;return`${x.toFixed(1)} ${y.toFixed(1)} ${Math.max(w,60).toFixed(1)} ${Math.max(h,40).toFixed(1)}`;}
+                if(b){const pad=3,padB=12,x=mX(b[2]-pad),y=mY(b[1]+pad),w=mX(b[3]+pad)-x,h=mY(b[0]-padB)-y;return`${x.toFixed(1)} ${y.toFixed(1)} ${Math.max(w,60).toFixed(1)} ${Math.max(h,40).toFixed(1)}`;}
                 const ll=CTY_LL[cn];if(!ll)return`0 0 ${MW} ${MH}`;
                 const vbW=MW/4,vbH=MH/4;return`${(mX(ll[1])-vbW/2).toFixed(1)} ${(mY(ll[0])-vbH/2).toFixed(1)} ${vbW} ${vbH}`;
               };
@@ -4913,7 +4913,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 </defs>
               );
               const MapBase=({viewBox:vb,children})=>(
-                <svg viewBox={vb||`0 0 ${MW} ${MH}`} style={{width:"100%",height:"auto",display:"block"}}>
+                <svg viewBox={vb||`0 0 ${MW} ${MH}`} style={{width:"100%",height:"auto",display:"block"}} overflow="visible">
                   {SVG_DEFS}
                   <rect width={MW} height={MH} fill="url(#oceanGrad)"/>
                   {[-60,-30,0,30,60].map(lat=>(<line key={`g${lat}`} x1={0} y1={mY(lat).toFixed(1)} x2={MW} y2={mY(lat).toFixed(1)} stroke="#1a3050" strokeWidth={lat===0?1:0.4} strokeDasharray={lat===0?"":"4,8"}/>))}

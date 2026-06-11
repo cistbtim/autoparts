@@ -1730,7 +1730,6 @@ export function WorkshopRegisterPage({ token }) {
           username: f.username.trim(), password: f.password,
           name: f.workshop_name.trim(), role: "workshop",
           phone: f.phone.trim() || "", email: f.email.trim() || "",
-          city: f.city || "", country: f.country || "",
           spare_shop_name: shopName,
           // spare_shop_id only when integer (admin QR = 1); branch QR uses uuid which can't fit int4
           ...(Number.isInteger(shopId) ? {spare_shop_id: shopId} : {}),

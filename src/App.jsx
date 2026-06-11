@@ -4969,7 +4969,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                     </>
                   ):(selectedMapProvince?(()=>{
                     /* ══ LEVEL 3: Province / City Detail ══ */
-                    const provLogs=loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo"&&l.province===selectedMapProvince&&l.country===sc);
+                    const provLogs=loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo"&&l.province===selectedMapProvince);
                     const cityMap=provLogs.reduce((a,l)=>{const c=l.city||"Unknown";if(!a[c])a[c]={count:0,users:[]};if(!a[c].users.includes(l.username)){a[c].count++;a[c].users.push(l.username);}return a;},{});
                     const cities=Object.entries(cityMap).sort((a,b)=>b[1].count-a[1].count);
                     const maxC=cities[0]?.[1].count||1;

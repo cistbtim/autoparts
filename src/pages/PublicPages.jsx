@@ -1704,14 +1704,18 @@ export function WorkshopRegisterPage({ token }) {
   const [errMsg, setErrMsg] = useState("");
   const upd = (k, v) => setF(p => ({...p, [k]: v}));
 
+  useEffect(() => {
+    fetch("https://ipapi.co/json/").then(r=>r.json()).then(d=>{
+      setF(p=>({...p, city: d.city||"", country: d.country_name||""}));
+    }).catch(()=>{});
+  }, []);
+
   const submit = async () => {
     if (!f.workshop_name.trim()) return setErrMsg("Workshop name is required");
     if (!f.username.trim())      return setErrMsg("Username is required");
     if (!f.password)             return setErrMsg("Password is required");
     if (f.password.length < 4)  return setErrMsg("Password must be at least 4 characters");
     if (f.password !== f.password2) return setErrMsg("Passwords don't match");
-    if (!f.city.trim())          return setErrMsg("City is required");
-    if (!f.country.trim())       return setErrMsg("Country is required");
     setErrMsg(""); setStep("submitting");
     try {
       const ex = await api.get("users", `username=eq.${encodeURIComponent(f.username.trim())}&select=id`).catch(() => []);
@@ -1726,6 +1730,7 @@ export function WorkshopRegisterPage({ token }) {
           username: f.username.trim(), password: f.password,
           name: f.workshop_name.trim(), role: "workshop",
           phone: f.phone.trim() || "", email: f.email.trim() || "",
+          city: f.city || "", country: f.country || "",
           spare_shop_name: shopName,
           // spare_shop_id only when integer (admin QR = 1); branch QR uses uuid which can't fit int4
           ...(Number.isInteger(shopId) ? {spare_shop_id: shopId} : {}),
@@ -1782,10 +1787,6 @@ export function WorkshopRegisterPage({ token }) {
           <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:"24px 20px"}}>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div><Lbl label="Workshop Name *"/><input style={inp} value={f.workshop_name} onChange={e=>upd("workshop_name",e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-                <div><Lbl label="City *"/><input style={inp} value={f.city} onChange={e=>upd("city",e.target.value)} placeholder="Cape Town"/></div>
-                <div><Lbl label="Country *"/><input style={inp} value={f.country} onChange={e=>upd("country",e.target.value)} placeholder="South Africa"/></div>
-              </div>
               <div><Lbl label="Phone"/><input style={inp} type="tel" value={f.phone} onChange={e=>upd("phone",e.target.value)} placeholder="+27 82 000 0000"/></div>
               <div><Lbl label="Email"/><input style={inp} type="email" value={f.email} onChange={e=>upd("email",e.target.value)} placeholder="workshop@email.com"/></div>
               <div style={{borderTop:"1px solid var(--border)",paddingTop:14,marginTop:2}}>

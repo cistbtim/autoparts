@@ -5067,11 +5067,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 {key:"Desktop",   icon:"🖥",  color:"#60a5fa", bg:"rgba(96,165,250,.12)"},
                 {key:"Other Mobile",icon:"📱",color:"#fb923c", bg:"rgba(251,146,60,.12)"},
               ];
-              const counts=loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").reduce((a,l)=>{
+              const filteredLogs=loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo");
+              const counts=filteredLogs.reduce((a,l)=>{
                 const raw=l.device_type||(()=>{const d=l.device||"";return /Android/i.test(d)?"Android":/iPhone|iPad/i.test(d)?"Apple iOS":/Mobile/i.test(d)?"Other Mobile":"Desktop";})();
                 a[raw]=(a[raw]||0)+1;return a;
               },{});
-              const total=loginLogs.length||1;
+              const total=filteredLogs.length||1;
               const rows=cfg.filter(c=>counts[c.key]);
               if(!rows.length)return null;
               return(

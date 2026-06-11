@@ -4968,7 +4968,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                   ):(
                     /* ══ LEVEL 2: Country Detail ══ */
                     <div style={{background:"#080f1a"}}>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+                      <div style={window.innerWidth<640?{display:"flex",flexDirection:"column"}:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
                         {/* Left: zoomed map with province pins */}
                         <MapBase viewBox={getVB(sc)}>
                           {scd&&Object.entries(scd.provinces).map(([prov,cnt],i)=>{
@@ -4994,7 +4994,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                           )}
                         </MapBase>
                         {/* Right: stats + user list */}
-                        <div style={{display:"flex",flexDirection:"column",borderLeft:"1px solid #0f1e2e"}}>
+                        <div style={{display:"flex",flexDirection:"column",borderLeft:window.innerWidth<640?"none":"1px solid #0f1e2e",borderTop:window.innerWidth<640?"1px solid #0f1e2e":"none"}}>
                           {/* New vs Old stat cards */}
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",borderBottom:"1px solid #0f1e2e"}}>
                             <div style={{padding:"14px 16px",borderRight:"1px solid #0f1e2e",textAlign:"center"}}>
@@ -5029,7 +5029,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                             </div>
                           )}
                           {/* User list */}
-                          <div style={{overflowY:"auto",flex:1,maxHeight:200}}>
+                          <div style={{overflowY:"auto",flex:1,maxHeight:window.innerWidth<640?400:200}}>
                             {loginLogs.filter(l=>scd?.users.includes(l.username)).reduce((a,l)=>{if(!a[l.username]||l.created_at>a[l.username].created_at)a[l.username]=l;return a;},{})&&
                               Object.values(loginLogs.filter(l=>scd?.users.includes(l.username)).reduce((a,l)=>{if(!a[l.username]||l.created_at>a[l.username].created_at)a[l.username]=l;return a;},{}))
                               .sort((a,b)=>(b.created_at||"").localeCompare(a.created_at||""))

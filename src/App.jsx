@@ -4900,7 +4900,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               const scd=sc?ctData[sc]:null;
               const getVB=cn=>{
                 const b=BBOX[cn];
-                if(b){const pad=3,padB=12,x=mX(b[2]-pad),y=mY(b[1]+pad),w=mX(b[3]+pad)-x,h=mY(b[0]-padB)-y;return`${x.toFixed(1)} ${y.toFixed(1)} ${Math.max(w,60).toFixed(1)} ${Math.max(h,40).toFixed(1)}`;}
+                if(b){const padT=4,padB=14,padL=12,padR=5,x=mX(b[2]-padL),y=mY(b[1]+padT),w=mX(b[3]+padR)-x,h=mY(b[0]-padB)-y;return`${x.toFixed(1)} ${y.toFixed(1)} ${Math.max(w,60).toFixed(1)} ${Math.max(h,40).toFixed(1)}`;}
                 const ll=CTY_LL[cn];if(!ll)return`0 0 ${MW} ${MH}`;
                 const vbW=MW/4,vbH=MH/4;return`${(mX(ll[1])-vbW/2).toFixed(1)} ${(mY(ll[0])-vbH/2).toFixed(1)} ${vbW} ${vbH}`;
               };
@@ -4973,14 +4973,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         <MapBase viewBox={getVB(sc)}>
                           {scd&&Object.entries(scd.provinces).map(([prov,cnt],i)=>{
                             const ll=PROV_LL[prov];if(!ll)return null;
-                            const r=Math.max(7,5+Math.sqrt(cnt/(Math.max(...Object.values(scd.provinces))))*9);
+                            const r=8;
                             const cx=+mX(ll[1]).toFixed(1),cy=+mY(ll[0]).toFixed(1);
                             return(
                               <g key={i} transform={`translate(${cx},${cy})`}>
-                                <circle r={r+3} fill="rgba(251,191,36,0.08)"/>
+                                <circle r={r+1} fill="rgba(251,191,36,0.08)"/>
                                 <circle r={r} fill="#d97706" stroke="#fef08a" strokeWidth={1.2} filter="url(#pinGlow)"/>
                                 <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={r*0.85} fontWeight="700" fontFamily="DM Mono,monospace">{cnt}</text>
-                                <text y={r+10} textAnchor="middle" fill="#fbbf24" fontSize={7} fontWeight="600">{prov}</text>
+                                <text y={r+5} textAnchor="middle" fill="#fbbf24" fontSize={4.5} fontWeight="600">{prov}</text>
                               </g>
                             );
                           })}

@@ -130,6 +130,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [loginLogsLoading,setLoginLogsLoading]=useState(false);
   const [confirmRefreshLogs,setConfirmRefreshLogs]=useState(false);
   const [selectedMapCountry,setSelectedMapCountry]=useState(null);
+  const [selectedMapProvince,setSelectedMapProvince]=useState(null);
   const [adContracts,setAdContracts]=useState([]);
   const [suppliers,setSuppliers]=useState([]);
   const [partSuppliers,setPartSuppliers]=useState([]);
@@ -4928,8 +4929,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                   {/* ── Header ── */}
                   <div style={{padding:"12px 18px 8px",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#080f1a",borderBottom:"1px solid #0f1e2e"}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      {sc&&<button className="btn btn-ghost" style={{fontSize:12,padding:"4px 10px"}} onClick={()=>setSelectedMapCountry(null)}>← World</button>}
-                      <span style={{fontWeight:700,fontSize:14,color:"#e2e8f0"}}>{sc?`🗺 ${sc}`:"🌍 Global User Map"}</span>
+                      {sc&&<button className="btn btn-ghost" style={{fontSize:12,padding:"4px 10px"}} onClick={()=>{setSelectedMapCountry(null);setSelectedMapProvince(null);}}>← World</button>}
+                      {sc&&selectedMapProvince&&<button className="btn btn-ghost" style={{fontSize:12,padding:"4px 10px"}} onClick={()=>setSelectedMapProvince(null)}>← {sc}</button>}
+                      <span style={{fontWeight:700,fontSize:14,color:"#e2e8f0"}}>{selectedMapProvince?`📍 ${selectedMapProvince}`:sc?`🗺 ${sc}`:"🌍 Global User Map"}</span>
                     </div>
                     <span style={{fontSize:12,color:"#64748b"}}>{seenU.size} user{seenU.size!==1?"s":""} · {Object.keys(ctData).length} countr{Object.keys(ctData).length!==1?"ies":"y"}</span>
                   </div>
@@ -4975,10 +4977,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                             const ll=PROV_LL[prov];if(!ll)return null;
                             const r=8;
                             const cx=+mX(ll[1]).toFixed(1),cy=+mY(ll[0]).toFixed(1);
+                            const isSelected=selectedMapProvince===prov;
                             return(
-                              <g key={i} transform={`translate(${cx},${cy})`}>
-                                <circle r={r+1} fill="rgba(251,191,36,0.08)"/>
-                                <circle r={r} fill="#d97706" stroke="#fef08a" strokeWidth={1.2} filter="url(#pinGlow)"/>
+                              <g key={i} transform={`translate(${cx},${cy})`} onClick={()=>setSelectedMapProvince(prov)} style={{cursor:"pointer"}}>
+                                <circle r={r+1} fill={isSelected?"rgba(251,191,36,0.2)":"rgba(251,191,36,0.08)"}/>
+                                <circle r={r} fill={isSelected?"#f59e0b":"#d97706"} stroke="#fef08a" strokeWidth={isSelected?2:1.2} filter="url(#pinGlow)"/>
                                 <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={r*0.85} fontWeight="700" fontFamily="DM Mono,monospace">{cnt}</text>
                                 <text y={r+5} textAnchor="middle" fill="#fbbf24" fontSize={4.5} fontWeight="600">{prov}</text>
                               </g>
@@ -4995,6 +4998,56 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         </MapBase>
                         {/* Right: stats + user list */}
                         <div style={{display:"flex",flexDirection:"column",borderLeft:window.innerWidth<640?"none":"1px solid #0f1e2e",borderTop:window.innerWidth<640?"1px solid #0f1e2e":"none"}}>
+                          {selectedMapProvince?(()=>{
+                            const provLogs=loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo"&&l.province===selectedMapProvince&&l.country===sc);
+                            const cityMap=provLogs.reduce((a,l)=>{const c=l.city||"Unknown";if(!a[c])a[c]={count:0,users:[]};if(!a[c].users.includes(l.username)){a[c].count++;a[c].users.push(l.username);}return a;},{});
+                            const cities=Object.entries(cityMap).sort((a,b)=>b[1].count-a[1].count);
+                            const maxC=cities[0]?.[1].count||1;
+                            return(
+                              <div style={{flex:1,overflowY:"auto"}}>
+                                <div style={{padding:"10px 14px",borderBottom:"1px solid #0f1e2e"}}>
+                                  <div style={{fontSize:11,fontWeight:600,color:"#64748b",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Cities in {selectedMapProvince}</div>
+                                  {cities.map(([city,d])=>(
+                                    <div key={city} style={{marginBottom:8}}>
+                                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                                        <span style={{fontSize:12,color:"#94a3b8"}}>{city}</span>
+                                        <span style={{fontSize:12,fontWeight:700,color:"#fbbf24"}}>{d.count}</span>
+                                      </div>
+                                      <div style={{background:"#0f1e2e",borderRadius:4,height:5,overflow:"hidden"}}>
+                                        <div style={{width:`${Math.round(d.count/maxC*100)}%`,height:"100%",background:"#d97706",borderRadius:4}}/>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                {cities.map(([city,d])=>(
+                                  <div key={city}>
+                                    <div style={{padding:"6px 14px",background:"#0a1525",fontSize:10,fontWeight:700,color:"#475569",textTransform:"uppercase",letterSpacing:"0.06em"}}>{city}</div>
+                                    {Object.values(provLogs.filter(l=>l.city===city||(city==="Unknown"&&!l.city)).reduce((a,l)=>{if(!a[l.username]||l.created_at>a[l.username].created_at)a[l.username]=l;return a;},{}))
+                                      .sort((a,b)=>(b.created_at||"").localeCompare(a.created_at||""))
+                                      .map((l,i)=>{
+                                        const dt=l.device_type||(l.device&&/Android/i.test(l.device)?"Android":/iPhone|iPad/i.test(l.device||"")?"Apple iOS":"Desktop");
+                                        const dc=dtCfg[dt]||{icon:"❓",color:"#94a3b8"};
+                                        const isNew=(firstLogin[l.username]||"").startsWith(currentMonth);
+                                        return(
+                                          <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 14px",borderBottom:"1px solid #0a1525"}}>
+                                            <div style={{width:28,height:28,borderRadius:"50%",background:isNew?"rgba(74,222,128,.2)":"rgba(96,165,250,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:isNew?"#4ade80":"#60a5fa",flexShrink:0}}>{(l.username||"?")[0].toUpperCase()}</div>
+                                            <div style={{flex:1,minWidth:0}}>
+                                              <div style={{fontSize:12,fontWeight:600,color:"#e2e8f0",display:"flex",alignItems:"center",gap:5}}>
+                                                {l.username}
+                                                <span style={{fontSize:9,padding:"1px 5px",borderRadius:3,background:isNew?"rgba(74,222,128,.15)":"rgba(96,165,250,.1)",color:isNew?"#4ade80":"#60a5fa"}}>{isNew?"NEW":"returning"}</span>
+                                              </div>
+                                              <div style={{fontSize:10,color:"#475569",marginTop:1}}>{l.city||"—"} · {new Date(l.created_at).toLocaleDateString()}</div>
+                                            </div>
+                                            <div style={{fontSize:10,color:dc.color,flexShrink:0}}>{dc.icon}</div>
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })():(
+                          <>
                           {/* New vs Old stat cards */}
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",borderBottom:"1px solid #0f1e2e"}}>
                             <div style={{padding:"14px 16px",borderRight:"1px solid #0f1e2e",textAlign:"center"}}>
@@ -5053,6 +5106,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                               })
                             }
                           </div>
+                          </>
+                          )}
                         </div>
                       </div>
                     </div>

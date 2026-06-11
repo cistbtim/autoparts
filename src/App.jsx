@@ -4973,11 +4973,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         <MapBase viewBox={getVB(sc)}>
                           {scd&&Object.entries(scd.provinces).map(([prov,cnt],i)=>{
                             const ll=PROV_LL[prov];if(!ll)return null;
-                            const r=Math.max(9,7+Math.sqrt(cnt/(Math.max(...Object.values(scd.provinces))))*12);
+                            const r=Math.max(7,5+Math.sqrt(cnt/(Math.max(...Object.values(scd.provinces))))*9);
                             const cx=+mX(ll[1]).toFixed(1),cy=+mY(ll[0]).toFixed(1);
                             return(
                               <g key={i} transform={`translate(${cx},${cy})`}>
-                                <circle r={r+6} fill="rgba(251,191,36,0.08)"/>
+                                <circle r={r+3} fill="rgba(251,191,36,0.08)"/>
                                 <circle r={r} fill="#d97706" stroke="#fef08a" strokeWidth={1.2} filter="url(#pinGlow)"/>
                                 <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={r*0.85} fontWeight="700" fontFamily="DM Mono,monospace">{cnt}</text>
                                 <text y={r+10} textAnchor="middle" fill="#fbbf24" fontSize={7} fontWeight="600">{prov}</text>

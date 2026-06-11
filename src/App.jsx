@@ -4913,7 +4913,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 </defs>
               );
               const MapBase=({viewBox:vb,children})=>(
-                <svg viewBox={vb||`0 0 ${MW} ${MH}`} style={{width:"100%",height:"auto",display:"block"}} overflow="visible">
+                <svg viewBox={vb||`0 0 ${MW} ${MH}`} style={{width:"100%",height:"auto",display:"block"}}>
                   {SVG_DEFS}
                   <rect width={MW} height={MH} fill="url(#oceanGrad)"/>
                   {[-60,-30,0,30,60].map(lat=>(<line key={`g${lat}`} x1={0} y1={mY(lat).toFixed(1)} x2={MW} y2={mY(lat).toFixed(1)} stroke="#1a3050" strokeWidth={lat===0?1:0.4} strokeDasharray={lat===0?"":"4,8"}/>))}

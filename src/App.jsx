@@ -2960,82 +2960,46 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const navItems=navGroups.flatMap(g=>g.children); // for compatibility
 
   if(loading) return (
-    <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <style>{CSS}</style>
-      <div style={{textAlign:"center"}}>
-        <div style={{position:"relative",width:400,height:120,margin:"0 auto 20px",overflow:"hidden"}}>
-          {/* Road surface */}
-          <div style={{position:"absolute",bottom:0,left:0,right:0,height:46,background:"#16162a",borderRadius:12,boxShadow:"inset 0 2px 8px rgba(0,0,0,.5)"}}/>
-          {/* Road edge line */}
-          <div style={{position:"absolute",bottom:44,left:0,right:0,height:2,background:"rgba(255,220,0,.5)"}}/>
-          {/* Scrolling dashes */}
-          <div style={{position:"absolute",bottom:20,left:0,display:"flex",gap:10,animation:"roadScroll .45s linear infinite"}}>
-            {Array.from({length:14}).map((_,i)=>(
-              <div key={i} style={{width:30,height:6,background:"rgba(255,255,255,.25)",borderRadius:2,flexShrink:0}}/>
-            ))}
-          </div>
-          {/* SVG Race Car */}
-          <div style={{position:"absolute",bottom:34,left:0,animation:"raceCar 1.6s linear infinite"}}>
-            <svg width="170" height="80" viewBox="0 0 170 80" xmlns="http://www.w3.org/2000/svg">
-              {/* Rear spoiler post */}
-              <rect x="9" y="26" width="5" height="14" rx="2" fill="#8a0e0e"/>
-              {/* Rear spoiler wing */}
-              <rect x="2" y="22" width="20" height="5" rx="2.5" fill="#cc1212"/>
-              {/* Main body */}
-              <path d="M18 50 Q16 36 20 34 L146 34 Q152 36 152 44 L152 54 Q152 60 145 60 L25 60 Q18 60 18 54 Z" fill="#cc1212"/>
-              {/* White stripe */}
-              <rect x="18" y="47" width="134" height="5" fill="white"/>
-              {/* Blue stripe */}
-              <rect x="18" y="52" width="134" height="8" fill="#1a3ec7"/>
-              {/* Cab */}
-              <path d="M36 34 Q38 12 54 10 L116 10 Q130 12 132 34 Z" fill="#aa0f0f"/>
-              {/* Rear window */}
-              <path d="M40 34 Q42 15 56 13 L80 13 Q82 15 80 34 Z" fill="#a8d8f0" opacity="0.88"/>
-              {/* Windscreen */}
-              <path d="M84 34 Q86 15 102 13 L128 13 Q130 15 128 34 Z" fill="#a8d8f0" opacity="0.88"/>
-              {/* B-pillar */}
-              <rect x="80" y="10" width="5" height="24" fill="#8a0e0e"/>
-              {/* Taillight */}
-              <rect x="12" y="37" width="8" height="14" rx="3" fill="#ff3333"/>
-              {/* Headlight */}
-              <polygon points="144,37 158,40 158,48 144,48" fill="#ffe566"/>
-              <rect x="156" y="40" width="6" height="8" rx="2" fill="#fff7aa"/>
-              {/* Rear bumper */}
-              <rect x="11" y="51" width="10" height="7" rx="2" fill="#666"/>
-              {/* Front bumper */}
-              <rect x="148" y="51" width="14" height="7" rx="2" fill="#666"/>
-              {/* Wheel arches */}
-              <ellipse cx="46" cy="60" rx="21" ry="14" fill="#aa0f0f"/>
-              <ellipse cx="122" cy="60" rx="21" ry="14" fill="#aa0f0f"/>
-              {/* Rear tyre */}
-              <circle cx="46" cy="62" r="16" fill="#0a0a0a"/>
-              {/* Rear rim (spinning) */}
-              <g><animateTransform attributeName="transform" type="rotate" from="0 46 62" to="360 46 62" dur="0.5s" repeatCount="indefinite"/>
-                <circle cx="46" cy="62" r="10" fill="#2c2c2c"/>
-                <circle cx="46" cy="62" r="4"  fill="#888"/>
-                <rect x="45" y="52" width="2" height="20" fill="#555"/>
-                <rect x="36" y="61" width="20" height="2"  fill="#555"/>
-              </g>
-              {/* Front tyre */}
-              <circle cx="122" cy="62" r="16" fill="#0a0a0a"/>
-              {/* Front rim (spinning) */}
-              <g><animateTransform attributeName="transform" type="rotate" from="0 122 62" to="360 122 62" dur="0.5s" repeatCount="indefinite"/>
-                <circle cx="122" cy="62" r="10" fill="#2c2c2c"/>
-                <circle cx="122" cy="62" r="4"  fill="#888"/>
-                <rect x="121" y="52" width="2" height="20" fill="#555"/>
-                <rect x="112" y="61" width="20" height="2"  fill="#555"/>
-              </g>
-              {/* Racing number roundel */}
-              <circle cx="86" cy="45" r="12" fill="white"/>
-              <text x="86" y="49" fontSize="13" fill="#cc1212" fontWeight="bold" textAnchor="middle" fontFamily="Arial,sans-serif">17</text>
-              {/* Speed lines */}
-              <rect x="0" y="42" width="12" height="2" rx="1" fill="rgba(255,255,255,.3)"/>
-              <rect x="0" y="46" width="8"  height="2" rx="1" fill="rgba(255,255,255,.2)"/>
-              <rect x="0" y="50" width="14" height="2" rx="1" fill="rgba(255,255,255,.15)"/>
+    <div style={{background:"#0a0f1a",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>
+      <style>{CSS}{`
+        @keyframes spinOuter{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @keyframes spinInner{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}
+        @keyframes pulseGlow{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
+        @keyframes ldFill{from{width:0%}to{width:100%}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+      `}</style>
+      <div style={{textAlign:"center",animation:"fadeUp .5s ease"}}>
+        {/* Gear rings */}
+        <div style={{position:"relative",width:110,height:110,margin:"0 auto 28px"}}>
+          {/* Outer ring */}
+          <div style={{position:"absolute",inset:0,borderRadius:"50%",border:"3px solid transparent",borderTopColor:"var(--accent)",borderRightColor:"var(--accent)",animation:"spinOuter 1.1s linear infinite"}}/>
+          {/* Middle ring */}
+          <div style={{position:"absolute",inset:14,borderRadius:"50%",border:"3px solid transparent",borderBottomColor:"rgba(249,115,22,.6)",borderLeftColor:"rgba(249,115,22,.6)",animation:"spinInner .8s linear infinite"}}/>
+          {/* Inner pulsing core */}
+          <div style={{position:"absolute",inset:30,borderRadius:"50%",background:"radial-gradient(circle,rgba(249,115,22,.25) 0%,transparent 70%)",animation:"pulseGlow 1.4s ease-in-out infinite",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
             </svg>
           </div>
         </div>
-        <div style={{color:"var(--accent)",fontSize:15,fontWeight:700,letterSpacing:.3}}>{t.connecting}</div>
+        {/* App name */}
+        <div style={{fontSize:22,fontWeight:800,color:"#f1f5f9",letterSpacing:".02em",marginBottom:4}}>AutoParts</div>
+        <div style={{fontSize:12,color:"#475569",marginBottom:24,letterSpacing:".06em",textTransform:"uppercase"}}>Loading your workspace</div>
+        {/* Progress bar */}
+        <div style={{width:220,margin:"0 auto 14px",background:"rgba(255,255,255,.06)",borderRadius:999,height:5,overflow:"hidden"}}>
+          <div style={{height:"100%",background:"linear-gradient(90deg,var(--accent),#fb923c)",borderRadius:999,
+            width:loadingItems.length?`${Math.min(100,Math.round(loadingItems.filter(x=>x.status!=="loading").length/Math.max(loadingItems.length,1)*100))}%`:"30%",
+            transition:"width .4s ease",animation:loadingItems.length===0?"ldFill 2s ease-in-out infinite":undefined}}/>
+        </div>
+        {/* Item list */}
+        <div style={{fontSize:11,color:"#334155",minHeight:16}}>
+          {loadingItems.length>0
+            ? loadingItems[loadingItems.length-1].status==="loading"
+              ? `Loading ${loadingItems[loadingItems.length-1].label}…`
+              : `✓ ${loadingItems[loadingItems.length-1].label}`
+            : t.connecting}
+        </div>
       </div>
     </div>
   );

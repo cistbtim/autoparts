@@ -3376,7 +3376,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
           </button>
         )}
         <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{job.id}</code>
-        <span style={{color:"var(--text3)",fontSize:11}}>· {job.date_in}</span>
         <div style={{flex:1}}/>
         <span style={{background:`${ST_COLOR[job.status]||"var(--blue)"}22`,color:ST_COLOR[job.status]||"var(--blue)",border:`1px solid ${ST_COLOR[job.status]||"var(--blue)"}44`,borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>
           {tSt(job.status)}

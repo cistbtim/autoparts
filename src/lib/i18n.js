@@ -147,7 +147,7 @@ export const T = {
     // WorkshopJobDetail strings
     wsBack: "← Back", wsLabel: "Label", wsCollect: "Collect", wsInfoBtn: "Info", wsMove: "Move",
     wsTabCar: "Car", wsTabInspect: "Inspect", wsTabPhotos: "Photos", wsTabDocs: "Docs", wsTabQuote: "Quote",
-    wsChCar: "Car", wsChDocs: "Photo/Docs", wsChBill: "Quote/Inv", wsChPay: "Payment", wsChCust: "Customer",
+    wsChCar: "Car", wsChDocs: "Photo & Doc", wsChBill: "Quote & Invoice", wsChPay: "Payment", wsChCust: "Customer",
     wsJobSheet: "Job Sheet", wsHistory: "History", wsProblemJob: "Problem Job",
     wsProfilePhotos: "Profile Photos", wsEditPhotos: "Edit Photos", wsDoneEditing: "Done",
     wsNoPhotos: "No photos — tap Edit Photos to add",

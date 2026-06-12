@@ -2829,6 +2829,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
   const [carPopup,      setCarPopup]      = useState(false);
   const [docsPopup,     setDocsPopup]     = useState(false);
   const [docsPopupTab,  setDocsPopupTab]  = useState("photos");
+  const [payPopup,      setPayPopup]      = useState(false);
   const [quotePopup,    setQuotePopup]    = useState(false);
   const [quotePopupTab, setQuotePopupTab] = useState("quote");
   const [matchModelOpen, setMatchModelOpen] = useState(false);
@@ -3674,7 +3675,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
           {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"],onClick:()=>{setDocsPopup(true);setDocsPopupTab("photos");}},
           ...(wsRole!=="mechanic"?[
             {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{setQuotePopup(true);setQuotePopupTab("quote");}},
-            {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"],      onClick:()=>setJobTab("payment")},
+            {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"],      onClick:()=>setPayPopup(true)},
           ]:[]),
         ];
 
@@ -5230,62 +5231,67 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         </Overlay>
       )}
 
-      {/* ══ PAYMENT tab ══ */}
-      {jobTab==="payment"&&wsRole!=="mechanic"&&(<>
-        {invoice ? (<>
-          <div className="card" style={{padding:16,marginBottom:12,borderLeft:`3px solid ${invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)"}`}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-              <div style={{fontWeight:700,fontSize:15}}>💳 Payment</div>
-              <span className="badge" style={{
-                background:invoice.status==="paid"?"rgba(52,211,153,.15)":invoice.status==="partial"?"rgba(251,191,36,.15)":"rgba(248,113,113,.15)",
-                color:invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)",
-                fontSize:12,padding:"4px 10px"
-              }}>
-                {invoice.status==="paid"?"✅ Paid":invoice.status==="partial"?"💛 Partial":"⏳ Unpaid"}
-              </span>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:5}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:14}}>
-                <span style={{color:"var(--text3)"}}>Invoice Total</span>
-                <strong style={{fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"var(--accent)"}}>{fmtAmt(invoice.total)}</strong>
+      {/* ══ PAYMENT popup ══ */}
+      {payPopup&&wsRole!=="mechanic"&&(
+        <Overlay onClose={()=>setPayPopup(false)}>
+          <MHead title="💳 Payment" onClose={()=>setPayPopup(false)}/>
+          <div style={{padding:16}}>
+          {invoice ? (<>
+            <div className="card" style={{padding:16,marginBottom:12,borderLeft:`3px solid ${invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)"}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                <div style={{fontWeight:700,fontSize:15}}>💳 Payment</div>
+                <span className="badge" style={{
+                  background:invoice.status==="paid"?"rgba(52,211,153,.15)":invoice.status==="partial"?"rgba(251,191,36,.15)":"rgba(248,113,113,.15)",
+                  color:invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)",
+                  fontSize:12,padding:"4px 10px"
+                }}>
+                  {invoice.status==="paid"?"✅ Paid":invoice.status==="partial"?"💛 Partial":"⏳ Unpaid"}
+                </span>
               </div>
-              {(+invoice.paid_amount||0)>0&&(
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
-                  <span style={{color:"var(--text3)"}}>Amount Paid</span>
-                  <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--green)"}}>{fmtAmt(invoice.paid_amount)}</span>
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:14}}>
+                  <span style={{color:"var(--text3)"}}>Invoice Total</span>
+                  <strong style={{fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"var(--accent)"}}>{fmtAmt(invoice.total)}</strong>
+                </div>
+                {(+invoice.paid_amount||0)>0&&(
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
+                    <span style={{color:"var(--text3)"}}>Amount Paid</span>
+                    <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--green)"}}>{fmtAmt(invoice.paid_amount)}</span>
+                  </div>
+                )}
+                {invoice.status!=="paid"&&(
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:14,paddingTop:7,borderTop:"1px solid var(--border)",marginTop:2}}>
+                    <span style={{fontWeight:600}}>Balance Due</span>
+                    <strong style={{fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"var(--red)"}}>{fmtAmt((+invoice.total||0)-(+invoice.paid_amount||0))}</strong>
+                  </div>
+                )}
+              </div>
+              {(invoice.payment_method||invoice.payment_date)&&(
+                <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)",fontSize:12,color:"var(--text3)"}}>
+                  {invoice.payment_method&&<span style={{marginRight:8}}>💳 {invoice.payment_method}</span>}
+                  {invoice.payment_date&&<span style={{marginRight:8}}>📅 {invoice.payment_date}</span>}
+                  {invoice.payment_ref&&<span>Ref: {invoice.payment_ref}</span>}
                 </div>
               )}
-              {invoice.status!=="paid"&&(
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:14,paddingTop:7,borderTop:"1px solid var(--border)",marginTop:2}}>
-                  <span style={{fontWeight:600}}>Balance Due</span>
-                  <strong style={{fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"var(--red)"}}>{fmtAmt((+invoice.total||0)-(+invoice.paid_amount||0))}</strong>
-                </div>
-              )}
             </div>
-            {(invoice.payment_method||invoice.payment_date)&&(
-              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)",fontSize:12,color:"var(--text3)"}}>
-                {invoice.payment_method&&<span style={{marginRight:8}}>💳 {invoice.payment_method}</span>}
-                {invoice.payment_date&&<span style={{marginRight:8}}>📅 {invoice.payment_date}</span>}
-                {invoice.payment_ref&&<span>Ref: {invoice.payment_ref}</span>}
-              </div>
-            )}
+            {invoice.status!=="paid"
+              ? !wsLocked&&<button className="btn btn-success" style={{width:"100%",padding:13,fontSize:15,fontWeight:700}} onClick={()=>setPaymentModal(true)}>💳 Record Payment</button>
+              : <div style={{textAlign:"center",padding:"14px",background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",borderRadius:10,fontSize:14,fontWeight:700,color:"var(--green)"}}>✅ Fully Paid{invoice.payment_date&&<span style={{fontSize:12,fontWeight:400,color:"var(--text3)",marginLeft:8}}>{invoice.payment_method} · {invoice.payment_date}</span>}</div>
+            }
+            <div style={{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setStatementModal(true)}>📋 Statement</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos)}>🖨️ Print</button>
+            </div>
+          </>) : (
+            <div style={{textAlign:"center",padding:"36px 16px",color:"var(--text3)"}}>
+              <div style={{fontSize:36,marginBottom:10}}>🧾</div>
+              <div style={{fontSize:14,marginBottom:14}}>No invoice yet — create one first</div>
+              <button className="btn btn-primary" onClick={()=>{setPayPopup(false);setQuotePopup(true);setQuotePopupTab("invoice");}}>Go to Invoice →</button>
+            </div>
+          )}
           </div>
-          {invoice.status!=="paid"
-            ? !wsLocked&&<button className="btn btn-success" style={{width:"100%",padding:13,fontSize:15,fontWeight:700}} onClick={()=>setPaymentModal(true)}>💳 Record Payment</button>
-            : <div style={{textAlign:"center",padding:"14px",background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",borderRadius:10,fontSize:14,fontWeight:700,color:"var(--green)"}}>✅ Fully Paid{invoice.payment_date&&<span style={{fontSize:12,fontWeight:400,color:"var(--text3)",marginLeft:8}}>{invoice.payment_method} · {invoice.payment_date}</span>}</div>
-          }
-          <div style={{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setStatementModal(true)}>📋 Statement</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos)}>🖨️ Print</button>
-          </div>
-        </>) : (
-          <div style={{textAlign:"center",padding:"36px 16px",color:"var(--text3)"}}>
-            <div style={{fontSize:36,marginBottom:10}}>🧾</div>
-            <div style={{fontSize:14,marginBottom:14}}>No invoice yet — create one first</div>
-            <button className="btn btn-primary" onClick={()=>setJobTab("invoice")}>Go to Invoice →</button>
-          </div>
-        )}
-      </>)}
+        </Overlay>
+      )}
 
       {/* Return Quote — supplier picker */}
       {returnQuoteOpen&&!returnQuoteTarget&&(()=>{

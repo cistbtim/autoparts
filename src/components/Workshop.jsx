@@ -2827,6 +2827,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
   const [vinPopup,      setVinPopup]      = useState(false);
   const [inspectPopup,  setInspectPopup]  = useState(false);
   const [carPopup,      setCarPopup]      = useState(false);
+  const [docsPopup,     setDocsPopup]     = useState(false);
+  const [docsPopupTab,  setDocsPopupTab]  = useState("photos");
   const [quotePopup,    setQuotePopup]    = useState(false);
   const [quotePopupTab, setQuotePopupTab] = useState("quote");
   const [matchModelOpen, setMatchModelOpen] = useState(false);
@@ -3669,7 +3671,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         ];
         const CHAPTERS = [
           {id:"ch_car",  icon:"🚗", label:t.wsChCar||"Car",        color:"#2563eb", tabs:["car"],          onClick:()=>setCarPopup(true)},
-          {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"],onClick:()=>setJobTab("photos")},
+          {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"],onClick:()=>{setDocsPopup(true);setDocsPopupTab("photos");}},
           ...(wsRole!=="mechanic"?[
             {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{setQuotePopup(true);setQuotePopupTab("quote");}},
             {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"],      onClick:()=>setJobTab("payment")},
@@ -4141,56 +4143,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         </Overlay>
       )}
 
-      {/* ══ PHOTOS tab ══ */}
-      {jobTab==="photos"&&(
-        <div className="card" style={{padding:14,marginBottom:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
-            <div style={{fontWeight:700,fontSize:14}}>
-              📷 Photos {savedPhotos.length>0&&<span style={{fontSize:12,fontWeight:400,color:"var(--text3)",marginLeft:6}}>{savedPhotos.length} saved</span>}
-            </div>
-            <div style={{display:"flex",gap:6}}>
-              <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoCamRef.current?.click()}>📷 Camera</button>
-              <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoGalRef.current?.click()}>🖼️ Gallery</button>
-              <button className="btn btn-ghost btn-sm" onClick={pasteJobPhoto}>📋 Paste</button>
-            </div>
-            <input ref={jobPhotoCamRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleJobPhotoFile}/>
-            <input ref={jobPhotoGalRef} type="file" multiple style={{display:"none"}} onChange={handleJobPhotoFile}/>
-          </div>
-          {loadingPhotos?(
-            <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:12}}>Loading photos...</div>
-          ):(savedPhotos.length===0&&uploadPhotos.length===0)?(
-            <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:13}}>
-              <div style={{marginBottom:10}}>No photos yet — tap Camera, Gallery or Paste</div>
-              <button className="btn btn-ghost btn-sm" onClick={()=>{setJobTab("car");setEditPhotos(true);}}>📸 Add/Edit Car Photos</button>
-            </div>
-          ):(
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
-              {savedPhotos.map(p=>{
-                const src=p.url?.includes("thumbnail?id=")||p.url?.includes("uc?export=")?p.url:toImgUrl(p.url);
-                return (
-                  <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3",cursor:"pointer"}} onClick={()=>setViewPhoto(p.url)}>
-                    <img src={src} alt="photo" style={{width:"100%",height:"100%",objectFit:"cover"}}
-                      onError={e=>{const m=p.url?.match(/thumbnail[?]id=([^&]+)/)||p.url?.match(/[?&]id=([^&]+)/)||p.url?.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view"))e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;}}/>
-                    <button onClick={e=>{e.stopPropagation();deleteJobPhoto(p.id);}}
-                      style={{position:"absolute",top:3,right:3,background:"rgba(0,0,0,.55)",border:"none",borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff",fontSize:10}}>✕</button>
-                  </div>
-                );
-              })}
-              {uploadPhotos.map(p=>(
-                <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3"}}>
-                  <img src={p.dataUrl} alt="uploading" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:p.status==="done"?"transparent":p.status==="error"?"rgba(180,0,0,.5)":"rgba(0,0,0,.45)"}}>
-                    {(p.status==="pending"||p.status==="uploading")&&<div style={{width:20,height:20,border:"2px solid rgba(255,255,255,.3)",borderTop:"2px solid #fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>}
-                    {p.status==="done"&&<div style={{position:"absolute",top:3,right:5,fontSize:14}}>✅</div>}
-                    {p.status==="error"&&<div style={{fontSize:9,color:"#fff",textAlign:"center",padding:3}}>❌ {(p.error||"").slice(0,25)}</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ══ PHOTO LIGHTBOX (global) ══ */}
       {viewPhoto&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setViewPhoto(null)}>
@@ -4200,56 +4152,119 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         </div>
       )}
 
-      {/* ══ DOCUMENTS tab ══ */}
-      {jobTab==="docs"&&(
-        <div className="card" style={{padding:14,marginBottom:14}}>
-          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📎 Documents ({jobDocs.length})</div>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:jobDocs.length>0?12:0}}>
-            <input ref={docFileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleDocFile}/>
-            <button className="btn btn-ghost btn-sm" onClick={()=>docFileRef.current?.click()}>📂 {docFile?docFile.name:"Choose File"}</button>
-            <input className="inp" style={{flex:1,minWidth:120,height:34,fontSize:13}} value={docName} onChange={e=>setDocName(e.target.value)} placeholder="Document name"/>
-            <input className="inp" style={{flex:1,minWidth:100,height:34,fontSize:13}} value={docNotes} onChange={e=>setDocNotes(e.target.value)} placeholder="Notes (optional)"/>
-            <button className="btn btn-primary btn-sm" onClick={uploadJobDoc} disabled={docUploading||!docFile}>{docUploading?"⏳ Uploading...":"⬆️ Upload"}</button>
+      {/* ══ PHOTO/DOCS popup ══ */}
+      {docsPopup&&(
+        <Overlay onClose={()=>setDocsPopup(false)}>
+          <MHead title="📷 Photos &amp; Docs" onClose={()=>setDocsPopup(false)}/>
+          <div style={{display:"flex",gap:6,padding:"8px 14px",borderBottom:"1px solid var(--border)"}}>
+            {["photos","docs"].map(tid=>(
+              <button key={tid} onClick={()=>setDocsPopupTab(tid)} style={{
+                flex:1,padding:"7px 4px",border:"none",borderRadius:8,cursor:"pointer",
+                fontSize:13,fontWeight:700,
+                background:docsPopupTab===tid?"var(--accent)":"var(--surface3)",
+                color:docsPopupTab===tid?"#fff":"var(--text2)",
+              }}>
+                {tid==="photos"?"📷 Photos":"📎 Docs"}
+              </button>
+            ))}
           </div>
-          {docPreview&&<div style={{marginBottom:8}}><img src={docPreview} alt="preview" style={{maxHeight:100,borderRadius:6,border:"1px solid var(--border)"}}/></div>}
-          {jobDocs.length>0&&(
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {jobDocs.map(d=>{
-                const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
-                const isEditing=editDocId===d.id;
-                return (
-                  <div key={d.id} style={{padding:"7px 10px",background:"var(--surface2)",borderRadius:8}}>
-                    {isEditing?(
-                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                        <input className="inp" style={{flex:2,minWidth:120,height:30,fontSize:13}} value={editDocVal.name} onChange={e=>setEditDocVal(v=>({...v,name:e.target.value}))} placeholder="Name"/>
-                        <input className="inp" style={{flex:2,minWidth:100,height:30,fontSize:13}} value={editDocVal.notes} onChange={e=>setEditDocVal(v=>({...v,notes:e.target.value}))} placeholder="Notes"/>
-                        <button className="btn btn-primary btn-xs" onClick={saveDocEdit}>✅</button>
-                        <button className="btn btn-ghost btn-xs" onClick={()=>setEditDocId(null)}>✕</button>
-                      </div>
-                    ):(
-                      <div style={{display:"flex",alignItems:"center",gap:10}}>
-                        <span style={{fontSize:20,flexShrink:0}}>{isPdf?"📄":"🖼️"}</span>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
-                          {d.notes&&<div style={{fontSize:11,color:"var(--text3)"}}>{d.notes}</div>}
-                        </div>
-                        <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{textDecoration:"none"}}>{isPdf?"📄 Open":"🔍 View"}</a>
-                        {!isPdf&&<button className="btn btn-ghost btn-xs" onClick={()=>setViewDocImg(d.file_url)}>🖼️</button>}
-                        <button className="btn btn-ghost btn-xs" onClick={()=>{setEditDocId(d.id);setEditDocVal({name:d.name||"",notes:d.notes||""});}}>✏️</button>
-                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete this document?"))deleteJobDoc(d.id);}}>🗑</button>
-                      </div>
-                    )}
+          <div style={{padding:14}}>
+          {docsPopupTab==="photos"&&(<>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
+              <div style={{fontWeight:700,fontSize:14}}>
+                📷 Photos {savedPhotos.length>0&&<span style={{fontSize:12,fontWeight:400,color:"var(--text3)",marginLeft:6}}>{savedPhotos.length} saved</span>}
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoCamRef.current?.click()}>📷 Camera</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>jobPhotoGalRef.current?.click()}>🖼️ Gallery</button>
+                <button className="btn btn-ghost btn-sm" onClick={pasteJobPhoto}>📋 Paste</button>
+              </div>
+              <input ref={jobPhotoCamRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleJobPhotoFile}/>
+              <input ref={jobPhotoGalRef} type="file" multiple style={{display:"none"}} onChange={handleJobPhotoFile}/>
+            </div>
+            {loadingPhotos?(
+              <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:12}}>Loading photos...</div>
+            ):(savedPhotos.length===0&&uploadPhotos.length===0)?(
+              <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:13}}>
+                <div style={{marginBottom:10}}>No photos yet — tap Camera, Gallery or Paste</div>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setDocsPopup(false);setCarPopup(true);setEditPhotos(true);}}>📸 Add/Edit Car Photos</button>
+              </div>
+            ):(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
+                {savedPhotos.map(p=>{
+                  const src=p.url?.includes("thumbnail?id=")||p.url?.includes("uc?export=")?p.url:toImgUrl(p.url);
+                  return (
+                    <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3",cursor:"pointer"}} onClick={()=>setViewPhoto(p.url)}>
+                      <img src={src} alt="photo" style={{width:"100%",height:"100%",objectFit:"cover"}}
+                        onError={e=>{const m=p.url?.match(/thumbnail[?]id=([^&]+)/)||p.url?.match(/[?&]id=([^&]+)/)||p.url?.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view"))e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;}}/>
+                      <button onClick={e=>{e.stopPropagation();deleteJobPhoto(p.id);}}
+                        style={{position:"absolute",top:3,right:3,background:"rgba(0,0,0,.55)",border:"none",borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff",fontSize:10}}>✕</button>
+                    </div>
+                  );
+                })}
+                {uploadPhotos.map(p=>(
+                  <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3"}}>
+                    <img src={p.dataUrl} alt="uploading" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                    <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:p.status==="done"?"transparent":p.status==="error"?"rgba(180,0,0,.5)":"rgba(0,0,0,.45)"}}>
+                      {(p.status==="pending"||p.status==="uploading")&&<div style={{width:20,height:20,border:"2px solid rgba(255,255,255,.3)",borderTop:"2px solid #fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>}
+                      {p.status==="done"&&<div style={{position:"absolute",top:3,right:5,fontSize:14}}>✅</div>}
+                      {p.status==="error"&&<div style={{fontSize:9,color:"#fff",textAlign:"center",padding:3}}>❌ {(p.error||"").slice(0,25)}</div>}
+                    </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+            )}
+          </>)}
+          {docsPopupTab==="docs"&&(<>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📎 Documents ({jobDocs.length})</div>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:jobDocs.length>0?12:0}}>
+              <input ref={docFileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleDocFile}/>
+              <button className="btn btn-ghost btn-sm" onClick={()=>docFileRef.current?.click()}>📂 {docFile?docFile.name:"Choose File"}</button>
+              <input className="inp" style={{flex:1,minWidth:120,height:34,fontSize:13}} value={docName} onChange={e=>setDocName(e.target.value)} placeholder="Document name"/>
+              <input className="inp" style={{flex:1,minWidth:100,height:34,fontSize:13}} value={docNotes} onChange={e=>setDocNotes(e.target.value)} placeholder="Notes (optional)"/>
+              <button className="btn btn-primary btn-sm" onClick={uploadJobDoc} disabled={docUploading||!docFile}>{docUploading?"⏳ Uploading...":"⬆️ Upload"}</button>
             </div>
-          )}
-          {viewDocImg&&(
-            <div onClick={()=>setViewDocImg(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-              <img src={viewDocImg} alt="doc" style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:10}}/>
-            </div>
-          )}
-        </div>
+            {docPreview&&<div style={{marginBottom:8}}><img src={docPreview} alt="preview" style={{maxHeight:100,borderRadius:6,border:"1px solid var(--border)"}}/></div>}
+            {jobDocs.length>0&&(
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {jobDocs.map(d=>{
+                  const isPdf=d.file_type==="pdf"||(d.mime_type||"").includes("pdf");
+                  const isEditing=editDocId===d.id;
+                  return (
+                    <div key={d.id} style={{padding:"7px 10px",background:"var(--surface2)",borderRadius:8}}>
+                      {isEditing?(
+                        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                          <input className="inp" style={{flex:2,minWidth:120,height:30,fontSize:13}} value={editDocVal.name} onChange={e=>setEditDocVal(v=>({...v,name:e.target.value}))} placeholder="Name"/>
+                          <input className="inp" style={{flex:2,minWidth:100,height:30,fontSize:13}} value={editDocVal.notes} onChange={e=>setEditDocVal(v=>({...v,notes:e.target.value}))} placeholder="Notes"/>
+                          <button className="btn btn-primary btn-xs" onClick={saveDocEdit}>✅</button>
+                          <button className="btn btn-ghost btn-xs" onClick={()=>setEditDocId(null)}>✕</button>
+                        </div>
+                      ):(
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{fontSize:20,flexShrink:0}}>{isPdf?"📄":"🖼️"}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                            {d.notes&&<div style={{fontSize:11,color:"var(--text3)"}}>{d.notes}</div>}
+                          </div>
+                          <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{textDecoration:"none"}}>{isPdf?"📄 Open":"🔍 View"}</a>
+                          {!isPdf&&<button className="btn btn-ghost btn-xs" onClick={()=>setViewDocImg(d.file_url)}>🖼️</button>}
+                          <button className="btn btn-ghost btn-xs" onClick={()=>{setEditDocId(d.id);setEditDocVal({name:d.name||"",notes:d.notes||""});}}>✏️</button>
+                          <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete this document?"))deleteJobDoc(d.id);}}>🗑</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {viewDocImg&&(
+              <div onClick={()=>setViewDocImg(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+                <img src={viewDocImg} alt="doc" style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:10}}/>
+              </div>
+            )}
+          </>)}
+          </div>
+        </Overlay>
       )}
 
       {/* ══ QUOTE/INVOICE popup ══ */}

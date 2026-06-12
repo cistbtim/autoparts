@@ -3428,10 +3428,12 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
           <FG cols="1fr 1fr 1fr">
             <div>
               <FL label={t.make}/>
-              <select className="inp" value={f.make} onChange={e=>{s("make",e.target.value);s("model","");}}>
-                <option value="">Select make...</option>
-                {Object.keys(CAR_MAKES).map(m=><option key={m}>{m}</option>)}
-              </select>
+              <input className="inp" list="car-makes-datalist" value={f.make}
+                onChange={e=>{s("make",e.target.value);s("model","");}}
+                placeholder="Type to search make..."/>
+              <datalist id="car-makes-datalist">
+                {Object.keys(CAR_MAKES).map(m=><option key={m} value={m}/>)}
+              </datalist>
             </div>
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>

@@ -3349,23 +3349,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
             <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>Make / Model</div>
             <div style={{fontWeight:700,fontSize:14,color:"var(--text)",lineHeight:1.3}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")||"—"}</div>
           </div>
-          <div style={{display:"flex",alignItems:"flex-end",gap:8,marginTop:2}}>
-            <div style={{flex:1}}>
-              <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>Mileage</div>
-              <div style={{fontWeight:700,fontSize:13,color:"var(--text)"}}>{job.mileage?(+job.mileage).toLocaleString()+" km":"—"}</div>
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>📋 Date In</div>
-              <div style={{fontWeight:700,fontSize:13,color:"var(--text)"}}>{job.date_in||"—"}</div>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
+            <div style={{flex:1,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",fontSize:12,fontWeight:600,color:"var(--text2)"}}>
+              {job.mileage&&<span>🛣️ {(+job.mileage).toLocaleString()} km</span>}
+              {job.mileage&&job.date_in&&<span style={{opacity:.35}}>·</span>}
+              {job.date_in&&<span>📅 {job.date_in}</span>}
             </div>
             <button onClick={()=>setServiceHistModal(true)}
-              style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:1,
-                padding:"3px 7px",background:"var(--surface2)",border:"1px solid var(--border)",
-                borderRadius:7,cursor:"pointer",color:"var(--text3)"}}>
-              <span style={{fontSize:14}}>📋</span>
-              <span style={{fontSize:8,fontWeight:700,textTransform:"uppercase",letterSpacing:".03em",whiteSpace:"nowrap"}}>
-                {vehicleHistory.length>0?vehicleHistory.length+" visits":"History"}
-              </span>
+              style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,
+                padding:"4px 8px",background:"var(--surface2)",border:"1px solid var(--border)",
+                borderRadius:7,cursor:"pointer",color:"var(--text3)",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>
+              📋 {vehicleHistory.length>0?vehicleHistory.length+" visits":"History"}
             </button>
           </div>
         </div>

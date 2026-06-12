@@ -1981,11 +1981,37 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
   const driveId = extractDriveId(url);
   const preview = driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w400` : (url||null);
 
+  const [actionSheet, setActionSheet] = useState(false);
+
+  const pasteFromClipboard = async () => {
+    setActionSheet(false);
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imgType = item.types.find(t => t.startsWith("image/"));
+        if (imgType) {
+          const blob = await item.getType(imgType);
+          upload(new File([blob], `${viewName||label||"photo"}.png`, {type:imgType}));
+          return;
+        }
+      }
+      alert("No image found in clipboard — copy an image first.");
+    } catch {
+      fileRef.current?.click();
+    }
+  };
+
   return (
-    <div>
-      {/* Drop zone */}
+    <div style={{position:"relative"}}>
+      {/* Hidden file inputs */}
+      <input ref={fileRef} type="file" style={{display:"none"}}
+        onChange={e => { upload(e.target.files[0]); e.target.value=""; }}/>
+      <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
+        onChange={e => { upload(e.target.files[0]); e.target.value=""; }}/>
+
+      {/* Photo tile — tap to open action sheet */}
       <div
-        onClick={() => !uploading && fileRef.current?.click()}
+        onClick={() => !uploading && setActionSheet(true)}
         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={e => { e.preventDefault(); setDragOver(false); upload(e.dataTransfer.files[0]); e.dataTransfer.clearData(); }}
@@ -1997,13 +2023,6 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
           display: "flex", alignItems: "center", justifyContent: "center",
           transition: "all .15s",
         }}>
-        {/* No accept + no capture = full file picker (gallery, Drive, files) */}
-        <input ref={fileRef} type="file" style={{display:"none"}}
-          onChange={e => { upload(e.target.files[0]); e.target.value=""; }}/>
-        {/* Camera only */}
-        <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
-          onChange={e => { upload(e.target.files[0]); e.target.value=""; }}/>
-
         {uploading ? (
           <div style={{textAlign:"center",color:"var(--accent)",padding:8}}>
             <div style={{width:24,height:24,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",
@@ -2013,91 +2032,70 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
         ) : preview ? (
           <>
             <DriveImg url={url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-            <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0)",
-              display:"flex",alignItems:"center",justifyContent:"center",
-              opacity:0,transition:"opacity .2s"}}
-              onMouseEnter={e=>e.currentTarget.style.opacity=1}
-              onMouseLeave={e=>e.currentTarget.style.opacity=0}>
-              <div style={{background:"rgba(0,0,0,.6)",color:"#fff",borderRadius:8,padding:"6px 12px",fontSize:12}}>
-                🔄 Tap to replace
+            <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.35)",
+              display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{background:"rgba(0,0,0,.55)",color:"#fff",borderRadius:8,padding:"5px 10px",fontSize:11,fontWeight:600}}>
+                ✏️ Change
               </div>
             </div>
           </>
         ) : (
           <div style={{textAlign:"center",color:"var(--text3)",padding:8}}>
-            <div style={{fontSize:22,marginBottom:4}}>🖼️</div>
-            <div style={{fontSize:11,fontWeight:600,marginBottom:2}}>{label}</div>
-            <div style={{fontSize:10}}>Tap to choose photo</div>
+            <div style={{fontSize:26,marginBottom:4}}>📷</div>
+            <div style={{fontSize:11,fontWeight:600}}>{label}</div>
+            <div style={{fontSize:10,marginTop:2}}>Tap to add</div>
           </div>
         )}
       </div>
 
-      {/* Label + 3 source buttons */}
-      <div style={{marginTop:6}}>
-        <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:5,textAlign:"center",textTransform:"uppercase",letterSpacing:".06em"}}>{label}</div>
-        <div style={{display:"flex",gap:5,justifyContent:"center"}}>
-          {/* Option 1 — Camera */}
-          <button className="btn btn-ghost btn-xs"
-            style={{flex:1,padding:"5px 4px",fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}
-            title="Take a new photo with camera"
-            onClick={e=>{ e.stopPropagation(); camRef.current?.click(); }}>
-            <span style={{fontSize:15}}>📷</span>
-            <span>Camera</span>
-          </button>
-          {/* Option 2 — Local file / gallery */}
-          <button className="btn btn-ghost btn-xs"
-            style={{flex:1,padding:"5px 4px",fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}
-            title="Browse local files or phone gallery"
-            onClick={e=>{ e.stopPropagation(); fileRef.current?.click(); }}>
-            <span style={{fontSize:15}}>🖼️</span>
-            <span>Files</span>
-          </button>
-          {/* Option 3 — Google Drive plate folder */}
-          <button className="btn btn-ghost btn-xs"
-            style={{flex:1,padding:"5px 4px",fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2,
-              color:"var(--blue)",opacity:(reg||vehicleId)?1:0.4}}
-            title={(reg||vehicleId)?`Browse Drive folder: ${String(reg||vehicleId||"").toUpperCase()}`:"Save vehicle plate first to browse Drive"}
-            onClick={e=>{ e.stopPropagation(); openBrowse(); }}>
-            <span style={{fontSize:15}}>☁️</span>
-            <span>Drive</span>
-          </button>
-          {/* Option 4 — Paste from clipboard */}
-          <button className="btn btn-ghost btn-xs"
-            style={{flex:1,padding:"5px 4px",fontSize:11,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}
-            title="Paste image from clipboard"
-            onClick={async e=>{
-              e.stopPropagation();
-              try{
-                const items = await navigator.clipboard.read();
-                for(const item of items){
-                  const imgType = item.types.find(t=>t.startsWith("image/"));
-                  if(imgType){
-                    const blob = await item.getType(imgType);
-                    const file = new File([blob], `${viewName||label||"photo"}.png`, {type:imgType});
-                    upload(file);
-                    return;
-                  }
-                }
-                alert("No image found in clipboard — copy an image first.");
-              }catch{
-                fileRef.current?.click();
-              }
-            }}>
-            <span style={{fontSize:15}}>📋</span>
-            <span>Paste</span>
-          </button>
-          {/* Remove */}
-          {url && (
-            <button className="btn btn-ghost btn-xs"
-              style={{padding:"5px 6px",fontSize:11,color:"var(--red)"}}
-              title="Remove photo"
-              onClick={e=>{ e.stopPropagation(); onChange(""); }}>✕</button>
-          )}
-        </div>
-      </div>
+      {/* Label */}
+      <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginTop:5,textAlign:"center",textTransform:"uppercase",letterSpacing:".06em"}}>{label}</div>
 
       {/* Error */}
-      {error && <div style={{fontSize:10,color:"var(--red)",marginTop:3}}>{error}</div>}
+      {error && <div style={{fontSize:10,color:"var(--red)",marginTop:3,textAlign:"center"}}>{error}</div>}
+
+      {/* Action sheet */}
+      {actionSheet && (
+        <div onClick={()=>setActionSheet(false)}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:10000,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{background:"var(--surface)",borderRadius:"16px 16px 0 0",padding:"16px 16px 28px",width:"100%",maxWidth:420}}>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:14,textAlign:"center",color:"var(--text2)",textTransform:"uppercase",letterSpacing:".06em"}}>
+              {label} Photo
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:url?12:0}}>
+              <button className="btn btn-ghost"
+                style={{padding:"14px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,fontSize:13,fontWeight:600}}
+                onClick={()=>{ setActionSheet(false); camRef.current?.click(); }}>
+                <span style={{fontSize:28}}>📷</span>Camera
+              </button>
+              <button className="btn btn-ghost"
+                style={{padding:"14px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,fontSize:13,fontWeight:600}}
+                onClick={()=>{ setActionSheet(false); fileRef.current?.click(); }}>
+                <span style={{fontSize:28}}>🖼️</span>Files
+              </button>
+              <button className="btn btn-ghost"
+                style={{padding:"14px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,fontSize:13,fontWeight:600,
+                  color:"var(--blue)",opacity:(reg||vehicleId)?1:0.4}}
+                onClick={()=>{ setActionSheet(false); openBrowse(); }}>
+                <span style={{fontSize:28}}>☁️</span>Drive
+              </button>
+              <button className="btn btn-ghost"
+                style={{padding:"14px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,fontSize:13,fontWeight:600}}
+                onClick={pasteFromClipboard}>
+                <span style={{fontSize:28}}>📋</span>Paste
+              </button>
+            </div>
+            {url && (
+              <button className="btn btn-ghost"
+                style={{width:"100%",padding:"12px 8px",fontSize:13,fontWeight:600,color:"var(--red)"}}
+                onClick={()=>{ setActionSheet(false); onChange(""); }}>
+                🗑️ Remove Photo
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Drive photo picker */}
       {browsing && (

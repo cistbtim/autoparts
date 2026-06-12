@@ -3429,7 +3429,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
             <div>
               <FL label={t.make}/>
               <input className="inp" list="car-makes-datalist" value={f.make}
-                onChange={e=>{s("make",e.target.value);s("model","");}}
+                onChange={e=>s("make",e.target.value)}
                 placeholder="Type to search make..."/>
               <datalist id="car-makes-datalist">
                 {Object.keys(CAR_MAKES).map(m=><option key={m} value={m}/>)}

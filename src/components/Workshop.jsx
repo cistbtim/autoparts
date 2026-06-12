@@ -3662,9 +3662,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         ];
         const CHAPTERS = [
           {id:"ch_car",  icon:"🚗", label:t.wsChCar||"Car",        color:"#2563eb", tabs:["car"],          onClick:()=>setCarPopup(true)},
-          {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"],onClick:()=>{setDocsPopup(true);setDocsPopupTab("photos");}},
+          {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo & Doc", color:"#7c3aed", tabs:["photos","docs"],onClick:()=>{setDocsPopup(true);setDocsPopupTab("photos");}},
           ...(wsRole!=="mechanic"?[
-            {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{setQuotePopup(true);setQuotePopupTab("quote");}},
+            {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote & Invoice",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{setQuotePopup(true);setQuotePopupTab("quote");}},
             {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"],      onClick:()=>setPayPopup(true)},
           ]:[]),
         ];

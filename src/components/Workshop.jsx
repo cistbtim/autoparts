@@ -5950,7 +5950,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
                 Later
               </button>
               <button className="btn btn-primary" style={{flex:2,fontWeight:700}}
-                onClick={()=>{setPhotoWarnOpen(false);setJobTab("car");setEditPhotos(true);}}>
+                onClick={()=>{setPhotoWarnOpen(false);setCarPopup(true);setEditPhotos(true);}}>
                 📸 Add Photos Now
               </button>
             </div>

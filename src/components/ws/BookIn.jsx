@@ -42,6 +42,7 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
   // Native file inputs — no getUserMedia, no HTTPS required
   const cameraRef=useRef(null);  // capture="environment" → opens native camera app
   const galleryRef=useRef(null); // no capture → opens file picker / gallery
+  const [vinPopup,setVinPopup]=useState(false);
 
   // ── Upload one photo to Google Drive + save URL to DB ─────────
   const uploadBookInPhoto=async(photoId,dataUrl,session,reg,jobId)=>{
@@ -255,7 +256,8 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
         <div style={{marginBottom:16,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,fontSize:13,display:"flex",gap:12,flexWrap:"wrap"}}>
           <span>🔍 Plate: <strong>{plate}</strong></span>
           {scanResult?.make&&<span>Make: <strong>{scanResult.make}</strong></span>}
-          {scanResult?.vin&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11}}>VIN: {scanResult.vin.slice(0,12)}…</span>}
+          {scanResult?.model&&<span>Model: <strong style={{color:"var(--red)"}}>{scanResult.model}</strong></span>}
+          {scanResult?.vin&&<button onClick={()=>setVinPopup(true)} style={{fontFamily:"DM Mono,monospace",fontSize:11,background:"var(--surface3)",border:"1px solid var(--border)",borderRadius:6,padding:"2px 8px",cursor:"pointer",color:"var(--text)"}}>VIN: {scanResult.vin}</button>}
         </div>
 
         {/* Cache hit — show suggestion */}
@@ -367,6 +369,17 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
             Skip →
           </button>
         </div>
+
+        {/* VIN popup */}
+        {vinPopup&&scanResult?.vin&&(
+          <div onClick={()=>setVinPopup(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:"var(--surface)",borderRadius:14,padding:"28px 32px",minWidth:320,boxShadow:"0 8px 40px rgba(0,0,0,.35)",textAlign:"center"}}>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Vehicle Identification Number</div>
+              <div style={{fontFamily:"DM Mono,monospace",fontSize:22,fontWeight:700,letterSpacing:2,marginBottom:20}}>{scanResult.vin}</div>
+              <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>setVinPopup(false)}>Close</button>
+            </div>
+          </div>
+        )}
       </Overlay>
     );
   }
@@ -586,6 +599,17 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
             🔍 Look Up {plate}
           </button>
         )}
+
+        {/* VIN popup */}
+        {vinPopup&&scanResult?.vin&&(
+          <div onClick={()=>setVinPopup(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:"var(--surface)",borderRadius:14,padding:"28px 32px",minWidth:320,boxShadow:"0 8px 40px rgba(0,0,0,.35)",textAlign:"center"}}>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Vehicle Identification Number</div>
+              <div style={{fontFamily:"DM Mono,monospace",fontSize:22,fontWeight:700,letterSpacing:2,marginBottom:20}}>{scanResult.vin}</div>
+              <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>setVinPopup(false)}>Close</button>
+            </div>
+          </div>
+        )}
       </Overlay>
     );
   }
@@ -599,7 +623,8 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
       {scanResult&&(
         <div style={{marginBottom:14,padding:10,background:"var(--surface2)",borderRadius:10,fontSize:12,display:"flex",gap:16,flexWrap:"wrap"}}>
           {scanResult.make&&<span>Make: <strong>{scanResult.make}</strong></span>}
-          {scanResult.vin&&<span>VIN: <code style={{fontFamily:"DM Mono,monospace"}}>{scanResult.vin}</code></span>}
+          {scanResult.model&&<span>Model: <strong style={{color:"var(--red)"}}>{scanResult.model}</strong></span>}
+          {scanResult.vin&&<button onClick={()=>setVinPopup(true)} style={{fontFamily:"DM Mono,monospace",fontSize:12,background:"var(--surface3)",border:"1px solid var(--border)",borderRadius:6,padding:"2px 8px",cursor:"pointer",color:"var(--text)"}}>VIN: {scanResult.vin}</button>}
           {scanResult.engine_no&&<span>Engine: <code style={{fontFamily:"DM Mono,monospace"}}>{scanResult.engine_no}</code></span>}
           {scanResult.expiry_date&&<span style={{color:new Date(scanResult.expiry_date)<new Date()?"var(--red)":"var(--green)"}}>
             Disc: {scanResult.expiry_date} {new Date(scanResult.expiry_date)<new Date()?"⚠️ EXPIRED":"✅"}
@@ -698,6 +723,17 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
           {openJobs.length>0&&decision==="reopen" ? "🔄 Reopen Job" : "📋 Create New Job →"}
         </button>
       </div>
+
+      {/* VIN popup */}
+      {vinPopup&&scanResult?.vin&&(
+        <div onClick={()=>setVinPopup(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"var(--surface)",borderRadius:14,padding:"28px 32px",minWidth:320,boxShadow:"0 8px 40px rgba(0,0,0,.35)",textAlign:"center"}}>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Vehicle Identification Number</div>
+            <div style={{fontFamily:"DM Mono,monospace",fontSize:22,fontWeight:700,letterSpacing:2,marginBottom:20}}>{scanResult.vin}</div>
+            <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>setVinPopup(false)}>Close</button>
+          </div>
+        </div>
+      )}
     </Overlay>
   );
 }

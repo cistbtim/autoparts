@@ -65,7 +65,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [bkCancelModal,   setBkCancelModal]   = useState(null);
   const [bkCancelReason,  setBkCancelReason]  = useState("");
   const [kanbanView,      setKanbanView]      = useState(true);
-  const [jobDetailTab,    setJobDetailTab]    = useState("car");
+  const [jobDetailTab,    setJobDetailTab]    = useState("menu");
   const [kanbanInvJob,    setKanbanInvJob]    = useState(null);
   const [kanbanInvOpen,   setKanbanInvOpen]   = useState(false);
   const kanbanInvPanelRef = useRef(null);
@@ -184,7 +184,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
     if(Object.keys(vehPhotoPatch).length) await api.patch("workshop_vehicles","id",vehicleId,vehPhotoPatch).catch(()=>{});
     await onPatchWsBooking(b.id,{status:"job_created",workshop_vehicle_id:vehicleId});
     await onRefresh(); // sync DB → jobs list includes the new job
-    setJobDetailTab("car");
+    setJobDetailTab("menu");
     setActiveJob(newJob);
     setWsTab("jobs");  // take the user to the jobs tab
     setView("job");
@@ -461,7 +461,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             const kst = kanbanSt(j);
             return (
               <div key={j.id} className="card card-hover" style={{padding:0,cursor:"pointer",borderLeft:`3px solid ${kst.color}`,overflow:"hidden",display:"flex",minHeight:110}}
-                onClick={()=>{setJobDetailTab("car");setActiveJob(j);setView("job");}}>
+                onClick={()=>{setJobDetailTab("menu");setActiveJob(j);setView("job");}}>
                 {/* Front photo */}
                 <div style={{width:64,flexShrink:0,background:"var(--surface2)",position:"relative",overflow:"hidden"}}>
                   {frontPhoto?(
@@ -622,7 +622,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                 onDragStart={isDraggable ? ()=>handleDragStart(job,col) : undefined}
                 onDragEnd={isDraggable ? handleDragEnd : undefined}
                 style={{cursor: isDraggable ? "grab" : undefined}}
-                onClick={()=>{setJobDetailTab(col.id==="invoiced"||col.id==="paid"?"invoice":"car");setActiveJob(job);setView("job");}}>
+                onClick={()=>{setJobDetailTab(col.id==="invoiced"||col.id==="paid"?"invoice":"menu");setActiveJob(job);setView("job");}}>
                 <div style={{height:3,background:col.color}}/>
                 <div style={{position:"relative",height:90,background:"var(--surface2)",overflow:"hidden"}}>
                   {fp
@@ -2795,7 +2795,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
   const [moveModal,     setMoveModal]     = useState(false);
   const [supplierModal, setSupplierModal] = useState(false);
   const [createPoOpen,  setCreatePoOpen]  = useState(false);
-  const [jobTab,        setJobTab]        = useState(initialTab||"car");
+  const [jobTab,        setJobTab]        = useState(initialTab||"menu");
   const [oeSearch,      setOeSearch]      = useState("");
   const [editPriceId,   setEditPriceId]   = useState(null);
   const [editPriceVal,  setEditPriceVal]  = useState("");
@@ -2824,6 +2824,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
   const [savingPastRec, setSavingPastRec] = useState(false);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   const [showVinSearch, setShowVinSearch] = useState(false);
+  const [vinPopup,      setVinPopup]      = useState(false);
+  const [inspectPopup,  setInspectPopup]  = useState(false);
+  const [carPopup,      setCarPopup]      = useState(false);
+  const [quotePopup,    setQuotePopup]    = useState(false);
+  const [quotePopupTab, setQuotePopupTab] = useState("quote");
   const [matchModelOpen, setMatchModelOpen] = useState(false);
   const [matchModelSearch, setMatchModelSearch] = useState("");
   const [matchModelLightbox, setMatchModelLightbox] = useState(null); // null | index — for selected vehicle
@@ -2953,7 +2958,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
   const clCamRefs = useRef({});
 
   useEffect(()=>{
-    if(jobTab!=="inspect"||checklistLoaded) return;
+    if(!inspectPopup||checklistLoaded) return;
     api.get("workshop_job_checklist",`job_id=eq.${job.id}`)
       .then(rows=>{
         const map={};
@@ -2962,7 +2967,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         setChecklistLoaded(true);
       })
       .catch(()=>setChecklistLoaded(true));
-  },[jobTab,checklistLoaded,job.id]);
+  },[inspectPopup,checklistLoaded,job.id]);
 
   const saveChecklistItem=async(key,patch)=>{
     const current=checklist[key]||{status:"pending",note:"",photo_url:""};
@@ -3264,52 +3269,108 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
 
   return (
     <div className="fu">
-      {/* ── Vehicle photo hero (always visible) ── */}
-      <div style={{position:"relative",height:155,borderRadius:"12px 12px 0 0",overflow:"hidden",border:"1px solid var(--border)",borderBottom:"none",background:"var(--surface2)"}}>
-        {vehiclePhotos.front ? (
-          <>
+      {/* ── Vehicle header card ── */}
+      <div style={{display:"flex",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:"12px 12px 0 0",borderBottom:"none",overflow:"hidden",minHeight:130}}>
+        {/* Photo */}
+        <div style={{width:130,flexShrink:0,position:"relative",background:"var(--surface2)",overflow:"hidden",cursor:vehiclePhotos.front?"pointer":"default"}}
+          onClick={vehiclePhotos.front?()=>setPhotoLightbox(0):undefined}>
+          {vehiclePhotos.front ? (
             <img src={toImgUrl(vehiclePhotos.front)} alt="vehicle"
               style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
               referrerPolicy="no-referrer"
               onError={e=>{e.target.style.display="none";}}/>
-            <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.08) 0%,rgba(0,0,0,.72) 100%)"}}/>
-          </>
-        ) : (
-          <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:"linear-gradient(135deg,var(--surface2) 0%,var(--surface3) 100%)"}}>
-            <svg width="64" height="37" viewBox="0 0 38 22" fill="none" xmlns="http://www.w3.org/2000/svg" style={{opacity:.18}}>
-              <rect x="1" y="9" width="36" height="11" rx="3" fill="currentColor"/>
-              <path d="M7 9L11 2h16l4 7" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-              <circle cx="9" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
-              <circle cx="29" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
-            </svg>
-            <span style={{fontSize:11,color:"var(--text3)",fontWeight:600,letterSpacing:".07em",textTransform:"uppercase"}}>No Photo</span>
+          ) : (
+            <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5}}>
+              <svg width="48" height="28" viewBox="0 0 38 22" fill="none" xmlns="http://www.w3.org/2000/svg" style={{opacity:.18}}>
+                <rect x="1" y="9" width="36" height="11" rx="3" fill="currentColor"/>
+                <path d="M7 9L11 2h16l4 7" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                <circle cx="9" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
+                <circle cx="29" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+            </div>
+          )}
+          <div style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,.55)",padding:"4px 0",textAlign:"center"}}>
+            <span style={{fontSize:10,fontWeight:700,color:"#fff",letterSpacing:".05em"}}>Front</span>
           </div>
-        )}
-        {/* Vehicle make/model badge — top left */}
-        {(job.vehicle_make||job.vehicle_model||job.vehicle_year)&&(
-          <div style={{position:"absolute",top:10,left:12}}>
-            <span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,.9)",background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",padding:"2px 9px",borderRadius:99,border:"1px solid rgba(255,255,255,.14)"}}>
-              {[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}
-            </span>
+        </div>
+        {/* Info grid */}
+        <div style={{flex:1,padding:"10px 14px",display:"flex",flexDirection:"column",justifyContent:"space-between",gap:4}}>
+          {/* Row 1: customer name (left) + contact buttons (right) */}
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:6}}>
+            <div style={{flex:1,minWidth:0}}>
+              {job.customer_name&&(
+                <div style={{fontSize:15,fontWeight:800,color:"var(--text)",lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  👤 {job.customer_name}
+                </div>
+              )}
+            </div>
+            {job.customer_phone&&(()=>{
+              const ph=(job.customer_phone||"").replace(/\D/g,"");
+              return(
+                <div style={{display:"flex",gap:4,flexShrink:0}}>
+                  <a href={`tel:${ph}`}
+                    style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.35)",borderRadius:7,textDecoration:"none",color:"var(--blue)",fontSize:11,fontWeight:700}}>
+                    📞
+                  </a>
+                  <a href={`https://wa.me/${ph}?text=${encodeURIComponent(`Hi ${(job.customer_name||"").split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}`}
+                    target="_blank" rel="noreferrer"
+                    style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.35)",borderRadius:7,textDecoration:"none",color:"#25d366",fontSize:11,fontWeight:700}}>
+                    💬
+                  </a>
+                  <button
+                    onClick={()=>{ navigator.clipboard.writeText(job.customer_name||"").then(()=>{ window.location.href="weixin://"; }).catch(()=>{ window.location.href="weixin://"; }); }}
+                    style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(9,187,7,.12)",border:"1px solid rgba(9,187,7,.35)",borderRadius:7,cursor:"pointer",color:"#09bb07",fontSize:11,fontWeight:700}}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8.5 10.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM12 2C6.477 2 2 6.253 2 11.5c0 2.304.87 4.411 2.304 6.03L3 22l4.682-1.558A10.46 10.46 0 0 0 12 21c5.523 0 10-4.253 10-9.5S17.523 2 12 2z"/></svg>
+                  </button>
+                </div>
+              );
+            })()}
           </div>
-        )}
-        {/* Reg plate — bottom left */}
-        {job.vehicle_reg&&(
-          <div style={{position:"absolute",bottom:10,left:12}}>
-            <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:14,color:"#fff",background:"rgba(0,0,0,.6)",backdropFilter:"blur(6px)",padding:"3px 11px",borderRadius:7,border:"1px solid rgba(255,255,255,.15)"}}>🚗 {job.vehicle_reg}</code>
+          {/* Row 2: plate (left) + VIN button (right, under plate) */}
+          <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:6}}>
+            <div>
+              <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>🚗 Plate</div>
+              <div style={{fontFamily:"DM Mono,monospace",fontWeight:800,fontSize:20,color:"#f97316",letterSpacing:".04em",lineHeight:1.1}}>{job.vehicle_reg||"—"}</div>
+            </div>
+            {job.vin&&(
+              <button onClick={()=>setVinPopup(true)}
+                style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",
+                  background:"rgba(99,102,241,.12)",border:"1px solid rgba(99,102,241,.4)",
+                  borderRadius:8,cursor:"pointer",color:"#6366f1",fontSize:11,fontWeight:700,
+                  fontFamily:"DM Mono,monospace",letterSpacing:".04em"}}>
+                🔍 VIN
+              </button>
+            )}
           </div>
-        )}
-        {/* Customer name — bottom right */}
-        {job.customer_name&&(
-          <div style={{position:"absolute",bottom:10,right:12,maxWidth:"55%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            <span style={{fontWeight:700,fontSize:13,color:"#fff",background:"rgba(0,0,0,.55)",backdropFilter:"blur(6px)",padding:"3px 10px",borderRadius:7,border:"1px solid rgba(255,255,255,.12)"}}>{job.customer_name}</span>
+          <div>
+            <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>Make / Model</div>
+            <div style={{fontWeight:700,fontSize:14,color:"var(--text)",lineHeight:1.3}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")||"—"}</div>
           </div>
-        )}
+          <div style={{display:"flex",alignItems:"flex-end",gap:8,marginTop:2}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>Mileage</div>
+              <div style={{fontWeight:700,fontSize:13,color:"var(--text)"}}>{job.mileage?(+job.mileage).toLocaleString()+" km":"—"}</div>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>📋 Date In</div>
+              <div style={{fontWeight:700,fontSize:13,color:"var(--text)"}}>{job.date_in||"—"}</div>
+            </div>
+            <button onClick={()=>setServiceHistModal(true)}
+              style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:1,
+                padding:"3px 7px",background:"var(--surface2)",border:"1px solid var(--border)",
+                borderRadius:7,cursor:"pointer",color:"var(--text3)"}}>
+              <span style={{fontSize:14}}>📋</span>
+              <span style={{fontSize:8,fontWeight:700,textTransform:"uppercase",letterSpacing:".03em",whiteSpace:"nowrap"}}>
+                {vehicleHistory.length>0?vehicleHistory.length+" visits":"History"}
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ── Back button / info strip ── */}
       <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",background:"var(--surface)",border:"1px solid var(--border)",borderTop:"none",borderRadius:"0 0 10px 10px",marginBottom:12,flexWrap:"wrap"}}>
-        <button className="btn btn-ghost btn-sm" onClick={onBack}>{t.wsBack}</button>
+        <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"linear-gradient(135deg,#334155,#475569)",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:800,boxShadow:"0 2px 8px rgba(0,0,0,.25)",letterSpacing:".01em"}}>← {t.wsBack||"Back"}</button>
         {onRefresh&&(
           <button className="btn btn-ghost btn-sm" disabled={refreshing}
             onClick={async()=>{ setRefreshing(true); try{await onRefresh();}finally{setRefreshing(false);} }}
@@ -3324,6 +3385,42 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
           {tSt(job.status)}
         </span>
       </div>
+      {/* ── Inspect shortcut ── */}
+      {(()=>{
+        const done = checklistLoaded ? CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length : 0;
+        const total = CHECKLIST_ITEMS.length;
+        const allDone = checklistLoaded && done===total && total>0;
+        const active = inspectPopup;
+        return (
+          <button onClick={()=>setInspectPopup(true)} style={{
+            display:"flex",alignItems:"center",justifyContent:"space-between",
+            width:"100%",marginBottom:8,padding:"10px 16px",
+            background:active?"#16a34a":allDone?"rgba(22,163,74,.12)":"var(--surface2)",
+            border:`1.5px solid ${active?"#16a34a":allDone?"#16a34a":"var(--border)"}`,
+            borderRadius:10,cursor:"pointer",boxSizing:"border-box",
+            boxShadow:active?"0 2px 10px rgba(22,163,74,.3)":"none",
+          }}>
+            <span style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>✅</span>
+              <span style={{fontSize:14,fontWeight:800,color:active?"#fff":allDone?"#16a34a":"var(--text2)",letterSpacing:".01em"}}>
+                {t.wsTabInspect||"Inspection"}
+              </span>
+            </span>
+            <span style={{display:"flex",alignItems:"center",gap:6}}>
+              {checklistLoaded&&(
+                <span style={{fontSize:11,fontWeight:700,
+                  color:active?"rgba(255,255,255,.85)":allDone?"#16a34a":"var(--text3)",
+                  background:active?"rgba(255,255,255,.18)":allDone?"rgba(22,163,74,.15)":"var(--surface3)",
+                  borderRadius:99,padding:"2px 8px"}}>
+                  {done}/{total}
+                </span>
+              )}
+              {allDone&&!active&&<span style={{fontSize:18}}>✅</span>}
+              <span style={{fontSize:14,color:active?"rgba(255,255,255,.7)":"var(--text3)"}}>›</span>
+            </span>
+          </button>
+        );
+      })()}
 
       {/* ── Status pipeline bar ── */}
       {(()=>{
@@ -3342,8 +3439,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         const phone=(job.customer_phone||"").replace(/\D/g,"");
         const showWa=(job.status==="Done"||job.status==="Delivered")&&phone;
         return (
-          <div className="card" style={{padding:"10px 14px",marginBottom:12}}>
-            <div style={{display:"flex",alignItems:"flex-start",overflowX:"auto",scrollbarWidth:"none",gap:0,paddingBottom:6,paddingTop:2}}>
+          <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"8px 12px",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:0}}>
+              <div style={{flex:1,display:"flex",alignItems:"flex-start",overflowX:"auto",scrollbarWidth:"none",gap:0}}>
               {visibleStages.map((s,i)=>{
                 const active = activeKey===s.key;
                 const stageIdx = visibleStages.findIndex(st=>st.key===activeKey);
@@ -3352,188 +3450,283 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
                 const short = s.key==="Payment Received"?(t.wsStPaid||"Paid"):s.key==="In Progress"?(t.wsStInProg||"In Prog."):tSt(s.key);
                 return (
                   <span key={s.key} style={{display:"contents"}}>
-                    {i>0&&<div style={{flex:1,height:2,minWidth:8,maxWidth:32,marginTop:13,background:done?visibleStages[i-1].color:"var(--border)",transition:"background .3s",flexShrink:1,alignSelf:"flex-start"}}/>}
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flexShrink:0}}>
+                    {i>0&&<div style={{flex:1,height:2,minWidth:6,maxWidth:28,marginTop:11,background:done?visibleStages[i-1].color:"var(--border)",transition:"background .3s",flexShrink:1,alignSelf:"flex-start"}}/>}
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,flexShrink:0}}>
                       <button
                         disabled={!clickable}
                         onClick={clickable?()=>onSaveJob({...job,status:s.key}):undefined}
                         title={s.key}
                         style={{
-                          width:28,height:28,borderRadius:"50%",padding:0,
+                          width:24,height:24,borderRadius:"50%",padding:0,
                           border:`2px solid ${active||done?s.color:"var(--border2)"}`,
                           background:done?s.color:active?s.color:"var(--surface2)",
                           color:done||active?"#fff":"var(--text3)",
                           cursor:clickable?"pointer":"default",
                           display:"flex",alignItems:"center",justifyContent:"center",
-                          fontSize:done?13:11,fontWeight:700,
-                          boxShadow:active?`0 0 14px ${s.color}80`:"none",
+                          fontSize:done?11:10,fontWeight:700,
+                          boxShadow:active?`0 0 10px ${s.color}70`:"none",
                           transition:"all .2s",fontFamily:"DM Sans,sans-serif",flexShrink:0,
                         }}>
                         {done?"✓":i+1}
                       </button>
-                      <span style={{fontSize:9,fontWeight:active?700:500,color:active?s.color:done?"var(--text2)":"var(--text3)",textAlign:"center",whiteSpace:"nowrap",maxWidth:54,overflow:"hidden",textOverflow:"ellipsis",lineHeight:1.2}}>
+                      <span style={{fontSize:9,fontWeight:active?700:500,color:active?s.color:done?"var(--text2)":"var(--text3)",textAlign:"center",whiteSpace:"nowrap",maxWidth:46,overflow:"hidden",textOverflow:"ellipsis",lineHeight:1.1}}>
                         {short}
                       </span>
                     </div>
                   </span>
                 );
               })}
-            </div>
-            {wsRole!=="mechanic"&&(
-              <div style={{marginTop:6}}>
-                <button
-                  onClick={()=>onSaveJob({...job,is_problem:!isProblem,problem_prev_status:!isProblem?job.status:job.problem_prev_status})}
-                  style={{
-                    border:`1.5px solid ${isProblem?"#f87171":"var(--border)"}`,
-                    borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:600,cursor:"pointer",
-                    background:isProblem?"rgba(248,113,113,.18)":"transparent",
-                    color:isProblem?"#f87171":"var(--text3)",
-                    fontFamily:"'DM Sans',sans-serif",transition:"all .15s",
-                  }}
-                >⚠️ {t.wsProblemJob||"Problem Job"}</button>
               </div>
-            )}
-            {showWa&&(()=>{
-              const name=job.customer_name||"there";
-              const reg=job.vehicle_reg?`your ${job.vehicle_make?`${job.vehicle_make} `:""}${job.vehicle_model?`${job.vehicle_model} `:""}(${job.vehicle_reg})`:"your vehicle";
-              const shopName=wsProfile?.name||settings?.shop_name||"Workshop";
-              const shopPhone=wsProfile?.phone||settings?.phone||"";
-              const msg=`Hi ${name}! 🎉 Great news — ${reg} is ready for collection at *${shopName}*.\n\nPlease contact us to arrange collection${shopPhone?` on ${shopPhone}`:""}.`;
-              return (
-                <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid var(--border)"}}>
-                  <a href={`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer"
-                    className="btn btn-ghost btn-xs"
-                    style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)",textDecoration:"none"}}>
-                    📱 Car Ready — Notify Customer
-                  </a>
-                </div>
-              );
-            })()}
+              {/* Problem Job + Car Ready — inline right of stepper */}
+              <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0,marginLeft:6,alignSelf:"center"}}>
+                {wsRole!=="mechanic"&&(
+                  <button
+                    onClick={()=>onSaveJob({...job,is_problem:!isProblem,problem_prev_status:!isProblem?job.status:job.problem_prev_status})}
+                    title={t.wsProblemJob||"Problem Job"}
+                    style={{background:"none",border:"none",cursor:"pointer",padding:"2px",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+                    <svg width="30" height="26" viewBox="0 0 30 26">
+                      <polygon points="15,2 1,24 29,24"
+                        fill={isProblem?"#ef4444":"transparent"}
+                        stroke={isProblem?"#ef4444":"var(--border2)"}
+                        strokeWidth="2" strokeLinejoin="round"/>
+                      <text x="15" y="20" textAnchor="middle" fontSize="11" fontWeight="bold"
+                        fill={isProblem?"#fff":"var(--text3)"}>!</text>
+                    </svg>
+                  </button>
+                )}
+                {showWa&&(()=>{
+                  const name=job.customer_name||"there";
+                  const reg=job.vehicle_reg?`your ${job.vehicle_make?`${job.vehicle_make} `:""}${job.vehicle_model?`${job.vehicle_model} `:""}(${job.vehicle_reg})`:"your vehicle";
+                  const shopName=wsProfile?.name||settings?.shop_name||"Workshop";
+                  const shopPhone=wsProfile?.phone||settings?.phone||"";
+                  const msg=`Hi ${name}! 🎉 Great news — ${reg} is ready for collection at *${shopName}*.\n\nPlease contact us to arrange collection${shopPhone?` on ${shopPhone}`:""}.`;
+                  return (
+                    <a href={`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer"
+                      style={{display:"flex",alignItems:"center",gap:3,padding:"3px 8px",border:"1px solid rgba(37,211,102,.35)",borderRadius:12,textDecoration:"none",color:"#25D366",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>
+                      📱 Ready
+                    </a>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
         );
       })()}
 
-      {/* ── Tab bars ── */}
+      {/* ══ Always-visible: Complaint / Diagnosis / Return Reason / Remark ══ */}
+      {job.complaint&&(
+        <div style={{marginBottom:6,borderRadius:8,overflow:"hidden",border:"1px solid rgba(239,68,68,.35)"}}>
+          <div style={{background:"linear-gradient(135deg,#dc2626,#ef4444)",padding:"5px 10px",display:"flex",alignItems:"center",gap:6}}>
+            <span style={{fontSize:12}}>⚠️</span>
+            <span style={{fontSize:10,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".1em"}}>Customer Complaint</span>
+          </div>
+          <div style={{padding:"6px 10px",background:"var(--surface2)",borderLeft:"3px solid #ef4444"}}>
+            <div style={{fontSize:13,fontWeight:600,color:"var(--text)",lineHeight:1.4}}>{job.complaint}</div>
+          </div>
+        </div>
+      )}
+      {job.diagnosis&&(
+        <div style={{marginBottom:6,borderRadius:8,overflow:"hidden",border:"1px solid rgba(96,165,250,.3)"}}>
+          <div style={{background:"linear-gradient(135deg,#1d4ed8,#3b82f6)",padding:"5px 10px",display:"flex",alignItems:"center",gap:6}}>
+            <span style={{fontSize:12}}>🔍</span>
+            <span style={{fontSize:10,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".1em"}}>Diagnosis</span>
+          </div>
+          <div style={{padding:"6px 10px",background:"var(--surface2)",borderLeft:"3px solid #3b82f6"}}>
+            <div style={{fontSize:13,lineHeight:1.4,color:"var(--text)"}}>{job.diagnosis}</div>
+          </div>
+        </div>
+      )}
+      {job.return_reason&&(
+        <div style={{marginBottom:6,borderRadius:8,overflow:"hidden",border:"1px solid rgba(251,191,36,.3)"}}>
+          <div style={{background:"linear-gradient(135deg,#b45309,#f59e0b)",padding:"5px 10px",display:"flex",alignItems:"center",gap:6}}>
+            <span style={{fontSize:12}}>🔄</span>
+            <span style={{fontSize:10,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".1em"}}>Return Reason</span>
+          </div>
+          <div style={{padding:"6px 10px",background:"var(--surface2)",borderLeft:"3px solid #f59e0b"}}>
+            <div style={{fontSize:13,color:"var(--text)",lineHeight:1.4}}>{job.return_reason}</div>
+            {job.parent_job_id&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Original job: <code style={{fontFamily:"DM Mono,monospace"}}>{job.parent_job_id}</code></div>}
+          </div>
+        </div>
+      )}
+      {/* ── Remark / Note ── */}
+      <div style={{marginBottom:8,borderRadius:8,overflow:"hidden",border:"1px solid rgba(217,119,6,.3)"}}>
+        <div style={{background:"linear-gradient(135deg,#92400e,#d97706)",padding:"5px 10px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <span style={{fontSize:12}}>📝</span>
+            <span style={{fontSize:10,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".1em"}}>Remark / Note</span>
+          </div>
+          {!noteEdit&&(
+            <button onClick={()=>setNoteEdit(true)}
+              style={{fontSize:10,padding:"3px 10px",background:"rgba(255,255,255,.2)",border:"1px solid rgba(255,255,255,.35)",borderRadius:6,cursor:"pointer",color:"#fff",fontWeight:700}}>
+              {noteVal?"✏️ Edit":"+ Add"}
+            </button>
+          )}
+        </div>
+        <div style={{padding:"6px 10px",background:"var(--surface2)",borderLeft:"3px solid #d97706"}}>
+          {noteEdit?(
+            <>
+              <textarea value={noteVal} onChange={e=>setNoteVal(e.target.value)}
+                placeholder="Add a remark or internal note..."
+                style={{width:"100%",fontSize:13,padding:"7px 9px",borderRadius:7,border:"1px solid rgba(251,191,36,.5)",background:"var(--surface)",color:"var(--text)",resize:"vertical",minHeight:60,fontFamily:"DM Sans,sans-serif",outline:"none",boxSizing:"border-box"}}
+                autoFocus/>
+              <div style={{display:"flex",gap:8,marginTop:6}}>
+                <button className="btn btn-sm" style={{flex:1,background:"linear-gradient(135deg,#d97706,#f59e0b)",color:"#fff",border:"none",borderRadius:7}} disabled={savingNote}
+                  onClick={async()=>{setSavingNote(true);await onSaveJob({...job,notes:noteVal.trim()||null});setSavingNote(false);setNoteEdit(false);}}>
+                  {savingNote?"Saving...":"💾 Save"}
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setNoteVal(job.notes||"");setNoteEdit(false);}}>Cancel</button>
+              </div>
+            </>
+          ):(
+            noteVal
+              ?<div style={{fontSize:13,lineHeight:1.4,color:"var(--text)",fontStyle:"italic"}}>{noteVal}</div>
+              :<div style={{fontSize:12,color:"var(--text3)",fontStyle:"italic"}}>No remark yet</div>
+          )}
+        </div>
+      </div>
+
+      {/* ── VIN popup ── */}
+      {vinPopup&&job.vin&&(
+        <Overlay onClose={()=>setVinPopup(false)}>
+          <MHead title="VIN" onClose={()=>setVinPopup(false)}/>
+          {/* VIN value + copy */}
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)"}}>
+            <code style={{fontFamily:"DM Mono,monospace",fontSize:15,fontWeight:800,letterSpacing:"1.5px",color:"#6366f1",flex:1,wordBreak:"break-all"}}>{job.vin}</code>
+            <button onClick={()=>navigator.clipboard.writeText(job.vin).then(()=>alert("VIN copied!"))}
+              style={{flexShrink:0,fontSize:11,padding:"5px 11px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:7,cursor:"pointer",color:"var(--text3)",fontWeight:600}}>📋 Copy</button>
+          </div>
+          {/* Decoded fields */}
+          {(()=>{
+            const d=decodeVin(job.vin);
+            if(!d) return null;
+            const fields=[
+              {k:"Year",   v:d.year},
+              {k:"Origin", v:d.country},
+              {k:"Make",   v:d.make},
+              d.model?{k:"Model", v:d.model}:null,
+              d.plant?{k:"Plant", v:d.plant}:null,
+            ].filter(Boolean);
+            return (
+              <div style={{marginBottom:14,padding:"10px 12px",background:"rgba(99,102,241,.07)",borderRadius:10,border:"1px solid rgba(99,102,241,.2)"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#6366f1",textTransform:"uppercase",letterSpacing:".08em",marginBottom:8}}>📡 Decoded</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {fields.map(f=>(
+                    <div key={f.k} style={{fontSize:12,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 10px",lineHeight:1.5}}>
+                      <span style={{color:"var(--text3)",marginRight:4,fontSize:10}}>{f.k}:</span>
+                      <span style={{fontWeight:700,color:"var(--text)"}}>{f.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+          {/* Tool links */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+            {vinSearchLinks.map(lk=>(
+              <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 4px",
+                  background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:10,
+                  color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                <span style={{fontSize:22}}>{lk.icon}</span>
+                <span>{lk.label}</span>
+              </a>
+            ))}
+            <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open(`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`,"_blank");}}
+              style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 4px",
+                background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.3)",borderRadius:10,
+                color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+              <span style={{fontSize:22}}>🔴</span><span>AutoZone</span>
+            </button>
+            <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
+              style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 4px",
+                background:"rgba(14,165,233,.1)",border:"1px solid rgba(14,165,233,.3)",borderRadius:10,
+                color:"#0ea5e9",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+              <span style={{fontSize:22}}>🔧</span><span>Amayama</span>
+            </button>
+            <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert("VIN copied!\n\nPaste it into WolfOil's VIN field.");window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
+              style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 4px",
+                background:"rgba(249,115,22,.1)",border:"1px solid rgba(249,115,22,.3)",borderRadius:10,
+                color:"#f97316",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+              <span style={{fontSize:22}}>🛢️</span><span>WolfOil</span>
+            </button>
+          </div>
+        </Overlay>
+      )}
+
+      {/* ── Tab nav: hub menu or back-button + sub-tabs ── */}
       {(()=>{
         const payBadge = invoice?.status==="paid"?"✓":invoice?.status==="partial"?"½":null;
-        const INFO_TABS = [
+        const ALL_FLAT_TABS = [
           {id:"car",     icon:"🚗", label:t.wsTabCar||"Car"},
           {id:"inspect", icon:"✅", label:t.wsTabInspect||"Inspect", badge:checklistLoaded?`${CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length}/${CHECKLIST_ITEMS.length}`:null},
           {id:"photos",  icon:"📷", label:t.wsTabPhotos||"Photos",  badge:savedPhotos.length>0?savedPhotos.length:null},
-          {id:"docs",    icon:"📎", label:t.wsTabDocs||"Docs",    badge:jobDocs.length>0?jobDocs.length:null},
+          {id:"docs",    icon:"📎", label:t.wsTabDocs||"Docs",      badge:jobDocs.length>0?jobDocs.length:null},
+          ...(wsRole!=="mechanic"?[
+            {id:"quote",   icon:"📝", label:t.wsTabQuote||"Quote",   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
+            {id:"invoice", icon:"🧾", label:t.invoice||"Invoice",    badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
+            {id:"payment", icon:"💳", label:t.wsTabPayment||"Payment", badge:payBadge},
+          ]:[]),
         ];
-        const BILLING_TABS = wsRole==="mechanic" ? [] : [
-          {id:"quote",   icon:"📝", label:t.wsTabQuote||"Quote",   badge:quote?{accepted:"✓",converted:"↗",declined:"✗"}[quote.status]||null:null},
-          {id:"invoice", icon:"🧾", label:t.invoice||"Invoice",    badge:invoice?{paid:"✓",partial:"½"}[invoice.status]||null:null},
-          {id:"payment", icon:"💳", label:t.wsTabPayment||"Payment", badge:payBadge},
+        const CHAPTERS = [
+          {id:"ch_car",  icon:"🚗", label:t.wsChCar||"Car",        color:"#2563eb", tabs:["car"],          onClick:()=>setCarPopup(true)},
+          {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"],onClick:()=>setJobTab("photos")},
+          ...(wsRole!=="mechanic"?[
+            {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{setQuotePopup(true);setQuotePopupTab("quote");}},
+            {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"],      onClick:()=>setJobTab("payment")},
+          ]:[]),
         ];
 
-        if(isMobile){
-          // ── Mobile: 5 chapter buttons + optional sub-tab row ──
-          const CHAPTERS = [
-            {id:"ch_car",  icon:"🚗", label:t.wsChCar||"Car",        color:"#2563eb", tabs:["car","inspect"]},
-            {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"]},
-            ...(wsRole!=="mechanic"?[
-              {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"]},
-              {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"]},
-            ]:[]),
-            {id:"ch_cust", icon:"👤", label:t.wsChCust||"Customer",   color:"#db2777", tabs:["customer"]},
-          ];
-          const activeChapter = CHAPTERS.find(ch=>ch.tabs.includes(jobTab));
-          const allFlatTabs = [...INFO_TABS,...BILLING_TABS];
+        // ── Hub menu state: show tiles only ──
+        if(jobTab==="menu"){
+          const tileSize = isMobile ? {iconSize:28,labelSize:9,padding:"14px 4px",gap:4,borderRadius:12} : {iconSize:36,labelSize:12,padding:"20px 10px",gap:6,borderRadius:14};
           return (
-            <div style={{marginBottom:10}}>
-              <div style={{display:"grid",gridTemplateColumns:`repeat(${CHAPTERS.length},1fr)`,gap:5,marginBottom:6}}>
-                {CHAPTERS.map(ch=>{
-                  const isActive = ch.tabs.includes(jobTab);
-                  return (
-                    <button key={ch.id} onClick={()=>setJobTab(ch.tabs[0])} style={{
-                      display:"flex",flexDirection:"column",alignItems:"center",gap:3,
-                      padding:"10px 2px",border:"none",borderRadius:12,cursor:"pointer",
-                      background:isActive?ch.color:"var(--surface2)",
-                      color:isActive?"#fff":"var(--text3)",
-                      transition:"all .15s",
-                      boxShadow:isActive?"0 2px 8px rgba(0,0,0,.18)":"none",
-                    }}>
-                      <span style={{fontSize:22,lineHeight:1}}>{ch.icon}</span>
-                      <span style={{fontSize:8,fontWeight:700,lineHeight:1.2,textAlign:"center",letterSpacing:".01em"}}>{ch.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {activeChapter&&activeChapter.tabs.length>1&&(
-                <div style={{display:"flex",gap:4,marginBottom:8}}>
-                  {activeChapter.tabs.map(tabId=>{
-                    const ti=allFlatTabs.find(t=>t.id===tabId);
-                    if(!ti)return null;
-                    const isActive=jobTab===tabId;
-                    return (
-                      <button key={tabId} onClick={()=>setJobTab(tabId)} style={{
-                        flex:1,padding:"7px 4px",border:"none",borderRadius:8,cursor:"pointer",
-                        fontSize:11,fontWeight:700,
-                        background:isActive?"var(--accent)":"var(--surface3)",
-                        color:isActive?"#fff":"var(--text2)",
-                        display:"flex",alignItems:"center",justifyContent:"center",gap:4,
-                      }}>
-                        <span>{ti.icon}</span><span>{ti.label}</span>
-                        {ti.badge!=null&&<span style={{fontSize:9,background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 4px"}}>{ti.badge}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+            <div style={{display:"grid",gridTemplateColumns:`repeat(${CHAPTERS.length},1fr)`,gap:isMobile?8:12,marginBottom:14}}>
+              {CHAPTERS.map(ch=>(
+                <button key={ch.id} onClick={ch.onClick} style={{
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:tileSize.gap,
+                  padding:tileSize.padding,border:"none",borderRadius:tileSize.borderRadius,cursor:"pointer",
+                  background:ch.color,color:"#fff",
+                  boxShadow:"0 4px 14px rgba(0,0,0,.22)",
+                  transition:"transform .12s,box-shadow .12s",
+                  WebkitTapHighlightColor:"transparent",
+                }}>
+                  <span style={{fontSize:tileSize.iconSize,lineHeight:1}}>{ch.icon}</span>
+                  <span style={{fontSize:tileSize.labelSize,fontWeight:700,lineHeight:1.2,textAlign:"center",letterSpacing:".01em"}}>{ch.label}</span>
+                </button>
+              ))}
             </div>
           );
         }
 
-        // ── Desktop: same chapter button layout as mobile ──
-        const CHAPTERS_D = [
-          {id:"ch_car",  icon:"🚗", label:t.wsChCar||"Car",        color:"#2563eb", tabs:["car","inspect"]},
-          {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo/Docs", color:"#7c3aed", tabs:["photos","docs"]},
-          ...(wsRole!=="mechanic"?[
-            {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote/Inv",  color:"#ea580c", tabs:["quote","invoice"]},
-            {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"]},
-          ]:[]),
-          {id:"ch_cust", icon:"👤", label:t.wsChCust||"Customer",   color:"#db2777", tabs:["customer"]},
-        ];
-        const activeChapterD = CHAPTERS_D.find(ch=>ch.tabs.includes(jobTab));
-        const allFlatTabsD = [...INFO_TABS,...BILLING_TABS];
+        // ── Section open: back button + optional sub-tab row ──
+        const activeChapter = CHAPTERS.find(ch=>ch.tabs.includes(jobTab));
         return (
           <div style={{marginBottom:10}}>
-            <div style={{display:"grid",gridTemplateColumns:`repeat(${CHAPTERS_D.length},1fr)`,gap:8,marginBottom:6}}>
-              {CHAPTERS_D.map(ch=>{
-                const isActive = ch.tabs.includes(jobTab);
-                return (
-                  <button key={ch.id} onClick={()=>setJobTab(ch.tabs[0])} style={{
-                    display:"flex",flexDirection:"column",alignItems:"center",gap:5,
-                    padding:"14px 8px",border:"none",borderRadius:12,cursor:"pointer",
-                    background:isActive?ch.color:"var(--surface2)",
-                    color:isActive?"#fff":"var(--text3)",
-                    transition:"all .15s",
-                    boxShadow:isActive?"0 2px 10px rgba(0,0,0,.2)":"none",
-                  }}>
-                    <span style={{fontSize:28,lineHeight:1}}>{ch.icon}</span>
-                    <span style={{fontSize:11,fontWeight:700,lineHeight:1.2,textAlign:"center"}}>{ch.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            {activeChapterD&&activeChapterD.tabs.length>1&&(
-              <div style={{display:"flex",gap:6,marginBottom:10}}>
-                {activeChapterD.tabs.map(tabId=>{
-                  const ti=allFlatTabsD.find(t=>t.id===tabId);
+            <button onClick={()=>setJobTab("menu")} style={{
+              display:"flex",alignItems:"center",gap:6,marginBottom:8,
+              background:"linear-gradient(135deg,#334155,#475569)",color:"#fff",
+              border:"none",borderRadius:10,cursor:"pointer",
+              padding:isMobile?"7px 14px":"8px 16px",
+              fontSize:isMobile?13:14,fontWeight:800,
+              boxShadow:"0 2px 8px rgba(0,0,0,.25)",letterSpacing:".01em",
+            }}>← {t.wsMenu||"Menu"}</button>
+            {activeChapter&&activeChapter.tabs.length>1&&(
+              <div style={{display:"flex",gap:isMobile?4:6,marginBottom:isMobile?6:10}}>
+                {activeChapter.tabs.map(tabId=>{
+                  const ti=ALL_FLAT_TABS.find(tt=>tt.id===tabId);
                   if(!ti) return null;
                   const isActive=jobTab===tabId;
                   return (
                     <button key={tabId} onClick={()=>setJobTab(tabId)} style={{
-                      flex:1,padding:"9px 8px",border:"none",borderRadius:9,cursor:"pointer",
-                      fontSize:13,fontWeight:700,
+                      flex:1,padding:isMobile?"7px 4px":"9px 8px",border:"none",
+                      borderRadius:isMobile?8:9,cursor:"pointer",
+                      fontSize:isMobile?11:13,fontWeight:700,
                       background:isActive?"var(--accent)":"var(--surface3)",
                       color:isActive?"#fff":"var(--text2)",
-                      display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                      display:"flex",alignItems:"center",justifyContent:"center",gap:isMobile?4:6,
                     }}>
                       <span>{ti.icon}</span><span>{ti.label}</span>
-                      {ti.badge!=null&&<span style={{fontSize:10,background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 5px"}}>{ti.badge}</span>}
+                      {ti.badge!=null&&<span style={{fontSize:isMobile?9:10,background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 5px"}}>{ti.badge}</span>}
                     </button>
                   );
                 })}
@@ -3543,9 +3736,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         );
       })()}
 
-      {/* ══ CAR INFO tab ══ */}
-      {jobTab==="car"&&(
-        <div className="card" style={{padding:16,marginBottom:14}}>
+      {/* ══ CAR INFO popup ══ */}
+      {carPopup&&(
+        <Overlay onClose={()=>setCarPopup(false)}>
+          <MHead title={"🚗 "+(job.make||"")+" "+(job.model||"")} onClose={()=>setCarPopup(false)}/>
+          <div style={{padding:16}}>
           {/* Action buttons */}
           <div style={{position:"relative",display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
             {wsRole!=="mechanic"&&!wsLocked&&<button className="btn" onClick={()=>setEditJob(true)} style={{flex:1,background:"linear-gradient(135deg,#fbbf24 0%,#f97316 55%,#ef4444 100%)",color:"#fff",padding:"13px 20px",fontSize:15,fontWeight:700,letterSpacing:"0.4px",borderRadius:12,boxShadow:"0 4px 24px rgba(249,115,22,0.55),inset 0 1px 0 rgba(255,255,255,0.18)",textShadow:"0 1px 3px rgba(0,0,0,0.25)",border:"none"}}>✏️ {t.edit}</button>}
@@ -3700,79 +3895,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
             )}
           </div>
 
-          {/* Complaint / Diagnosis / Return Reason / Notes */}
-          {job.complaint&&(
-            <div style={{marginBottom:12,borderRadius:12,overflow:"hidden",boxShadow:"0 2px 12px rgba(239,68,68,.2)"}}>
-              <div style={{background:"linear-gradient(135deg,#dc2626,#ef4444)",padding:"8px 14px",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:16}}>⚠️</span>
-                <span style={{fontSize:11,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".1em"}}>Customer Complaint</span>
-              </div>
-              <div style={{padding:"12px 14px",background:"var(--surface2)",borderLeft:"3px solid #ef4444"}}>
-                <div style={{fontSize:14,fontWeight:600,color:"var(--text)",lineHeight:1.6}}>{job.complaint}</div>
-              </div>
-            </div>
-          )}
-          {job.diagnosis&&(
-            <div style={{marginBottom:12,borderRadius:12,overflow:"hidden",boxShadow:"0 2px 10px rgba(96,165,250,.15)"}}>
-              <div style={{background:"linear-gradient(135deg,#1d4ed8,#3b82f6)",padding:"8px 14px",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:15}}>🔍</span>
-                <span style={{fontSize:11,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".1em"}}>Diagnosis</span>
-              </div>
-              <div style={{padding:"12px 14px",background:"var(--surface2)",borderLeft:"3px solid #3b82f6"}}>
-                <div style={{fontSize:14,lineHeight:1.6,color:"var(--text)"}}>{job.diagnosis}</div>
-              </div>
-            </div>
-          )}
-          {job.return_reason&&(
-            <div style={{marginBottom:12,borderRadius:12,overflow:"hidden",boxShadow:"0 2px 10px rgba(251,191,36,.15)"}}>
-              <div style={{background:"linear-gradient(135deg,#b45309,#f59e0b)",padding:"8px 14px",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:15}}>🔄</span>
-                <span style={{fontSize:11,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".1em"}}>Return Reason</span>
-              </div>
-              <div style={{padding:"12px 14px",background:"var(--surface2)",borderLeft:"3px solid #f59e0b"}}>
-                <div style={{fontSize:14,color:"var(--text)",lineHeight:1.6}}>{job.return_reason}</div>
-                {job.parent_job_id&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Original job: <code style={{fontFamily:"DM Mono,monospace"}}>{job.parent_job_id}</code></div>}
-              </div>
-            </div>
-          )}
-
-          {/* ── Inline Remark / Note ── */}
-          <div style={{marginBottom:12,borderRadius:12,overflow:"hidden",boxShadow:"0 2px 10px rgba(251,191,36,.12)"}}>
-            <div style={{background:"linear-gradient(135deg,#92400e,#d97706)",padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:15}}>📝</span>
-                <span style={{fontSize:11,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".1em"}}>Remark / Note</span>
-              </div>
-              {!noteEdit&&(
-                <button onClick={()=>setNoteEdit(true)}
-                  style={{fontSize:11,padding:"4px 12px",background:"rgba(255,255,255,.2)",border:"1px solid rgba(255,255,255,.35)",borderRadius:8,cursor:"pointer",color:"#fff",fontWeight:700}}>
-                  {noteVal?"✏️ Edit":"+ Add"}
-                </button>
-              )}
-            </div>
-            <div style={{padding:"12px 14px",background:"var(--surface2)",borderLeft:"3px solid #d97706"}}>
-              {noteEdit?(
-                <>
-                  <textarea value={noteVal} onChange={e=>setNoteVal(e.target.value)}
-                    placeholder="Add a remark or internal note..."
-                    style={{width:"100%",fontSize:13,padding:"8px 10px",borderRadius:8,border:"1px solid rgba(251,191,36,.5)",background:"var(--surface)",color:"var(--text)",resize:"vertical",minHeight:72,fontFamily:"DM Sans,sans-serif",outline:"none",boxSizing:"border-box"}}
-                    autoFocus/>
-                  <div style={{display:"flex",gap:8,marginTop:8}}>
-                    <button className="btn btn-sm" style={{flex:1,background:"linear-gradient(135deg,#d97706,#f59e0b)",color:"#fff",border:"none",borderRadius:8}} disabled={savingNote}
-                      onClick={async()=>{setSavingNote(true);await onSaveJob({...job,notes:noteVal.trim()||null});setSavingNote(false);setNoteEdit(false);}}>
-                      {savingNote?"Saving...":"💾 Save"}
-                    </button>
-                    <button className="btn btn-ghost btn-sm" onClick={()=>{setNoteVal(job.notes||"");setNoteEdit(false);}}>Cancel</button>
-                  </div>
-                </>
-              ):(
-                noteVal
-                  ?<div style={{fontSize:14,lineHeight:1.6,color:"var(--text)",fontStyle:"italic"}}>{noteVal}</div>
-                  :<div style={{fontSize:13,color:"var(--text3)",fontStyle:"italic"}}>No remark yet</div>
-              )}
-            </div>
-          </div>
-
           {/* ── Car Details ── */}
           <div style={{marginBottom:12,borderRadius:12,overflow:"hidden",boxShadow:"0 2px 10px rgba(0,0,0,.12)"}}>
             <div style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)",padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -3914,6 +4036,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
           )}
 
         </div>
+        </Overlay>
       )}
 
       {/* Photo lightbox */}
@@ -3947,74 +4070,75 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         );
       })()}
 
-      {/* ══ INSPECTION tab ══ */}
-      {jobTab==="inspect"&&(
-        <div className="card" style={{overflow:"hidden",marginBottom:14}}>
-          <div style={{padding:"12px 14px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{fontWeight:700,fontSize:14}}>✅ Check-in Inspection</div>
+      {/* ══ INSPECTION popup ══ */}
+      {inspectPopup&&(
+        <Overlay onClose={()=>setInspectPopup(false)}>
+          <MHead title="✅ Check-in Inspection" onClose={()=>setInspectPopup(false)}/>
+          <div style={{overflow:"hidden"}}>
             {checklistLoaded&&(
-              <span style={{fontSize:12,color:"var(--text3)"}}>
-                {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK ·{" "}
-                {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues
-              </span>
+              <div style={{padding:"8px 14px",borderBottom:"1px solid var(--border)",fontSize:12,color:"var(--text3)",display:"flex",gap:12}}>
+                <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK</span>
+                <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues</span>
+                <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="pending").length} Pending</span>
+              </div>
+            )}
+            {!checklistLoaded?(
+              <div style={{padding:24,textAlign:"center",color:"var(--text3)",fontSize:13}}>Loading checklist...</div>
+            ):(
+              <>
+                {CHECKLIST_ITEMS.map(item=>{
+                  const cl=checklist[item.key]||{status:"pending",note:"",photo_url:""};
+                  return(
+                    <div key={item.key} style={{padding:"10px 14px",borderBottom:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:6}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                        <span style={{fontSize:16,width:22}}>{item.icon}</span>
+                        <span style={{fontSize:13,fontWeight:600,flex:1,minWidth:120}}>{item.label}</span>
+                        <div style={{display:"flex",gap:4}}>
+                          {[{v:"ok",label:"✓ OK",bg:"rgba(34,197,94,.15)",col:"#22c55e",bdr:"rgba(34,197,94,.4)"},
+                            {v:"issue",label:"✗ Issue",bg:"rgba(239,68,68,.15)",col:"#ef4444",bdr:"rgba(239,68,68,.4)"},
+                            {v:"na",label:"N/A",bg:"rgba(148,163,184,.1)",col:"#94a3b8",bdr:"rgba(148,163,184,.3)"}
+                          ].map(s=>(
+                            <button key={s.v} onClick={()=>saveChecklistItem(item.key,{status:s.v})}
+                              style={{fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",fontWeight:cl.status===s.v?700:400,
+                                background:cl.status===s.v?s.bg:"transparent",
+                                color:cl.status===s.v?s.col:"var(--text3)",
+                                border:`1px solid ${cl.status===s.v?s.bdr:"var(--border)"}`}}>
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button onClick={()=>clCamRefs.current[item.key]?.click()}
+                          style={{fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",
+                            background:cl.photo_url?"rgba(96,165,250,.15)":"transparent",
+                            color:cl.photo_url?"var(--blue)":"var(--text3)",
+                            border:`1px solid ${cl.photo_url?"rgba(96,165,250,.3)":"var(--border)"}`}}>
+                          {clUploading[item.key]?"⏳":cl.photo_url?"📷 ✓":"📷"}
+                        </button>
+                        <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+                          ref={el=>clCamRefs.current[item.key]=el}
+                          onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;const fr=new FileReader();fr.onload=ev=>uploadChecklistPhoto(item.key,ev.target.result);fr.readAsDataURL(file);}}/>
+                        {cl.photo_url&&(
+                          <img src={toImgUrl(cl.photo_url)} alt="check" onClick={()=>setViewPhoto(cl.photo_url)}
+                            style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)"}}
+                            referrerPolicy="no-referrer"
+                            onError={e=>{const m=cl.photo_url.match(/thumbnail[?]id=([^&]+)/)||cl.photo_url.match(/[?&]id=([^&]+)/)||cl.photo_url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {e.target.style.display="none";}}}/>
+                        )}
+                      </div>
+                      <input className="inp" placeholder="Note (optional)..." value={cl.note}
+                        onChange={e=>setChecklist(p=>({...p,[item.key]:{...cl,note:e.target.value}}))}
+                        onBlur={e=>{if(e.target.value!==(checklist[item.key]?.note||""))saveChecklistItem(item.key,{note:e.target.value});else if(cl.status!=="pending"||cl.note)saveChecklistItem(item.key,{note:e.target.value});}}
+                        style={{fontSize:12,padding:"4px 8px"}}/>
+                    </div>
+                  );
+                })}
+                <div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"var(--text3)",flexWrap:"wrap",gap:8}}>
+                  <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="na").length} N/A · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="pending").length} Pending</span>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>printChecklistReport(job,checklist,settings)}>🖨️ Print Report</button>
+                </div>
+              </>
             )}
           </div>
-          {!checklistLoaded?(
-            <div style={{padding:24,textAlign:"center",color:"var(--text3)",fontSize:13}}>Loading checklist...</div>
-          ):(
-            <>
-              {CHECKLIST_ITEMS.map(item=>{
-                const cl=checklist[item.key]||{status:"pending",note:"",photo_url:""};
-                return(
-                  <div key={item.key} style={{padding:"10px 14px",borderBottom:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:6}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                      <span style={{fontSize:16,width:22}}>{item.icon}</span>
-                      <span style={{fontSize:13,fontWeight:600,flex:1,minWidth:120}}>{item.label}</span>
-                      <div style={{display:"flex",gap:4}}>
-                        {[{v:"ok",label:"✓ OK",bg:"rgba(34,197,94,.15)",col:"#22c55e",bdr:"rgba(34,197,94,.4)"},
-                          {v:"issue",label:"✗ Issue",bg:"rgba(239,68,68,.15)",col:"#ef4444",bdr:"rgba(239,68,68,.4)"},
-                          {v:"na",label:"N/A",bg:"rgba(148,163,184,.1)",col:"#94a3b8",bdr:"rgba(148,163,184,.3)"}
-                        ].map(s=>(
-                          <button key={s.v} onClick={()=>saveChecklistItem(item.key,{status:s.v})}
-                            style={{fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",fontWeight:cl.status===s.v?700:400,
-                              background:cl.status===s.v?s.bg:"transparent",
-                              color:cl.status===s.v?s.col:"var(--text3)",
-                              border:`1px solid ${cl.status===s.v?s.bdr:"var(--border)"}`}}>
-                            {s.label}
-                          </button>
-                        ))}
-                      </div>
-                      <button onClick={()=>clCamRefs.current[item.key]?.click()}
-                        style={{fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",
-                          background:cl.photo_url?"rgba(96,165,250,.15)":"transparent",
-                          color:cl.photo_url?"var(--blue)":"var(--text3)",
-                          border:`1px solid ${cl.photo_url?"rgba(96,165,250,.3)":"var(--border)"}`}}>
-                        {clUploading[item.key]?"⏳":cl.photo_url?"📷 ✓":"📷"}
-                      </button>
-                      <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
-                        ref={el=>clCamRefs.current[item.key]=el}
-                        onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;const fr=new FileReader();fr.onload=ev=>uploadChecklistPhoto(item.key,ev.target.result);fr.readAsDataURL(file);}}/>
-                      {cl.photo_url&&(
-                        <img src={toImgUrl(cl.photo_url)} alt="check" onClick={()=>setViewPhoto(cl.photo_url)}
-                          style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)"}}
-                          referrerPolicy="no-referrer"
-                          onError={e=>{const m=cl.photo_url.match(/thumbnail[?]id=([^&]+)/)||cl.photo_url.match(/[?&]id=([^&]+)/)||cl.photo_url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {e.target.style.display="none";}}}/>
-                      )}
-                    </div>
-                    <input className="inp" placeholder="Note (optional)..." value={cl.note}
-                      onChange={e=>setChecklist(p=>({...p,[item.key]:{...cl,note:e.target.value}}))}
-                      onBlur={e=>{if(e.target.value!==(checklist[item.key]?.note||""))saveChecklistItem(item.key,{note:e.target.value});else if(cl.status!=="pending"||cl.note)saveChecklistItem(item.key,{note:e.target.value});}}
-                      style={{fontSize:12,padding:"4px 8px"}}/>
-                  </div>
-                );
-              })}
-              <div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"var(--text3)",flexWrap:"wrap",gap:8}}>
-                <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="na").length} N/A · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="pending").length} Pending</span>
-                <button className="btn btn-ghost btn-sm" onClick={()=>printChecklistReport(job,checklist,settings)}>🖨️ Print Report</button>
-              </div>
-            </>
-          )}
-        </div>
+        </Overlay>
       )}
 
       {/* ══ PHOTOS tab ══ */}
@@ -4128,8 +4252,25 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         </div>
       )}
 
-      {/* ══ QUOTE tab ══ */}
-      {jobTab==="quote"&&wsRole!=="mechanic"&&(<>
+      {/* ══ QUOTE/INVOICE popup ══ */}
+      {quotePopup&&wsRole!=="mechanic"&&(
+        <Overlay onClose={()=>setQuotePopup(false)}>
+          <MHead title="📝 Quote / Invoice" onClose={()=>setQuotePopup(false)}/>
+          <div style={{display:"flex",gap:6,padding:"8px 14px",borderBottom:"1px solid var(--border)"}}>
+            {["quote","invoice"].map(tid=>(
+              <button key={tid} onClick={()=>setQuotePopupTab(tid)} style={{
+                flex:1,padding:"7px 4px",border:"none",borderRadius:8,cursor:"pointer",
+                fontSize:13,fontWeight:700,
+                background:quotePopupTab===tid?"var(--accent)":"var(--surface3)",
+                color:quotePopupTab===tid?"#fff":"var(--text2)",
+              }}>
+                {tid==="quote"?"📋 Quote":"🧾 Invoice"}
+              </button>
+            ))}
+          </div>
+          <div>
+      {/* ── quote content ── */}
+      {quotePopupTab==="quote"&&(<>
         {/* OE Number search */}
         <div style={{marginBottom:14,borderRadius:12,overflow:"hidden",border:"1px solid var(--border)"}}>
           <div style={{background:"linear-gradient(135deg,#0f766e,#14b8a6)",padding:"8px 14px",display:"flex",alignItems:"center",gap:8}}>
@@ -4980,9 +5121,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
         </div>
       )}
       </>)}
-
-      {/* ══ INVOICE tab ══ */}
-      {jobTab==="invoice"&&wsRole!=="mechanic"&&(<>
+      {/* ── invoice content ── */}
+      {quotePopupTab==="invoice"&&(<>
       {invoice ? (
         <div className="card" style={{padding:14,borderLeft:`3px solid ${invoice.status==="paid"?"var(--green)":invoice.status==="partial"?"var(--yellow)":"var(--red)"}`}}>
           {/* Header row */}
@@ -5071,6 +5211,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
             </button>
       )}
       </>)}
+          </div>
+        </Overlay>
+      )}
 
       {/* ══ PAYMENT tab ══ */}
       {jobTab==="payment"&&wsRole!=="mechanic"&&(<>
@@ -5128,109 +5271,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],settings,ve
           </div>
         )}
       </>)}
-
-      {/* ══ CUSTOMER tab ══ */}
-      {jobTab==="customer"&&(()=>{
-        const custRecord=wsCustomers.find(c=>c.id===job.workshop_customer_id)||null;
-        const phone=(job.customer_phone||custRecord?.phone||"").replace(/\D/g,"");
-        const name=job.customer_name||custRecord?.name||"";
-        const email=job.customer_email||custRecord?.email||"";
-        const custJobs=jobs.filter(j=>j.id!==job.id&&(
-          (job.workshop_customer_id&&j.workshop_customer_id===job.workshop_customer_id)||
-          (name&&j.customer_name===name)
-        )).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
-        return(<>
-          {/* Customer card */}
-          <div className="card" style={{padding:16,marginBottom:12,borderLeft:"3px solid #db2777"}}>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-              <div style={{width:44,height:44,borderRadius:22,background:"rgba(219,39,119,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>👤</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:700,fontSize:17,lineHeight:1.2}}>{name||<span style={{color:"var(--text3)"}}>No customer linked</span>}</div>
-                {custRecord&&<div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>ID: {custRecord.id}</div>}
-              </div>
-            </div>
-            {(phone||email)&&(
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {phone&&(
-                  <div style={{display:"flex",gap:8}}>
-                    <a href={`tel:${phone}`} className="btn btn-ghost" style={{flex:1,textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",fontSize:14,fontWeight:600,color:"var(--blue)"}}>
-                      📞 Call
-                    </a>
-                    <a href={`https://wa.me/${phone}?text=${encodeURIComponent(`Hi ${name.split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}`}
-                      className="btn btn-ghost" target="_blank" rel="noreferrer"
-                      style={{flex:1,textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",fontSize:14,fontWeight:600,color:"#25d366"}}>
-                      💬 WhatsApp
-                    </a>
-                  </div>
-                )}
-                {email&&(
-                  <a href={`mailto:${email}`} className="btn btn-ghost" style={{textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 0",fontSize:13,color:"var(--text2)"}}>
-                    ✉️ {email}
-                  </a>
-                )}
-              </div>
-            )}
-            {!phone&&!email&&!name&&(
-              <div style={{fontSize:13,color:"var(--text3)",textAlign:"center",padding:"8px 0"}}>No contact details on this job.</div>
-            )}
-          </div>
-
-          {/* Vehicle summary card */}
-          <div className="card" style={{padding:16,marginBottom:12}}>
-            <div style={{fontWeight:700,fontSize:14,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>🚗 Vehicle Details</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 12px"}}>
-              {[
-                ["Plate",      job.vehicle_reg||"—"],
-                ["Make",       job.vehicle_make||"—"],
-                ["Model",      job.vehicle_model||"—"],
-                ["Year",       job.vehicle_year||"—"],
-                ["Color",      job.vehicle_color||"—"],
-                ["Mileage",    job.mileage?(+job.mileage).toLocaleString()+" km":"—"],
-                ["VIN",        job.vin||"—"],
-                ["Engine No",  job.engine_no||"—"],
-              ].map(([label,val])=>(
-                <div key={label} style={{background:"var(--surface2)",borderRadius:8,padding:"8px 10px"}}>
-                  <div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
-                  <div style={{fontSize:13,fontWeight:600,fontFamily:label==="Plate"||label==="VIN"||label==="Engine No"?"DM Mono,monospace":"inherit",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{val}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Service history */}
-          <div className="card" style={{padding:16}}>
-            <div style={{fontWeight:700,fontSize:14,marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <span>🔧 Service History</span>
-              {custJobs.length>0&&<span style={{fontSize:12,color:"var(--text3)"}}>{custJobs.length} previous {custJobs.length===1?"visit":"visits"}</span>}
-            </div>
-            {custJobs.length===0?(
-              <div style={{textAlign:"center",padding:"20px 0",color:"var(--text3)",fontSize:13}}>No previous visits</div>
-            ):(
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {custJobs.slice(0,5).map(j=>{
-                  const ji=invoices.find(i=>i.job_id===j.id);
-                  return(
-                    <div key={j.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:600}}>{j.date_in||"—"} · <code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{j.vehicle_reg||"—"}</code></div>
-                        <div style={{fontSize:11,color:"var(--text3)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.complaint||j.notes||"No description"}</div>
-                      </div>
-                      {ji&&(
-                        <span style={{fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:6,flexShrink:0,
-                          background:ji.status==="paid"?"rgba(52,211,153,.15)":ji.status==="partial"?"rgba(251,191,36,.15)":"rgba(248,113,113,.12)",
-                          color:ji.status==="paid"?"var(--green)":ji.status==="partial"?"var(--yellow)":"var(--red)"}}>
-                          {ji.status==="paid"?"✅ Paid":ji.status==="partial"?"💛 Part":"⏳ Unpaid"}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-                {custJobs.length>5&&<div style={{textAlign:"center",fontSize:12,color:"var(--text3)",paddingTop:4}}>+{custJobs.length-5} more visits</div>}
-              </div>
-            )}
-          </div>
-        </>);
-      })()}
 
       {/* Return Quote — supplier picker */}
       {returnQuoteOpen&&!returnQuoteTarget&&(()=>{

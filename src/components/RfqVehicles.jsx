@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { removeBackground } from "@imgly/background-removal";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
 import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, extractDriveId } from "../lib/helpers.js";
@@ -883,6 +884,7 @@ let _appPhotoClip = null; // { url, fromSku }
 // ═══════════════════════════════════════════════════════════════
 export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
   const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState("");
   const [dragOver, setDragOver]   = useState(false);
   const [error, setError]         = useState(null);
   const [zoomed, setZoomed]       = useState(false);
@@ -912,36 +914,50 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
 
     setUploading(true);
     setError(null);
+    setUploadStatus("Removing background…");
 
     try {
-      // Resize image first using canvas (max 1200px)
+      // Step 1: AI background removal → transparent PNG blob
+      let processedBlob;
+      try {
+        processedBlob = await removeBackground(file, {
+          publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/",
+          progress: (_key, current, total) => {
+            if (total > 0) setUploadStatus(`Removing background… ${Math.round(current/total*100)}%`);
+          },
+        });
+      } catch {
+        // If background removal fails, fall back to original file
+        processedBlob = file;
+      }
+
+      // Step 2: Draw on white canvas and resize to max 1200px
+      setUploadStatus("Processing…");
       const MAX = 1200;
       const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = ev => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement("canvas");
-            let w = img.width, h = img.height;
-            if (w > MAX || h > MAX) {
-              const r = Math.min(MAX/w, MAX/h);
-              w = Math.round(w*r); h = Math.round(h*r);
-            }
-            canvas.width = w; canvas.height = h;
-            const ctx = canvas.getContext("2d");
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, w, h);
-            ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL("image/jpeg", 0.92));
-          };
-          img.onerror = reject;
-          img.src = ev.target.result;
+        const url = URL.createObjectURL(processedBlob);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const canvas = document.createElement("canvas");
+          let w = img.width, h = img.height;
+          if (w > MAX || h > MAX) {
+            const r = Math.min(MAX/w, MAX/h);
+            w = Math.round(w*r); h = Math.round(h*r);
+          }
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.92));
         };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+        img.onerror = reject;
+        img.src = url;
       });
 
-      // Send to Apps Script
+      // Step 3: Send to Apps Script
+      setUploadStatus("Uploading…");
       const resp = await fetch(SCRIPT_URL, {
         method: "POST",
         body: JSON.stringify({
@@ -953,7 +969,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
 
       const result = await resp.json();
       if (result.success) {
-        onChange(result.url); // Set thumbnail URL
+        onChange(result.url);
         setError(null);
       } else {
         setError("Upload failed: " + result.error);
@@ -961,6 +977,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
     } catch (e) {
       setError("Upload error: " + e.message);
     }
+    setUploadStatus("");
     setUploading(false);
   };
 
@@ -1004,9 +1021,10 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
           transition: "border-color .15s, background .15s",
         }}>
         {uploading ? (
-          <div style={{textAlign:"center",color:"var(--accent)"}}>
+          <div style={{textAlign:"center",color:"var(--accent)",padding:"0 12px"}}>
             <div style={{width:26,height:26,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 8px"}}/>
-            <div style={{fontSize:12}}>{t.phuUploading}</div>
+            <div style={{fontSize:12,fontWeight:600}}>{uploadStatus||t.phuUploading}</div>
+            {uploadStatus.startsWith("Removing")&&<div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>First use downloads AI model (~50MB)</div>}
           </div>
         ) : preview ? (
           <>

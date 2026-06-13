@@ -981,20 +981,90 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
     setUploading(false);
   };
 
-  // Show preview instantly using CSS — no CORS needed
   const flipPhoto = () => {
     if (!imageUrl) return;
     setError(null);
     setShowFlipPopup(true);
   };
 
-  const copyFlippedToClipboard = () => {
-    _appPhotoClip = {url: imageUrl, fromSku: sku};
-    setHasClip(true);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+  const _getFlippedBlob = async () => {
+    const srcUrl = toImgUrl(imageUrl) || imageUrl;
+    const r = await fetch(srcUrl, {credentials:"omit"});
+    if (!r.ok) throw new Error("fetch failed");
+    const blob = await r.blob();
+    if (!blob.type.startsWith("image/")) throw new Error("not an image");
+    return new Promise((res, rej) => {
+      const objUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(objUrl);
+        const cv = document.createElement("canvas");
+        const w = img.naturalWidth, h = img.naturalHeight;
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext("2d");
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
+        ctx.translate(w, 0); ctx.scale(-1, 1);
+        ctx.drawImage(img, 0, 0);
+        cv.toBlob(b => b ? res(b) : rej(new Error("toBlob failed")), "image/jpeg", 0.92);
+      };
+      img.onerror = () => { URL.revokeObjectURL(objUrl); rej(new Error("img load failed")); };
+      img.src = objUrl;
+    });
+  };
+
+  const saveFlipped = async () => {
+    if (!imageUrl || !SCRIPT_URL) return;
     setShowFlipPopup(false);
+    setUploading(true);
+    setUploadStatus("Saving flipped photo…");
     setError(null);
+    try {
+      const flippedBlob = await _getFlippedBlob();
+      await uploadToGDrive(new File([flippedBlob], `${sku||"part"}_flipped.jpg`, {type:"image/jpeg"}));
+    } catch(e) {
+      setError("Could not flip — try re-uploading the original photo first");
+    }
+    setUploading(false);
+    setUploadStatus("");
+  };
+
+  const copyFlippedToClipboard = async () => {
+    setShowFlipPopup(false);
+    if (!SCRIPT_URL) {
+      // No script URL — just store original URL (old behaviour)
+      _appPhotoClip = {url: imageUrl, fromSku: sku};
+      setHasClip(true); setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+      return;
+    }
+    setUploading(true);
+    setUploadStatus("Preparing flipped copy…");
+    setError(null);
+    try {
+      const flippedBlob = await _getFlippedBlob();
+      const base64 = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = e => res(e.target.result);
+        fr.onerror = rej;
+        fr.readAsDataURL(flippedBlob);
+      });
+      const resp = await fetch(SCRIPT_URL, {
+        method:"POST",
+        body: JSON.stringify({image:base64, filename:`${sku||"part"}_flip_copy.jpg`, mimeType:"image/jpeg"})
+      });
+      const result = await resp.json();
+      if (result.success && result.url) {
+        _appPhotoClip = {url: result.url, fromSku: sku};
+      } else {
+        _appPhotoClip = {url: imageUrl, fromSku: sku};
+      }
+    } catch {
+      _appPhotoClip = {url: imageUrl, fromSku: sku};
+    }
+    setHasClip(true); setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+    setUploading(false);
+    setUploadStatus("");
   };
 
   const preview = imageUrl ? toImgUrl(imageUrl) : null;
@@ -1137,10 +1207,14 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
                 style={{maxWidth:"100%",maxHeight:200,objectFit:"contain",transform:"scaleX(-1)",display:"block"}}
                 onError={e=>e.target.style.opacity="0.3"}/>
             </div>
-            <div style={{display:"flex",gap:8}}>
-              <button className="btn btn-ghost btn-sm" style={{flex:1}}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button className="btn btn-ghost btn-sm" style={{flex:"1 1 60px"}}
                 onClick={()=>{setShowFlipPopup(false);setError(null);}}>✕ Cancel</button>
-              <button className="btn btn-primary btn-sm" style={{flex:2,background:"var(--green)",border:"none"}}
+              <button className="btn btn-primary btn-sm" style={{flex:"2 1 120px",background:"var(--accent)",border:"none"}}
+                onClick={saveFlipped}>
+                ↔ Save as This Part
+              </button>
+              <button className="btn btn-primary btn-sm" style={{flex:"2 1 120px",background:"var(--green)",border:"none"}}
                 onClick={copyFlippedToClipboard}>
                 📋 Copy to Other Part
               </button>

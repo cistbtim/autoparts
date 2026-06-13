@@ -1090,9 +1090,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         const cv=document.createElement("canvas");
         cv.width=w;cv.height=h;
         const ctx=cv.getContext("2d");
+        ctx.fillStyle="#ffffff";ctx.fillRect(0,0,w,h);
         ctx.translate(w,0);ctx.scale(-1,1);
         ctx.drawImage(img,0,0);
-        resolve(cv.toDataURL("image/png")); // throws SecurityError if canvas tainted
+        resolve(cv.toDataURL("image/jpeg",0.92)); // throws SecurityError if canvas tainted
       }catch(e){reject(e);}
     };
     img.onerror=(e)=>reject(e);
@@ -1119,9 +1120,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 const cv=document.createElement("canvas");
                 cv.width=w;cv.height=h;
                 const ctx=cv.getContext("2d");
+                ctx.fillStyle="#ffffff";ctx.fillRect(0,0,w,h);
                 ctx.translate(w,0);ctx.scale(-1,1);
                 ctx.drawImage(img,0,0);
-                res(cv.toDataURL("image/png"));
+                res(cv.toDataURL("image/jpeg",0.92));
               }catch(e){URL.revokeObjectURL(objUrl);rej(e);}
             };
             img.onerror=()=>{URL.revokeObjectURL(objUrl);rej(new Error("blob img load failed"));};
@@ -1140,7 +1142,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       return srcUrl;
     }
     try{
-      const up=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({image:base64,filename:`${sku}_flipped.png`,mimeType:"image/png"})});
+      const up=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({image:base64,filename:`${sku}_flipped.jpg`,mimeType:"image/jpeg"})});
       const result=await up.json();
       if(result.success&&result.url) return result.url;
       console.warn("Flip upload result:",result);

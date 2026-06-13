@@ -1472,7 +1472,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 // ═══════════════════════════════════════════════════════════════
 // onFilter   — fitment-based filter (shop/POS): passes a Set of part IDs
 // onVehicleChange — direct make/model filter (inventory): passes {make, model}
-export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onAddPart, t, initialMake="", initialModel=""}) {
+export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onAddPart, onCarChange, t, initialMake="", initialModel=""}) {
   const [selMake,  setSelMake]  = useState(initialMake);
   const [selModel, setSelModel] = useState(initialModel);
   const [makeInput,  setMakeInput]  = useState(initialMake);
@@ -1511,6 +1511,8 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
       setActive(false);
       return;
     }
+    // Reload fresh inventory data whenever car selection changes
+    if(make && onCarChange) onCarChange();
     const matchVehicles = vehicles.filter(v =>
       v.make === make && (!model || v.code === model || v.model === model)
     );

@@ -4202,6 +4202,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               initialMake={shopVehicleFilter.make}
               initialModel={shopVehicleFilter.model}
               onFilter={(ids)=>{setVehicleFilterIds(ids);setShopPage(0);}}
+              onCarChange={()=>{ api.cacheClearAll(); loadAll(); }}
               onAddPart={(role==="admin"||role==="manager"||role==="demo")?((vehIds)=>{
                 setNewPartInitialF({price:0,cost_price:0});
                 setPendingVehicleIds(vehIds);

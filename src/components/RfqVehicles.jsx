@@ -928,8 +928,11 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
               w = Math.round(w*r); h = Math.round(h*r);
             }
             canvas.width = w; canvas.height = h;
-            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL("image/png"));
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", 0.92));
           };
           img.onerror = reject;
           img.src = ev.target.result;
@@ -943,8 +946,8 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
         method: "POST",
         body: JSON.stringify({
           image: base64,
-          filename: `${sku||'part_'+Date.now()}.png`,
-          mimeType: "image/png"
+          filename: `${sku||'part_'+Date.now()}.jpg`,
+          mimeType: "image/jpeg"
         })
       });
 
@@ -1942,8 +1945,11 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
             let w = img.width, h = img.height;
             if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
             canvas.width = w; canvas.height = h;
-            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL("image/png"));
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", 0.92));
           };
           img.onerror = reject;
           img.src = ev.target.result;
@@ -1958,11 +1964,11 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
       const _dt=`${_date.replace(/-/g,"")}_${_p(_now.getHours())}${_p(_now.getMinutes())}${_p(_now.getSeconds())}`;
       const _plate=String(reg||vehicleId||"vehicle").replace(/\s/g,"").toUpperCase();
       const folderPath = "Tim_Car_Phot/" + _plate + "/" + _date;
-      const filename = _dt + "_" + viewName + ".png";
+      const filename = _dt + "_" + viewName + ".jpg";
       setStatus("Uploading " + filename + "...");
       const uploadResp = await fetch(SCRIPT_URL, {
         method: "POST",
-        body: JSON.stringify({ image:base64, filename, mimeType:"image/png", folderPath })
+        body: JSON.stringify({ image:base64, filename, mimeType:"image/jpeg", folderPath })
       });
       const result = await uploadResp.json();
       if (result.success) {

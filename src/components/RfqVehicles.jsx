@@ -1624,24 +1624,32 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
             }
           }}/>
 
-        {/* Model — searchable datalist */}
+        {/* Model — searchable datalist with clear button */}
         <datalist id={`${_vsbId}_models`}>{modelOpts.map(o=><option key={o.val} value={o.label}/>)}</datalist>
-        <input className="inp" list={`${_vsbId}_models`} value={modelInput}
-          placeholder={selMake ? (t.selectModel||"Type model…") : "—"}
-          disabled={!selMake}
-          style={{flex:"2 1 200px",minWidth:160}}
-          onChange={e=>{
-            const v=e.target.value;
-            setModelInput(v);
-            const code=modelLabelToVal[v];
-            if(code!==undefined){
-              setSelModel(code);
-              applyFilter(selMake, code);
-            } else if(!v){
-              setSelModel("");
-              applyFilter(selMake,"");
-            }
-          }}/>
+        <div style={{position:"relative",flex:"2 1 200px",minWidth:160}}>
+          <input className="inp" list={`${_vsbId}_models`} value={modelInput}
+            placeholder={selMake ? (t.selectModel||"Type model…") : "—"}
+            disabled={!selMake}
+            style={{width:"100%",paddingRight:modelInput?30:10}}
+            onChange={e=>{
+              const v=e.target.value;
+              setModelInput(v);
+              const code=modelLabelToVal[v];
+              if(code!==undefined){
+                setSelModel(code);
+                applyFilter(selMake, code);
+              } else if(!v){
+                setSelModel("");
+                applyFilter(selMake,"");
+              }
+            }}/>
+          {modelInput&&(
+            <button onClick={()=>{ setModelInput(""); setSelModel(""); applyFilter(selMake,""); }}
+              style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",
+                background:"none",border:"none",cursor:"pointer",color:"var(--text3)",
+                fontSize:15,lineHeight:1,padding:2}}>✕</button>
+          )}
+        </div>
       </div>
 
       {/* Vehicle photos + result info */}

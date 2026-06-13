@@ -27,7 +27,7 @@ import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, Wor
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -65,6 +65,15 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [bkCancelModal,   setBkCancelModal]   = useState(null);
   const [bkCancelReason,  setBkCancelReason]  = useState("");
   const [kanbanView,      setKanbanView]      = useState(true);
+  const [kanbanZoom,      setKanbanZoom]      = useState(()=>{try{return Number(localStorage.getItem("ws_kanban_zoom")||1);}catch{return 1;}});
+  const KANBAN_WIDTHS=[200,270,340,420];
+  const kanbanColW=KANBAN_WIDTHS[Math.max(0,Math.min(3,kanbanZoom))];
+  const [collapsedCols,   setCollapsedCols]   = useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("ws_kanban_collapsed")||"[]"));}catch{return new Set();}});
+  const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
+  const [kanbanSearch,    setKanbanSearch]    = useState("");
+  const [kanbanNoteEdit,  setKanbanNoteEdit]  = useState(null);
+  const [kanbanDueEdit,   setKanbanDueEdit]   = useState(null);
+  const [kanbanAssignEdit,setKanbanAssignEdit]= useState(null);
   const [jobDetailTab,    setJobDetailTab]    = useState("menu");
   const [kanbanInvJob,    setKanbanInvJob]    = useState(null);
   const [kanbanInvOpen,   setKanbanInvOpen]   = useState(false);
@@ -247,7 +256,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onDeleteWsSupplierRequest={onDeleteWsSupplierRequest}
         onSaveWsSupplierQuote={onSaveWsSupplierQuote}
         onSaveWsStock={onSaveWsStock}
-        onBack={()=>{ setView("list"); setActiveJob(null); }}
+        onBack={()=>{ setView("list"); setActiveJob(null); setWsTab("jobs"); }}
         onSaveJob={async(d,onProgress)=>{ await onSaveJob(d,onProgress); setActiveJob({...activeJob,...d}); }}
         onDeleteJob={async()=>{ await onDeleteJob(activeJob.id); setView("list"); setActiveJob(null); }}
         onMoveJob={async(targetWsId)=>{ await onMoveJob(activeJob.id,targetWsId); setView("list"); setActiveJob(null); }}
@@ -360,6 +369,27 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
               <button title="List view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:!kanbanView?"var(--accent)":"transparent",color:!kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(false)}>≡</button>
               <button title="Board view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:kanbanView?"var(--accent)":"transparent",color:kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(true)}>⬜</button>
             </div>
+            {kanbanView&&(<>
+              <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+                <button title="Zoom out" disabled={kanbanZoom<=0}
+                  style={{padding:"7px 11px",border:"none",cursor:kanbanZoom<=0?"not-allowed":"pointer",background:"transparent",color:kanbanZoom<=0?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom<=0?.4:1}}
+                  onClick={()=>{const z=Math.max(0,kanbanZoom-1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>−</button>
+                <div style={{padding:"7px 6px",fontSize:11,color:"var(--text2)",display:"flex",alignItems:"center",borderLeft:"1px solid var(--border)",borderRight:"1px solid var(--border)"}}>{kanbanColW}px</div>
+                <button title="Zoom in" disabled={kanbanZoom>=3}
+                  style={{padding:"7px 11px",border:"none",cursor:kanbanZoom>=3?"not-allowed":"pointer",background:"transparent",color:kanbanZoom>=3?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom>=3?.4:1}}
+                  onClick={()=>{const z=Math.min(3,kanbanZoom+1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>＋</button>
+              </div>
+              <button title={showKanbanPhotos?"Hide car photos":"Show car photos"}
+                style={{padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:showKanbanPhotos?"var(--surface2)":"transparent",cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:4}}
+                onClick={()=>{const v=!showKanbanPhotos;setShowKanbanPhotos(v);try{localStorage.setItem("ws_kanban_photos",v?"1":"0");}catch{}}}>
+                {showKanbanPhotos?"🖼️":"📷"}
+              </button>
+              <div style={{position:"relative",marginLeft:4}}>
+                <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
+                  placeholder="Search board…" style={{padding:"7px 28px 7px 10px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:12,width:140,outline:"none"}}/>
+                {kanbanSearch&&<button onClick={()=>setKanbanSearch("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,lineHeight:1}}>✕</button>}
+              </div>
+            </>)}
           </div>
           )}
         </div>
@@ -524,13 +554,86 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         {/* ══════════════ KANBAN BOARD VIEW ══════════════ */}
         {kanbanView&&(()=>{
           const jInv = id => invoices.find(i=>i.job_id===id);
+
+          // ── helpers ──────────────────────────────────────────
+          const kq = kanbanSearch.trim().toLowerCase();
+          const matchesSearch = j => !kq || [j.customer_name,j.vehicle_reg,j.vehicle_make,j.vehicle_model,j.complaint,j.notes,j.assigned_to].some(f=>(f||"").toLowerCase().includes(kq));
+
+          const highlight = (text) => {
+            if(!kq||!text) return text;
+            const i=String(text).toLowerCase().indexOf(kq);
+            if(i===-1) return text;
+            const s=String(text);
+            return <>{s.slice(0,i)}<mark style={{background:"rgba(251,191,36,.45)",color:"inherit",borderRadius:2,padding:"0 1px"}}>{s.slice(i,i+kq.length)}</mark>{s.slice(i+kq.length)}</>;
+          };
+
+          const timeAgo = (dateStr) => {
+            if(!dateStr) return null;
+            const diffMs=Date.now()-new Date(dateStr).getTime();
+            const diffMins=Math.floor(diffMs/60000);
+            if(diffMins<60) return `${diffMins}m`;
+            const diffHrs=Math.floor(diffMins/60);
+            if(diffHrs<24) return `${diffHrs}h`;
+            return `${Math.floor(diffHrs/24)}d`;
+          };
+
+          const STUCK_DAYS = {Pending:7,"In Progress":3,Done:2,Invoiced:5};
+          const isStuck = (job) => {
+            if(!job.updated_at||job.is_problem) return false;
+            const days=Math.floor((Date.now()-new Date(job.updated_at).getTime())/86400000);
+            const thresh=STUCK_DAYS[job.status]||999;
+            return days>=thresh;
+          };
+
+          const patchJobField = async(job,field,value) => {
+            await onSaveJob({...job,[field]:value});
+          };
+
+          const printJobSheet = (job) => {
+            const items=jobItems.filter(i=>i.job_id===job.id);
+            const inv=jInv(job.id);
+            const sub=items.reduce((s,i)=>s+(+i.total||0),0);
+            const ws=wsProfile?.name||"Workshop";
+            const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Job Sheet</title>
+<style>body{font-family:Arial,sans-serif;margin:24px;color:#111;font-size:13px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;margin:16px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px}
+table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}
+th{background:#f5f5f5;font-size:11px}td{font-size:12px}.right{text-align:right}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
+@media print{body{margin:12px}button{display:none}}</style></head><body>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+  <div><h1>🔧 Job Sheet</h1><div style="font-size:11px;color:#555">${ws}</div></div>
+  <div style="text-align:right;font-size:11px;color:#555">Printed: ${new Date().toLocaleString()}</div>
+</div>
+<table style="margin-bottom:0"><tbody>
+<tr><td><b>Job ID</b></td><td>${job.id||"—"}</td><td><b>Date</b></td><td>${job.date_in||"—"}</td></tr>
+<tr><td><b>Customer</b></td><td>${job.customer_name||"—"}</td><td><b>Phone</b></td><td>${job.customer_phone||"—"}</td></tr>
+<tr><td><b>Reg</b></td><td><b style="font-size:15px">${job.vehicle_reg||"—"}</b></td><td><b>Vehicle</b></td><td>${[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")||"—"}</td></tr>
+<tr><td><b>KM</b></td><td>${job.mileage||"—"}</td><td><b>Status</b></td><td>${job.status||"—"}</td></tr>
+<tr><td><b>Complaint</b></td><td colspan="3">${job.complaint||"—"}</td></tr>
+${job.notes?`<tr><td><b>Note</b></td><td colspan="3">${job.notes}</td></tr>`:""}
+${job.assigned_to?`<tr><td><b>Mechanic</b></td><td colspan="3">${job.assigned_to}</td></tr>`:""}
+${job.due_date?`<tr><td><b>Due Date</b></td><td colspan="3">${job.due_date}</td></tr>`:""}
+</tbody></table>
+${items.length>0?`<h2>Items</h2><table><thead><tr><th>Description</th><th>Type</th><th class="right">Qty</th><th class="right">Unit</th><th class="right">Total</th></tr></thead><tbody>${items.map(it=>`<tr><td>${it.description||it.part_name||"—"}</td><td>${it.item_type||"part"}</td><td class="right">${it.qty}</td><td class="right">${it.unit_price||0}</td><td class="right"><b>${it.total||0}</b></td></tr>`).join("")}</tbody></table><div style="text-align:right;margin-top:8px;font-size:14px"><b>Total: ${C} ${sub.toLocaleString(undefined,{minimumFractionDigits:2})}</b></div>`:""}
+${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv.total||0).toLocaleString(undefined,{minimumFractionDigits:2})}</b></p>`:""}
+<div style="margin-top:24px;border-top:1px solid #ddd;padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div><div style="font-size:11px;color:#555;margin-bottom:24px">Customer Signature</div><div style="border-top:1px solid #999;width:180px"></div></div>
+  <div><div style="font-size:11px;color:#555;margin-bottom:24px">Mechanic Signature</div><div style="border-top:1px solid #999;width:180px"></div></div>
+</div>
+<script>window.onload=()=>window.print();</script></body></html>`;
+            const w=window.open("","_blank","width=820,height=960");
+            if(w){w.document.write(html);w.document.close();}
+          };
+
+          // ── filter columns by search ──────────────────────────
           const bkCol   = wsBookings.filter(b=>b.status==="pending"||b.status==="confirmed");
-          const pendCol = jobs.filter(j=>!j.is_problem&&j.status==="Pending");
-          const wipCol  = jobs.filter(j=>!j.is_problem&&j.status==="In Progress");
-          const doneCol = jobs.filter(j=>!j.is_problem&&j.status==="Done"&&!jInv(j.id));
-          const invCol  = jobs.filter(j=>!j.is_problem&&jInv(j.id)&&jInv(j.id)?.status!=="paid");
-          const paidCol = jobs.filter(j=>!j.is_problem&&jInv(j.id)?.status==="paid");
-          const probCol = jobs.filter(j=>j.is_problem);
+          const pendCol = jobs.filter(j=>!j.is_problem&&j.status==="Pending"&&matchesSearch(j));
+          const wipCol  = jobs.filter(j=>!j.is_problem&&j.status==="In Progress"&&matchesSearch(j));
+          const doneCol = jobs.filter(j=>!j.is_problem&&j.status==="Done"&&!jInv(j.id)&&matchesSearch(j));
+          const invCol  = jobs.filter(j=>!j.is_problem&&jInv(j.id)&&jInv(j.id)?.status!=="paid"&&matchesSearch(j));
+          const paidCol = jobs.filter(j=>!j.is_problem&&jInv(j.id)?.status==="paid"&&matchesSearch(j));
+          const probCol = jobs.filter(j=>j.is_problem&&matchesSearch(j));
 
           const COLS = [
             {id:"booking",  label:"Booking",          hint:"Confirm & create job",   color:"#60a5fa", items:bkCol,   type:"booking"},
@@ -616,81 +719,201 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             const canUnflag = col.id==="problem";
             const canInvoice= col.id==="done";
             const isDraggable = !wsLocked && DRAGGABLE_COLS.includes(col.id);
+            const stuck = isStuck(job);
+            const elapsed = timeAgo(job.updated_at);
+            const isOverdue = job.due_date && new Date(job.due_date)<new Date() && col.id!=="paid";
+            const isNoteEditing = kanbanNoteEdit?.jobId===job.id;
+            const isDueEditing  = kanbanDueEdit?.jobId===job.id;
+            const isAssignEditing = kanbanAssignEdit?.jobId===job.id;
+            // colour-coded mechanic initials
+            const mechanic = job.assigned_to||"";
+            const mechInitials = mechanic.trim().split(/\s+/).map(w=>w[0]||"").slice(0,2).join("").toUpperCase();
+            const mechColor = mechanic ? "#"+Math.abs(mechanic.split("").reduce((h,c)=>h*31+c.charCodeAt(0),0)&0xffffff).toString(16).padStart(6,"0").slice(0,6) : null;
             return (
               <div className="kb-card"
                 draggable={isDraggable}
                 onDragStart={isDraggable ? ()=>handleDragStart(job,col) : undefined}
                 onDragEnd={isDraggable ? handleDragEnd : undefined}
-                style={{cursor: isDraggable ? "grab" : undefined}}
+                style={{cursor: isDraggable ? "grab" : undefined, outline: isOverdue?"2px solid #f87171":"none", outlineOffset:1}}
                 onClick={()=>{setJobDetailTab(col.id==="invoiced"||col.id==="paid"?"invoice":"menu");setActiveJob(job);setView("job");}}>
-                <div style={{height:3,background:col.color}}/>
-                <div style={{position:"relative",height:90,background:"var(--surface2)",overflow:"hidden"}}>
-                  {fp
-                    ? <>
-                        <img src={toImgUrl(fp)} alt="car" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}
-                          referrerPolicy="no-referrer"
-                          onError={e=>{e.target.style.display="none";}}/>
-                        <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.4) 0%,transparent 60%)"}}/>
-                      </>
-                    : <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"linear-gradient(135deg,var(--surface2) 0%,var(--surface3) 100%)"}}>
-                        <svg width="42" height="25" viewBox="0 0 38 22" fill="none" xmlns="http://www.w3.org/2000/svg" style={{opacity:.2}}>
-                          <rect x="1" y="9" width="36" height="11" rx="3" fill="currentColor"/>
-                          <path d="M7 9L11 2h16l4 7" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                          <circle cx="9" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
-                          <circle cx="29" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
-                        </svg>
-                        <span style={{fontSize:9,color:"var(--text3)",fontWeight:600,letterSpacing:".08em",textTransform:"uppercase"}}>No Photo</span>
+                <div style={{height:3,background:isOverdue?"#f87171":col.color}}/>
+
+                {/* ── Car photo (toggleable) ── */}
+                {showKanbanPhotos&&(
+                  <div style={{position:"relative",height:90,background:"var(--surface2)",overflow:"hidden"}}>
+                    {fp
+                      ? <>
+                          <img src={toImgUrl(fp)} alt="car" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}
+                            referrerPolicy="no-referrer"
+                            onError={e=>{e.target.style.display="none";}}/>
+                          <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.4) 0%,transparent 60%)"}}/>
+                        </>
+                      : <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"linear-gradient(135deg,var(--surface2) 0%,var(--surface3) 100%)"}}>
+                          <svg width="42" height="25" viewBox="0 0 38 22" fill="none" xmlns="http://www.w3.org/2000/svg" style={{opacity:.2}}>
+                            <rect x="1" y="9" width="36" height="11" rx="3" fill="currentColor"/>
+                            <path d="M7 9L11 2h16l4 7" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                            <circle cx="9" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
+                            <circle cx="29" cy="19" r="3" fill="var(--surface2)" stroke="currentColor" strokeWidth="1.5"/>
+                          </svg>
+                          <span style={{fontSize:9,color:"var(--text3)",fontWeight:600,letterSpacing:".08em",textTransform:"uppercase"}}>No Photo</span>
+                        </div>
+                    }
+                    {job.vehicle_reg&&(
+                      <div style={{position:"absolute",bottom:6,left:7,background:"rgba(0,0,0,.6)",backdropFilter:"blur(6px)",borderRadius:5,padding:"2px 8px",border:"1px solid rgba(255,255,255,.12)"}}>
+                        <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:11,color:"#fff"}}>{highlight(job.vehicle_reg)}</code>
                       </div>
-                  }
-                  {job.vehicle_reg&&(
-                    <div style={{position:"absolute",bottom:6,left:7,background:"rgba(0,0,0,.6)",backdropFilter:"blur(6px)",borderRadius:5,padding:"2px 8px",border:"1px solid rgba(255,255,255,.12)"}}>
-                      <code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:11,color:"#fff"}}>{job.vehicle_reg}</code>
-                    </div>
-                  )}
-                  {job.customer_name&&(
-                    <div style={{position:"absolute",bottom:6,right:7,background:"rgba(0,0,0,.6)",backdropFilter:"blur(6px)",borderRadius:5,padding:"2px 8px",maxWidth:"55%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",border:"1px solid rgba(255,255,255,.1)"}}>
-                      <span style={{fontWeight:700,fontSize:11,color:"#fff"}}>{job.customer_name}</span>
-                    </div>
-                  )}
-                  <div style={{position:"absolute",top:6,right:6,display:"flex",gap:3}} onClick={e=>e.stopPropagation()}>
-                    {srcBk&&<span style={{padding:"2px 6px",background:"rgba(96,165,250,.9)",color:"#fff",borderRadius:4,fontSize:9,fontWeight:700,letterSpacing:".04em",backdropFilter:"blur(4px)"}}>🌐 Online</span>}
-                    {canFlag&&(
-                      <button title="Flag as Problem" style={{padding:"2px 5px",border:"1px solid rgba(248,113,113,.35)",background:"rgba(0,0,0,.55)",color:"#f87171",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
-                        onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>
                     )}
-                    {canUnflag&&(
-                      <button title="Return to previous stage" style={{padding:"2px 5px",border:"1px solid rgba(52,211,153,.35)",background:"rgba(0,0,0,.55)",color:"#34d399",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
-                        onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>
+                    {job.customer_name&&(
+                      <div style={{position:"absolute",bottom:6,right:7,background:"rgba(0,0,0,.6)",backdropFilter:"blur(6px)",borderRadius:5,padding:"2px 8px",maxWidth:"55%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",border:"1px solid rgba(255,255,255,.1)"}}>
+                        <span style={{fontWeight:700,fontSize:11,color:"#fff"}}>{highlight(job.customer_name)}</span>
+                      </div>
                     )}
+                    <div style={{position:"absolute",top:6,right:6,display:"flex",gap:3}} onClick={e=>e.stopPropagation()}>
+                      {srcBk&&<span style={{padding:"2px 6px",background:"rgba(96,165,250,.9)",color:"#fff",borderRadius:4,fontSize:9,fontWeight:700,letterSpacing:".04em",backdropFilter:"blur(4px)"}}>🌐</span>}
+                      {canFlag&&(
+                        <button title="Flag as Problem" style={{padding:"2px 5px",border:"1px solid rgba(248,113,113,.35)",background:"rgba(0,0,0,.55)",color:"#f87171",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
+                          onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>
+                      )}
+                      {canUnflag&&(
+                        <button title="Return to previous stage" style={{padding:"2px 5px",border:"1px solid rgba(52,211,153,.35)",background:"rgba(0,0,0,.55)",color:"#34d399",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
+                          onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>
+                      )}
+                    </div>
+                    {/* ── time-in-column + stuck badge ── */}
+                    <div style={{position:"absolute",top:6,left:7,display:"flex",gap:3}}>
+                      {elapsed&&<span style={{padding:"1px 5px",background:"rgba(0,0,0,.55)",backdropFilter:"blur(4px)",borderRadius:4,fontSize:9,fontWeight:700,color:stuck?"#f87171":"#fff"}}>
+                        {stuck?"⏰":""}{elapsed}
+                      </span>}
+                    </div>
                   </div>
-                </div>
+                )}
+
                 <div style={{padding:"8px 10px"}}>
+                  {/* vehicle + time badges when photos hidden */}
+                  {!showKanbanPhotos&&(
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                      {job.vehicle_reg&&<code style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12,color:col.color}}>{highlight(job.vehicle_reg)}</code>}
+                      <div style={{display:"flex",gap:3,marginLeft:"auto"}}>
+                        {elapsed&&<span style={{padding:"1px 5px",background:stuck?"rgba(248,113,113,.2)":"var(--surface3)",borderRadius:4,fontSize:9,fontWeight:700,color:stuck?"#f87171":"var(--text3)"}}>{stuck?"⏰":""}{elapsed}</span>}
+                        {canFlag&&<button title="Flag as Problem" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#f87171",cursor:"pointer",fontSize:10,lineHeight:1}} onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>}
+                        {canUnflag&&<button title="Unflag" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#34d399",cursor:"pointer",fontSize:10,lineHeight:1}} onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* vehicle make/model */}
                   {(job.vehicle_make||job.vehicle_model||job.vehicle_year)&&(
-                    <div style={{textAlign:"center",marginBottom:6}}>
+                    <div style={{textAlign:"center",marginBottom:5}}>
                       <span style={{display:"inline-block",fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.2)",borderRadius:99,padding:"2px 10px",letterSpacing:".03em",textTransform:"uppercase",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                        {[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}
+                        {highlight([job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" "))}
                       </span>
                     </div>
                   )}
-                  {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#ef4444",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {job.complaint}</div>}
-                  {job.notes&&<div style={{fontSize:10,color:"#b45309",fontWeight:700,fontStyle:"italic",marginBottom:4,padding:"3px 7px",background:"rgba(251,191,36,.18)",border:"1px solid rgba(251,191,36,.35)",borderRadius:5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📝 {job.notes}</div>}
+
+                  {/* complaint */}
+                  {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#ef4444",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {highlight(job.complaint)}</div>}
+
+                  {/* due date badge */}
+                  {job.due_date&&!isDueEditing&&(
+                    <div style={{fontSize:10,fontWeight:700,marginBottom:4,padding:"2px 7px",background:isOverdue?"rgba(248,113,113,.18)":"rgba(96,165,250,.1)",border:`1px solid ${isOverdue?"rgba(248,113,113,.4)":"rgba(96,165,250,.25)"}`,borderRadius:5,color:isOverdue?"#f87171":"var(--blue)",display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                      onClick={e=>e.stopPropagation()}>
+                      <span>{isOverdue?"🔴":"📅"} {job.due_date}</span>
+                    </div>
+                  )}
+
+                  {/* inline due date editor */}
+                  {isDueEditing&&(
+                    <div style={{marginBottom:4}} onClick={e=>e.stopPropagation()}>
+                      <input type="date" defaultValue={job.due_date||""} autoFocus
+                        style={{width:"100%",padding:"4px 6px",border:"1px solid var(--border)",borderRadius:5,background:"var(--surface)",color:"var(--text1)",fontSize:11}}
+                        onBlur={async e=>{
+                          const v=e.target.value;
+                          setKanbanDueEdit(null);
+                          if(v!==job.due_date) await patchJobField(job,"due_date",v||null);
+                        }}
+                        onChange={()=>{}}/>
+                    </div>
+                  )}
+
+                  {/* notes */}
+                  {job.notes&&!isNoteEditing&&<div style={{fontSize:10,color:"#b45309",fontWeight:700,fontStyle:"italic",marginBottom:4,padding:"3px 7px",background:"rgba(251,191,36,.18)",border:"1px solid rgba(251,191,36,.35)",borderRadius:5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📝 {highlight(job.notes)}</div>}
+
+                  {/* inline note editor */}
+                  {isNoteEditing&&(
+                    <div style={{marginBottom:4}} onClick={e=>e.stopPropagation()}>
+                      <input autoFocus defaultValue={kanbanNoteEdit.draft}
+                        style={{width:"100%",padding:"4px 6px",border:"1px solid var(--border)",borderRadius:5,background:"var(--surface)",color:"var(--text1)",fontSize:11}}
+                        placeholder="Add a note…"
+                        onBlur={async e=>{
+                          const v=e.target.value.trim();
+                          setKanbanNoteEdit(null);
+                          if(v!==job.notes) await patchJobField(job,"notes",v||null);
+                        }}
+                        onKeyDown={async e=>{
+                          if(e.key==="Enter"){const v=e.target.value.trim();setKanbanNoteEdit(null);if(v!==job.notes)await patchJobField(job,"notes",v||null);}
+                          if(e.key==="Escape") setKanbanNoteEdit(null);
+                        }}/>
+                    </div>
+                  )}
+
+                  {/* mechanic badge + inline assign editor */}
+                  {isAssignEditing?(
+                    <div style={{marginBottom:4}} onClick={e=>e.stopPropagation()}>
+                      <input autoFocus defaultValue={kanbanAssignEdit.draft}
+                        style={{width:"100%",padding:"4px 6px",border:"1px solid var(--border)",borderRadius:5,background:"var(--surface)",color:"var(--text1)",fontSize:11}}
+                        placeholder="Mechanic name…"
+                        onBlur={async e=>{
+                          const v=e.target.value.trim();
+                          setKanbanAssignEdit(null);
+                          if(v!==job.assigned_to) await patchJobField(job,"assigned_to",v||null);
+                        }}
+                        onKeyDown={async e=>{
+                          if(e.key==="Enter"){const v=e.target.value.trim();setKanbanAssignEdit(null);if(v!==job.assigned_to)await patchJobField(job,"assigned_to",v||null);}
+                          if(e.key==="Escape") setKanbanAssignEdit(null);
+                        }}/>
+                    </div>
+                  ):mechanic&&(
+                    <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4,fontSize:10,color:"var(--text2)"}}
+                      onClick={e=>e.stopPropagation()}>
+                      <div style={{width:18,height:18,borderRadius:"50%",background:mechColor,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,flexShrink:0}}>{mechInitials||"?"}</div>
+                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{mechanic}</span>
+                    </div>
+                  )}
+
+                  {/* booking quick-actions */}
                   {srcBk&&job.customer_phone&&(
                     <div style={{display:"flex",gap:4,marginBottom:5}} onClick={e=>e.stopPropagation()}>
                       <a href={`tel:${job.customer_phone}`} className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"4px 0",textDecoration:"none",textAlign:"center",color:"var(--blue)"}}>📞 Call</a>
                       <a href={`https://wa.me/${job.customer_phone.replace(/\D/g,"")}?text=${encodeURIComponent(`Hi ${(job.customer_name||"").split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}`}
                         target="_blank" rel="noreferrer" className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"4px 0",textDecoration:"none",textAlign:"center",color:"#25D366"}}>
-                        📱 WhatsApp
+                        📱 WA
                       </a>
                     </div>
                   )}
+
+                  {/* invoice total */}
                   {inv&&wsRole!=="mechanic"&&(
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,marginBottom:5,padding:"4px 8px",background:"var(--surface2)",borderRadius:6,border:"1px solid var(--border)"}}>
                       <span style={{color:"var(--text3)",fontWeight:500}}>Invoice</span>
                       <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
                     </div>
                   )}
+
+                  {/* quick-action icon row */}
+                  <div style={{display:"flex",gap:3,marginBottom:4,marginTop:2}} onClick={e=>e.stopPropagation()}>
+                    <button title="Quick note" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:job.notes?"rgba(251,191,36,.15)":"transparent",cursor:"pointer",fontSize:11}}
+                      onClick={()=>setKanbanNoteEdit({jobId:job.id,draft:job.notes||""})}>📝</button>
+                    <button title="Set due date" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:job.due_date?"rgba(96,165,250,.15)":"transparent",cursor:"pointer",fontSize:11}}
+                      onClick={()=>setKanbanDueEdit({jobId:job.id})}>📅</button>
+                    <button title="Assign mechanic" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:job.assigned_to?"rgba(52,211,153,.15)":"transparent",cursor:"pointer",fontSize:11}}
+                      onClick={()=>setKanbanAssignEdit({jobId:job.id,draft:job.assigned_to||""})}>👤</button>
+                    <button title="Print job sheet" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11}}
+                      onClick={()=>printJobSheet(job)}>🖨️</button>
+                  </div>
+
+                  {/* status action buttons */}
                   {!wsLocked&&(col.nextStatus||canInvoice||col.id==="wip"||col.id==="invoiced")&&(
-                    <div style={{marginTop:4}} onClick={e=>e.stopPropagation()}>
+                    <div style={{marginTop:2}} onClick={e=>e.stopPropagation()}>
                       {col.id==="wip"&&(
                         <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:10,padding:"5px 0",marginBottom:3}}
                           onClick={()=>{ setJobDetailTab("quote"); setActiveJob(job); setView("job"); }}>📝 Quote</button>
@@ -719,36 +942,58 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             );
           };
 
+          const toggleCollapse = (colId) => {
+            setCollapsedCols(prev=>{
+              const next=new Set(prev);
+              next.has(colId)?next.delete(colId):next.add(colId);
+              try{localStorage.setItem("ws_kanban_collapsed",JSON.stringify([...next]));}catch{}
+              return next;
+            });
+          };
+
           return (
-            <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:24,alignItems:"flex-start",marginLeft:-4,marginRight:-4,paddingLeft:4,paddingRight:4}}>
-              {COLS.map(col=>(
-                <div key={col.id} style={{minWidth:270,maxWidth:270,flexShrink:0,display:"flex",flexDirection:"column"}}>
-                  <div style={{borderRadius:"12px 12px 0 0",padding:"10px 14px",background:`linear-gradient(135deg,${col.color}1a 0%,${col.color}0a 100%)`,border:`1px solid ${col.color}35`,borderBottom:"none",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
-                      <div style={{width:8,height:8,borderRadius:"50%",background:col.color,boxShadow:`0 0 8px ${col.color}`,flexShrink:0}}/>
-                      <div style={{minWidth:0}}>
-                        <div style={{fontWeight:700,fontSize:12,letterSpacing:".01em"}}>{col.label}</div>
-                        {col.hint&&<div style={{fontSize:10,color:col.color,opacity:.75,marginTop:1,whiteSpace:"nowrap"}}>{col.hint}</div>}
+            <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:24,alignItems:"flex-start",marginLeft:-4,marginRight:-4,paddingLeft:4,paddingRight:4}}>
+              {COLS.map(col=>{
+                const isCollapsed=collapsedCols.has(col.id);
+                if(isCollapsed) return (
+                  <div key={col.id} style={{minWidth:34,maxWidth:34,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",paddingTop:6,gap:8}}
+                    title={`Expand ${col.label}`}
+                    onClick={()=>toggleCollapse(col.id)}>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:col.color,boxShadow:`0 0 8px ${col.color}`}}/>
+                    <span style={{background:`${col.color}22`,color:col.color,borderRadius:99,padding:"3px 7px",fontSize:11,fontWeight:700}}>{col.items.length}</span>
+                    <div style={{writingMode:"vertical-rl",transform:"rotate(180deg)",fontSize:11,fontWeight:700,color:"var(--text2)",letterSpacing:".05em",marginTop:4}}>{col.label}</div>
+                  </div>
+                );
+                return (
+                  <div key={col.id} style={{minWidth:kanbanColW,maxWidth:kanbanColW,flexShrink:0,display:"flex",flexDirection:"column"}}>
+                    <div style={{borderRadius:"12px 12px 0 0",padding:"10px 14px",background:`linear-gradient(135deg,${col.color}1a 0%,${col.color}0a 100%)`,border:`1px solid ${col.color}35`,borderBottom:"none",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",userSelect:"none"}}
+                      onClick={()=>toggleCollapse(col.id)} title="Click to collapse">
+                      <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:col.color,boxShadow:`0 0 8px ${col.color}`,flexShrink:0}}/>
+                        <div style={{minWidth:0}}>
+                          <div style={{fontWeight:700,fontSize:12,letterSpacing:".01em"}}>{col.label}</div>
+                          {col.hint&&<div style={{fontSize:10,color:col.color,opacity:.75,marginTop:1,whiteSpace:"nowrap"}}>{col.hint}</div>}
+                        </div>
                       </div>
+                      <span style={{background:`${col.color}22`,color:col.color,borderRadius:99,padding:"2px 9px",fontSize:11,fontWeight:700,minWidth:22,textAlign:"center",flexShrink:0}}>{col.items.length}</span>
                     </div>
-                    <span style={{background:`${col.color}22`,color:col.color,borderRadius:99,padding:"2px 9px",fontSize:11,fontWeight:700,minWidth:22,textAlign:"center",flexShrink:0}}>{col.items.length}</span>
+                    <div
+                      onDragOver={e=>handleDragOver(e,col.id)}
+                      onDragLeave={()=>handleDragLeave(col.id)}
+                      onDrop={e=>handleDrop(e,col)}
+                      style={{background: dragOverColId===col.id ? `${col.color}20` : `${col.color}07`, border:`1px solid ${dragOverColId===col.id ? col.color : `${col.color}25`}`,borderTop:"none",borderRadius:"0 0 12px 12px",padding:"8px 7px",minHeight:160,maxHeight:"calc(100vh - 240px)",overflowY:"auto",transition:"background .15s,border-color .15s"}}>
+                      {col.items.length===0&&(
+                        <div style={{textAlign:"center",padding:"32px 10px",border:`1.5px dashed ${dragOverColId===col.id ? col.color : "var(--border2)"}`,borderRadius:10,margin:"2px 0",transition:"border-color .15s"}}>
+                          <div style={{fontSize:24,marginBottom:6,opacity:.25}}>{col.id==="booking"?"🗓️":col.id==="paid"?"💳":col.id==="problem"?"⚠️":"📋"}</div>
+                          <div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic"}}>No items</div>
+                        </div>
+                      )}
+                      {col.type==="booking"&&col.items.map(b=><BkCard key={b.id} b={b}/>)}
+                      {col.type==="job"&&col.items.map(j=><JobCard key={j.id} job={j} col={col}/>)}
+                    </div>
                   </div>
-                  <div
-                    onDragOver={e=>handleDragOver(e,col.id)}
-                    onDragLeave={()=>handleDragLeave(col.id)}
-                    onDrop={e=>handleDrop(e,col)}
-                    style={{background: dragOverColId===col.id ? `${col.color}20` : `${col.color}07`, border:`1px solid ${dragOverColId===col.id ? col.color : `${col.color}25`}`,borderTop:"none",borderRadius:"0 0 12px 12px",padding:"8px 7px",minHeight:160,maxHeight:"calc(100vh - 240px)",overflowY:"auto",transition:"background .15s,border-color .15s"}}>
-                    {col.items.length===0&&(
-                      <div style={{textAlign:"center",padding:"32px 10px",border:`1.5px dashed ${dragOverColId===col.id ? col.color : "var(--border2)"}`,borderRadius:10,margin:"2px 0",transition:"border-color .15s"}}>
-                        <div style={{fontSize:24,marginBottom:6,opacity:.25}}>{col.id==="booking"?"🗓️":col.id==="paid"?"💳":col.id==="problem"?"⚠️":"📋"}</div>
-                        <div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic"}}>No items</div>
-                      </div>
-                    )}
-                    {col.type==="booking"&&col.items.map(b=><BkCard key={b.id} b={b}/>)}
-                    {col.type==="job"&&col.items.map(j=><JobCard key={j.id} job={j} col={col}/>)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           );
         })()}
@@ -1331,7 +1576,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
           </div>
         );
-        return <WsSpareShopTab key={`${spareShopFilter.make}|${spareShopFilter.model}`} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} ads={ads} userCtx={userCtx} wsLocked={wsLocked}/>;
+        return <WsSpareShopTab key={`${spareShopFilter.make}|${spareShopFilter.model}`} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
@@ -4648,226 +4893,184 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           </div>
           {/* Items body */}
           <div style={{background:"var(--surface)"}}>
-          {items.length===0
-            ?<div style={{textAlign:"center",padding:32,color:"var(--text3)",fontSize:14}}>{t.wsqtNoItems}</div>
-            : isMobile ? (
-              /* ── Mobile card list ── */
-              <div style={{display:"flex",flexDirection:"column"}}>
-                {items.map((item,idx)=>{
-                  const supCosts=getSupCosts(item.description);
-                  const isEditingPrice=editPriceId===item.id;
-                  const isEditingQty=editQtyId===item.id;
-                  const isEditing=isEditingPrice; // keep alias for price block
-                  const displayQty=isEditingQty?(+editQtyVal||1):(+item.qty||1);
-                  const rowTotal=isEditingPrice?(+editPriceVal||0)*displayQty:isEditingQty?(+item.unit_price||0)*displayQty:+item.total||0;
-                  const accentColor=item.type==="part"?"var(--blue)":"var(--green)";
-                  const accentBg=item.type==="part"?"rgba(96,165,250,.1)":"rgba(52,211,153,.1)";
-                  const accentBorder=item.type==="part"?"rgba(96,165,250,.3)":"rgba(52,211,153,.3)";
-                  return (
-                    <div key={item.id} style={{
-                      padding:"14px 16px",
-                      borderLeft:`4px solid ${accentColor}`,
-                      background:idx%2===0?"var(--surface2)":"var(--surface)",
-                      borderBottom:`1px solid var(--border2)`,
-                    }}>
-                      {/* Top row: checkbox + badge + name + delete */}
-                      <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:8}}>
-                        <input type="checkbox" checked={!quoteExcluded.has(item.id)}
-                          onChange={()=>setQuoteExcluded(prev=>{const n=new Set(prev);n.has(item.id)?n.delete(item.id):n.add(item.id);return n;})}
-                          style={{marginTop:4,flexShrink:0,accentColor:accentColor,width:18,height:18,cursor:"pointer"}}/>
-                        <span style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:99,background:item.type==="part"?"rgba(96,165,250,.15)":"rgba(52,211,153,.15)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>
-                          {item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}
-                        </span>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)"}}>{item.description}</div>
-                          {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2,display:"block"}}>{item.part_sku}</code>}
-                        </div>
-                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0,fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
-                      </div>
-                      {/* Supplier cost badges */}
-                      {supCosts.length>0&&(
-                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
-                          {supCosts.map((sc,i)=>{
-                            const sellP = +(sc.price*(1+defaultMarkup/100)).toFixed(2);
-                            const isShop=!!sc.isShop;
-                            return (
-                            <span key={i}
-                              onClick={()=>isShop
-                                ?setWsShopPartView({...sc,currentItem:item})
-                                :setPricePopup({item, costs:getSupCosts(item.description), markup:String(defaultMarkup), selIdx:i})}
-                              title={defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price"}
-                              style={{fontSize:11,fontWeight:600,cursor:"pointer",borderRadius:4,padding:"2px 8px",
-                                color:isShop?"#34d399":"#f59e0b",
-                                background:isShop?"rgba(52,211,153,.1)":"rgba(251,191,36,.1)",
-                                border:`1px solid ${isShop?"rgba(52,211,153,.25)":"rgba(251,191,36,.25)"}`}}>
-                              {isShop?"🏪":"💰"} {sc.name}: {fmtAmt(sc.price)}
-                            </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {/* Qty × Price = Total row */}
-                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:item.type==="part"?"8px 8px 0 0":"8px",padding:"8px 10px"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:4}}>
-                          <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.qty}</span>
-                          {isEditingQty
-                            ? <input autoFocus type="number" min="1" step="1"
-                                value={editQtyVal}
-                                onChange={e=>setEditQtyVal(e.target.value)}
-                                onBlur={()=>commitQty(item)}
-                                onKeyDown={e=>{ if(e.key==="Enter") commitQty(item); if(e.key==="Escape") setEditQtyId(null); }}
-                                style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:`1px solid ${accentColor}`,background:"var(--surface2)",color:"var(--text1)"}}/>
-                            : <span onClick={()=>{ setEditQtyId(item.id); setEditQtyVal(String(item.qty||1)); setEditPriceId(null); }}
-                                style={{fontWeight:700,fontSize:15,cursor:"pointer",borderBottom:`1px dashed ${accentColor}`,color:"var(--text)"}}>
-                                {item.qty}
-                              </span>
-                          }
-                        </div>
-                        <span style={{color:accentColor,fontWeight:700,opacity:.6}}>×</span>
-                        <div style={{display:"flex",alignItems:"center",gap:4}}>
-                          <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.wsqtPrice}</span>
-                          {isEditingPrice
-                            ? <input autoFocus type="number" min="0" step="0.01"
-                                value={editPriceVal}
-                                onChange={e=>setEditPriceVal(e.target.value)}
-                                onBlur={()=>commitPrice(item)}
-                                onKeyDown={e=>{ if(e.key==="Enter") commitPrice(item); if(e.key==="Escape") setEditPriceId(null); }}
-                                style={{width:80,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:`1px solid ${accentColor}`,background:"var(--surface2)",color:"var(--text1)"}}/>
-                            : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); setEditQtyId(null); setEditMarkupId(null); }}
-                                style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:"pointer",borderBottom:`1px dashed ${accentColor}`,color:"var(--text)"}}>
-                                {fmtAmt(item.unit_price)}
-                              </span>
-                          }
-                        </div>
-                        <span style={{color:accentColor,fontWeight:700,opacity:.6}}>=</span>
-                        <span style={{fontWeight:800,fontSize:16,fontFamily:"Rajdhani,sans-serif",color:accentColor,marginLeft:"auto"}}>
-                          {fmtAmt(rowTotal)}
-                        </span>
-                      </div>
-                      {/* Cost / Markup row (parts only) */}
-                      {item.type==="part"&&(
-                        <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(251,191,36,.07)",borderRadius:"0 0 8px 8px",padding:"5px 10px",borderTop:"1px solid rgba(251,191,36,.15)"}}>
-                          {+(item.cost_price||0)>0&&<>
-                            <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsqtCost}</span>
-                            <span style={{fontFamily:"Rajdhani,sans-serif",fontSize:12,color:"var(--text2)",flexShrink:0}}>{fmtAmt(item.cost_price)}</span>
-                            <span style={{fontSize:10,color:"var(--text3)"}}>·</span>
-                          </>}
-                          <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsqtMarkup}</span>
-                          {editMarkupId===item.id
-                            ? <input autoFocus type="number" min="0" step="0.1"
-                                value={editMarkupVal}
-                                onChange={e=>setEditMarkupVal(e.target.value)}
-                                onBlur={()=>commitMarkup(item)}
-                                onKeyDown={e=>{ if(e.key==="Enter") commitMarkup(item); if(e.key==="Escape") setEditMarkupId(null); }}
-                                style={{width:56,fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 5px",borderRadius:5,border:"1px solid #f59e0b",background:"var(--surface2)",color:"var(--text1)"}}/>
-                            : <span onClick={()=>{ setEditMarkupId(item.id); setEditMarkupVal(String(item.markup_pct||0)); setEditPriceId(null); setEditQtyId(null); }}
-                                style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",color:"#f59e0b",borderBottom:"1px dashed rgba(251,191,36,.4)"}}>
-                                {item.markup_pct||0}%
-                              </span>
-                          }
-                        </div>
-                      )}
+          {(()=>{
+            if(items.length===0) return <div style={{textAlign:"center",padding:32,color:"var(--text3)",fontSize:14}}>{t.wsqtNoItems}</div>;
+            const partItems=items.filter(i=>i.type!=="labour");
+            const labourItems=items.filter(i=>i.type==="labour");
+            const partTotal=partItems.reduce((s,i)=>s+(+i.total||0),0);
+            const labourTotal=labourItems.reduce((s,i)=>s+(+i.total||0),0);
+            const mobileCard=(item,idx)=>{
+              const supCosts=getSupCosts(item.description);
+              const isEditingPrice=editPriceId===item.id;
+              const isEditingQty=editQtyId===item.id;
+              const isEditing=isEditingPrice;
+              const displayQty=isEditingQty?(+editQtyVal||1):(+item.qty||1);
+              const rowTotal=isEditingPrice?(+editPriceVal||0)*displayQty:isEditingQty?(+item.unit_price||0)*displayQty:+item.total||0;
+              const accentColor=item.type==="part"?"var(--blue)":"var(--green)";
+              const accentBg=item.type==="part"?"rgba(96,165,250,.1)":"rgba(52,211,153,.1)";
+              const accentBorder=item.type==="part"?"rgba(96,165,250,.3)":"rgba(52,211,153,.3)";
+              return (
+                <div key={item.id} style={{padding:"14px 16px",borderLeft:`4px solid ${accentColor}`,background:idx%2===0?"var(--surface2)":"var(--surface)",borderBottom:`1px solid var(--border2)`}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:8}}>
+                    <input type="checkbox" checked={!quoteExcluded.has(item.id)}
+                      onChange={()=>setQuoteExcluded(prev=>{const n=new Set(prev);n.has(item.id)?n.delete(item.id):n.add(item.id);return n;})}
+                      style={{marginTop:4,flexShrink:0,accentColor:accentColor,width:18,height:18,cursor:"pointer"}}/>
+                    <span style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:99,background:item.type==="part"?"rgba(96,165,250,.15)":"rgba(52,211,153,.15)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>
+                      {item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}
+                    </span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)"}}>{item.description}</div>
+                      {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2,display:"block"}}>{item.part_sku}</code>}
                     </div>
-                  );
-                })}
+                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0,fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
+                  </div>
+                  {supCosts.length>0&&(
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                      {supCosts.map((sc,i)=>{
+                        const sellP=+(sc.price*(1+defaultMarkup/100)).toFixed(2);
+                        const isShop=!!sc.isShop;
+                        return (
+                        <span key={i}
+                          onClick={()=>isShop?setWsShopPartView({...sc,currentItem:item}):setPricePopup({item,costs:getSupCosts(item.description),markup:String(defaultMarkup),selIdx:i})}
+                          title={defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price"}
+                          style={{fontSize:11,fontWeight:600,cursor:"pointer",borderRadius:4,padding:"2px 8px",color:isShop?"#34d399":"#f59e0b",background:isShop?"rgba(52,211,153,.1)":"rgba(251,191,36,.1)",border:`1px solid ${isShop?"rgba(52,211,153,.25)":"rgba(251,191,36,.25)"}`}}>
+                          {isShop?"🏪":"💰"} {sc.name}: {fmtAmt(sc.price)}
+                        </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:item.type==="part"?"8px 8px 0 0":"8px",padding:"8px 10px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.qty}</span>
+                      {isEditingQty
+                        ?<input autoFocus type="number" min="1" step="1" value={editQtyVal} onChange={e=>setEditQtyVal(e.target.value)} onBlur={()=>commitQty(item)} onKeyDown={e=>{if(e.key==="Enter")commitQty(item);if(e.key==="Escape")setEditQtyId(null);}} style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:`1px solid ${accentColor}`,background:"var(--surface2)",color:"var(--text1)"}}/>
+                        :<span onClick={()=>{setEditQtyId(item.id);setEditQtyVal(String(item.qty||1));setEditPriceId(null);}} style={{fontWeight:700,fontSize:15,cursor:"pointer",borderBottom:`1px dashed ${accentColor}`,color:"var(--text)"}}>{item.qty}</span>
+                      }
+                    </div>
+                    <span style={{color:accentColor,fontWeight:700,opacity:.6}}>×</span>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.wsqtPrice}</span>
+                      {isEditingPrice
+                        ?<input autoFocus type="number" min="0" step="0.01" value={editPriceVal} onChange={e=>setEditPriceVal(e.target.value)} onBlur={()=>commitPrice(item)} onKeyDown={e=>{if(e.key==="Enter")commitPrice(item);if(e.key==="Escape")setEditPriceId(null);}} style={{width:80,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:`1px solid ${accentColor}`,background:"var(--surface2)",color:"var(--text1)"}}/>
+                        :<span onClick={()=>{setEditPriceId(item.id);setEditPriceVal(String(item.unit_price||0));setEditQtyId(null);setEditMarkupId(null);}} style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:"pointer",borderBottom:`1px dashed ${accentColor}`,color:"var(--text)"}}>{fmtAmt(item.unit_price)}</span>
+                      }
+                    </div>
+                    <span style={{color:accentColor,fontWeight:700,opacity:.6}}>=</span>
+                    <span style={{fontWeight:800,fontSize:16,fontFamily:"Rajdhani,sans-serif",color:accentColor,marginLeft:"auto"}}>{fmtAmt(rowTotal)}</span>
+                  </div>
+                  {item.type==="part"&&(
+                    <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(251,191,36,.07)",borderRadius:"0 0 8px 8px",padding:"5px 10px",borderTop:"1px solid rgba(251,191,36,.15)"}}>
+                      {+(item.cost_price||0)>0&&<>
+                        <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsqtCost}</span>
+                        <span style={{fontFamily:"Rajdhani,sans-serif",fontSize:12,color:"var(--text2)",flexShrink:0}}>{fmtAmt(item.cost_price)}</span>
+                        <span style={{fontSize:10,color:"var(--text3)"}}>·</span>
+                      </>}
+                      <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsqtMarkup}</span>
+                      {editMarkupId===item.id
+                        ?<input autoFocus type="number" min="0" step="0.1" value={editMarkupVal} onChange={e=>setEditMarkupVal(e.target.value)} onBlur={()=>commitMarkup(item)} onKeyDown={e=>{if(e.key==="Enter")commitMarkup(item);if(e.key==="Escape")setEditMarkupId(null);}} style={{width:56,fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 5px",borderRadius:5,border:"1px solid #f59e0b",background:"var(--surface2)",color:"var(--text1)"}}/>
+                        :<span onClick={()=>{setEditMarkupId(item.id);setEditMarkupVal(String(item.markup_pct||0));setEditPriceId(null);setEditQtyId(null);}} style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",color:"#f59e0b",borderBottom:"1px dashed rgba(251,191,36,.4)"}}>{item.markup_pct||0}%</span>
+                      }
+                    </div>
+                  )}
+                </div>
+              );
+            };
+            const desktopRow=(item)=>{
+              const supCosts=getSupCosts(item.description);
+              const isEditing=editPriceId===item.id;
+              return (
+              <tr key={item.id} style={{opacity:quoteExcluded.has(item.id)?0.5:1}}>
+                <td style={{width:32,textAlign:"center"}}>
+                  <input type="checkbox" checked={!quoteExcluded.has(item.id)}
+                    onChange={()=>setQuoteExcluded(prev=>{const n=new Set(prev);n.has(item.id)?n.delete(item.id):n.add(item.id);return n;})}
+                    style={{cursor:"pointer",accentColor:item.type==="part"?"var(--blue)":"var(--green)"}}/>
+                </td>
+                <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}</span></td>
+                <td style={{fontWeight:500}}>
+                  {item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
+                  {supCosts.length>0&&(
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
+                      {supCosts.map((sc,i)=>{
+                        const sellP=+(sc.price*(1+defaultMarkup/100)).toFixed(2);
+                        const isShop=!!sc.isShop;
+                        return (
+                        <span key={i} title={isShop?(sc.part_id?`Part# ${sc.part_id} — click for details`:"Click for spare shop details"):(defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price")}
+                          onClick={()=>isShop?setWsShopPartView({...sc,currentItem:item}):setPricePopup({item,costs:getSupCosts(item.description),markup:String(defaultMarkup),selIdx:i})}
+                          style={{fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,padding:"1px 6px",background:isShop?"rgba(22,163,74,.15)":"rgba(251,191,36,.1)",color:isShop?"#000":"#f59e0b",border:isShop?"1px solid rgba(22,163,74,.4)":"1px solid rgba(251,191,36,.25)"}}>
+                          {isShop?"🏪":"💰"} {sc.name}: {fmtAmt(sc.price)}{isShop&&sc.sku?<> · <code style={{fontFamily:"DM Mono,monospace",fontSize:9}}>{sc.sku}</code></>:""}
+                        </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </td>
+                <td style={{textAlign:"right"}}>
+                  {editQtyId===item.id
+                    ?<input autoFocus type="number" min="1" step="1" value={editQtyVal} onChange={e=>setEditQtyVal(e.target.value)} onBlur={()=>commitQty(item)} onKeyDown={e=>{if(e.key==="Enter")commitQty(item);if(e.key==="Escape")setEditQtyId(null);}} style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
+                    :<span onClick={()=>{setEditQtyId(item.id);setEditQtyVal(String(item.qty||1));setEditPriceId(null);}} title="Click to edit qty" style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>{item.qty}</span>
+                  }
+                </td>
+                <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",minWidth:110}}>
+                  {isEditing
+                    ?<input autoFocus type="number" min="0" step="0.01" value={editPriceVal} onChange={e=>setEditPriceVal(e.target.value)} onBlur={()=>commitPrice(item)} onKeyDown={e=>{if(e.key==="Enter")commitPrice(item);if(e.key==="Escape")setEditPriceId(null);}} style={{width:90,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
+                    :<span onClick={()=>{setEditPriceId(item.id);setEditPriceVal(String(item.unit_price||0));setEditMarkupId(null);}} title="Click to edit price" style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>{fmtAmt(item.unit_price)}</span>
+                  }
+                  {item.type==="part"&&(
+                    <div style={{fontSize:10,color:"var(--text3)",marginTop:2,textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end",gap:3}}>
+                      {+(item.cost_price||0)>0&&<span style={{color:"var(--text3)"}}>Cost {fmtAmt(item.cost_price)} ·</span>}
+                      {editMarkupId===item.id
+                        ?<input autoFocus type="number" min="0" step="0.1" value={editMarkupVal} onChange={e=>setEditMarkupVal(e.target.value)} onBlur={()=>commitMarkup(item)} onKeyDown={e=>{if(e.key==="Enter")commitMarkup(item);if(e.key==="Escape")setEditMarkupId(null);}} style={{width:50,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:11,padding:"1px 4px",borderRadius:4,border:"1px solid #f59e0b",background:"var(--surface2)",color:"#f59e0b"}}/>
+                        :<span onClick={()=>{setEditMarkupId(item.id);setEditMarkupVal(String(item.markup_pct||0));setEditPriceId(null);}} title="Click to edit markup %" style={{cursor:"pointer",color:"#f59e0b",fontWeight:600,borderBottom:"1px dashed rgba(251,191,36,.4)"}}>+{item.markup_pct||0}%</span>
+                      }
+                      <span>markup</span>
+                    </div>
+                  )}
+                </td>
+                <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(isEditing?(+editPriceVal||0)*(editQtyId===item.id?+editQtyVal||1:+item.qty||1):editQtyId===item.id?(+item.unit_price||0)*(+editQtyVal||1):item.total)}</td>
+                <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button></td>
+              </tr>
+              );
+            };
+            if(isMobile) return (
+              <div style={{display:"flex",flexDirection:"column"}}>
+                {partItems.length>0&&<div style={{padding:"6px 16px",background:"rgba(96,165,250,.07)",borderLeft:"3px solid var(--blue)",fontSize:11,fontWeight:700,color:"var(--blue)",letterSpacing:".04em"}}>🔩 {t.wsqtPart} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:4}}>{partItems.length} item{partItems.length!==1?"s":""}</span></div>}
+                {partItems.map((item,idx)=>mobileCard(item,idx))}
+                {partItems.length>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 16px 5px 19px",background:"rgba(96,165,250,.04)",borderLeft:"3px solid rgba(96,165,250,.4)",fontSize:12,fontWeight:700,color:"var(--blue)"}}><span>Parts subtotal</span><span style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(partTotal)}</span></div>}
+                {partItems.length>0&&labourItems.length>0&&<div style={{height:6,background:"var(--surface3)"}}/>}
+                {labourItems.length>0&&<div style={{padding:"6px 16px",background:"rgba(52,211,153,.07)",borderLeft:"3px solid var(--green)",fontSize:11,fontWeight:700,color:"var(--green)",letterSpacing:".04em"}}>👷 {t.wsqtLabour} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:4}}>{labourItems.length} item{labourItems.length!==1?"s":""}</span></div>}
+                {labourItems.map((item,idx)=>mobileCard(item,idx))}
+                {labourItems.length>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 16px 5px 19px",background:"rgba(52,211,153,.04)",borderLeft:"3px solid rgba(52,211,153,.4)",fontSize:12,fontWeight:700,color:"var(--green)"}}><span>Labour subtotal</span><span style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(labourTotal)}</span></div>}
+                <div style={{borderTop:"2px solid var(--border2)",padding:"10px 16px",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+                  {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:12,color:"var(--text3)"}}>{t.subtotal}: <strong style={{color:"var(--text)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(quoteSubtotal)}</strong></div>}
+                  {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:12,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(quoteTax)}</strong></div>}
+                  <div style={{fontSize:15,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",whiteSpace:"nowrap"}}>{t.total}: {fmtAmt(quoteTotal)}</div>
+                </div>
               </div>
-            ) : (
-              /* ── Desktop table ── */
+            );
+            return (
               <table className="tbl" style={{width:"100%"}}>
                 <thead><tr>{["",t.wsqtType,t.wsqPdfDescription,t.qty,t.unitPrice,t.total,""].map((h,i)=><th key={i}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {items.map(item=>{
-                    const supCosts = getSupCosts(item.description);
-                    const isEditing = editPriceId === item.id;
-                    return (
-                    <tr key={item.id} style={{opacity:quoteExcluded.has(item.id)?0.5:1}}>
-                      <td style={{width:32,textAlign:"center"}}>
-                        <input type="checkbox" checked={!quoteExcluded.has(item.id)}
-                          onChange={()=>setQuoteExcluded(prev=>{const n=new Set(prev);n.has(item.id)?n.delete(item.id):n.add(item.id);return n;})}
-                          style={{cursor:"pointer",accentColor:item.type==="part"?"var(--blue)":"var(--green)"}}/>
-                      </td>
-                      <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}</span></td>
-                      <td style={{fontWeight:500}}>
-                        {item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
-                        {supCosts.length>0&&(
-                          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
-                            {supCosts.map((sc,i)=>{
-                              const sellP=+(sc.price*(1+defaultMarkup/100)).toFixed(2);
-                              const isShop=!!sc.isShop;
-                              return (
-                              <span key={i} title={isShop?(sc.part_id?`Part# ${sc.part_id} — click for details`:"Click for spare shop details"):(defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price")}
-                                onClick={()=>isShop
-                                  ?setWsShopPartView({...sc,currentItem:item})
-                                  :setPricePopup({item, costs:getSupCosts(item.description), markup:String(defaultMarkup), selIdx:i})}
-                                style={{fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,padding:"1px 6px",
-                                  background:isShop?"rgba(22,163,74,.15)":"rgba(251,191,36,.1)",
-                                  color:isShop?"#000":"#f59e0b",
-                                  border:isShop?"1px solid rgba(22,163,74,.4)":"1px solid rgba(251,191,36,.25)"}}>
-                                {isShop?"🏪":"💰"} {sc.name}: {fmtAmt(sc.price)}{isShop&&sc.sku?<> · <code style={{fontFamily:"DM Mono,monospace",fontSize:9}}>{sc.sku}</code></>:""}
-                              </span>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{textAlign:"right"}}>
-                        {editQtyId===item.id
-                          ? <input autoFocus type="number" min="1" step="1"
-                              value={editQtyVal}
-                              onChange={e=>setEditQtyVal(e.target.value)}
-                              onBlur={()=>commitQty(item)}
-                              onKeyDown={e=>{ if(e.key==="Enter") commitQty(item); if(e.key==="Escape") setEditQtyId(null); }}
-                              style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
-                          : <span onClick={()=>{ setEditQtyId(item.id); setEditQtyVal(String(item.qty||1)); setEditPriceId(null); }}
-                              title="Click to edit qty"
-                              style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>
-                              {item.qty}
-                            </span>
-                        }
-                      </td>
-                      <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",minWidth:110}}>
-                        {isEditing
-                          ? <input autoFocus type="number" min="0" step="0.01"
-                              value={editPriceVal}
-                              onChange={e=>setEditPriceVal(e.target.value)}
-                              onBlur={()=>commitPrice(item)}
-                              onKeyDown={e=>{ if(e.key==="Enter") commitPrice(item); if(e.key==="Escape") setEditPriceId(null); }}
-                              style={{width:90,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
-                          : <span onClick={()=>{ setEditPriceId(item.id); setEditPriceVal(String(item.unit_price||0)); setEditMarkupId(null); }}
-                              title="Click to edit price"
-                              style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>
-                              {fmtAmt(item.unit_price)}
-                            </span>
-                        }
-                        {item.type==="part"&&(
-                          <div style={{fontSize:10,color:"var(--text3)",marginTop:2,textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end",gap:3}}>
-                            {+(item.cost_price||0)>0&&<span style={{color:"var(--text3)"}}>Cost {fmtAmt(item.cost_price)} ·</span>}
-                            {editMarkupId===item.id
-                              ? <input autoFocus type="number" min="0" step="0.1"
-                                  value={editMarkupVal}
-                                  onChange={e=>setEditMarkupVal(e.target.value)}
-                                  onBlur={()=>commitMarkup(item)}
-                                  onKeyDown={e=>{ if(e.key==="Enter") commitMarkup(item); if(e.key==="Escape") setEditMarkupId(null); }}
-                                  style={{width:50,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:11,padding:"1px 4px",borderRadius:4,border:"1px solid #f59e0b",background:"var(--surface2)",color:"#f59e0b"}}/>
-                              : <span onClick={()=>{ setEditMarkupId(item.id); setEditMarkupVal(String(item.markup_pct||0)); setEditPriceId(null); }}
-                                  title="Click to edit markup %"
-                                  style={{cursor:"pointer",color:"#f59e0b",fontWeight:600,borderBottom:"1px dashed rgba(251,191,36,.4)"}}>
-                                  +{item.markup_pct||0}%
-                                </span>
-                            }
-                            <span>markup</span>
-                          </div>
-                        )}
-                      </td>
-                      <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(isEditing?(+editPriceVal||0)*(editQtyId===item.id?+editQtyVal||1:+item.qty||1):editQtyId===item.id?(+item.unit_price||0)*(+editQtyVal||1):item.total)}</td>
-                      <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button></td>
-                    </tr>
-                    );
-                  })}
+                  {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.07)"}}><td colSpan={7} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--blue)",borderBottom:"1px solid rgba(96,165,250,.2)",letterSpacing:".04em"}}>🔩 {t.wsqtPart} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{partItems.length} item{partItems.length!==1?"s":""}</span></td></tr>}
+                  {partItems.map(desktopRow)}
+                  {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.04)"}}><td colSpan={5} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Parts subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)",padding:"5px 8px"}}>{fmtAmt(partTotal)}</td><td/></tr>}
+                  {partItems.length>0&&labourItems.length>0&&<tr><td colSpan={7} style={{height:6,background:"var(--surface3)",padding:0}}/></tr>}
+                  {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.07)"}}><td colSpan={7} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--green)",borderBottom:"1px solid rgba(52,211,153,.2)",letterSpacing:".04em"}}>👷 {t.wsqtLabour} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{labourItems.length} item{labourItems.length!==1?"s":""}</span></td></tr>}
+                  {labourItems.map(desktopRow)}
+                  {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.04)"}}><td colSpan={5} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Labour subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--green)",padding:"5px 8px"}}>{fmtAmt(labourTotal)}</td><td/></tr>}
+                  <tr style={{borderTop:"2px solid var(--border2)"}}>
+                    <td colSpan={5} style={{textAlign:"right",padding:"8px 12px",verticalAlign:"middle"}}>
+                      {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:12,color:"var(--text3)"}}>{t.subtotal}: <span style={{fontFamily:"Rajdhani,sans-serif",color:"var(--text)"}}>{fmtAmt(quoteSubtotal)}</span></div>}
+                      {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:12,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <span style={{fontFamily:"Rajdhani,sans-serif",color:"var(--text)"}}>{fmtAmt(quoteTax)}</span></div>}
+                    </td>
+                    <td style={{textAlign:"right",padding:"8px 8px",verticalAlign:"middle",whiteSpace:"nowrap"}}><div style={{fontSize:15,fontWeight:800,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{t.total}: {fmtAmt(quoteTotal)}</div></td>
+                    <td/>
+                  </tr>
                 </tbody>
               </table>
-            )
-          }
+            );
+          })()}
           {/* ── Supplier quote requests + PO status ── */}
           {(()=>{
             const jobReqs=wsSupplierRequests.filter(r=>r.job_id===job.id);
@@ -4914,15 +5117,16 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               </div>
             );
           })()}
-          <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)"}}>
+            <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>Actions</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))",gap:8}}>
               {wsProfile?.linked_branch_id&&job.vehicle_make&&onGoToSpareShop&&(()=>{
                 const mv=vehicles.find(v=>v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()&&(v.model?.toLowerCase()===job.vehicle_model?.toLowerCase()||v.code?.toLowerCase()===job.vehicle_model?.toLowerCase()));
                 const displayCode=mv?.code||job.vehicle_model||"";
                 const shopMake=job.vehicle_make;
                 const shopModel=mv?.model||job.vehicle_model||"";
                 return(
-                  <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.35)"}} onClick={()=>onGoToSpareShop(shopMake,shopModel)}>
+                  <button onClick={()=>onGoToSpareShop(shopMake,shopModel)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(96,165,250,.3)",background:"rgba(96,165,250,.08)",color:"var(--blue)",fontWeight:700,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
                     🏪 {job.vehicle_make}{displayCode?` · ${displayCode}`:""}
                   </button>
                 );
@@ -4931,27 +5135,30 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 const pending=localShopRequests.filter(r=>r.status==="pending");
                 const replied=localShopRequests.filter(r=>r.status==="replied");
                 const ordered=localShopRequests.filter(r=>r.status==="ordered");
+                const statusIcon=ordered.length>0?"🛒":replied.length>0?"✅":pending.length>0?"⏳":"";
+                const col=ordered.length>0?"#16a34a":replied.length>0?"#34d399":"var(--green)";
+                const bg=ordered.length>0?"rgba(22,163,74,.12)":replied.length>0?"rgba(52,211,153,.1)":"rgba(52,211,153,.07)";
+                const bc=ordered.length>0?"rgba(22,163,74,.35)":"rgba(52,211,153,.3)";
                 return (
-                  <button className="btn btn-ghost btn-sm"
-                    style={{color:ordered.length>0?"#16a34a":replied.length>0?"#34d399":"inherit",borderColor:ordered.length>0?"rgba(22,163,74,.4)":replied.length>0?"rgba(52,211,153,.35)":"rgba(52,211,153,.35)",position:"relative"}}
-                    onClick={()=>setWsShopReqModal(true)}>
-                    📦 Linked Shop Request{ordered.length>0?" 🛒":replied.length>0?" ✅":pending.length>0?" ⏳":""}
+                  <button onClick={()=>setWsShopReqModal(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:`1px solid ${bc}`,background:bg,color:col,fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                    📦 Shop Request {statusIcon}
                   </button>
                 );
               })()}
-              <button className="btn btn-ghost btn-sm" style={{color:"#25D366",borderColor:"rgba(37,211,102,.35)"}} onClick={()=>setSupplierModal(true)}>📤 {t.wsqtSendQuote}</button>
-              {wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&<button className="btn btn-ghost btn-sm" style={{color:"#38bdf8",borderColor:"rgba(56,189,248,.35)"}} onClick={()=>setReturnQuoteOpen(true)}>↩️ {t.wsqtReturnQuote}</button>}
+              <button onClick={()=>setSupplierModal(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(37,211,102,.3)",background:"rgba(37,211,102,.08)",color:"#25D366",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                📤 {t.wsqtSendQuote}
+              </button>
+              {wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&(
+                <button onClick={()=>setReturnQuoteOpen(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(56,189,248,.3)",background:"rgba(56,189,248,.08)",color:"#38bdf8",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                  ↩️ {t.wsqtReturnQuote}
+                </button>
+              )}
               {(wsSupplierQuotes.filter(q=>q.job_id===job.id).length>0||sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id)).length>0)&&(
-                <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(251,146,60,.35)"}} onClick={()=>setCreatePoOpen(true)}>📦 {t.wsqtCreateOrder}</button>
+                <button onClick={()=>setCreatePoOpen(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(251,146,60,.3)",background:"rgba(251,146,60,.1)",color:"var(--accent)",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                  📦 {t.wsqtCreateOrder}
+                </button>
               )}
             </div>
-            {items.length>0&&(
-              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-                <div style={{fontSize:13,color:"var(--text3)"}}>{t.subtotal}: <strong style={{color:"var(--text)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(quoteSubtotal)}</strong></div>
-                {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(quoteTax)}</strong></div>}
-                <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{t.total}: {fmtAmt(quoteTotal)}</div>
-              </div>
-            )}
           </div>
           </div>{/* end items-body */}
         </div>{/* end outer card */}
@@ -7055,7 +7262,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
   );
 }
 
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",ads=[],userCtx=null}) {
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",ads=[],userCtx=null,onClearJobFilter}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
@@ -7093,10 +7300,24 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const [page,setPage]=useState(0);
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [stockOnly,setStockOnly]=useState(false);
+  // jobMode: came from a job card with a pre-set vehicle — hide VehicleSearchBar
+  const jobMode=!!initialMake;
   const [lightbox,setLightbox]=useState(null);
   const [refreshKey,setRefreshKey]=useState(0);
   const [refreshing,setRefreshing]=useState(false);
+  const [loadElapsed,setLoadElapsed]=useState(0);
+  const loadStartRef=useRef(null);
+  const EST_LOAD_S=10;
   const Cs=curSym(settings?.currency||"ZAR R");
+
+  // Elapsed-time ticker while loading
+  useEffect(()=>{
+    if(!loading){setLoadElapsed(0);return;}
+    loadStartRef.current=Date.now();
+    setLoadElapsed(0);
+    const t=setInterval(()=>setLoadElapsed(Math.floor((Date.now()-loadStartRef.current)/1000)),500);
+    return()=>clearInterval(t);
+  },[loading]);
 
   useEffect(()=>{
     if(!linkedBranchId){setLoading(false);setShopParts([]);return;}
@@ -7151,6 +7372,24 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       setRefreshing(false);
     });
   },[linkedBranchId,mainBranchId,refreshKey]);
+
+  // When in job mode, compute vehicleFilterIds directly from fitments + part make/model
+  useEffect(()=>{
+    if(!jobMode||!initialMake) return;
+    const matchV=vehicles.filter(v=>
+      v.make===initialMake&&(!initialModel||v.code===initialModel||v.model===initialModel)
+    );
+    const vIds=new Set(matchV.map(v=>String(v.id)));
+    const fitIds=new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)));
+    // Also match SKU prefix (vehicle code-)
+    const vCodes=matchV.map(v=>(v.code||"").toUpperCase()).filter(Boolean);
+    const codeIds=new Set(shopParts.filter(p=>{
+      const s=(p.sku||"").toUpperCase();
+      return vCodes.some(c=>s.startsWith(c+"-"));
+    }).map(p=>String(p.id)));
+    const allIds=new Set([...fitIds,...codeIds]);
+    setVehicleFilterIds(allIds.size>0?allIds:null);
+  },[jobMode,initialMake,initialModel,vehicles,partFitments,shopParts]);
 
   const q=search.trim().toLowerCase();
   const filtered=(q
@@ -7349,15 +7588,78 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       </div>
 
       {/* Vehicle filter */}
-      <VehicleSearchBar vehicles={vehicles} partFitments={partFitments} parts={shopParts}
-        t={{}} initialMake={initialMake} initialModel={initialModel} onFilter={(ids)=>{setVehicleFilterIds(ids);setPage(0);}}/>
+      {jobMode&&initialMake?(()=>{
+        const matchV=vehicles.filter(v=>
+          v.make===initialMake&&(!initialModel||v.code===initialModel||v.model===initialModel)
+        );
+        const photos=matchV.find(v=>v.photo_front||v.photo_rear||v.photo_side)||matchV[0];
+        const photoList=[
+          {url:photos?.photo_front,label:"Front"},
+          {url:photos?.photo_rear, label:"Rear"},
+          {url:photos?.photo_side, label:"Side"},
+        ];
+        return (
+          <div style={{marginBottom:14}}>
+            {photos&&(photos.photo_front||photos.photo_rear||photos.photo_side)&&(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
+                {photoList.map(({url,label})=>(
+                  <div key={label} style={{position:"relative",borderRadius:8,overflow:"hidden",
+                    background:"var(--surface3)",height:195}}>
+                    {url
+                      ?<DriveImg url={url} alt={label}
+                          style={{width:"100%",height:"100%",objectFit:"contain",cursor:"zoom-in"}}
+                          onClick={()=>{
+                            const all=photoList.filter(p=>p.url);
+                            setLightbox({url:url,name:label,photos:all,idx:all.findIndex(p=>p.url===url&&p.label===label)||0});
+                          }}/>
+                      :<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",
+                          justifyContent:"center",color:"var(--text3)",fontSize:11}}>No photo</div>}
+                    <div style={{position:"absolute",bottom:0,left:0,right:0,
+                      background:"rgba(0,0,0,.5)",color:"#fff",fontSize:10,
+                      textAlign:"center",padding:"2px 0",fontWeight:600}}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",padding:"8px 12px",
+              background:"rgba(29,78,216,.07)",border:"1px solid rgba(29,78,216,.2)",borderRadius:10}}>
+              <span style={{fontSize:13,fontWeight:700,color:"var(--blue)"}}>
+                🚗 {initialMake}{initialModel?` · ${initialModel}`:""} — {filtered.length} part{filtered.length!==1?"s":""} found
+              </span>
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",marginLeft:"auto"}}
+                onClick={()=>onClearJobFilter?.()}>
+                🔍 Search Other Car
+              </button>
+            </div>
+          </div>
+        );
+      })():(
+        <VehicleSearchBar vehicles={vehicles} partFitments={partFitments} parts={shopParts}
+          t={{}} onFilter={(ids)=>{setVehicleFilterIds(ids);setPage(0);}}/>
+      )}
 
-      {vehicleFilterIds&&<div style={{fontSize:12,color:"var(--blue)",marginBottom:12,fontWeight:600}}>
+      {!jobMode&&vehicleFilterIds&&<div style={{fontSize:12,color:"var(--blue)",marginBottom:12,fontWeight:600}}>
         🚗 {filtered.length} parts match your vehicle
       </div>}
 
       {loading
-        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>Loading…</div>
+        ? (()=>{
+            const pct=Math.min(96,Math.round((loadElapsed/EST_LOAD_S)*100));
+            const remaining=Math.max(0,EST_LOAD_S-loadElapsed);
+            return(
+              <div style={{textAlign:"center",padding:"60px 24px"}}>
+                <div style={{fontSize:36,marginBottom:16}}>🏪</div>
+                <div style={{fontWeight:700,fontSize:15,marginBottom:6}}>Loading inventory…</div>
+                <div style={{fontSize:13,color:"var(--text3)",marginBottom:22,minHeight:20}}>
+                  {remaining>0?`About ${remaining}s remaining`:"Almost done…"}
+                </div>
+                <div style={{width:"100%",maxWidth:320,margin:"0 auto 10px",height:7,background:"var(--surface3)",borderRadius:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${pct}%`,background:"var(--accent)",borderRadius:4,transition:"width .5s ease"}}/>
+                </div>
+                <div style={{fontSize:11,color:"var(--text3)"}}>{loadElapsed}s elapsed</div>
+              </div>
+            );
+          })()
         : filtered.length===0
         ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>{search||vehicleFilterIds?"No parts match your search":"No parts found for this branch"}</div>
         : <>

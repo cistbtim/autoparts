@@ -1472,7 +1472,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 // ═══════════════════════════════════════════════════════════════
 // onFilter   — fitment-based filter (shop/POS): passes a Set of part IDs
 // onVehicleChange — direct make/model filter (inventory): passes {make, model}
-export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onAddPart, onCarChange, t, initialMake="", initialModel=""}) {
+export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onAddPart, t, initialMake="", initialModel=""}) {
   const [selMake,  setSelMake]  = useState(initialMake);
   const [selModel, setSelModel] = useState(initialModel);
   const [makeInput,  setMakeInput]  = useState(initialMake);
@@ -1487,17 +1487,6 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[vehicles.length > 0]);
 
-  // Re-run filter when parts array updates (after a DB reload triggered by car change)
-  const selMakeRef = useRef(selMake);
-  const selModelRef = useRef(selModel);
-  const activeRef = useRef(active);
-  selMakeRef.current = selMake;
-  selModelRef.current = selModel;
-  activeRef.current = active;
-  useEffect(()=>{
-    if(activeRef.current && selMakeRef.current) applyFilter(selMakeRef.current, selModelRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[parts]);
 
   // Always derive makes/models from the vehicles table (clean data with codes)
   const makes = [...new Set(vehicles.map(v => v.make))].sort();
@@ -1523,8 +1512,6 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
       setActive(false);
       return;
     }
-    // Reload fresh inventory data whenever car selection changes
-    if(make && onCarChange) onCarChange();
     const matchVehicles = vehicles.filter(v =>
       v.make === make && (!model || v.code === model || v.model === model)
     );

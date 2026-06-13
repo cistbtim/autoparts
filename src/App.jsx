@@ -4202,7 +4202,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               initialMake={shopVehicleFilter.make}
               initialModel={shopVehicleFilter.model}
               onFilter={(ids)=>{setVehicleFilterIds(ids);setShopPage(0);}}
-              onCarChange={()=>{ api.cacheClearAll(); loadAll(); }}
               onAddPart={(role==="admin"||role==="manager"||role==="demo")?((vehIds)=>{
                 setNewPartInitialF({price:0,cost_price:0});
                 setPendingVehicleIds(vehIds);
@@ -5367,6 +5366,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             wsDaysLeft={role==="workshop"?(subStatus?.daysLeft??sub?.daysLeft??null):null}
             wsExpiresAt={role==="workshop"?(subStatus?.expiresAt??sub?.expiresAt??null):null}
             wsSubStatus={role==="workshop"?(subStatus?.status??sub?.status??null):null}
+            onGoToSpareShopTab={()=>setTab("wsspareshop")}
             t={t} lang={lang}/>
         )}
 

@@ -1535,8 +1535,24 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
       }).map(p=>String(p.id))
     );
 
-    // Union of both
-    const allIds = new Set([...fitmentIds, ...codeIds]);
+    // 3. Part's own make/model fields match the vehicle (e.g. part tagged make=TOYOTA, model=COROLLA)
+    const makeUp = make.toUpperCase();
+    const vehicleModelNames = [...new Set(matchVehicles.map(v=>v.model).filter(Boolean))].map(m=>m.toUpperCase());
+    const makeModelIds = new Set(
+      (parts||[]).filter(p=>{
+        if((p.make||"").toUpperCase() !== makeUp) return false;
+        const pmod=(p.model||"").toUpperCase().trim();
+        if(!pmod) return false;
+        // Match if part model contains any word from the vehicle model, or vehicle model contains part model
+        return vehicleModelNames.some(vm=>{
+          const vmWords=vm.split(/[\s\/,]+/).filter(w=>w.length>2);
+          return pmod===vm || vm.includes(pmod) || vmWords.some(w=>pmod.includes(w));
+        });
+      }).map(p=>String(p.id))
+    );
+
+    // Union of all three strategies
+    const allIds = new Set([...fitmentIds, ...codeIds, ...makeModelIds]);
 
     if(onVehicleChange){
       // Always pass a Set so the filter stays active; empty Set (sentinel) = 0 results, not "show all"

@@ -71,6 +71,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [collapsedCols,   setCollapsedCols]   = useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("ws_kanban_collapsed")||"[]"));}catch{return new Set();}});
   const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
   const [kanbanSearch,    setKanbanSearch]    = useState("");
+  const [showSizePicker,  setShowSizePicker]  = useState(false);
   const [kanbanNoteEdit,  setKanbanNoteEdit]  = useState(null);
   const [kanbanDueEdit,   setKanbanDueEdit]   = useState(null);
   const [kanbanAssignEdit,setKanbanAssignEdit]= useState(null);
@@ -369,27 +370,32 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
               <button title="List view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:!kanbanView?"var(--accent)":"transparent",color:!kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(false)}>≡</button>
               <button title="Board view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:kanbanView?"var(--accent)":"transparent",color:kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(true)}>⬜</button>
             </div>
-            {kanbanView&&(<>
-              <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
-                <button title="Zoom out" disabled={kanbanZoom<=0}
-                  style={{padding:"7px 11px",border:"none",cursor:kanbanZoom<=0?"not-allowed":"pointer",background:"transparent",color:kanbanZoom<=0?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom<=0?.4:1}}
-                  onClick={()=>{const z=Math.max(0,kanbanZoom-1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>−</button>
-                <div style={{padding:"7px 6px",fontSize:11,color:"var(--text2)",display:"flex",alignItems:"center",borderLeft:"1px solid var(--border)",borderRight:"1px solid var(--border)"}}>{kanbanColW}px</div>
-                <button title="Zoom in" disabled={kanbanZoom>=3}
-                  style={{padding:"7px 11px",border:"none",cursor:kanbanZoom>=3?"not-allowed":"pointer",background:"transparent",color:kanbanZoom>=3?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom>=3?.4:1}}
-                  onClick={()=>{const z=Math.min(3,kanbanZoom+1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>＋</button>
+            {kanbanView&&(
+              <div className="hide-mobile" style={{display:"contents"}}>
+                <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+                  <button title="Zoom out" disabled={kanbanZoom<=0}
+                    style={{padding:"7px 11px",border:"none",cursor:kanbanZoom<=0?"not-allowed":"pointer",background:"transparent",color:kanbanZoom<=0?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom<=0?.4:1}}
+                    onClick={()=>{const z=Math.max(0,kanbanZoom-1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>−</button>
+                  <div style={{padding:"7px 8px",fontSize:11,fontWeight:700,color:"var(--text1)",display:"flex",alignItems:"center",gap:4,borderLeft:"1px solid var(--border)",borderRight:"1px solid var(--border)"}}>
+                    {["S","M","L","XL"][kanbanZoom]}
+                    <span style={{color:"var(--text3)",fontWeight:400}}>{kanbanColW}px</span>
+                  </div>
+                  <button title="Zoom in" disabled={kanbanZoom>=3}
+                    style={{padding:"7px 11px",border:"none",cursor:kanbanZoom>=3?"not-allowed":"pointer",background:"transparent",color:kanbanZoom>=3?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom>=3?.4:1}}
+                    onClick={()=>{const z=Math.min(3,kanbanZoom+1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>＋</button>
+                </div>
+                <button title={showKanbanPhotos?"Hide car photos":"Show car photos"}
+                  style={{padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:showKanbanPhotos?"var(--surface2)":"transparent",cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:4}}
+                  onClick={()=>{const v=!showKanbanPhotos;setShowKanbanPhotos(v);try{localStorage.setItem("ws_kanban_photos",v?"1":"0");}catch{}}}>
+                  {showKanbanPhotos?"🚗":"🚫"}
+                </button>
+                <div style={{position:"relative",marginLeft:4}}>
+                  <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
+                    placeholder="Search board…" style={{padding:"7px 28px 7px 10px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:12,width:140,outline:"none"}}/>
+                  {kanbanSearch&&<button onClick={()=>setKanbanSearch("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,lineHeight:1}}>✕</button>}
+                </div>
               </div>
-              <button title={showKanbanPhotos?"Hide car photos":"Show car photos"}
-                style={{padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:showKanbanPhotos?"var(--surface2)":"transparent",cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:4}}
-                onClick={()=>{const v=!showKanbanPhotos;setShowKanbanPhotos(v);try{localStorage.setItem("ws_kanban_photos",v?"1":"0");}catch{}}}>
-                {showKanbanPhotos?"🖼️":"📷"}
-              </button>
-              <div style={{position:"relative",marginLeft:4}}>
-                <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
-                  placeholder="Search board…" style={{padding:"7px 28px 7px 10px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:12,width:140,outline:"none"}}/>
-                {kanbanSearch&&<button onClick={()=>setKanbanSearch("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,lineHeight:1}}>✕</button>}
-              </div>
-            </>)}
+            )}
           </div>
           )}
         </div>
@@ -418,7 +424,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         </select>
       </div>
 
-      {wsTab!=="spareshop"&&<AdBanner ads={ads} page="workshop" userCtx={userCtx} height={140}/>}
+      {wsTab!=="spareshop"&&<AdBanner ads={ads} page="workshop" userCtx={userCtx} height={140} mobileHeight={112}/>}
 
       {/* ── Resume Job banner (navigated away via Go to Stock / View POs) ── */}
       {activeJob&&view==="list"&&(
@@ -1089,45 +1095,87 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         </div>
         {quotes.length===0
           ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No quotations yet — create one from a job card</div>
-          : <div className="card" style={{overflow:"auto"}}>
-              <table className="tbl" style={{width:"100%",minWidth:700}}>
-                <thead><tr>
-                  <th>Quote ID</th><th>Customer</th><th>Vehicle</th><th>Date</th><th>Valid Until</th><th style={{textAlign:"right"}}>Total</th><th>Status</th><th></th>
-                </tr></thead>
-                <tbody>
-                  {[...quotes].sort((a,b)=>new Date(b.quote_date)-new Date(a.quote_date)).map(q=>{
+          : (()=>{
+              const sorted=[...quotes].sort((a,b)=>new Date(b.quote_date)-new Date(a.quote_date));
+              const QST_COLOR={draft:"var(--text3)",sent:"var(--blue)",accepted:"var(--green)",declined:"var(--red)",converted:"var(--text3)"};
+              const QST_BG={draft:"rgba(100,116,139,.12)",sent:"rgba(96,165,250,.12)",accepted:"rgba(52,211,153,.12)",declined:"rgba(248,113,113,.12)",converted:"rgba(100,116,139,.08)"};
+              return (<>
+                {/* ── Desktop table ── */}
+                <div className="hide-mobile" style={{background:"var(--surface2)",borderRadius:12,overflow:"auto",border:"1px solid var(--border)"}}>
+                  <table className="tbl" style={{width:"100%",minWidth:700}}>
+                    <thead><tr>
+                      <th>Quote ID</th><th>Customer</th><th>Vehicle</th><th>Date</th><th>Valid Until</th><th style={{textAlign:"right"}}>Total</th><th>Status</th><th></th>
+                    </tr></thead>
+                    <tbody>
+                      {sorted.map(q=>{
+                        const j=jobs.find(jb=>jb.id===q.job_id);
+                        return (
+                          <tr key={q.id}>
+                            <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{q.id}</code></td>
+                            <td><div style={{fontWeight:600}}>{q.quote_customer||j?.customer_name||"—"}</div><div style={{fontSize:11,color:"var(--text3)"}}>{q.quote_phone||j?.customer_phone}</div></td>
+                            <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{q.vehicle_reg||j?.vehicle_reg||"—"}</code></td>
+                            <td style={{fontSize:12}}>{q.quote_date}</td>
+                            <td style={{fontSize:12,color:q.valid_until&&new Date(q.valid_until)<new Date()?"var(--red)":"var(--text2)"}}>{q.valid_until||"—"}</td>
+                            <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmt(q.total)}</td>
+                            <td><span className="badge" style={{background:QST_BG[q.status]||QST_BG.draft,color:QST_COLOR[q.status]||"var(--text3)",fontSize:11}}>{q.status}</span></td>
+                            <td>
+                              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                                {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{setActiveJob(j);setView("job");}}>Open Job</button>}
+                                {j&&q.status==="accepted"&&!invoices.find(i=>i.job_id===q.job_id)&&(
+                                  <button className="btn btn-primary btn-xs" onClick={()=>{const its=jobItems.filter(i=>i.job_id===q.job_id);const sub=its.reduce((s,i)=>s+(+i.total||0),0);const tx=settings.vat_number?sub*(settings.tax_rate||0)/100:0;setQInvModal({job:j,items:its,quote:q,subtotal:sub,tax:tx,total:sub+tx});}}>🧾 Invoice</button>
+                                )}
+                                {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* ── Mobile cards ── */}
+                <div className="show-mobile" style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {sorted.map(q=>{
                     const j=jobs.find(jb=>jb.id===q.job_id);
-                    const QST_COLOR={draft:"var(--text3)",sent:"var(--blue)",accepted:"var(--green)",declined:"var(--red)",converted:"var(--text3)"};
-                    const QST_BG={draft:"rgba(100,116,139,.12)",sent:"rgba(96,165,250,.12)",accepted:"rgba(52,211,153,.12)",declined:"rgba(248,113,113,.12)",converted:"rgba(100,116,139,.08)"};
+                    const isExpired=q.valid_until&&new Date(q.valid_until)<new Date();
+                    const stColor=QST_COLOR[q.status]||"var(--text3)";
+                    const stBg=QST_BG[q.status]||QST_BG.draft;
                     return (
-                      <tr key={q.id}>
-                        <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{q.id}</code></td>
-                        <td><div style={{fontWeight:600}}>{q.quote_customer||j?.customer_name||"—"}</div><div style={{fontSize:11,color:"var(--text3)"}}>{q.quote_phone||j?.customer_phone}</div></td>
-                        <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{q.vehicle_reg||j?.vehicle_reg||"—"}</code></td>
-                        <td style={{fontSize:12}}>{q.quote_date}</td>
-                        <td style={{fontSize:12,color:q.valid_until&&new Date(q.valid_until)<new Date()?"var(--red)":"var(--text2)"}}>{q.valid_until||"—"}</td>
-                        <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmt(q.total)}</td>
-                        <td><span className="badge" style={{background:QST_BG[q.status]||QST_BG.draft,color:QST_COLOR[q.status]||"var(--text3)",fontSize:11}}>{q.status}</span></td>
-                        <td>
-                          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                            {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{setActiveJob(j);setView("job");}}>Open Job</button>}
-                            {j&&q.status==="accepted"&&!invoices.find(i=>i.job_id===q.job_id)&&(
-                              <button className="btn btn-primary btn-xs" onClick={()=>{
-                                const its=jobItems.filter(i=>i.job_id===q.job_id);
-                                const sub=its.reduce((s,i)=>s+(+i.total||0),0);
-                                const tx=settings.vat_number?sub*(settings.tax_rate||0)/100:0;
-                                setQInvModal({job:j,items:its,quote:q,subtotal:sub,tax:tx,total:sub+tx});
-                              }}>🧾 Invoice</button>
-                            )}
-                            {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
+                      <div key={q.id} style={{background:"var(--surface2)",borderRadius:12,border:"1px solid var(--border)",overflow:"hidden"}}>
+                        {/* Top bar: ID + status */}
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px",borderBottom:"1px solid var(--border2)",background:"var(--surface3)"}}>
+                          <code style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)"}}>{q.id}</code>
+                          <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:99,background:stBg,color:stColor}}>{q.status}</span>
+                        </div>
+                        {/* Body */}
+                        <div style={{padding:"10px 12px",display:"flex",alignItems:"flex-start",gap:10}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:700,fontSize:15,color:"var(--text)",marginBottom:2}}>{q.quote_customer||j?.customer_name||"—"}</div>
+                            {(q.quote_phone||j?.customer_phone)&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>📞 {q.quote_phone||j?.customer_phone}</div>}
+                            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                              <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)",background:"rgba(96,165,250,.1)",padding:"2px 7px",borderRadius:6}}>🚗 {q.vehicle_reg||j?.vehicle_reg||"—"}</code>
+                              <span style={{fontSize:11,color:"var(--text3)"}}>📅 {q.quote_date}</span>
+                              {q.valid_until&&<span style={{fontSize:11,color:isExpired?"var(--red)":"var(--text3)"}}>→ {q.valid_until}{isExpired?" ⚠️":""}</span>}
+                            </div>
                           </div>
-                        </td>
-                      </tr>
+                          <div style={{textAlign:"right",flexShrink:0}}>
+                            <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:20,fontWeight:800,color:"var(--accent)"}}>{fmt(q.total)}</div>
+                          </div>
+                        </div>
+                        {/* Actions */}
+                        <div style={{display:"flex",gap:8,padding:"8px 12px 10px",borderTop:"1px solid var(--border2)"}}>
+                          {j&&<button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{setActiveJob(j);setView("job");}}>🔧 Open Job</button>}
+                          {j&&q.status==="accepted"&&!invoices.find(i=>i.job_id===q.job_id)&&(
+                            <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={()=>{const its=jobItems.filter(i=>i.job_id===q.job_id);const sub=its.reduce((s,i)=>s+(+i.total||0),0);const tx=settings.vat_number?sub*(settings.tax_rate||0)/100:0;setQInvModal({job:j,items:its,quote:q,subtotal:sub,tax:tx,total:sub+tx});}}>🧾 Invoice</button>
+                          )}
+                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              </>);
+            })()
         }
       </>)}
 
@@ -1432,38 +1480,82 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         </div>
         {invoices.length===0
           ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.wsiNoInvoices}</div>
-          : <div className="card" style={{overflow:"auto"}}>
-              <table className="tbl" style={{width:"100%",minWidth:750}}>
-                <thead><tr><th>{t.invoiceNo}</th><th>{t.customer}</th><th>{t.wsiVehicle}</th><th>{t.date}</th><th style={{textAlign:"right"}}>{t.total}</th><th style={{textAlign:"right"}}>{t.paid}</th><th style={{textAlign:"right"}}>{t.wsiBalance}</th><th>{t.status}</th><th></th></tr></thead>
-                <tbody>
-                  {[...invoices].sort((a,b)=>new Date(b.invoice_date)-new Date(a.invoice_date)).map(inv=>{
+          : (()=>{
+              const sorted=[...invoices].sort((a,b)=>new Date(b.invoice_date)-new Date(a.invoice_date));
+              return (<>
+                {/* Desktop table */}
+                <div className="hide-mobile" style={{background:"var(--surface2)",borderRadius:12,overflow:"auto",border:"1px solid var(--border)"}}>
+                  <table className="tbl" style={{width:"100%",minWidth:750}}>
+                    <thead><tr><th>{t.invoiceNo}</th><th>{t.customer}</th><th>{t.wsiVehicle}</th><th>{t.date}</th><th style={{textAlign:"right"}}>{t.total}</th><th style={{textAlign:"right"}}>{t.paid}</th><th style={{textAlign:"right"}}>{t.wsiBalance}</th><th>{t.status}</th><th></th></tr></thead>
+                    <tbody>
+                      {sorted.map(inv=>{
+                        const j=jobs.find(jb=>jb.id===inv.job_id);
+                        const paid=+inv.paid_amount||0;
+                        const bal=(+inv.total||0)-paid;
+                        const sc=inv.status==="paid"?"var(--green)":inv.status==="partial"?"var(--yellow)":"var(--red)";
+                        const sb=inv.status==="paid"?"rgba(52,211,153,.12)":inv.status==="partial"?"rgba(251,191,36,.12)":"rgba(248,113,113,.12)";
+                        return (
+                          <tr key={inv.id}>
+                            <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{inv.id}</code></td>
+                            <td><div style={{fontWeight:600}}>{inv.invoice_customer||j?.customer_name||"—"}</div><div style={{fontSize:11,color:"var(--text3)"}}>{inv.inv_phone||j?.customer_phone}</div></td>
+                            <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{inv.vehicle_reg||j?.vehicle_reg||"—"}</code></td>
+                            <td style={{fontSize:12}}>{inv.invoice_date}</td>
+                            <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.total)}</td>
+                            <td style={{textAlign:"right",color:"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{paid>0?fmt(paid):"—"}</td>
+                            <td style={{textAlign:"right",color:bal>0?"var(--red)":"var(--green)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{fmt(bal)}</td>
+                            <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ "+t.paid:inv.status==="partial"?"💛 "+t.partial:"⏳ "+t.unpaid}</span></td>
+                            <td><div style={{display:"flex",gap:4}}>
+                              {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{setActiveJob(j);setView("job");}}>{t.stOpen}</button>}
+                              {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
+                            </div></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Mobile cards */}
+                <div className="show-mobile" style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {sorted.map(inv=>{
                     const j=jobs.find(jb=>jb.id===inv.job_id);
                     const paid=+inv.paid_amount||0;
                     const bal=(+inv.total||0)-paid;
                     const sc=inv.status==="paid"?"var(--green)":inv.status==="partial"?"var(--yellow)":"var(--red)";
                     const sb=inv.status==="paid"?"rgba(52,211,153,.12)":inv.status==="partial"?"rgba(251,191,36,.12)":"rgba(248,113,113,.12)";
+                    const statusLabel=inv.status==="paid"?"✅ "+t.paid:inv.status==="partial"?"💛 "+t.partial:"⏳ "+t.unpaid;
                     return (
-                      <tr key={inv.id}>
-                        <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{inv.id}</code></td>
-                        <td><div style={{fontWeight:600}}>{inv.invoice_customer||j?.customer_name||"—"}</div><div style={{fontSize:11,color:"var(--text3)"}}>{inv.inv_phone||j?.customer_phone}</div></td>
-                        <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{inv.vehicle_reg||j?.vehicle_reg||"—"}</code></td>
-                        <td style={{fontSize:12}}>{inv.invoice_date}</td>
-                        <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.total)}</td>
-                        <td style={{textAlign:"right",color:"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{paid>0?fmt(paid):"—"}</td>
-                        <td style={{textAlign:"right",color:bal>0?"var(--red)":"var(--green)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{fmt(bal)}</td>
-                        <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ "+t.paid:inv.status==="partial"?"💛 "+t.partial:"⏳ "+t.unpaid}</span></td>
-                        <td>
-                          <div style={{display:"flex",gap:4}}>
-                            {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{setActiveJob(j);setView("job");}}>{t.stOpen}</button>}
-                            {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
+                      <div key={inv.id} style={{background:"var(--surface2)",borderRadius:12,border:"1px solid var(--border)",overflow:"hidden"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px",background:"var(--surface3)",borderBottom:"1px solid var(--border2)"}}>
+                          <code style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)"}}>{inv.id}</code>
+                          <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:99,background:sb,color:sc}}>{statusLabel}</span>
+                        </div>
+                        <div style={{padding:"10px 12px"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                            <div>
+                              <div style={{fontWeight:700,fontSize:15,color:"var(--text)"}}>{inv.invoice_customer||j?.customer_name||"—"}</div>
+                              {(inv.inv_phone||j?.customer_phone)&&<div style={{fontSize:12,color:"var(--text3)"}}>📞 {inv.inv_phone||j?.customer_phone}</div>}
+                            </div>
+                            <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
+                              <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:20,fontWeight:800,color:"var(--accent)"}}>{fmt(inv.total)}</div>
+                              <div style={{fontSize:11,color:"var(--text3)"}}>{inv.invoice_date}</div>
+                            </div>
                           </div>
-                        </td>
-                      </tr>
+                          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                            <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)",background:"rgba(96,165,250,.1)",padding:"2px 7px",borderRadius:6}}>🚗 {inv.vehicle_reg||j?.vehicle_reg||"—"}</code>
+                            {paid>0&&<span style={{fontSize:12,color:"var(--green)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>✓ {fmt(paid)}</span>}
+                            {bal>0&&<span style={{fontSize:12,color:"var(--red)",fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>Balance {fmt(bal)}</span>}
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:8,padding:"8px 12px 10px",borderTop:"1px solid var(--border2)"}}>
+                          {j&&<button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{setActiveJob(j);setView("job");}}>🔧 {t.stOpen}</button>}
+                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              </>);
+            })()
         }
       </>)}
 
@@ -1481,31 +1573,65 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           </div>
           {paid.length===0
             ? <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.wsiNoPayments}</div>
-            : <div className="card" style={{overflow:"auto"}}>
-                <table className="tbl" style={{width:"100%",minWidth:700}}>
-                  <thead><tr><th>{t.invoice}</th><th>{t.customer}</th><th>{t.wsiVehicle}</th><th>{t.wsiPayDate}</th><th>{t.paymentMethod}</th><th>{t.wsiReference}</th><th style={{textAlign:"right"}}>{t.wsiInvTotal}</th><th style={{textAlign:"right"}}>{t.paid}</th><th>{t.status}</th></tr></thead>
-                  <tbody>
-                    {paid.map(inv=>{
-                      const j=jobs.find(jb=>jb.id===inv.job_id);
-                      const sc=inv.status==="paid"?"var(--green)":"var(--yellow)";
-                      const sb=inv.status==="paid"?"rgba(52,211,153,.12)":"rgba(251,191,36,.12)";
-                      return (
-                        <tr key={inv.id}>
-                          <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{inv.id}</code></td>
-                          <td style={{fontWeight:600}}>{inv.invoice_customer||j?.customer_name||"—"}</td>
-                          <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{inv.vehicle_reg||j?.vehicle_reg||"—"}</code></td>
-                          <td style={{fontSize:12}}>{inv.payment_date||"—"}</td>
-                          <td><span className="badge" style={{background:"var(--surface2)",color:"var(--text2)",fontSize:11}}>{inv.payment_method||"—"}</span></td>
-                          <td style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{inv.payment_ref||"—"}</td>
-                          <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.total)}</td>
-                          <td style={{textAlign:"right",fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.paid_amount)}</td>
-                          <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ "+t.paid:"💛 "+t.partial}</span></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+            : (<>
+                {/* Desktop table */}
+                <div className="hide-mobile" style={{background:"var(--surface2)",borderRadius:12,overflow:"auto",border:"1px solid var(--border)"}}>
+                  <table className="tbl" style={{width:"100%",minWidth:700}}>
+                    <thead><tr><th>{t.invoice}</th><th>{t.customer}</th><th>{t.wsiVehicle}</th><th>{t.wsiPayDate}</th><th>{t.paymentMethod}</th><th>{t.wsiReference}</th><th style={{textAlign:"right"}}>{t.wsiInvTotal}</th><th style={{textAlign:"right"}}>{t.paid}</th><th>{t.status}</th></tr></thead>
+                    <tbody>
+                      {paid.map(inv=>{
+                        const j=jobs.find(jb=>jb.id===inv.job_id);
+                        const sc=inv.status==="paid"?"var(--green)":"var(--yellow)";
+                        const sb=inv.status==="paid"?"rgba(52,211,153,.12)":"rgba(251,191,36,.12)";
+                        return (
+                          <tr key={inv.id}>
+                            <td><code style={{fontFamily:"DM Mono,monospace",fontSize:11}}>{inv.id}</code></td>
+                            <td style={{fontWeight:600}}>{inv.invoice_customer||j?.customer_name||"—"}</td>
+                            <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{inv.vehicle_reg||j?.vehicle_reg||"—"}</code></td>
+                            <td style={{fontSize:12}}>{inv.payment_date||"—"}</td>
+                            <td><span className="badge" style={{background:"var(--surface2)",color:"var(--text2)",fontSize:11}}>{inv.payment_method||"—"}</span></td>
+                            <td style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{inv.payment_ref||"—"}</td>
+                            <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.total)}</td>
+                            <td style={{textAlign:"right",fontWeight:700,color:"var(--green)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(inv.paid_amount)}</td>
+                            <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ "+t.paid:"💛 "+t.partial}</span></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Mobile cards */}
+                <div className="show-mobile" style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {paid.map(inv=>{
+                    const j=jobs.find(jb=>jb.id===inv.job_id);
+                    const sc=inv.status==="paid"?"var(--green)":"var(--yellow)";
+                    const sb=inv.status==="paid"?"rgba(52,211,153,.12)":"rgba(251,191,36,.12)";
+                    return (
+                      <div key={inv.id} style={{background:"var(--surface2)",borderRadius:12,border:"1px solid var(--border)",overflow:"hidden"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px",background:"var(--surface3)",borderBottom:"1px solid var(--border2)"}}>
+                          <code style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)"}}>{inv.id}</code>
+                          <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:99,background:sb,color:sc}}>{inv.status==="paid"?"✅ "+t.paid:"💛 "+t.partial}</span>
+                        </div>
+                        <div style={{padding:"10px 12px"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                            <div style={{fontWeight:700,fontSize:15,color:"var(--text)"}}>{inv.invoice_customer||j?.customer_name||"—"}</div>
+                            <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
+                              <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:20,fontWeight:800,color:"var(--green)"}}>{fmt(inv.paid_amount)}</div>
+                              <div style={{fontSize:10,color:"var(--text3)"}}>of {fmt(inv.total)}</div>
+                            </div>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                            <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)",background:"rgba(96,165,250,.1)",padding:"2px 7px",borderRadius:6}}>🚗 {inv.vehicle_reg||j?.vehicle_reg||"—"}</code>
+                            {inv.payment_date&&<span style={{fontSize:12,color:"var(--text3)"}}>📅 {inv.payment_date}</span>}
+                            {inv.payment_method&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:6,background:"var(--surface3)",color:"var(--text2)"}}>{inv.payment_method}</span>}
+                            {inv.payment_ref&&<span style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>#{inv.payment_ref}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>)
           }
         </>);
       })()}
@@ -1911,6 +2037,61 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           </div>
         </div>
       )}
+      {/* ── Fixed bottom toolbar (mobile only — always visible) ── */}
+      <div className="show-mobile" style={{height:wsTab==="jobs"&&kanbanView?showSizePicker?156:104:56}}/>
+      <div className="show-mobile">
+        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:300,background:"var(--surface)",borderTop:"2px solid var(--border2)",boxShadow:"0 -4px 24px rgba(0,0,0,.22)"}}>
+          {/* Size picker row — expands when toggled */}
+          {wsTab==="jobs"&&kanbanView&&showSizePicker&&(
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",borderBottom:"1px solid var(--border)",background:"var(--surface2)"}}>
+              <span style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",flexShrink:0}}>Card size</span>
+              {["S","M","L","XL"].map((lbl,i)=>(
+                <button key={i}
+                  onClick={()=>{setKanbanZoom(i);try{localStorage.setItem("ws_kanban_zoom",i);}catch{};setShowSizePicker(false);}}
+                  style={{flex:1,padding:"8px 0",borderRadius:9,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:kanbanZoom===i?"var(--accent)":"var(--surface3)",color:kanbanZoom===i?"#fff":"var(--text2)"}}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* Kanban controls row (only when in kanban jobs) */}
+          {wsTab==="jobs"&&kanbanView&&(
+            <div style={{display:"flex",alignItems:"center",gap:7,padding:"6px 10px",borderBottom:"1px solid var(--border2)"}}>
+              <button onClick={()=>setShowSizePicker(p=>!p)}
+                style={{flexShrink:0,padding:"6px 10px",borderRadius:9,border:`1px solid ${showSizePicker?"var(--accent)":"var(--border)"}`,background:showSizePicker?"rgba(251,146,60,.1)":"var(--surface3)",color:showSizePicker?"var(--accent)":"var(--text2)",cursor:"pointer",fontWeight:700,fontSize:12}}>
+                {["S","M","L","XL"][kanbanZoom]} ↕
+              </button>
+              <button onClick={()=>{const v=!showKanbanPhotos;setShowKanbanPhotos(v);try{localStorage.setItem("ws_kanban_photos",v?"1":"0");}catch{}}}
+                style={{flexShrink:0,padding:"6px 10px",borderRadius:9,border:`1px solid ${showKanbanPhotos?"var(--accent)":"var(--border)"}`,background:showKanbanPhotos?"rgba(251,146,60,.12)":"var(--surface3)",cursor:"pointer",fontSize:15,lineHeight:1}}>
+                {showKanbanPhotos?"🚗":"🚫"}
+              </button>
+              <div style={{flex:1,position:"relative",minWidth:0}}>
+                <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
+                  placeholder="Search jobs…"
+                  style={{width:"100%",padding:"6px 28px 6px 10px",border:"1px solid var(--border)",borderRadius:9,background:"var(--surface2)",color:"var(--text1)",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                {kanbanSearch&&<button onClick={()=>setKanbanSearch("")}
+                  style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,lineHeight:1}}>✕</button>}
+              </div>
+            </div>
+          )}
+          {/* Icon tab navigation — always visible, horizontally scrollable */}
+          <div style={{display:"flex",overflowX:"auto",padding:"6px 6px 14px",gap:2,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+            {WS_TABS.map(([v,label,cnt])=>{
+              const icon=label.split(" ")[0];
+              const isActive=wsTab===v;
+              const hasBadge=cnt>0&&!isActive;
+              return (
+                <button key={v}
+                  onClick={()=>{setWsTab(v);if(v==="spareshop")setSpareShopFilter({make:"",model:"",});}}
+                  style={{position:"relative",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"6px 10px",borderRadius:10,border:"none",cursor:"pointer",background:isActive?"var(--accent)":"transparent",color:isActive?"#fff":"var(--text3)",fontSize:20,lineHeight:1,minWidth:44}}>
+                  {icon}
+                  {hasBadge&&<div style={{position:"absolute",top:5,right:7,width:7,height:7,borderRadius:"50%",background:"var(--red)",border:"1.5px solid var(--surface)"}}/>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

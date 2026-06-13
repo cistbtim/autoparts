@@ -1487,6 +1487,18 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[vehicles.length > 0]);
 
+  // Re-run filter when parts array updates (after a DB reload triggered by car change)
+  const selMakeRef = useRef(selMake);
+  const selModelRef = useRef(selModel);
+  const activeRef = useRef(active);
+  selMakeRef.current = selMake;
+  selModelRef.current = selModel;
+  activeRef.current = active;
+  useEffect(()=>{
+    if(activeRef.current && selMakeRef.current) applyFilter(selMakeRef.current, selModelRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[parts]);
+
   // Always derive makes/models from the vehicles table (clean data with codes)
   const makes = [...new Set(vehicles.map(v => v.make))].sort();
   const models = (() => {

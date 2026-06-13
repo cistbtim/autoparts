@@ -3789,8 +3789,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                                   onError={e=>{e.target.style.display="none";e.target.nextSibling&&(e.target.nextSibling.style.display="flex");}}/>
                               : <div className="part-emoji">{p.image||"🔩"}</div>}
                           </td>
-                          <td>
-                            <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)"}}>{p.sku}</code>
+                          <td style={{whiteSpace:"nowrap"}}>
+                            <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{p.sku}</code>
                             <div style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)",opacity:.55,marginTop:1}}>#{p.id}</div>
                           </td>
                           <td>

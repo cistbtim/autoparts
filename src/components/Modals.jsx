@@ -22,10 +22,15 @@ const _LR_RE = /(?<![A-Za-z])(Left|Right|left|right|LEFT|RIGHT|LH|RH|Driver|Pass
 // _SINGLE_LR: swap terminal L/R in SKU codes (e.g. 054GL→054GR, 089BHL→089BHR)
 // Requires digit before letters, and letter before L/R is not itself L or R to avoid double-swapping LH/RH
 const _SINGLE_LR_RE = /(?:(?<=\d[A-KM-QS-Za-km-qs-z])[LRlr]|(?<=\d[A-Za-z][A-KM-QS-Za-km-qs-z])[LRlr])(?=[^A-Za-z]|$)/g;
+// Also swap L/R when directly after a digit, followed by non-H letters (e.g. 201RLE→201LLE)
+// Excludes H suffix to avoid double-swapping after _LR_MAP already handled LH/RH
+const _DIGIT_LR_RE = /(?<=\d)[LRlr](?=[A-GI-QS-Za-gi-qs-z][A-Za-z]{0,2}(?:[^A-Za-z]|$))/g;
+const _swapChar = c => c==='L'?'R':c==='R'?'L':c==='l'?'r':'l';
 function swapLR(str){
   return (str||"")
     .replace(_LR_RE, m => _LR_MAP[m]||m)
-    .replace(_SINGLE_LR_RE, c => c==='L'?'R':c==='R'?'L':c==='l'?'r':'l');
+    .replace(_SINGLE_LR_RE, _swapChar)
+    .replace(_DIGIT_LR_RE, _swapChar);
 }
 function detectSide(sku, name) {
   const s=(sku||"").toUpperCase(), n=(name||"").toUpperCase();

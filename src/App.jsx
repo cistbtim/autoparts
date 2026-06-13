@@ -4180,7 +4180,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 {(searchPart||filterCat!=="__all__")&&(
                   <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");}} style={{color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear</button>
                 )}
-                <button className="btn btn-ghost btn-sm" onClick={loadAll} title="Refresh stock & prices" style={{flexShrink:0}}>↻</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{ api.cacheClearAll(); loadAll(); }} title="Refresh stock & prices" style={{flexShrink:0}}>↺ Refresh</button>
                 <button className="btn btn-ghost btn-sm" onClick={()=>{setShopSort(s=>s==="sku"?"default":"sku");setShopPage(0);}} style={{flexShrink:0,borderColor:shopSort==="sku"?"var(--accent)":"var(--border)",color:shopSort==="sku"?"var(--accent)":undefined}} title="Sort by SKU">
                   Sort by SKU{shopSort==="sku"?" ↑":""}
                 </button>

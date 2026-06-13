@@ -1476,6 +1476,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
   const [selMake,  setSelMake]  = useState(initialMake);
   const [selModel, setSelModel] = useState(initialModel);
   const [active,   setActive]   = useState(false);
+  const [lightbox, setLightbox] = useState(null); // {photos:[{url,label}], idx}
 
   // Auto-apply filter when pre-populated from vehicle management
   useEffect(()=>{
@@ -1613,7 +1614,14 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
                     {url
                       ? <DriveImg url={url} alt={label}
                           style={{width:"100%",height:"100%",objectFit:"contain",cursor:"zoom-in"}}
-                          onClick={()=>window.open(toFullUrl(url),"_blank")}/>
+                          onClick={()=>{
+                            const all=[
+                              {url:photos.photo_front,label:"Front"},
+                              {url:photos.photo_rear, label:"Rear"},
+                              {url:photos.photo_side, label:"Side"},
+                            ].filter(p=>p.url);
+                            setLightbox({photos:all, idx:all.findIndex(p=>p.url===url&&p.label===label)||0});
+                          }}/>
                       : <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",
                           justifyContent:"center",color:"var(--text3)",fontSize:11}}>No photo</div>}
                     <div style={{position:"absolute",bottom:0,left:0,right:0,
@@ -1636,6 +1644,32 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
           </div>
         );
       })()}
+
+      {/* Lightbox */}
+      {lightbox&&(
+        <div onClick={()=>setLightbox(null)}
+          style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:"relative",maxWidth:"92vw",maxHeight:"90vh",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+            <img src={toImgUrl(lightbox.photos[lightbox.idx].url)} alt={lightbox.photos[lightbox.idx].label}
+              style={{maxWidth:"88vw",maxHeight:"78vh",objectFit:"contain",borderRadius:10,boxShadow:"0 8px 48px rgba(0,0,0,.6)"}}/>
+            <div style={{color:"#fff",fontWeight:700,fontSize:15,letterSpacing:".05em"}}>{lightbox.photos[lightbox.idx].label}</div>
+            {lightbox.photos.length>1&&(
+              <div style={{display:"flex",gap:10}}>
+                {lightbox.photos.map((p,i)=>(
+                  <button key={p.label} onClick={()=>setLightbox(lb=>({...lb,idx:i}))}
+                    style={{border:`2px solid ${i===lightbox.idx?"#fff":"rgba(255,255,255,.3)"}`,borderRadius:8,overflow:"hidden",
+                      padding:0,cursor:"pointer",background:"none",opacity:i===lightbox.idx?1:.6,transition:"all .15s"}}>
+                    <img src={toImgUrl(p.url)} alt={p.label} style={{width:80,height:54,objectFit:"cover",display:"block"}}/>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button onClick={()=>setLightbox(null)}
+              style={{position:"absolute",top:-12,right:-12,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",
+                width:32,height:32,fontSize:18,color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

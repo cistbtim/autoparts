@@ -1475,8 +1475,11 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onAddPart, t, initialMake="", initialModel=""}) {
   const [selMake,  setSelMake]  = useState(initialMake);
   const [selModel, setSelModel] = useState(initialModel);
+  const [makeInput,  setMakeInput]  = useState(initialMake);
+  const [modelInput, setModelInput] = useState("");
   const [active,   setActive]   = useState(false);
   const [lightbox, setLightbox] = useState(null); // {photos:[{url,label}], idx}
+  const _vsbId = useRef(`vsb_${Math.random().toString(36).slice(2)}`).current;
 
   // Auto-apply filter when pre-populated from vehicle management
   useEffect(()=>{
@@ -1546,11 +1549,21 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
   };
 
   const clear = () => {
-    setSelMake(""); setSelModel("");
+    setSelMake(""); setSelModel(""); setMakeInput(""); setModelInput("");
     if(onFilter) onFilter(null);
     if(onVehicleChange) onVehicleChange(null);
     setActive(false);
   };
+
+  // Build model display options (label → code/model value)
+  const modelOpts = models.map(({model, yearFrom, yearTo, code})=>{
+    const val = code||model;
+    const yf = parseInt(yearFrom)>1900 ? String(parseInt(yearFrom)) : "";
+    const yt = parseInt(yearTo)>1900 ? String(parseInt(yearTo)) : "";
+    const yr = yf ? ` (${yf}–${yt||"present"})` : "";
+    return { val, label:`${code?`[${code}] `:""}${model}${yr}` };
+  });
+  const modelLabelToVal = Object.fromEntries(modelOpts.map(o=>[o.label, o.val]));
 
   return (
     <div style={{marginBottom:14,padding:"12px 14px",
@@ -1562,30 +1575,43 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
         {active && <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={clear}>✕ Clear</button>}
       </div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-        {/* Make */}
-        <select className="inp" value={selMake} style={{flex:"1 1 120px",minWidth:100}}
-          onChange={e=>{ const v=e.target.value; setSelMake(v); setSelModel(""); applyFilter(v,""); }}>
-          <option value="">{t.selectMake||"Select Make"}</option>
-          {makes.map(m=><option key={m}>{m}</option>)}
-        </select>
+        {/* Make — searchable datalist */}
+        <datalist id={`${_vsbId}_makes`}>{makes.map(m=><option key={m} value={m}/>)}</datalist>
+        <input className="inp" list={`${_vsbId}_makes`} value={makeInput}
+          placeholder={t.selectMake||"Type make…"}
+          style={{flex:"1 1 120px",minWidth:100}}
+          onChange={e=>{
+            const v=e.target.value;
+            setMakeInput(v);
+            if(makes.includes(v)){
+              setSelMake(v); setSelModel(""); setModelInput("");
+              applyFilter(v,"");
+            } else if(!v){
+              setSelMake(""); setSelModel(""); setModelInput("");
+              if(onFilter) onFilter(null);
+              if(onVehicleChange) onVehicleChange(null);
+              setActive(false);
+            }
+          }}/>
 
-        {/* Model — value is "code||model" so same-named generations stay distinct */}
-        <select className="inp" value={selModel} style={{flex:"1 1 160px",minWidth:130}}
+        {/* Model — searchable datalist */}
+        <datalist id={`${_vsbId}_models`}>{modelOpts.map(o=><option key={o.val} value={o.label}/>)}</datalist>
+        <input className="inp" list={`${_vsbId}_models`} value={modelInput}
+          placeholder={selMake ? (t.selectModel||"Type model…") : "—"}
           disabled={!selMake}
-          onChange={e=>{ const v=e.target.value; setSelModel(v); applyFilter(selMake,v); }}>
-          <option value="">{t.selectModel||"Select Model"}</option>
-          {models.map(({model, yearFrom, yearTo, code})=>{
-            const val=code||model;
-            const yf=parseInt(yearFrom)>1900?String(parseInt(yearFrom)):"";
-            const yt=parseInt(yearTo)>1900?String(parseInt(yearTo)):"";
-            const yr=yf?` (${yf}–${yt||"present"})`:"";
-            return(
-              <option key={val} value={val}>
-                {code?`[${code}] `:""}{model}{yr}
-              </option>
-            );
-          })}
-        </select>
+          style={{flex:"2 1 200px",minWidth:160}}
+          onChange={e=>{
+            const v=e.target.value;
+            setModelInput(v);
+            const code=modelLabelToVal[v];
+            if(code!==undefined){
+              setSelModel(code);
+              applyFilter(selMake, code);
+            } else if(!v){
+              setSelModel("");
+              applyFilter(selMake,"");
+            }
+          }}/>
       </div>
 
       {/* Vehicle photos + result info */}
@@ -1601,8 +1627,8 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
         const photos = matchV.find(v=>v.photo_front||v.photo_rear||v.photo_side) || matchV[0];
         return (
           <div style={{marginTop:10}}>
-            {/* 3 photos side by side */}
-            {photos&&(photos.photo_front||photos.photo_rear||photos.photo_side)&&(
+            {/* 3 photos side by side — only when model is selected */}
+            {selModel&&photos&&(photos.photo_front||photos.photo_rear||photos.photo_side)&&(
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
                 {[
                   {url:photos.photo_front, label:"Front"},

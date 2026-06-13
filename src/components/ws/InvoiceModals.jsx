@@ -7,7 +7,15 @@ import { printWorkshopQuote } from "./Print.jsx";
 export function WsQuoteModal({job,items,existing,settings,wsSupplierQuotes=[],onSave,onClose}) {
   const C=curSym(settings.currency||getSettings().currency);
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-  const [selectedIds,setSelectedIds]=useState(()=>new Set(items.map(i=>i.id)));
+  const [selectedIds,setSelectedIds]=useState(()=>{
+    if(existing?.selected_item_ids){
+      try{
+        const saved=new Set(JSON.parse(existing.selected_item_ids));
+        return new Set(items.filter(i=>saved.has(i.id)).map(i=>i.id));
+      }catch{}
+    }
+    return new Set(items.map(i=>i.id));
+  });
   const toggleItem=id=>setSelectedIds(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const selItems=items.filter(i=>selectedIds.has(i.id));
   const selSubtotal=selItems.reduce((s,i)=>s+(+i.total||0),0);
@@ -134,13 +142,13 @@ export function WsQuoteModal({job,items,existing,settings,wsSupplierQuotes=[],on
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-ghost" style={{flex:1}} disabled={saving||selItems.length===0} onClick={async()=>{
           setSaving(true);
-          const q={...f,subtotal:selSubtotal,tax:selTax,total:selTotal};
+          const q={...f,subtotal:selSubtotal,tax:selTax,total:selTotal,selected_item_ids:JSON.stringify([...selectedIds])};
           try{ await onSave(q); printWorkshopQuote(job,selItems,q,settings); }catch(e){alert(e.message);}
           finally{setSaving(false);}
         }}>💾 Save &amp; Print</button>
         <button className="btn btn-primary" style={{flex:1}} disabled={saving||selItems.length===0} onClick={async()=>{
           setSaving(true);
-          try{ await onSave({...f,subtotal:selSubtotal,tax:selTax,total:selTotal}); }catch(e){alert(e.message);}
+          try{ await onSave({...f,subtotal:selSubtotal,tax:selTax,total:selTotal,selected_item_ids:JSON.stringify([...selectedIds])}); }catch(e){alert(e.message);}
           finally{setSaving(false);}
         }}>{saving?"Saving...":(existing?"💾 Save":"📝 Create Quote")}</button>
       </div>
@@ -361,17 +369,27 @@ export function WsStatementModal({invoice,job,items,settings,onClose,onPrint}) {
   );
 }
 
-export function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSave,onClose,t,prefill={}}) {
+export function WorkshopInvoiceModal({job,items,settings,onSave,onClose,t,prefill={}}) {
+  const C=curSym(settings.currency||getSettings().currency);
+  const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [invDate,  setInvDate]  = useState(prefill.invDate||job.date_in||new Date().toISOString().slice(0,10));
   const [dueDate,  setDueDate]  = useState(prefill.dueDate||"");
   const [notes,    setNotes]    = useState(prefill.notes||"");
   const [saving,   setSaving]   = useState(false);
-  // Invoice-specific customer details — pre-filled from quote or job profile
   const [invCust,  setInvCust]  = useState(prefill.invCust||job.customer_name||"");
   const [invPhone, setInvPhone] = useState(prefill.invPhone||job.customer_phone||"");
   const [invEmail, setInvEmail] = useState(prefill.invEmail||job.customer_email||"");
 
+  // Item selection — all passed items are selected by default
+  const [selectedIds,setSelectedIds]=useState(()=>new Set(items.map(i=>i.id)));
+  const toggleItem=id=>setSelectedIds(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
+  const selItems=items.filter(i=>selectedIds.has(i.id));
+  const selSubtotal=selItems.reduce((s,i)=>s+(+i.total||0),0);
+  const selTax=settings.vat_number?selSubtotal*(settings.tax_rate||0)/100:0;
+  const selTotal=selSubtotal+selTax;
+
   const handleCreate=async(payNow=false)=>{
+    if(selItems.length===0){alert("Select at least one item to invoice.");return;}
     setSaving(true);
     try{
       await onSave({
@@ -379,7 +397,7 @@ export function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSa
         invoice_customer:invCust, inv_phone:invPhone, inv_email:invEmail,
         vehicle_reg:job.vehicle_reg||"",
         invoice_date:invDate, due_date:dueDate,
-        subtotal, tax, total, status:"unpaid", notes,
+        subtotal:selSubtotal, tax:selTax, total:selTotal, status:"unpaid", notes,
       }, payNow);
     }catch(e){ alert("Failed to create invoice: "+e.message); }
     finally{ setSaving(false); }
@@ -387,12 +405,12 @@ export function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSa
 
   return (
     <Overlay onClose={onClose} wide>
-      <MHead title={prefill.notes?"🧾 Convert Quote to Invoice":"🧾 Create Workshop Invoice"} onClose={onClose}/>
-      {prefill.notes&&<div style={{background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",borderRadius:6,padding:"8px 12px",marginBottom:12,fontSize:12,color:"var(--blue)"}}>
+      <MHead title={prefill.invCust?"🧾 Convert Quote to Invoice":"🧾 Create Workshop Invoice"} onClose={onClose}/>
+      {prefill.invCust&&<div style={{background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",borderRadius:6,padding:"8px 12px",marginBottom:12,fontSize:12,color:"var(--blue)"}}>
         📝 Pre-filled from quotation — review and adjust before saving.
       </div>}
 
-      {/* Editable invoice customer details — pre-filled from quote or job profile */}
+      {/* Editable invoice customer details */}
       <div className="card" style={{padding:14,marginBottom:14,background:"var(--surface2)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
           <div style={{fontSize:11,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:".06em"}}>
@@ -416,27 +434,36 @@ export function WorkshopInvoiceModal({job,items,subtotal,tax,total,settings,onSa
         <FD><FL label="Invoice Email"/><input className="inp" value={invEmail} onChange={e=>setInvEmail(e.target.value)} placeholder="Email"/></FD>
       </div>
 
-      {/* Line items summary */}
+      {/* Line items with checkboxes */}
       <div className="card" style={{padding:14,marginBottom:14,background:"var(--surface2)"}}>
-        <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>{job.vehicle_reg} · {items.length} item{items.length!==1?"s":""}</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+          <div style={{fontWeight:700,fontSize:13}}>{job.vehicle_reg} · {selItems.length}/{items.length} item{items.length!==1?"s":""}</div>
+          {selItems.length<items.length&&(
+            <button className="btn btn-ghost btn-xs" onClick={()=>setSelectedIds(new Set(items.map(i=>i.id)))}>select all</button>
+          )}
+        </div>
         <table className="tbl" style={{width:"100%"}}>
-          <thead><tr>{["Type","Description","Qty","Price","Total"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <thead><tr><th style={{width:28}}></th>{["Type","Description","Qty","Price","Total"].map(h=><th key={h}>{h}</th>)}</tr></thead>
           <tbody>
-            {items.map(i=>(
-              <tr key={i.id}>
-                <td><span className="badge" style={{background:i.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:i.type==="part"?"var(--blue)":"var(--green)",fontSize:11}}>{i.type==="part"?"🔩":"👷"}</span></td>
-                <td>{i.description}{i.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:6}}>{i.part_sku}</code>}</td>
-                <td style={{textAlign:"right"}}>{i.qty}</td>
-                <td style={{textAlign:"right"}}>{fmtAmt(i.unit_price)}</td>
-                <td style={{textAlign:"right",fontWeight:700}}>{fmtAmt(i.total)}</td>
-              </tr>
-            ))}
+            {items.map(i=>{
+              const checked=selectedIds.has(i.id);
+              return (
+                <tr key={i.id} style={{opacity:checked?1:0.4,cursor:"pointer"}} onClick={()=>toggleItem(i.id)}>
+                  <td><input type="checkbox" checked={checked} onChange={()=>toggleItem(i.id)} onClick={e=>e.stopPropagation()} style={{cursor:"pointer"}}/></td>
+                  <td><span className="badge" style={{background:i.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:i.type==="part"?"var(--blue)":"var(--green)",fontSize:11}}>{i.type==="part"?"🔩":"👷"}</span></td>
+                  <td style={{textDecoration:checked?"none":"line-through"}}>{i.description}{i.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:6}}>{i.part_sku}</code>}</td>
+                  <td style={{textAlign:"right"}}>{i.qty}</td>
+                  <td style={{textAlign:"right"}}>{fmt(i.unit_price)}</td>
+                  <td style={{textAlign:"right",fontWeight:700}}>{fmt(i.total)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
-          <div>Subtotal: <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(subtotal)}</strong></div>
-          {settings.vat_number&&(settings.tax_rate||0)>0&&<div>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(tax)}</strong></div>}
-          <div style={{fontSize:16,fontWeight:700,color:"var(--accent)"}}>Total: {fmtAmt(total)}</div>
+          <div>Subtotal: <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(selSubtotal)}</strong></div>
+          {settings.vat_number&&(settings.tax_rate||0)>0&&<div>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(selTax)}</strong></div>}
+          <div style={{fontSize:16,fontWeight:700,color:"var(--accent)"}}>Total: {fmt(selTotal)}</div>
         </div>
       </div>
 

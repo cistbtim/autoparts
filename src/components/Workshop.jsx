@@ -7571,13 +7571,13 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     }
     const idClause=idFilter?`or=(${idFilter.map(id=>`id.eq.${id}`).join(",")})&`:"";
     const fetches=[
-      api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}select=${COLS}&order=name.asc`).catch(()=>[]),
+      api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}select=${COLS}&order=sku.asc`).catch(()=>[]),
       api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=id,part_id,stock,price,bin_location`).catch(()=>[]),
       // Fetch from ALL branches in both modes — job mode scoped by fitment idClause,
       // standalone mode fetches full catalog (same as admin view)
       idClause
-        ? api.get("parts",`${idClause}select=${COLS}&order=name.asc`).catch(()=>[])
-        : api.get("parts",`select=${COLS}&order=name.asc`).catch(()=>[]),
+        ? api.get("parts",`${idClause}select=${COLS}&order=sku.asc`).catch(()=>[])
+        : api.get("parts",`select=${COLS}&order=sku.asc`).catch(()=>[]),
     ];
     Promise.all(fetches).then(async([ownParts,bStock,mainParts])=>{
       const bStockArr=Array.isArray(bStock)?bStock:[];
@@ -7684,7 +7684,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const cartTotal=localCart.reduce((s,i)=>s+i.price*i.qty,0);
   const cartCount=cart.reduce((s,i)=>s+i.qty,0);
 
-  const paged=filtered.slice(page*WS_SHOP_PAGE_SIZE,(page+1)*WS_SHOP_PAGE_SIZE);
+  const sortedFiltered=[...filtered].sort((a,b)=>(a.sku||"").localeCompare(b.sku||""));
+  const paged=sortedFiltered.slice(page*WS_SHOP_PAGE_SIZE,(page+1)*WS_SHOP_PAGE_SIZE);
 
   return (
     <div>

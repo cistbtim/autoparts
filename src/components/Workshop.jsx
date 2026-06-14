@@ -277,6 +277,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
+        mainBranchId={branches.find(b=>b.is_main)?.id||null}
         wsShopRequests={wsShopRequests.filter(r=>r.job_id===activeJob.id)}
         onSaveWsShopRequest={onSaveWsShopRequest}
         sourceBooking={wsBookings.find(bk=>bk.id===activeJob.booking_id)||null}
@@ -3201,7 +3202,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,wsLocked=false,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,wsLocked=false,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -3337,17 +3338,22 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     if(!fitIds.length){setSpareShopPartsCount(0);return;}
     if(fitIds.length>400){setSpareShopPartsCount(null);return;}
     const idClause=`or=(${fitIds.map(id=>`id.eq.${id}`).join(",")})`;
-    Promise.all([
+    // Mirror the WsSpareShopTab fetch: linked branch own parts + branch_stock catalog + main branch parts
+    const fetches=[
       api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}&select=id`).catch(()=>[]),
       api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=part_id`).catch(()=>[]),
-    ]).then(([ownParts,bStock])=>{
+      mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&${idClause}&select=id`).catch(()=>[]):Promise.resolve([]),
+    ];
+    Promise.all(fetches).then(([ownParts,bStock,mainParts])=>{
       const ids=new Set((Array.isArray(ownParts)?ownParts:[]).map(p=>String(p.id)));
       (Array.isArray(bStock)?bStock:[]).forEach(bs=>{
         if(fitIds.includes(String(bs.part_id))) ids.add(String(bs.part_id));
       });
+      // Add main branch parts (same dedup logic as WsSpareShopTab)
+      (Array.isArray(mainParts)?mainParts:[]).forEach(p=>ids.add(String(p.id)));
       setSpareShopPartsCount(ids.size);
     });
-  },[job.vehicle_make,job.vehicle_model,wsProfile?.linked_branch_id,partFitments,vehicles]);
+  },[job.vehicle_make,job.vehicle_model,wsProfile?.linked_branch_id,mainBranchId,partFitments,vehicles]);
   // When spare shop part popup opens with a part_id but no photo,
   // fetch the latest part row directly so a recently-added photo shows immediately.
   useEffect(()=>{

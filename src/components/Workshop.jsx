@@ -3247,6 +3247,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [addingPastRecord, setAddingPastRecord] = useState(false);
   const [pastRec, setPastRec] = useState({date_in:"",date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});
   const [savingPastRec, setSavingPastRec] = useState(false);
+  const [spareShopPartsCount, setSpareShopPartsCount] = useState(null);
   const [isMobile,      setIsMobile]      = useState(()=>window.innerWidth<=700);
   const [showVinSearch, setShowVinSearch] = useState(false);
   const [showOePanel,   setShowOePanel]   = useState(false);
@@ -3322,6 +3323,31 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   useEffect(()=>{
     refreshLocalShopRequests();
   },[refreshLocalShopRequests]);
+  // Fetch the count of spare-shop parts that actually fit this vehicle so the badge
+  // on the "Parts for..." button matches what the shop page shows.
+  useEffect(()=>{
+    const linkedBranchId=wsProfile?.linked_branch_id;
+    if(!linkedBranchId||!onGoToSpareShop||!job.vehicle_make){setSpareShopPartsCount(null);return;}
+    const matchV=vehicles.filter(v=>
+      v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()&&
+      (!job.vehicle_model||(v.model?.toLowerCase()===job.vehicle_model?.toLowerCase()||v.code===job.vehicle_model))
+    );
+    const vIds=new Set(matchV.map(v=>String(v.id)));
+    const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
+    if(!fitIds.length){setSpareShopPartsCount(0);return;}
+    if(fitIds.length>400){setSpareShopPartsCount(null);return;}
+    const idClause=`or=(${fitIds.map(id=>`id.eq.${id}`).join(",")})`;
+    Promise.all([
+      api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}&select=id`).catch(()=>[]),
+      api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=part_id`).catch(()=>[]),
+    ]).then(([ownParts,bStock])=>{
+      const ids=new Set((Array.isArray(ownParts)?ownParts:[]).map(p=>String(p.id)));
+      (Array.isArray(bStock)?bStock:[]).forEach(bs=>{
+        if(fitIds.includes(String(bs.part_id))) ids.add(String(bs.part_id));
+      });
+      setSpareShopPartsCount(ids.size);
+    });
+  },[job.vehicle_make,job.vehicle_model,wsProfile?.linked_branch_id,partFitments,vehicles]);
   // When spare shop part popup opens with a part_id but no photo,
   // fetch the latest part row directly so a recently-added photo shows immediately.
   useEffect(()=>{
@@ -4130,6 +4156,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     <div style={{fontSize:13,fontWeight:800,letterSpacing:".02em",marginBottom:2}}>Parts for {carLabel}</div>
                     <div style={{fontSize:12,color:"rgba(255,255,255,.7)"}}>Browse spare shop stock for this vehicle</div>
                   </div>
+                  {spareShopPartsCount>0&&(
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",background:"rgba(255,255,255,.15)",borderRadius:10,padding:"6px 12px",flexShrink:0}}>
+                      <span style={{fontSize:20,fontWeight:800,fontFamily:"Rajdhani,sans-serif",lineHeight:1}}>{spareShopPartsCount}</span>
+                      <span style={{fontSize:10,fontWeight:600,color:"rgba(255,255,255,.75)"}}>parts</span>
+                    </div>
+                  )}
                 </button>
               )}
             </div>

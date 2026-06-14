@@ -3339,25 +3339,16 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     let cancelled=false;
     (async()=>{
       const ids=new Set();
-      // Methods 1+2: fitment IDs from linked branch, branch_stock, main branch
+      // Method 1: fitment IDs — no branch restriction (all parts from any branch)
       if(fitIds.length>0&&fitIds.length<=400){
         const idClause=`or=(${fitIds.map(id=>`id.eq.${id}`).join(",")})`;
-        const[ownParts,bStock,mainParts]=await Promise.all([
-          api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}&select=id`).catch(()=>[]),
-          api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=part_id`).catch(()=>[]),
-          mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&${idClause}&select=id`).catch(()=>[]):Promise.resolve([]),
-        ]);
-        (Array.isArray(ownParts)?ownParts:[]).forEach(p=>ids.add(String(p.id)));
-        (Array.isArray(bStock)?bStock:[]).forEach(bs=>{if(fitIds.includes(String(bs.part_id)))ids.add(String(bs.part_id));});
-        (Array.isArray(mainParts)?mainParts:[]).forEach(p=>ids.add(String(p.id)));
+        const allFitParts=await api.get("parts",`${idClause}&select=id`).catch(()=>[]);
+        (Array.isArray(allFitParts)?allFitParts:[]).forEach(p=>ids.add(String(p.id)));
       }
-      // Method 3: make/model field matching (mirrors VehicleSearchBar)
+      // Method 3: make/model field matching — no branch restriction
       if(vmNames.length>0){
-        const[mkLinked,mkMain]=await Promise.all([
-          api.get("parts",`branch_id=eq.${linkedBranchId}&make=eq.${encodeURIComponent(job.vehicle_make)}&select=id,model`).catch(()=>[]),
-          mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&make=eq.${encodeURIComponent(job.vehicle_make)}&select=id,model`).catch(()=>[]):Promise.resolve([]),
-        ]);
-        [...(Array.isArray(mkLinked)?mkLinked:[]),...(Array.isArray(mkMain)?mkMain:[])].forEach(p=>{
+        const mkAll=await api.get("parts",`make=eq.${encodeURIComponent(job.vehicle_make)}&select=id,model`).catch(()=>[]);
+        (Array.isArray(mkAll)?mkAll:[]).forEach(p=>{
           const pmod=(p.model||"").toUpperCase().trim();
           if(!pmod)return;
           const ok=vmNames.some(vm=>{
@@ -7582,8 +7573,11 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     const fetches=[
       api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}select=${COLS}&order=name.asc`).catch(()=>[]),
       api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=id,part_id,stock,price,bin_location`).catch(()=>[]),
-      // Only load main branch parts if mainBranchId is known — avoids fetching entire table
-      mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&${idClause}select=${COLS}&order=name.asc`).catch(()=>[]):Promise.resolve([]),
+      // Job mode (idClause set): fetch fitment parts from ALL branches so count matches admin view
+      // Non-job mode: only fetch main branch to avoid downloading the entire catalog
+      idClause
+        ? api.get("parts",`${idClause}select=${COLS}&order=name.asc`).catch(()=>[])
+        : mainBranchId ? api.get("parts",`branch_id=eq.${mainBranchId}&select=${COLS}&order=name.asc`).catch(()=>[]) : Promise.resolve([]),
     ];
     Promise.all(fetches).then(async([ownParts,bStock,mainParts])=>{
       const bStockArr=Array.isArray(bStock)?bStock:[];
@@ -7617,12 +7611,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       if(initialMake&&jobModeMatchV.length>0){
         const vmNames=[...new Set(jobModeMatchV.map(v=>v.model).filter(Boolean))];
         if(vmNames.length>0){
-          const[mkLinked,mkMain]=await Promise.all([
-            api.get("parts",`branch_id=eq.${linkedBranchId}&make=eq.${encodeURIComponent(initialMake)}&select=${COLS}`).catch(()=>[]),
-            mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&make=eq.${encodeURIComponent(initialMake)}&select=${COLS}`).catch(()=>[]):Promise.resolve([]),
-          ]);
-          const mkLinkedIds=new Set((Array.isArray(mkLinked)?mkLinked:[]).map(p=>String(p.id)));
-          [...(Array.isArray(mkLinked)?mkLinked:[]),...(Array.isArray(mkMain)?mkMain:[])].forEach(p=>{
+          // Fetch make/model parts from ALL branches (no branch restriction)
+          const mkAll=await api.get("parts",`make=eq.${encodeURIComponent(initialMake)}&select=${COLS},branch_id`).catch(()=>[]);
+          (Array.isArray(mkAll)?mkAll:[]).forEach(p=>{
             if(allSeen.has(String(p.id)))return;
             const pmod=(p.model||"").toUpperCase().trim();
             if(!pmod)return;
@@ -7631,7 +7622,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
               const w=vmUp.split(/[\s\/,]+/).filter(ww=>ww.length>2);
               return pmod===vmUp||vmUp.includes(pmod)||w.some(ww=>pmod.includes(ww));
             });
-            if(ok){allSeen.add(String(p.id));combined.push({...p,_source:mkLinkedIds.has(String(p.id))?"local":"other"});}
+            if(ok){allSeen.add(String(p.id));combined.push({...p,_source:String(p.branch_id)===String(linkedBranchId)?"local":"other"});}
           });
         }
       }

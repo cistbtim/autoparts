@@ -7573,11 +7573,11 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     const fetches=[
       api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}select=${COLS}&order=name.asc`).catch(()=>[]),
       api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=id,part_id,stock,price,bin_location`).catch(()=>[]),
-      // Job mode (idClause set): fetch fitment parts from ALL branches so count matches admin view
-      // Non-job mode: only fetch main branch to avoid downloading the entire catalog
+      // Fetch from ALL branches in both modes — job mode scoped by fitment idClause,
+      // standalone mode fetches full catalog (same as admin view)
       idClause
         ? api.get("parts",`${idClause}select=${COLS}&order=name.asc`).catch(()=>[])
-        : mainBranchId ? api.get("parts",`branch_id=eq.${mainBranchId}&select=${COLS}&order=name.asc`).catch(()=>[]) : Promise.resolve([]),
+        : api.get("parts",`select=${COLS}&order=name.asc`).catch(()=>[]),
     ];
     Promise.all(fetches).then(async([ownParts,bStock,mainParts])=>{
       const bStockArr=Array.isArray(bStock)?bStock:[];

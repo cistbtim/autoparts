@@ -3353,8 +3353,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           if(!pmod)return;
           const ok=vmNames.some(vm=>{
             const vmUp=vm.toUpperCase();
-            const w=vmUp.split(/[\s\/,]+/).filter(ww=>ww.length>2);
-            return pmod===vmUp||vmUp.includes(pmod)||w.some(ww=>pmod.includes(ww));
+            return pmod===vmUp||vmUp.includes(pmod)||pmod.includes(vmUp);
           });
           if(ok)ids.add(String(p.id));
         });
@@ -7656,8 +7655,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const pmod=(p.model||"").toUpperCase().trim();
       if(!pmod)return false;
       return vmNamesUp.some(vm=>{
-        const w=vm.split(/[\s\/,]+/).filter(ww=>ww.length>2);
-        return pmod===vm||vm.includes(pmod)||w.some(ww=>pmod.includes(ww));
+        return pmod===vm||vm.includes(pmod)||pmod.includes(vm);
       });
     }).map(p=>String(p.id)));
     const allIds=new Set([...fitIds,...codeIds,...makeModelIds]);

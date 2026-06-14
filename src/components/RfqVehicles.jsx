@@ -1544,11 +1544,8 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
         if((p.make||"").toUpperCase() !== makeUp) return false;
         const pmod=(p.model||"").toUpperCase().trim();
         if(!pmod) return false;
-        // Match if part model contains any word from the vehicle model, or vehicle model contains part model
-        return vehicleModelNames.some(vm=>{
-          const vmWords=vm.split(/[\s\/,]+/).filter(w=>w.length>2);
-          return pmod===vm || vm.includes(pmod) || vmWords.some(w=>pmod.includes(w));
-        });
+        // Match if vehicle model contains part model (general part) or part model contains vehicle model (specific part)
+        return vehicleModelNames.some(vm=>pmod===vm||vm.includes(pmod)||pmod.includes(vm));
       }).map(p=>String(p.id))
     );
 

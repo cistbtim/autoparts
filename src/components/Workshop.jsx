@@ -4114,14 +4114,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               <span style={{fontSize:tileSize.labelSize,fontWeight:700,lineHeight:1.2,textAlign:"center",letterSpacing:".01em"}}>{ch.label}</span>
             </button>
           );
-          // Parts count for this car from the fitments database
-          const jobVehicleRec = job.vehicle_make ? vehicles.find(v=>
-            v.make?.toLowerCase()===job.vehicle_make?.toLowerCase() &&
-            (!job.vehicle_model || v.model?.toLowerCase()===job.vehicle_model?.toLowerCase() || v.code===job.vehicle_model)
-          ) : null;
-          const fitPartsCount = jobVehicleRec
-            ? new Set(partFitments.filter(f=>String(f.vehicle_id)===String(jobVehicleRec.id)).map(f=>f.part_id)).size
-            : 0;
           const hasSpareShop = !!wsProfile?.linked_branch_id && !!onGoToSpareShop;
           const carLabel = [job.vehicle_make, job.vehicle_model].filter(Boolean).join(" ") || job.vehicle_reg || "This Car";
           return (
@@ -4138,12 +4130,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     <div style={{fontSize:13,fontWeight:800,letterSpacing:".02em",marginBottom:2}}>Parts for {carLabel}</div>
                     <div style={{fontSize:12,color:"rgba(255,255,255,.7)"}}>Browse spare shop stock for this vehicle</div>
                   </div>
-                  {fitPartsCount>0&&(
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",background:"rgba(255,255,255,.15)",borderRadius:10,padding:"6px 12px",flexShrink:0}}>
-                      <span style={{fontSize:20,fontWeight:800,fontFamily:"Rajdhani,sans-serif",lineHeight:1}}>{fitPartsCount}</span>
-                      <span style={{fontSize:10,fontWeight:600,color:"rgba(255,255,255,.75)"}}>parts</span>
-                    </div>
-                  )}
                 </button>
               )}
             </div>

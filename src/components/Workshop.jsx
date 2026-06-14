@@ -3335,24 +3335,42 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     );
     const vIds=new Set(matchV.map(v=>String(v.id)));
     const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
-    if(!fitIds.length){setSpareShopPartsCount(0);return;}
-    if(fitIds.length>400){setSpareShopPartsCount(null);return;}
-    const idClause=`or=(${fitIds.map(id=>`id.eq.${id}`).join(",")})`;
-    // Mirror the WsSpareShopTab fetch: linked branch own parts + branch_stock catalog + main branch parts
-    const fetches=[
-      api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}&select=id`).catch(()=>[]),
-      api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=part_id`).catch(()=>[]),
-      mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&${idClause}&select=id`).catch(()=>[]):Promise.resolve([]),
-    ];
-    Promise.all(fetches).then(([ownParts,bStock,mainParts])=>{
-      const ids=new Set((Array.isArray(ownParts)?ownParts:[]).map(p=>String(p.id)));
-      (Array.isArray(bStock)?bStock:[]).forEach(bs=>{
-        if(fitIds.includes(String(bs.part_id))) ids.add(String(bs.part_id));
-      });
-      // Add main branch parts (same dedup logic as WsSpareShopTab)
-      (Array.isArray(mainParts)?mainParts:[]).forEach(p=>ids.add(String(p.id)));
-      setSpareShopPartsCount(ids.size);
-    });
+    const vmNames=[...new Set(matchV.map(v=>v.model).filter(Boolean))];
+    let cancelled=false;
+    (async()=>{
+      const ids=new Set();
+      // Methods 1+2: fitment IDs from linked branch, branch_stock, main branch
+      if(fitIds.length>0&&fitIds.length<=400){
+        const idClause=`or=(${fitIds.map(id=>`id.eq.${id}`).join(",")})`;
+        const[ownParts,bStock,mainParts]=await Promise.all([
+          api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}&select=id`).catch(()=>[]),
+          api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=part_id`).catch(()=>[]),
+          mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&${idClause}&select=id`).catch(()=>[]):Promise.resolve([]),
+        ]);
+        (Array.isArray(ownParts)?ownParts:[]).forEach(p=>ids.add(String(p.id)));
+        (Array.isArray(bStock)?bStock:[]).forEach(bs=>{if(fitIds.includes(String(bs.part_id)))ids.add(String(bs.part_id));});
+        (Array.isArray(mainParts)?mainParts:[]).forEach(p=>ids.add(String(p.id)));
+      }
+      // Method 3: make/model field matching (mirrors VehicleSearchBar)
+      if(vmNames.length>0){
+        const[mkLinked,mkMain]=await Promise.all([
+          api.get("parts",`branch_id=eq.${linkedBranchId}&make=eq.${encodeURIComponent(job.vehicle_make)}&select=id,model`).catch(()=>[]),
+          mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&make=eq.${encodeURIComponent(job.vehicle_make)}&select=id,model`).catch(()=>[]):Promise.resolve([]),
+        ]);
+        [...(Array.isArray(mkLinked)?mkLinked:[]),...(Array.isArray(mkMain)?mkMain:[])].forEach(p=>{
+          const pmod=(p.model||"").toUpperCase().trim();
+          if(!pmod)return;
+          const ok=vmNames.some(vm=>{
+            const vmUp=vm.toUpperCase();
+            const w=vmUp.split(/[\s\/,]+/).filter(ww=>ww.length>2);
+            return pmod===vmUp||vmUp.includes(pmod)||w.some(ww=>pmod.includes(ww));
+          });
+          if(ok)ids.add(String(p.id));
+        });
+      }
+      if(!cancelled)setSpareShopPartsCount(ids.size||null);
+    })();
+    return()=>{cancelled=true;};
   },[job.vehicle_make,job.vehicle_model,wsProfile?.linked_branch_id,mainBranchId,partFitments,vehicles]);
   // When spare shop part popup opens with a part_id but no photo,
   // fetch the latest part row directly so a recently-added photo shows immediately.
@@ -7551,11 +7569,14 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     // When coming from a job card (initialMake set), pre-filter by vehicle fitments so we only
     // download parts that fit the vehicle instead of the entire catalog — critical on SA mobile data
     let idFilter=null;
-    if(initialMake&&partFitments.length>0&&vehicles.length>0){
-      const matchV=vehicles.filter(v=>v.make===initialMake&&(!initialModel||v.code===initialModel||v.model===initialModel));
-      const vIds=new Set(matchV.map(v=>String(v.id)));
-      const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
-      if(fitIds.length>0&&fitIds.length<=400) idFilter=fitIds;
+    let jobModeMatchV=[];
+    if(initialMake&&vehicles.length>0){
+      jobModeMatchV=vehicles.filter(v=>v.make===initialMake&&(!initialModel||v.code===initialModel||v.model===initialModel));
+      if(partFitments.length>0&&jobModeMatchV.length>0){
+        const vIds=new Set(jobModeMatchV.map(v=>String(v.id)));
+        const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
+        if(fitIds.length>0&&fitIds.length<=400) idFilter=fitIds;
+      }
     }
     const idClause=idFilter?`or=(${idFilter.map(id=>`id.eq.${id}`).join(",")})&`:"";
     const fetches=[
@@ -7591,6 +7612,29 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         ...linkedParts.map(p=>({...p,_source:"local"})),
         ...mainArr.filter(p=>!allSeen.has(String(p.id))).map(p=>({...p,_source:"other"})),
       ];
+      // Method 3 (job mode only): also include parts matched by make/model fields,
+      // mirroring VehicleSearchBar so job-mode count equals VehicleSearchBar count
+      if(initialMake&&jobModeMatchV.length>0){
+        const vmNames=[...new Set(jobModeMatchV.map(v=>v.model).filter(Boolean))];
+        if(vmNames.length>0){
+          const[mkLinked,mkMain]=await Promise.all([
+            api.get("parts",`branch_id=eq.${linkedBranchId}&make=eq.${encodeURIComponent(initialMake)}&select=${COLS}`).catch(()=>[]),
+            mainBranchId?api.get("parts",`branch_id=eq.${mainBranchId}&make=eq.${encodeURIComponent(initialMake)}&select=${COLS}`).catch(()=>[]):Promise.resolve([]),
+          ]);
+          const mkLinkedIds=new Set((Array.isArray(mkLinked)?mkLinked:[]).map(p=>String(p.id)));
+          [...(Array.isArray(mkLinked)?mkLinked:[]),...(Array.isArray(mkMain)?mkMain:[])].forEach(p=>{
+            if(allSeen.has(String(p.id)))return;
+            const pmod=(p.model||"").toUpperCase().trim();
+            if(!pmod)return;
+            const ok=vmNames.some(vm=>{
+              const vmUp=vm.toUpperCase();
+              const w=vmUp.split(/[\s\/,]+/).filter(ww=>ww.length>2);
+              return pmod===vmUp||vmUp.includes(pmod)||w.some(ww=>pmod.includes(ww));
+            });
+            if(ok){allSeen.add(String(p.id));combined.push({...p,_source:mkLinkedIds.has(String(p.id))?"local":"other"});}
+          });
+        }
+      }
       setShopParts(combined);
       setLoading(false);
       setRefreshing(false);
@@ -7611,7 +7655,19 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const s=(p.sku||"").toUpperCase();
       return vCodes.some(c=>s.startsWith(c+"-"));
     }).map(p=>String(p.id)));
-    const allIds=new Set([...fitIds,...codeIds]);
+    // Also match make/model fields (VehicleSearchBar method 3)
+    const makeUp=initialMake.toUpperCase();
+    const vmNamesUp=[...new Set(matchV.map(v=>(v.model||"").toUpperCase()).filter(Boolean))];
+    const makeModelIds=new Set(shopParts.filter(p=>{
+      if((p.make||"").toUpperCase()!==makeUp)return false;
+      const pmod=(p.model||"").toUpperCase().trim();
+      if(!pmod)return false;
+      return vmNamesUp.some(vm=>{
+        const w=vm.split(/[\s\/,]+/).filter(ww=>ww.length>2);
+        return pmod===vm||vm.includes(pmod)||w.some(ww=>pmod.includes(ww));
+      });
+    }).map(p=>String(p.id)));
+    const allIds=new Set([...fitIds,...codeIds,...makeModelIds]);
     setVehicleFilterIds(allIds.size>0?allIds:null);
   },[jobMode,initialMake,initialModel,vehicles,partFitments,shopParts]);
 

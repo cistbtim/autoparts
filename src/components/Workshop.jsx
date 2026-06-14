@@ -3329,10 +3329,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   useEffect(()=>{
     const linkedBranchId=wsProfile?.linked_branch_id;
     if(!linkedBranchId||!onGoToSpareShop||!job.vehicle_make){setSpareShopPartsCount(null);return;}
-    const matchV=vehicles.filter(v=>
-      v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()&&
-      (!job.vehicle_model||(v.model?.toLowerCase()===job.vehicle_model?.toLowerCase()||v.code===job.vehicle_model))
-    );
+    const _jMake=job.vehicle_make?.toLowerCase();
+    const _jModel=job.vehicle_model;
+    const matchV=!_jModel
+      ?vehicles.filter(v=>v.make?.toLowerCase()===_jMake)
+      :((_bc=vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&v.code===_jModel))=>
+          _bc.length>0?_bc:vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&!v.code&&v.model?.toLowerCase()===_jModel.toLowerCase()))();
     const vIds=new Set(matchV.map(v=>String(v.id)));
     const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
     const vmNames=[...new Set(matchV.map(v=>v.model).filter(Boolean))];
@@ -7561,7 +7563,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     let idFilter=null;
     let jobModeMatchV=[];
     if(initialMake&&vehicles.length>0){
-      jobModeMatchV=vehicles.filter(v=>v.make===initialMake&&(!initialModel||v.code===initialModel||v.model===initialModel));
+      jobModeMatchV=(!initialModel?vehicles.filter(v=>v.make===initialMake):((bc=vehicles.filter(v=>v.make===initialMake&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make===initialMake&&!v.code&&v.model===initialModel))());
       if(partFitments.length>0&&jobModeMatchV.length>0){
         const vIds=new Set(jobModeMatchV.map(v=>String(v.id)));
         const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];

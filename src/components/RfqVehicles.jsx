@@ -1512,9 +1512,17 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
       setActive(false);
       return;
     }
-    const matchVehicles = vehicles.filter(v =>
-      v.make === make && (!model || v.code === model || v.model === model)
-    );
+    // Code-first: if any vehicles have this exact code, use only those.
+    // Fall back to model-name matching only for vehicles with no code.
+    // This prevents a vehicle with code=HD45A and model=HD45F being included when selecting code HD45F.
+    const matchVehicles = !model
+      ? vehicles.filter(v => v.make === make)
+      : (() => {
+          const byCode = vehicles.filter(v => v.make === make && v.code === model);
+          return byCode.length > 0
+            ? byCode
+            : vehicles.filter(v => v.make === make && !v.code && v.model === model);
+        })();
 
     // 1. Fitment-linked part IDs (part_fitments table)
     const vehicleIds = new Set(matchVehicles.map(v => String(v.id)));
@@ -1638,10 +1646,12 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 
       {/* Vehicle photos + result info */}
       {active && (()=>{
-        const matchV = vehicles.filter(v=>
-          v.make===selMake &&
-          (!selModel||v.code===selModel||v.model===selModel)
-        );
+        const matchV = !selModel
+          ? vehicles.filter(v=>v.make===selMake)
+          : (() => {
+              const byCode = vehicles.filter(v=>v.make===selMake&&v.code===selModel);
+              return byCode.length>0 ? byCode : vehicles.filter(v=>v.make===selMake&&!v.code&&v.model===selModel);
+            })();
         const variants = [...new Set(matchV.map(v=>v.variant).filter(Boolean))];
         const variantLabel = variants.length === 1 ? variants[0] : "";
         const codes = [...new Set(matchV.map(v=>v.code).filter(Boolean))];

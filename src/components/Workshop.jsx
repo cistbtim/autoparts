@@ -7602,9 +7602,11 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const linkedParts=[...ownArr,...mergedCatalog.filter(p=>!seen.has(String(p.id)))];
       // Add main branch parts (dedupe — linked branch takes priority)
       const allSeen=new Set(linkedParts.map(p=>String(p.id)));
+      const mainFiltered=mainArr.filter(p=>!allSeen.has(String(p.id)));
+      mainFiltered.forEach(p=>allSeen.add(String(p.id)));
       const combined=[
         ...linkedParts.map(p=>({...p,_source:"local"})),
-        ...mainArr.filter(p=>!allSeen.has(String(p.id))).map(p=>({...p,_source:"other"})),
+        ...mainFiltered.map(p=>({...p,_source:"other"})),
       ];
       // Method 3 (job mode only): also include parts matched by make/model fields,
       // mirroring VehicleSearchBar so job-mode count equals VehicleSearchBar count

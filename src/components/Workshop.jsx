@@ -741,7 +741,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 onDragStart={isDraggable ? ()=>handleDragStart(job,col) : undefined}
                 onDragEnd={isDraggable ? handleDragEnd : undefined}
                 style={{cursor: isDraggable ? "grab" : undefined, outline: isOverdue?"2px solid #f87171":"none", outlineOffset:1}}
-                onClick={()=>{setJobDetailTab(col.id==="invoiced"||col.id==="paid"?"invoice":"menu");setActiveJob(job);setView("job");}}>
+                onClick={()=>{setJobDetailTab("menu");setActiveJob(job);setView("job");}}>
                 <div style={{height:3,background:isOverdue?"#f87171":col.color}}/>
 
                 {/* ── Car photo (toggleable) ── */}
@@ -922,7 +922,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                     <div style={{marginTop:2}} onClick={e=>e.stopPropagation()}>
                       {col.id==="wip"&&(
                         <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:10,padding:"5px 0",marginBottom:3}}
-                          onClick={()=>{ setJobDetailTab("quote"); setActiveJob(job); setView("job"); }}>📝 Quote</button>
+                          onClick={()=>{ setJobDetailTab("menu"); setActiveJob(job); setView("job"); }}>📝 Quote</button>
                       )}
                       {col.nextStatus&&(()=>{
                         const hasQuote = col.id==="wip" ? !!jobQuote(job.id) : true;
@@ -3700,7 +3700,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   return (
     <div className="fu">
       {/* ── Vehicle header card ── */}
-      <div style={{display:"flex",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:"12px 12px 0 0",borderBottom:"none",overflow:"hidden",minHeight:130}}>
+      <div style={{display:"flex",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:"12px 12px 0 0",borderBottom:"none",overflow:"hidden",minHeight:130,position:"relative"}}>
         {/* Photo */}
         <div style={{width:130,flexShrink:0,position:"relative",background:"var(--surface2)",overflow:"hidden",cursor:vehiclePhotos.front?"pointer":"default"}}
           onClick={vehiclePhotos.front?()=>setPhotoLightbox(0):undefined}>
@@ -3790,6 +3790,25 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             </button>
           </div>
         </div>
+        {/* ── PAID stamp overlay ── */}
+        {invoice?.status==="paid"&&(
+          <div style={{position:"absolute",top:16,right:16,transform:"rotate(-10deg)",
+            border:"3px solid #dc2626",borderRadius:7,padding:"7px 16px",
+            color:"#dc2626",fontWeight:900,fontSize:20,letterSpacing:".18em",
+            opacity:.75,fontFamily:"DM Mono,monospace",textTransform:"uppercase",
+            lineHeight:1,background:"rgba(220,38,38,.05)",pointerEvents:"none",userSelect:"none"}}>
+            PAID
+          </div>
+        )}
+        {invoice?.status==="partial"&&(
+          <div style={{position:"absolute",top:16,right:16,transform:"rotate(-10deg)",
+            border:"3px solid #f97316",borderRadius:7,padding:"7px 16px",
+            color:"#f97316",fontWeight:900,fontSize:20,letterSpacing:".18em",
+            opacity:.75,fontFamily:"DM Mono,monospace",textTransform:"uppercase",
+            lineHeight:1,background:"rgba(249,115,22,.05)",pointerEvents:"none",userSelect:"none"}}>
+            PARTIAL
+          </div>
+        )}
       </div>
 
       {/* ── Back button / info strip ── */}

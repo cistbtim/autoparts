@@ -2051,6 +2051,12 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         )}
         {!barHidden&&(
         <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:300,background:"var(--surface)",borderTop:"2px solid var(--border2)",boxShadow:"0 -4px 24px rgba(0,0,0,.22)"}}>
+          {/* Hide-bar handle — sits above the toolbar top-right */}
+          <button onClick={()=>{setBarHidden(true);try{localStorage.setItem("ws_bar_hidden","1");}catch{}}}
+            style={{position:"absolute",top:-22,right:12,background:"var(--surface)",border:"2px solid var(--border2)",borderBottom:"none",borderRadius:"8px 8px 0 0",padding:"2px 12px",fontSize:11,fontWeight:700,color:"var(--text3)",cursor:"pointer",lineHeight:1.4}}
+            title="Hide toolbar">
+            ▼
+          </button>
           {/* Size picker row — expands when toggled */}
           {wsTab==="jobs"&&kanbanView&&showSizePicker&&(
             <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",borderBottom:"1px solid var(--border)",background:"var(--surface2)"}}>
@@ -2084,8 +2090,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
               </div>
             </div>
           )}
-          {/* Icon tab navigation + hide button */}
-          <div style={{display:"flex",alignItems:"center",overflowX:"auto",padding:"6px 6px 14px",gap:2,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+          {/* Icon tab navigation — horizontally scrollable */}
+          <div style={{display:"flex",overflowX:"auto",padding:"6px 6px 14px",gap:2,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
             {WS_TABS.map(([v,label,cnt])=>{
               const icon=label.split(" ")[0];
               const isActive=wsTab===v;
@@ -2099,12 +2105,6 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 </button>
               );
             })}
-            {/* Hide bar button */}
-            <button onClick={()=>{setBarHidden(true);try{localStorage.setItem("ws_bar_hidden","1");}catch{}}}
-              style={{flexShrink:0,marginLeft:"auto",padding:"6px 10px",borderRadius:10,border:"none",cursor:"pointer",background:"transparent",color:"var(--text3)",fontSize:13,lineHeight:1,display:"flex",alignItems:"center",gap:3}}
-              title="Hide toolbar">
-              ▼
-            </button>
           </div>
         </div>
         )}

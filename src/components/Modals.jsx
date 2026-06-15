@@ -8440,21 +8440,28 @@ function catAutoDetect(headers) {
   return map;
 }
 
-function parseCSVText(text) {
+function parseDelimitedText(text) {
+  // Auto-detect: if more tabs than commas on the first line it's TSV (Word/Excel paste)
+  const firstLine = text.split(/\r?\n/)[0] || "";
+  const delim = (firstLine.match(/\t/g)||[]).length > (firstLine.match(/,/g)||[]).length ? "\t" : ",";
   const rows = [];
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
-    const cells = [];
-    let inQ = false, cur = "";
-    for (const c of line) {
-      if (c === '"') { inQ = !inQ; continue; }
-      if (c === ',' && !inQ) { cells.push(cur.trim()); cur = ""; continue; }
-      cur += c;
+    if (delim === "\t") {
+      rows.push(line.split("\t").map(c => c.trim()));
+    } else {
+      const cells = [];
+      let inQ = false, cur = "";
+      for (const c of line) {
+        if (c === '"') { inQ = !inQ; continue; }
+        if (c === ',' && !inQ) { cells.push(cur.trim()); cur = ""; continue; }
+        cur += c;
+      }
+      cells.push(cur.trim());
+      rows.push(cells);
     }
-    cells.push(cur.trim());
-    rows.push(cells);
   }
-  return rows;
+  return rows.filter(r => r.some(c => c));
 }
 
 const loadXLSX = () => new Promise((resolve, reject) => {
@@ -8600,10 +8607,26 @@ export function CatalogueImportModal({ suppliers, parts, vehicles=[], onClose, o
   const [fileName, setFileName] = useState("");
   const [fileErr, setFileErr] = useState("");
   const [fileLoading, setFileLoading] = useState(false);
+  const [pasteMode, setPasteMode] = useState(false);
+  const [pasteText, setPasteText] = useState("");
   const [colMap, setColMap] = useState({});
   const [reviewRows, setReviewRows] = useState([]);
   const [importing, setImporting] = useState(false);
   const [results, setResults] = useState(null);
+
+  const handlePaste = (text) => {
+    setPasteText(text);
+    if (!text.trim()) { setRawRows([]); setFileName(""); return; }
+    try {
+      const rows = parseDelimitedText(text);
+      setRawRows(rows);
+      setFileName("pasted data");
+      setColMap(catAutoDetect(rows[0] || []));
+      setFileErr("");
+    } catch(e) {
+      setFileErr("Could not parse pasted text: " + e.message);
+    }
+  };
 
   const headers = rawRows[0] || [];
   const dataRows = rawRows.slice(1).filter(r => r.some(c => String(c).trim()));
@@ -8615,7 +8638,7 @@ export function CatalogueImportModal({ suppliers, parts, vehicles=[], onClose, o
       const ext = file.name.split('.').pop().toLowerCase();
       let rows;
       if (ext === 'csv') {
-        rows = parseCSVText(await file.text());
+        rows = parseDelimitedText(await file.text());
       } else if (ext === 'xlsx' || ext === 'xls') {
         const XLSX = await loadXLSX();
         const wb = XLSX.read(await file.arrayBuffer());
@@ -8729,14 +8752,34 @@ export function CatalogueImportModal({ suppliers, parts, vehicles=[], onClose, o
             </div>
           )}
 
-          <FL label="Catalogue File"/>
-          <label style={{display:"block",border:"2px dashed var(--border)",borderRadius:8,padding:"28px 20px",textAlign:"center",cursor:"pointer",color:"var(--text3)",fontSize:13,background:fileName?"rgba(96,165,250,.06)":"transparent",transition:"background .2s"}}>
-            <input type="file" accept=".csv,.xlsx,.xls,.pdf" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
-            {fileLoading ? "Parsing…" : fileName
-              ? <><strong style={{color:"var(--text)"}}>{fileName}</strong><br/><span style={{fontSize:12}}>{dataRows.length} data rows detected</span></>
-              : <>Drop .pdf, .csv or .xlsx here, or click to browse<br/><span style={{fontSize:11,display:"block",marginTop:4}}>PDF must be a digital (non-scanned) file — text must be selectable</span></>
-            }
-          </label>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+            <FL label="Catalogue Data" style={{margin:0}}/>
+            <div style={{display:"flex",gap:0,border:"1px solid var(--border)",borderRadius:6,overflow:"hidden",fontSize:12}}>
+              <button onClick={()=>setPasteMode(false)} style={{padding:"3px 10px",background:!pasteMode?"var(--accent)":"transparent",color:!pasteMode?"#fff":"var(--text3)",border:"none",cursor:"pointer",fontFamily:"inherit"}}>File</button>
+              <button onClick={()=>setPasteMode(true)} style={{padding:"3px 10px",background:pasteMode?"var(--accent)":"transparent",color:pasteMode?"#fff":"var(--text3)",border:"none",cursor:"pointer",fontFamily:"inherit"}}>Paste from Word/Excel</button>
+            </div>
+          </div>
+
+          {!pasteMode ? (
+            <label style={{display:"block",border:"2px dashed var(--border)",borderRadius:8,padding:"28px 20px",textAlign:"center",cursor:"pointer",color:"var(--text3)",fontSize:13,background:fileName&&fileName!=="pasted data"?"rgba(96,165,250,.06)":"transparent",transition:"background .2s"}}>
+              <input type="file" accept=".csv,.xlsx,.xls,.pdf" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+              {fileLoading ? "Parsing…" : fileName && fileName!=="pasted data"
+                ? <><strong style={{color:"var(--text)"}}>{fileName}</strong><br/><span style={{fontSize:12}}>{dataRows.length} data rows detected</span></>
+                : <>Drop .pdf, .csv or .xlsx here, or click to browse<br/><span style={{fontSize:11,display:"block",marginTop:4}}>PDF must be digital (text selectable) · Word users: use Paste tab instead</span></>
+              }
+            </label>
+          ) : (
+            <div>
+              <textarea
+                className="inp"
+                style={{width:"100%",minHeight:140,fontSize:12,fontFamily:"monospace",resize:"vertical",boxSizing:"border-box"}}
+                placeholder={"In Word: click inside the table → Ctrl+A → Ctrl+C\nThen click here and press Ctrl+V to paste"}
+                value={pasteText}
+                onChange={e=>handlePaste(e.target.value)}
+              />
+              {fileName==="pasted data"&&rawRows.length>1&&<div style={{fontSize:12,color:"var(--green)",marginTop:4}}>✓ {dataRows.length} rows detected</div>}
+            </div>
+          )}
           {fileErr&&<div style={{color:"var(--red)",fontSize:12,marginTop:6}}>{fileErr}</div>}
 
           {rawRows.length>1&&(

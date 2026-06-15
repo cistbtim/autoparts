@@ -8400,3 +8400,520 @@ export function AdContractsPage({ads=[],adContracts=[],onSaveContract,onDeleteCo
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// CATALOGUE IMPORT MODAL — multi-step: file → header mapping → review → import
+// ═══════════════════════════════════════════════════════════════
+
+const IMPORT_FIELDS = [
+  { value: "", label: "(skip)" },
+  { value: "supplier_part_no", label: "Supplier Part No" },
+  { value: "description", label: "Description" },
+  { value: "oem", label: "OEM Number" },
+  { value: "application", label: "Application / Fitment" },
+  { value: "unit", label: "Unit" },
+  { value: "price", label: "Price / Cost" },
+];
+
+const CAT_FIELD_HINTS = {
+  supplier_part_no: ["our no","part no","part num","item no","item code","article","ref no","sku","part code","no.","our code","supplier part"],
+  description: ["desc","name","item name","product","part name","details"],
+  oem: ["oem","oe no","original","cross ref","oe number","oem no"],
+  application: ["applic","fitment","fit","vehicle","car","model","use for","for model"],
+  unit: ["unit","uom","u/m"],
+  price: ["price","cost","rate","unit price"],
+};
+
+function catAutoDetect(headers) {
+  const map = {};
+  const used = new Set();
+  headers.forEach((h, i) => {
+    const lower = String(h).toLowerCase().trim();
+    for (const [field, hints] of Object.entries(CAT_FIELD_HINTS)) {
+      if (!used.has(field) && hints.some(hint => lower.includes(hint))) {
+        map[i] = field;
+        used.add(field);
+        break;
+      }
+    }
+  });
+  return map;
+}
+
+function parseCSVText(text) {
+  const rows = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const cells = [];
+    let inQ = false, cur = "";
+    for (const c of line) {
+      if (c === '"') { inQ = !inQ; continue; }
+      if (c === ',' && !inQ) { cells.push(cur.trim()); cur = ""; continue; }
+      cur += c;
+    }
+    cells.push(cur.trim());
+    rows.push(cells);
+  }
+  return rows;
+}
+
+const loadXLSX = () => new Promise((resolve, reject) => {
+  if (window.XLSX) return resolve(window.XLSX);
+  const s = document.createElement('script');
+  s.src = 'https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js';
+  s.onload = () => window.XLSX ? resolve(window.XLSX) : reject(new Error('XLSX load failed'));
+  s.onerror = () => reject(new Error('Failed to load Excel parser'));
+  document.head.appendChild(s);
+});
+
+const loadPDFJS = () => new Promise((resolve, reject) => {
+  if (window.pdfjsLib) return resolve(window.pdfjsLib);
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  s.onload = () => {
+    if (!window.pdfjsLib) { reject(new Error('PDF.js failed to load')); return; }
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    resolve(window.pdfjsLib);
+  };
+  s.onerror = () => reject(new Error('Failed to load PDF parser'));
+  document.head.appendChild(s);
+});
+
+async function extractRowsFromPDF(file) {
+  const pdfjsLib = await loadPDFJS();
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const allRows = [];
+  let colXPositions = null; // determined from the first/widest line (header row)
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const { items } = await page.getTextContent();
+    const textItems = items
+      .filter(i => i.str?.trim())
+      .map(i => ({ x: i.transform[4], y: i.transform[5], text: i.str.trim() }));
+
+    if (p === 1 && textItems.length === 0) {
+      throw new Error('No text found in this PDF — it appears to be a scanned image. Please convert it to Excel or CSV first using Adobe Acrobat, Smallpdf.com, or ilovepdf.com.');
+    }
+    if (!textItems.length) continue;
+
+    // Group items into lines by Y coordinate (quantize to 4px buckets)
+    const lineMap = new Map();
+    for (const item of textItems) {
+      const yKey = Math.round(item.y / 4) * 4;
+      if (!lineMap.has(yKey)) lineMap.set(yKey, []);
+      lineMap.get(yKey).push(item);
+    }
+
+    // Sort lines top-to-bottom (PDF Y increases upward so sort descending)
+    const lines = [...lineMap.entries()]
+      .sort(([a], [b]) => b - a)
+      .map(([, it]) => it.sort((a, b) => a.x - b.x));
+
+    // Use the widest line (most distinct X positions) as the column reference
+    if (!colXPositions) {
+      const widest = lines.reduce((best, l) => l.length > best.length ? l : best, lines[0]);
+      colXPositions = widest.map(i => i.x);
+    }
+
+    const numCols = colXPositions.length;
+    const nearestCol = (x) => colXPositions.reduce(
+      (best, cx, i) => Math.abs(x - cx) < Math.abs(x - colXPositions[best]) ? i : best, 0
+    );
+
+    // Build row arrays, assigning each item to its nearest column
+    const pageRows = [];
+    for (const lineItems of lines) {
+      const row = new Array(numCols).fill('');
+      for (const item of lineItems) {
+        const col = nearestCol(item.x);
+        row[col] = row[col] ? row[col] + ' ' + item.text : item.text;
+      }
+      if (row.some(c => c)) pageRows.push(row);
+    }
+
+    // Merge continuation lines: rows where col 0 is empty are usually a wrapped
+    // cell from the previous row (e.g. long Application text overflowing)
+    const merged = [];
+    for (const row of pageRows) {
+      if (merged.length > 0 && !row[0]) {
+        const prev = merged[merged.length - 1];
+        for (let i = 1; i < row.length; i++) {
+          if (row[i]) prev[i] = prev[i] ? prev[i] + ' ' + row[i] : row[i];
+        }
+      } else {
+        merged.push([...row]);
+      }
+    }
+
+    allRows.push(...merged);
+  }
+
+  return allRows;
+}
+
+function parseFitmentText(text, vehicles) {
+  if (!text) return [];
+  const cleaned = text.replace(/\n?(Dia|Engine|Size|Length|Width|OD|ID|Type)\s*[.:：][^\n]*/gi, ' ').trim();
+  const suggestions = [];
+  const upper = cleaned.toUpperCase();
+  const pattern = /([A-Z]{2}[A-Z\s]{0,18}?)\s*[:：]\s*([^;:]+)/g;
+  let m;
+  while ((m = pattern.exec(upper)) !== null) {
+    const make = m[1].trim();
+    const modelStr = m[2];
+    for (const raw of modelStr.split(',')) {
+      const r = raw.trim();
+      if (!r) continue;
+      const clean = r.replace(/\s*[-–]\s*[\d.]+[A-Z]*/g, '').replace(/\s+[\d.]+[A-Z]*$/g, '').trim();
+      if (!clean || clean.length < 2) continue;
+      const firstWord = clean.split(/\s+/)[0];
+      const matched = vehicles.filter(v =>
+        v.make?.toUpperCase() === make &&
+        (v.model?.toUpperCase().startsWith(firstWord) || v.code?.toUpperCase() === firstWord)
+      );
+      suggestions.push({ make, model: clean, raw: r, vehicleIds: matched.map(v => v.id) });
+    }
+  }
+  if (suggestions.length === 0) {
+    const simple = /([A-Z]{2,})\s*[:：]\s*([A-Z0-9]+)/i.exec(upper);
+    if (simple) {
+      const make = simple[1];
+      const code = simple[2];
+      const matched = vehicles.filter(v =>
+        v.make?.toUpperCase() === make && (v.code?.toUpperCase() === code || v.model?.toUpperCase() === code)
+      );
+      suggestions.push({ make, model: code, raw: code, vehicleIds: matched.map(v => v.id) });
+    }
+  }
+  return suggestions;
+}
+
+export function CatalogueImportModal({ suppliers, parts, vehicles=[], onClose, onImportDone }) {
+  const [step, setStep] = useState(1);
+  const [suppId, setSuppId] = useState("");
+  const [createSupp, setCreateSupp] = useState(false);
+  const [newSuppName, setNewSuppName] = useState("");
+  const [newSuppCode, setNewSuppCode] = useState("");
+  const [rawRows, setRawRows] = useState([]);
+  const [fileName, setFileName] = useState("");
+  const [fileErr, setFileErr] = useState("");
+  const [fileLoading, setFileLoading] = useState(false);
+  const [colMap, setColMap] = useState({});
+  const [reviewRows, setReviewRows] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [results, setResults] = useState(null);
+
+  const headers = rawRows[0] || [];
+  const dataRows = rawRows.slice(1).filter(r => r.some(c => String(c).trim()));
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    setFileErr(""); setFileLoading(true);
+    try {
+      const ext = file.name.split('.').pop().toLowerCase();
+      let rows;
+      if (ext === 'csv') {
+        rows = parseCSVText(await file.text());
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        const XLSX = await loadXLSX();
+        const wb = XLSX.read(await file.arrayBuffer());
+        rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
+      } else if (ext === 'pdf') {
+        rows = await extractRowsFromPDF(file);
+      } else {
+        setFileErr("Unsupported file. Use .pdf, .csv, .xlsx or .xls");
+        setFileLoading(false); return;
+      }
+      const cleaned = rows.filter(r => Array.isArray(r) && r.some(c => String(c).trim()));
+      setRawRows(cleaned);
+      setFileName(file.name);
+      setColMap(catAutoDetect(cleaned[0] || []));
+    } catch (e) {
+      setFileErr("Parse error: " + e.message);
+    }
+    setFileLoading(false);
+  };
+
+  const buildReview = () => {
+    const get = (row, field) => {
+      const entry = Object.entries(colMap).find(([, f]) => f === field);
+      return entry !== undefined ? String(row[+entry[0]] || "").trim() : "";
+    };
+    return dataRows.map(row => {
+      const suppPartNo = get(row, "supplier_part_no");
+      const description = get(row, "description");
+      const oem = get(row, "oem");
+      const application = get(row, "application");
+      const fitments = parseFitmentText(application, vehicles);
+      const matchedPart = oem ? parts.find(p => p.oem?.trim().toLowerCase() === oem.toLowerCase()) : null;
+      return { suppPartNo, description, oem, application, fitments, matchedPart, partId: matchedPart?.id || null, action: "import" };
+    }).filter(r => r.suppPartNo || r.description || r.oem);
+  };
+
+  const runImport = async () => {
+    setImporting(true);
+    let resolvedSuppId = suppId ? +suppId : null;
+    const created = { parts: 0, links: 0, fitments: 0 };
+    const newParts = [], newLinks = [], newFits = [];
+    try {
+      if (createSupp && newSuppName) {
+        const r = await api.upsert("suppliers", { name: newSuppName, code: newSuppCode || null });
+        resolvedSuppId = r?.[0]?.id || r?.id || null;
+      }
+      for (const row of reviewRows.filter(r => r.action === "import")) {
+        let partId = row.partId;
+        if (!partId) {
+          const sku = row.suppPartNo || `IMP-${Date.now()}`;
+          const existing = parts.find(p => p.sku?.toLowerCase() === sku.toLowerCase());
+          if (existing) {
+            partId = existing.id;
+          } else {
+            const r = await api.upsert("parts", { sku, name: row.description || sku, oem: row.oem || null, stock: 0 });
+            const np = Array.isArray(r) ? r[0] : r;
+            if (np?.id) { partId = np.id; newParts.push(np); created.parts++; }
+          }
+        }
+        if (!partId) continue;
+        if (resolvedSuppId && row.suppPartNo) {
+          const ex = await api.get("part_suppliers", `part_id=eq.${partId}&supplier_id=eq.${resolvedSuppId}&limit=1`);
+          if (!ex?.length) {
+            const r = await api.upsert("part_suppliers", { part_id: partId, supplier_id: resolvedSuppId, supplier_part_no: row.suppPartNo });
+            const nl = Array.isArray(r) ? r[0] : r;
+            if (nl?.id) { newLinks.push(nl); created.links++; }
+          }
+        }
+        for (const fit of row.fitments) {
+          for (const vid of fit.vehicleIds) {
+            const r = await api.upsert("part_fitments", { part_id: partId, vehicle_id: vid, notes: "" });
+            const nf = Array.isArray(r) ? r[0] : r;
+            if (nf?.id) { newFits.push(nf); created.fitments++; }
+          }
+        }
+      }
+      setResults(created);
+      onImportDone?.({ newParts, newLinks, newFits });
+      setStep(4);
+    } catch (e) {
+      alert("Import error: " + e.message);
+    }
+    setImporting(false);
+  };
+
+  // ── Step 1: Supplier + File ──
+  if (step === 1) {
+    const canNext = (suppId || (createSupp && newSuppName)) && rawRows.length > 1;
+    return (
+      <Overlay onClose={onClose}>
+        <div style={{background:"var(--surface)",borderRadius:12,padding:28,width:"min(520px,94vw)",maxHeight:"92vh",overflowY:"auto"}}>
+          <MHead title="Import Supplier Catalogue" onClose={onClose}/>
+          <div style={{fontSize:12,color:"var(--text3)",marginBottom:20}}>Step 1 of 3 — Supplier &amp; File</div>
+
+          <FL label="Supplier *"/>
+          {!createSupp ? (
+            <div style={{display:"flex",gap:8,marginBottom:20}}>
+              <select className="inp" style={{flex:1}} value={suppId} onChange={e=>setSuppId(e.target.value)}>
+                <option value="">Select supplier…</option>
+                {suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <button className="btn-sec" onClick={()=>{setCreateSupp(true);setSuppId("");}}>+ New</button>
+            </div>
+          ) : (
+            <div style={{marginBottom:20}}>
+              <div style={{display:"flex",gap:8,marginBottom:6}}>
+                <input className="inp" style={{flex:2}} placeholder="Supplier name *" value={newSuppName} onChange={e=>setNewSuppName(e.target.value)}/>
+                <input className="inp" style={{flex:1}} placeholder="Code" value={newSuppCode} onChange={e=>setNewSuppCode(e.target.value)}/>
+              </div>
+              <button style={{fontSize:12,background:"none",border:"none",cursor:"pointer",color:"var(--text3)",padding:0}} onClick={()=>{setCreateSupp(false);setNewSuppName("");setNewSuppCode("");}}>← Use existing</button>
+            </div>
+          )}
+
+          <FL label="Catalogue File"/>
+          <label style={{display:"block",border:"2px dashed var(--border)",borderRadius:8,padding:"28px 20px",textAlign:"center",cursor:"pointer",color:"var(--text3)",fontSize:13,background:fileName?"rgba(96,165,250,.06)":"transparent",transition:"background .2s"}}>
+            <input type="file" accept=".csv,.xlsx,.xls,.pdf" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+            {fileLoading ? "Parsing…" : fileName
+              ? <><strong style={{color:"var(--text)"}}>{fileName}</strong><br/><span style={{fontSize:12}}>{dataRows.length} data rows detected</span></>
+              : <>Drop .pdf, .csv or .xlsx here, or click to browse<br/><span style={{fontSize:11,display:"block",marginTop:4}}>PDF must be a digital (non-scanned) file — text must be selectable</span></>
+            }
+          </label>
+          {fileErr&&<div style={{color:"var(--red)",fontSize:12,marginTop:6}}>{fileErr}</div>}
+
+          {rawRows.length>1&&(
+            <div style={{marginTop:12,fontSize:12,color:"var(--text3)"}}>
+              <strong style={{color:"var(--text)"}}>Detected columns:</strong> {headers.filter(Boolean).join(" · ")}
+            </div>
+          )}
+
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:24}}>
+            <button className="btn-sec" onClick={onClose}>Cancel</button>
+            <button className="btn" disabled={!canNext} onClick={()=>setStep(2)}>Map Columns →</button>
+          </div>
+        </div>
+      </Overlay>
+    );
+  }
+
+  // ── Step 2: Column Mapping ──
+  if (step === 2) {
+    const autoMap = catAutoDetect(headers);
+    const mappedFields = new Set(Object.values(colMap).filter(Boolean));
+    const unmapped = headers.filter((_, i) => !colMap[i]).length;
+    return (
+      <Overlay onClose={onClose}>
+        <div style={{background:"var(--surface)",borderRadius:12,padding:28,width:"min(700px,97vw)",maxHeight:"92vh",display:"flex",flexDirection:"column"}}>
+          <MHead title="Map Columns" onClose={onClose}/>
+          <div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>
+            Step 2 of 3 — Each column from your file is shown below. Auto-detected fields are pre-filled — adjust any that are wrong, and set unused columns to <em>(skip)</em>.
+          </div>
+          <div style={{overflowY:"auto",flex:1}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+              <thead>
+                <tr style={{background:"var(--bg)"}}>
+                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:600,border:"1px solid var(--border)",color:"var(--text3)"}}>Column in file</th>
+                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:600,border:"1px solid var(--border)",color:"var(--text3)"}}>Sample values</th>
+                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:600,border:"1px solid var(--border)",color:"var(--text3)"}}>Maps to field</th>
+                </tr>
+              </thead>
+              <tbody>
+                {headers.map((h, i) => {
+                  const samples = dataRows.slice(0,3).map(r=>String(r[i]||"")).filter(Boolean).join(", ");
+                  const mapped = colMap[i] || "";
+                  const wasAuto = !!autoMap[i];
+                  return (
+                    <tr key={i} style={{background:mapped?"rgba(96,165,250,.04)":"transparent"}}>
+                      <td style={{padding:"8px 12px",border:"1px solid var(--border)",fontWeight:600}}>
+                        {h||<span style={{color:"var(--text3)"}}>(empty)</span>}
+                        {wasAuto&&mapped&&<span style={{marginLeft:6,fontSize:10,background:"rgba(96,165,250,.18)",color:"var(--blue)",borderRadius:3,padding:"1px 5px"}}>auto</span>}
+                      </td>
+                      <td style={{padding:"8px 12px",border:"1px solid var(--border)",color:"var(--text3)",fontSize:11,maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{samples||"—"}</td>
+                      <td style={{padding:"8px 12px",border:"1px solid var(--border)"}}>
+                        <select className="inp" style={{fontSize:12,padding:"4px 8px",minWidth:170}} value={mapped}
+                          onChange={e=>{
+                            const val=e.target.value;
+                            setColMap(prev=>{
+                              const next={...prev};
+                              if(val) Object.keys(next).forEach(k=>{if(next[k]===val&&+k!==i)delete next[k];});
+                              if(val) next[i]=val; else delete next[i];
+                              return next;
+                            });
+                          }}>
+                          {IMPORT_FIELDS.map(f=><option key={f.value} value={f.value}>{f.label}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div style={{marginTop:8,fontSize:12,color:"var(--text3)"}}>
+            Mapped: {[...mappedFields].map(f=>IMPORT_FIELDS.find(ff=>ff.value===f)?.label).join(", ")||"none"}
+            {unmapped>0&&<span style={{marginLeft:8,color:"var(--orange)"}}> · {unmapped} column{unmapped!==1?"s":""} set to skip</span>}
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:16,paddingTop:12,borderTop:"1px solid var(--border)"}}>
+            <button className="btn-sec" onClick={()=>setStep(1)}>← Back</button>
+            <button className="btn" disabled={!mappedFields.size} onClick={()=>{setReviewRows(buildReview());setStep(3);}}>Preview Rows →</button>
+          </div>
+        </div>
+      </Overlay>
+    );
+  }
+
+  // ── Step 3: Review & Match ──
+  if (step === 3) {
+    const toImport = reviewRows.filter(r=>r.action==="import");
+    const newCount = toImport.filter(r=>!r.partId).length;
+    const matchCount = toImport.filter(r=>!!r.partId).length;
+    const toggleAll = (v) => setReviewRows(prev=>prev.map(r=>({...r,action:v?"import":"skip"})));
+    return (
+      <Overlay onClose={onClose}>
+        <div style={{background:"var(--surface)",borderRadius:12,padding:28,width:"min(1050px,99vw)",maxHeight:"96vh",display:"flex",flexDirection:"column"}}>
+          <MHead title={`Review — ${reviewRows.length} rows`} onClose={onClose}/>
+          <div style={{fontSize:12,color:"var(--text3)",marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
+            <span><strong>{toImport.length}</strong> to import &nbsp;·&nbsp;
+            <span style={{color:"var(--green)"}}>{matchCount} matched existing</span> &nbsp;·&nbsp;
+            <span style={{color:"var(--accent)"}}>{newCount} new parts</span></span>
+            <span style={{marginLeft:"auto",display:"flex",gap:8}}>
+              <button style={{fontSize:11,background:"none",border:"none",cursor:"pointer",color:"var(--blue)"}} onClick={()=>toggleAll(true)}>Select all</button>
+              <button style={{fontSize:11,background:"none",border:"none",cursor:"pointer",color:"var(--text3)"}} onClick={()=>toggleAll(false)}>None</button>
+            </span>
+          </div>
+          <div style={{overflowY:"auto",flex:1}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead style={{position:"sticky",top:0,background:"var(--surface)",zIndex:1}}>
+                <tr style={{background:"var(--bg)"}}>
+                  <th style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"left"}}>Supplier Part No</th>
+                  <th style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"left"}}>Description</th>
+                  <th style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"left"}}>OEM</th>
+                  <th style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"left"}}>Our Part</th>
+                  <th style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"left"}}>Fitments</th>
+                  <th style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"center",width:60}}>Import?</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reviewRows.map((row, i) => (
+                  <tr key={i} style={{opacity:row.action==="skip"?0.35:1,background:i%2===0?"transparent":"rgba(0,0,0,.015)"}}>
+                    <td style={{padding:"7px 10px",border:"1px solid var(--border)",fontFamily:"monospace",fontSize:11}}>{row.suppPartNo||"—"}</td>
+                    <td style={{padding:"7px 10px",border:"1px solid var(--border)"}}>{row.description||"—"}</td>
+                    <td style={{padding:"7px 10px",border:"1px solid var(--border)",fontFamily:"monospace",fontSize:11,color:"var(--text3)"}}>{row.oem||"—"}</td>
+                    <td style={{padding:"7px 10px",border:"1px solid var(--border)"}}>
+                      {row.matchedPart
+                        ? <span style={{color:"var(--green)",fontWeight:600}}>✓ {row.matchedPart.sku}</span>
+                        : <span style={{color:"var(--accent)",fontSize:11}}>+ New</span>}
+                    </td>
+                    <td style={{padding:"7px 10px",border:"1px solid var(--border)"}}>
+                      {row.fitments.length===0
+                        ? <span style={{color:"var(--text3)"}}>—</span>
+                        : row.fitments.map((f,fi)=>(
+                          <span key={fi} style={{display:"inline-block",margin:"1px 2px",padding:"1px 6px",borderRadius:4,fontSize:10,
+                            background:f.vehicleIds.length>0?"rgba(96,165,250,.15)":"rgba(251,146,60,.15)",
+                            color:f.vehicleIds.length>0?"var(--blue)":"var(--orange)"}}>
+                            {f.make} {f.model}{f.vehicleIds.length===0?" ⚠":f.vehicleIds.length>1?` ×${f.vehicleIds.length}`:""}
+                          </span>
+                        ))}
+                    </td>
+                    <td style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"center"}}>
+                      <input type="checkbox" checked={row.action==="import"}
+                        onChange={e=>setReviewRows(prev=>prev.map((r,j)=>j===i?{...r,action:e.target.checked?"import":"skip"}:r))}/>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:16,paddingTop:12,borderTop:"1px solid var(--border)"}}>
+            <button className="btn-sec" onClick={()=>setStep(2)}>← Back</button>
+            <button className="btn" disabled={toImport.length===0||importing} onClick={runImport}>
+              {importing?"Importing…":`Import ${toImport.length} rows →`}
+            </button>
+          </div>
+        </div>
+      </Overlay>
+    );
+  }
+
+  // ── Step 4: Results ──
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{background:"var(--surface)",borderRadius:12,padding:32,width:"min(420px,94vw)",textAlign:"center"}}>
+        <MHead title="Import Complete" onClose={onClose}/>
+        {importing
+          ? <div style={{padding:40,color:"var(--text3)"}}>Importing rows…</div>
+          : results&&<>
+            <div style={{fontSize:44,marginBottom:18}}>✅</div>
+            <div style={{display:"flex",gap:20,justifyContent:"center",marginBottom:28}}>
+              {[["Parts created",results.parts],["Supplier links",results.links],["Fitments",results.fitments]].map(([lbl,val])=>(
+                <div key={lbl} style={{textAlign:"center"}}>
+                  <div style={{fontSize:28,fontWeight:800,color:"var(--accent)"}}>{val}</div>
+                  <div style={{fontSize:12,color:"var(--text3)"}}>{lbl}</div>
+                </div>
+              ))}
+            </div>
+            <button className="btn" onClick={onClose}>Done</button>
+          </>
+        }
+      </div>
+    </Overlay>
+  );
+}

@@ -72,6 +72,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
   const [kanbanSearch,    setKanbanSearch]    = useState("");
   const [showSizePicker,  setShowSizePicker]  = useState(false);
+  const [barHidden,       setBarHidden]       = useState(()=>{try{return localStorage.getItem("ws_bar_hidden")==="1";}catch{return false;}});
   const [kanbanNoteEdit,  setKanbanNoteEdit]  = useState(null);
   const [kanbanDueEdit,   setKanbanDueEdit]   = useState(null);
   const [kanbanAssignEdit,setKanbanAssignEdit]= useState(null);
@@ -2038,9 +2039,17 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           </div>
         </div>
       )}
-      {/* ── Fixed bottom toolbar (mobile only — always visible) ── */}
-      {!bookIn&&<div className="show-mobile" style={{height:wsTab==="jobs"&&kanbanView?showSizePicker?156:104:56}}/>}
+      {/* ── Fixed bottom toolbar (mobile only) ── */}
+      {!bookIn&&!barHidden&&<div className="show-mobile" style={{height:wsTab==="jobs"&&kanbanView?showSizePicker?156:104:56}}/>}
       {!bookIn&&<div className="show-mobile">
+        {/* Floating show-bar pill — visible only when bar is hidden */}
+        {barHidden&&(
+          <button onClick={()=>{setBarHidden(false);try{localStorage.setItem("ws_bar_hidden","0");}catch{}}}
+            style={{position:"fixed",bottom:16,right:16,zIndex:300,background:"var(--accent)",color:"#fff",border:"none",borderRadius:99,padding:"8px 14px",fontSize:13,fontWeight:700,boxShadow:"0 4px 16px rgba(0,0,0,.28)",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+            ▲ Nav
+          </button>
+        )}
+        {!barHidden&&(
         <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:300,background:"var(--surface)",borderTop:"2px solid var(--border2)",boxShadow:"0 -4px 24px rgba(0,0,0,.22)"}}>
           {/* Size picker row — expands when toggled */}
           {wsTab==="jobs"&&kanbanView&&showSizePicker&&(
@@ -2075,8 +2084,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
               </div>
             </div>
           )}
-          {/* Icon tab navigation — always visible, horizontally scrollable */}
-          <div style={{display:"flex",overflowX:"auto",padding:"6px 6px 14px",gap:2,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+          {/* Icon tab navigation + hide button */}
+          <div style={{display:"flex",alignItems:"center",overflowX:"auto",padding:"6px 6px 14px",gap:2,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
             {WS_TABS.map(([v,label,cnt])=>{
               const icon=label.split(" ")[0];
               const isActive=wsTab===v;
@@ -2090,8 +2099,15 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 </button>
               );
             })}
+            {/* Hide bar button */}
+            <button onClick={()=>{setBarHidden(true);try{localStorage.setItem("ws_bar_hidden","1");}catch{}}}
+              style={{flexShrink:0,marginLeft:"auto",padding:"6px 10px",borderRadius:10,border:"none",cursor:"pointer",background:"transparent",color:"var(--text3)",fontSize:13,lineHeight:1,display:"flex",alignItems:"center",gap:3}}
+              title="Hide toolbar">
+              ▼
+            </button>
           </div>
         </div>
+        )}
       </div>}
     </div>
   );

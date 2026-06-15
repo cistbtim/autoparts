@@ -8960,3 +8960,206 @@ export function CatalogueImportModal({ suppliers, parts, vehicles=[], onClose, o
     </Overlay>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// BULK IMAGE IMPORT — match image filenames to part SKUs / supplier part nos
+// ═══════════════════════════════════════════════════════════════
+export function BulkImageImportModal({ parts, partSuppliers=[], onClose, onImageUpdated }) {
+  const SCRIPT_URL = (typeof window._VEHICLE_SCRIPT_URL==="string"&&window._VEHICLE_SCRIPT_URL)
+    || (typeof window._APPS_SCRIPT_URL==="string"&&window._APPS_SCRIPT_URL) || "";
+
+  const [step, setStep]       = useState(1);
+  const [entries, setEntries] = useState([]);
+  const [doneCount, setDoneCount] = useState(0);
+
+  const matchFiles = (fileList) => {
+    return [...fileList]
+      .filter(f => f.type?.startsWith("image/"))
+      .map(file => {
+        const base = file.name.replace(/\.[^.]+$/, "").toLowerCase().trim();
+        const bySku = parts.find(p => p.sku?.toLowerCase().trim() === base);
+        if (bySku) return { file, matched: bySku, by: "SKU", status: "pending" };
+        const bySupp = partSuppliers.find(ps => ps.supplier_part_no?.toLowerCase().trim() === base);
+        const suppPart = bySupp ? parts.find(p => p.id === bySupp.part_id) : null;
+        if (suppPart) return { file, matched: suppPart, by: "Supplier No", status: "pending" };
+        return { file, matched: null, by: null, status: "skip" };
+      });
+  };
+
+  const handleFiles = (fileList) => {
+    const list = matchFiles(fileList);
+    setEntries(list);
+    if (list.length) setStep(2);
+  };
+
+  const processImg = (file) => new Promise((resolve, reject) => {
+    const MAX = 1200;
+    const objUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objUrl);
+      const c = document.createElement("canvas");
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+      c.width=w; c.height=h;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+      resolve(c.toDataURL("image/jpeg", 0.92));
+    };
+    img.onerror = reject;
+    img.src = objUrl;
+  });
+
+  const runUpload = async () => {
+    if (!SCRIPT_URL) { alert("Apps Script URL not configured — go to Settings → System."); return; }
+    setStep(3);
+    const queue = entries.filter(e => e.status === "pending");
+    let n = 0;
+    for (const entry of queue) {
+      setEntries(prev => prev.map(e => e===entry ? {...e, status:"uploading"} : e));
+      try {
+        const base64 = await processImg(entry.file);
+        const resp = await fetch(SCRIPT_URL, {
+          method: "POST",
+          body: JSON.stringify({ image: base64, filename: `${entry.matched.sku}.jpg`, mimeType: "image/jpeg" })
+        });
+        const res = await resp.json();
+        if (!res.success) throw new Error(res.error || "Upload failed");
+        await api.patch("parts", "id", entry.matched.id, { image_url: res.url });
+        onImageUpdated?.(entry.matched.id, res.url);
+        setEntries(prev => prev.map(e => e===entry ? {...e, status:"done", url:res.url} : e));
+      } catch(err) {
+        setEntries(prev => prev.map(e => e===entry ? {...e, status:"error", err:err.message} : e));
+      }
+      setDoneCount(++n);
+    }
+  };
+
+  const toUpload  = entries.filter(e => e.status==="pending");
+  const matched   = entries.filter(e => e.matched);
+  const unmatched = entries.filter(e => !e.matched);
+  const done      = entries.filter(e => e.status==="done");
+  const errors    = entries.filter(e => e.status==="error");
+  const total     = entries.filter(e => e.matched && e.status!=="skip").length;
+  const progress  = total > 0 ? Math.round((done.length + errors.length) / total * 100) : 0;
+  const allDone   = step===3 && entries.every(e => ["done","skip","error"].includes(e.status));
+
+  // ── Step 1: Select files ──
+  if (step === 1) return (
+    <Overlay onClose={onClose}>
+      <div style={{background:"var(--surface)",borderRadius:12,padding:28,width:"min(480px,94vw)"}}>
+        <MHead title="Bulk Image Import" onClose={onClose}/>
+        <p style={{fontSize:13,color:"var(--text3)",marginBottom:18}}>
+          Select images named after the part SKU or supplier part number (e.g. <strong>AH02001.jpg</strong>). Each matched image will be uploaded and linked to the correct part.
+        </p>
+
+        {!SCRIPT_URL&&<div style={{background:"rgba(251,146,60,.1)",border:"1px solid var(--orange)",borderRadius:8,padding:"10px 14px",fontSize:12,color:"var(--orange)",marginBottom:14}}>
+          ⚠ Apps Script URL not set — uploads will fail. Go to Settings → System first.
+        </div>}
+
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
+          <label style={{display:"block",border:"2px dashed var(--border)",borderRadius:8,padding:"24px 20px",textAlign:"center",cursor:"pointer",color:"var(--text3)",fontSize:13}}>
+            <input type="file" multiple accept="image/*" style={{display:"none"}} onChange={e=>handleFiles(e.target.files)}/>
+            🖼 Select image files
+            <span style={{fontSize:11,display:"block",marginTop:4}}>Click to choose multiple images</span>
+          </label>
+          <label style={{display:"block",border:"2px dashed var(--border)",borderRadius:8,padding:"24px 20px",textAlign:"center",cursor:"pointer",color:"var(--text3)",fontSize:13}}>
+            <input type="file" {...{"webkitdirectory":""}} multiple style={{display:"none"}} onChange={e=>handleFiles(e.target.files)}/>
+            📁 Select entire folder
+            <span style={{fontSize:11,display:"block",marginTop:4}}>All images inside the folder will be scanned</span>
+          </label>
+        </div>
+
+        <div style={{display:"flex",justifyContent:"flex-end"}}>
+          <button className="btn-sec" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </Overlay>
+  );
+
+  // ── Step 2: Review matches ──
+  if (step === 2) return (
+    <Overlay onClose={onClose}>
+      <div style={{background:"var(--surface)",borderRadius:12,padding:28,width:"min(700px,97vw)",maxHeight:"94vh",display:"flex",flexDirection:"column"}}>
+        <MHead title={`Match Preview — ${entries.length} images`} onClose={onClose}/>
+        <div style={{fontSize:12,color:"var(--text3)",marginBottom:10,display:"flex",gap:16}}>
+          <span style={{color:"var(--green)"}}>{matched.length} matched</span>
+          <span style={{color:"var(--orange)"}}>{unmatched.length} not matched (will be skipped)</span>
+        </div>
+        <div style={{overflowY:"auto",flex:1}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead style={{position:"sticky",top:0,background:"var(--surface)",zIndex:1}}>
+              <tr style={{background:"var(--bg)"}}>
+                <th style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"left"}}>Image file</th>
+                <th style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"left"}}>Matched part</th>
+                <th style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"left"}}>By</th>
+                <th style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"center",width:60}}>Upload?</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e,i) => (
+                <tr key={i} style={{opacity:e.status==="skip"?0.35:1,background:i%2===0?"transparent":"rgba(0,0,0,.015)"}}>
+                  <td style={{padding:"7px 10px",border:"1px solid var(--border)",fontFamily:"monospace",fontSize:11}}>{e.file.name}</td>
+                  <td style={{padding:"7px 10px",border:"1px solid var(--border)"}}>
+                    {e.matched
+                      ? <span style={{color:"var(--green)",fontWeight:600}}>{e.matched.sku} <span style={{fontWeight:400,color:"var(--text3)"}}>{e.matched.name||""}</span></span>
+                      : <span style={{color:"var(--orange)",fontSize:11}}>No match</span>}
+                  </td>
+                  <td style={{padding:"7px 10px",border:"1px solid var(--border)",color:"var(--text3)",fontSize:11}}>{e.by||"—"}</td>
+                  <td style={{padding:"7px 10px",border:"1px solid var(--border)",textAlign:"center"}}>
+                    {e.matched
+                      ? <input type="checkbox" checked={e.status==="pending"}
+                          onChange={ev=>setEntries(prev=>prev.map((r,j)=>j===i?{...r,status:ev.target.checked?"pending":"skip"}:r))}/>
+                      : <span style={{color:"var(--text3)"}}>—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:16,paddingTop:12,borderTop:"1px solid var(--border)"}}>
+          <button className="btn-sec" onClick={()=>setStep(1)}>← Back</button>
+          <button className="btn" disabled={toUpload.length===0} onClick={runUpload}>
+            Upload {toUpload.length} images →
+          </button>
+        </div>
+      </div>
+    </Overlay>
+  );
+
+  // ── Step 3: Progress / Results ──
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{background:"var(--surface)",borderRadius:12,padding:28,width:"min(640px,97vw)",maxHeight:"94vh",display:"flex",flexDirection:"column"}}>
+        <MHead title={allDone?"Upload Complete":"Uploading Images…"} onClose={onClose}/>
+        <div style={{background:"var(--bg)",borderRadius:6,height:8,marginBottom:12,overflow:"hidden"}}>
+          <div style={{height:"100%",background:"var(--accent)",borderRadius:6,width:progress+"%",transition:"width .4s"}}/>
+        </div>
+        <div style={{fontSize:12,color:"var(--text3)",textAlign:"center",marginBottom:14}}>
+          {done.length} uploaded · {errors.length} errors · {entries.filter(e=>["pending","uploading"].includes(e.status)).length} remaining
+        </div>
+        <div style={{overflowY:"auto",flex:1}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <tbody>
+              {entries.filter(e=>e.status!=="skip").map((e,i)=>(
+                <tr key={i} style={{background:i%2===0?"transparent":"rgba(0,0,0,.015)"}}>
+                  <td style={{padding:"6px 10px",border:"1px solid var(--border)",fontFamily:"monospace",fontSize:11}}>{e.file.name}</td>
+                  <td style={{padding:"6px 10px",border:"1px solid var(--border)",fontWeight:600}}>{e.matched?.sku}</td>
+                  <td style={{padding:"6px 10px",border:"1px solid var(--border)",textAlign:"center"}}>
+                    {e.status==="done"    &&<span style={{color:"var(--green)"}}>✓</span>}
+                    {e.status==="uploading"&&<span style={{color:"var(--blue)",display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span>}
+                    {e.status==="error"   &&<span style={{color:"var(--red)",fontSize:11}}>✗ {e.err}</span>}
+                    {e.status==="pending" &&<span style={{color:"var(--text3)"}}>—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {allDone&&<div style={{display:"flex",justifyContent:"center",marginTop:16,paddingTop:12,borderTop:"1px solid var(--border)"}}>
+          <button className="btn" onClick={onClose}>Done</button>
+        </div>}
+      </div>
+    </Overlay>
+  );
+}

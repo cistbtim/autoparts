@@ -2039,8 +2039,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         </div>
       )}
       {/* ── Fixed bottom toolbar (mobile only — always visible) ── */}
-      <div className="show-mobile" style={{height:wsTab==="jobs"&&kanbanView?showSizePicker?156:104:56}}/>
-      <div className="show-mobile">
+      {!bookIn&&<div className="show-mobile" style={{height:wsTab==="jobs"&&kanbanView?showSizePicker?156:104:56}}/>}
+      {!bookIn&&<div className="show-mobile">
         <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:300,background:"var(--surface)",borderTop:"2px solid var(--border2)",boxShadow:"0 -4px 24px rgba(0,0,0,.22)"}}>
           {/* Size picker row — expands when toggled */}
           {wsTab==="jobs"&&kanbanView&&showSizePicker&&(
@@ -2092,7 +2092,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             })}
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

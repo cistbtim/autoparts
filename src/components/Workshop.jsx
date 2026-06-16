@@ -3357,15 +3357,21 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     let cancelled=false;
     (async()=>{
       const ids=new Set();
-      // Method 1: fitment IDs — no branch restriction (all parts from any branch)
-      if(fitIds.length>0&&fitIds.length<=400){
-        const idClause=`or=(${fitIds.map(id=>`id.eq.${id}`).join(",")})`;
-        const allFitParts=await api.get("parts",`${idClause}&select=id`).catch(()=>[]);
-        (Array.isArray(allFitParts)?allFitParts:[]).forEach(p=>ids.add(String(p.id)));
+      // Method 1: fitment IDs — no branch restriction (all parts from any branch).
+      // Chunked id=in.() so high-fitment vehicles (e.g. Ford Ranger) don't get dropped.
+      if(fitIds.length>0){
+        const CHUNK=300;
+        const chunks=[];
+        for(let i=0;i<fitIds.length;i+=CHUNK) chunks.push(fitIds.slice(i,i+CHUNK));
+        const pages=await Promise.all(chunks.map(c=>api.get("parts",`id=in.(${c.join(",")})&select=id`).catch(()=>[])));
+        pages.flat().forEach(p=>ids.add(String(p.id)));
       }
-      // Method 3: make/model field matching — no branch restriction
+      // Method 3: make/model field matching — no branch restriction.
+      // Narrow server-side to model words so this doesn't pull every part of that make.
       if(vmNames.length>0){
-        const mkAll=await api.get("parts",`make=eq.${encodeURIComponent(job.vehicle_make)}&select=id,model`).catch(()=>[]);
+        const words=[...new Set(vmNames.flatMap(vm=>vm.toUpperCase().split(/[\s\/,]+/).filter(ww=>ww.length>2)))];
+        const modelOr=words.map(w=>`model.ilike.*${encodeURIComponent(w)}*`).join(",");
+        const mkAll=await api.get("parts",`make=eq.${encodeURIComponent(job.vehicle_make)}${modelOr?`&or=(${modelOr})`:""}&select=id,model`).catch(()=>[]);
         (Array.isArray(mkAll)?mkAll:[]).forEach(p=>{
           const pmod=(p.model||"").toUpperCase().trim();
           if(!pmod)return;
@@ -7576,6 +7582,18 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     const COLS="id,sku,name,brand,stock,price,image_url,image,bin_location,category,chinese_desc,make,model,year_range,oe_number";
     // When coming from a job card (initialMake set), pre-filter by vehicle fitments so we only
     // download parts that fit the vehicle instead of the entire catalog — critical on SA mobile data
+    // Chunked id=in.() fetch — scales to any fitment count without falling back
+    // to a full-catalog scan (was 28s+ on the 44k-row parts table for vehicles
+    // like Ford Ranger that have hundreds of fitted parts)
+    const CHUNK=300;
+    const fetchPartsByIds=(ids,extra="")=>{
+      if(!ids||ids.length===0) return Promise.resolve([]);
+      const chunks=[];
+      for(let i=0;i<ids.length;i+=CHUNK) chunks.push(ids.slice(i,i+CHUNK));
+      return Promise.all(chunks.map(c=>
+        api.get("parts",`${extra}id=in.(${c.join(",")})&select=${COLS}&order=sku.asc`).catch(()=>[])
+      )).then(pages=>pages.flat());
+    };
     let idFilter=null;
     let jobModeMatchV=[];
     if(initialMake&&vehicles.length>0){
@@ -7583,17 +7601,18 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       if(partFitments.length>0&&jobModeMatchV.length>0){
         const vIds=new Set(jobModeMatchV.map(v=>String(v.id)));
         const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
-        if(fitIds.length>0&&fitIds.length<=400) idFilter=fitIds;
+        if(fitIds.length>0) idFilter=fitIds;
       }
     }
-    const idClause=idFilter?`or=(${idFilter.map(id=>`id.eq.${id}`).join(",")})&`:"";
     const fetches=[
-      api.get("parts",`branch_id=eq.${linkedBranchId}&${idClause}select=${COLS}&order=sku.asc`).catch(()=>[]),
+      idFilter
+        ? fetchPartsByIds(idFilter,`branch_id=eq.${linkedBranchId}&`)
+        : api.get("parts",`branch_id=eq.${linkedBranchId}&select=${COLS}&order=sku.asc`).catch(()=>[]),
       api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=id,part_id,stock,price,bin_location`).catch(()=>[]),
-      // Fetch from ALL branches in both modes — job mode scoped by fitment idClause,
+      // Fetch from ALL branches in both modes — job mode scoped by fitment ids,
       // standalone mode fetches full catalog (same as admin view)
-      idClause
-        ? api.get("parts",`${idClause}select=${COLS}&order=sku.asc`).catch(()=>[])
+      idFilter
+        ? fetchPartsByIds(idFilter)
         : api.get("parts",`select=${COLS}&order=sku.asc`).catch(()=>[]),
     ];
     Promise.all(fetches).then(async([ownParts,bStock,mainParts])=>{
@@ -7603,11 +7622,10 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       let catalogParts=[];
       if(bStockArr.length){
         const allBsIds=bStockArr.map(bs=>bs.part_id).filter(Boolean);
-        const filteredBsIds=idFilter?allBsIds.filter(id=>idFilter.includes(String(id))):allBsIds;
+        const idFilterSet=idFilter?new Set(idFilter):null;
+        const filteredBsIds=idFilterSet?allBsIds.filter(id=>idFilterSet.has(String(id))):allBsIds;
         if(filteredBsIds.length){
-          const orFilter=filteredBsIds.map(id=>`id.eq.${id}`).join(",");
-          catalogParts=await api.get("parts",`or=(${orFilter})&select=${COLS}`).catch(()=>[]);
-          if(!Array.isArray(catalogParts))catalogParts=[];
+          catalogParts=await fetchPartsByIds(filteredBsIds);
         }
       }
       const bStockMap=Object.fromEntries(bStockArr.map(bs=>[String(bs.part_id),bs]));
@@ -7630,8 +7648,12 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       if(initialMake&&jobModeMatchV.length>0){
         const vmNames=[...new Set(jobModeMatchV.map(v=>v.model).filter(Boolean))];
         if(vmNames.length>0){
-          // Fetch make/model parts from ALL branches (no branch restriction)
-          const mkAll=await api.get("parts",`make=eq.${encodeURIComponent(initialMake)}&select=${COLS},branch_id`).catch(()=>[]);
+          // Fetch make/model parts from ALL branches (no branch restriction).
+          // Narrow server-side to model words that could match (mirrors the word
+          // match below) so this doesn't pull every part of that make over the wire.
+          const words=[...new Set(vmNames.flatMap(vm=>vm.toUpperCase().split(/[\s\/,]+/).filter(ww=>ww.length>2)))];
+          const modelOr=words.map(w=>`model.ilike.*${encodeURIComponent(w)}*`).join(",");
+          const mkAll=await api.get("parts",`make=eq.${encodeURIComponent(initialMake)}${modelOr?`&or=(${modelOr})`:""}&select=${COLS},branch_id`).catch(()=>[]);
           (Array.isArray(mkAll)?mkAll:[]).forEach(p=>{
             if(allSeen.has(String(p.id)))return;
             const pmod=(p.model||"").toUpperCase().trim();

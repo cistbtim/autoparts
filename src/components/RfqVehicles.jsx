@@ -1521,7 +1521,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
           const byCode = vehicles.filter(v => v.make === make && v.code === model);
           return byCode.length > 0
             ? byCode
-            : vehicles.filter(v => v.make === make && !v.code && v.model === model);
+            : vehicles.filter(v => v.make === make && v.model === model);
         })();
 
     // 1. Fitment-linked part IDs (part_fitments table)
@@ -1650,7 +1650,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
           ? vehicles.filter(v=>v.make===selMake)
           : (() => {
               const byCode = vehicles.filter(v=>v.make===selMake&&v.code===selModel);
-              return byCode.length>0 ? byCode : vehicles.filter(v=>v.make===selMake&&!v.code&&v.model===selModel);
+              return byCode.length>0 ? byCode : vehicles.filter(v=>v.make===selMake&&v.model===selModel);
             })();
         const variants = [...new Set(matchV.map(v=>v.variant).filter(Boolean))];
         const variantLabel = variants.length === 1 ? variants[0] : "";

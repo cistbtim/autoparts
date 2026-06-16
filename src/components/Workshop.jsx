@@ -3350,7 +3350,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     const matchV=!_jModel
       ?vehicles.filter(v=>v.make?.toLowerCase()===_jMake)
       :((_bc=vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&v.code===_jModel))=>
-          _bc.length>0?_bc:vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&!v.code&&v.model?.toLowerCase()===_jModel.toLowerCase()))();
+          _bc.length>0?_bc:vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&v.model?.toLowerCase()===_jModel.toLowerCase()))();
     const vIds=new Set(matchV.map(v=>String(v.id)));
     const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
     // Fall back to the job's own vehicle_model text when no vehicles-table row
@@ -7601,7 +7601,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     let idFilter=null;
     let jobModeMatchV=[];
     if(initialMake&&vehicles.length>0){
-      jobModeMatchV=(!initialModel?vehicles.filter(v=>v.make===initialMake):((bc=vehicles.filter(v=>v.make===initialMake&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make===initialMake&&!v.code&&v.model===initialModel))());
+      jobModeMatchV=(!initialModel?vehicles.filter(v=>v.make===initialMake):((bc=vehicles.filter(v=>v.make===initialMake&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make===initialMake&&v.model===initialModel))());
       if(partFitments.length>0&&jobModeMatchV.length>0){
         const vIds=new Set(jobModeMatchV.map(v=>String(v.id)));
         const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];

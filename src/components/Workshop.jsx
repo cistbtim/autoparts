@@ -3353,7 +3353,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           _bc.length>0?_bc:vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&!v.code&&v.model?.toLowerCase()===_jModel.toLowerCase()))();
     const vIds=new Set(matchV.map(v=>String(v.id)));
     const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
-    const vmNames=[...new Set(matchV.map(v=>v.model).filter(Boolean))];
+    // Fall back to the job's own vehicle_model text when no vehicles-table row
+    // matches, so parts tagged with make/model directly still count
+    const vmNames=matchV.length>0
+      ? [...new Set(matchV.map(v=>v.model).filter(Boolean))]
+      : (_jModel?[_jModel]:[]);
     let cancelled=false;
     (async()=>{
       const ids=new Set();
@@ -7652,9 +7656,14 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         ...mainFiltered.map(p=>({...p,_source:"other"})),
       ];
       // Method 3 (job mode only): also include parts matched by make/model fields,
-      // mirroring VehicleSearchBar so job-mode count equals VehicleSearchBar count
-      if(initialMake&&jobModeMatchV.length>0){
-        const vmNames=[...new Set(jobModeMatchV.map(v=>v.model).filter(Boolean))];
+      // mirroring VehicleSearchBar so job-mode count equals VehicleSearchBar count.
+      // Falls back to the job's own vehicle_model text when no vehicles-table row
+      // matches — parts tagged with make/model directly should still surface even
+      // if the formal vehicle catalog doesn't have an exact entry for this car.
+      if(initialMake){
+        const vmNames=jobModeMatchV.length>0
+          ? [...new Set(jobModeMatchV.map(v=>v.model).filter(Boolean))]
+          : (initialModel?[initialModel]:[]);
         if(vmNames.length>0){
           // Fetch make/model parts from ALL branches (no branch restriction).
           // Narrow server-side to model words that could match (mirrors the word
@@ -7695,9 +7704,13 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const s=(p.sku||"").toUpperCase();
       return vCodes.some(c=>s.startsWith(c+"-"));
     }).map(p=>String(p.id)));
-    // Also match make/model fields (VehicleSearchBar method 3)
+    // Also match make/model fields (VehicleSearchBar method 3) — fall back to the
+    // job's own vehicle_model text when no vehicles-table row matches, so parts
+    // tagged with make/model directly still show up
     const makeUp=initialMake.toUpperCase();
-    const vmNamesUp=[...new Set(matchV.map(v=>(v.model||"").toUpperCase()).filter(Boolean))];
+    const vmNamesUp=matchV.length>0
+      ? [...new Set(matchV.map(v=>(v.model||"").toUpperCase()).filter(Boolean))]
+      : (initialModel?[initialModel.toUpperCase()]:[]);
     const makeModelIds=new Set(shopParts.filter(p=>{
       if((p.make||"").toUpperCase()!==makeUp)return false;
       const pmod=(p.model||"").toUpperCase().trim();

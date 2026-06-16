@@ -7604,16 +7604,24 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         if(fitIds.length>0) idFilter=fitIds;
       }
     }
+    // jobMode with no fitment match (vehicle/make-model not found in vehicles or
+    // part_fitments) must NOT fall back to the full catalog — that's only correct
+    // for standalone browse mode (no vehicle context at all). Method 3 below still
+    // covers make/model-field matches even when idFilter is empty.
     const fetches=[
       idFilter
         ? fetchPartsByIds(idFilter,`branch_id=eq.${linkedBranchId}&`)
-        : api.get("parts",`branch_id=eq.${linkedBranchId}&select=${COLS}&order=sku.asc`).catch(()=>[]),
+        : jobMode
+          ? Promise.resolve([])
+          : api.get("parts",`branch_id=eq.${linkedBranchId}&select=${COLS}&order=sku.asc`).catch(()=>[]),
       api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=id,part_id,stock,price,bin_location`).catch(()=>[]),
       // Fetch from ALL branches in both modes — job mode scoped by fitment ids,
       // standalone mode fetches full catalog (same as admin view)
       idFilter
         ? fetchPartsByIds(idFilter)
-        : api.get("parts",`select=${COLS}&order=sku.asc`).catch(()=>[]),
+        : jobMode
+          ? Promise.resolve([])
+          : api.get("parts",`select=${COLS}&order=sku.asc`).catch(()=>[]),
     ];
     Promise.all(fetches).then(async([ownParts,bStock,mainParts])=>{
       const bStockArr=Array.isArray(bStock)?bStock:[];
@@ -7623,7 +7631,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       if(bStockArr.length){
         const allBsIds=bStockArr.map(bs=>bs.part_id).filter(Boolean);
         const idFilterSet=idFilter?new Set(idFilter):null;
-        const filteredBsIds=idFilterSet?allBsIds.filter(id=>idFilterSet.has(String(id))):allBsIds;
+        const filteredBsIds=idFilterSet?allBsIds.filter(id=>idFilterSet.has(String(id))):(jobMode?[]:allBsIds);
         if(filteredBsIds.length){
           catalogParts=await fetchPartsByIds(filteredBsIds);
         }
@@ -7699,7 +7707,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       });
     }).map(p=>String(p.id)));
     const allIds=new Set([...fitIds,...codeIds,...makeModelIds]);
-    setVehicleFilterIds(allIds.size>0?allIds:null);
+    // Zero matches means "no parts found for this vehicle", not "no filter active" —
+    // use a sentinel so it doesn't fall through to showing the whole catalog
+    setVehicleFilterIds(allIds.size>0?allIds:new Set(["__none__"]));
   },[jobMode,initialMake,initialModel,vehicles,partFitments,shopParts]);
 
   const q=search.trim().toLowerCase();

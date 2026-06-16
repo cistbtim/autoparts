@@ -71,8 +71,6 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [collapsedCols,   setCollapsedCols]   = useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("ws_kanban_collapsed")||"[]"));}catch{return new Set();}});
   const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
   const [kanbanSearch,    setKanbanSearch]    = useState("");
-  const [showSizePicker,  setShowSizePicker]  = useState(false);
-  const [barHidden,       setBarHidden]       = useState(()=>{try{return localStorage.getItem("ws_bar_hidden")==="1";}catch{return false;}});
   const [kanbanNoteEdit,  setKanbanNoteEdit]  = useState(null);
   const [kanbanDueEdit,   setKanbanDueEdit]   = useState(null);
   const [kanbanAssignEdit,setKanbanAssignEdit]= useState(null);
@@ -2039,76 +2037,6 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           </div>
         </div>
       )}
-      {/* ── Fixed bottom toolbar (mobile only) ── */}
-      {!bookIn&&!barHidden&&<div className="show-mobile" style={{height:wsTab==="jobs"&&kanbanView?showSizePicker?156:104:56}}/>}
-      {!bookIn&&<div className="show-mobile">
-        {/* Floating show-bar pill — visible only when bar is hidden */}
-        {barHidden&&(
-          <button onClick={()=>{setBarHidden(false);try{localStorage.setItem("ws_bar_hidden","0");}catch{}}}
-            style={{position:"fixed",bottom:16,right:16,zIndex:300,background:"var(--accent)",color:"#fff",border:"none",borderRadius:99,padding:"8px 14px",fontSize:13,fontWeight:700,boxShadow:"0 4px 16px rgba(0,0,0,.28)",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
-            ▲ Nav
-          </button>
-        )}
-        {!barHidden&&(
-        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:300,background:"var(--surface)",borderTop:"2px solid var(--border2)",boxShadow:"0 -4px 24px rgba(0,0,0,.22)"}}>
-          {/* Hide-bar handle — sits above the toolbar top-right */}
-          <button onClick={()=>{setBarHidden(true);try{localStorage.setItem("ws_bar_hidden","1");}catch{}}}
-            style={{position:"absolute",top:-22,right:12,background:"var(--surface)",border:"2px solid var(--border2)",borderBottom:"none",borderRadius:"8px 8px 0 0",padding:"2px 12px",fontSize:11,fontWeight:700,color:"var(--text3)",cursor:"pointer",lineHeight:1.4}}
-            title="Hide toolbar">
-            ▼
-          </button>
-          {/* Size picker row — expands when toggled */}
-          {wsTab==="jobs"&&kanbanView&&showSizePicker&&(
-            <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",borderBottom:"1px solid var(--border)",background:"var(--surface2)"}}>
-              <span style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",flexShrink:0}}>Card size</span>
-              {["S","M","L","XL"].map((lbl,i)=>(
-                <button key={i}
-                  onClick={()=>{setKanbanZoom(i);try{localStorage.setItem("ws_kanban_zoom",i);}catch{};setShowSizePicker(false);}}
-                  style={{flex:1,padding:"8px 0",borderRadius:9,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:kanbanZoom===i?"var(--accent)":"var(--surface3)",color:kanbanZoom===i?"#fff":"var(--text2)"}}>
-                  {lbl}
-                </button>
-              ))}
-            </div>
-          )}
-          {/* Kanban controls row (only when in kanban jobs) */}
-          {wsTab==="jobs"&&kanbanView&&(
-            <div style={{display:"flex",alignItems:"center",gap:7,padding:"6px 10px",borderBottom:"1px solid var(--border2)"}}>
-              <button onClick={()=>setShowSizePicker(p=>!p)}
-                style={{flexShrink:0,padding:"6px 10px",borderRadius:9,border:`1px solid ${showSizePicker?"var(--accent)":"var(--border)"}`,background:showSizePicker?"rgba(251,146,60,.1)":"var(--surface3)",color:showSizePicker?"var(--accent)":"var(--text2)",cursor:"pointer",fontWeight:700,fontSize:12}}>
-                {["S","M","L","XL"][kanbanZoom]} ↕
-              </button>
-              <button onClick={()=>{const v=!showKanbanPhotos;setShowKanbanPhotos(v);try{localStorage.setItem("ws_kanban_photos",v?"1":"0");}catch{}}}
-                style={{flexShrink:0,padding:"6px 10px",borderRadius:9,border:`1px solid ${showKanbanPhotos?"var(--accent)":"var(--border)"}`,background:showKanbanPhotos?"rgba(251,146,60,.12)":"var(--surface3)",cursor:"pointer",fontSize:15,lineHeight:1}}>
-                {showKanbanPhotos?"🚗":"🚫"}
-              </button>
-              <div style={{flex:1,position:"relative",minWidth:0}}>
-                <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
-                  placeholder="Search jobs…"
-                  style={{width:"100%",padding:"6px 28px 6px 10px",border:"1px solid var(--border)",borderRadius:9,background:"var(--surface2)",color:"var(--text1)",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
-                {kanbanSearch&&<button onClick={()=>setKanbanSearch("")}
-                  style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,lineHeight:1}}>✕</button>}
-              </div>
-            </div>
-          )}
-          {/* Icon tab navigation — horizontally scrollable */}
-          <div style={{display:"flex",overflowX:"auto",padding:"6px 6px 14px",gap:2,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
-            {WS_TABS.map(([v,label,cnt])=>{
-              const icon=label.split(" ")[0];
-              const isActive=wsTab===v;
-              const hasBadge=cnt>0&&!isActive;
-              return (
-                <button key={v}
-                  onClick={()=>{setWsTab(v);if(v==="spareshop")setSpareShopFilter({make:"",model:"",});}}
-                  style={{position:"relative",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"6px 10px",borderRadius:10,border:"none",cursor:"pointer",background:isActive?"var(--accent)":"transparent",color:isActive?"#fff":"var(--text3)",fontSize:20,lineHeight:1,minWidth:44}}>
-                  {icon}
-                  {hasBadge&&<div style={{position:"absolute",top:5,right:7,width:7,height:7,borderRadius:"50%",background:"var(--red)",border:"1.5px solid var(--surface)"}}/>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        )}
-      </div>}
     </div>
   );
 }

@@ -7608,6 +7608,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     setVehicleFilterIds(fitIds.size>0?fitIds:new Set(["__none__"]));
   },[jobMode,initialMake,initialModel,initialCode,vehicles,partFitments]);
 
+  const _dispV=initialCode?vehicles.find(v=>v.make===initialMake&&v.code===initialCode):null;
+  const _dispYear=_dispV?((_dispV.year_from||"")+(_dispV.year_to&&_dispV.year_to!==_dispV.year_from?`–${_dispV.year_to}`:"")).trim():"";
+
   const q=search.trim().toLowerCase();
   const filtered=(q
     ?shopParts.filter(p=>(p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q))
@@ -7842,7 +7845,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",padding:"8px 12px",
               background:"rgba(29,78,216,.07)",border:"1px solid rgba(29,78,216,.2)",borderRadius:10}}>
               <span style={{fontSize:13,fontWeight:700,color:"var(--blue)"}}>
-                🚗 {initialMake}{initialModel?` · ${initialModel}`:""} — {filtered.length} part{filtered.length!==1?"s":""} found
+                🚗 {initialMake}{_dispV?` · ${_dispV.code}`:initialModel?` · ${initialModel}`:""}
+                {_dispV&&<span style={{fontWeight:400,color:"var(--text2)",marginLeft:6}}>{_dispV.model}{_dispYear?` · ${_dispYear}`:""}</span>}
+                <span style={{marginLeft:8}}>— {filtered.length} part{filtered.length!==1?"s":""} found</span>
               </span>
               <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",marginLeft:"auto"}}
                 onClick={()=>onClearJobFilter?.()}>

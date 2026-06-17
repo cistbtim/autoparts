@@ -35,7 +35,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [search,         setSearch]         = useState("");
   const [bookIn,         setBookIn]         = useState(false);
   const [wsTab,          setWsTab]          = useState(initialTab||"jobs");
-  const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:""});
+  const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:"", code:""});
   const [stmtCust,       setStmtCust]       = useState("");
   const [qInvModal,      setQInvModal]      = useState(null);
   const [sortBy,         setSortBy]         = useState("date_desc");
@@ -272,7 +272,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onViewPurchaseOrders={()=>{ setView("list"); setWsTab("wssuporders"); }}
         onViewPO={(poId)=>{ setPendingViewPoId(poId); setView("list"); setWsTab("wssuporders"); }}
         onGoToStock={()=>{ setView("list"); setWsTab("wsstock"); }}
-        onGoToSpareShop={(make,model)=>{ setSpareShopFilter({make:make||"",model:model||""}); setView("list"); setWsTab("spareshop"); }}
+        onGoToSpareShop={(make,model,code)=>{ setSpareShopFilter({make:make||"",model:model||"",code:code||""}); setView("list"); setWsTab("spareshop"); }}
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
@@ -1702,7 +1702,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
           </div>
         );
-        return <WsSpareShopTab key={`${spareShopFilter.make}|${spareShopFilter.model}`} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab}/>;
+        return <WsSpareShopTab key={`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}`} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
@@ -3150,6 +3150,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
+  // Resolve catalog vehicle code to display model name (e.g. "FD57E" → "RANGER S-CAB DRL-H.LAMP")
+  const resolvedVehicleModel = vehicles.find(v=>v.code===job.vehicle_model&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase())?.model||job.vehicle_model;
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);
@@ -3770,7 +3772,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           </div>
           <div>
             <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>Make / Model</div>
-            <div style={{fontWeight:700,fontSize:14,color:"var(--text)",lineHeight:1.3}}>{[job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")||"—"}</div>
+            <div style={{fontWeight:700,fontSize:14,color:"var(--text)",lineHeight:1.3}}>{[job.vehicle_make,resolvedVehicleModel].filter(Boolean).join(" ")||"—"}</div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
             <div style={{flex:1,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",fontSize:12,fontWeight:600,color:"var(--text2)"}}>
@@ -3931,7 +3933,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 )}
                 {showWa&&(()=>{
                   const name=job.customer_name||"there";
-                  const reg=job.vehicle_reg?`your ${job.vehicle_make?`${job.vehicle_make} `:""}${job.vehicle_model?`${job.vehicle_model} `:""}(${job.vehicle_reg})`:"your vehicle";
+                  const reg=job.vehicle_reg?`your ${job.vehicle_make?`${job.vehicle_make} `:""}${resolvedVehicleModel?`${resolvedVehicleModel} `:""}(${job.vehicle_reg})`:"your vehicle";
                   const shopName=wsProfile?.name||settings?.shop_name||"Workshop";
                   const shopPhone=wsProfile?.phone||settings?.phone||"";
                   const msg=`Hi ${name}! 🎉 Great news — ${reg} is ready for collection at *${shopName}*.\n\nPlease contact us to arrange collection${shopPhone?` on ${shopPhone}`:""}.`;
@@ -4111,13 +4113,13 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             </button>
           );
           const hasSpareShop = !!wsProfile?.linked_branch_id && !!onGoToSpareShop;
-          const carLabel = [job.vehicle_make, job.vehicle_model].filter(Boolean).join(" ") || job.vehicle_reg || "This Car";
+          const carLabel = [job.vehicle_make, resolvedVehicleModel].filter(Boolean).join(" ") || job.vehicle_reg || "This Car";
           return (
             <div style={{display:"flex",flexDirection:"column",gap:isMobile?8:12,marginBottom:14}}>
               <div style={{display:"flex",gap:isMobile?8:12}}>{row1.map(renderTile)}</div>
               {row2.length>0&&<div style={{display:"flex",gap:isMobile?8:12}}>{row2.map(renderTile)}</div>}
               {hasSpareShop&&(
-                <button onClick={()=>onGoToSpareShop(job.vehicle_make||"",job.vehicle_model||"")}
+                <button onClick={()=>{const _mv=vehicles.find(v=>v.make?.toLowerCase()===(job.vehicle_make||"").toLowerCase()&&(v.code===job.vehicle_model||v.model?.toLowerCase()===(job.vehicle_model||"").toLowerCase()));onGoToSpareShop(job.vehicle_make||"",_mv?.model||job.vehicle_model||"",_mv?.code||"");}}
                   style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"none",cursor:"pointer",
                     background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",color:"#fff",
                     boxShadow:"0 4px 14px rgba(29,78,216,.35)",textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
@@ -5314,7 +5316,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 const shopMake=job.vehicle_make;
                 const shopModel=mv?.model||job.vehicle_model||"";
                 return(
-                  <button onClick={()=>onGoToSpareShop(shopMake,shopModel)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(96,165,250,.3)",background:"rgba(96,165,250,.08)",color:"var(--blue)",fontWeight:700,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
+                  <button onClick={()=>onGoToSpareShop(shopMake,shopModel,mv?.code||"")} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(96,165,250,.3)",background:"rgba(96,165,250,.08)",color:"var(--blue)",fontWeight:700,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
                     🏪 {job.vehicle_make}{displayCode?` · ${displayCode}`:""}
                   </button>
                 );
@@ -5891,7 +5893,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             {matchAutoSuggestion&&!matchModelSelected&&(()=>{
               const sv=matchAutoSuggestion.vehicle;
               const img=toImgUrl(sv.photo_front||"");
-              const isCurrent=sv.model===job.vehicle_model;
+              const isCurrent=sv.model===job.vehicle_model||sv.code===job.vehicle_model;
               const sourceLabel=matchAutoSuggestion.source==="cache"
                 ? "Previously matched on a vehicle with the same VIN prefix"
                 : `VIN decodes to ${matchAutoSuggestion.yearDecoded} — fits ${sv.year_from||"?"}${sv.year_to&&sv.year_to!==sv.year_from?`–${sv.year_to}`:"+"} range`;
@@ -5914,7 +5916,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   </div>
                   <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>{sourceLabel}</div>
                   <div style={{display:"flex",gap:8}}>
-                    <button className="btn btn-primary" style={{flex:2,fontSize:13}} onClick={()=>{ pickModel(sv.model); setMatchAutoSuggestion(null); }}>
+                    <button className="btn btn-primary" style={{flex:2,fontSize:13}} onClick={()=>{ pickModel(sv.code||sv.model); setMatchAutoSuggestion(null); }}>
                       ✅ Use this match
                     </button>
                     <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setMatchAutoSuggestion(null)}>
@@ -5936,7 +5938,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:16}}>
                   {modelCards.map(v=>{
                     const img=toImgUrl(v.photo_front||"");
-                    const isCurrent=v.model===job.vehicle_model;
+                    const isCurrent=v.model===job.vehicle_model||v.code===job.vehicle_model;
                     const isSel=matchModelSelected?.id===v.id;
                     return(
                       <button key={v.id} onClick={()=>setMatchModelSelected(isSel?null:v)} style={{
@@ -5994,7 +5996,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   )}
                   <div style={{display:"flex",gap:8}}>
                     <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setMatchModelSelected(null)}>← Back</button>
-                    <button className="btn btn-primary" style={{flex:2}} onClick={()=>{ pickModel(sv.model); setMatchModelSelected(null); }}>
+                    <button className="btn btn-primary" style={{flex:2}} onClick={()=>{ pickModel(sv.code||sv.model); setMatchModelSelected(null); }}>
                       ✅ Confirm — {sv.model}
                     </button>
                   </div>
@@ -7450,7 +7452,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
   );
 }
 
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",ads=[],userCtx=null,onClearJobFilter}) {
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",ads=[],userCtx=null,onClearJobFilter}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
@@ -7529,7 +7531,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     let idFilter=null;
     let jobModeMatchV=[];
     if(initialMake&&vehicles.length>0){
-      jobModeMatchV=(!initialModel?vehicles.filter(v=>v.make===initialMake):((bc=vehicles.filter(v=>v.make===initialMake&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make===initialMake&&v.model===initialModel))());
+      jobModeMatchV=(!initialModel?vehicles.filter(v=>v.make===initialMake):initialCode?vehicles.filter(v=>v.make===initialMake&&v.code===initialCode):((bc=vehicles.filter(v=>v.make===initialMake&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make===initialMake&&v.model===initialModel))());
       if(partFitments.length>0&&jobModeMatchV.length>0){
         const vIds=new Set(jobModeMatchV.map(v=>String(v.id)));
         const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
@@ -7621,8 +7623,10 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   // When in job mode, compute vehicleFilterIds directly from fitments + part make/model
   useEffect(()=>{
     if(!jobMode||!initialMake) return;
+    // When a specific vehicle code is known, use it for exact matching.
+    // Falling back to model-name matching catches all variants sharing that name.
     const matchV=vehicles.filter(v=>
-      v.make===initialMake&&(!initialModel||v.code===initialModel||v.model===initialModel)
+      v.make===initialMake&&(!initialModel||(initialCode?v.code===initialCode:(v.code===initialModel||v.model===initialModel)))
     );
     const vIds=new Set(matchV.map(v=>String(v.id)));
     const fitIds=new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)));
@@ -7644,6 +7648,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const pmod=(p.model||"").toUpperCase().trim();
       if(!pmod)return false;
       return vmNamesUp.some(vm=>{
+        // When the exact vehicle code is known, only exact model match counts
+        if(initialCode) return pmod===vm;
         return pmod===vm||vm.includes(pmod)||pmod.includes(vm);
       });
     }).map(p=>String(p.id)));
@@ -7651,7 +7657,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     // Zero matches means "no parts found for this vehicle", not "no filter active" —
     // use a sentinel so it doesn't fall through to showing the whole catalog
     setVehicleFilterIds(allIds.size>0?allIds:new Set(["__none__"]));
-  },[jobMode,initialMake,initialModel,vehicles,partFitments,shopParts]);
+  },[jobMode,initialMake,initialModel,initialCode,vehicles,partFitments,shopParts]);
 
   const q=search.trim().toLowerCase();
   const filtered=(q

@@ -3286,39 +3286,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
     // Fall back to the job's own vehicle_model text when no vehicles-table row
     // matches, so parts tagged with make/model directly still count
-    const vmNames=matchV.length>0
-      ? [...new Set(matchV.map(v=>v.model).filter(Boolean))]
-      : (_jModel?[_jModel]:[]);
     let cancelled=false;
     (async()=>{
       const ids=new Set();
-      // Method 1: fitment IDs — no branch restriction (all parts from any branch).
-      // Chunked id=in.() so high-fitment vehicles (e.g. Ford Ranger) don't get dropped.
+      // Only count fitment-linked parts — text/model matching is excluded here
+      // to prevent showing parts that don't actually fit this specific vehicle.
       if(fitIds.length>0){
         const CHUNK=300;
         const chunks=[];
         for(let i=0;i<fitIds.length;i+=CHUNK) chunks.push(fitIds.slice(i,i+CHUNK));
         const pages=await Promise.all(chunks.map(c=>api.get("parts",`id=in.(${c.join(",")})&select=id`).catch(()=>[])));
         pages.flat().forEach(p=>ids.add(String(p.id)));
-      }
-      // Method 3: make/model field matching — no branch restriction.
-      // Narrow server-side to model words so this doesn't pull every part of that make.
-      if(vmNames.length>0){
-        const words=[...new Set(vmNames.flatMap(vm=>vm.toUpperCase().split(/[\s\/,]+/).filter(ww=>ww.length>2)))];
-        const modelOr=words.map(w=>`model.ilike.*${encodeURIComponent(w)}*`).join(",");
-        const mkAll=await api.get("parts",`make=eq.${encodeURIComponent(job.vehicle_make)}${modelOr?`&or=(${modelOr})`:""}&select=id,model`).catch(()=>[]);
-        (Array.isArray(mkAll)?mkAll:[]).forEach(p=>{
-          const pmod=(p.model||"").toUpperCase().trim();
-          if(!pmod)return;
-          const ok=vmNames.some(vm=>{
-            const vmUp=vm.toUpperCase();
-            // When vehicle was matched by exact code, use exact model name only —
-            // prevents "RANGER" matching "RANGER S-CAB DRL-H.LAMP" via substring
-            if(_foundByCode) return pmod===vmUp;
-            return pmod===vmUp||vmUp.includes(pmod)||pmod.includes(vmUp);
-          });
-          if(ok)ids.add(String(p.id));
-        });
       }
       if(!cancelled)setSpareShopPartsCount(ids.size||null);
     })();
@@ -7589,82 +7567,27 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         ...linkedParts.map(p=>({...p,_source:"local"})),
         ...mainFiltered.map(p=>({...p,_source:"other"})),
       ];
-      // Method 3 (job mode only): also include parts matched by make/model fields,
-      // mirroring VehicleSearchBar so job-mode count equals VehicleSearchBar count.
-      // Falls back to the job's own vehicle_model text when no vehicles-table row
-      // matches — parts tagged with make/model directly should still surface even
-      // if the formal vehicle catalog doesn't have an exact entry for this car.
-      if(initialMake){
-        const vmNames=jobModeMatchV.length>0
-          ? [...new Set(jobModeMatchV.map(v=>v.model).filter(Boolean))]
-          : (initialModel?[initialModel]:[]);
-        if(vmNames.length>0){
-          // Fetch make/model parts from ALL branches (no branch restriction).
-          // Narrow server-side to model words that could match (mirrors the word
-          // match below) so this doesn't pull every part of that make over the wire.
-          const words=[...new Set(vmNames.flatMap(vm=>vm.toUpperCase().split(/[\s\/,]+/).filter(ww=>ww.length>2)))];
-          const modelOr=words.map(w=>`model.ilike.*${encodeURIComponent(w)}*`).join(",");
-          const mkAll=await api.get("parts",`make=eq.${encodeURIComponent(initialMake)}${modelOr?`&or=(${modelOr})`:""}&select=${COLS},branch_id`).catch(()=>[]);
-          (Array.isArray(mkAll)?mkAll:[]).forEach(p=>{
-            if(allSeen.has(String(p.id)))return;
-            const pmod=(p.model||"").toUpperCase().trim();
-            if(!pmod)return;
-            const ok=vmNames.some(vm=>{
-              const vmUp=vm.toUpperCase();
-              // Exact match only when a specific vehicle code is known — prevents
-              // "RANGER" matching "RANGER S-CAB DRL-H.LAMP" via substring
-              if(initialCode) return pmod===vmUp;
-              const w=vmUp.split(/[\s\/,]+/).filter(ww=>ww.length>2);
-              return pmod===vmUp||vmUp.includes(pmod)||w.some(ww=>pmod.includes(ww));
-            });
-            if(ok){allSeen.add(String(p.id));combined.push({...p,_source:String(p.branch_id)===String(linkedBranchId)?"local":"other"});}
-          });
-        }
-      }
+      // Job mode: only fitment-linked parts are shown — no text/model matching.
+      // Text matching risks showing parts that don't fit this specific vehicle.
       setShopParts(combined);
       setLoading(false);
       setRefreshing(false);
     });
   },[linkedBranchId,mainBranchId,refreshKey]);
 
-  // When in job mode, compute vehicleFilterIds directly from fitments + part make/model
+  // When in job mode, filter to fitment-linked parts only.
+  // No text/model matching — that risks showing parts for the wrong variant.
   useEffect(()=>{
     if(!jobMode||!initialMake) return;
-    // When a specific vehicle code is known, use it for exact matching.
-    // Falling back to model-name matching catches all variants sharing that name.
     const matchV=vehicles.filter(v=>
       v.make===initialMake&&(!initialModel||(initialCode?v.code===initialCode:(v.code===initialModel||v.model===initialModel)))
     );
     const vIds=new Set(matchV.map(v=>String(v.id)));
     const fitIds=new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)));
-    // Also match SKU prefix (vehicle code-)
-    const vCodes=matchV.map(v=>(v.code||"").toUpperCase()).filter(Boolean);
-    const codeIds=new Set(shopParts.filter(p=>{
-      const s=(p.sku||"").toUpperCase();
-      return vCodes.some(c=>s.startsWith(c+"-"));
-    }).map(p=>String(p.id)));
-    // Also match make/model fields (VehicleSearchBar method 3) — fall back to the
-    // job's own vehicle_model text when no vehicles-table row matches, so parts
-    // tagged with make/model directly still show up
-    const makeUp=initialMake.toUpperCase();
-    const vmNamesUp=matchV.length>0
-      ? [...new Set(matchV.map(v=>(v.model||"").toUpperCase()).filter(Boolean))]
-      : (initialModel?[initialModel.toUpperCase()]:[]);
-    const makeModelIds=new Set(shopParts.filter(p=>{
-      if((p.make||"").toUpperCase()!==makeUp)return false;
-      const pmod=(p.model||"").toUpperCase().trim();
-      if(!pmod)return false;
-      return vmNamesUp.some(vm=>{
-        // When the exact vehicle code is known, only exact model match counts
-        if(initialCode) return pmod===vm;
-        return pmod===vm||vm.includes(pmod)||pmod.includes(vm);
-      });
-    }).map(p=>String(p.id)));
-    const allIds=new Set([...fitIds,...codeIds,...makeModelIds]);
-    // Zero matches means "no parts found for this vehicle", not "no filter active" —
+    // Zero matches means "no fitment data for this vehicle", not "no filter active" —
     // use a sentinel so it doesn't fall through to showing the whole catalog
-    setVehicleFilterIds(allIds.size>0?allIds:new Set(["__none__"]));
-  },[jobMode,initialMake,initialModel,initialCode,vehicles,partFitments,shopParts]);
+    setVehicleFilterIds(fitIds.size>0?fitIds:new Set(["__none__"]));
+  },[jobMode,initialMake,initialModel,initialCode,vehicles,partFitments]);
 
   const q=search.trim().toLowerCase();
   const filtered=(q

@@ -4119,7 +4119,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               <div style={{display:"flex",gap:isMobile?8:12}}>{row1.map(renderTile)}</div>
               {row2.length>0&&<div style={{display:"flex",gap:isMobile?8:12}}>{row2.map(renderTile)}</div>}
               {hasSpareShop&&(
-                <button onClick={()=>{const _mv=vehicles.find(v=>v.make?.toLowerCase()===(job.vehicle_make||"").toLowerCase()&&(v.code===job.vehicle_model||v.model?.toLowerCase()===(job.vehicle_model||"").toLowerCase()));onGoToSpareShop(job.vehicle_make||"",_mv?.model||job.vehicle_model||"",_mv?.code||"");}}
+                <button onClick={()=>{const _mv=vehicles.find(v=>v.code===job.vehicle_model&&v.make?.toLowerCase()===(job.vehicle_make||"").toLowerCase());onGoToSpareShop(job.vehicle_make||"",_mv?.model||job.vehicle_model||"",_mv?.code||"");}}
                   style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"none",cursor:"pointer",
                     background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",color:"#fff",
                     boxShadow:"0 4px 14px rgba(29,78,216,.35)",textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
@@ -5311,7 +5311,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>Actions</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))",gap:8}}>
               {wsProfile?.linked_branch_id&&job.vehicle_make&&onGoToSpareShop&&(()=>{
-                const mv=vehicles.find(v=>v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()&&(v.model?.toLowerCase()===job.vehicle_model?.toLowerCase()||v.code?.toLowerCase()===job.vehicle_model?.toLowerCase()));
+                const mv=vehicles.find(v=>v.code===job.vehicle_model&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase());
                 const displayCode=mv?.code||job.vehicle_model||"";
                 const shopMake=job.vehicle_make;
                 const shopModel=mv?.model||job.vehicle_model||"";

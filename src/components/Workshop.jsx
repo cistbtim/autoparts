@@ -3277,10 +3277,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     if(!linkedBranchId||!onGoToSpareShop||!job.vehicle_make){setSpareShopPartsCount(null);return;}
     const _jMake=job.vehicle_make?.toLowerCase();
     const _jModel=job.vehicle_model;
+    const _byCode=!_jModel?[]:vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&v.code===_jModel);
+    const _foundByCode=_byCode.length>0;
     const matchV=!_jModel
       ?vehicles.filter(v=>v.make?.toLowerCase()===_jMake)
-      :((_bc=vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&v.code===_jModel))=>
-          _bc.length>0?_bc:vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&v.model?.toLowerCase()===_jModel.toLowerCase()))();
+      :_foundByCode?_byCode:vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&v.model?.toLowerCase()===_jModel.toLowerCase());
     const vIds=new Set(matchV.map(v=>String(v.id)));
     const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
     // Fall back to the job's own vehicle_model text when no vehicles-table row
@@ -3311,6 +3312,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           if(!pmod)return;
           const ok=vmNames.some(vm=>{
             const vmUp=vm.toUpperCase();
+            // When vehicle was matched by exact code, use exact model name only —
+            // prevents "RANGER" matching "RANGER S-CAB DRL-H.LAMP" via substring
+            if(_foundByCode) return pmod===vmUp;
             return pmod===vmUp||vmUp.includes(pmod)||pmod.includes(vmUp);
           });
           if(ok)ids.add(String(p.id));
@@ -7607,6 +7611,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             if(!pmod)return;
             const ok=vmNames.some(vm=>{
               const vmUp=vm.toUpperCase();
+              // Exact match only when a specific vehicle code is known — prevents
+              // "RANGER" matching "RANGER S-CAB DRL-H.LAMP" via substring
+              if(initialCode) return pmod===vmUp;
               const w=vmUp.split(/[\s\/,]+/).filter(ww=>ww.length>2);
               return pmod===vmUp||vmUp.includes(pmod)||w.some(ww=>pmod.includes(ww));
             });

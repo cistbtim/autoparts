@@ -7846,7 +7846,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
               background:"rgba(29,78,216,.07)",border:"1px solid rgba(29,78,216,.2)",borderRadius:10}}>
               <span style={{fontSize:13,fontWeight:700,color:"var(--blue)"}}>
                 🚗 {initialMake}{_dispV?` · ${_dispV.code}`:initialModel?` · ${initialModel}`:""}
-                {_dispV&&<span style={{fontWeight:400,color:"var(--text2)",marginLeft:6}}>{_dispV.model}{_dispYear?` · ${_dispYear}`:""}</span>}
+                {_dispV&&<span style={{fontWeight:700,color:"#ef4444",marginLeft:6}}>{_dispV.model}{_dispYear?` · ${_dispYear}`:""}</span>}
                 <span style={{marginLeft:8}}>— {filtered.length} part{filtered.length!==1?"s":""} found</span>
               </span>
               <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",marginLeft:"auto"}}

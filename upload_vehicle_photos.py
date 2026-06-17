@@ -5,6 +5,8 @@ Upload vehicle photos to Google Drive and update Supabase vehicles table.
 Usage:
     python upload_vehicle_photos.py <photos_folder>
     python upload_vehicle_photos.py <photos_folder> --overwrite
+    python upload_vehicle_photos.py <photos_folder> --clean
+    python upload_vehicle_photos.py <photos_folder> --clean --overwrite
 
 Image files must be named:  <CODE>_front.jpg / <CODE>_rear.jpg / <CODE>_side.jpg
     e.g.  AD01A_front.jpg   AD01A_rear.jpg   AD01A_side.jpg
@@ -13,8 +15,9 @@ The script will:
   1. Load the Apps Script URL from your Supabase settings
   2. Parse each filename  →  vehicle code  +  photo position (front/rear/side)
   3. Look up the vehicle in Supabase by code
-  4. Upload the image to Google Drive via Apps Script
-  5. Save the URL into vehicles.photo_front / photo_rear / photo_side
+  4. If --clean: auto-detect and remove dealer branding (WeBuyCars etc.) before upload
+  5. Upload the image to Google Drive via Apps Script
+  6. Save the URL into vehicles.photo_front / photo_rear / photo_side
 """
 
 import base64
@@ -51,6 +54,22 @@ def sb_get(path, params=None):
     with urllib.request.urlopen(req) as r:
         return json.loads(r.read())
 
+def sb_get_all(path, params=None):
+    """Paginate through all rows (1 000 per request) — same as app's fetchAll."""
+    PAGE = 1000
+    results = []
+    offset = 0
+    while True:
+        p = dict(params or {})
+        p["limit"]  = PAGE
+        p["offset"] = offset
+        page = sb_get(path, p)
+        results.extend(page)
+        if len(page) < PAGE:
+            break
+        offset += PAGE
+    return results
+
 def sb_patch(path, params, data):
     url = SUPABASE_URL + "/rest/v1/" + path + "?" + urllib.parse.urlencode(params)
     body = json.dumps(data).encode()
@@ -81,6 +100,71 @@ def encode_image(path: Path) -> str:
         raw = path.read_bytes()
         mime = mimetypes.guess_type(str(path))[0] or "image/jpeg"
         return f"data:{mime};base64," + base64.b64encode(raw).decode()
+
+# ── Logo removal ─────────────────────────────────────────────────────────────
+
+def remove_logo(path: Path) -> bytes:
+    """
+    Detect and remove dealer branding (WeBuyCars orange logo etc.) from a local photo.
+    Returns cleaned image bytes, or original bytes if no logo found.
+    """
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        print("  [clean] opencv not installed — skipping logo removal")
+        return path.read_bytes()
+
+    raw = path.read_bytes()
+    arr = np.frombuffer(raw, np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        return raw
+
+    h, w = img.shape[:2]
+    search_top = int(h * 0.30)
+    roi = img[search_top:, :]
+    roi_area = roi.shape[0] * roi.shape[1]
+
+    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    lower = np.array([5,  120, 100])
+    upper = np.array([22, 255, 255])
+    orange = cv2.inRange(hsv, lower, upper)
+
+    kernel_sm = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    kernel_lg = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    orange = cv2.morphologyEx(orange, cv2.MORPH_OPEN,  kernel_sm, iterations=1)
+    orange = cv2.morphologyEx(orange, cv2.MORPH_CLOSE, kernel_lg, iterations=2)
+
+    contours, _ = cv2.findContours(orange, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return raw
+
+    min_area = roi_area * 0.001
+    max_area = roi_area * 0.05
+    contours = [c for c in contours if min_area < cv2.contourArea(c) < max_area]
+    if not contours:
+        return raw
+
+    largest = max(contours, key=cv2.contourArea)
+    x, y, bw, bh = cv2.boundingRect(largest)
+    y += search_top
+
+    px = min(int(bw * 0.8), 120)
+    py = min(int(bh * 0.6), 50)
+    x1, y1 = max(0, x - px), max(0, y - py)
+    x2, y2 = min(w, x + bw + px), min(h, y + bh + py)
+
+    if (x2 - x1) * (y2 - y1) > w * h * 0.15:
+        return raw  # sanity check — mask too large, skip
+
+    mask = np.zeros((h, w), dtype=np.uint8)
+    mask[y1:y2, x1:x2] = 255
+
+    result = cv2.inpaint(img, mask, inpaintRadius=12, flags=cv2.INPAINT_TELEA)
+    _, buf = cv2.imencode(".png", result)
+    print("  [clean] logo removed ✓")
+    return buf.tobytes()
 
 # ── Google Drive upload ───────────────────────────────────────────────────────
 
@@ -132,7 +216,8 @@ def parse_filename(stem: str):
 def main():
     args = sys.argv[1:]
     overwrite = "--overwrite" in args
-    args = [a for a in args if a != "--overwrite"]
+    clean     = "--clean"     in args
+    args = [a for a in args if a not in ("--overwrite", "--clean")]
 
     if not args:
         print(__doc__)
@@ -178,16 +263,17 @@ def main():
             print(f"SKIP (bad name) — '{img.name}'  (expected CODE_front/rear/side.jpg)")
 
     print(f"\nFound {len(valid)} valid vehicle photo(s) out of {len(images)} files.")
-    print(f"Overwrite existing: {'yes' if overwrite else 'no'}\n")
+    print(f"Overwrite existing : {'yes' if overwrite else 'no'}")
+    print(f"Auto-remove logos  : {'yes' if clean else 'no'}\n")
 
     if not valid:
         sys.exit(0)
 
-    # 3. Build vehicle code → id lookup (fetch all vehicles with codes)
+    # 3. Build vehicle code → id lookup (fetch ALL vehicles, paginated)
     print("Loading vehicles from Supabase…")
     try:
-        vehicles = sb_get("vehicles", {"select": "id,code,photo_front,photo_rear,photo_side",
-                                        "code": "not.is.null"})
+        vehicles = sb_get_all("vehicles", {"select": "id,code,photo_front,photo_rear,photo_side",
+                                            "code": "not.is.null"})
     except Exception as e:
         print(f"ERROR: {e}")
         sys.exit(1)
@@ -214,9 +300,27 @@ def main():
             skipped += 1
             continue
 
+        # Optionally remove dealer branding before upload
+        if clean:
+            cleaned_bytes = remove_logo(img_path)
+        else:
+            cleaned_bytes = None
+
         # Encode image
         try:
-            b64 = encode_image(img_path)
+            if cleaned_bytes:
+                from PIL import Image
+                import io as _io
+                pil = Image.open(_io.BytesIO(cleaned_bytes)).convert("RGB")
+                w_px, h_px = pil.size
+                if w_px > MAX_IMAGE_PX or h_px > MAX_IMAGE_PX:
+                    r = min(MAX_IMAGE_PX / w_px, MAX_IMAGE_PX / h_px)
+                    pil = pil.resize((round(w_px * r), round(h_px * r)), Image.LANCZOS)
+                buf = _io.BytesIO()
+                pil.save(buf, format="PNG")
+                b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+            else:
+                b64 = encode_image(img_path)
         except Exception as e:
             print(f"  FAIL — cannot read image: {e}")
             failed += 1

@@ -2172,6 +2172,7 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
   const preview = driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w400` : (url||null);
 
   const [actionSheet, setActionSheet] = useState(false);
+  const [lightbox,    setLightbox]    = useState(false);
 
   const pasteFromClipboard = async () => {
     setActionSheet(false);
@@ -2193,6 +2194,7 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
 
   return (
     <div style={{position:"relative"}}>
+      {lightbox && <ImgLightbox url={url} onClose={()=>setLightbox(false)}/>}
       {/* Hidden file inputs */}
       <input ref={fileRef} type="file" style={{display:"none"}}
         onChange={e => { upload(e.target.files[0]); e.target.value=""; }}/>
@@ -2228,6 +2230,14 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
                 ✏️ Change
               </div>
             </div>
+            <button
+              onClick={e=>{ e.stopPropagation(); setLightbox(true); }}
+              title="Enlarge"
+              style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.6)",
+                border:"none",borderRadius:6,color:"#fff",fontSize:14,cursor:"pointer",
+                padding:"3px 7px",lineHeight:1,zIndex:1}}>
+              ⛶
+            </button>
           </>
         ) : (
           <div style={{textAlign:"center",color:"var(--text3)",padding:8}}>

@@ -4095,28 +4095,47 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             </button>
           );
           const hasSpareShop = !!wsProfile?.linked_branch_id && !!onGoToSpareShop;
-          const carLabel = [job.vehicle_make, resolvedVehicleModel].filter(Boolean).join(" ") || job.vehicle_reg || "This Car";
+          const _linkedV = job.vehicle_make&&job.vehicle_model
+            ? vehicles.find(v=>v.code===job.vehicle_model&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase())
+            : null;
+          const isCodeLinked = !!_linkedV;
           return (
             <div style={{display:"flex",flexDirection:"column",gap:isMobile?8:12,marginBottom:14}}>
               <div style={{display:"flex",gap:isMobile?8:12}}>{row1.map(renderTile)}</div>
               {row2.length>0&&<div style={{display:"flex",gap:isMobile?8:12}}>{row2.map(renderTile)}</div>}
               {hasSpareShop&&(
-                <button onClick={()=>{const _mv=vehicles.find(v=>v.code===job.vehicle_model&&v.make?.toLowerCase()===(job.vehicle_make||"").toLowerCase());onGoToSpareShop(job.vehicle_make||"",_mv?.model||job.vehicle_model||"",_mv?.code||"");}}
-                  style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"none",cursor:"pointer",
-                    background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",color:"#fff",
-                    boxShadow:"0 4px 14px rgba(29,78,216,.35)",textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
-                  <span style={{fontSize:28,lineHeight:1}}>🏪</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:800,letterSpacing:".02em",marginBottom:2}}>Parts for {carLabel}</div>
-                    <div style={{fontSize:12,color:"rgba(255,255,255,.7)"}}>Browse spare shop stock for this vehicle</div>
-                  </div>
-                  {spareShopPartsCount>0&&(
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",background:"rgba(255,255,255,.15)",borderRadius:10,padding:"6px 12px",flexShrink:0}}>
-                      <span style={{fontSize:20,fontWeight:800,fontFamily:"Rajdhani,sans-serif",lineHeight:1}}>{spareShopPartsCount}</span>
-                      <span style={{fontSize:10,fontWeight:600,color:"rgba(255,255,255,.75)"}}>parts</span>
-                    </div>
-                  )}
-                </button>
+                isCodeLinked
+                  ? <button onClick={()=>onGoToSpareShop(job.vehicle_make||"",_linkedV.model||"",_linkedV.code||"")}
+                      style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"none",cursor:"pointer",
+                        background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",color:"#fff",
+                        boxShadow:"0 4px 14px rgba(29,78,216,.35)",textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
+                      <span style={{fontSize:28,lineHeight:1}}>🏪</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:800,letterSpacing:".02em",marginBottom:2}}>
+                          {job.vehicle_make} · {_linkedV.code}
+                        </div>
+                        <div style={{fontSize:12,color:"rgba(255,255,255,.7)"}}>{_linkedV.model}</div>
+                      </div>
+                      {spareShopPartsCount>0&&(
+                        <div style={{display:"flex",flexDirection:"column",alignItems:"center",background:"rgba(255,255,255,.15)",borderRadius:10,padding:"6px 12px",flexShrink:0}}>
+                          <span style={{fontSize:20,fontWeight:800,fontFamily:"Rajdhani,sans-serif",lineHeight:1}}>{spareShopPartsCount}</span>
+                          <span style={{fontSize:10,fontWeight:600,color:"rgba(255,255,255,.75)"}}>parts</span>
+                        </div>
+                      )}
+                    </button>
+                  : <button onClick={()=>setMatchModelOpen(true)}
+                      style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"1px dashed rgba(251,146,60,.6)",cursor:"pointer",
+                        background:"rgba(251,146,60,.08)",color:"#f97316",
+                        textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
+                      <span style={{fontSize:24,lineHeight:1}}>🔗</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:800,letterSpacing:".02em",marginBottom:2}}>Link vehicle to browse spare parts</div>
+                        <div style={{fontSize:12,color:"rgba(249,115,22,.7)"}}>
+                          {job.vehicle_make&&job.vehicle_model?`${job.vehicle_make} ${resolvedVehicleModel} — tap to match vehicle code`:"Tap to match this car to a vehicle code"}
+                        </div>
+                      </div>
+                      <span style={{fontSize:20}}>›</span>
+                    </button>
               )}
             </div>
           );

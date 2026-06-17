@@ -1552,7 +1552,13 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
         if((p.make||"").toUpperCase() !== makeUp) return false;
         const pmod=(p.model||"").toUpperCase().trim();
         if(!pmod) return false;
-        // Match if vehicle model contains part model (general part) or part model contains vehicle model (specific part)
+        // When a specific vehicle code is selected, exact match only.
+        // Substring matching causes cross-contamination between similar models:
+        // "XV".includes("XV") and "XV 2.0 CVT".includes("XV") are both true,
+        // so SB47A and SB47B would bleed into each other via vm.includes(pmod).
+        if(model) return vehicleModelNames.some(vm=>pmod===vm);
+        // For make-only queries (no code), allow broader matching so a general
+        // part (model="XV") still shows when browsing all Subaru variants.
         return vehicleModelNames.some(vm=>pmod===vm||vm.includes(pmod)||pmod.includes(vm));
       }).map(p=>String(p.id))
     );

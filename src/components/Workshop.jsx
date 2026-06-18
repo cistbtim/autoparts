@@ -808,13 +808,17 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   )}
 
                   {/* vehicle make/model */}
-                  {(job.vehicle_make||job.vehicle_model||job.vehicle_year)&&(
+                  {(job.vehicle_make||job.vehicle_model||job.vehicle_year)&&(()=>{
+                    const _jv=job.vehicle_model&&job.vehicle_make?vehicles.find(v=>v.code===job.vehicle_model&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()):null;
+                    const dispModel=_jv?_jv.model:job.vehicle_model;
+                    return(
                     <div style={{textAlign:"center",marginBottom:5}}>
                       <span style={{display:"inline-block",fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.2)",borderRadius:99,padding:"2px 10px",letterSpacing:".03em",textTransform:"uppercase",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                        {highlight([job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" "))}
+                        {highlight([job.vehicle_year,job.vehicle_make,dispModel].filter(Boolean).join(" "))}
                       </span>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* complaint */}
                   {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#ef4444",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {highlight(job.complaint)}</div>}
@@ -4112,9 +4116,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       <span style={{fontSize:28,lineHeight:1}}>🏪</span>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:800,letterSpacing:".02em",marginBottom:2}}>
-                          {job.vehicle_make} · {_linkedV.code}
+                          {job.vehicle_make} · {_linkedV.model}
                         </div>
-                        <div style={{fontSize:12,color:"rgba(255,255,255,.7)"}}>{_linkedV.model}</div>
+                        <div style={{fontSize:12,color:"rgba(255,255,255,.7)"}}>{_linkedV.code}</div>
                       </div>
                       {spareShopPartsCount>0&&(
                         <div style={{display:"flex",flexDirection:"column",alignItems:"center",background:"rgba(255,255,255,.15)",borderRadius:10,padding:"6px 12px",flexShrink:0}}>

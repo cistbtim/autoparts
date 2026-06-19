@@ -53,67 +53,73 @@ def extract_images_from_pdf(pdf_path: str, output_dir: str, log, progress_var, p
     total_pages = len(doc)
     progress_max.set(total_pages)
 
-    saved    = 0
-    skipped  = 0
-    no_match = 0
-    done_parts: set = set()   # part numbers already saved — skip duplicates regardless of ext
+    saved     = 0
+    skipped   = 0
+    no_match  = 0
+    done_parts: set = set()   # part numbers already saved across all pages
+
+    HEADER_Y  = 160   # images with Y-centre below this are header/logo — skip
+    MIN_PX    = 30    # ignore images smaller than 30×30 px (borders, icons)
 
     for page_num in range(total_pages):
         page = doc[page_num]
         progress_var.set(page_num + 1)
 
-        # ── 1. Collect part numbers with their Y-centre position ──────────────
+        # ── 1. Collect part numbers (not yet saved), sorted by Y ─────────────
         part_numbers = []
         for block in page.get_text("dict")["blocks"]:
-            if block["type"] != 0:   # 0 = text block
+            if block["type"] != 0:
                 continue
             for line in block["lines"]:
                 for span in line["spans"]:
                     text = span["text"].strip()
-                    if PART_PATTERN.match(text):
-                        bbox = span["bbox"]        # (x0, y0, x1, y1)
+                    if PART_PATTERN.match(text) and text not in done_parts:
+                        bbox  = span["bbox"]
                         y_mid = (bbox[1] + bbox[3]) / 2
                         part_numbers.append({"no": text, "y": y_mid})
 
-        # ── 2. Get all embedded images on this page ───────────────────────────
-        img_list = page.get_images(full=True)
+        if not part_numbers:
+            continue
 
-        for img_info in img_list:
-            xref = img_info[0]
+        part_numbers.sort(key=lambda p: p["y"])
 
-            # Get the rectangle(s) where this image is rendered on the page
+        # ── 2. Collect product images: skip header & tiny images ──────────────
+        raw_imgs = []
+        for img_info in page.get_images(full=True):
+            xref, _smask, w, h = img_info[0], img_info[1], img_info[2], img_info[3]
+            if w < MIN_PX or h < MIN_PX:
+                continue                         # skip tiny decorative elements
             rects = page.get_image_rects(xref)
             if not rects:
-                skipped += 1
                 continue
+            y_mid = (rects[0].y0 + rects[0].y1) / 2
+            if y_mid < HEADER_Y:
+                continue                         # skip company logo / header
+            raw_imgs.append({"xref": xref, "y": y_mid})
 
-            img_y_mid = (rects[0].y0 + rects[0].y1) / 2
+        # Deduplicate: JPEG + PNG of the same image sit at the same Y position
+        raw_imgs.sort(key=lambda x: x["y"])
+        unique_imgs = []
+        for img in raw_imgs:
+            if unique_imgs and abs(img["y"] - unique_imgs[-1]["y"]) < 15:
+                continue                         # same row — already have one
+            unique_imgs.append(img)
 
-            # ── 3. Find closest part number by Y ─────────────────────────────
-            if not part_numbers:
-                no_match += 1
-                continue
+        if not unique_imgs:
+            no_match += len(part_numbers)
+            log(f"  ⊘ Page {page_num+1}: no product images found ({len(part_numbers)} parts)")
+            continue
 
-            closest = min(part_numbers, key=lambda p: abs(p["y"] - img_y_mid))
-            y_gap   = abs(closest["y"] - img_y_mid)
+        if len(unique_imgs) != len(part_numbers):
+            log(f"  ⚠ Page {page_num+1}: {len(unique_imgs)} images vs {len(part_numbers)} parts — pairing what we can")
 
-            # Reject if too far away (header logos, decorative images, etc.)
-            if y_gap > 100:
-                log(f"  ⊘ Page {page_num+1}: no match for image at y={img_y_mid:.0f} (nearest={closest['no']} gap={y_gap:.0f})")
-                no_match += 1
-                continue
-
-            part_no = closest["no"]
-
-            # One image per part number — skip all duplicates (jpeg, png, etc.)
-            if part_no in done_parts:
-                continue
-
-            # ── 4. Extract & save ─────────────────────────────────────────────
+        # ── 3. Pair by sorted order: 1st image → 1st part, 2nd → 2nd … ───────
+        for img, part in zip(unique_imgs, part_numbers):
+            part_no = part["no"]
             try:
-                base_img  = doc.extract_image(xref)
+                base_img  = doc.extract_image(img["xref"])
                 img_bytes = base_img["image"]
-                ext       = base_img["ext"]   # "jpeg", "png", etc.
+                ext       = base_img["ext"]
 
                 filename = f"{part_no}.{ext}"
                 filepath = os.path.join(output_dir, filename)
@@ -128,6 +134,13 @@ def extract_images_from_pdf(pdf_path: str, output_dir: str, log, progress_var, p
             except Exception as e:
                 log(f"  ✗ Page {page_num+1}: error saving {part_no} — {e}")
                 skipped += 1
+
+        # Parts with no image (list longer than images)
+        unmatched = len(part_numbers) - len(unique_imgs)
+        if unmatched > 0:
+            for part in part_numbers[len(unique_imgs):]:
+                log(f"  — Page {page_num+1}: no image for {part['no']}")
+            no_match += unmatched
 
     doc.close()
     return saved, skipped, no_match

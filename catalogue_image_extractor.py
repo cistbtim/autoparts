@@ -38,109 +38,119 @@ MONO    = ("Consolas", 9)
 # Part number pattern: 2-4 uppercase letters followed by 4-6 digits (e.g. AK00001, ABP30007)
 PART_PATTERN = re.compile(r'^[A-Z]{2,4}\d{4,6}[A-Z]?$')
 
+# Render DPI for cropping rows off the page
+RENDER_DPI   = 200
+HEADER_Y_PT  = 155   # PDF points — below this is the table content area
+CELL_PAD_PT  = 3     # extra padding around each crop
+COL_TOL_PT   = 25    # X tolerance when filtering text to "Our No." column
 
-# ── Core extraction logic ─────────────────────────────────────────────────────
 
-def extract_images_from_pdf(pdf_path: str, output_dir: str, log, progress_var, progress_max):
+def _collect_parts_on_page(page, our_no_x0, done_parts):
+    """Return list of {no, y} for part numbers in the Our No. column, sorted by Y."""
+    parts = []
+    for block in page.get_text("dict")["blocks"]:
+        if block["type"] != 0:
+            continue
+        for line in block["lines"]:
+            for span in line["spans"]:
+                text = span["text"].strip()
+                if not PART_PATTERN.match(text):
+                    continue
+                if text in done_parts:
+                    continue
+                # Only accept text in the "Our No." column (filter out OEM column)
+                x0 = span["bbox"][0]
+                if abs(x0 - our_no_x0) > COL_TOL_PT:
+                    continue
+                y_mid = (span["bbox"][1] + span["bbox"][3]) / 2
+                parts.append({"no": text, "y": y_mid})
+    parts.sort(key=lambda p: p["y"])
+    return parts
+
+
+def _detect_our_no_column(doc, total_pages):
     """
-    For each page in the PDF:
-      1. Collect all text spans that look like part numbers (column C).
-      2. Collect all embedded images with their on-page bounding boxes.
-      3. Match each image to the nearest part number by Y coordinate.
-      4. Save image as <part_no>.<ext> in output_dir.
+    Scan the first few pages to find which X position has the most part numbers.
+    That column is "Our No." — the supplier's own part number column.
+    OEM cross-reference numbers land in a different column at a different X.
+    Returns the modal X position (left edge of the column text).
     """
-    doc = fitz.open(pdf_path)
-    total_pages = len(doc)
-    progress_max.set(total_pages)
-
-    saved     = 0
-    skipped   = 0
-    no_match  = 0
-    done_parts: set = set()   # part numbers already saved across all pages
-
-    HEADER_Y  = 160   # images with Y-centre below this are header/logo — skip
-    MIN_PX    = 30    # ignore images smaller than 30×30 px (borders, icons)
-
-    for page_num in range(total_pages):
-        page = doc[page_num]
-        progress_var.set(page_num + 1)
-
-        # ── 1. Collect part numbers (not yet saved), sorted by Y ─────────────
-        part_numbers = []
+    from collections import Counter
+    x_counts = Counter()
+    for pn in range(min(5, total_pages)):
+        page = doc[pn]
         for block in page.get_text("dict")["blocks"]:
             if block["type"] != 0:
                 continue
             for line in block["lines"]:
                 for span in line["spans"]:
-                    text = span["text"].strip()
-                    if PART_PATTERN.match(text) and text not in done_parts:
-                        bbox  = span["bbox"]
-                        y_mid = (bbox[1] + bbox[3]) / 2
-                        part_numbers.append({"no": text, "y": y_mid})
+                    if PART_PATTERN.match(span["text"].strip()):
+                        bucket = round(span["bbox"][0] / 5) * 5  # 5-pt buckets
+                        x_counts[bucket] += 1
+    if not x_counts:
+        return 150  # fallback
+    return x_counts.most_common(1)[0][0]
 
-        if not part_numbers:
+
+# ── Core extraction logic ─────────────────────────────────────────────────────
+
+def extract_images_from_pdf(pdf_path: str, output_dir: str, log, progress_var, progress_max):
+    """
+    For each page:
+      1. Auto-detect the 'Our No.' column X position (most common X for part-number text).
+      2. Collect supplier part numbers from that column only (skips OEM column).
+      3. For each part number, render just the Picture-column cell for that row.
+      4. Save as <part_no>.png in output_dir.
+    """
+    doc = fitz.open(pdf_path)
+    total_pages = len(doc)
+    progress_max.set(total_pages)
+
+    saved    = 0
+    skipped  = 0
+    no_match = 0
+    done_parts: set = set()
+
+    # ── Detect column layout from first few pages ─────────────────────────────
+    our_no_x0 = _detect_our_no_column(doc, total_pages)
+    pic_x0    = 32               # after the S/N column
+    pic_x1    = our_no_x0 - 3   # just before the Our No. column
+    log(f"  📐 Column detection: Picture x=[{pic_x0:.0f}–{pic_x1:.0f}]  Our No. starts at x≈{our_no_x0:.0f}")
+
+    scale = RENDER_DPI / 72
+
+    for page_num in range(total_pages):
+        page = doc[page_num]
+        progress_var.set(page_num + 1)
+        page_h = page.rect.height
+
+        # ── 1. Collect part numbers in the Our No. column ────────────────────
+        parts = _collect_parts_on_page(page, our_no_x0, done_parts)
+        if not parts:
             continue
 
-        part_numbers.sort(key=lambda p: p["y"])
+        # ── 2. Render each row's Picture cell and save ────────────────────────
+        mat = fitz.Matrix(scale, scale)
+        for i, part in enumerate(parts):
+            # Row Y bounds: midpoint between adjacent parts (or page edge)
+            y_top = HEADER_Y_PT if i == 0 else (parts[i-1]["y"] + part["y"]) / 2
+            y_bot = page_h - 15 if i == len(parts)-1 else (part["y"] + parts[i+1]["y"]) / 2
+            # Small padding
+            y_top = max(HEADER_Y_PT, y_top - CELL_PAD_PT)
+            y_bot = min(page_h, y_bot + CELL_PAD_PT)
 
-        # ── 2. Collect product images: skip header & tiny images ──────────────
-        raw_imgs = []
-        for img_info in page.get_images(full=True):
-            xref, _smask, w, h = img_info[0], img_info[1], img_info[2], img_info[3]
-            if w < MIN_PX or h < MIN_PX:
-                continue                         # skip tiny decorative elements
-            rects = page.get_image_rects(xref)
-            if not rects:
-                continue
-            y_mid = (rects[0].y0 + rects[0].y1) / 2
-            if y_mid < HEADER_Y:
-                continue                         # skip company logo / header
-            raw_imgs.append({"xref": xref, "y": y_mid})
-
-        # Deduplicate: JPEG + PNG of the same image sit at the same Y position
-        raw_imgs.sort(key=lambda x: x["y"])
-        unique_imgs = []
-        for img in raw_imgs:
-            if unique_imgs and abs(img["y"] - unique_imgs[-1]["y"]) < 15:
-                continue                         # same row — already have one
-            unique_imgs.append(img)
-
-        if not unique_imgs:
-            no_match += len(part_numbers)
-            log(f"  ⊘ Page {page_num+1}: no product images found ({len(part_numbers)} parts)")
-            continue
-
-        if len(unique_imgs) != len(part_numbers):
-            log(f"  ⚠ Page {page_num+1}: {len(unique_imgs)} images vs {len(part_numbers)} parts — pairing what we can")
-
-        # ── 3. Pair by sorted order: 1st image → 1st part, 2nd → 2nd … ───────
-        for img, part in zip(unique_imgs, part_numbers):
-            part_no = part["no"]
+            clip = fitz.Rect(pic_x0, y_top, pic_x1, y_bot)
             try:
-                base_img  = doc.extract_image(img["xref"])
-                img_bytes = base_img["image"]
-                ext       = base_img["ext"]
-
-                filename = f"{part_no}.{ext}"
+                pix      = page.get_pixmap(matrix=mat, clip=clip, colorspace=fitz.csRGB)
+                filename = f"{part['no']}.png"
                 filepath = os.path.join(output_dir, filename)
-
-                with open(filepath, "wb") as f:
-                    f.write(img_bytes)
-
-                done_parts.add(part_no)
-                log(f"  ✓ Page {page_num+1}: {filename}  ({len(img_bytes)//1024} KB)")
+                pix.save(filepath)
+                done_parts.add(part["no"])
+                log(f"  ✓ Page {page_num+1}: {filename}  ({pix.width}×{pix.height}px)")
                 saved += 1
-
             except Exception as e:
-                log(f"  ✗ Page {page_num+1}: error saving {part_no} — {e}")
+                log(f"  ✗ Page {page_num+1}: error saving {part['no']} — {e}")
                 skipped += 1
-
-        # Parts with no image (list longer than images)
-        unmatched = len(part_numbers) - len(unique_imgs)
-        if unmatched > 0:
-            for part in part_numbers[len(unique_imgs):]:
-                log(f"  — Page {page_num+1}: no image for {part['no']}")
-            no_match += unmatched
 
     doc.close()
     return saved, skipped, no_match
@@ -201,7 +211,7 @@ class App(tk.Tk):
         info_frm = tk.Frame(self, bg=SURFACE, bd=0)
         info_frm.pack(fill="x", padx=16, pady=(4, 8))
         tk.Label(info_frm,
-                 text="ℹ  Images are matched to part numbers (e.g. AK00001, ABP30007) by their row position on each page.",
+                 text="ℹ  Each product row is rendered from the PDF and saved as <PartNo>.png — works even when images are not embedded individually.",
                  bg=SURFACE, fg=FG2, font=FONT, wraplength=580, justify="left").pack(padx=10, pady=8)
 
         # Progress bar

@@ -53,9 +53,10 @@ def extract_images_from_pdf(pdf_path: str, output_dir: str, log, progress_var, p
     total_pages = len(doc)
     progress_max.set(total_pages)
 
-    saved   = 0
-    skipped = 0
+    saved    = 0
+    skipped  = 0
     no_match = 0
+    done_parts: set = set()   # part numbers already saved — skip duplicates regardless of ext
 
     for page_num in range(total_pages):
         page = doc[page_num]
@@ -104,25 +105,24 @@ def extract_images_from_pdf(pdf_path: str, output_dir: str, log, progress_var, p
 
             part_no = closest["no"]
 
+            # One image per part number — skip all duplicates (jpeg, png, etc.)
+            if part_no in done_parts:
+                continue
+
             # ── 4. Extract & save ─────────────────────────────────────────────
             try:
-                base_img = doc.extract_image(xref)
+                base_img  = doc.extract_image(xref)
                 img_bytes = base_img["image"]
                 ext       = base_img["ext"]   # "jpeg", "png", etc.
 
                 filename = f"{part_no}.{ext}"
                 filepath = os.path.join(output_dir, filename)
 
-                # Skip if already written (same part no appears on multiple pages)
-                if os.path.exists(filepath):
-                    log(f"  ↷ Page {page_num+1}: {filename} already exists — skipped")
-                    skipped += 1
-                    continue
-
                 with open(filepath, "wb") as f:
                     f.write(img_bytes)
 
-                log(f"  ✓ Page {page_num+1}: saved {filename}  ({len(img_bytes)//1024} KB)")
+                done_parts.add(part_no)
+                log(f"  ✓ Page {page_num+1}: {filename}  ({len(img_bytes)//1024} KB)")
                 saved += 1
 
             except Exception as e:

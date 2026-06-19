@@ -38,31 +38,64 @@ MONO    = ("Consolas", 9)
 # Part number pattern: 2-4 uppercase letters followed by 4-6 digits (e.g. AK00001, ABP30007)
 PART_PATTERN = re.compile(r'^[A-Z]{2,4}\d{4,6}[A-Z]?$')
 
-HEADER_Y = 155   # PDF points — content below this is the table body
-MIN_PX   = 30    # skip images smaller than 30×30 px
-Y_MAX_GAP = 150  # reject match if part-number Y is more than 150pt from image Y
+HEADER_Y       = 155    # PDF points — table content starts below this
+RENDER_DPI     = 180    # DPI for page rendering
+BLANK_THRESHOLD = 247   # average pixel ≥ this → cell is white/empty, skip it
 
 
-def _detect_picture_column(doc, total_pages):
+def _detect_picture_column(doc):
     """
-    Find the X bounds of the Picture column by looking at the first non-header
-    embedded image.  Returns (pic_x0, pic_x1) or (None, None) if not found.
+    Find the Picture column by locating the LARGEST horizontal gap in text
+    coverage on page 1.  The picture column has no text — only images.
+    Returns (x0, x1) padding the gap by 2 pt on each side.
+    Falls back to None, None if no wide-enough gap is found.
     """
-    for pn in range(min(5, total_pages)):
-        page = doc[pn]
-        for img_info in page.get_images(full=True):
-            xref, _sm, w, h = img_info[0], img_info[1], img_info[2], img_info[3]
-            if w < MIN_PX or h < MIN_PX:
-                continue
-            rects = page.get_image_rects(xref)
-            if not rects:
-                continue
-            r = rects[0]
-            if (r.y0 + r.y1) / 2 < HEADER_Y:
-                continue  # skip company logo / header row
-            if r.x1 - r.x0 > 10:
-                return r.x0 - 5, r.x1 + 5
+    page  = doc[0]
+    pw    = int(page.rect.width)
+    occ   = bytearray(pw)   # 1 = text present at this X position
+
+    for block in page.get_text("dict")["blocks"]:
+        if block["type"] != 0:
+            continue
+        for line in block["lines"]:
+            if (line["bbox"][1] + line["bbox"][3]) / 2 < HEADER_Y:
+                continue   # skip header rows
+            x0 = max(0,    int(line["bbox"][0]))
+            x1 = min(pw-1, int(line["bbox"][2]))
+            for x in range(x0, x1 + 1):
+                occ[x] = 1
+
+    # Walk left→right, find the longest gap of un-occupied X positions
+    best = (0, 0, 0)        # (gap_start, gap_end, gap_len)
+    in_gap, g_start = False, 0
+    for x in range(10, pw): # ignore first 10 pt (page margin)
+        if not occ[x]:
+            if not in_gap:
+                in_gap, g_start = True, x
+        else:
+            if in_gap:
+                g_len = x - g_start
+                if g_len > best[2]:
+                    best = (g_start, x, g_len)
+                in_gap = False
+    if in_gap:
+        g_len = pw - g_start
+        if g_len > best[2]:
+            best = (g_start, pw, g_len)
+
+    if best[2] >= 30:
+        return best[0] - 2, best[1] + 2    # slight outward padding
     return None, None
+
+
+def _is_blank(pix, threshold=BLANK_THRESHOLD):
+    """True if the rendered pixmap is mostly white (no product photo)."""
+    raw = pix.samples
+    if not raw:
+        return True
+    step   = (pix.n or 3) * 8   # sample every 8th pixel
+    sample = raw[::step]
+    return (sum(sample) / len(sample)) > threshold if sample else True
 
 
 # ── Core extraction logic ─────────────────────────────────────────────────────
@@ -70,16 +103,14 @@ def _detect_picture_column(doc, total_pages):
 def extract_images_from_pdf(pdf_path: str, output_dir: str, log, progress_var, progress_max):
     """
     For each page:
-      1. Detect the Picture column X range from the first embedded product image.
-      2. Collect part numbers that are NOT inside the Picture column.
-         Determine whether 'Our No.' is to the left or right of Picture and
-         keep only that side (eliminates OEM/cross-ref numbers on the other side).
-      3. Extract each embedded image that falls inside the Picture column.
-      4. Match image to nearest part number by Y distance.
-      5. Save as <part_no>.<ext>  (jpeg/png, whatever is embedded).
+      1. Detect the Picture column as the widest horizontal text-free gap (page 1).
+      2. Collect part numbers from the 'Our No.' column (the correct side of Picture).
+      3. For each part, render just its Picture-cell rectangle at RENDER_DPI.
+      4. Skip blank/white cells (product has no photo).
+      5. Save non-blank cells as <part_no>.png.
 
-    Note: this PDF has exactly 1 product photo per page (374 pages = 374 photos).
-    Products without a photo in the PDF will not be extracted — that is expected.
+    This works for product images stored as any PDF content type (embedded XObjects,
+    Form XObjects, inline images, etc.) because rendering handles them all.
     """
     doc = fitz.open(pdf_path)
     total_pages = len(doc)
@@ -87,43 +118,54 @@ def extract_images_from_pdf(pdf_path: str, output_dir: str, log, progress_var, p
 
     saved    = 0
     skipped  = 0
-    no_match = 0
+    no_photo = 0
     done_parts: set = set()
 
-    # ── Detect Picture column X bounds from first embedded image ─────────────
-    pic_x0, pic_x1 = _detect_picture_column(doc, total_pages)
-    if pic_x0 is not None:
-        log(f"  📐 Picture column detected: x=[{pic_x0:.0f} – {pic_x1:.0f}]")
-    else:
-        log("  ⚠  Could not auto-detect Picture column X — using Y-only matching")
+    # ── 1. Detect Picture column ─────────────────────────────────────────────
+    pic_x0, pic_x1 = _detect_picture_column(doc)
 
-    # Detect which side of Picture column 'Our No.' is on (left or right).
-    # Check page 1 only; apply the same rule to all pages.
-    our_no_left: bool | None = None  # True = Our No. is left of Picture
-    if pic_x0 is not None:
-        page0 = doc[0]
-        left_count = right_count = 0
-        for block in page0.get_text("dict")["blocks"]:
-            if block["type"] != 0:
-                continue
-            for line in block["lines"]:
-                for span in line["spans"]:
-                    if not PART_PATTERN.match(span["text"].strip()):
-                        continue
-                    x0 = span["bbox"][0]
-                    if x0 < pic_x0:
-                        left_count += 1
-                    elif x0 > pic_x1:
-                        right_count += 1
-        our_no_left = left_count > right_count
-        side_str = "LEFT" if our_no_left else "RIGHT"
-        log(f"  📐 'Our No.' column is {side_str} of Picture  (L:{left_count} R:{right_count})")
+    if pic_x0 is None:
+        # Hard fallback: middle region of the page
+        pw     = doc[0].rect.width
+        pic_x0 = pw * 0.12
+        pic_x1 = pw * 0.38
+        log(f"  ⚠  Gap detection failed — using fallback Picture x=[{pic_x0:.0f}–{pic_x1:.0f}]")
+    else:
+        log(f"  📐 Picture column: x=[{pic_x0:.0f} – {pic_x1:.0f}]  (width {pic_x1-pic_x0:.0f} pt)")
+
+    if pic_x1 <= pic_x0:
+        log("  ✗  Detected picture column has zero or negative width — aborting")
+        doc.close()
+        return 0, 0, 0
+
+    # ── 2. Determine which side of Picture column holds 'Our No.' ────────────
+    page0 = doc[0]
+    left_cnt = right_cnt = 0
+    for block in page0.get_text("dict")["blocks"]:
+        if block["type"] != 0:
+            continue
+        for line in block["lines"]:
+            for span in line["spans"]:
+                if not PART_PATTERN.match(span["text"].strip()):
+                    continue
+                x = span["bbox"][0]
+                if x < pic_x0 - 5:
+                    left_cnt += 1
+                elif x > pic_x1 + 5:
+                    right_cnt += 1
+    our_no_left = left_cnt >= right_cnt
+    log(f"  📐 'Our No.' is {'LEFT' if our_no_left else 'RIGHT'} of Picture  (L:{left_cnt} R:{right_cnt})")
+
+    scale = RENDER_DPI / 72
+    mat   = fitz.Matrix(scale, scale)
+    COL_TOL = 25   # X tolerance when deciding column membership
 
     for page_num in range(total_pages):
-        page = doc[page_num]
+        page  = doc[page_num]
         progress_var.set(page_num + 1)
+        page_h = page.rect.height
 
-        # ── 1. Collect part numbers on the 'Our No.' side of Picture ─────────
+        # ── 3. Collect part numbers on the 'Our No.' side ────────────────────
         parts = []
         for block in page.get_text("dict")["blocks"]:
             if block["type"] != 0:
@@ -133,74 +175,55 @@ def extract_images_from_pdf(pdf_path: str, output_dir: str, log, progress_var, p
                     text = span["text"].strip()
                     if not PART_PATTERN.match(text) or text in done_parts:
                         continue
-                    x0   = span["bbox"][0]
+                    x0 = span["bbox"][0]
+                    if our_no_left  and x0 >= pic_x0 - COL_TOL:
+                        continue   # right side — not Our No.
+                    if not our_no_left and x0 <= pic_x1 + COL_TOL:
+                        continue   # left side — not Our No.
                     y_mid = (span["bbox"][1] + span["bbox"][3]) / 2
-                    # Filter by column side
-                    if pic_x0 is not None:
-                        if our_no_left and x0 >= pic_x0:
-                            continue   # skip — not on the left side
-                        if not our_no_left and x0 <= pic_x1:
-                            continue   # skip — not on the right side
                     parts.append({"no": text, "y": y_mid})
 
         if not parts:
             continue
 
-        # ── 2. Collect embedded images inside the Picture column ──────────────
-        images = []
-        seen_y: set = set()
-        for img_info in page.get_images(full=True):
-            xref, _sm, w, h = img_info[0], img_info[1], img_info[2], img_info[3]
-            if w < MIN_PX or h < MIN_PX:
-                continue
-            rects = page.get_image_rects(xref)
-            if not rects:
-                continue
-            r     = rects[0]
-            y_mid = (r.y0 + r.y1) / 2
-            if y_mid < HEADER_Y:
-                continue   # skip header logo
-            # Keep only images that overlap the Picture column
-            if pic_x0 is not None and not (r.x0 < pic_x1 + 20 and r.x1 > pic_x0 - 20):
-                continue
-            y_key = round(y_mid / 10) * 10
-            if y_key in seen_y:
-                continue   # deduplicate JPEG + PNG at same position
-            seen_y.add(y_key)
-            images.append({"xref": xref, "y": y_mid})
+        parts.sort(key=lambda p: p["y"])
 
-        if not images:
-            no_match += 1
-            continue
+        # ── 4. Render each row's Picture cell; skip if blank ─────────────────
+        for i, part in enumerate(parts):
+            # Row boundaries: midpoints between adjacent part numbers
+            y_top = HEADER_Y if i == 0 else (parts[i-1]["y"] + part["y"]) / 2
+            y_bot = (page_h - 15) if i == len(parts)-1 else (part["y"] + parts[i+1]["y"]) / 2
+            y_top = max(HEADER_Y, y_top - 3)
+            y_bot = min(page_h,   y_bot + 3)
 
-        # ── 3. Match each image to nearest part number by Y ──────────────────
-        for img in images:
-            closest = min(parts, key=lambda p: abs(p["y"] - img["y"]))
-            gap     = abs(closest["y"] - img["y"])
-            part_no = closest["no"]
+            if y_bot - y_top < 5 or pic_x1 - pic_x0 < 5:
+                continue   # degenerate cell — skip
 
-            if part_no in done_parts:
-                continue
-            if gap > Y_MAX_GAP:
-                log(f"  ⊘ Page {page_num+1}: image y={img['y']:.0f} too far from {part_no} (gap={gap:.0f})")
-                no_match += 1
-                continue
-
+            clip = fitz.Rect(pic_x0, y_top, pic_x1, y_bot)
             try:
-                bi       = doc.extract_image(img["xref"])
-                filename = f"{part_no}.{bi['ext']}"
-                filepath = os.path.join(output_dir, filename)
-                with open(filepath, "wb") as f:
-                    f.write(bi["image"])
-                done_parts.add(part_no)
-                log(f"  ✓ Page {page_num+1}: {filename}  ({len(bi['image'])//1024} KB)")
+                pix = page.get_pixmap(matrix=mat, clip=clip, colorspace=fitz.csRGB)
+            except Exception as e:
+                log(f"  ✗ Page {page_num+1}: render error {part['no']} — {e}")
+                skipped += 1
+                continue
+
+            if _is_blank(pix):
+                no_photo += 1
+                continue   # empty cell — this product has no photo in the PDF
+
+            filename = f"{part['no']}.png"
+            filepath = os.path.join(output_dir, filename)
+            try:
+                pix.save(filepath)
+                done_parts.add(part["no"])
+                log(f"  ✓ Page {page_num+1}: {filename}  ({pix.width}×{pix.height}px)")
                 saved += 1
             except Exception as e:
-                log(f"  ✗ Page {page_num+1}: error saving {part_no} — {e}")
+                log(f"  ✗ Page {page_num+1}: error saving {part['no']} — {e}")
                 skipped += 1
 
     doc.close()
-    return saved, skipped, no_match
+    return saved, skipped, no_photo
 
 
 # ── UI ────────────────────────────────────────────────────────────────────────
@@ -258,7 +281,7 @@ class App(tk.Tk):
         info_frm = tk.Frame(self, bg=SURFACE, bd=0)
         info_frm.pack(fill="x", padx=16, pady=(4, 8))
         tk.Label(info_frm,
-                 text="ℹ  Extracts embedded product images. Auto-detects the Picture column and filters to the supplier 'Our No.' column only (ignores OEM cross-ref numbers).",
+                 text="ℹ  Renders each product row's Picture cell directly from the PDF. Blank cells are skipped automatically.",
                  bg=SURFACE, fg=FG2, font=FONT, wraplength=580, justify="left").pack(padx=10, pady=8)
 
         # Progress bar
@@ -361,18 +384,18 @@ class App(tk.Tk):
         self._log("─" * 60)
 
         try:
-            saved, skipped, no_match = extract_images_from_pdf(
+            saved, skipped, no_photo = extract_images_from_pdf(
                 pdf, out,
                 log=self._log,
                 progress_var=type("V", (), {"set": lambda s, v: self._set_progress(v)})(),
                 progress_max=self._prog_max,
             )
             self._log("─" * 60)
-            self._log(f"✅  Done!  {saved} saved · {skipped} skipped · {no_match} unmatched")
+            self._log(f"✅  Done!  {saved} saved · {skipped} errors · {no_photo} blank (no photo)")
             self.after(0, lambda: messagebox.showinfo(
                 "Complete",
                 f"{saved} images saved to:\n{out}\n\n"
-                f"{skipped} skipped · {no_match} could not be matched to a part number"
+                f"{skipped} errors · {no_photo} products had no photo in PDF"
             ))
         except Exception as e:
             self._log(f"✗ Error: {e}")

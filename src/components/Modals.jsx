@@ -6554,16 +6554,23 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                   {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--text3)",lineHeight:1}} title="Clear search">✕</button>}
                 </div>
 
-                <div style={{overflowX:"auto",maxHeight:420}}>
-                  <table className="tbl" style={{fontSize:12}}>
+                <div style={{maxHeight:440,overflowY:"auto"}}>
+                  <table className="tbl" style={{fontSize:12,tableLayout:"fixed",width:"100%"}}>
+                    <colgroup>
+                      <col style={{width:"16%"}}/>
+                      <col style={{width:"18%"}}/>
+                      <col style={{width:"24%"}}/>
+                      <col style={{width:"38%"}}/>
+                      <col style={{width:"4%"}}/>
+                    </colgroup>
                     <thead><tr><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th><th></th></tr></thead>
                     <tbody>
                       {filtered.map(item=>(
                         <tr key={item.id}>
-                          <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,whiteSpace:"nowrap"}}>{item.supplier_part_no||"—"}</td>
-                          <td>{item.description||"—"}</td>
-                          <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"nowrap"}}>{item.oem_number||"—"}</td>
-                          <td style={{color:"var(--text2)",maxWidth:280,whiteSpace:"pre-wrap",lineHeight:1.4}}>{item.application||"—"}</td>
+                          <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.supplier_part_no||""}>{item.supplier_part_no||"—"}</td>
+                          <td style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.description||""}>{item.description||"—"}</td>
+                          <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.oem_number||""}>{item.oem_number||"—"}</td>
+                          <td style={{color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.application||""}>{item.application||"—"}</td>
                           <td style={{textAlign:"center"}}>
                             <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"1px 8px"}} onClick={()=>deleteItem(item.id)} title="Delete row">✕</button>
                           </td>

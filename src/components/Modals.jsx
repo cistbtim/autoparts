@@ -6548,11 +6548,13 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
             )
             : (
               <>
-                <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center"}}>
-                  <input className="form-control" placeholder="Search part no / description / OEM / application…" value={search} onChange={e=>setSearch(e.target.value)} style={{flex:1,fontSize:13}}/>
-                  <button className="btn btn-danger btn-sm" onClick={clearAll}>Clear All</button>
+                {/* Search — full width, inline clear ✕ */}
+                <div style={{position:"relative",marginBottom:12}}>
+                  <input className="form-control" placeholder="🔍  Search part no / description / OEM / application…" value={search} onChange={e=>setSearch(e.target.value)} style={{width:"100%",fontSize:13,paddingRight:search?32:12,boxSizing:"border-box"}}/>
+                  {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--text3)",lineHeight:1}} title="Clear search">✕</button>}
                 </div>
-                <div style={{overflowX:"auto",maxHeight:460}}>
+
+                <div style={{overflowX:"auto",maxHeight:420}}>
                   <table className="tbl" style={{fontSize:12}}>
                     <thead><tr><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th><th></th></tr></thead>
                     <tbody>
@@ -6563,14 +6565,23 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                           <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"nowrap"}}>{item.oem_number||"—"}</td>
                           <td style={{color:"var(--text2)",maxWidth:280,whiteSpace:"pre-wrap",lineHeight:1.4}}>{item.application||"—"}</td>
                           <td style={{textAlign:"center"}}>
-                            <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"1px 8px"}} onClick={()=>deleteItem(item.id)} title="Delete">✕</button>
+                            <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"1px 8px"}} onClick={()=>deleteItem(item.id)} title="Delete row">✕</button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                {search.trim()&&<div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>{filtered.length} of {items.length} shown</div>}
+
+                {/* Footer: result count + clearly-separated destructive action */}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+                  <span style={{fontSize:12,color:"var(--text3)"}}>
+                    {search.trim()?`${filtered.length} of ${items.length} items`:`${items.length} items`}
+                  </span>
+                  <button onClick={clearAll} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"var(--red)",opacity:.7,textDecoration:"underline",padding:0}} title="Permanently delete all catalogue items for this supplier">
+                    🗑 Delete all {items.length} items
+                  </button>
+                </div>
               </>
             )
       )}

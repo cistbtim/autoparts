@@ -6409,6 +6409,273 @@ export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMan
   );
 }
 
+// ─── Supplier Catalogue Modal ─────────────────────────────────────────────────
+export function SupplierCatalogueModal({ supplier, onClose }) {
+  const [activeTab, setActiveTab] = useState("browse");
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  // import state
+  const [rawRows, setRawRows] = useState([]);   // all rows incl. header
+  const [colMap, setColMap] = useState({});     // { colIndex: fieldName }
+  const [fileErr, setFileErr] = useState("");
+  const [fileLoading, setFileLoading] = useState(false);
+  const [importStep, setImportStep] = useState(1);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+
+  useEffect(() => {
+    api.get("supplier_catalogue", `select=*&supplier_id=eq.${supplier.id}&order=supplier_part_no.asc`)
+      .then(r => { setItems(Array.isArray(r) ? r : []); setLoading(false); });
+  }, [supplier.id]);
+
+  const headers  = rawRows[0] || [];
+  const dataRows = rawRows.slice(1).filter(r => r.some(c => String(c).trim()));
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    setFileErr(""); setFileLoading(true);
+    try {
+      const ext = file.name.split(".").pop().toLowerCase();
+      let rows;
+      if (ext === "csv") {
+        rows = parseDelimitedText(await file.text());
+      } else if (ext === "xlsx" || ext === "xls") {
+        const XLSX = await loadXLSX();
+        const wb = XLSX.read(await file.arrayBuffer());
+        rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
+      } else {
+        setFileErr("Use .csv, .xlsx or .xls"); setFileLoading(false); return;
+      }
+      const cleaned = rows.filter(r => Array.isArray(r) && r.some(c => String(c).trim()));
+      if (cleaned.length < 2) { setFileErr("File has no data rows"); setFileLoading(false); return; }
+      setRawRows(cleaned);
+      setColMap(catAutoDetect(cleaned[0] || []));
+      setImportStep(2);
+    } catch(e) {
+      setFileErr("Parse error: " + e.message);
+    }
+    setFileLoading(false);
+  };
+
+  const getField = (row, field) => {
+    const entry = Object.entries(colMap).find(([, f]) => f === field);
+    return entry !== undefined ? String(row[+entry[0]] || "").trim() : "";
+  };
+
+  const buildPreview = () => dataRows.slice(0, 5).map(row => ({
+    supplier_part_no: getField(row, "supplier_part_no"),
+    description:      getField(row, "description"),
+    oem_number:       getField(row, "oem"),
+    application:      getField(row, "application"),
+  }));
+
+  const doImport = async () => {
+    setImporting(true);
+    const toInsert = dataRows
+      .map(row => ({
+        supplier_id:      supplier.id,
+        supplier_part_no: getField(row, "supplier_part_no") || null,
+        description:      getField(row, "description") || null,
+        oem_number:       getField(row, "oem") || null,
+        application:      getField(row, "application") || null,
+      }))
+      .filter(r => r.supplier_part_no || r.description);
+
+    let inserted = 0, errors = 0;
+    for (let i = 0; i < toInsert.length; i += 500) {
+      const chunk = toInsert.slice(i, i + 500);
+      const res = await api.upsert("supplier_catalogue", chunk);
+      if (res?.code) errors += chunk.length;
+      else inserted += Array.isArray(res) ? res.length : chunk.length;
+    }
+    setImportResult({ inserted, errors });
+    const updated = await api.get("supplier_catalogue", `select=*&supplier_id=eq.${supplier.id}&order=supplier_part_no.asc`);
+    setItems(Array.isArray(updated) ? updated : []);
+    setImporting(false);
+    setImportStep(3);
+  };
+
+  const clearAll = async () => {
+    if (!confirm(`Delete all ${items.length} catalogue items for ${supplier.name}?`)) return;
+    await api.delete("supplier_catalogue", "supplier_id", supplier.id);
+    setItems([]);
+  };
+
+  const deleteItem = async (id) => {
+    await api.delete("supplier_catalogue", "id", id);
+    setItems(prev => prev.filter(x => x.id !== id));
+  };
+
+  const filtered = search.trim()
+    ? items.filter(x => {
+        const q = search.toLowerCase();
+        return (x.supplier_part_no||"").toLowerCase().includes(q) ||
+               (x.description||"").toLowerCase().includes(q) ||
+               (x.oem_number||"").toLowerCase().includes(q) ||
+               (x.application||"").toLowerCase().includes(q);
+      })
+    : items;
+
+  const resetImport = () => { setImportStep(1); setRawRows([]); setImportResult(null); setFileErr(""); };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title={`📋 ${supplier?.name} — Catalogue`} sub={`${items.length} item${items.length!==1?"s":""}`} onClose={onClose}/>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:2,marginBottom:16,borderBottom:"1px solid var(--border)"}}>
+        {[["browse","Browse"],["import","⬆ Import"]].map(([key,label])=>(
+          <button key={key} onClick={()=>{setActiveTab(key);if(key==="import"&&importStep===3)resetImport();}}
+            style={{padding:"7px 18px",background:"none",border:"none",borderBottom:`2px solid ${activeTab===key?"var(--accent)":"transparent"}`,fontWeight:activeTab===key?700:400,color:activeTab===key?"var(--accent)":"var(--text2)",cursor:"pointer",fontSize:14}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── BROWSE ── */}
+      {activeTab==="browse"&&(
+        loading
+          ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>Loading…</div>
+          : items.length===0
+            ? (
+              <div style={{textAlign:"center",padding:36,color:"var(--text3)"}}>
+                <div style={{fontSize:36,marginBottom:8}}>📭</div>
+                <div style={{marginBottom:14}}>No catalogue items yet.</div>
+                <button className="btn btn-primary" onClick={()=>setActiveTab("import")}>Import CSV / Excel</button>
+              </div>
+            )
+            : (
+              <>
+                <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center"}}>
+                  <input className="form-control" placeholder="Search part no / description / OEM / application…" value={search} onChange={e=>setSearch(e.target.value)} style={{flex:1,fontSize:13}}/>
+                  <button className="btn btn-danger btn-sm" onClick={clearAll}>Clear All</button>
+                </div>
+                <div style={{overflowX:"auto",maxHeight:460}}>
+                  <table className="tbl" style={{fontSize:12}}>
+                    <thead><tr><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th><th></th></tr></thead>
+                    <tbody>
+                      {filtered.map(item=>(
+                        <tr key={item.id}>
+                          <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,whiteSpace:"nowrap"}}>{item.supplier_part_no||"—"}</td>
+                          <td>{item.description||"—"}</td>
+                          <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"nowrap"}}>{item.oem_number||"—"}</td>
+                          <td style={{color:"var(--text2)",maxWidth:280,whiteSpace:"pre-wrap",lineHeight:1.4}}>{item.application||"—"}</td>
+                          <td style={{textAlign:"center"}}>
+                            <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"1px 8px"}} onClick={()=>deleteItem(item.id)} title="Delete">✕</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {search.trim()&&<div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>{filtered.length} of {items.length} shown</div>}
+              </>
+            )
+      )}
+
+      {/* ── IMPORT ── */}
+      {activeTab==="import"&&(
+        <>
+          {/* Step 1: Upload */}
+          {importStep===1&&(
+            <div>
+              <p style={{fontSize:13,color:"var(--text3)",marginBottom:16}}>
+                Upload a CSV or Excel file. Needs at least a supplier part number column.
+              </p>
+              {fileErr&&<div style={{background:"rgba(239,68,68,.1)",border:"1px solid var(--red)",borderRadius:8,padding:"8px 12px",fontSize:12,color:"var(--red)",marginBottom:12}}>{fileErr}</div>}
+              <label style={{display:"block",border:"2px dashed var(--border)",borderRadius:10,padding:"44px 20px",textAlign:"center",cursor:fileLoading?"wait":"pointer",color:"var(--text3)",fontSize:13}}>
+                <input type="file" accept=".csv,.xlsx,.xls" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])} disabled={fileLoading}/>
+                {fileLoading?"⟳ Parsing file…":"📄 Click to upload CSV or Excel"}
+                <span style={{fontSize:11,display:"block",marginTop:4}}>Supported: .csv · .xlsx · .xls</span>
+              </label>
+            </div>
+          )}
+
+          {/* Step 2: Map columns + preview + import */}
+          {importStep===2&&(
+            <div>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>Map Columns</div>
+              <p style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Auto-detected from headers — adjust if needed.</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:18}}>
+                {[
+                  {field:"supplier_part_no",label:"Supplier Part No *"},
+                  {field:"description",     label:"Description"},
+                  {field:"oem",             label:"OEM Number"},
+                  {field:"application",     label:"Application"},
+                ].map(({field,label})=>{
+                  const curIdx = Object.entries(colMap).find(([,f])=>f===field)?.[0] ?? "";
+                  return (
+                    <div key={field}>
+                      <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:4}}>{label}</div>
+                      <select className="form-control" value={curIdx}
+                        onChange={e=>{
+                          const newIdx = e.target.value;
+                          setColMap(prev=>{
+                            const next = {...prev};
+                            Object.keys(next).forEach(k=>{ if(next[k]===field) delete next[k]; });
+                            if(newIdx!=="") next[newIdx]=field;
+                            return next;
+                          });
+                        }}
+                        style={{fontSize:12}}>
+                        <option value="">— skip —</option>
+                        {headers.map((h,i)=><option key={i} value={String(i)}>{String(h)||`Column ${i+1}`}</option>)}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{fontSize:12,fontWeight:700,marginBottom:6,color:"var(--text2)"}}>Preview (first 5 rows)</div>
+              <div style={{overflowX:"auto",marginBottom:16}}>
+                <table className="tbl" style={{fontSize:11}}>
+                  <thead><tr><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th></tr></thead>
+                  <tbody>
+                    {buildPreview().map((r,i)=>(
+                      <tr key={i}>
+                        <td style={{fontFamily:"DM Mono,monospace",whiteSpace:"nowrap"}}>{r.supplier_part_no||<span style={{color:"var(--text3)"}}>—</span>}</td>
+                        <td>{r.description||<span style={{color:"var(--text3)"}}>—</span>}</td>
+                        <td style={{fontFamily:"DM Mono,monospace",whiteSpace:"nowrap"}}>{r.oem_number||<span style={{color:"var(--text3)"}}>—</span>}</td>
+                        <td style={{maxWidth:200,whiteSpace:"pre-wrap"}}>{r.application||<span style={{color:"var(--text3)"}}>—</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setImportStep(1);setRawRows([]);}} disabled={importing}>← Back</button>
+                <button className="btn btn-primary" style={{flex:2}}
+                  disabled={importing||!Object.values(colMap).includes("supplier_part_no")}
+                  onClick={doImport}>
+                  {importing?"Importing…":`Import ${dataRows.length} rows`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Done */}
+          {importStep===3&&importResult&&(
+            <div style={{textAlign:"center",padding:28}}>
+              <div style={{fontSize:40,marginBottom:10}}>✅</div>
+              <div style={{fontWeight:700,fontSize:17,marginBottom:6}}>Import Complete</div>
+              <div style={{fontSize:13,color:"var(--text3)",marginBottom:20}}>
+                {importResult.inserted} items imported
+                {importResult.errors>0&&<span style={{color:"var(--red)"}}>, {importResult.errors} errors</span>}
+              </div>
+              <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+                <button className="btn btn-ghost" onClick={resetImport}>Import More</button>
+                <button className="btn btn-primary" onClick={()=>setActiveTab("browse")}>View Catalogue</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </Overlay>
+  );
+}
+
 // ─── Branches Management Page ────────────────────────────────────────────────
 export function BranchesPage({branches:propBranches=[], onRefresh, _t={}}) {
   const regLink = `${window.location.origin}${window.location.pathname}?branch_reg=1`;

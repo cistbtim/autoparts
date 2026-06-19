@@ -38,53 +38,80 @@ MONO    = ("Consolas", 9)
 # Part number pattern: 2-4 uppercase letters followed by 4-6 digits (e.g. AK00001, ABP30007)
 PART_PATTERN = re.compile(r'^[A-Z]{2,4}\d{4,6}[A-Z]?$')
 
-HEADER_Y       = 155    # PDF points — table content starts below this
-RENDER_DPI     = 180    # DPI for page rendering
-BLANK_THRESHOLD = 247   # average pixel ≥ this → cell is white/empty, skip it
+HEADER_Y        = 155    # PDF points — table content starts below this
+RENDER_DPI      = 200    # DPI for page rendering
+BLANK_THRESHOLD = 247    # average pixel ≥ this → cell is white/empty, skip it
+MIN_EMBED_PX    = 30     # ignore embedded images smaller than this (px)
 
 
-def _detect_picture_column(doc):
+def _detect_picture_column(doc, total_pages):
     """
-    Find the Picture column by locating the LARGEST horizontal gap in text
-    coverage on page 1.  The picture column has no text — only images.
-    Returns (x0, x1) padding the gap by 2 pt on each side.
-    Falls back to None, None if no wide-enough gap is found.
+    Detect the Picture column X bounds using two methods in priority order:
+
+    1. Modal X range of all non-header embedded images across first 20 pages.
+       These are guaranteed to be in the picture column.
+
+    2. First horizontal text-free gap between 30–250 pt wide (skipping the
+       right-margin gap which is typically very wide).
+
+    Returns (x0, x1) or (None, None).
     """
-    page  = doc[0]
-    pw    = int(page.rect.width)
-    occ   = bytearray(pw)   # 1 = text present at this X position
+    from collections import Counter
 
-    for block in page.get_text("dict")["blocks"]:
-        if block["type"] != 0:
-            continue
-        for line in block["lines"]:
-            if (line["bbox"][1] + line["bbox"][3]) / 2 < HEADER_Y:
-                continue   # skip header rows
-            x0 = max(0,    int(line["bbox"][0]))
-            x1 = min(pw-1, int(line["bbox"][2]))
-            for x in range(x0, x1 + 1):
-                occ[x] = 1
+    # ── Method 1: embedded image bounding rects ───────────────────────────────
+    x0c, x1c = Counter(), Counter()
+    for pn in range(min(20, total_pages)):
+        page = doc[pn]
+        for img_info in page.get_images(full=True):
+            xref, _sm, w, h = img_info[0], img_info[1], img_info[2], img_info[3]
+            if w < MIN_EMBED_PX or h < MIN_EMBED_PX:
+                continue
+            rects = page.get_image_rects(xref)
+            if not rects:
+                continue
+            r = rects[0]
+            if (r.y0 + r.y1) / 2 < HEADER_Y:
+                continue   # skip company header / logo
+            col_w = r.x1 - r.x0
+            if col_w < 10:
+                continue
+            x0c[round(r.x0 / 5) * 5] += 1
+            x1c[round(r.x1 / 5) * 5] += 1
 
-    # Walk left→right, find the longest gap of un-occupied X positions
-    best = (0, 0, 0)        # (gap_start, gap_end, gap_len)
-    in_gap, g_start = False, 0
-    for x in range(10, pw): # ignore first 10 pt (page margin)
-        if not occ[x]:
-            if not in_gap:
-                in_gap, g_start = True, x
-        else:
-            if in_gap:
-                g_len = x - g_start
-                if g_len > best[2]:
-                    best = (g_start, x, g_len)
-                in_gap = False
-    if in_gap:
-        g_len = pw - g_start
-        if g_len > best[2]:
-            best = (g_start, pw, g_len)
+    if x0c and x1c:
+        pic_x0 = x0c.most_common(1)[0][0]
+        pic_x1 = x1c.most_common(1)[0][0]
+        if pic_x1 > pic_x0 + 15:
+            return pic_x0 - 3, pic_x1 + 3
 
-    if best[2] >= 30:
-        return best[0] - 2, best[1] + 2    # slight outward padding
+    # ── Method 2: first text-free gap of sensible width ───────────────────────
+    try:
+        page = doc[0]
+        pw   = int(page.rect.width)
+        occ  = bytearray(pw)
+        for block in page.get_text("dict")["blocks"]:
+            if block["type"] != 0:
+                continue
+            for line in block["lines"]:
+                if (line["bbox"][1] + line["bbox"][3]) / 2 < HEADER_Y:
+                    continue
+                for x in range(max(0, int(line["bbox"][0])),
+                               min(pw, int(line["bbox"][2]) + 1)):
+                    occ[x] = 1
+        in_gap, g_start = False, 0
+        for x in range(15, pw):
+            if not occ[x]:
+                if not in_gap:
+                    in_gap, g_start = True, x
+            else:
+                if in_gap:
+                    g_len = x - g_start
+                    if 30 <= g_len <= 250:   # realistic picture-column width
+                        return g_start - 2, x + 2
+                    in_gap = False
+    except Exception:
+        pass
+
     return None, None
 
 
@@ -122,7 +149,7 @@ def extract_images_from_pdf(pdf_path: str, output_dir: str, log, progress_var, p
     done_parts: set = set()
 
     # ── 1. Detect Picture column ─────────────────────────────────────────────
-    pic_x0, pic_x1 = _detect_picture_column(doc)
+    pic_x0, pic_x1 = _detect_picture_column(doc, total_pages)
 
     if pic_x0 is None:
         # Hard fallback: middle region of the page

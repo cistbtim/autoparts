@@ -6570,7 +6570,7 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                           <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.supplier_part_no||""}>{item.supplier_part_no||"—"}</td>
                           <td style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.description||""}>{item.description||"—"}</td>
                           <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.oem_number||""}>{item.oem_number||"—"}</td>
-                          <td style={{color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.application||""}>{item.application||"—"}</td>
+                          <td style={{color:"var(--text2)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.application||"—"}</td>
                           <td style={{textAlign:"center"}}>
                             <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"1px 8px"}} onClick={()=>deleteItem(item.id)} title="Delete row">✕</button>
                           </td>

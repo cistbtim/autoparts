@@ -6417,6 +6417,7 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
+  const [lightboxUrl, setLightboxUrl] = useState(null);
 
   // import state
   const [rawRows, setRawRows] = useState([]);   // all rows incl. header
@@ -6578,7 +6579,7 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                         <tr key={item.id}>
                           <td style={{textAlign:"center",padding:"2px 4px"}}>
                             {item.image_url
-                              ? <img src={toImgUrl(item.image_url)} alt="" loading="lazy" style={{width:44,height:44,objectFit:"contain",borderRadius:4,background:"#f5f5f5",border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
+                              ? <img src={toImgUrl(item.image_url)} alt="" loading="lazy" onClick={()=>setLightboxUrl(item.image_url)} style={{width:44,height:44,objectFit:"contain",borderRadius:4,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in"}} onError={e=>{e.target.style.display="none";}}/>
                               : <span style={{fontSize:18,opacity:.25}}>🖼</span>}
                           </td>
                           <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.supplier_part_no||""}>{item.supplier_part_no||"—"}</td>
@@ -6613,6 +6614,8 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
               </>
             )
       )}
+
+      {lightboxUrl&&<ImgLightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>}
 
       {/* ── IMPORT ── */}
       {activeTab==="import"&&(

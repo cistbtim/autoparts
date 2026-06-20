@@ -6469,6 +6469,7 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
     description:      getField(row, "description"),
     oem_number:       getField(row, "oem"),
     application:      getField(row, "application"),
+    image_url:        getField(row, "image_url"),
   }));
 
   const doImport = async () => {
@@ -6480,6 +6481,7 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
         description:      getField(row, "description") || null,
         oem_number:       getField(row, "oem") || null,
         application:      getField(row, "application") || null,
+        image_url:        getField(row, "image_url") || null,
       }))
       .filter(r => r.supplier_part_no || r.description);
 
@@ -6557,16 +6559,22 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                 <div style={{maxHeight:440,overflowY:"auto"}}>
                   <table className="tbl" style={{fontSize:12,tableLayout:"fixed",width:"100%"}}>
                     <colgroup>
+                      <col style={{width:"7%"}}/>
+                      <col style={{width:"14%"}}/>
                       <col style={{width:"16%"}}/>
-                      <col style={{width:"18%"}}/>
-                      <col style={{width:"24%"}}/>
-                      <col style={{width:"38%"}}/>
+                      <col style={{width:"22%"}}/>
+                      <col style={{width:"37%"}}/>
                       <col style={{width:"4%"}}/>
                     </colgroup>
-                    <thead><tr><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th><th></th></tr></thead>
+                    <thead><tr><th></th><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th><th></th></tr></thead>
                     <tbody>
                       {filtered.map(item=>(
                         <tr key={item.id}>
+                          <td style={{textAlign:"center",padding:"2px 4px"}}>
+                            {item.image_url
+                              ? <img src={item.image_url} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:4,background:"#f5f5f5",border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
+                              : <span style={{fontSize:18,opacity:.25}}>🖼</span>}
+                          </td>
                           <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.supplier_part_no||""}>{item.supplier_part_no||"—"}</td>
                           <td style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.description||""}>{item.description||"—"}</td>
                           <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.oem_number||"—"}</td>
@@ -8707,6 +8715,7 @@ const CAT_FIELD_HINTS = {
   application: ["applic","fitment","fit","vehicle","car","model","use for","for model"],
   unit: ["unit","uom","u/m"],
   price: ["price","cost","rate","unit price"],
+  image_url: ["image","img","photo","picture","pic url","image url","img url"],
 };
 
 function catAutoDetect(headers) {

@@ -57,7 +57,7 @@ def upload_file(drive, local_path, filename):
         fileId=file_id,
         body={"role": "reader", "type": "anyone"},
     ).execute()
-    return f"https://drive.google.com/uc?export=view&id={file_id}"
+    return f"https://drive.google.com/thumbnail?id={file_id}&sz=w200"
 
 
 def main():

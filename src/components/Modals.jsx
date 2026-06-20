@@ -6415,6 +6415,8 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   // import state
   const [rawRows, setRawRows] = useState([]);   // all rows incl. header
@@ -6520,6 +6522,10 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
       })
     : items;
 
+  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage    = Math.min(page, totalPages);
+  const pageItems   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   const resetImport = () => { setImportStep(1); setRawRows([]); setImportResult(null); setFileErr(""); };
 
   return (
@@ -6552,7 +6558,7 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
               <>
                 {/* Search — full width, inline clear ✕ */}
                 <div style={{position:"relative",marginBottom:12}}>
-                  <input className="form-control" placeholder="🔍  Search part no / description / OEM / application…" value={search} onChange={e=>setSearch(e.target.value)} style={{width:"100%",fontSize:13,paddingRight:search?32:12,boxSizing:"border-box"}}/>
+                  <input className="form-control" placeholder="🔍  Search part no / description / OEM / application…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} style={{width:"100%",fontSize:13,paddingRight:search?32:12,boxSizing:"border-box"}}/>
                   {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--text3)",lineHeight:1}} title="Clear search">✕</button>}
                 </div>
 
@@ -6568,11 +6574,11 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                     </colgroup>
                     <thead><tr><th></th><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th><th></th></tr></thead>
                     <tbody>
-                      {filtered.map(item=>(
+                      {pageItems.map(item=>(
                         <tr key={item.id}>
                           <td style={{textAlign:"center",padding:"2px 4px"}}>
                             {item.image_url
-                              ? <img src={item.image_url} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:4,background:"#f5f5f5",border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
+                              ? <img src={toImgUrl(item.image_url)} alt="" loading="lazy" style={{width:44,height:44,objectFit:"contain",borderRadius:4,background:"#f5f5f5",border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
                               : <span style={{fontSize:18,opacity:.25}}>🖼</span>}
                           </td>
                           <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.supplier_part_no||""}>{item.supplier_part_no||"—"}</td>
@@ -6588,11 +6594,18 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                   </table>
                 </div>
 
-                {/* Footer: result count + clearly-separated destructive action */}
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+                {/* Footer: pagination + result count + delete */}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)",gap:8,flexWrap:"wrap"}}>
                   <span style={{fontSize:12,color:"var(--text3)"}}>
                     {search.trim()?`${filtered.length} of ${items.length} items`:`${items.length} items`}
                   </span>
+                  {totalPages > 1 && (
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={safePage<=1}>‹ Prev</button>
+                      <span style={{fontSize:12,color:"var(--text2)"}}>Page {safePage} / {totalPages}</span>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={safePage>=totalPages}>Next ›</button>
+                    </div>
+                  )}
                   <button onClick={clearAll} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"var(--red)",opacity:.7,textDecoration:"underline",padding:0}} title="Permanently delete all catalogue items for this supplier">
                     🗑 Delete all {items.length} items
                   </button>

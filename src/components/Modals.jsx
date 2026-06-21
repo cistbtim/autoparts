@@ -6492,10 +6492,10 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
     return matched;
   };
 
-  const renderMatchBadge = (p, stopProp=false) => (
+  const renderMatchBadge = (p, stopProp=false, showName=false) => (
     <div key={p.id} style={{display:"inline-flex",alignItems:"center",gap:5}}>
       <span style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"2px 6px"}}>✓ {p.sku}</span>
-      {p.name&&<span style={{fontSize:10,color:"var(--text2)"}}>{p.name}</span>}
+      {showName&&p.name&&<span style={{fontSize:10,color:"var(--text2)"}}>{p.name}</span>}
       {onGoToPart&&<button className="btn btn-ghost btn-sm" style={{fontSize:10,padding:"1px 7px",color:"var(--blue)",borderColor:"rgba(96,165,250,.3)"}}
         onClick={async(e)=>{if(stopProp)e.stopPropagation();try{const full=await api.get("parts",`id=eq.${p.id}&select=*&limit=1`);onGoToPart(Array.isArray(full)?full[0]:full,{page,search});}catch{onGoToPart(p,{page,search});}}}
         title={`Open ${p.sku}`}>✏️ Edit</button>}
@@ -6789,7 +6789,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                           <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{selectedItem.description||""}</div>
                           {(()=>{const ps=getMatchedSkus(selectedItem);return ps.length>0&&(
                             <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:6}}>
-                              {ps.map(p=>renderMatchBadge(p,false))}
+                              {ps.map(p=>renderMatchBadge(p,false,true))}
                             </div>
                           );})()}
                         </div>

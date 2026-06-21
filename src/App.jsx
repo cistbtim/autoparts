@@ -5726,7 +5726,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             setTimeout(()=>openM("editPart",null),50);
           }:null}
           onGoBack={returnToCatalogue?()=>{const {sup,catalogueState}=returnToCatalogue;setReturnToCatalogue(null);setPendingCatalogueLink(null);setNewPartInitialF(null);closeM("editPart");openM("supplierCatalogue",{...sup,_page:catalogueState?.page,_search:catalogueState?.search});}:null}
-          onClose={()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);setReturnToCatalogue(null);closeM("editPart");}}
+          onClose={()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);if(returnToCatalogue){const {sup,catalogueState}=returnToCatalogue;setReturnToCatalogue(null);setPendingCatalogueLink(null);setNewPartInitialF(null);closeM("editPart");openM("supplierCatalogue",{...sup,_page:catalogueState?.page,_search:catalogueState?.search});}else{setReturnToCatalogue(null);closeM("editPart");}}}
           t={t}/>;
       })()}
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}

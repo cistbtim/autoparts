@@ -6744,7 +6744,7 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                           const multiLine = field==="oem_number"||field==="application";
                           return (
                             <div key={field} style={{marginBottom:8}}>
-                              <div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
+                              <div style={{fontSize:12,fontWeight:700,color:"var(--text2)",marginBottom:3,textTransform:"uppercase",letterSpacing:.6}}>{label}</div>
                               {multiLine
                                 ? <textarea rows={2} className="inp" style={{width:"100%",fontSize:12,resize:"none",boxSizing:"border-box",lineHeight:1.4,padding:"5px 8px"}}
                                     value={editForm[field]} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))}/>

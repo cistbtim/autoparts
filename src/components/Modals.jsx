@@ -6492,6 +6492,16 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
     return matched;
   };
 
+  const renderMatchBadge = (p, stopProp=false) => (
+    <div key={p.id} style={{display:"inline-flex",alignItems:"center",gap:4,background:"rgba(52,211,153,.15)",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"1px 4px 1px 5px"}}>
+      <span style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,color:"#047857"}}>✓ {p.sku}</span>
+      {p.name&&<span style={{fontWeight:400,color:"#065f46",fontSize:10,marginLeft:2}}>{p.name}</span>}
+      {onGoToPart&&<button style={{background:"none",border:"none",cursor:"pointer",color:"#047857",fontWeight:700,fontSize:11,padding:"0 2px",lineHeight:1}}
+        onClick={async(e)=>{if(stopProp)e.stopPropagation();try{const full=await api.get("parts",`id=eq.${p.id}&select=*&limit=1`);onGoToPart(Array.isArray(full)?full[0]:full,{page,search});}catch{onGoToPart(p,{page,search});}}}
+        title={`Go to ${p.sku}`}>→</button>}
+    </div>
+  );
+
   // responsive: card view on narrow screens
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
   useEffect(() => {
@@ -6715,7 +6725,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                               <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"0 6px",fontSize:13}} onClick={e=>{e.stopPropagation();deleteItem(item.id);}}>✕</button>
                             </div>
                             <div style={{fontSize:12,fontWeight:500,marginBottom:3}}>{item.description||"—"}</div>
-                            {matchedSkus.length>0&&<div style={{marginBottom:3,display:"flex",flexDirection:"column",gap:2}}>{matchedSkus.map(p=><span key={p.id} style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:3,padding:"1px 5px"}}>✓ {p.sku}{p.name&&<span style={{fontWeight:400,color:"#065f46",marginLeft:4}}>{p.name}</span>}</span>)}</div>}
+                            {matchedSkus.length>0&&<div style={{marginBottom:3,display:"flex",flexDirection:"column",gap:3}}>{matchedSkus.map(p=>renderMatchBadge(p,true))}</div>}
                             {item.oem_number&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginBottom:2,wordBreak:"break-all"}}>{item.oem_number}</div>}
                             {item.application&&<div style={{fontSize:11,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.application}>{item.application}</div>}
                           </div>
@@ -6749,7 +6759,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                                     {item.supplier_part_no||"—"}
                                     {dups.length>0&&<span title={`OEM also in: ${dups.map(d=>d.supplier_part_no).join(", ")}`} style={{marginLeft:4,color:"var(--amber,#f59e0b)",fontSize:10}}>⚠</span>}
                                   </div>
-                                  {matchedSkus.length>0&&<div style={{display:"flex",flexDirection:"column",gap:1,marginTop:2}}>{matchedSkus.map(p=><span key={p.id} style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:3,padding:"0 4px",whiteSpace:"nowrap"}}>✓ {p.sku}{p.name&&<span style={{fontWeight:400,color:"#065f46",marginLeft:3}}>{p.name}</span>}</span>)}</div>}
+                                  {matchedSkus.length>0&&<div style={{display:"flex",flexDirection:"column",gap:2,marginTop:2}}>{matchedSkus.map(p=>renderMatchBadge(p,true))}</div>}
                                 </td>
                                 <td style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.description||""}>{item.description||"—"}</td>
                                 <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.oem_number||"—"}</td>
@@ -6779,7 +6789,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                           <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{selectedItem.description||""}</div>
                           {(()=>{const ps=getMatchedSkus(selectedItem);return ps.length>0&&(
                             <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:6}}>
-                              {ps.map(p=><span key={p.id} style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"2px 7px"}}>✓ {p.sku}{p.name&&<span style={{fontWeight:400,color:"#065f46",marginLeft:5}}>{p.name}</span>}</span>)}
+                              {ps.map(p=>renderMatchBadge(p,false))}
                             </div>
                           );})()}
                         </div>

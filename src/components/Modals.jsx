@@ -6451,7 +6451,8 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart }) {
   const [saving, setSaving]             = useState(false);
   const [invMatches, setInvMatches]     = useState(null);
   const [checkingInv, setCheckingInv]   = useState(false);
-  useEffect(()=>{ setInvMatches(null); }, [selectedItem?.id]);
+  const [compareItem, setCompareItem]   = useState(null);
+  useEffect(()=>{ setInvMatches(null); setCompareItem(null); }, [selectedItem?.id]);
 
   // responsive: card view on narrow screens
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
@@ -6795,18 +6796,66 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart }) {
                         })}
                         {(()=>{
                           const dups = getOemDuplicates(selectedItem);
-                          return dups.length>0?(
-                            <div style={{marginTop:10,padding:"8px 10px",background:"rgba(245,158,11,.08)",borderRadius:6,border:"1px solid rgba(245,158,11,.25)"}}>
-                              <div style={{fontSize:11,fontWeight:700,color:"#b45309",marginBottom:6}}>⚠ OEM also found in this catalogue</div>
-                              {dups.map(d=>(
-                                <div key={d.id} style={{fontSize:11,marginBottom:4}}>
-                                  <span style={{fontFamily:"DM Mono,monospace",fontWeight:600}}>{d.supplier_part_no}</span>
-                                  <span style={{color:"var(--text3)",marginLeft:6}}>{d.description}</span>
-                                  <span style={{display:"block",color:"var(--amber,#f59e0b)",fontSize:10}}>shared OEM: {d.matchedOem}</span>
+                          if(!dups.length) return null;
+                          return (
+                            <div style={{marginTop:10}}>
+                              {/* ── Duplicate list ── */}
+                              <div style={{padding:"8px 10px",background:"rgba(245,158,11,.08)",borderRadius:6,border:"1px solid rgba(245,158,11,.25)"}}>
+                                <div style={{fontSize:11,fontWeight:700,color:"#b45309",marginBottom:8}}>⚠ OEM also found in this catalogue</div>
+                                {dups.map(d=>(
+                                  <div key={d.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,gap:6}}>
+                                    <div style={{minWidth:0}}>
+                                      <span style={{fontFamily:"DM Mono,monospace",fontWeight:600,fontSize:12}}>{d.supplier_part_no}</span>
+                                      <span style={{color:"var(--text3)",marginLeft:6,fontSize:11}}>{d.description}</span>
+                                      <span style={{display:"block",color:"#b45309",fontSize:10}}>shared OEM: {d.matchedOem}</span>
+                                    </div>
+                                    <button className="btn btn-ghost btn-sm" style={{flexShrink:0,fontSize:11,borderColor:"#f59e0b",color:"#b45309"}}
+                                      onClick={()=>setCompareItem(compareItem?.id===d.id?null:d)}>
+                                      {compareItem?.id===d.id?"✕ Close":"⚖ Compare"}
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* ── Side-by-side compare ── */}
+                              {compareItem&&(
+                                <div style={{marginTop:8,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+                                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",background:"var(--surface)"}}>
+                                    {/* header */}
+                                    <div style={{padding:"6px 10px",borderRight:"1px solid var(--border)",borderBottom:"1px solid var(--border)",background:"rgba(99,102,241,.07)"}}>
+                                      <div style={{fontSize:11,color:"var(--text3)",marginBottom:1}}>CURRENT</div>
+                                      <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{selectedItem.supplier_part_no}</div>
+                                    </div>
+                                    <div style={{padding:"6px 10px",borderBottom:"1px solid var(--border)",background:"rgba(245,158,11,.07)"}}>
+                                      <div style={{fontSize:11,color:"var(--text3)",marginBottom:1}}>DUPLICATE</div>
+                                      <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{compareItem.supplier_part_no}</div>
+                                    </div>
+                                    {/* images */}
+                                    {[selectedItem, compareItem].map((it,i)=>(
+                                      <div key={i} style={{padding:8,textAlign:"center",borderRight:i===0?"1px solid var(--border)":"none",borderBottom:"1px solid var(--border)"}}>
+                                        {it.image_url
+                                          ? <img src={toImgUrl(it.image_url)} alt="" style={{maxWidth:"100%",maxHeight:80,objectFit:"contain",borderRadius:4}} onError={e=>{e.target.style.display="none";}}/>
+                                          : <div style={{height:60,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,opacity:.25}}>🖼</div>}
+                                      </div>
+                                    ))}
+                                    {/* rows */}
+                                    {[
+                                      ["Description", it=>it.description],
+                                      ["OEM Numbers",  it=>it.oem_number],
+                                      ["Application",  it=>it.application],
+                                    ].map(([rowLabel, getter])=>(
+                                      [selectedItem, compareItem].map((it,i)=>(
+                                        <div key={`${rowLabel}-${i}`} style={{padding:"6px 10px",borderRight:i===0?"1px solid var(--border)":"none",borderBottom:"1px solid var(--border)",fontSize:11}}>
+                                          {i===0&&<div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.4}}>{rowLabel}</div>}
+                                          <div style={{color:"var(--text)",whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:1.4}}>{getter(it)||"—"}</div>
+                                        </div>
+                                      ))
+                                    ))}
+                                  </div>
                                 </div>
-                              ))}
+                              )}
                             </div>
-                          ):null;
+                          );
                         })()}
                       </div>
 

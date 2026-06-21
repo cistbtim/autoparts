@@ -17,7 +17,7 @@ DEBUG = True
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-PART_PATTERN = re.compile(r'^[A-Z]{2,4}\d{3,6}[A-Z]?$')
+PART_PATTERN = re.compile(r'^[A-Z]{2,4}\d{3,6}[A-Z]?(-\d+)?$')
 
 # Original working picture crop coordinates (do not change these)
 PICTURE_X0_PCT = 0.08
@@ -43,7 +43,6 @@ def ocr_cell(cell_img, single_line=False):
     up = cv2.resize(cell_img, (w * 2, h * 2), interpolation=cv2.INTER_CUBIC)
     gray = cv2.cvtColor(up, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    # psm 7 = single text line, better for short part numbers
     cfg = '--psm 7 --oem 3' if single_line else '--psm 6 --oem 3'
     return pytesseract.image_to_string(binary, config=cfg).strip()
 
@@ -73,11 +72,19 @@ def clean_part_no(raw):
     if not letters:
         return s
     prefix = letters.group()
-    suffix = s[len(prefix):]
+    remainder = s[len(prefix):]
+    # Split off any hyphen-variant suffix (e.g. -1, -2) before cleaning digits
+    _hyp = remainder.split('-', 1)
+    digits = _hyp[0]
+    variant = ('-' + _hyp[1]) if len(_hyp) > 1 else ''
     # Fix remaining digit lookalikes in the numeric suffix
-    suffix = suffix.replace('I', '1').replace('L', '1')
-    suffix = suffix.replace('S', '5').replace('B', '8').replace('G', '6')
-    return prefix + suffix
+    digits = digits.replace('I', '1').replace('L', '1')
+    digits = digits.replace('S', '5').replace('B', '8').replace('G', '6')
+    # OCR often reads a single 0 as two chars (0 + O → 00 after O→0 replacement).
+    # e.g. AH001901 → AH01901, AH002004 → AH02004
+    if digits.startswith('00') and len(digits) >= 4:
+        digits = digits[1:]
+    return prefix + digits + variant
 
 
 def get_row_y(img):
@@ -116,7 +123,7 @@ def get_col_x(W):
 
     Col: 0=S/N | 1=Picture | 2=Our No. | 3=Description | 4=OEM | 5=Application | 6=Unit
     """
-    return [0, int(W*0.08), int(W*0.21), int(W*0.27), int(W*0.44), int(W*0.55), int(W*0.92), W]
+    return [0, int(W*0.08), int(W*0.21), int(W*0.30), int(W*0.44), int(W*0.55), int(W*0.92), W]
 
 
 def save_debug_img(img, row_y, col_x, filename):
@@ -184,7 +191,26 @@ for page_num, filename in enumerate(image_files):
         if not matched:
             continue
 
-        description = strip_artifacts(ocr_cell(crop(3)).replace('\n', ' '))
+        _desc_raw = ocr_cell(crop(3)).replace('\n', ' ').strip()
+
+        # Check raw text first: if it starts with -N the column cut the variant suffix
+        # e.g. our_no="AH06301"  raw="-1 Piston..."  →  "AH06301-1" / "Piston..."
+        _var = re.match(r'^-(\d+)\s*(.*)', _desc_raw, re.DOTALL)
+        if _var:
+            our_no = our_no + '-' + _var.group(1)
+            description = strip_artifacts(_var.group(2).strip())
+        else:
+            description = strip_artifacts(_desc_raw)
+            # If description starts with a single digit + space, the OCR column boundary
+            # cut the last digit of the part number into the description column — move it back.
+            # e.g.  our_no="ABP3201"  description="8 Brake Pad"  →  "ABP32018" / "Brake Pad"
+            _dm = re.match(r'^(\d)\s+(.*)', description, re.DOTALL)
+            if _dm:
+                _candidate = our_no + _dm.group(1)
+                if PART_PATTERN.match(_candidate):
+                    our_no = _candidate
+                    description = strip_artifacts(_dm.group(2).strip())
+
         oem         = clean_oem(ocr_cell(crop(4)).replace('\n', ' '))
         application = strip_artifacts(ocr_cell(crop(5)).replace('\n', ' '))
         unit        = strip_artifacts(ocr_cell(crop(6)).replace('\n', ' ')) or "PC"

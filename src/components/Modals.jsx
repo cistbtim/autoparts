@@ -6710,7 +6710,7 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                       </div>
 
                       {/* ── Scrollable body ── */}
-                      <div style={{overflowY:"auto",padding:"12px 16px",flex:1}}>
+                      <div style={{overflowY:"auto",padding:"12px 16px",flex:1,fontWeight:"normal",color:"var(--text)"}}>
                         {editForm.image_url&&(
                           <div style={{textAlign:"center",marginBottom:10}}>
                             <img src={toImgUrl(editForm.image_url)} alt="" style={{maxWidth:"100%",maxHeight:100,objectFit:"contain",borderRadius:6,border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>

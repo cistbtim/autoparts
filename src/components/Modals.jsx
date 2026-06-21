@@ -6494,7 +6494,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
 
   const renderMatchBadge = (p, stopProp=false, showName=false) => (
     <div key={p.id} style={{display:"inline-flex",alignItems:"center",gap:5}}>
-      <span style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"2px 6px"}}>✓ {p.sku}</span>
+      <span style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"2px 6px"}}>{p.sku}</span>
       {showName&&p.name&&<span style={{fontSize:10,color:"var(--text2)"}}>{p.name}</span>}
       {onGoToPart&&<button className="btn btn-ghost btn-sm" style={{fontSize:10,padding:"1px 7px",color:"var(--blue)",borderColor:"rgba(96,165,250,.3)"}}
         onClick={async(e)=>{if(stopProp)e.stopPropagation();try{const full=await api.get("parts",`id=eq.${p.id}&select=*&limit=1`);onGoToPart(Array.isArray(full)?full[0]:full,{page,search});}catch{onGoToPart(p,{page,search});}}}

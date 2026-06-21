@@ -6445,7 +6445,7 @@ export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMan
 }
 
 // ─── Supplier Catalogue Modal ─────────────────────────────────────────────────
-export function SupplierCatalogueModal({ supplier, onClose, onGoToPart }) {
+export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToInventory }) {
   const [activeTab, setActiveTab] = useState("browse");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -6786,7 +6786,13 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart }) {
                               {field==="oem_number"&&invMatches!==null&&(
                                 <div style={{marginTop:8,borderRadius:6,border:"1px solid var(--border)",overflow:"hidden"}}>
                                   {invMatches.length===0
-                                    ? <div style={{padding:"8px 10px",fontSize:12,color:"var(--text3)"}}>No matching parts found in inventory.</div>
+                                    ? <div style={{padding:"10px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                                        <span style={{fontSize:12,color:"var(--text3)"}}>No matching parts found in inventory.</span>
+                                        {onAddToInventory&&<button className="btn btn-primary btn-sm" style={{flexShrink:0,fontSize:12}}
+                                          onClick={()=>onAddToInventory(selectedItem, supplier)}>
+                                          ➕ Add to Inventory
+                                        </button>}
+                                      </div>
                                     : invMatches.map(p=>(
                                       <div key={p.id} style={{display:"flex",alignItems:"center",padding:"8px 10px",borderBottom:"1px solid var(--border)",gap:8}}>
                                         {/* part photo */}

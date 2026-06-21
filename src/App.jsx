@@ -118,6 +118,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
   const [pendingVehicleIds,setPendingVehicleIds]=useState(null); // vehicle IDs to auto-link on next new-part save
   const [newPartInitialF,setNewPartInitialF]=useState(null); // prefill values for next new part form
+  const [pendingCatalogueLink,setPendingCatalogueLink]=useState(null); // {supplier_id,supplier_part_no} to auto-link after new part save
   const [parts,setParts]=useState([]);
   const [orders,setOrders]=useState([]);
   const [customers,setCustomers]=useState([]);
@@ -1046,9 +1047,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         await logInv(newPart,0,d2.stock,"New Part","Added");
         const copyFromId=pendingFitsCopy;
         const vehIds=pendingVehicleIds;
+        const catLink=pendingCatalogueLink;
         setPendingFitsCopy(null);
         setPendingVehicleIds(null);
         setNewPartInitialF(null);
+        setPendingCatalogueLink(null);
+        if(catLink?.supplier_id){
+          await api.upsert("part_suppliers",{part_id:newPart.id,supplier_id:catLink.supplier_id,supplier_part_no:catLink.supplier_part_no||"",supplier_price:null,lead_time:"",min_order:1});
+          await reloadPartSuppliers();
+          showToast(`✅ Supplier part ${catLink.supplier_part_no} linked`);
+        }
         if(copyFromId){
           // Fetch fresh fitments from DB for the source part to avoid stale local state
           api.cacheInvalidate("part_fitments");
@@ -5725,7 +5733,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}
       {isOpen("importSuppliers")&&<SupplierImportModal onImport={async()=>{await refreshTables("suppliers");}} onClose={()=>closeM("importSuppliers")}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}
-      {isOpen("supplierCatalogue")&&<SupplierCatalogueModal supplier={mData("supplierCatalogue")} onGoToPart={(part)=>{closeM("supplierCatalogue");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierCatalogue")}/>}
+      {isOpen("supplierCatalogue")&&<SupplierCatalogueModal supplier={mData("supplierCatalogue")}
+        onGoToPart={(part)=>{closeM("supplierCatalogue");setTab("inventory");openM("editPart",part);}}
+        onAddToInventory={(item,sup)=>{
+          setPendingCatalogueLink({supplier_id:sup?.id,supplier_part_no:item.supplier_part_no});
+          setNewPartInitialF({name:item.description||"",oe_number:(item.oem_number||"").replace(/[\s,;]+/g," ").trim(),image_url:item.image_url||""});
+          closeM("supplierCatalogue");
+          setTab("inventory");
+          openM("editPart",null);
+        }}
+        onClose={()=>closeM("supplierCatalogue")}/>}
       {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} vehicles={vehicles} partFitments={partFitments} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} onEditPart={(p,tab)=>{closeM("partSupplier");openM("editPart",{...p,_tab:tab||"info"});}} onMergePart={mergePart} branches={branches} allParts={parts} onGoToMainPart={(targetPart)=>{closeM("partSupplier");setTimeout(()=>{setTab("inventory");setFilterBranch("__all__");setSearchPart(targetPart.sku||"");},0);}} onAddSupplier={()=>openM("editSupplier")} t={t}/>}
       {isOpen("inquiry")&&<InquiryModal part={mData("inquiry")} suppliers={suppliers} partSuppliers={getPartSupps(mData("inquiry")?.id)} onSend={sendInquiry} onClose={()=>closeM("inquiry")} t={t}/>}
       {isOpen("inquiryDetail")&&<InquiryDetailModal inquiry={mData("inquiryDetail")} onUpdate={updateInquiry} onAccept={async(inq)=>{closeM("inquiryDetail");await acceptInquiry(inq);}} onClose={()=>closeM("inquiryDetail")} settings={settings} t={t}/>}

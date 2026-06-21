@@ -6577,11 +6577,9 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
 
   const filtered = search.trim()
     ? items.filter(x => {
-        const q = search.toLowerCase();
-        return (x.supplier_part_no||"").toLowerCase().includes(q) ||
-               (x.description||"").toLowerCase().includes(q) ||
-               (x.oem_number||"").toLowerCase().includes(q) ||
-               (x.application||"").toLowerCase().includes(q);
+        const haystack = [x.supplier_part_no, x.description, x.oem_number, x.application]
+          .map(v => (v||"").toLowerCase()).join(" ");
+        return search.trim().toLowerCase().split(/\s+/).every(w => haystack.includes(w));
       })
     : items;
 

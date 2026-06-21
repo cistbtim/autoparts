@@ -6424,6 +6424,14 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
   const [editForm, setEditForm]         = useState({});
   const [saving, setSaving]             = useState(false);
 
+  // responsive: card view on narrow screens
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
+  useEffect(() => {
+    const fn = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+
   // Split an OEM string into individual tokens
   const parseOems = (str) => (str||"").split(/[\s,;]+/).map(s=>s.trim()).filter(Boolean);
 
@@ -6617,83 +6625,27 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                   {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--text3)",lineHeight:1}} title="Clear search">✕</button>}
                 </div>
 
-                <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                  {/* ── Table ── */}
-                  <div style={{flex:1,minWidth:0,overflowX:"auto"}}>
-                    <div style={{maxHeight:440,overflowY:"auto"}}>
-                      <table className="tbl" style={{fontSize:12,tableLayout:"fixed",width:"100%"}}>
-                        <colgroup>
-                          <col style={{width:"7%"}}/>
-                          <col style={{width:"15%"}}/>
-                          <col style={{width:"16%"}}/>
-                          <col style={{width:"22%"}}/>
-                          <col style={{width:"36%"}}/>
-                          <col style={{width:"4%"}}/>
-                        </colgroup>
-                        <thead><tr><th></th><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th><th></th></tr></thead>
-                        <tbody>
-                          {pageItems.map(item=>{
-                            const dups = getOemDuplicates(item);
-                            const isSelected = selectedItem?.id === item.id;
-                            return (
-                              <tr key={item.id} style={{background:isSelected?"var(--accent-muted, rgba(99,102,241,.08))":"",cursor:"pointer"}} onClick={()=>openDrawer(item)}>
-                                <td style={{textAlign:"center",padding:"2px 4px"}} onClick={e=>e.stopPropagation()}>
-                                  {item.image_url
-                                    ? <img src={toImgUrl(item.image_url)} alt="" loading="lazy" onClick={()=>setLightboxUrl(item.image_url)} style={{width:44,height:44,objectFit:"contain",borderRadius:4,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in"}} onError={e=>{e.target.style.display="none";}}/>
-                                    : <span style={{fontSize:18,opacity:.25}}>🖼</span>}
-                                </td>
-                                <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.supplier_part_no||""}>
-                                  {item.supplier_part_no||"—"}
-                                  {dups.length>0&&<span title={`OEM also in: ${dups.map(d=>d.supplier_part_no).join(", ")}`} style={{marginLeft:4,color:"var(--amber,#f59e0b)",fontSize:10}}>⚠</span>}
-                                </td>
-                                <td style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.description||""}>{item.description||"—"}</td>
-                                <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.oem_number||"—"}</td>
-                                <td style={{color:"var(--text2)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.application||"—"}</td>
-                                <td style={{textAlign:"center"}} onClick={e=>e.stopPropagation()}>
-                                  <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"1px 8px"}} onClick={()=>deleteItem(item.id)} title="Delete row">✕</button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* ── Edit Drawer ── */}
-                  {selectedItem&&(
-                    <div style={{width:300,flexShrink:0,border:"1px solid var(--border)",borderRadius:8,padding:14,background:"var(--surface)",maxHeight:440,overflowY:"auto"}}>
+                {/* ── Edit Drawer (shared, shown below list on mobile) ── */}
+                {(() => {
+                  const drawer = selectedItem ? (
+                    <div style={{border:"1px solid var(--border)",borderRadius:8,padding:14,background:"var(--surface)",overflowY:"auto",...(isMobile?{marginTop:12}:{width:300,flexShrink:0,maxHeight:440})}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                         <span style={{fontWeight:700,fontSize:13}}>Edit Part</span>
                         <button onClick={()=>setSelectedItem(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--text3)"}}>✕</button>
                       </div>
-
-                      {/* Image */}
                       {editForm.image_url&&(
                         <div style={{textAlign:"center",marginBottom:10}}>
                           <img src={toImgUrl(editForm.image_url)} alt="" style={{maxWidth:"100%",maxHeight:120,objectFit:"contain",borderRadius:6,border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
                         </div>
                       )}
-
-                      {[
-                        ["Part No",      "supplier_part_no"],
-                        ["Description",  "description"],
-                        ["OEM Numbers",  "oem_number"],
-                        ["Application",  "application"],
-                        ["Image URL",    "image_url"],
-                      ].map(([label, field])=>(
+                      {[["Part No","supplier_part_no"],["Description","description"],["OEM Numbers","oem_number"],["Application","application"],["Image URL","image_url"]].map(([label,field])=>(
                         <div key={field} style={{marginBottom:8}}>
                           <div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
                           <textarea rows={field==="application"||field==="oem_number"?3:1} className="inp" style={{width:"100%",fontSize:12,resize:"vertical",boxSizing:"border-box"}}
                             value={editForm[field]} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))}/>
                         </div>
                       ))}
-
-                      <button className="btn btn-primary btn-sm" style={{width:"100%",marginTop:4}} onClick={saveDrawer} disabled={saving}>
-                        {saving?"Saving…":"Save"}
-                      </button>
-
-                      {/* OEM duplicates */}
+                      <button className="btn btn-primary btn-sm" style={{width:"100%",marginTop:4}} onClick={saveDrawer} disabled={saving}>{saving?"Saving…":"Save"}</button>
                       {(()=>{
                         const dups = getOemDuplicates(selectedItem);
                         return dups.length>0?(
@@ -6710,8 +6662,88 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                         ):null;
                       })()}
                     </div>
-                  )}
-                </div>
+                  ) : null;
+
+                  /* ── MOBILE: card list ── */
+                  if (isMobile) return (
+                    <div>
+                      <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:420,overflowY:"auto"}}>
+                        {pageItems.map(item=>{
+                          const dups = getOemDuplicates(item);
+                          const isSelected = selectedItem?.id === item.id;
+                          return (
+                            <div key={item.id} onClick={()=>openDrawer(item)}
+                              style={{display:"flex",gap:10,padding:"10px 10px",borderRadius:8,border:`1px solid ${isSelected?"var(--accent)":"var(--border)"}`,background:isSelected?"rgba(99,102,241,.06)":"var(--surface2,var(--surface))",cursor:"pointer",alignItems:"flex-start"}}>
+                              {/* thumbnail */}
+                              <div style={{flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                                {item.image_url
+                                  ? <img src={toImgUrl(item.image_url)} alt="" loading="lazy" onClick={()=>setLightboxUrl(item.image_url)}
+                                      style={{width:52,height:52,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in"}} onError={e=>{e.target.style.display="none";}}/>
+                                  : <div style={{width:52,height:52,borderRadius:6,background:"var(--surface)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,opacity:.25}}>🖼</div>}
+                              </div>
+                              {/* info */}
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+                                  <span style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>
+                                    {item.supplier_part_no||"—"}
+                                    {dups.length>0&&<span title="OEM duplicate" style={{marginLeft:4,color:"var(--amber,#f59e0b)",fontSize:10}}>⚠</span>}
+                                  </span>
+                                  <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"0 6px",fontSize:13}} onClick={e=>{e.stopPropagation();deleteItem(item.id);}}>✕</button>
+                                </div>
+                                <div style={{fontSize:12,fontWeight:500,marginBottom:3}}>{item.description||"—"}</div>
+                                {item.oem_number&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginBottom:2,wordBreak:"break-all"}}>{item.oem_number}</div>}
+                                {item.application&&<div style={{fontSize:11,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.application}>{item.application}</div>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {drawer}
+                    </div>
+                  );
+
+                  /* ── DESKTOP: table + side drawer ── */
+                  return (
+                    <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                      <div style={{flex:1,minWidth:0,overflowX:"auto"}}>
+                        <div style={{maxHeight:440,overflowY:"auto"}}>
+                          <table className="tbl" style={{fontSize:12,tableLayout:"fixed",width:"100%"}}>
+                            <colgroup>
+                              <col style={{width:"7%"}}/><col style={{width:"15%"}}/><col style={{width:"16%"}}/><col style={{width:"22%"}}/><col style={{width:"36%"}}/><col style={{width:"4%"}}/>
+                            </colgroup>
+                            <thead><tr><th></th><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th><th></th></tr></thead>
+                            <tbody>
+                              {pageItems.map(item=>{
+                                const dups = getOemDuplicates(item);
+                                const isSelected = selectedItem?.id === item.id;
+                                return (
+                                  <tr key={item.id} style={{background:isSelected?"var(--accent-muted,rgba(99,102,241,.08))":"",cursor:"pointer"}} onClick={()=>openDrawer(item)}>
+                                    <td style={{textAlign:"center",padding:"2px 4px"}} onClick={e=>e.stopPropagation()}>
+                                      {item.image_url
+                                        ? <img src={toImgUrl(item.image_url)} alt="" loading="lazy" onClick={()=>setLightboxUrl(item.image_url)} style={{width:44,height:44,objectFit:"contain",borderRadius:4,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in"}} onError={e=>{e.target.style.display="none";}}/>
+                                        : <span style={{fontSize:18,opacity:.25}}>🖼</span>}
+                                    </td>
+                                    <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.supplier_part_no||""}>
+                                      {item.supplier_part_no||"—"}
+                                      {dups.length>0&&<span title={`OEM also in: ${dups.map(d=>d.supplier_part_no).join(", ")}`} style={{marginLeft:4,color:"var(--amber,#f59e0b)",fontSize:10}}>⚠</span>}
+                                    </td>
+                                    <td style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.description||""}>{item.description||"—"}</td>
+                                    <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.oem_number||"—"}</td>
+                                    <td style={{color:"var(--text2)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.application||"—"}</td>
+                                    <td style={{textAlign:"center"}} onClick={e=>e.stopPropagation()}>
+                                      <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"1px 8px"}} onClick={()=>deleteItem(item.id)} title="Delete row">✕</button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                      {drawer}
+                    </div>
+                  );
+                })()}
 
                 {/* Footer: pagination + result count + delete */}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)",gap:8,flexWrap:"wrap"}}>

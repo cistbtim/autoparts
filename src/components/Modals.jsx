@@ -3047,7 +3047,7 @@ function GrabImageOverlay({supplierUrl,partSku,onSave,onClose}) {
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier}) {
+export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onGoBack=null}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -3159,6 +3159,11 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
   return (
     <Overlay onClose={handleClose} wide>
       <MHead title={part?`✏️ ${t.pmEditPart}`:`+ ${t.pmNewPart}`} onClose={handleClose}/>
+      {onGoBack&&(
+        <button className="btn btn-ghost btn-sm" style={{marginBottom:10,fontSize:12,color:"var(--blue)"}} onClick={onGoBack}>
+          ← Back to Supplier Catalogue
+        </button>
+      )}
 
       {/* Copy from main catalog — shown only when adding a new part at a branch */}
       {isNonMainBranch&&(

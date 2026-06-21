@@ -119,6 +119,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [pendingVehicleIds,setPendingVehicleIds]=useState(null); // vehicle IDs to auto-link on next new-part save
   const [newPartInitialF,setNewPartInitialF]=useState(null); // prefill values for next new part form
   const [pendingCatalogueLink,setPendingCatalogueLink]=useState(null); // {supplier_id,supplier_part_no} to auto-link after new part save
+  const [returnToCatalogue,setReturnToCatalogue]=useState(null); // supplier to reopen catalogue when user clicks back
   const [parts,setParts]=useState([]);
   const [orders,setOrders]=useState([]);
   const [customers,setCustomers]=useState([]);
@@ -5724,7 +5725,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             closeM("editPart");
             setTimeout(()=>openM("editPart",null),50);
           }:null}
-          onClose={()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);closeM("editPart");}}
+          onGoBack={returnToCatalogue?()=>{const sup=returnToCatalogue;setReturnToCatalogue(null);setPendingCatalogueLink(null);setNewPartInitialF(null);closeM("editPart");openM("supplierCatalogue",sup);}:null}
+          onClose={()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);setReturnToCatalogue(null);closeM("editPart");}}
           t={t}/>;
       })()}
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}
@@ -5738,6 +5740,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         onAddToInventory={(item,sup)=>{
           setPendingCatalogueLink({supplier_id:sup?.id,supplier_part_no:item.supplier_part_no});
           setNewPartInitialF({name:item.description||"",oe_number:(item.oem_number||"").replace(/[\s,;]+/g," ").trim(),image_url:item.image_url||""});
+          setReturnToCatalogue(sup);
           closeM("supplierCatalogue");
           setTab("inventory");
           openM("editPart",null);

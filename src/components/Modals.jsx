@@ -4004,8 +4004,9 @@ export function CheckoutModal({cart,customers,cartTotal,role,currentUser,onPlace
 }
 
 export function SupplierModal({supplier,onSave,onClose,t}) {
-  const [f,setF]=useState(supplier?{name:supplier.name,email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||"",account_number:supplier.account_number||""}:{name:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:"",account_number:""});
+  const [f,setF]=useState(supplier?{name:supplier.name,email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||"",account_number:supplier.account_number||"",supplier_origin:supplier.supplier_origin||"",supplier_types:supplier.supplier_types||[]}:{name:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:"",account_number:"",supplier_origin:"",supplier_types:[]});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const toggleType=(tp)=>setF(p=>({...p,supplier_types:p.supplier_types.includes(tp)?p.supplier_types.filter(x=>x!==tp):[...p.supplier_types,tp]}));
   return (
     <Overlay onClose={onClose}>
       <MHead title={supplier?"Edit Supplier":"Add Supplier"} onClose={onClose}/>
@@ -4018,6 +4019,31 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
           <input className="inp" value={f.account_number} onChange={e=>s("account_number",e.target.value)} placeholder="e.g. ACC-00123"/>
         </div>
         <div/>
+      </FG>
+      {/* ── Origin + Type ── */}
+      <FG>
+        <div>
+          <FL label="Supplier Origin"/>
+          <div style={{display:"flex",gap:16,marginTop:6}}>
+            {[["local","🏠 Local"],["international","✈ International"]].map(([v,label])=>(
+              <label key={v} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:13}}>
+                <input type="radio" name="supplier_origin" checked={f.supplier_origin===v} onChange={()=>s("supplier_origin",v)} style={{accentColor:"var(--accent)"}}/>
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+        <div>
+          <FL label="Supplier Types"/>
+          <div style={{display:"flex",flexWrap:"wrap",gap:10,marginTop:6}}>
+            {["new","used","dealer","factory"].map(tp=>(
+              <label key={tp} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:13}}>
+                <input type="checkbox" checked={f.supplier_types.includes(tp)} onChange={()=>toggleType(tp)} style={{accentColor:"var(--accent)"}}/>
+                {tp.charAt(0).toUpperCase()+tp.slice(1)}
+              </label>
+            ))}
+          </div>
+        </div>
       </FG>
       <FD>
         <FL label="Part Search URL" sub="Placeholders: {sku} = supplier/our part no · {vehicle_code} = car model code (e.g. VW18D)"/>

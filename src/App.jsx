@@ -134,6 +134,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [selectedMapCity,setSelectedMapCity]=useState(null);
   const [adContracts,setAdContracts]=useState([]);
   const [suppliers,setSuppliers]=useState([]);
+  const [supplierSearch,setSupplierSearch]=useState("");
+  const [supplierOriginFilter,setSupplierOriginFilter]=useState("all");
+  const [supplierTypeFilter,setSupplierTypeFilter]=useState([]);
   const [partSuppliers,setPartSuppliers]=useState([]);
   const [inquiries,setInquiries]=useState([]);
   const [customerQueries,setCustomerQueries]=useState([]);
@@ -4550,15 +4553,57 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {/* ── SUPPLIERS ── */}
-        {tab==="suppliers"&&(role==="admin"||isBranchUser)&&(
+        {tab==="suppliers"&&(role==="admin"||isBranchUser)&&(()=>{
+          const TYPES = ["new","used","dealer","factory"];
+          const filteredSuppliers = suppliers.filter(s=>{
+            if(supplierSearch.trim()){
+              const h=[s.name,s.country,s.contact_person,s.email,s.phone,s.account_number].map(v=>(v||"").toLowerCase()).join(" ");
+              if(!supplierSearch.trim().toLowerCase().split(/\s+/).every(w=>h.includes(w))) return false;
+            }
+            if(supplierOriginFilter!=="all" && (s.supplier_origin||"")!==supplierOriginFilter) return false;
+            if(supplierTypeFilter.length>0){
+              const st=s.supplier_types||[];
+              if(!supplierTypeFilter.every(t=>st.includes(t))) return false;
+            }
+            return true;
+          });
+          const toggleTypeF=(t)=>setSupplierTypeFilter(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
+          return (
           <div className="fu">
-            <PH title={`🏭 ${t.suppliers}`} subtitle={`${suppliers.length} suppliers`}
+            <PH title={`🏭 ${t.suppliers}`} subtitle={`${filteredSuppliers.length} of ${suppliers.length} suppliers`}
               action={<div style={{display:"flex",gap:8}}>
                 <button className="btn btn-ghost" onClick={()=>openM("importSuppliers")}>📥 Import CSV</button>
                 <button className="btn btn-primary" onClick={()=>openM("editSupplier")}>+ {t.addSupplier}</button>
               </div>}/>
+
+            {/* ── Search + filters ── */}
+            <div style={{display:"flex",flexWrap:"wrap",gap:10,marginBottom:16,alignItems:"center"}}>
+              <div style={{position:"relative",flex:"1 1 220px",minWidth:180}}>
+                <input className="form-control" placeholder="🔍 Search suppliers…" value={supplierSearch}
+                  onChange={e=>setSupplierSearch(e.target.value)}
+                  style={{width:"100%",fontSize:14,padding:"8px 32px 8px 12px",boxSizing:"border-box",color:"var(--text)",background:"var(--bg)"}}/>
+                {supplierSearch&&<button onClick={()=>setSupplierSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:15,color:"var(--text3)"}}>✕</button>}
+              </div>
+              {/* Origin pills */}
+              {[["all","All"],["local","🏠 Local"],["international","✈ International"]].map(([v,label])=>(
+                <button key={v} onClick={()=>setSupplierOriginFilter(v)}
+                  className={supplierOriginFilter===v?"btn btn-primary btn-sm":"btn btn-ghost btn-sm"}>
+                  {label}
+                </button>
+              ))}
+              {/* Type checkboxes */}
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {TYPES.map(type=>(
+                  <label key={type} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:13,fontWeight:supplierTypeFilter.includes(type)?700:400,color:supplierTypeFilter.includes(type)?"var(--accent)":"var(--text2)"}}>
+                    <input type="checkbox" checked={supplierTypeFilter.includes(type)} onChange={()=>toggleTypeF(type)} style={{accentColor:"var(--accent)"}}/>
+                    {type.charAt(0).toUpperCase()+type.slice(1)}
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-              {suppliers.map(s=>{
+              {filteredSuppliers.map(s=>{
                 const linked=partSuppliers.filter(ps=>ps.supplier_id===s.id);
                 const isGlobal=!s.branch_id;
                 const isOwn=s.branch_id===user.branch_id;
@@ -4575,6 +4620,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                           }
                         </div>
                         <div style={{fontSize:12,color:"var(--text3)"}}>📍 {s.country||"—"}</div>
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:5}}>
+                          {s.supplier_origin&&<span style={{fontSize:10,fontWeight:700,borderRadius:4,padding:"1px 6px",background:s.supplier_origin==="local"?"rgba(52,211,153,.15)":"rgba(251,191,36,.15)",color:s.supplier_origin==="local"?"var(--green)":"#b45309"}}>{s.supplier_origin==="local"?"🏠 Local":"✈ International"}</span>}
+                          {(s.supplier_types||[]).map(tp=><span key={tp} style={{fontSize:10,fontWeight:700,borderRadius:4,padding:"1px 6px",background:"rgba(99,102,241,.1)",color:"#818cf8",textTransform:"capitalize"}}>{tp}</span>)}
+                        </div>
                       </div>
                       <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",cursor:psLoading?"wait":"pointer"}} onClick={async()=>{await loadPartSuppliers();openM("supplierParts",s);}}>{psLoading?"…":linked.length} parts</span>
                     </div>
@@ -4592,7 +4641,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               })}
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ── INQUIRIES ── */}
         {tab==="inquiries"&&(role==="admin"||role==="branch_admin")&&(()=>{

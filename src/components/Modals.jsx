@@ -6450,7 +6450,7 @@ export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMan
 }
 
 // ─── Supplier Catalogue Modal ─────────────────────────────────────────────────
-export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToInventory }) {
+export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToInventory, parts=[] }) {
   const [activeTab, setActiveTab] = useState("browse");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -6467,6 +6467,29 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
   const [checkingInv, setCheckingInv]   = useState(false);
   const [compareItem, setCompareItem]   = useState(null);
   useEffect(()=>{ setInvMatches(null); setCompareItem(null); }, [selectedItem?.id]);
+
+  // Build OEM → [sku] map from parts array for instant row-level matching
+  const oemToSkus = useMemo(()=>{
+    const map = {};
+    for(const p of parts){
+      if(!p.oe_number) continue;
+      p.oe_number.split(/[\s,;]+/).filter(Boolean).forEach(tok=>{
+        const k = tok.trim().toUpperCase();
+        if(!map[k]) map[k]=[];
+        if(!map[k].includes(p.sku)) map[k].push(p.sku);
+      });
+    }
+    return map;
+  }, [parts]);
+
+  const getMatchedSkus = (item) => {
+    if(!item?.oem_number) return [];
+    const matched = new Set();
+    parseOems(item.oem_number).forEach(tok=>{
+      (oemToSkus[tok.toUpperCase()]||[]).forEach(sku=>matched.add(sku));
+    });
+    return [...matched];
+  };
 
   // responsive: card view on narrow screens
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
@@ -6672,6 +6695,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                   <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:420,overflowY:"auto"}}>
                     {pageItems.map(item=>{
                       const dups = getOemDuplicates(item);
+                      const matchedSkus = getMatchedSkus(item);
                       return (
                         <div key={item.id} onClick={()=>openDrawer(item)}
                           style={{display:"flex",gap:10,padding:"10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--surface)",cursor:"pointer",alignItems:"flex-start"}}>
@@ -6690,6 +6714,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                               <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"0 6px",fontSize:13}} onClick={e=>{e.stopPropagation();deleteItem(item.id);}}>✕</button>
                             </div>
                             <div style={{fontSize:12,fontWeight:500,marginBottom:3}}>{item.description||"—"}</div>
+                            {matchedSkus.length>0&&<div style={{marginBottom:3,display:"flex",flexWrap:"wrap",gap:3}}>{matchedSkus.map(sku=><span key={sku} style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:3,padding:"1px 5px"}}>✓ {sku}</span>)}</div>}
                             {item.oem_number&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginBottom:2,wordBreak:"break-all"}}>{item.oem_number}</div>}
                             {item.application&&<div style={{fontSize:11,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.application}>{item.application}</div>}
                           </div>
@@ -6710,6 +6735,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                           {pageItems.map(item=>{
                             const dups = getOemDuplicates(item);
                             const isSelected = selectedItem?.id === item.id;
+                            const matchedSkus = getMatchedSkus(item);
                             return (
                               <tr key={item.id} style={{background:isSelected?"var(--accent-muted,rgba(99,102,241,.08))":"",cursor:"pointer"}} onClick={()=>openDrawer(item)}>
                                 <td style={{textAlign:"center",padding:"2px 4px"}} onClick={e=>e.stopPropagation()}>
@@ -6717,9 +6743,12 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                                     ? <img src={toImgUrl(item.image_url)} alt="" loading="lazy" onClick={()=>setLightboxUrl(item.image_url)} style={{width:44,height:44,objectFit:"contain",borderRadius:4,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in"}} onError={e=>{e.target.style.display="none";}}/>
                                     : <span style={{fontSize:18,opacity:.25}}>🖼</span>}
                                 </td>
-                                <td style={{fontFamily:"DM Mono,monospace",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.supplier_part_no||""}>
-                                  {item.supplier_part_no||"—"}
-                                  {dups.length>0&&<span title={`OEM also in: ${dups.map(d=>d.supplier_part_no).join(", ")}`} style={{marginLeft:4,color:"var(--amber,#f59e0b)",fontSize:10}}>⚠</span>}
+                                <td title={item.supplier_part_no||""}>
+                                  <div style={{fontFamily:"DM Mono,monospace",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                    {item.supplier_part_no||"—"}
+                                    {dups.length>0&&<span title={`OEM also in: ${dups.map(d=>d.supplier_part_no).join(", ")}`} style={{marginLeft:4,color:"var(--amber,#f59e0b)",fontSize:10}}>⚠</span>}
+                                  </div>
+                                  {matchedSkus.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:2,marginTop:2}}>{matchedSkus.map(sku=><span key={sku} style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:3,padding:"0 4px"}}>✓ {sku}</span>)}</div>}
                                 </td>
                                 <td style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.description||""}>{item.description||"—"}</td>
                                 <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.oem_number||"—"}</td>

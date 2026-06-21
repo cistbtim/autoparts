@@ -5735,7 +5735,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}
       {isOpen("importSuppliers")&&<SupplierImportModal onImport={async()=>{await refreshTables("suppliers");}} onClose={()=>closeM("importSuppliers")}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}
-      {isOpen("supplierCatalogue")&&<SupplierCatalogueModal supplier={mData("supplierCatalogue")}
+      {isOpen("supplierCatalogue")&&<SupplierCatalogueModal parts={parts} supplier={mData("supplierCatalogue")}
         onGoToPart={(part,catalogueState)=>{const sup=mData("supplierCatalogue");setReturnToCatalogue({sup,catalogueState});closeM("supplierCatalogue");setTab("inventory");openM("editPart",part);}}
         onAddToInventory={(item,sup,catalogueState)=>{
           setPendingCatalogueLink({supplier_id:sup?.id,supplier_part_no:item.supplier_part_no});

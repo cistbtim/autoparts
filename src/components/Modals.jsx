@@ -6493,12 +6493,12 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
   };
 
   const renderMatchBadge = (p, stopProp=false) => (
-    <div key={p.id} style={{display:"inline-flex",alignItems:"center",gap:4,background:"rgba(52,211,153,.15)",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"1px 4px 1px 5px"}}>
-      <span style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,color:"#047857"}}>✓ {p.sku}</span>
-      {p.name&&<span style={{fontWeight:400,color:"#065f46",fontSize:10,marginLeft:2}}>{p.name}</span>}
-      {onGoToPart&&<button style={{background:"none",border:"none",cursor:"pointer",color:"#047857",fontWeight:700,fontSize:11,padding:"0 2px",lineHeight:1}}
+    <div key={p.id} style={{display:"inline-flex",alignItems:"center",gap:5}}>
+      <span style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"2px 6px"}}>✓ {p.sku}</span>
+      {p.name&&<span style={{fontSize:10,color:"var(--text2)"}}>{p.name}</span>}
+      {onGoToPart&&<button className="btn btn-ghost btn-sm" style={{fontSize:10,padding:"1px 7px",color:"var(--blue)",borderColor:"rgba(96,165,250,.3)"}}
         onClick={async(e)=>{if(stopProp)e.stopPropagation();try{const full=await api.get("parts",`id=eq.${p.id}&select=*&limit=1`);onGoToPart(Array.isArray(full)?full[0]:full,{page,search});}catch{onGoToPart(p,{page,search});}}}
-        title={`Go to ${p.sku}`}>→</button>}
+        title={`Open ${p.sku}`}>✏️ Edit</button>}
     </div>
   );
 

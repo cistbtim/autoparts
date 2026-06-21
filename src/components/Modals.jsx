@@ -6739,7 +6739,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                     <div style={{maxHeight:440,overflowY:"auto"}}>
                       <table className="tbl" style={{fontSize:12,tableLayout:"fixed",width:"100%"}}>
                         <colgroup>
-                          <col style={{width:"7%"}}/><col style={{width:"15%"}}/><col style={{width:"16%"}}/><col style={{width:"22%"}}/><col style={{width:"36%"}}/><col style={{width:"4%"}}/>
+                          <col style={{width:"7%"}}/><col style={{width:"16%"}}/><col style={{width:"15%"}}/><col style={{width:"22%"}}/><col style={{width:"32%"}}/><col style={{width:"8%"}}/>
                         </colgroup>
                         <thead><tr><th></th><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th><th></th></tr></thead>
                         <tbody>
@@ -6764,8 +6764,8 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                                 <td style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.description||""}>{item.description||"—"}</td>
                                 <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.oem_number||"—"}</td>
                                 <td style={{color:"var(--text2)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.application||"—"}</td>
-                                <td style={{textAlign:"center"}} onClick={e=>e.stopPropagation()}>
-                                  <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"1px 8px"}} onClick={()=>deleteItem(item.id)} title="Delete row">✕</button>
+                                <td style={{textAlign:"center",paddingRight:8,whiteSpace:"nowrap"}} onClick={e=>e.stopPropagation()}>
+                                  <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"2px 10px",minWidth:32}} onClick={()=>deleteItem(item.id)} title="Delete row">✕</button>
                                 </td>
                               </tr>
                             );

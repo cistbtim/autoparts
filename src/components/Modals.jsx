@@ -6758,7 +6758,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart }) {
                                       setCheckingInv(true); setInvMatches(null);
                                       try {
                                         const orClause = tokens.map(n=>`oe_number.ilike.*${encodeURIComponent(n)}*`).join(",");
-                                        const res = await api.get("parts", `or=(${orClause})&select=id,name,sku,oe_number,category&limit=10`);
+                                        const res = await api.get("parts", `or=(${orClause})&select=id,name,sku,oe_number,category,image_url&limit=10`);
                                         setInvMatches(Array.isArray(res)?res:[]);
                                       } catch(e){ setInvMatches([]); }
                                       setCheckingInv(false);
@@ -6779,8 +6779,14 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart }) {
                                   {invMatches.length===0
                                     ? <div style={{padding:"8px 10px",fontSize:12,color:"var(--text3)"}}>No matching parts found in inventory.</div>
                                     : invMatches.map(p=>(
-                                      <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",borderBottom:"1px solid var(--border)",gap:8}}>
-                                        <div style={{minWidth:0}}>
+                                      <div key={p.id} style={{display:"flex",alignItems:"center",padding:"8px 10px",borderBottom:"1px solid var(--border)",gap:8}}>
+                                        {/* part photo */}
+                                        <div style={{flexShrink:0,width:48,height:48,borderRadius:6,overflow:"hidden",background:"var(--surface)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                          {p.image_url
+                                            ? <img src={toImgUrl(p.image_url)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>{e.target.style.display="none";e.target.parentNode.innerHTML='<span style="font-size:20px;opacity:.3">🖼</span>';}}/>
+                                            : <span style={{fontSize:20,opacity:.3}}>🖼</span>}
+                                        </div>
+                                        <div style={{minWidth:0,flex:1}}>
                                           <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12}}>{p.sku}</div>
                                           <div style={{fontSize:12,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
                                           {p.oe_number&&<div style={{fontSize:11,color:"var(--text3)"}}>OE: {p.oe_number}</div>}

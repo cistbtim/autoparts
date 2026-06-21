@@ -3293,14 +3293,13 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
               {f.oe_number&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.oe_number)}>📋 Copy OE</button>}
             </div>
             {f.oe_number&&(
-              <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
+              <select className="inp" style={{marginBottom:6,color:"#e65c00",fontSize:12}}
+                value="" onChange={e=>{if(e.target.value)window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+                <option value="">🔍 Search on SpareTO…</option>
                 {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
-                  <button key={i} className="cp-btn" style={{color:"#e65c00",borderColor:"rgba(230,92,0,.3)",fontSize:10,padding:"1px 6px"}}
-                    onClick={()=>window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(tok.trim())}`,"_blank","noopener,noreferrer")}>
-                    🔍 {tok}
-                  </button>
+                  <option key={i} value={tok}>{tok}</option>
                 ))}
-              </div>
+              </select>
             )}
             <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)} placeholder="OE number / OEM reference"/>
           </FD>

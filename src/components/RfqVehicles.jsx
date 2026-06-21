@@ -1331,14 +1331,13 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
           ✅ Linked Vehicles ({linked.length})
         </div>
         {part?.oe_number&&(
-          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+          <select className="inp" style={{fontSize:12,color:"#e65c00"}}
+            value="" onChange={e=>{if(e.target.value)window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+            <option value="">🔍 Search on SpareTO…</option>
             {part.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
-              <button key={i} className="btn btn-ghost btn-sm" style={{fontSize:10,color:"#e65c00",borderColor:"rgba(230,92,0,.3)",padding:"1px 7px"}}
-                onClick={()=>window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(tok.trim())}`,"_blank","noopener,noreferrer")}>
-                🔍 {tok}
-              </button>
+              <option key={i} value={tok}>{tok}</option>
             ))}
-          </div>
+          </select>
         )}
       </div>
       {linked.length === 0 && pending.size === 0 && (

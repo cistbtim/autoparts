@@ -6498,7 +6498,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
       {showName&&p.name&&<span style={{fontSize:10,color:"var(--text2)"}}>{p.name}</span>}
       {onGoToPart&&<button className="btn btn-ghost btn-sm" style={{fontSize:10,padding:"1px 7px",color:"var(--blue)",borderColor:"rgba(96,165,250,.3)"}}
         onClick={async(e)=>{if(stopProp)e.stopPropagation();try{const full=await api.get("parts",`id=eq.${p.id}&select=*&limit=1`);onGoToPart(Array.isArray(full)?full[0]:full,{page,search});}catch{onGoToPart(p,{page,search});}}}
-        title={`Open ${p.sku}`}>✏️ Edit</button>}
+        title={`Open ${p.sku}`}>✏️</button>}
     </div>
   );
 

@@ -6436,7 +6436,7 @@ export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMan
 }
 
 // ─── Supplier Catalogue Modal ─────────────────────────────────────────────────
-export function SupplierCatalogueModal({ supplier, onClose }) {
+export function SupplierCatalogueModal({ supplier, onClose, onGoToPart }) {
   const [activeTab, setActiveTab] = useState("browse");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -6449,6 +6449,9 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
   const [selectedItem, setSelectedItem] = useState(null);
   const [editForm, setEditForm]         = useState({});
   const [saving, setSaving]             = useState(false);
+  const [invMatches, setInvMatches]     = useState(null);
+  const [checkingInv, setCheckingInv]   = useState(false);
+  useEffect(()=>{ setInvMatches(null); }, [selectedItem?.id]);
 
   // responsive: card view on narrow screens
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
@@ -6744,13 +6747,49 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                           const multiLine = field==="oem_number"||field==="application";
                           return (
                             <div key={field} style={{marginBottom:8}}>
-                              <div style={{fontSize:12,fontWeight:700,color:"var(--text2)",marginBottom:3,textTransform:"uppercase",letterSpacing:.6}}>{label}</div>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                                <div style={{fontSize:12,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:.6}}>{label}</div>
+                                {field==="oem_number"&&(
+                                  <button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"1px 8px"}} disabled={checkingInv}
+                                    onClick={async()=>{
+                                      const tokens = parseOems(editForm.oem_number);
+                                      if(!tokens.length) return;
+                                      setCheckingInv(true); setInvMatches(null);
+                                      try {
+                                        const orClause = tokens.map(n=>`oe_number.ilike.*${encodeURIComponent(n)}*`).join(",");
+                                        const res = await api.get("parts", `or=(${orClause})&select=id,name,sku,oe_number,category&limit=10`);
+                                        setInvMatches(Array.isArray(res)?res:[]);
+                                      } catch(e){ setInvMatches([]); }
+                                      setCheckingInv(false);
+                                    }}>
+                                    {checkingInv?"Checking…":"🔍 Check Inventory"}
+                                  </button>
+                                )}
+                              </div>
                               {multiLine
                                 ? <textarea rows={2} className="inp" style={{width:"100%",fontSize:12,resize:"none",boxSizing:"border-box",lineHeight:1.4,padding:"5px 8px"}}
                                     value={editForm[field]} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))}/>
                                 : <input type="text" className="inp" style={{width:"100%",fontSize:12,boxSizing:"border-box",padding:"5px 8px"}}
                                     value={editForm[field]} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))}/>
                               }
+                              {/* ── Inventory matches ── */}
+                              {field==="oem_number"&&invMatches!==null&&(
+                                <div style={{marginTop:8,borderRadius:6,border:"1px solid var(--border)",overflow:"hidden"}}>
+                                  {invMatches.length===0
+                                    ? <div style={{padding:"8px 10px",fontSize:12,color:"var(--text3)"}}>No matching parts found in inventory.</div>
+                                    : invMatches.map(p=>(
+                                      <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",borderBottom:"1px solid var(--border)",gap:8}}>
+                                        <div style={{minWidth:0}}>
+                                          <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12}}>{p.sku}</div>
+                                          <div style={{fontSize:12,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                                          {p.oe_number&&<div style={{fontSize:11,color:"var(--text3)"}}>OE: {p.oe_number}</div>}
+                                        </div>
+                                        {onGoToPart&&<button className="btn btn-ghost btn-sm" style={{flexShrink:0,fontSize:11}} onClick={()=>onGoToPart(p)}>→ View Part</button>}
+                                      </div>
+                                    ))
+                                  }
+                                </div>
+                              )}
                             </div>
                           );
                         })}

@@ -6469,14 +6469,14 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
   useEffect(()=>{ setInvMatches(null); setCompareItem(null); }, [selectedItem?.id]);
 
   // Build OEM → [sku] map from parts array for instant row-level matching
-  const oemToSkus = useMemo(()=>{
+  const oemToParts = useMemo(()=>{
     const map = {};
     for(const p of parts){
       if(!p.oe_number) continue;
       p.oe_number.split(/[\s,;]+/).filter(Boolean).forEach(tok=>{
         const k = tok.trim().toUpperCase();
         if(!map[k]) map[k]=[];
-        if(!map[k].includes(p.sku)) map[k].push(p.sku);
+        if(!map[k].find(x=>x.id===p.id)) map[k].push({id:p.id,sku:p.sku,name:p.name});
       });
     }
     return map;
@@ -6484,11 +6484,12 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
 
   const getMatchedSkus = (item) => {
     if(!item?.oem_number) return [];
-    const matched = new Set();
+    const seen = new Set();
+    const matched = [];
     parseOems(item.oem_number).forEach(tok=>{
-      (oemToSkus[tok.toUpperCase()]||[]).forEach(sku=>matched.add(sku));
+      (oemToParts[tok.toUpperCase()]||[]).forEach(p=>{ if(!seen.has(p.id)){seen.add(p.id);matched.push(p);} });
     });
-    return [...matched];
+    return matched;
   };
 
   // responsive: card view on narrow screens
@@ -6714,7 +6715,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                               <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"0 6px",fontSize:13}} onClick={e=>{e.stopPropagation();deleteItem(item.id);}}>✕</button>
                             </div>
                             <div style={{fontSize:12,fontWeight:500,marginBottom:3}}>{item.description||"—"}</div>
-                            {matchedSkus.length>0&&<div style={{marginBottom:3,display:"flex",flexWrap:"wrap",gap:3}}>{matchedSkus.map(sku=><span key={sku} style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:3,padding:"1px 5px"}}>✓ {sku}</span>)}</div>}
+                            {matchedSkus.length>0&&<div style={{marginBottom:3,display:"flex",flexDirection:"column",gap:2}}>{matchedSkus.map(p=><span key={p.id} style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:3,padding:"1px 5px"}}>✓ {p.sku}{p.name&&<span style={{fontWeight:400,color:"#065f46",marginLeft:4}}>{p.name}</span>}</span>)}</div>}
                             {item.oem_number&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginBottom:2,wordBreak:"break-all"}}>{item.oem_number}</div>}
                             {item.application&&<div style={{fontSize:11,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.application}>{item.application}</div>}
                           </div>
@@ -6748,7 +6749,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                                     {item.supplier_part_no||"—"}
                                     {dups.length>0&&<span title={`OEM also in: ${dups.map(d=>d.supplier_part_no).join(", ")}`} style={{marginLeft:4,color:"var(--amber,#f59e0b)",fontSize:10}}>⚠</span>}
                                   </div>
-                                  {matchedSkus.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:2,marginTop:2}}>{matchedSkus.map(sku=><span key={sku} style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:3,padding:"0 4px"}}>✓ {sku}</span>)}</div>}
+                                  {matchedSkus.length>0&&<div style={{display:"flex",flexDirection:"column",gap:1,marginTop:2}}>{matchedSkus.map(p=><span key={p.id} style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:3,padding:"0 4px",whiteSpace:"nowrap"}}>✓ {p.sku}{p.name&&<span style={{fontWeight:400,color:"#065f46",marginLeft:3}}>{p.name}</span>}</span>)}</div>}
                                 </td>
                                 <td style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.description||""}>{item.description||"—"}</td>
                                 <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.oem_number||"—"}</td>
@@ -6776,9 +6777,9 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                         <div>
                           <div style={{fontFamily:"DM Mono,monospace",fontWeight:800,fontSize:22,letterSpacing:.5,lineHeight:1.1}}>{selectedItem.supplier_part_no||"—"}</div>
                           <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{selectedItem.description||""}</div>
-                          {(()=>{const skus=getMatchedSkus(selectedItem);return skus.length>0&&(
-                            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>
-                              {skus.map(sku=><span key={sku} style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"2px 7px"}}>✓ {sku}</span>)}
+                          {(()=>{const ps=getMatchedSkus(selectedItem);return ps.length>0&&(
+                            <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:6}}>
+                              {ps.map(p=><span key={p.id} style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"2px 7px"}}>✓ {p.sku}{p.name&&<span style={{fontWeight:400,color:"#065f46",marginLeft:5}}>{p.name}</span>}</span>)}
                             </div>
                           );})()}
                         </div>

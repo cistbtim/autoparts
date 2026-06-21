@@ -6619,7 +6619,7 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
               <>
                 {/* Search */}
                 <div style={{position:"relative",marginBottom:12}}>
-                  <input className="form-control" placeholder="🔍  Search part no / description / OEM / application…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} style={{width:"100%",fontSize:13,paddingRight:search?32:12,boxSizing:"border-box",color:"var(--text)",background:"var(--bg)"}}/>
+                  <input className="form-control" placeholder="🔍  Search part no / description / OEM / application…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} style={{width:"100%",fontSize:15,paddingRight:search?36:14,paddingTop:10,paddingBottom:10,paddingLeft:14,boxSizing:"border-box",color:"#111",background:"#fff",border:"1.5px solid var(--border)",borderRadius:8}}/>
                   {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--text3)",lineHeight:1}} title="Clear search">✕</button>}
                 </div>
 

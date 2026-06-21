@@ -1326,15 +1326,19 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
       </div>
 
       {/* ── Currently linked ── */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em"}}>
+      <div style={{marginBottom:8}}>
+        <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:part?.oe_number?5:0}}>
           ✅ Linked Vehicles ({linked.length})
         </div>
         {part?.oe_number&&(
-          <button className="btn btn-ghost btn-sm" style={{fontSize:11,color:"#e65c00",borderColor:"rgba(230,92,0,.3)",padding:"2px 8px"}}
-            onClick={()=>window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(part.oe_number.trim())}`,"_blank","noopener,noreferrer")}>
-            🔍 SpareTO
-          </button>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {part.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
+              <button key={i} className="btn btn-ghost btn-sm" style={{fontSize:10,color:"#e65c00",borderColor:"rgba(230,92,0,.3)",padding:"1px 7px"}}
+                onClick={()=>window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(tok.trim())}`,"_blank","noopener,noreferrer")}>
+                🔍 {tok}
+              </button>
+            ))}
+          </div>
         )}
       </div>
       {linked.length === 0 && pending.size === 0 && (

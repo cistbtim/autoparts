@@ -6716,14 +6716,20 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
                             <img src={toImgUrl(editForm.image_url)} alt="" style={{maxWidth:"100%",maxHeight:100,objectFit:"contain",borderRadius:6,border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
                           </div>
                         )}
-                        {[["Part No","supplier_part_no"],["Description","description"],["OEM Numbers","oem_number"],["Application","application"],["Image URL","image_url"]].map(([label,field])=>(
-                          <div key={field} style={{marginBottom:8}}>
-                            <div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
-                            <textarea rows={field==="application"||field==="oem_number"?2:1} className="inp"
-                              style={{width:"100%",fontSize:12,resize:"none",boxSizing:"border-box",lineHeight:1.4,padding:"5px 8px"}}
-                              value={editForm[field]} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))}/>
-                          </div>
-                        ))}
+                        {[["Part No","supplier_part_no"],["Description","description"],["OEM Numbers","oem_number"],["Application","application"],["Image URL","image_url"]].map(([label,field])=>{
+                          const multiLine = field==="oem_number"||field==="application";
+                          return (
+                            <div key={field} style={{marginBottom:8}}>
+                              <div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
+                              {multiLine
+                                ? <textarea rows={2} className="inp" style={{width:"100%",fontSize:12,resize:"none",boxSizing:"border-box",lineHeight:1.4,padding:"5px 8px"}}
+                                    value={editForm[field]} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))}/>
+                                : <input type="text" className="inp" style={{width:"100%",fontSize:12,boxSizing:"border-box",padding:"5px 8px"}}
+                                    value={editForm[field]} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))}/>
+                              }
+                            </div>
+                          );
+                        })}
                         {(()=>{
                           const dups = getOemDuplicates(selectedItem);
                           return dups.length>0?(

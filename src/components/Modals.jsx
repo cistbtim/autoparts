@@ -6798,6 +6798,21 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
 
                       {/* ── Scrollable body ── */}
                       <div style={{overflowY:"auto",padding:"12px 16px",flex:1,fontWeight:"normal",color:"var(--text)"}}>
+                        {/* Inventory match quick-nav */}
+                        {(()=>{const ps=getMatchedSkus(selectedItem);return ps.length>0&&onGoToPart&&(
+                          <div style={{marginBottom:12,display:"flex",flexDirection:"column",gap:6}}>
+                            {ps.map(p=>(
+                              <button key={p.id} className="btn btn-ghost" style={{justifyContent:"space-between",display:"flex",alignItems:"center",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--surface2)",textAlign:"left"}}
+                                onClick={async()=>{try{const full=await api.get("parts",`id=eq.${p.id}&select=*&limit=1`);onGoToPart(Array.isArray(full)?full[0]:full,{page,search});}catch{onGoToPart(p,{page,search});}}}>
+                                <div>
+                                  <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13,color:"var(--text)"}}>{p.sku}</div>
+                                  {p.name&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{p.name}</div>}
+                                </div>
+                                <span style={{fontSize:13,color:"var(--blue)",fontWeight:600}}>Open in Inventory ↗</span>
+                              </button>
+                            ))}
+                          </div>
+                        );})()}
                         {editForm.image_url&&(
                           <div style={{textAlign:"center",marginBottom:10}}>
                             <img src={toImgUrl(editForm.image_url)} alt="" style={{maxWidth:"100%",maxHeight:100,objectFit:"contain",borderRadius:6,border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>

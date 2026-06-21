@@ -6776,6 +6776,11 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                         <div>
                           <div style={{fontFamily:"DM Mono,monospace",fontWeight:800,fontSize:22,letterSpacing:.5,lineHeight:1.1}}>{selectedItem.supplier_part_no||"—"}</div>
                           <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{selectedItem.description||""}</div>
+                          {(()=>{const skus=getMatchedSkus(selectedItem);return skus.length>0&&(
+                            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>
+                              {skus.map(sku=><span key={sku} style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"2px 7px"}}>✓ {sku}</span>)}
+                            </div>
+                          );})()}
                         </div>
                         <button onClick={()=>setSelectedItem(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:"var(--text3)",lineHeight:1,marginLeft:12,flexShrink:0}}>✕</button>
                       </div>

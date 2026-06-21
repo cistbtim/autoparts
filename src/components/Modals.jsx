@@ -6696,41 +6696,57 @@ export function SupplierCatalogueModal({ supplier, onClose }) {
 
                 {/* ── Edit popup (both desktop & mobile) ── */}
                 {selectedItem&&(
-                  <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setSelectedItem(null)}>
+                  <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:12}} onClick={()=>setSelectedItem(null)}>
                     <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.45)"}}/>
-                    <div style={{position:"relative",width:"100%",maxWidth:460,maxHeight:"90vh",overflowY:"auto",background:"var(--bg)",borderRadius:12,padding:20,boxShadow:"0 8px 40px rgba(0,0,0,.35)"}} onClick={e=>e.stopPropagation()}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                        <span style={{fontWeight:700,fontSize:15}}>Edit Part</span>
-                        <button onClick={()=>setSelectedItem(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:"var(--text3)",lineHeight:1}}>✕</button>
+                    <div style={{position:"relative",width:"100%",maxWidth:440,maxHeight:"92vh",display:"flex",flexDirection:"column",background:"var(--bg)",borderRadius:12,boxShadow:"0 8px 40px rgba(0,0,0,.35)"}} onClick={e=>e.stopPropagation()}>
+
+                      {/* ── Header: large part no + close ── */}
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"14px 16px 10px",borderBottom:"1px solid var(--border)",flexShrink:0}}>
+                        <div>
+                          <div style={{fontFamily:"DM Mono,monospace",fontWeight:800,fontSize:22,letterSpacing:.5,lineHeight:1.1}}>{selectedItem.supplier_part_no||"—"}</div>
+                          <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{selectedItem.description||""}</div>
+                        </div>
+                        <button onClick={()=>setSelectedItem(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:"var(--text3)",lineHeight:1,marginLeft:12,flexShrink:0}}>✕</button>
                       </div>
-                      {editForm.image_url&&(
-                        <div style={{textAlign:"center",marginBottom:12}}>
-                          <img src={toImgUrl(editForm.image_url)} alt="" style={{maxWidth:"100%",maxHeight:140,objectFit:"contain",borderRadius:8,border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
-                        </div>
-                      )}
-                      {[["Part No","supplier_part_no"],["Description","description"],["OEM Numbers","oem_number"],["Application","application"],["Image URL","image_url"]].map(([label,field])=>(
-                        <div key={field} style={{marginBottom:10}}>
-                          <div style={{fontSize:10,color:"var(--text3)",marginBottom:3,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
-                          <textarea rows={field==="application"||field==="oem_number"?3:1} className="inp" style={{width:"100%",fontSize:13,resize:"vertical",boxSizing:"border-box"}}
-                            value={editForm[field]} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))}/>
-                        </div>
-                      ))}
-                      <button className="btn btn-primary" style={{width:"100%",marginTop:4}} onClick={saveDrawer} disabled={saving}>{saving?"Saving…":"Save"}</button>
-                      {(()=>{
-                        const dups = getOemDuplicates(selectedItem);
-                        return dups.length>0?(
-                          <div style={{marginTop:14,padding:"10px 12px",background:"rgba(245,158,11,.08)",borderRadius:8,border:"1px solid rgba(245,158,11,.25)"}}>
-                            <div style={{fontSize:12,fontWeight:700,color:"#b45309",marginBottom:8}}>⚠ OEM also found in this catalogue</div>
-                            {dups.map(d=>(
-                              <div key={d.id} style={{fontSize:12,marginBottom:6}}>
-                                <span style={{fontFamily:"DM Mono,monospace",fontWeight:600}}>{d.supplier_part_no}</span>
-                                <span style={{color:"var(--text3)",marginLeft:6}}>{d.description}</span>
-                                <span style={{display:"block",color:"var(--amber,#f59e0b)",fontSize:11}}>shared OEM: {d.matchedOem}</span>
-                              </div>
-                            ))}
+
+                      {/* ── Scrollable body ── */}
+                      <div style={{overflowY:"auto",padding:"12px 16px",flex:1}}>
+                        {editForm.image_url&&(
+                          <div style={{textAlign:"center",marginBottom:10}}>
+                            <img src={toImgUrl(editForm.image_url)} alt="" style={{maxWidth:"100%",maxHeight:100,objectFit:"contain",borderRadius:6,border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
                           </div>
-                        ):null;
-                      })()}
+                        )}
+                        {[["Part No","supplier_part_no"],["Description","description"],["OEM Numbers","oem_number"],["Application","application"],["Image URL","image_url"]].map(([label,field])=>(
+                          <div key={field} style={{marginBottom:8}}>
+                            <div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
+                            <textarea rows={field==="application"||field==="oem_number"?2:1} className="inp"
+                              style={{width:"100%",fontSize:12,resize:"none",boxSizing:"border-box",lineHeight:1.4,padding:"5px 8px"}}
+                              value={editForm[field]} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))}/>
+                          </div>
+                        ))}
+                        {(()=>{
+                          const dups = getOemDuplicates(selectedItem);
+                          return dups.length>0?(
+                            <div style={{marginTop:10,padding:"8px 10px",background:"rgba(245,158,11,.08)",borderRadius:6,border:"1px solid rgba(245,158,11,.25)"}}>
+                              <div style={{fontSize:11,fontWeight:700,color:"#b45309",marginBottom:6}}>⚠ OEM also found in this catalogue</div>
+                              {dups.map(d=>(
+                                <div key={d.id} style={{fontSize:11,marginBottom:4}}>
+                                  <span style={{fontFamily:"DM Mono,monospace",fontWeight:600}}>{d.supplier_part_no}</span>
+                                  <span style={{color:"var(--text3)",marginLeft:6}}>{d.description}</span>
+                                  <span style={{display:"block",color:"var(--amber,#f59e0b)",fontSize:10}}>shared OEM: {d.matchedOem}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ):null;
+                        })()}
+                      </div>
+
+                      {/* ── Sticky footer: Save + Close ── */}
+                      <div style={{display:"flex",gap:8,padding:"10px 16px",borderTop:"1px solid var(--border)",flexShrink:0}}>
+                        <button className="btn btn-primary" style={{flex:1}} onClick={saveDrawer} disabled={saving}>{saving?"Saving…":"Save"}</button>
+                        <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setSelectedItem(null)}>Close</button>
+                      </div>
+
                     </div>
                   </div>
                 )}

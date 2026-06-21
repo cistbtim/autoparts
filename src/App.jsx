@@ -5739,11 +5739,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         onGoToPart={(part,catalogueState)=>{const sup=mData("supplierCatalogue");setReturnToCatalogue({sup,catalogueState});closeM("supplierCatalogue");setTab("inventory");openM("editPart",part);}}
         onAddToInventory={(item,sup,catalogueState)=>{
           setPendingCatalogueLink({supplier_id:sup?.id,supplier_part_no:item.supplier_part_no});
-          const _firstLine=(item.application||"").split(/\n/)[0].trim();
+          const _appLines=(item.application||"").split(/\n/).map(l=>l.trim()).filter(Boolean);
+          const _firstLine=_appLines[0]||"";
+          const _secondLine=_appLines[1]||"";
           const _colon=_firstLine.indexOf(":");
           const _make=_colon>-1?_firstLine.slice(0,_colon).trim():"";
           const _model=_colon>-1?_firstLine.slice(_colon+1).trim():"";
-          setNewPartInitialF({name:item.description||"",oe_number:(item.oem_number||"").replace(/[\s,;]+/g," ").trim(),image_url:item.image_url||"",make:_make,model:_model});
+          const _name=[item.description,_secondLine].filter(Boolean).join(" - ");
+          setNewPartInitialF({name:_name,oe_number:(item.oem_number||"").replace(/[\s,;]+/g," ").trim(),image_url:item.image_url||"",make:_make,model:_model});
           setReturnToCatalogue({sup,catalogueState});
           closeM("supplierCatalogue");
           setTab("inventory");

@@ -6454,8 +6454,8 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
   const [activeTab, setActiveTab] = useState("browse");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState(supplier?._search||"");
+  const [page, setPage] = useState(supplier?._page||1);
   const PAGE_SIZE = 20;
   const [lightboxUrl, setLightboxUrl] = useState(null);
 
@@ -6794,7 +6794,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                                     ? <div style={{padding:"10px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
                                         <span style={{fontSize:12,color:"var(--text3)"}}>No matching parts found in inventory.</span>
                                         {onAddToInventory&&<button className="btn btn-primary btn-sm" style={{flexShrink:0,fontSize:12}}
-                                          onClick={()=>onAddToInventory(selectedItem, supplier)}>
+                                          onClick={()=>onAddToInventory(selectedItem, supplier, {page, search})}>
                                           ➕ Add to Inventory
                                         </button>}
                                       </div>
@@ -6814,8 +6814,8 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                                         {onGoToPart&&<button className="btn btn-ghost btn-sm" style={{flexShrink:0,fontSize:11}} onClick={async()=>{
                                           try {
                                             const full = await api.get("parts", `id=eq.${p.id}&select=*&limit=1`);
-                                            onGoToPart(Array.isArray(full)?full[0]:full);
-                                          } catch(e){ onGoToPart(p); }
+                                            onGoToPart(Array.isArray(full)?full[0]:full, {page, search});
+                                          } catch(e){ onGoToPart(p, {page, search}); }
                                         }}>→ View Part</button>}
                                       </div>
                                     ))

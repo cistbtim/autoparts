@@ -5725,7 +5725,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             closeM("editPart");
             setTimeout(()=>openM("editPart",null),50);
           }:null}
-          onGoBack={returnToCatalogue?()=>{const sup=returnToCatalogue;setReturnToCatalogue(null);setPendingCatalogueLink(null);setNewPartInitialF(null);closeM("editPart");openM("supplierCatalogue",sup);}:null}
+          onGoBack={returnToCatalogue?()=>{const {sup,catalogueState}=returnToCatalogue;setReturnToCatalogue(null);setPendingCatalogueLink(null);setNewPartInitialF(null);closeM("editPart");openM("supplierCatalogue",{...sup,_page:catalogueState?.page,_search:catalogueState?.search});}:null}
           onClose={()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);setReturnToCatalogue(null);closeM("editPart");}}
           t={t}/>;
       })()}
@@ -5736,11 +5736,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {isOpen("importSuppliers")&&<SupplierImportModal onImport={async()=>{await refreshTables("suppliers");}} onClose={()=>closeM("importSuppliers")}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}
       {isOpen("supplierCatalogue")&&<SupplierCatalogueModal supplier={mData("supplierCatalogue")}
-        onGoToPart={(part)=>{const sup=mData("supplierCatalogue");setReturnToCatalogue(sup);closeM("supplierCatalogue");setTab("inventory");openM("editPart",part);}}
-        onAddToInventory={(item,sup)=>{
+        onGoToPart={(part,catalogueState)=>{const sup=mData("supplierCatalogue");setReturnToCatalogue({sup,catalogueState});closeM("supplierCatalogue");setTab("inventory");openM("editPart",part);}}
+        onAddToInventory={(item,sup,catalogueState)=>{
           setPendingCatalogueLink({supplier_id:sup?.id,supplier_part_no:item.supplier_part_no});
           setNewPartInitialF({name:item.description||"",oe_number:(item.oem_number||"").replace(/[\s,;]+/g," ").trim(),image_url:item.image_url||""});
-          setReturnToCatalogue(sup);
+          setReturnToCatalogue({sup,catalogueState});
           closeM("supplierCatalogue");
           setTab("inventory");
           openM("editPart",null);

@@ -6791,7 +6791,12 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart }) {
                                           <div style={{fontSize:12,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
                                           {p.oe_number&&<div style={{fontSize:11,color:"var(--text3)"}}>OE: {p.oe_number}</div>}
                                         </div>
-                                        {onGoToPart&&<button className="btn btn-ghost btn-sm" style={{flexShrink:0,fontSize:11}} onClick={()=>onGoToPart(p)}>→ View Part</button>}
+                                        {onGoToPart&&<button className="btn btn-ghost btn-sm" style={{flexShrink:0,fontSize:11}} onClick={async()=>{
+                                          try {
+                                            const full = await api.get("parts", `id=eq.${p.id}&select=*&limit=1`);
+                                            onGoToPart(Array.isArray(full)?full[0]:full);
+                                          } catch(e){ onGoToPart(p); }
+                                        }}>→ View Part</button>}
                                       </div>
                                     ))
                                   }

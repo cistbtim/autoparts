@@ -3290,7 +3290,10 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
           <FD>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
               <FL label={t.oeNumber}/>
-              {f.oe_number&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.oe_number)}>📋 Copy OE</button>}
+              <div style={{display:"flex",gap:4}}>
+                {f.oe_number&&<button className="cp-btn" onClick={()=>window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(f.oe_number.trim())}`, "_blank","noopener,noreferrer")} style={{color:"#e65c00",borderColor:"rgba(230,92,0,.3)"}}>🔍 SpareTO</button>}
+                {f.oe_number&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.oe_number)}>📋 Copy OE</button>}
+              </div>
             </div>
             <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)} placeholder="OE number / OEM reference"/>
           </FD>

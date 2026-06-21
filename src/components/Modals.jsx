@@ -6818,42 +6818,72 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart }) {
                               </div>
 
                               {/* ── Side-by-side compare ── */}
-                              {compareItem&&(
-                                <div style={{marginTop:8,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
-                                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",background:"var(--surface)"}}>
-                                    {/* header */}
-                                    <div style={{padding:"6px 10px",borderRight:"1px solid var(--border)",borderBottom:"1px solid var(--border)",background:"rgba(99,102,241,.07)"}}>
-                                      <div style={{fontSize:11,color:"var(--text3)",marginBottom:1}}>CURRENT</div>
-                                      <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{selectedItem.supplier_part_no}</div>
-                                    </div>
-                                    <div style={{padding:"6px 10px",borderBottom:"1px solid var(--border)",background:"rgba(245,158,11,.07)"}}>
-                                      <div style={{fontSize:11,color:"var(--text3)",marginBottom:1}}>DUPLICATE</div>
-                                      <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{compareItem.supplier_part_no}</div>
-                                    </div>
-                                    {/* images */}
-                                    {[selectedItem, compareItem].map((it,i)=>(
-                                      <div key={i} style={{padding:8,textAlign:"center",borderRight:i===0?"1px solid var(--border)":"none",borderBottom:"1px solid var(--border)"}}>
-                                        {it.image_url
-                                          ? <img src={toImgUrl(it.image_url)} alt="" style={{maxWidth:"100%",maxHeight:80,objectFit:"contain",borderRadius:4}} onError={e=>{e.target.style.display="none";}}/>
-                                          : <div style={{height:60,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,opacity:.25}}>🖼</div>}
+                              {compareItem&&(()=>{
+                                const aOems = new Set(parseOems(selectedItem.oem_number).map(x=>x.toUpperCase()));
+                                const bOems = new Set(parseOems(compareItem.oem_number).map(x=>x.toUpperCase()));
+                                const sharedOems = new Set([...aOems].filter(x=>bOems.has(x)));
+
+                                const isSame = (a,b) => (a||"").trim().toLowerCase()===(b||"").trim().toLowerCase() && (a||"").trim()!=="";
+
+                                const MATCH_BG   = "rgba(52,211,153,.15)";
+                                const MATCH_BDR  = "1px solid rgba(52,211,153,.4)";
+
+                                const renderOems = (str) => parseOems(str).map((tok,i)=>{
+                                  const shared = sharedOems.has(tok.toUpperCase());
+                                  return <span key={i} style={{display:"inline-block",marginRight:4,marginBottom:2,padding:"1px 5px",borderRadius:3,fontSize:11,fontFamily:"DM Mono,monospace",background:shared?"rgba(52,211,153,.2)":"transparent",color:shared?"#047857":"var(--text)",fontWeight:shared?700:400,border:shared?"1px solid rgba(52,211,153,.4)":"none"}}>{tok}</span>;
+                                });
+
+                                return (
+                                  <div style={{marginTop:8,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+                                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",background:"var(--surface)"}}>
+                                      {/* header */}
+                                      <div style={{padding:"6px 10px",borderRight:"1px solid var(--border)",borderBottom:"1px solid var(--border)",background:"rgba(99,102,241,.07)"}}>
+                                        <div style={{fontSize:10,color:"var(--text3)",marginBottom:1}}>CURRENT</div>
+                                        <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{selectedItem.supplier_part_no}</div>
                                       </div>
-                                    ))}
-                                    {/* rows */}
-                                    {[
-                                      ["Description", it=>it.description],
-                                      ["OEM Numbers",  it=>it.oem_number],
-                                      ["Application",  it=>it.application],
-                                    ].map(([rowLabel, getter])=>(
-                                      [selectedItem, compareItem].map((it,i)=>(
-                                        <div key={`${rowLabel}-${i}`} style={{padding:"6px 10px",borderRight:i===0?"1px solid var(--border)":"none",borderBottom:"1px solid var(--border)",fontSize:11}}>
-                                          {i===0&&<div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.4}}>{rowLabel}</div>}
-                                          <div style={{color:"var(--text)",whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:1.4}}>{getter(it)||"—"}</div>
+                                      <div style={{padding:"6px 10px",borderBottom:"1px solid var(--border)",background:"rgba(245,158,11,.07)"}}>
+                                        <div style={{fontSize:10,color:"var(--text3)",marginBottom:1}}>DUPLICATE</div>
+                                        <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{compareItem.supplier_part_no}</div>
+                                      </div>
+                                      {/* images */}
+                                      {[selectedItem, compareItem].map((it,i)=>(
+                                        <div key={i} style={{padding:8,textAlign:"center",borderRight:i===0?"1px solid var(--border)":"none",borderBottom:"1px solid var(--border)"}}>
+                                          {it.image_url
+                                            ? <img src={toImgUrl(it.image_url)} alt="" style={{maxWidth:"100%",maxHeight:80,objectFit:"contain",borderRadius:4}} onError={e=>{e.target.style.display="none";}}/>
+                                            : <div style={{height:60,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,opacity:.25}}>🖼</div>}
                                         </div>
-                                      ))
-                                    ))}
+                                      ))}
+                                      {/* Description */}
+                                      {[selectedItem, compareItem].map((it,i)=>{
+                                        const same = isSame(selectedItem.description, compareItem.description);
+                                        return (
+                                          <div key={`desc-${i}`} style={{padding:"6px 10px",borderRight:i===0?"1px solid var(--border)":"none",borderBottom:"1px solid var(--border)",fontSize:11,background:same?MATCH_BG:"",border:same?MATCH_BDR:""}}>
+                                            {i===0&&<div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.4}}>Description {same&&<span style={{color:"#047857"}}>✓ same</span>}</div>}
+                                            <div style={{color:"var(--text)"}}>{it.description||"—"}</div>
+                                          </div>
+                                        );
+                                      })}
+                                      {/* OEM */}
+                                      {[selectedItem, compareItem].map((it,i)=>(
+                                        <div key={`oem-${i}`} style={{padding:"6px 10px",borderRight:i===0?"1px solid var(--border)":"none",borderBottom:"1px solid var(--border)",fontSize:11}}>
+                                          {i===0&&<div style={{fontSize:10,color:"var(--text3)",marginBottom:4,textTransform:"uppercase",letterSpacing:.4}}>OEM Numbers <span style={{color:"#047857"}}>● green = shared</span></div>}
+                                          <div style={{display:"flex",flexWrap:"wrap",gap:2}}>{renderOems(it.oem_number)}</div>
+                                        </div>
+                                      ))}
+                                      {/* Application */}
+                                      {[selectedItem, compareItem].map((it,i)=>{
+                                        const same = isSame(selectedItem.application, compareItem.application);
+                                        return (
+                                          <div key={`app-${i}`} style={{padding:"6px 10px",borderRight:i===0?"1px solid var(--border)":"none",fontSize:11,background:same?MATCH_BG:""}}>
+                                            {i===0&&<div style={{fontSize:10,color:"var(--text3)",marginBottom:2,textTransform:"uppercase",letterSpacing:.4}}>Application {same&&<span style={{color:"#047857"}}>✓ same</span>}</div>}
+                                            <div style={{color:"var(--text)",whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:1.4}}>{it.application||"—"}</div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                );
+                              })()}
                             </div>
                           );
                         })()}

@@ -7476,6 +7476,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const [shelfModal,setShelfModal]=useState(false);
   const wsId=wsProfile?.id?String(wsProfile.id):null;
   const prevReqStatusRef=useRef({});
+  const [reqsRefreshKey,setReqsRefreshKey]=useState(0);
   useEffect(()=>{
     if(!wsId)return;
     const fetchReqs=()=>{
@@ -7499,7 +7500,6 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     const timer=setInterval(fetchReqs,30000);
     return()=>clearInterval(timer);
   },[wsId,reqsRefreshKey]);
-  const [reqsRefreshKey,setReqsRefreshKey]=useState(0);
   const [shopParts,setShopPartsRaw]=useState(cachedMatch?_spCache.data:[]);
   const setShopParts=(d)=>{_spCache.data=d;_spCache.branchId=linkedBranchId;setShopPartsRaw(d);};
   const [page,setPage]=useState(0);

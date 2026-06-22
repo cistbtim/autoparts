@@ -4720,7 +4720,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
 
       {/* ══ QUOTE/INVOICE popup ══ */}
       {quotePopup&&wsRole!=="mechanic"&&(
-        <Overlay onClose={()=>setQuotePopup(false)}>
+        <Overlay wide onClose={()=>setQuotePopup(false)}>
           <MHead title={quotePopupQuoteOnly?"📋 Parts Quotation":"📝 Quote / Invoice"} onClose={()=>setQuotePopup(false)}/>
           {!quotePopupQuoteOnly&&<div style={{display:"flex",gap:6,padding:"8px 14px",borderBottom:"1px solid var(--border)"}}>
             {["quote","invoice"].map(tid=>(
@@ -5256,15 +5256,16 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               </div>
             );
             return (
-              <table className="tbl" style={{width:"100%"}}>
+              <div style={{overflowX:"auto"}}>
+              <table className="tbl" style={{width:"100%",minWidth:560}}>
                 <thead><tr>
                   <th style={{width:32}}></th>
-                  <th style={{width:90,whiteSpace:"nowrap"}}>{t.wsqtType}</th>
+                  <th style={{width:80,whiteSpace:"nowrap"}}>{t.wsqtType}</th>
                   <th>{t.wsqPdfDescription}</th>
-                  <th style={{width:60,textAlign:"right"}}>{t.qty}</th>
-                  <th style={{width:130,textAlign:"right"}}>{t.unitPrice}</th>
-                  <th style={{width:110,textAlign:"right"}}>{t.total}</th>
-                  <th style={{width:36}}></th>
+                  <th style={{width:50,textAlign:"right"}}>{t.qty}</th>
+                  <th style={{width:120,textAlign:"right"}}>{t.unitPrice}</th>
+                  <th style={{width:100,textAlign:"right"}}>{t.total}</th>
+                  <th style={{width:32}}></th>
                 </tr></thead>
                 <tbody>
                   {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.07)"}}><td colSpan={7} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--blue)",borderBottom:"1px solid rgba(96,165,250,.2)",letterSpacing:".04em"}}>🔩 {t.wsqtPart} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{partItems.length} item{partItems.length!==1?"s":""}</span></td></tr>}
@@ -5284,6 +5285,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   </tr>
                 </tbody>
               </table>
+              </div>
             );
           })()}
           {/* ── Description edit popup ── */}

@@ -2711,7 +2711,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
   const phone = (chosenSupplier?.phone || manualPhone || "").replace(/\D/g, "");
 
   const SEP = "─".repeat(28);
-  const msgLines = [
+  const buildMsg = (link="") => [
     `🔧 *Parts Request* — ${shopName}`,
     SEP,
     `🚗 *${job.vehicle_reg||"—"}*  |  ${[job.vehicle_make, job.vehicle_model].filter(Boolean).join(" ")||"—"}${job.vehicle_color ? "  |  "+job.vehicle_color : ""}`,
@@ -2724,8 +2724,10 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
     ...selectedItems.map((i, idx) => `${idx + 1}. ${i.label}${i.qty > 1 ? ` x${i.qty}` : ""}`),
     SEP,
     customNote.trim() || "Please quote price & availability 🙏",
+    ...(link ? [SEP, `🔗 Quote link (tap to price):`, link] : []),
   ].filter(l => l !== null).join("\n");
 
+  const msgLines = buildMsg(generatedLink);
   const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msgLines)}` : null;
 
   const logSend = (viaGroup=false) => {
@@ -2872,23 +2874,58 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 
       {/* Actions */}
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {/* Direct WhatsApp (personal number) */}
-        {waUrl&&(
-          <a href={waUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}} onClick={()=>logSend(false)}>
-            <button className="btn btn-primary" style={{width:"100%",background:"#25D366",border:"none",fontSize:15,padding:"13px 0",fontWeight:700,borderRadius:10}}>
-              📲 Send via WhatsApp
-            </button>
-          </a>
+        {/* Direct WhatsApp — auto-generates quote link first */}
+        {phone&&(
+          <button
+            disabled={generatingLink}
+            style={{width:"100%",background:generatingLink?"#4ade80":"#25D366",border:"none",fontSize:15,padding:"13px 0",fontWeight:700,borderRadius:10,color:"#fff",cursor:generatingLink?"not-allowed":"pointer",transition:"background .2s"}}
+            onClick={async()=>{
+              if(generatingLink) return;
+              // Open blank window NOW (synchronous) so browsers don't block the popup
+              const win=window.open("about:blank","_blank");
+              let link=generatedLink;
+              if(!link&&onGenerateLink&&selectedItems.length>0){
+                setGeneratingLink(true);
+                try{
+                  const linkItems=selectedItems.map(i=>({description:i.label,qty:i.qty,sku:i.sku}));
+                  const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false};
+                  link=await onGenerateLink(info,linkItems);
+                  setGeneratedLink(link);
+                }catch(e){/* link generation failed — send without */}
+                finally{setGeneratingLink(false);}
+              }
+              logSend(false);
+              const fullMsg=buildMsg(link||"");
+              const url=`https://wa.me/${phone}?text=${encodeURIComponent(fullMsg)}`;
+              if(win) win.location=url; else window.open(url,"_blank");
+            }}>
+            {generatingLink?"⏳ Generating link…":"📲 Send via WhatsApp"}
+          </button>
         )}
         {/* WhatsApp Group — copy message then open group */}
         {chosenSupplier?.group_link&&(
           <button style={{width:"100%",background:"#128C7E",border:"none",fontSize:14,padding:"12px 0",fontWeight:700,borderRadius:10,color:"#fff",cursor:"pointer"}}
-            onClick={()=>{ logSend(true); navigator.clipboard.writeText(msgLines).then(()=>{ window.open(chosenSupplier.group_link,"_blank"); }); }}>
+            onClick={async()=>{
+              let link=generatedLink;
+              if(!link&&onGenerateLink&&selectedItems.length>0){
+                setGeneratingLink(true);
+                try{
+                  const linkItems=selectedItems.map(i=>({description:i.label,qty:i.qty,sku:i.sku}));
+                  const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false};
+                  link=await onGenerateLink(info,linkItems);
+                  setGeneratedLink(link);
+                }catch(e){}
+                finally{setGeneratingLink(false);}
+              }
+              logSend(true);
+              const fullMsg=buildMsg(link||"");
+              navigator.clipboard.writeText(fullMsg).then(()=>{ window.open(chosenSupplier.group_link,"_blank"); });
+            }}>
             👥 Copy & Open Group Chat
           </button>
         )}
         {/* Fallback — nothing selected yet */}
-        {!waUrl&&!chosenSupplier?.group_link&&(
+        {!phone&&!chosenSupplier?.group_link&&(
           <button disabled style={{width:"100%",fontSize:14,padding:"13px 0",opacity:.45,borderRadius:10,border:"1px solid var(--border)",background:"var(--surface2)",cursor:"not-allowed"}}>
             📲 Select a supplier or enter a phone above
           </button>
@@ -2896,21 +2933,11 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
         <button className="btn btn-ghost" style={{width:"100%",fontSize:13,padding:"10px 0",borderRadius:10}} onClick={copyMsg}>
           {copied ? "✓ Copied!" : "📋 Copy Message"}
         </button>
-        {/* Generate digital quote link */}
-        {onGenerateLink&&selectedItems.length>0&&(
-          <button
-            disabled={generatingLink}
-            style={{width:"100%",fontSize:13,padding:"11px 0",borderRadius:10,border:"1px solid rgba(56,189,248,.4)",background:"rgba(56,189,248,.08)",color:"#38bdf8",cursor:generatingLink?"not-allowed":"pointer",fontWeight:600}}
-            onClick={async()=>{
-              setGeneratingLink(true);
-              const linkItems=selectedItems.map(i=>({description:i.label,qty:i.qty,sku:i.sku}));
-              const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false};
-              const url=await onGenerateLink(info,linkItems);
-              setGeneratedLink(url);
-              setGeneratingLink(false);
-            }}>
-            {generatingLink?"Generating…":"🔗 Generate Supplier Quote Link"}
-          </button>
+        {/* Show generated link if already produced */}
+        {generatedLink&&(
+          <div style={{fontSize:11,color:"#38bdf8",background:"rgba(56,189,248,.06)",border:"1px solid rgba(56,189,248,.25)",borderRadius:8,padding:"6px 10px",wordBreak:"break-all"}}>
+            🔗 {generatedLink}
+          </div>
         )}
         {generatedLink&&(
           <div style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.3)",borderRadius:10,padding:"10px 12px"}}>

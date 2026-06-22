@@ -7496,7 +7496,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     fetchReqs();
     const timer=setInterval(fetchReqs,30000);
     return()=>clearInterval(timer);
-  },[wsId]);
+  },[wsId,reqsRefreshKey]);
+  const [reqsRefreshKey,setReqsRefreshKey]=useState(0);
   const [shopParts,setShopParts]=useState([]);
   const [page,setPage]=useState(0);
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
@@ -7800,9 +7801,16 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <button onClick={()=>{setStockOnly(true);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:stockOnly?700:400,background:stockOnly?"var(--accent)":"transparent",color:stockOnly?"#fff":"var(--text2)"}}>In Stock</button>
           </div>
           <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={()=>setShelfModal({})} title="Print shelf/bin label">📋 Shelf Label</button>
-          <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} disabled={refreshing} title="Refresh parts"
-            onClick={()=>{api.cacheInvalidate("parts");api.cacheInvalidate("branch_stock");setRefreshing(true);setRefreshKey(k=>k+1);}}>
-            <span style={refreshing?{display:"inline-block",animation:"spin 1s linear infinite"}:{}}>{refreshing?"⟳":"↻"}</span>{refreshing?" Refreshing…":" Refresh"}
+          <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} disabled={refreshing} title="Reload all inventory and requests from server"
+            onClick={()=>{
+              api.cacheInvalidate("parts");
+              api.cacheInvalidate("branch_stock");
+              api.cacheInvalidate("branch_stock_requests");
+              setRefreshing(true);
+              setRefreshKey(k=>k+1);
+              setReqsRefreshKey(k=>k+1);
+            }}>
+            <span style={refreshing?{display:"inline-block",animation:"spin 1s linear infinite"}:{}}>{refreshing?"⟳":"↻"}</span>{refreshing?" Refreshing…":" Refresh All"}
           </button>
           <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}} onClick={()=>setShowCheckout(true)} disabled={!cart.length}>
             🛒 {cartCount>0?`(${cartCount}) `:""}{ (mainCart.length>0||requestCart.length>0)&&localCart.length>0?"Checkout & Request":(mainCart.length>0||requestCart.length>0)?"Send Request":"Checkout"}

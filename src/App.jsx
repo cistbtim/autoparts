@@ -1506,8 +1506,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
     if(id){ chkR(await api.patch("ws_supplier_quotes","id",id,rest),"Update quote"); }
     else { chkR(await api.insert("ws_supplier_quotes",{...rest,id:makeId("WSQT"),workshop_id:wsId||null,quoted_at:new Date().toISOString()}),"Save quote"); }
+    // Apply supplier prices as cost_price + recalculate unit_price on matching job items
+    if(qt.job_id && qt.line_items){
+      const defaultMarkup=+(workshopProfile?.default_markup_pct||0);
+      const jobItems=workshopJobItems.filter(i=>i.job_id===qt.job_id);
+      let lineItems=[]; try{ lineItems=JSON.parse(qt.line_items||"[]"); }catch{}
+      for(const li of lineItems){
+        const price=+(li.price||0);
+        if(!(price>0)) continue;
+        const sku=(li.sku||"").trim();
+        const match=jobItems.find(i=>sku?(i.part_sku||"").trim()===sku:(i.description||"").toLowerCase().trim()===(li.name||"").toLowerCase().trim());
+        if(!match) continue;
+        const mu=+(match.markup_pct||defaultMarkup);
+        const newPrice=+(price*(1+mu/100)).toFixed(2);
+        await api.patch("workshop_job_items","id",match.id,{cost_price:price,unit_price:newPrice,total:+(newPrice*(+match.qty||1)).toFixed(2),markup_pct:mu}).catch(()=>{});
+      }
+    }
     const fresh=await api.get("ws_supplier_quotes",`select=*&order=quoted_at.desc${wsF}`).catch(()=>[]);
     setWsSupplierQuotes(Array.isArray(fresh)?fresh:[]);
+    await refreshWorkshopData();
   };
 
   const saveWsSupplierRequest=async(req)=>{

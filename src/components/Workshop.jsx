@@ -5125,13 +5125,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       {item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}
                     </span>
                     <div style={{flex:1,minWidth:0}}>
-                      {editDescId===item.id
-                        ?<input autoFocus value={editDescVal} onChange={e=>setEditDescVal(e.target.value)}
-                            onBlur={()=>commitDesc(item)}
-                            onKeyDown={e=>{if(e.key==="Enter")commitDesc(item);if(e.key==="Escape")setEditDescId(null);}}
-                            style={{width:"100%",fontSize:14,fontWeight:700,padding:"4px 8px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
-                        :<div onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(item.description||"");}}} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)"}}>{item.description}</div>
-                      }
+                      <div onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(item.description||"");}}} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)"}}>{item.description}</div>
                       {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2,display:"block"}}>{item.part_sku}</code>}
                     </div>
                     <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0,fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
@@ -5200,13 +5194,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 </td>
                 <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}</span></td>
                 <td style={{fontWeight:500}}>
-                  {editDescId===item.id
-                    ?<input autoFocus value={editDescVal} onChange={e=>setEditDescVal(e.target.value)}
-                        onBlur={()=>commitDesc(item)}
-                        onKeyDown={e=>{if(e.key==="Enter")commitDesc(item);if(e.key==="Escape")setEditDescId(null);}}
-                        style={{width:"100%",fontSize:13,fontWeight:600,padding:"3px 7px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
-                    :<span onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(item.description||"");}}} title={wsLocked?"":""} style={{cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{item.description}</span>
-                  }
+                  <span onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(item.description||"");}}} style={{cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{item.description}</span>
                   {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
                   {supCosts.length>0&&(
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
@@ -5296,6 +5284,28 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   </tr>
                 </tbody>
               </table>
+            );
+          })()}
+          {/* ── Description edit popup ── */}
+          {editDescId&&(()=>{
+            const editItem=items.find(i=>i.id===editDescId);
+            if(!editItem) return null;
+            return (
+              <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
+                onClick={()=>setEditDescId(null)}>
+                <div style={{background:"var(--surface)",borderRadius:16,padding:24,width:"100%",maxWidth:460,boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}
+                  onClick={e=>e.stopPropagation()}>
+                  <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Edit Description</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>{editItem.type==="part"?"🔩 Part":"👷 Labour"}{editItem.part_sku&&<> · <code style={{fontFamily:"DM Mono,monospace"}}>{editItem.part_sku}</code></>}</div>
+                  <textarea autoFocus rows={4} value={editDescVal} onChange={e=>setEditDescVal(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Escape")setEditDescId(null);}}
+                    style={{width:"100%",resize:"vertical",fontSize:14,fontWeight:600,padding:"10px 12px",borderRadius:10,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text)",fontFamily:"inherit",lineHeight:1.5}}/>
+                  <div style={{display:"flex",gap:10,marginTop:14}}>
+                    <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setEditDescId(null)}>Cancel</button>
+                    <button className="btn btn-primary" style={{flex:2}} onClick={()=>commitDesc(editItem)}>Save</button>
+                  </div>
+                </div>
+              </div>
             );
           })()}
           {/* ── Supplier quote requests + PO status ── */}

@@ -7462,7 +7462,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
 }
 
 // Module-level cache so spare shop parts survive WorkshopPage remounts (tab switches)
-const _spCache={data:null,branchId:null};
+const _spCache={data:null,branchId:null,ts:null};
 
 function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",ads=[],userCtx=null,onClearJobFilter}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
@@ -7501,7 +7501,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     return()=>clearInterval(timer);
   },[wsId,reqsRefreshKey]);
   const [shopParts,setShopPartsRaw]=useState(cachedMatch?_spCache.data:[]);
-  const setShopParts=(d)=>{_spCache.data=d;_spCache.branchId=linkedBranchId;setShopPartsRaw(d);};
+  const setShopParts=(d)=>{_spCache.data=d;_spCache.branchId=linkedBranchId;_spCache.ts=Date.now();setShopPartsRaw(d);};
   const [page,setPage]=useState(0);
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [stockOnly,setStockOnly]=useState(false);
@@ -7514,6 +7514,11 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const loadStartRef=useRef(null);
   const EST_LOAD_S=10;
   const Cs=curSym(settings?.currency||"ZAR R");
+  const [cacheAge,setCacheAge]=useState(()=>_spCache.ts?Math.floor((Date.now()-_spCache.ts)/60000):null);
+  useEffect(()=>{
+    const t=setInterval(()=>setCacheAge(_spCache.ts?Math.floor((Date.now()-_spCache.ts)/60000):null),30000);
+    return()=>clearInterval(t);
+  },[]);
 
   // Elapsed-time ticker while loading
   useEffect(()=>{
@@ -7594,6 +7599,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         setShopParts(combined);
         setLoading(false);
         setRefreshing(false);
+        setCacheAge(0);
       };
       // Only fetch parts missing from both ownArr and mainArr (rare edge case)
       const missingIds=bStockArr.map(bs=>String(bs.part_id)).filter(id=>!allSeen.has(id));
@@ -7818,6 +7824,12 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             }}>
             <span style={refreshing?{display:"inline-block",animation:"spin 1s linear infinite"}:{}}>{refreshing?"⟳":"↻"}</span>{refreshing?" Refreshing…":" Refresh All"}
           </button>
+          {!loading&&!refreshing&&cacheAge!==null&&(
+            <span style={{fontSize:11,color:cacheAge>=5?"var(--yellow)":"var(--text3)",flexShrink:0,display:"flex",alignItems:"center",gap:4}}>
+              {cacheAge>=5?"⚠️":"🕐"} {cacheAge===0?"Just updated":cacheAge===1?"1 min ago":`${cacheAge} mins ago`}
+              {cacheAge>=5&&<span style={{color:"var(--yellow)"}}>— stock &amp; price may differ</span>}
+            </span>
+          )}
           <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}} onClick={()=>setShowCheckout(true)} disabled={!cart.length}>
             🛒 {cartCount>0?`(${cartCount}) `:""}{ (mainCart.length>0||requestCart.length>0)&&localCart.length>0?"Checkout & Request":(mainCart.length>0||requestCart.length>0)?"Send Request":"Checkout"}
           </button>

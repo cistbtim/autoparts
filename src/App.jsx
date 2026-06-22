@@ -5310,7 +5310,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
 
         {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop"].includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
           <WorkshopPage
-            key={tab}
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":"report"}
             ads={liveAds}
             userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}

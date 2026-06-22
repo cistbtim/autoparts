@@ -35,6 +35,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [search,         setSearch]         = useState("");
   const [bookIn,         setBookIn]         = useState(false);
   const [wsTab,          setWsTab]          = useState(initialTab||"jobs");
+  // Sync external tab navigation (main app nav) into internal wsTab without remounting
+  useEffect(()=>{ if(initialTab) setWsTab(initialTab); },[initialTab]);
   const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:"", code:""});
   const [stmtCust,       setStmtCust]       = useState("");
   const [qInvModal,      setQInvModal]      = useState(null);

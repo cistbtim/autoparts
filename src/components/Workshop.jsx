@@ -4364,6 +4364,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   <VehiclePhotoUploader key={field} label={label} url={vehiclePhotos[key]}
                     vehicleId={vehicleRecord.id} make={vehicleRecord.make||"vehicle"}
                     reg={vehicleRecord.reg||job.vehicle_reg} viewName={key}
+                    bucket="cars_parts"
                     onChange={url=>handleVehiclePhotoChange(field,key,url)}/>
                 ))}
               </div>

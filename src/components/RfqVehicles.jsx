@@ -2085,7 +2085,7 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
 // VEHICLE PHOTO UPLOADER
 // Uploads to Google Drive: Tim_Car_Phot/Make/vehicleId/view.png
 // ═══════════════════════════════════════════════════════════════
-export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onChange}) {
+export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName, onChange, bucket=""}) {
   const [uploading, setUploading] = useState(false);
   const [status,    setStatus]    = useState("");
   const [dragOver,  setDragOver]  = useState(false);
@@ -2124,60 +2124,96 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
     (window._VEHICLE_SCRIPT_URL && window._VEHICLE_SCRIPT_URL.trim()) ||
     (window._APPS_SCRIPT_URL    && window._APPS_SCRIPT_URL.trim())    || "";
 
+  // Resize image to JPEG blob (shared by both upload paths)
+  const resizeToBlob = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1200;
+        const canvas = document.createElement("canvas");
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error("Canvas toBlob failed")), "image/jpeg", 0.92);
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const uploadToSupabase = async (file) => {
+    const _now=new Date(), _p=n=>String(n).padStart(2,"0");
+    const _dt=`${_now.getFullYear()}${_p(_now.getMonth()+1)}${_p(_now.getDate())}_${_p(_now.getHours())}${_p(_now.getMinutes())}${_p(_now.getSeconds())}`;
+    const _plate=String(reg||vehicleId||"vehicle").replace(/[\s/\\]/g,"_").toUpperCase();
+    const path = `ws_vehicles/${_plate}/${_dt}_${viewName}.jpg`;
+    setStatus("Uploading...");
+    const blob = await resizeToBlob(file);
+    const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
+      method: "PUT",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "image/jpeg", "x-upsert": "true" },
+      body: blob,
+    });
+    if (!resp.ok) { const t=await resp.text(); throw new Error(t||resp.statusText); }
+    return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+  };
+
+  const uploadToGoogleDrive = async (file) => {
+    const SCRIPT_URL = getScriptUrl();
+    if (!SCRIPT_URL) throw new Error("⚙️ Set Vehicle Photos Apps Script URL in Settings first");
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 1200;
+          const canvas = document.createElement("canvas");
+          let w = img.width, h = img.height;
+          if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.92));
+        };
+        img.onerror = reject;
+        img.src = ev.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const _now=new Date(), _p=n=>String(n).padStart(2,"0");
+    const _date=`${_now.getFullYear()}-${_p(_now.getMonth()+1)}-${_p(_now.getDate())}`;
+    const _dt=`${_date.replace(/-/g,"")}_${_p(_now.getHours())}${_p(_now.getMinutes())}${_p(_now.getSeconds())}`;
+    const _plate=String(reg||vehicleId||"vehicle").replace(/\s/g,"").toUpperCase();
+    const folderPath = "Tim_Car_Phot/" + _plate + "/" + _date;
+    const filename = _dt + "_" + viewName + ".jpg";
+    setStatus("Uploading " + filename + "...");
+    const uploadResp = await fetch(SCRIPT_URL, { method:"POST", body:JSON.stringify({image:base64,filename,mimeType:"image/jpeg",folderPath}) });
+    const result = await uploadResp.json();
+    if (!result.success) throw new Error(result.error || "Upload failed");
+    return result.url;
+  };
+
   const upload = async (file) => {
     if (!file) return;
     const isImg = file.type.startsWith("image/") || file.type==="" ||
       /\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(file.name);
     if (!isImg) { setError("Image files only"); return; }
-    const SCRIPT_URL = getScriptUrl();
-    if (!SCRIPT_URL) { setError("⚙️ Set Vehicle Photos Apps Script URL in Settings first"); return; }
 
     setUploading(true); setError(null);
     try {
-      // ── Step 1: Resize to PNG (same format as PartPhotoUploader) ──
       setStatus("Resizing image...");
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = ev => {
-          const img = new Image();
-          img.onload = () => {
-            const MAX = 1200;
-            const canvas = document.createElement("canvas");
-            let w = img.width, h = img.height;
-            if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
-            canvas.width = w; canvas.height = h;
-            const ctx = canvas.getContext("2d");
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, w, h);
-            ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL("image/jpeg", 0.92));
-          };
-          img.onerror = reject;
-          img.src = ev.target.result;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      // ── Step 2: Upload — same payload shape as PartPhotoUploader ──
-      const _now=new Date(), _p=n=>String(n).padStart(2,"0");
-      const _date=`${_now.getFullYear()}-${_p(_now.getMonth()+1)}-${_p(_now.getDate())}`;
-      const _dt=`${_date.replace(/-/g,"")}_${_p(_now.getHours())}${_p(_now.getMinutes())}${_p(_now.getSeconds())}`;
-      const _plate=String(reg||vehicleId||"vehicle").replace(/\s/g,"").toUpperCase();
-      const folderPath = "Tim_Car_Phot/" + _plate + "/" + _date;
-      const filename = _dt + "_" + viewName + ".jpg";
-      setStatus("Uploading " + filename + "...");
-      const uploadResp = await fetch(SCRIPT_URL, {
-        method: "POST",
-        body: JSON.stringify({ image:base64, filename, mimeType:"image/jpeg", folderPath })
-      });
-      const result = await uploadResp.json();
-      if (result.success) {
-        onChange(result.url);
-        setStatus(""); setError(null);
-      } else {
-        throw new Error(result.error || "Upload failed");
-      }
+      const resultUrl = bucket
+        ? await uploadToSupabase(file)
+        : await uploadToGoogleDrive(file);
+      onChange(resultUrl);
+      setStatus(""); setError(null);
     } catch(e) {
       setError("❌ " + e.message);
       setStatus("");
@@ -2185,7 +2221,7 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
     setUploading(false);
   };
 
-  const driveId = extractDriveId(url);
+  const driveId = !bucket && extractDriveId(url);
   const preview = driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w400` : (url||null);
 
   const [actionSheet, setActionSheet] = useState(false);

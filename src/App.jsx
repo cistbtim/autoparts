@@ -1560,6 +1560,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     const rec={id:reqId,workshop_id:wsId||null,job_id:info.job_id||null,vehicle_reg:info.vehicle_reg||"",
       supplier_id:info.supplier_id||null,supplier_name:info.supplier_name||"",supplier_phone:info.supplier_phone||"",
       supplier_vat_inclusive:info.supplier_vat_inclusive||false,
+      vehicle_make:info.vehicle_make||"",vehicle_model:info.vehicle_model||"",vehicle_year:info.vehicle_year||"",
+      vehicle_color:info.vehicle_color||"",vin:info.vin||"",engine_no:info.engine_no||"",
+      photo_front:info.photo_front||"",photo_rear:info.photo_rear||"",photo_side:info.photo_side||"",
       parts_list:JSON.stringify(items.map(i=>i.label||i.description||"")),message:"",token,
       items_json:JSON.stringify(items),sent_at:now};
     await api.insert("ws_supplier_requests",rec).catch(e=>console.warn("Link gen failed:",e));

@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
+import { toImgUrl } from "../lib/helpers.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { T } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
@@ -956,8 +957,55 @@ export function WsSupplierQuoteReplyPage({token}) {
         {/* Vehicle/job info */}
         {(req?.vehicle_reg||req?.supplier_name)&&(
           <div style={{...card,background:"#162032",marginBottom:18}}>
-            {req.vehicle_reg&&<div style={{fontSize:15,fontWeight:700,color:"#38bdf8",marginBottom:4}}>🚗 {req.vehicle_reg}</div>}
-            {req.supplier_name&&<div style={{fontSize:12,color:"#94a3b8"}}>For: {req.supplier_name}</div>}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:20}}>🚗</span>
+              <div style={{flex:1,minWidth:0}}>
+                {req.vehicle_reg&&<div style={{fontSize:16,fontWeight:800,color:"#38bdf8",letterSpacing:".05em"}}>{req.vehicle_reg}</div>}
+                {(req.vehicle_make||req.vehicle_model)&&(
+                  <div style={{fontSize:13,fontWeight:600,color:"#e2e8f0",marginTop:1}}>
+                    {[req.vehicle_make,req.vehicle_model].filter(Boolean).join(" ")}
+                    {req.vehicle_year&&<span style={{color:"#94a3b8",fontWeight:400}}> · {req.vehicle_year}</span>}
+                    {req.vehicle_color&&<span style={{color:"#94a3b8",fontWeight:400}}> · {req.vehicle_color}</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+            {(req.vin||req.engine_no)&&(
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#94a3b8",marginBottom:8,fontFamily:"monospace"}}>
+                {req.vin&&<span>VIN: <strong style={{color:"#cbd5e1"}}>{req.vin}</strong></span>}
+                {req.engine_no&&<span>Eng: <strong style={{color:"#cbd5e1"}}>{req.engine_no}</strong></span>}
+              </div>
+            )}
+            {/* Vehicle photos */}
+            {(req.photo_front||req.photo_rear||req.photo_side)&&(()=>{
+              const [lightbox,setLightbox]=useState("");
+              const photos=[
+                {url:req.photo_front,label:"Front"},
+                {url:req.photo_side,label:"Side"},
+                {url:req.photo_rear,label:"Rear"},
+              ].filter(p=>p.url);
+              return (
+                <>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
+                    {photos.map(p=>(
+                      <div key={p.label} style={{flex:"1 1 80px",minWidth:80,maxWidth:160,cursor:"pointer"}} onClick={()=>setLightbox(p.url)}>
+                        <img src={toImgUrl(p.url)} alt={p.label}
+                          style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:8,border:"1px solid #334155"}}/>
+                        <div style={{fontSize:10,color:"#64748b",textAlign:"center",marginTop:2}}>{p.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {lightbox&&(
+                    <div onClick={()=>setLightbox("")}
+                      style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+                      <img src={toImgUrl(lightbox)} alt="" style={{maxWidth:"100%",maxHeight:"90vh",borderRadius:10,objectFit:"contain"}}/>
+                      <div style={{position:"absolute",top:16,right:20,fontSize:28,color:"#fff",cursor:"pointer",fontWeight:700}}>✕</div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+            {req.supplier_name&&<div style={{fontSize:11,color:"#64748b",marginTop:8}}>For: {req.supplier_name}</div>}
           </div>
         )}
 

@@ -2634,7 +2634,7 @@ const makePartSku = (name) => {
   return `ws-${abbr}-${rand}`;
 };
 
-function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onGenerateLink, onCreatePO, onClose}) {
+function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onGenerateLink, onCreatePO, onClose}) {
   const shopName = settings?.shop_name || "Workshop";
 
   // Job items — all pre-ticked
@@ -2709,6 +2709,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
 
   const chosenSupplier = wsSuppliers.find(s => String(s.id) === String(supplierId));
   const phone = (chosenSupplier?.phone || manualPhone || "").replace(/\D/g, "");
+  const jobVehicle = wsVehicles.find(v => v.id === job.workshop_vehicle_id);
 
   const SEP = "─".repeat(28);
   const buildMsg = (link="") => [
@@ -2730,6 +2731,18 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
   const msgLines = buildMsg(generatedLink);
   const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msgLines)}` : null;
 
+  const vehiclePayload = {
+    vehicle_make:  job.vehicle_make||"",
+    vehicle_model: job.vehicle_model||"",
+    vehicle_year:  job.vehicle_year||"",
+    vehicle_color: job.vehicle_color||"",
+    vin:           job.vin||"",
+    engine_no:     job.engine_no||"",
+    photo_front:   jobVehicle?.photo_front||"",
+    photo_rear:    jobVehicle?.photo_rear||"",
+    photo_side:    jobVehicle?.photo_side||"",
+  };
+
   const logSend = (viaGroup=false) => {
     if (!onLogSend) return;
     onLogSend({
@@ -2743,6 +2756,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
       parts_list:           JSON.stringify(selectedItems.map(i=>i.label)),
       items_json:           JSON.stringify(selectedItems.map(i=>({label:i.label,description:i.label,sku:i.sku||"",qty:i.qty||1}))),
       message:              msgLines,
+      ...vehiclePayload,
     });
   };
 
@@ -2888,7 +2902,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
                 setGeneratingLink(true);
                 try{
                   const linkItems=selectedItems.map(i=>({description:i.label,qty:i.qty,sku:i.sku}));
-                  const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false};
+                  const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false,...vehiclePayload};
                   link=await onGenerateLink(info,linkItems);
                   setGeneratedLink(link);
                 }catch(e){/* link generation failed — send without */}
@@ -2911,7 +2925,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
                 setGeneratingLink(true);
                 try{
                   const linkItems=selectedItems.map(i=>({description:i.label,qty:i.qty,sku:i.sku}));
-                  const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false};
+                  const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false,...vehiclePayload};
                   link=await onGenerateLink(info,linkItems);
                   setGeneratedLink(link);
                 }catch(e){}
@@ -6328,7 +6342,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       {supplierModal&&(
         <Overlay onClose={()=>setSupplierModal(false)}>
           <SupplierSendModal
-            job={job} items={items} wsSuppliers={wsSuppliers} settings={settings}
+            job={job} items={items} wsSuppliers={wsSuppliers} wsVehicles={wsVehicles} settings={settings}
             history={wsSupplierRequests.filter(r=>r.job_id===job.id)}
             quotes={wsSupplierQuotes.filter(q=>q.job_id===job.id)}
             sqReplies={sqReplies}

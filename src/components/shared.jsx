@@ -89,9 +89,9 @@ export const MotorDeskBanner = () => (
   </div>
 );
 
-export const Overlay = ({onClose,children,wide}) => (
+export const Overlay = ({onClose,children,wide,maxWidth}) => (
   <div className="overlay" onClick={onClose}>
-    <div className={`modal${wide?" modal-wide":""}`} onClick={e=>e.stopPropagation()}>{children}</div>
+    <div className={`modal${wide?" modal-wide":""}`} style={maxWidth?{maxWidth}:undefined} onClick={e=>e.stopPropagation()}>{children}</div>
   </div>
 );
 

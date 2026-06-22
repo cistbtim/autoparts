@@ -4725,7 +4725,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
 
       {/* ══ QUOTE/INVOICE popup ══ */}
       {quotePopup&&wsRole!=="mechanic"&&(
-        <Overlay wide onClose={()=>setQuotePopup(false)}>
+        <Overlay wide maxWidth={1100} onClose={()=>setQuotePopup(false)}>
           <MHead title={quotePopupQuoteOnly?"📋 Parts Quotation":"📝 Quote / Invoice"} onClose={()=>setQuotePopup(false)}/>
           {!quotePopupQuoteOnly&&<div style={{display:"flex",gap:6,padding:"8px 14px",borderBottom:"1px solid var(--border)"}}>
             {["quote","invoice"].map(tid=>(

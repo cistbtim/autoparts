@@ -826,12 +826,13 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
 // Supplier opens ?ws_supreq=<token> and fills in price/condition/part_no
 // ═══════════════════════════════════════════════════════════════
 export function WsSupplierQuoteReplyPage({token}) {
-  const [req, setReq]     = useState(null);
-  const [items, setItems] = useState([]); // [{idx,description,qty,sku,price,condition,supplier_part_no,notes}]
+  const [req, setReq]         = useState(null);
+  const [items, setItems]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [done,    setDone]    = useState(false);
   const [err,     setErr]     = useState("");
+  const [lightbox,setLightbox]= useState("");
   const shopSettings = getSettings();
 
   useEffect(()=>{
@@ -977,34 +978,24 @@ export function WsSupplierQuoteReplyPage({token}) {
               </div>
             )}
             {/* Vehicle photos */}
-            {(req.photo_front||req.photo_rear||req.photo_side)&&(()=>{
-              const [lightbox,setLightbox]=useState("");
-              const photos=[
-                {url:req.photo_front,label:"Front"},
-                {url:req.photo_side,label:"Side"},
-                {url:req.photo_rear,label:"Rear"},
-              ].filter(p=>p.url);
-              return (
-                <>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
-                    {photos.map(p=>(
-                      <div key={p.label} style={{flex:"1 1 80px",minWidth:80,maxWidth:160,cursor:"pointer"}} onClick={()=>setLightbox(p.url)}>
-                        <img src={toImgUrl(p.url)} alt={p.label}
-                          style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:8,border:"1px solid #334155"}}/>
-                        <div style={{fontSize:10,color:"#64748b",textAlign:"center",marginTop:2}}>{p.label}</div>
-                      </div>
-                    ))}
+            {(req.photo_front||req.photo_rear||req.photo_side)&&(
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
+                {[{url:req.photo_front,label:"Front"},{url:req.photo_side,label:"Side"},{url:req.photo_rear,label:"Rear"}].filter(p=>p.url).map(p=>(
+                  <div key={p.label} style={{flex:"1 1 80px",minWidth:80,maxWidth:160,cursor:"pointer"}} onClick={()=>setLightbox(p.url)}>
+                    <img src={toImgUrl(p.url)} alt={p.label}
+                      style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:8,border:"1px solid #334155"}}/>
+                    <div style={{fontSize:10,color:"#64748b",textAlign:"center",marginTop:2}}>{p.label}</div>
                   </div>
-                  {lightbox&&(
-                    <div onClick={()=>setLightbox("")}
-                      style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-                      <img src={toImgUrl(lightbox)} alt="" style={{maxWidth:"100%",maxHeight:"90vh",borderRadius:10,objectFit:"contain"}}/>
-                      <div style={{position:"absolute",top:16,right:20,fontSize:28,color:"#fff",cursor:"pointer",fontWeight:700}}>✕</div>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
+                ))}
+              </div>
+            )}
+            {lightbox&&(
+              <div onClick={()=>setLightbox("")}
+                style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+                <img src={toImgUrl(lightbox)} alt="" style={{maxWidth:"100%",maxHeight:"90vh",borderRadius:10,objectFit:"contain"}}/>
+                <div style={{position:"absolute",top:16,right:20,fontSize:28,color:"#fff",cursor:"pointer",fontWeight:700}}>✕</div>
+              </div>
+            )}
             {req.supplier_name&&<div style={{fontSize:11,color:"#64748b",marginTop:8}}>For: {req.supplier_name}</div>}
           </div>
         )}

@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { removeBackground } from "@imgly/background-removal";
-import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
+import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
 import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, extractDriveId } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
@@ -882,7 +882,7 @@ let _appPhotoClip = null; // { url, fromSku }
 // PART PHOTO UPLOADER
 // Uses Google Apps Script Web App to upload to Google Drive
 // ═══════════════════════════════════════════════════════════════
-export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
+export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
   const [dragOver, setDragOver]   = useState(false);
@@ -903,82 +903,66 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
   if(!SCRIPT_URL) console.warn("No vehicle script URL configured");
   else console.log("Vehicle upload URL:", SCRIPT_URL.slice(0,60)+"...");
 
+  const _processImage = async (file) => {
+    // Step 1: AI background removal
+    let processedBlob;
+    try {
+      processedBlob = await removeBackground(file, {
+        publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/",
+        progress: (_key, current, total) => {
+          if (total > 0) setUploadStatus(`Removing background… ${Math.round(current/total*100)}%`);
+        },
+      });
+    } catch { processedBlob = file; }
+    // Step 2: Draw on white canvas, resize to 1200px → Blob
+    setUploadStatus("Processing…");
+    const MAX = 1200;
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(processedBlob);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement("canvas");
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error("toBlob failed")), "image/jpeg", 0.92);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  };
+
   const uploadToGDrive = async (file) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) { setError("Please select an image file"); return; }
 
-    if (!SCRIPT_URL) {
-      setError("⚙️ Apps Script URL not configured. Go to Settings → System to set it up.");
-      return;
-    }
-
-    setUploading(true);
-    setError(null);
+    setUploading(true); setError(null);
     setUploadStatus("Removing background…");
-
     try {
-      // Step 1: AI background removal → transparent PNG blob
-      let processedBlob;
-      try {
-        processedBlob = await removeBackground(file, {
-          publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/",
-          progress: (_key, current, total) => {
-            if (total > 0) setUploadStatus(`Removing background… ${Math.round(current/total*100)}%`);
-          },
-        });
-      } catch {
-        // If background removal fails, fall back to original file
-        processedBlob = file;
-      }
-
-      // Step 2: Draw on white canvas and resize to max 1200px
-      setUploadStatus("Processing…");
-      const MAX = 1200;
-      const base64 = await new Promise((resolve, reject) => {
-        const url = URL.createObjectURL(processedBlob);
-        const img = new Image();
-        img.onload = () => {
-          URL.revokeObjectURL(url);
-          const canvas = document.createElement("canvas");
-          let w = img.width, h = img.height;
-          if (w > MAX || h > MAX) {
-            const r = Math.min(MAX/w, MAX/h);
-            w = Math.round(w*r); h = Math.round(h*r);
-          }
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, w, h);
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL("image/jpeg", 0.92));
-        };
-        img.onerror = reject;
-        img.src = url;
-      });
-
-      // Step 3: Send to Apps Script
+      const blob = await _processImage(file);
       setUploadStatus("Uploading…");
-      const resp = await fetch(SCRIPT_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          image: base64,
-          filename: `${sku||'part_'+Date.now()}.jpg`,
-          mimeType: "image/jpeg"
-        })
-      });
 
-      const result = await resp.json();
-      if (result.success) {
-        onChange(result.url);
-        setError(null);
+      if (bucket) {
+        // ── Supabase Storage ──
+        const _ts = Date.now();
+        const _sku = String(sku||"part").replace(/[^a-zA-Z0-9_-]/g,"_");
+        const path = `parts/${_sku}/${_ts}.jpg`;
+        const url = await uploadToStorage(bucket, path, blob);
+        onChange(url); setError(null);
       } else {
-        setError("Upload failed: " + result.error);
+        // ── Google Drive (Apps Script) ──
+        if (!SCRIPT_URL) { setError("⚙️ Apps Script URL not configured. Go to Settings → System to set it up."); return; }
+        const base64 = await new Promise((res, rej) => { const fr=new FileReader(); fr.onload=e=>res(e.target.result); fr.onerror=rej; fr.readAsDataURL(blob); });
+        const resp = await fetch(SCRIPT_URL, { method:"POST", body:JSON.stringify({image:base64, filename:`${sku||"part_"+Date.now()}.jpg`, mimeType:"image/jpeg"}) });
+        const result = await resp.json();
+        if (result.success) { onChange(result.url); setError(null); }
+        else { setError("Upload failed: " + result.error); }
       }
-    } catch (e) {
-      setError("Upload error: " + e.message);
-    }
-    setUploadStatus("");
-    setUploading(false);
+    } catch (e) { setError("Upload error: " + e.message); }
+    setUploadStatus(""); setUploading(false);
   };
 
   const flipPhoto = () => {
@@ -1013,58 +997,47 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t}) {
   };
 
   const saveFlipped = async () => {
-    if (!imageUrl || !SCRIPT_URL) return;
+    if (!imageUrl || (!SCRIPT_URL && !bucket)) return;
     setShowFlipPopup(false);
-    setUploading(true);
-    setUploadStatus("Saving flipped photo…");
-    setError(null);
+    setUploading(true); setUploadStatus("Saving flipped photo…"); setError(null);
     try {
       const flippedBlob = await _getFlippedBlob();
-      await uploadToGDrive(new File([flippedBlob], `${sku||"part"}_flipped.jpg`, {type:"image/jpeg"}));
-    } catch(e) {
-      setError("Could not flip — try re-uploading the original photo first");
-    }
-    setUploading(false);
-    setUploadStatus("");
+      if (bucket) {
+        const _sku = String(sku||"part").replace(/[^a-zA-Z0-9_-]/g,"_");
+        const path = `parts/${_sku}/${Date.now()}_flipped.jpg`;
+        const url = await uploadToStorage(bucket, path, flippedBlob);
+        onChange(url);
+      } else {
+        await uploadToGDrive(new File([flippedBlob], `${sku||"part"}_flipped.jpg`, {type:"image/jpeg"}));
+      }
+    } catch(e) { setError("Could not flip — try re-uploading the original photo first"); }
+    setUploading(false); setUploadStatus("");
   };
 
   const copyFlippedToClipboard = async () => {
     setShowFlipPopup(false);
-    if (!SCRIPT_URL) {
-      // No script URL — just store original URL (old behaviour)
+    if (!SCRIPT_URL && !bucket) {
       _appPhotoClip = {url: imageUrl, fromSku: sku};
-      setHasClip(true); setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setHasClip(true); setCopied(true); setTimeout(() => setCopied(false), 2500);
       return;
     }
-    setUploading(true);
-    setUploadStatus("Preparing flipped copy…");
-    setError(null);
+    setUploading(true); setUploadStatus("Preparing flipped copy…"); setError(null);
     try {
       const flippedBlob = await _getFlippedBlob();
-      const base64 = await new Promise((res, rej) => {
-        const fr = new FileReader();
-        fr.onload = e => res(e.target.result);
-        fr.onerror = rej;
-        fr.readAsDataURL(flippedBlob);
-      });
-      const resp = await fetch(SCRIPT_URL, {
-        method:"POST",
-        body: JSON.stringify({image:base64, filename:`${sku||"part"}_flip_copy.jpg`, mimeType:"image/jpeg"})
-      });
-      const result = await resp.json();
-      if (result.success && result.url) {
-        _appPhotoClip = {url: result.url, fromSku: sku};
+      if (bucket) {
+        const _sku = String(sku||"part").replace(/[^a-zA-Z0-9_-]/g,"_");
+        const path = `parts/${_sku}/${Date.now()}_flip_copy.jpg`;
+        const url = await uploadToStorage(bucket, path, flippedBlob);
+        _appPhotoClip = {url, fromSku: sku};
       } else {
-        _appPhotoClip = {url: imageUrl, fromSku: sku};
+        const base64 = await new Promise((res, rej) => { const fr=new FileReader(); fr.onload=e=>res(e.target.result); fr.onerror=rej; fr.readAsDataURL(flippedBlob); });
+        const resp = await fetch(SCRIPT_URL, { method:"POST", body:JSON.stringify({image:base64, filename:`${sku||"part"}_flip_copy.jpg`, mimeType:"image/jpeg"}) });
+        const result = await resp.json();
+        _appPhotoClip = {url: (result.success && result.url) ? result.url : imageUrl, fromSku: sku};
       }
-    } catch {
-      _appPhotoClip = {url: imageUrl, fromSku: sku};
-    }
-    setHasClip(true); setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-    setUploading(false);
-    setUploadStatus("");
+    } catch { _appPhotoClip = {url: imageUrl, fromSku: sku}; }
+    setHasClip(true); setCopied(true); setTimeout(() => setCopied(false), 2500);
+    setUploading(false); setUploadStatus("");
   };
 
   const preview = imageUrl ? toImgUrl(imageUrl) : null;
@@ -2059,6 +2032,7 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
             ].map(({key,label})=>(
               <VehiclePhotoUploader key={key} label={label} url={f[key]}
                 vehicleId={f.id} make={f.make} viewName={label.toLowerCase()}
+                bucket="cars_parts"
                 onChange={v=>s(key,v)}/>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { api } from "../../lib/api.js";
+import { api, uploadToStorage } from "../../lib/api.js";
 import { makeId, toImgUrl } from "../../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../../lib/barcode.js";
 import { Overlay, MHead, FL, ImgLightbox } from "../shared.jsx";
@@ -44,45 +44,30 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
   const galleryRef=useRef(null); // no capture → opens file picker / gallery
   const [vinPopup,setVinPopup]=useState(false);
 
-  // ── Upload one photo to Google Drive + save URL to DB ─────────
+  // ── Upload one photo to Supabase Storage + save URL to DB ──────
   const uploadBookInPhoto=async(photoId,dataUrl,session,reg,jobId)=>{
-    const SCRIPT_URL=
-      (window._VEHICLE_SCRIPT_URL&&window._VEHICLE_SCRIPT_URL.trim())||
-      (window._APPS_SCRIPT_URL&&window._APPS_SCRIPT_URL.trim())||"";
-    if(!SCRIPT_URL){
-      setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"error",error:"No script URL — set Vehicle Script URL in Settings"}:x));
-      return;
-    }
     const setStatus=(s)=>setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:s}:x));
     setStatus("uploading");
     try{
-      // resize to max 1600px
-      const base64=await new Promise((res,rej)=>{
+      const blob=await new Promise((res,rej)=>{
         const img=new Image();
         img.onload=()=>{
-          const MAX=1600;
-          const canvas=document.createElement("canvas");
+          const MAX=1600; const canvas=document.createElement("canvas");
           let w=img.width,h=img.height;
           if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
           canvas.width=w;canvas.height=h;
           canvas.getContext("2d").drawImage(img,0,0,w,h);
-          res(canvas.toDataURL("image/jpeg",0.88));
+          canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.88);
         };
-        img.onerror=rej;
-        img.src=dataUrl;
+        img.onerror=rej; img.src=dataUrl;
       });
-      const folderPath=`Tim_Car_Phot/${reg}/${session.date}`;
       const n=String(photoId).padStart(3,"0");
-      const filename=`${session.date.replace(/-/g,"")}_${session.time.replace(/-/g,"")}_${n}.jpg`;
-      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType:"image/jpeg",folderPath})});
-      const result=await resp.json();
-      if(result.success){
-        // Save URL to DB linked to this job
-        if(jobId) await api.insert("workshop_job_photos",{id:makeId("PH"),job_id:jobId,url:result.url,folder_path:folderPath}).catch(()=>{});
-        setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"done",url:result.url}:x));
-      } else {
-        setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"error",error:result.error||"Upload failed"}:x));
-      }
+      const ts=`${session.date.replace(/-/g,"")}_${session.time.replace(/:/g,"")}`;
+      const safeReg=reg.replace(/[\s/\\]/g,"_").toUpperCase();
+      const path=`bookings/${safeReg}/${ts}_${n}.jpg`;
+      const url=await uploadToStorage("cars_parts",path,blob);
+      if(jobId) await api.insert("workshop_job_photos",{id:makeId("PH"),job_id:jobId,url,folder_path:`bookings/${safeReg}`}).catch(()=>{});
+      setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"done",url}:x));
     }catch(e){
       setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"error",error:e.message}:x));
     }

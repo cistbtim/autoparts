@@ -144,3 +144,14 @@ export const api = {
     return res;
   },
 };
+
+// Upload a Blob/File to Supabase Storage and return the public URL.
+export const uploadToStorage = async (bucket, path, blob, contentType = "image/jpeg") => {
+  const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encodeURIComponent(path).replace(/%2F/g, "/")}`, {
+    method: "PUT",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": contentType, "x-upsert": "true" },
+    body: blob,
+  });
+  if (!resp.ok) { const txt = await resp.text(); throw new Error(txt || resp.statusText); }
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+};

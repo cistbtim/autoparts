@@ -3352,7 +3352,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
         {/* RIGHT: Photo */}
         <div style={{flexShrink:0,width:210}}>
           {part&&<div style={{fontSize:11,color:"var(--green)",marginBottom:8,background:"rgba(34,197,94,.08)",borderRadius:7,padding:"5px 9px"}}>✅ {t.phuAutoSave}</div>}
-          <PartPhotoUploader imageUrl={f.image_url} onChange={handlePhotoChange} sku={f.sku} t={t}/>
+          <PartPhotoUploader imageUrl={f.image_url} onChange={handlePhotoChange} sku={f.sku} t={t} bucket="cars_parts"/>
           {part&&onSavePartSupplier&&partSuppliers.length===0&&(
             <div style={{marginTop:10,background:"rgba(96,165,250,.07)",border:"1px dashed rgba(96,165,250,.35)",borderRadius:9,padding:"10px 12px",textAlign:"center"}}>
               <div style={{fontSize:12,fontWeight:600,color:"var(--blue)",marginBottom:5}}>🏭 No supplier linked</div>

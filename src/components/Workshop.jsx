@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { createWorker } from "tesseract.js";
-import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
+import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
 import { fmtAmt, makeId, today, toImgUrl, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
@@ -3464,11 +3464,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   };
 
   const uploadChecklistPhoto=async(key,dataUrl)=>{
-    const SCRIPT_URL=(window._VEHICLE_SCRIPT_URL&&window._VEHICLE_SCRIPT_URL.trim())||(window._APPS_SCRIPT_URL&&window._APPS_SCRIPT_URL.trim())||"";
-    if(!SCRIPT_URL){ alert("No Script URL configured in Settings."); return; }
     setClUploading(p=>({...p,[key]:true}));
     try{
-      const base64=await new Promise((res,rej)=>{
+      const blob=await new Promise((res,rej)=>{
         const img=new Image();
         img.onload=()=>{
           const MAX=1200; const canvas=document.createElement("canvas");
@@ -3476,28 +3474,16 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
           canvas.width=w;canvas.height=h;
           canvas.getContext("2d").drawImage(img,0,0,w,h);
-          res(canvas.toDataURL("image/jpeg",0.85));
+          canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
         };
         img.onerror=rej; img.src=dataUrl;
       });
       const now=new Date(); const pad2=n=>String(n).padStart(2,"0");
-      const dateStr=`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`;
-      const timeStr=`${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`;
-      const reg=(job.vehicle_reg||"REG").replace(/\s/g,"").toUpperCase();
-      const folderPath=`Tim_Car_Phot/${reg}/Checklist`;
-      const filename=`CL_${key}_${dateStr.replace(/-/g,"")}_${timeStr.replace(/-/g,"")}.jpg`;
-      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType:"image/jpeg",folderPath})});
-      const result=await resp.json();
-      console.log("[CL Photo Upload] Success:",result.success,"URL:",result.url);
-      if(result.success){
-        if(!result.url||(!result.url.includes("/file/d/")&&!result.url.includes("?id="))){
-          console.warn("[CL Photo] Invalid URL format returned:",result.url);
-          alert("Photo uploaded but URL format is invalid. Check Apps Script configuration.");
-          return;
-        }
-        await saveChecklistItem(key,{photo_url:result.url});
-      }
-      else { alert("Photo upload failed: "+(result.error||"Unknown error")); }
+      const ts=`${now.getFullYear()}${pad2(now.getMonth()+1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;
+      const reg=(job.vehicle_reg||"REG").replace(/[\s/\\]/g,"_").toUpperCase();
+      const path=`checklist/${reg}/${ts}_${key}.jpg`;
+      const url=await uploadToStorage("cars_parts",path,blob);
+      await saveChecklistItem(key,{photo_url:url});
     }catch(e){ alert("Upload error: "+e.message); }
     finally{ setClUploading(p=>({...p,[key]:false})); }
   };
@@ -3530,42 +3516,35 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const uploadJobDoc=async()=>{
     if(!docFile){alert("Choose a file first");return;}
     if(!docName.trim()){alert("Enter a document name");return;}
-    const SCRIPT_URL=(window._VEHICLE_SCRIPT_URL?.trim())||(window._APPS_SCRIPT_URL?.trim())||"";
-    if(!SCRIPT_URL){alert("No Google Drive Script URL in Settings");return;}
     setDocUploading(true);
     try{
       const isPdf=docFile.type==="application/pdf";
-      let base64,mimeType,filename;
+      let blob,mimeType,filename;
+      const safeName=docName.trim().replace(/\s+/g,"_").replace(/[^a-zA-Z0-9_-]/g,"");
       if(isPdf){
-        base64=await new Promise((res,rej)=>{
-          const r=new FileReader();
-          r.onload=ev=>{const b=new Uint8Array(ev.target.result);let s="";b.forEach(x=>{s+=String.fromCharCode(x);});res("data:application/pdf;base64,"+btoa(s));};
-          r.onerror=rej; r.readAsArrayBuffer(docFile);
-        });
-        mimeType="application/pdf"; filename=`${docName.trim().replace(/\s+/g,"_")}_${Date.now()}.pdf`;
+        blob=docFile; mimeType="application/pdf"; filename=`${safeName}_${Date.now()}.pdf`;
       } else {
-        base64=await new Promise((res,rej)=>{
+        blob=await new Promise((res,rej)=>{
           const img=new Image();
           img.onload=()=>{
             const MAX=1600; const canvas=document.createElement("canvas");
             let w=img.width,h=img.height;
-            if(w>MAX||h>MAX){const ratio=Math.min(MAX/w,MAX/h);w=Math.round(w*ratio);h=Math.round(h*ratio);}
+            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
             canvas.width=w;canvas.height=h;
             canvas.getContext("2d").drawImage(img,0,0,w,h);
-            res(canvas.toDataURL("image/jpeg",0.88));
+            canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.88);
           };
           img.onerror=rej; img.src=docPreview;
         });
-        mimeType="image/jpeg"; filename=`${docName.trim().replace(/\s+/g,"_")}_${Date.now()}.jpg`;
+        mimeType="image/jpeg"; filename=`${safeName}_${Date.now()}.jpg`;
       }
-      const folderPath=`Tim_Car_Phot/${(job.vehicle_reg||"REG").replace(/\s/g,"").toUpperCase()}/Documents`;
-      const resp=await fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"upload",image:base64,filename,mimeType,folderPath})});
-      const result=await resp.json();
-      if(!result.success) throw new Error(result.error||"Upload failed");
+      const reg=(job.vehicle_reg||"REG").replace(/[\s/\\]/g,"_").toUpperCase();
+      const path=`documents/${reg}/${filename}`;
+      const fileUrl=await uploadToStorage("cars_parts",path,blob,mimeType);
       const rec={
         id:makeId("WSD"),job_id:job.id,workshop_id:job.workshop_id||null,customer_id:job.workshop_customer_id||null,
         name:docName.trim(),notes:docNotes.trim()||null,
-        file_url:result.url,file_type:isPdf?"pdf":"image",mime_type:mimeType,filename,
+        file_url:fileUrl,file_type:isPdf?"pdf":"image",mime_type:mimeType,filename,
         uploaded_at:new Date().toISOString(),
       };
       const saved=await api.insert("workshop_documents",rec);

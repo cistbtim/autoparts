@@ -372,7 +372,8 @@ export function WsVehicleForm({data,onSave,onPhotoSaved,onClose,t}) {
             ].map(({key,label})=>(
               <VehiclePhotoUploader key={key} label={label} url={f[key]}
                 vehicleId={f.id} make={f.make||"vehicle"} reg={f.reg} viewName={key.replace("photo_","")}
-                onChange={url=>{ const upd={...f,[key]:url}; s(key,url); onPhotoSaved?onPhotoSaved(upd):api.patch("workshop_vehicles",f.id,{[key]:url}).catch(()=>{}); }}/>
+                bucket="cars_parts"
+                onChange={url=>{ const upd={...f,[key]:url}; s(key,url); onPhotoSaved?onPhotoSaved(upd):api.patch("workshop_vehicles","id",f.id,{[key]:url}).catch(()=>{}); }}/>
             ))}
           </div>
         : <div style={{textAlign:"center",padding:16,background:"var(--surface2)",borderRadius:10,color:"var(--text3)",fontSize:13}}>

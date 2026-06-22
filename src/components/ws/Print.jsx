@@ -487,12 +487,17 @@ export function printWorkshopQuote(job, items, quote, settings, photos={}, share
       </div>`).join("")}
     </div>` : "";
 
+  const hasPartType = items.some(i=>i.part_type);
+  const hasRemark   = items.some(i=>i.remark);
+
   const rowsHtml = items.map((i,idx)=>`
     <tr style="background:${idx%2===0?"#fff":"#f9f9f9"}">
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5">
         <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${i.type==="part"?"#dbeafe":"#dcfce7"};color:${i.type==="part"?"#1d4ed8":"#166534"};margin-right:6px">${i.type==="part"?"PART":"LABOUR"}</span>
         ${i.description}${i.part_sku?`<br/><span style="font-size:11px;color:#888;font-family:monospace">${i.part_sku}</span>`:""}
       </td>
+      ${hasPartType?`<td style="padding:9px 12px;border-bottom:1px solid #e5e5e5">${i.part_type?`<span style="display:inline-block;padding:2px 8px;border-radius:6px;background:#f3f4f6;border:1px solid #d1d5db;font-size:10px;font-weight:600;white-space:nowrap">${i.part_type}</span>`:""}</td>`:""}
+      ${hasRemark?`<td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;font-size:11px;color:#555">${i.remark||""}</td>`:""}
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${i.qty}</td>
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${fmt(i.unit_price)}</td>
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:700">${fmt(i.total)}</td>
@@ -519,7 +524,6 @@ export function printWorkshopQuote(job, items, quote, settings, photos={}, share
   table{width:100%;border-collapse:collapse;margin-bottom:20px}
   thead tr{background:#2563eb;color:#fff}
   thead th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
-  thead th:nth-child(n+2){text-align:right}
   .totals{margin-left:auto;width:260px;margin-bottom:24px}
   .t-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #eee}
   .t-total{display:flex;justify-content:space-between;padding:10px 0;font-size:17px;font-weight:800;color:#2563eb;border-top:2px solid #2563eb;margin-top:4px}
@@ -594,6 +598,8 @@ ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:
   <table>
     <thead><tr>
       <th>Description</th>
+      ${hasPartType?`<th style="width:120px">Part Type</th>`:""}
+      ${hasRemark?`<th style="width:140px">Remark</th>`:""}
       <th style="text-align:right;width:60px">Qty</th>
       <th style="text-align:right;width:120px">Unit Price</th>
       <th style="text-align:right;width:120px">Amount</th>

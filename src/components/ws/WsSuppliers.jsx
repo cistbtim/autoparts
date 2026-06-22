@@ -4,10 +4,13 @@ import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 const SUPPLIER_TYPES=["New Spares","Used Parts","Dealer"];
 
 export const CAR_BRANDS=[
-  "BMW","VW","Audi","Mercedes Benz","Porsche","Range Rover","Jaguar",
-  "Toyota","Haval","KIA","Hyundai","Ford","Mazda","Nissan","Honda",
-  "Opel","Peugeot","Renault","Suzuki","Subaru","Mitsubishi","Isuzu",
-  "Chevrolet","Volvo","Lexus","Jeep","Fiat","Alfa Romeo","Bentley","Rolls Royce",
+  "Alfa Romeo","Audi","Bentley","BMW","BYD","Chery","Chevrolet","Chrysler",
+  "Citroen","Daihatsu","Dodge","Ferrari","Fiat","Ford","Genesis","GMC",
+  "GWM","Haval","Honda","Hyundai","Infiniti","Isuzu","JAC","Jaguar",
+  "Jeep","KIA","Lamborghini","Land Rover","Lexus","Mahindra","Maserati",
+  "Mazda","Mercedes Benz","MG","Mini","Mitsubishi","Nissan","Opel",
+  "Peugeot","Porsche","Range Rover","Renault","Rolls Royce","Seat",
+  "Skoda","Ssangyong","Subaru","Suzuki","Tesla","Toyota","Volvo","VW",
 ];
 
 function parseTypes(v){

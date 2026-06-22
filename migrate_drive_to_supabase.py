@@ -18,8 +18,12 @@ import requests
 from urllib.parse import quote
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+# Credentials loaded from migration_secrets.py (local only, not in git)
+try:
+    from migration_secrets import SUPABASE_URL, SUPABASE_KEY
+except ImportError:
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 BUCKET       = "cars_parts"
 DELAY        = 0.3   # seconds between requests (Google rate limiting)
 PAGE_SIZE    = 1000

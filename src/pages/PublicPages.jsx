@@ -990,10 +990,15 @@ export function WsSupplierQuoteReplyPage({token}) {
               </div>
             )}
             {lightbox&&(
-              <div onClick={()=>setLightbox("")}
-                style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-                <img src={toImgUrl(lightbox)} alt="" style={{maxWidth:"100%",maxHeight:"90vh",borderRadius:10,objectFit:"contain"}}/>
-                <div style={{position:"absolute",top:16,right:20,fontSize:28,color:"#fff",cursor:"pointer",fontWeight:700}}>✕</div>
+              <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.96)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}
+                onClick={()=>setLightbox("")}>
+                <img src={toImgUrl(lightbox)} alt=""
+                  style={{width:"100vw",height:"100vh",objectFit:"contain",display:"block"}}
+                  onClick={e=>e.stopPropagation()}/>
+                <button onClick={()=>setLightbox("")}
+                  style={{position:"absolute",top:12,right:12,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",width:40,height:40,fontSize:20,color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>
+                  ✕
+                </button>
               </div>
             )}
             {req.supplier_name&&<div style={{fontSize:11,color:"#64748b",marginTop:8}}>For: {req.supplier_name}</div>}

@@ -2732,15 +2732,15 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], settings,
   const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msgLines)}` : null;
 
   const vehiclePayload = {
-    vehicle_make:  job.vehicle_make||"",
-    vehicle_model: job.vehicle_model||"",
-    vehicle_year:  job.vehicle_year||"",
-    vehicle_color: job.vehicle_color||"",
-    vin:           job.vin||"",
-    engine_no:     job.engine_no||"",
-    photo_front:   jobVehicle?.photo_front||"",
-    photo_rear:    jobVehicle?.photo_rear||"",
-    photo_side:    jobVehicle?.photo_side||"",
+    vehicle_make:  jobVehicle?.make  || job.vehicle_make  || "",
+    vehicle_model: jobVehicle?.model || job.vehicle_model || "",
+    vehicle_year:  jobVehicle?.year  || job.vehicle_year  || "",
+    vehicle_color: jobVehicle?.color || job.vehicle_color || "",
+    vin:           jobVehicle?.vin   || job.vin           || "",
+    engine_no:     jobVehicle?.engine_no || job.engine_no || "",
+    photo_front:   jobVehicle?.photo_front || "",
+    photo_rear:    jobVehicle?.photo_rear  || "",
+    photo_side:    jobVehicle?.photo_side  || "",
   };
 
   const logSend = (viaGroup=false) => {

@@ -1448,6 +1448,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     else { await api.insert("workshop_vehicles",{...data, id:makeId("WSV"), workshop_id:wsId||null}); }
     await refreshWorkshopData(); showToast("Vehicle saved");
   };
+  const patchWsVehicleLocal=(id,patch)=>setWorkshopVehicles(prev=>prev.map(v=>v.id===id?{...v,...patch}:v));
   const deleteWorkshopVehicle=async(id)=>{
     await api.delete("workshop_vehicles","id",id);
     await refreshWorkshopData(); showToast("Deleted","err");
@@ -5390,6 +5391,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             onSaveWsCustomer={saveWorkshopCustomer}
             onDeleteWsCustomer={deleteWorkshopCustomer}
             onSaveWsVehicle={saveWorkshopVehicle}
+            onPatchWsVehicle={patchWsVehicleLocal}
             onDeleteWsVehicle={deleteWorkshopVehicle}
             onSaveWsStock={saveWsStockItem}
             onDeleteWsStock={deleteWsStockItem}

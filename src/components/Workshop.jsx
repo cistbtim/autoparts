@@ -4815,8 +4815,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               const plMatch = p=>p.toLowerCase().trim()===oldName.toLowerCase().trim();
               const newPl = pl.map(p=>plMatch(p)?v:p);
               const newIj = ij.map(it=>ijMatch(it)?{...it,label:v,description:v}:it);
-              if(JSON.stringify(newPl)!==JSON.stringify(pl)||JSON.stringify(newIj)!==JSON.stringify(ij))
+              if(JSON.stringify(newPl)!==JSON.stringify(pl)||JSON.stringify(newIj)!==JSON.stringify(ij)){
                 await api.patch("ws_supplier_requests","id",req.id,{parts_list:JSON.stringify(newPl),items_json:JSON.stringify(newIj)}).catch(()=>{});
+                req.parts_list=JSON.stringify(newPl); req.items_json=JSON.stringify(newIj);
+              }
               // Update line_items in any existing quotes for this request
               for(const qt of wsSupplierQuotes.filter(q=>q.request_id===req.id)){
                 let li=[]; try{li=JSON.parse(qt.line_items||"[]");}catch{}
@@ -4824,8 +4826,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   const m=sku?(l.sku||"").trim()===sku:(l.name||"").toLowerCase().trim()===oldName.toLowerCase().trim();
                   return m?{...l,name:v}:l;
                 });
-                if(JSON.stringify(newLi)!==JSON.stringify(li))
+                if(JSON.stringify(newLi)!==JSON.stringify(li)){
                   await api.patch("ws_supplier_quotes","id",qt.id,{line_items:JSON.stringify(newLi)}).catch(()=>{});
+                  qt.line_items=JSON.stringify(newLi);
+                }
               }
             }
           };

@@ -2634,7 +2634,7 @@ const makePartSku = (name) => {
   return `ws-${abbr}-${rand}`;
 };
 
-function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onGenerateLink, onCreatePO, onClose}) {
+function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onGenerateLink, onCreatePO, onClose}) {
   const shopName = settings?.shop_name || "Workshop";
 
   // Job items — all pre-ticked
@@ -2731,9 +2731,15 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], settings,
   const msgLines = buildMsg(generatedLink);
   const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msgLines)}` : null;
 
+  // Resolve display model name: catalog lookup first (code→name), then workshop vehicle record, then raw job field
+  const _catVeh = job.vehicle_model && job.vehicle_make
+    ? vehicles.find(v => v.code === job.vehicle_model && (v.make||"").toLowerCase() === (job.vehicle_make||"").toLowerCase())
+    : null;
+  const dispModel = _catVeh?.model || jobVehicle?.model || job.vehicle_model || "";
+
   const vehiclePayload = {
     vehicle_make:  jobVehicle?.make  || job.vehicle_make  || "",
-    vehicle_model: jobVehicle?.model || job.vehicle_model || "",
+    vehicle_model: dispModel,
     vehicle_year:  jobVehicle?.year  || job.vehicle_year  || "",
     vehicle_color: jobVehicle?.color || job.vehicle_color || "",
     vin:           jobVehicle?.vin   || job.vin           || "",
@@ -6342,7 +6348,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       {supplierModal&&(
         <Overlay onClose={()=>setSupplierModal(false)}>
           <SupplierSendModal
-            job={job} items={items} wsSuppliers={wsSuppliers} wsVehicles={wsVehicles} settings={settings}
+            job={job} items={items} wsSuppliers={wsSuppliers} wsVehicles={wsVehicles} vehicles={vehicles} settings={settings}
             history={wsSupplierRequests.filter(r=>r.job_id===job.id)}
             quotes={wsSupplierQuotes.filter(q=>q.job_id===job.id)}
             sqReplies={sqReplies}

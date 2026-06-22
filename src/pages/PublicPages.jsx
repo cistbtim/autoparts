@@ -979,12 +979,12 @@ export function WsSupplierQuoteReplyPage({token}) {
             )}
             {/* Vehicle photos */}
             {(req.photo_front||req.photo_rear||req.photo_side)&&(
-              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
                 {[{url:req.photo_front,label:"Front"},{url:req.photo_side,label:"Side"},{url:req.photo_rear,label:"Rear"}].filter(p=>p.url).map(p=>(
-                  <div key={p.label} style={{flex:"1 1 80px",minWidth:80,maxWidth:160,cursor:"pointer"}} onClick={()=>setLightbox(p.url)}>
+                  <div key={p.label} style={{flex:"1 1 140px",cursor:"pointer"}} onClick={()=>setLightbox(p.url)}>
                     <img src={toImgUrl(p.url)} alt={p.label}
-                      style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:8,border:"1px solid #334155"}}/>
-                    <div style={{fontSize:10,color:"#64748b",textAlign:"center",marginTop:2}}>{p.label}</div>
+                      style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:10,border:"1px solid #334155",display:"block"}}/>
+                    <div style={{fontSize:11,color:"#64748b",textAlign:"center",marginTop:4,fontWeight:600}}>{p.label}</div>
                   </div>
                 ))}
               </div>

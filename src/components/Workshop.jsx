@@ -4800,8 +4800,34 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             const v = editDescVal.trim();
             setEditDescId(null);
             if (!v || v === (descOverrides[item.id]??item.description)) return;
+            const oldDesc = (descOverrides[item.id]??item.description??"").trim();
+            const sku = (item.part_sku||"").trim();
             setDescOverrides(prev=>({...prev,[item.id]:v}));
             await api.patch("workshop_job_items","id",item.id,{description:v}).catch(()=>{});
+            // Sync new description into supplier requests + existing quotes for this job
+            const jobReqs = wsSupplierRequests.filter(r=>r.job_id===job.id);
+            for(const req of jobReqs){
+              let pl=[]; try{pl=JSON.parse(req.parts_list||"[]");}catch{}
+              let ij=[]; try{ij=JSON.parse(req.items_json||"[]");}catch{}
+              // Find old name in items_json using SKU if available, else oldDesc
+              const ijMatch = it=>sku?(it.sku||"").trim()===sku:(it.label||it.description||"").toLowerCase().trim()===oldDesc.toLowerCase().trim();
+              const oldName = (ij.find(ijMatch)||{}).label||(ij.find(ijMatch)||{}).description||oldDesc;
+              const plMatch = p=>p.toLowerCase().trim()===oldName.toLowerCase().trim();
+              const newPl = pl.map(p=>plMatch(p)?v:p);
+              const newIj = ij.map(it=>ijMatch(it)?{...it,label:v,description:v}:it);
+              if(JSON.stringify(newPl)!==JSON.stringify(pl)||JSON.stringify(newIj)!==JSON.stringify(ij))
+                await api.patch("ws_supplier_requests","id",req.id,{parts_list:JSON.stringify(newPl),items_json:JSON.stringify(newIj)}).catch(()=>{});
+              // Update line_items in any existing quotes for this request
+              for(const qt of wsSupplierQuotes.filter(q=>q.request_id===req.id)){
+                let li=[]; try{li=JSON.parse(qt.line_items||"[]");}catch{}
+                const newLi=li.map(l=>{
+                  const m=sku?(l.sku||"").trim()===sku:(l.name||"").toLowerCase().trim()===oldName.toLowerCase().trim();
+                  return m?{...l,name:v}:l;
+                });
+                if(JSON.stringify(newLi)!==JSON.stringify(li))
+                  await api.patch("ws_supplier_quotes","id",qt.id,{line_items:JSON.stringify(newLi)}).catch(()=>{});
+              }
+            }
           };
           const commitPartType = async (item, v) => {
             setPartTypeOverrides(prev=>({...prev,[item.id]:v}));

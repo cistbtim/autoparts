@@ -1001,6 +1001,27 @@ export function WsSupplierQuoteReplyPage({token}) {
                 </button>
               </div>
             )}
+            {/* Partsouq link */}
+            {(req.vin||req.vehicle_make)&&(
+              <div style={{marginTop:10,display:"flex",gap:6,flexWrap:"wrap"}}>
+                {req.vin&&(
+                  <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent(req.vin)}`}
+                    target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                    <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.12)",color:"#60a5fa",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                      🔩 Partsouq <span style={{fontSize:10,opacity:.7}}>by VIN</span>
+                    </button>
+                  </a>
+                )}
+                {(req.vehicle_make||req.vehicle_model)&&(
+                  <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent([req.vehicle_make,req.vehicle_model].filter(Boolean).join(" "))}`}
+                    target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                    <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.12)",color:"#60a5fa",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                      🔩 Partsouq <span style={{fontSize:10,opacity:.7}}>by model</span>
+                    </button>
+                  </a>
+                )}
+              </div>
+            )}
             {req.supplier_name&&<div style={{fontSize:11,color:"#64748b",marginTop:8}}>For: {req.supplier_name}</div>}
           </div>
         )}

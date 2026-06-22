@@ -3185,6 +3185,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [editMarkupVal, setEditMarkupVal] = useState("");
   const [editDescId,    setEditDescId]    = useState(null);
   const [editDescVal,   setEditDescVal]   = useState("");
+  const [descOverrides, setDescOverrides] = useState({});
   const [pricePopup,    setPricePopup]    = useState(null); // {item, costs, markup, selIdx}
   const [wsShopReqModal, setWsShopReqModal] = useState(false);
   const [wsShopPartView, setWsShopPartView] = useState(null); // spare shop part info popup
@@ -4793,8 +4794,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           const defaultMarkup = +(wsProfile?.default_markup_pct||0);
           const commitDesc = async (item) => {
             const v = editDescVal.trim();
-            if (v && v !== item.description) await onSaveItem({...item, description: v});
             setEditDescId(null);
+            if (!v || v === (descOverrides[item.id]??item.description)) return;
+            setDescOverrides(prev=>({...prev,[item.id]:v}));
+            await api.patch("workshop_job_items","id",item.id,{description:v}).catch(()=>{});
           };
           const commitPrice = async (item) => {
             const newPrice = +editPriceVal;
@@ -5125,7 +5128,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       {item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}
                     </span>
                     <div style={{flex:1,minWidth:0}}>
-                      <div onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(item.description||"");}}} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)"}}>{item.description}</div>
+                      <div onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)"}}>{descOverrides[item.id]??item.description}</div>
                       {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2,display:"block"}}>{item.part_sku}</code>}
                     </div>
                     <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0,fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
@@ -5194,7 +5197,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 </td>
                 <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}</span></td>
                 <td style={{fontWeight:500}}>
-                  <span onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(item.description||"");}}} style={{cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{item.description}</span>
+                  <span onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{descOverrides[item.id]??item.description}</span>
                   {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
                   {supCosts.length>0&&(
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>

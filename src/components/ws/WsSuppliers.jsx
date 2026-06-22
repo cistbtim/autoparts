@@ -3,6 +3,13 @@ import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 
 const SUPPLIER_TYPES=["New Spares","Used Parts","Dealer"];
 
+export const CAR_BRANDS=[
+  "BMW","VW","Audi","Mercedes Benz","Porsche","Range Rover","Jaguar",
+  "Toyota","Haval","KIA","Hyundai","Ford","Mazda","Nissan","Honda",
+  "Opel","Peugeot","Renault","Suzuki","Subaru","Mitsubishi","Isuzu",
+  "Chevrolet","Volvo","Lexus","Jeep","Fiat","Alfa Romeo","Bentley","Rolls Royce",
+];
+
 function parseTypes(v){
   if(!v) return [];
   if(Array.isArray(v)) return v;
@@ -20,7 +27,8 @@ export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete,wsLocked=false})
       if(!types.includes(typeFilter)) return false;
     }
     if(!search.trim()) return true;
-    const h=`${s.name||""} ${s.phone||""} ${s.email||""} ${s.notes||""}`.toLowerCase();
+    const brands=parseTypes(s.car_brands).join(" ");
+    const h=`${s.name||""} ${s.phone||""} ${s.email||""} ${s.notes||""} ${brands}`.toLowerCase();
     return search.trim().toLowerCase().split(/\s+/).every(w=>h.includes(w));
   });
 
@@ -43,7 +51,9 @@ export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete,wsLocked=false})
           </div>
         : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {filtered.map(s=>(
+            {filtered.map(s=>{
+              const brands=parseTypes(s.car_brands);
+              return (
               <div key={s.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                 <div style={{width:38,height:38,borderRadius:10,background:"rgba(37,211,102,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🏪</div>
                 <div style={{flex:1,minWidth:0}}>
@@ -62,6 +72,13 @@ export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete,wsLocked=false})
                     {s.email&&<span>✉️ {s.email}</span>}
                     {s.notes&&<span style={{fontStyle:"italic"}}>{s.notes}</span>}
                   </div>
+                  {brands.length>0&&(
+                    <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:5}}>
+                      {brands.map(b=>(
+                        <span key={b} style={{fontSize:10,fontWeight:600,padding:"1px 7px",borderRadius:8,background:"rgba(96,165,250,.12)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.25)",whiteSpace:"nowrap"}}>{b}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div style={{display:"flex",gap:6,flexShrink:0}}>
                   {s.phone&&(
@@ -78,7 +95,8 @@ export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete,wsLocked=false})
                   {!wsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm(`Delete ${s.name}?`))onDelete(s.id);}}>🗑</button>}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )
       }
@@ -100,10 +118,14 @@ export function WsSupplierModal({item,onSave,onClose}) {
   const [notes,        setNotes]        = useState(item?.notes||"");
   const [vatInclusive, setVatInclusive] = useState(item?.vat_inclusive||false);
   const [supTypes,     setSupTypes]     = useState(()=>parseTypes(item?.supplier_type));
+  const [carBrands,    setCarBrands]    = useState(()=>parseTypes(item?.car_brands));
   const [saving,       setSaving]       = useState(false);
   const isEdit=!!item;
 
   const toggleType=(tp)=>setSupTypes(p=>p.includes(tp)?p.filter(x=>x!==tp):[...p,tp]);
+  const toggleBrand=(b)=>setCarBrands(p=>p.includes(b)?p.filter(x=>x!==b):[...p,b]);
+  const allSelected=carBrands.length===CAR_BRANDS.length;
+  const toggleAll=()=>setCarBrands(allSelected?[]:CAR_BRANDS.slice());
 
   const handleSave=async()=>{
     if(!name.trim()){alert("Name is required");return;}
@@ -118,15 +140,16 @@ export function WsSupplierModal({item,onSave,onClose}) {
         notes:notes.trim()||null,
         vat_inclusive:vatInclusive,
         supplier_type:supTypes.length?JSON.stringify(supTypes):null,
+        car_brands:carBrands.length?JSON.stringify(carBrands):null,
       });
     }catch(e){alert("Save failed: "+e.message);}
     finally{setSaving(false);}
   };
 
   return (
-    <Overlay onClose={onClose}>
+    <Overlay onClose={onClose} wide>
       <MHead title={isEdit?"✏️ Edit Supplier":"🏪 New Supplier"} onClose={onClose}/>
-      <FD><FL label="Supplier Name *"/><input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. ABC Auto Parts"/></FD>
+      <FD><FL label="Supplier Name *"/><input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Kein Auto Spares"/></FD>
       <FG>
         <FD><FL label="WhatsApp / Phone"/><input className="inp" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+27 83 000 0000"/></FD>
         <FD><FL label="Email (optional)"/><input className="inp" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="supplier@example.com"/></FD>
@@ -148,6 +171,28 @@ export function WsSupplierModal({item,onSave,onClose}) {
           ))}
         </div>
         <div style={{fontSize:11,color:"var(--text3)"}}>Select all that apply — a supplier can sell multiple types</div>
+      </FD>
+      <FD>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+          <FL label="Car Brands"/>
+          <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:600,color:"var(--accent)"}}>
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{width:14,height:14,cursor:"pointer",accentColor:"var(--accent)"}}/>
+            Select All
+          </label>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:"6px 12px",padding:"8px 10px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
+          {CAR_BRANDS.map(b=>(
+            <label key={b} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,whiteSpace:"nowrap"}}>
+              <input type="checkbox" checked={carBrands.includes(b)} onChange={()=>toggleBrand(b)} style={{width:14,height:14,cursor:"pointer",accentColor:"var(--accent)"}}/>
+              {b}
+            </label>
+          ))}
+        </div>
+        {carBrands.length>0&&(
+          <div style={{marginTop:6,fontSize:11,color:"var(--text3)"}}>
+            {carBrands.length} brand{carBrands.length!==1?"s":""} selected
+          </div>
+        )}
       </FD>
       <FD>
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0"}}>

@@ -7526,7 +7526,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
 
   useEffect(()=>{
     if(!linkedBranchId){setLoading(false);setShopParts([]);return;}
-    setLoading(true);
+    // Skip loading spinner if we have cached data (tab switch) — only show it for first load or explicit refresh
+    const hasCached=_spCache.branchId===linkedBranchId&&Array.isArray(_spCache.data)&&_spCache.data.length>0;
+    if(!hasCached) setLoading(true);
     // Only fetch columns shown in the UI — avoids transferring large unused fields over mobile data
     const COLS="id,sku,name,brand,stock,price,image_url,image,bin_location,category,chinese_desc,make,model,year_range,oe_number";
     // When coming from a job card (initialMake set), pre-filter by vehicle fitments so we only
@@ -7809,6 +7811,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
               api.cacheInvalidate("parts");
               api.cacheInvalidate("branch_stock");
               api.cacheInvalidate("branch_stock_requests");
+              _spCache.data=null;_spCache.branchId=null;
               setRefreshing(true);
               setRefreshKey(k=>k+1);
               setReqsRefreshKey(k=>k+1);

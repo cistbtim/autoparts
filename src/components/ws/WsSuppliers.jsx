@@ -4,13 +4,19 @@ import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 const SUPPLIER_TYPES=["New Spares","Used Parts","Dealer"];
 
 export const CAR_BRANDS=[
-  "Alfa Romeo","Audi","Bentley","BMW","BYD","Chery","Chevrolet","Chrysler",
+  // European / American / Japanese / Korean
+  "Alfa Romeo","Audi","Bentley","BMW","Chevrolet","Chrysler",
   "Citroen","Daihatsu","Dodge","Ferrari","Fiat","Ford","Genesis","GMC",
-  "GWM","Haval","Honda","Hyundai","Infiniti","Isuzu","JAC","Jaguar",
+  "Honda","Hyundai","Infiniti","Isuzu","Jaguar",
   "Jeep","KIA","Lamborghini","Land Rover","Lexus","Mahindra","Maserati",
-  "Mazda","Mercedes Benz","MG","Mini","Mitsubishi","Nissan","Opel",
+  "Mazda","Mercedes Benz","Mini","Mitsubishi","Nissan","Opel",
   "Peugeot","Porsche","Range Rover","Renault","Rolls Royce","Seat",
   "Skoda","Ssangyong","Subaru","Suzuki","Tesla","Toyota","Volvo","VW",
+  // Chinese brands
+  "BAIC","Brilliance","BYD","Changan","Chery","Dongfeng","FAW",
+  "Foton","Geely","GWM","Haval","JAC","Jetour","Leapmotor",
+  "Li Auto","Lynk & Co","Maxus","MG","NIO","OMODA","Ora",
+  "Roewe","Tank","Wuling","Xpeng","Zeekr","Zotye",
 ];
 
 function parseTypes(v){

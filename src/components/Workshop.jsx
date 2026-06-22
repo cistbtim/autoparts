@@ -2637,8 +2637,8 @@ const makePartSku = (name) => {
 function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onGenerateLink, onCreatePO, onClose}) {
   const shopName = settings?.shop_name || "Workshop";
 
-  // Job items — all pre-ticked
-  const jobItemIds = items.filter(i => i.description?.trim()).map(i => i.id);
+  // Job items — parts only, pre-ticked (labour items excluded from supplier requests)
+  const jobItemIds = items.filter(i => i.description?.trim() && i.type !== "labour").map(i => i.id);
   const [selected,    setSelected]    = useState(jobItemIds);
   // Extra parts typed manually  { id, label, sku }
   const [extraParts,  setExtraParts]  = useState([]);
@@ -2772,7 +2772,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
     });
   };
 
-  const jobItemsList = items.filter(i => i.description?.trim());
+  const jobItemsList = items.filter(i => i.description?.trim() && i.type !== "labour");
 
   return (
     <div style={{maxWidth:520,width:"100%"}}>

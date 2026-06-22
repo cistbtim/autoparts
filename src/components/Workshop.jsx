@@ -2819,33 +2819,56 @@ function SupplierSendModal({job, items, wsSuppliers=[], settings, history=[], qu
       )}
 
       {/* Supplier selector */}
-      <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",margin:"14px 0 6px"}}>Supplier</div>
-      {wsSuppliers.length > 0 && (
-        <div style={{display:"flex",gap:8,marginBottom:8}}>
-          <select className="inp" style={{flex:"0 0 auto",width:150}} value={typeFilter}
-            onChange={e=>{setTypeFilter(e.target.value);setSupplierId("");}}>
-            <option value="">All Types</option>
-            <option value="New Spares">New Spares</option>
-            <option value="Used Parts">Used Parts</option>
-            <option value="Dealer">Dealer</option>
-          </select>
-          <select className="inp" style={{flex:1}} value={supplierId} onChange={e=>{setSupplierId(e.target.value);setManualPhone("");}}>
-            <option value="">— Select supplier —</option>
-            {wsSuppliers.filter(s=>{
-              if(!typeFilter) return true;
-              const types=s.supplier_type?(Array.isArray(s.supplier_type)?s.supplier_type:(()=>{try{return JSON.parse(s.supplier_type);}catch{return [];}})()):[];
-              return types.includes(typeFilter);
-            }).map(s=>(
-              <option key={s.id} value={s.id}>{s.name}{s.phone?` · ${s.phone}`:""}</option>
-            ))}
-          </select>
-        </div>
-      )}
-      {wsSuppliers.length === 0 && (
-        <div style={{fontSize:12,color:"var(--text3)",marginBottom:6,padding:"8px 12px",background:"var(--surface2)",borderRadius:8}}>
-          No suppliers saved yet — go to <strong>WS → Suppliers</strong> tab to add them, or type a number below
-        </div>
-      )}
+      {(()=>{
+        const normMake=(job.vehicle_make||"").toLowerCase().replace(/[-_]/g," ").trim();
+        const parseBrands=s=>{if(!s.car_brands)return [];if(Array.isArray(s.car_brands))return s.car_brands;try{return JSON.parse(s.car_brands);}catch{return [];}};
+        const parseTypes2=s=>{if(!s.supplier_type)return [];if(Array.isArray(s.supplier_type))return s.supplier_type;try{return JSON.parse(s.supplier_type);}catch{return [];}};
+        const matchesMake=s=>parseBrands(s).some(b=>{const nb=b.toLowerCase().replace(/[-_]/g," ").trim();return nb===normMake||nb.includes(normMake)||normMake.includes(nb);});
+        const brandPool=normMake&&wsSuppliers.some(matchesMake)?wsSuppliers.filter(matchesMake):wsSuppliers;
+        const isBrandFiltered=brandPool.length<wsSuppliers.length;
+        const TYPES=["New Spares","Used Parts","Dealer"];
+        const typeColors={"New Spares":"var(--accent)","Used Parts":"#b45309","Dealer":"#16a34a"};
+        return (
+          <>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",margin:"14px 0 6px",display:"flex",alignItems:"center",gap:8}}>
+              Supplier
+              {isBrandFiltered&&normMake&&<span style={{fontSize:10,fontWeight:600,padding:"1px 7px",borderRadius:8,background:"rgba(96,165,250,.12)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.25)",textTransform:"none",letterSpacing:0}}>{job.vehicle_make} suppliers only</span>}
+            </div>
+            {wsSuppliers.length>0&&(
+              <>
+                <select className="inp" style={{width:160,marginBottom:8}} value={typeFilter} onChange={e=>{setTypeFilter(e.target.value);setSupplierId("");}}>
+                  <option value="">All Types</option>
+                  {TYPES.map(tp=>{
+                    const cnt=brandPool.filter(s=>parseTypes2(s).includes(tp)).length;
+                    return <option key={tp} value={tp}>{tp}{cnt>0?` (${cnt})`:""}</option>;
+                  })}
+                </select>
+                {(typeFilter?[typeFilter]:TYPES).map(tp=>{
+                  const group=brandPool.filter(s=>parseTypes2(s).includes(tp)&&(!typeFilter||typeFilter===tp));
+                  if(!group.length) return null;
+                  return (
+                    <div key={tp} style={{marginBottom:8}}>
+                      <div style={{fontSize:10,fontWeight:700,color:typeColors[tp]||"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4,paddingLeft:2}}>{tp}</div>
+                      <select className="inp" style={{width:"100%"}} value={supplierId&&group.some(s=>s.id===supplierId)?supplierId:""} onChange={e=>{setSupplierId(e.target.value);setManualPhone("");}}>
+                        <option value="">— Select {tp} supplier —</option>
+                        {group.map(s=><option key={s.id} value={s.id}>{s.name}{s.phone?` · ${s.phone}`:""}</option>)}
+                      </select>
+                    </div>
+                  );
+                })}
+                {!typeFilter&&brandPool.filter(s=>!TYPES.some(tp=>parseTypes2(s).includes(tp))).map(s=>(
+                  <option key={s.id} value={s.id}>{s.name}{s.phone?` · ${s.phone}`:""}</option>
+                ))}
+              </>
+            )}
+            {wsSuppliers.length===0&&(
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:6,padding:"8px 12px",background:"var(--surface2)",borderRadius:8}}>
+                No suppliers saved yet — go to <strong>WS → Suppliers</strong> tab to add them, or type a number below
+              </div>
+            )}
+          </>
+        );
+      })()}
       <input className="inp" placeholder="Or enter phone number: +27 83 123 4567"
         value={manualPhone} onChange={e=>{setManualPhone(e.target.value);setSupplierId("");}}
         style={{marginBottom:14}}/>

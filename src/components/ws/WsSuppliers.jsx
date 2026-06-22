@@ -10,7 +10,7 @@ const BRANDS_INTL=[
   "Land Rover","Lexus","Mahindra","Maserati","Mazda","Mercedes Benz",
   "Mini","Mitsubishi","Nissan","Opel","Peugeot","Porsche","Range Rover",
   "Renault","Rolls Royce","Seat","Skoda","Ssangyong","Subaru","Suzuki",
-  "Tesla","Toyota","Volvo","VW",
+  "Tesla","Toyota","Volkswagen","Volvo",
 ];
 
 const BRANDS_CN=[

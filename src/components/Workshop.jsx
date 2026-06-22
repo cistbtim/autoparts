@@ -5231,6 +5231,21 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 <td style={{fontWeight:500}}>
                   <span onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{descOverrides[item.id]??item.description}</span>
                   {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
+                  {supCosts.length>0&&(
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
+                      {supCosts.map((sc,i)=>{
+                        const sellP=+(sc.price*(1+defaultMarkup/100)).toFixed(2);
+                        const isShop=!!sc.isShop;
+                        return (
+                        <span key={i} title={isShop?(sc.part_id?`Part# ${sc.part_id} — click for details`:"Click for spare shop details"):(defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price")}
+                          onClick={()=>isShop?setWsShopPartView({...sc,currentItem:item}):setPricePopup({item,costs:getSupCosts(item.description),markup:String(defaultMarkup),selIdx:i})}
+                          style={{fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,padding:"1px 6px",background:isShop?"rgba(22,163,74,.15)":"rgba(251,191,36,.1)",color:isShop?"#000":"#f59e0b",border:isShop?"1px solid rgba(22,163,74,.4)":"1px solid rgba(251,191,36,.25)"}}>
+                          {isShop?"🏪":"💰"} {sc.name}: {fmtAmt(sc.price)}{isShop&&sc.sku?<> · <code style={{fontFamily:"DM Mono,monospace",fontSize:9}}>{sc.sku}</code></>:""}
+                        </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </td>
                 <td style={{width:120,verticalAlign:"middle"}}>
                   <select value={partTypeOverrides[item.id]??item.part_type??""} onChange={e=>commitPartType(item,e.target.value)}

@@ -7555,46 +7555,38 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
           : api.get("parts",`branch_id=eq.${linkedBranchId}&select=${COLS}&order=sku.asc`).catch(()=>[]),
       api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=id,part_id,stock,price,bin_location`).catch(()=>[]),
       // Fetch from ALL branches in both modes — job mode scoped by fitment ids,
-      // standalone mode fetches full catalog (same as admin view)
+      // standalone mode fetches main-branch catalog (scoped to avoid full 44k-row scan)
       idFilter
         ? fetchPartsByIds(idFilter)
         : jobMode
           ? Promise.resolve([])
-          : api.get("parts",`select=${COLS}&order=sku.asc`).catch(()=>[]),
+          : mainBranchId&&mainBranchId!==linkedBranchId
+            ? api.get("parts",`branch_id=eq.${mainBranchId}&select=${COLS}&order=sku.asc`).catch(()=>[])
+            : Promise.resolve([]),
     ];
-    Promise.all(fetches).then(async([ownParts,bStock,mainParts])=>{
+    Promise.all(fetches).then(([ownParts,bStock,mainParts])=>{
       const bStockArr=Array.isArray(bStock)?bStock:[];
       const ownArr=Array.isArray(ownParts)?ownParts:[];
       const mainArr=Array.isArray(mainParts)?mainParts:[];
-      let catalogParts=[];
-      if(bStockArr.length){
-        const allBsIds=bStockArr.map(bs=>bs.part_id).filter(Boolean);
-        const idFilterSet=idFilter?new Set(idFilter):null;
-        const filteredBsIds=idFilterSet?allBsIds.filter(id=>idFilterSet.has(String(id))):(jobMode?[]:allBsIds);
-        if(filteredBsIds.length){
-          catalogParts=await fetchPartsByIds(filteredBsIds);
-        }
-      }
       const bStockMap=Object.fromEntries(bStockArr.map(bs=>[String(bs.part_id),bs]));
-      const mergedCatalog=catalogParts.map(p=>{
-        const bs=bStockMap[String(p.id)];
-        return bs?{...p,stock:bs.stock??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;
-      });
+      // Apply branch_stock pricing directly to own + main parts — no separate sequential fetch needed
+      const applyBs=p=>{const bs=bStockMap[String(p.id)];return bs?{...p,stock:bs.stock??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;};
       const seen=new Set(ownArr.map(p=>String(p.id)));
-      const linkedParts=[...ownArr,...mergedCatalog.filter(p=>!seen.has(String(p.id)))];
-      // Add main branch parts (dedupe — linked branch takes priority)
+      const linkedParts=[...ownArr.map(applyBs),...mainArr.filter(p=>!seen.has(String(p.id))).map(applyBs)];
       const allSeen=new Set(linkedParts.map(p=>String(p.id)));
-      const mainFiltered=mainArr.filter(p=>!allSeen.has(String(p.id)));
-      mainFiltered.forEach(p=>allSeen.add(String(p.id)));
-      const combined=[
-        ...linkedParts.map(p=>({...p,_source:"local"})),
-        ...mainFiltered.map(p=>({...p,_source:"other"})),
-      ];
-      // Job mode: only fitment-linked parts are shown — no text/model matching.
-      // Text matching risks showing parts that don't fit this specific vehicle.
-      setShopParts(combined);
-      setLoading(false);
-      setRefreshing(false);
+      const finalize=(extra=[])=>{
+        const combined=[
+          ...linkedParts.map(p=>({...p,_source:"local"})),
+          ...extra.filter(p=>!allSeen.has(String(p.id))).map(p=>({...applyBs(p),_source:"other"})),
+        ];
+        setShopParts(combined);
+        setLoading(false);
+        setRefreshing(false);
+      };
+      // Only fetch parts missing from both ownArr and mainArr (rare edge case)
+      const missingIds=bStockArr.map(bs=>String(bs.part_id)).filter(id=>!allSeen.has(id));
+      if(missingIds.length>0) fetchPartsByIds(missingIds).then(finalize);
+      else finalize();
     });
   },[linkedBranchId,mainBranchId,refreshKey]);
 

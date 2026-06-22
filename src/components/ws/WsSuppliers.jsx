@@ -3,21 +3,23 @@ import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 
 const SUPPLIER_TYPES=["New Spares","Used Parts","Dealer"];
 
-export const CAR_BRANDS=[
-  // European / American / Japanese / Korean
-  "Alfa Romeo","Audi","Bentley","BMW","Chevrolet","Chrysler",
-  "Citroen","Daihatsu","Dodge","Ferrari","Fiat","Ford","Genesis","GMC",
-  "Honda","Hyundai","Infiniti","Isuzu","Jaguar",
-  "Jeep","KIA","Lamborghini","Land Rover","Lexus","Mahindra","Maserati",
-  "Mazda","Mercedes Benz","Mini","Mitsubishi","Nissan","Opel",
-  "Peugeot","Porsche","Range Rover","Renault","Rolls Royce","Seat",
-  "Skoda","Ssangyong","Subaru","Suzuki","Tesla","Toyota","Volvo","VW",
-  // Chinese brands
-  "BAIC","Brilliance","BYD","Changan","Chery","Dongfeng","FAW",
-  "Foton","Geely","GWM","Haval","JAC","Jetour","Leapmotor",
-  "Li Auto","Lynk & Co","Maxus","MG","NIO","OMODA","Ora",
-  "Roewe","Tank","Wuling","Xpeng","Zeekr","Zotye",
+const BRANDS_INTL=[
+  "Alfa Romeo","Audi","Bentley","BMW","Chevrolet","Chrysler","Citroen",
+  "Daihatsu","Dodge","Ferrari","Fiat","Ford","Genesis","GMC","Honda",
+  "Hyundai","Infiniti","Isuzu","Jaguar","Jeep","KIA","Lamborghini",
+  "Land Rover","Lexus","Mahindra","Maserati","Mazda","Mercedes Benz",
+  "Mini","Mitsubishi","Nissan","Opel","Peugeot","Porsche","Range Rover",
+  "Renault","Rolls Royce","Seat","Skoda","Ssangyong","Subaru","Suzuki",
+  "Tesla","Toyota","Volvo","VW",
 ];
+
+const BRANDS_CN=[
+  "BAIC","Brilliance","BYD","Changan","Chery","Dongfeng","FAW","Foton",
+  "Geely","GWM","Haval","JAC","Jetour","Leapmotor","Li Auto","Lynk & Co",
+  "Maxus","MG","NIO","OMODA","Ora","Roewe","Tank","Wuling","Xpeng","Zeekr","Zotye",
+];
+
+export const CAR_BRANDS=[...BRANDS_INTL,...BRANDS_CN];
 
 function parseTypes(v){
   if(!v) return [];
@@ -189,16 +191,34 @@ export function WsSupplierModal({item,onSave,onClose}) {
             Select All
           </label>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:"6px 12px",padding:"8px 10px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
-          {CAR_BRANDS.map(b=>(
-            <label key={b} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,whiteSpace:"nowrap"}}>
-              <input type="checkbox" checked={carBrands.includes(b)} onChange={()=>toggleBrand(b)} style={{width:14,height:14,cursor:"pointer",accentColor:"var(--accent)"}}/>
-              {b}
-            </label>
-          ))}
-        </div>
+        {[{label:"International",brands:BRANDS_INTL},{label:"Chinese",brands:BRANDS_CN}].map(grp=>(
+          <div key={grp.label} style={{marginBottom:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+              <span style={{fontSize:11,fontWeight:700,color:"var(--text3)",letterSpacing:".05em",textTransform:"uppercase"}}>{grp.label}</span>
+              <div style={{flex:1,height:1,background:"var(--border)"}}/>
+              <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:11,fontWeight:600,color:"var(--accent)",whiteSpace:"nowrap"}}>
+                <input type="checkbox"
+                  checked={grp.brands.every(b=>carBrands.includes(b))}
+                  onChange={()=>{
+                    const allIn=grp.brands.every(b=>carBrands.includes(b));
+                    setCarBrands(prev=>allIn?prev.filter(b=>!grp.brands.includes(b)):[...new Set([...prev,...grp.brands])]);
+                  }}
+                  style={{width:13,height:13,cursor:"pointer",accentColor:"var(--accent)"}}/>
+                All {grp.label}
+              </label>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:"6px 12px",padding:"8px 10px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
+              {grp.brands.map(b=>(
+                <label key={b} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,whiteSpace:"nowrap"}}>
+                  <input type="checkbox" checked={carBrands.includes(b)} onChange={()=>toggleBrand(b)} style={{width:14,height:14,cursor:"pointer",accentColor:"var(--accent)"}}/>
+                  {b}
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
         {carBrands.length>0&&(
-          <div style={{marginTop:6,fontSize:11,color:"var(--text3)"}}>
+          <div style={{marginTop:4,fontSize:11,color:"var(--text3)"}}>
             {carBrands.length} brand{carBrands.length!==1?"s":""} selected
           </div>
         )}

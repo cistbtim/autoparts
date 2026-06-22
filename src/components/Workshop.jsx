@@ -1695,18 +1695,22 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
       )}
 
       {/* ══════════════ SPARE SHOP TAB ══════════════ */}
-      {wsTab==="spareshop"&&(()=>{
+      {(()=>{
         const linkedBranchId=wsProfile?.linked_branch_id;
         const linkedBranch=branches.find(b=>b.id===linkedBranchId);
         const mainBranchId=branches.find(b=>b.is_main)?.id||null;
-        if(!linkedBranchId) return (
-          <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
-            <div style={{fontSize:32,marginBottom:12}}>🏪</div>
-            <div style={{fontWeight:600,marginBottom:6}}>No spare shop linked</div>
-            <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
+        return (
+          <div style={{display:wsTab==="spareshop"?"":"none"}}>
+            {!linkedBranchId
+              ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
+                  <div style={{fontSize:32,marginBottom:12}}>🏪</div>
+                  <div style={{fontWeight:600,marginBottom:6}}>No spare shop linked</div>
+                  <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
+                </div>
+              : <WsSpareShopTab key={`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}`} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab}/>
+            }
           </div>
         );
-        return <WsSpareShopTab key={`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}`} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab}/>;
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}

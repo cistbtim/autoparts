@@ -3185,7 +3185,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [editMarkupVal, setEditMarkupVal] = useState("");
   const [editDescId,    setEditDescId]    = useState(null);
   const [editDescVal,   setEditDescVal]   = useState("");
-  const [descOverrides, setDescOverrides] = useState({});
+  const [descOverrides,     setDescOverrides]     = useState({});
+  const [partTypeOverrides, setPartTypeOverrides] = useState({});
+  const [editRemarkId,      setEditRemarkId]      = useState(null);
+  const [editRemarkVal,     setEditRemarkVal]      = useState("");
+  const [remarkOverrides,   setRemarkOverrides]   = useState({});
   const [pricePopup,    setPricePopup]    = useState(null); // {item, costs, markup, selIdx}
   const [wsShopReqModal, setWsShopReqModal] = useState(false);
   const [wsShopPartView, setWsShopPartView] = useState(null); // spare shop part info popup
@@ -4799,6 +4803,16 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             setDescOverrides(prev=>({...prev,[item.id]:v}));
             await api.patch("workshop_job_items","id",item.id,{description:v}).catch(()=>{});
           };
+          const commitPartType = async (item, v) => {
+            setPartTypeOverrides(prev=>({...prev,[item.id]:v}));
+            await api.patch("workshop_job_items","id",item.id,{part_type:v}).catch(()=>{});
+          };
+          const commitRemark = async (item) => {
+            const v = editRemarkVal.trim();
+            setEditRemarkId(null);
+            setRemarkOverrides(prev=>({...prev,[item.id]:v}));
+            await api.patch("workshop_job_items","id",item.id,{remark:v}).catch(()=>{});
+          };
           const commitPrice = async (item) => {
             const newPrice = +editPriceVal;
             if (!isNaN(newPrice) && newPrice !== +item.unit_price) {
@@ -5182,6 +5196,24 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       }
                     </div>
                   )}
+                  <div style={{display:"flex",gap:8,alignItems:"center",marginTop:6,flexWrap:"wrap"}}>
+                    <select value={partTypeOverrides[item.id]??item.part_type??""} onChange={e=>commitPartType(item,e.target.value)}
+                      style={{fontSize:11,padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text)",flex:"0 0 auto"}}>
+                      <option value="">— Part Type —</option>
+                      <option value="New-Replacement">New-Replacement</option>
+                      <option value="Original Parts">Original Parts</option>
+                      <option value="Used Parts">Used Parts</option>
+                    </select>
+                    {editRemarkId===item.id
+                      ?<input autoFocus type="text" value={editRemarkVal} onChange={e=>setEditRemarkVal(e.target.value)}
+                          onBlur={()=>commitRemark(item)} onKeyDown={e=>{if(e.key==="Enter")commitRemark(item);if(e.key==="Escape")setEditRemarkId(null);}}
+                          placeholder="Remark" style={{flex:1,minWidth:100,fontSize:12,padding:"3px 8px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text)"}}/>
+                      :<span onClick={()=>{setEditRemarkId(item.id);setEditRemarkVal(remarkOverrides[item.id]??item.remark??"");}}
+                          style={{flex:1,fontSize:12,color:(remarkOverrides[item.id]??item.remark)?"var(--text)":"var(--text3)",cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>
+                          {(remarkOverrides[item.id]??item.remark)||"Remark..."}
+                        </span>
+                    }
+                  </div>
                 </div>
               );
             };
@@ -5199,21 +5231,26 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 <td style={{fontWeight:500}}>
                   <span onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{descOverrides[item.id]??item.description}</span>
                   {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
-                  {supCosts.length>0&&(
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
-                      {supCosts.map((sc,i)=>{
-                        const sellP=+(sc.price*(1+defaultMarkup/100)).toFixed(2);
-                        const isShop=!!sc.isShop;
-                        return (
-                        <span key={i} title={isShop?(sc.part_id?`Part# ${sc.part_id} — click for details`:"Click for spare shop details"):(defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price")}
-                          onClick={()=>isShop?setWsShopPartView({...sc,currentItem:item}):setPricePopup({item,costs:getSupCosts(item.description),markup:String(defaultMarkup),selIdx:i})}
-                          style={{fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,padding:"1px 6px",background:isShop?"rgba(22,163,74,.15)":"rgba(251,191,36,.1)",color:isShop?"#000":"#f59e0b",border:isShop?"1px solid rgba(22,163,74,.4)":"1px solid rgba(251,191,36,.25)"}}>
-                          {isShop?"🏪":"💰"} {sc.name}: {fmtAmt(sc.price)}{isShop&&sc.sku?<> · <code style={{fontFamily:"DM Mono,monospace",fontSize:9}}>{sc.sku}</code></>:""}
-                        </span>
-                        );
-                      })}
-                    </div>
-                  )}
+                </td>
+                <td style={{width:120,verticalAlign:"middle"}}>
+                  <select value={partTypeOverrides[item.id]??item.part_type??""} onChange={e=>commitPartType(item,e.target.value)}
+                    style={{width:"100%",fontSize:11,padding:"3px 5px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text)",cursor:"pointer"}}>
+                    <option value=""></option>
+                    <option value="New-Replacement">New-Replacement</option>
+                    <option value="Original Parts">Original Parts</option>
+                    <option value="Used Parts">Used Parts</option>
+                  </select>
+                </td>
+                <td style={{width:130,verticalAlign:"middle"}}>
+                  {editRemarkId===item.id
+                    ?<input autoFocus type="text" value={editRemarkVal} onChange={e=>setEditRemarkVal(e.target.value)}
+                        onBlur={()=>commitRemark(item)} onKeyDown={e=>{if(e.key==="Enter")commitRemark(item);if(e.key==="Escape")setEditRemarkId(null);}}
+                        style={{width:"100%",fontSize:12,padding:"3px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text)"}}/>
+                    :<span onClick={()=>{setEditRemarkId(item.id);setEditRemarkVal(remarkOverrides[item.id]??item.remark??"");}}
+                        style={{fontSize:12,color:(remarkOverrides[item.id]??item.remark)?"var(--text)":"var(--text3)",cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1,display:"block",minHeight:18}}>
+                        {(remarkOverrides[item.id]??item.remark)||"—"}
+                      </span>
+                  }
                 </td>
                 <td style={{textAlign:"right"}}>
                   {editQtyId===item.id
@@ -5260,26 +5297,28 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             );
             return (
               <div style={{overflowX:"auto"}}>
-              <table className="tbl" style={{width:"100%",minWidth:560}}>
+              <table className="tbl" style={{width:"100%",minWidth:780}}>
                 <thead><tr>
                   <th style={{width:32}}></th>
                   <th style={{width:80,whiteSpace:"nowrap"}}>{t.wsqtType}</th>
                   <th>{t.wsqPdfDescription}</th>
+                  <th style={{width:120,whiteSpace:"nowrap"}}>Part Type</th>
+                  <th style={{width:130}}>Remark</th>
                   <th style={{width:50,textAlign:"right"}}>{t.qty}</th>
                   <th style={{width:120,textAlign:"right"}}>{t.unitPrice}</th>
                   <th style={{width:100,textAlign:"right"}}>{t.total}</th>
                   <th style={{width:32}}></th>
                 </tr></thead>
                 <tbody>
-                  {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.07)"}}><td colSpan={7} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--blue)",borderBottom:"1px solid rgba(96,165,250,.2)",letterSpacing:".04em"}}>🔩 {t.wsqtPart} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{partItems.length} item{partItems.length!==1?"s":""}</span></td></tr>}
+                  {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.07)"}}><td colSpan={9} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--blue)",borderBottom:"1px solid rgba(96,165,250,.2)",letterSpacing:".04em"}}>🔩 {t.wsqtPart} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{partItems.length} item{partItems.length!==1?"s":""}</span></td></tr>}
                   {partItems.map(desktopRow)}
-                  {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.04)"}}><td colSpan={5} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Parts subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)",padding:"5px 8px"}}>{fmtAmt(partTotal)}</td><td/></tr>}
-                  {partItems.length>0&&labourItems.length>0&&<tr><td colSpan={7} style={{height:6,background:"var(--surface3)",padding:0}}/></tr>}
-                  {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.07)"}}><td colSpan={7} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--green)",borderBottom:"1px solid rgba(52,211,153,.2)",letterSpacing:".04em"}}>👷 {t.wsqtLabour} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{labourItems.length} item{labourItems.length!==1?"s":""}</span></td></tr>}
+                  {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.04)"}}><td colSpan={7} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Parts subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)",padding:"5px 8px"}}>{fmtAmt(partTotal)}</td><td/></tr>}
+                  {partItems.length>0&&labourItems.length>0&&<tr><td colSpan={9} style={{height:6,background:"var(--surface3)",padding:0}}/></tr>}
+                  {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.07)"}}><td colSpan={9} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--green)",borderBottom:"1px solid rgba(52,211,153,.2)",letterSpacing:".04em"}}>👷 {t.wsqtLabour} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{labourItems.length} item{labourItems.length!==1?"s":""}</span></td></tr>}
                   {labourItems.map(desktopRow)}
-                  {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.04)"}}><td colSpan={5} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Labour subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--green)",padding:"5px 8px"}}>{fmtAmt(labourTotal)}</td><td/></tr>}
+                  {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.04)"}}><td colSpan={7} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Labour subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--green)",padding:"5px 8px"}}>{fmtAmt(labourTotal)}</td><td/></tr>}
                   <tr style={{borderTop:"2px solid var(--border2)"}}>
-                    <td colSpan={5} style={{textAlign:"right",padding:"8px 12px",verticalAlign:"middle"}}>
+                    <td colSpan={7} style={{textAlign:"right",padding:"8px 12px",verticalAlign:"middle"}}>
                       {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:12,color:"var(--text3)"}}>{t.subtotal}: <span style={{fontFamily:"Rajdhani,sans-serif",color:"var(--text)"}}>{fmtAmt(quoteSubtotal)}</span></div>}
                       {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:12,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <span style={{fontFamily:"Rajdhani,sans-serif",color:"var(--text)"}}>{fmtAmt(quoteTax)}</span></div>}
                     </td>

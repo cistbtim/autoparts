@@ -5156,7 +5156,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                         <span key={i}
                           onClick={()=>isShop?setWsShopPartView({...sc,currentItem:item}):setPricePopup({item,costs:getSupCosts(item.description),markup:String(defaultMarkup),selIdx:i})}
                           title={defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price"}
-                          style={{fontSize:11,fontWeight:600,cursor:"pointer",borderRadius:4,padding:"2px 8px",color:isShop?"#34d399":"#f59e0b",background:isShop?"rgba(52,211,153,.1)":"rgba(251,191,36,.1)",border:`1px solid ${isShop?"rgba(52,211,153,.25)":"rgba(251,191,36,.25)"}`}}>
+                          style={{fontSize:11,fontWeight:600,cursor:"pointer",borderRadius:4,padding:"2px 8px",color:isShop?"#14532d":"#78350f",background:isShop?"rgba(52,211,153,.15)":"rgba(251,191,36,.18)",border:`1px solid ${isShop?"rgba(52,211,153,.4)":"rgba(251,191,36,.5)"}`}}>
                           {isShop?"🏪":"💰"} {sc.name}: {fmtAmt(sc.price)}
                         </span>
                         );
@@ -5239,7 +5239,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                         return (
                         <span key={i} title={isShop?(sc.part_id?`Part# ${sc.part_id} — click for details`:"Click for spare shop details"):(defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price")}
                           onClick={()=>isShop?setWsShopPartView({...sc,currentItem:item}):setPricePopup({item,costs:getSupCosts(item.description),markup:String(defaultMarkup),selIdx:i})}
-                          style={{fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,padding:"1px 6px",background:isShop?"rgba(22,163,74,.15)":"rgba(251,191,36,.1)",color:isShop?"#000":"#f59e0b",border:isShop?"1px solid rgba(22,163,74,.4)":"1px solid rgba(251,191,36,.25)"}}>
+                          style={{fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,padding:"1px 6px",background:isShop?"rgba(22,163,74,.15)":"rgba(251,191,36,.18)",color:isShop?"#14532d":"#78350f",border:isShop?"1px solid rgba(22,163,74,.4)":"1px solid rgba(251,191,36,.5)"}}>
                           {isShop?"🏪":"💰"} {sc.name}: {fmtAmt(sc.price)}{isShop&&sc.sku?<> · <code style={{fontFamily:"DM Mono,monospace",fontSize:9}}>{sc.sku}</code></>:""}
                         </span>
                         );

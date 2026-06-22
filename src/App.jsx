@@ -845,6 +845,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     tabRef.current === "picking" ||     // always pause when picking orders
     tabRef.current === "vehicles" ||    // always pause when managing vehicles
     tabRef.current === "workshop" ||    // always pause on workshop
+    tabRef.current === "wssuppliers" || // always pause on suppliers sub-tab
     tabRef.current === "sy_vehicles" || // always pause on scrapyard
     tabRef.current === "sy_parts" ||
     tabRef.current === "wscustomers" ||
@@ -1493,13 +1494,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     const {id,...rest}=sup;
     const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
     const clean=Object.fromEntries(Object.entries(rest).filter(([,v])=>v!=null));
-    if(id){ chkR(await api.patch("workshop_suppliers","id",id,clean),"Update supplier"); showToast("Supplier updated"); }
-    else { chkR(await api.insert("workshop_suppliers",{...clean,id:makeId("WSUP"),workshop_id:wsId||null}),"Add supplier"); showToast("Supplier added"); }
-    await refreshWorkshopData();
+    if(id){
+      chkR(await api.patch("workshop_suppliers","id",id,clean),"Update supplier");
+      setWorkshopSuppliers(prev=>prev.map(s=>s.id===id?{...s,...clean}:s));
+      showToast("Supplier updated");
+    } else {
+      const newId=makeId("WSUP");
+      const newSup={...clean,id:newId,workshop_id:wsId||null};
+      chkR(await api.insert("workshop_suppliers",newSup),"Add supplier");
+      setWorkshopSuppliers(prev=>[...prev,newSup].sort((a,b)=>(a.name||"").localeCompare(b.name||"")));
+      showToast("Supplier added");
+    }
   };
   const deleteWsSupplier=async(id)=>{
     await api.delete("workshop_suppliers","id",id);
-    await refreshWorkshopData(); showToast("Deleted","err");
+    setWorkshopSuppliers(prev=>prev.filter(s=>s.id!==id));
+    showToast("Deleted","err");
   };
   const saveWsSupplierQuote=async(qt)=>{
     const {id,...rest}=qt;

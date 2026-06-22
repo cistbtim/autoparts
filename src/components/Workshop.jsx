@@ -3183,6 +3183,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [editQtyVal,    setEditQtyVal]    = useState("");
   const [editMarkupId,  setEditMarkupId]  = useState(null);
   const [editMarkupVal, setEditMarkupVal] = useState("");
+  const [editDescId,    setEditDescId]    = useState(null);
+  const [editDescVal,   setEditDescVal]   = useState("");
   const [pricePopup,    setPricePopup]    = useState(null); // {item, costs, markup, selIdx}
   const [wsShopReqModal, setWsShopReqModal] = useState(false);
   const [wsShopPartView, setWsShopPartView] = useState(null); // spare shop part info popup
@@ -4789,6 +4791,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         {/* Parts & Labour */}
         {(()=>{
           const defaultMarkup = +(wsProfile?.default_markup_pct||0);
+          const commitDesc = async (item) => {
+            const v = editDescVal.trim();
+            if (v && v !== item.description) await onSaveItem({...item, description: v});
+            setEditDescId(null);
+          };
           const commitPrice = async (item) => {
             const newPrice = +editPriceVal;
             if (!isNaN(newPrice) && newPrice !== +item.unit_price) {
@@ -5118,7 +5125,13 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       {item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}
                     </span>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)"}}>{item.description}</div>
+                      {editDescId===item.id
+                        ?<input autoFocus value={editDescVal} onChange={e=>setEditDescVal(e.target.value)}
+                            onBlur={()=>commitDesc(item)}
+                            onKeyDown={e=>{if(e.key==="Enter")commitDesc(item);if(e.key==="Escape")setEditDescId(null);}}
+                            style={{width:"100%",fontSize:14,fontWeight:700,padding:"4px 8px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
+                        :<div onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(item.description||"");}}} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)"}}>{item.description}</div>
+                      }
                       {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2,display:"block"}}>{item.part_sku}</code>}
                     </div>
                     <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0,fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
@@ -5187,7 +5200,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 </td>
                 <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}</span></td>
                 <td style={{fontWeight:500}}>
-                  {item.description}{item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
+                  {editDescId===item.id
+                    ?<input autoFocus value={editDescVal} onChange={e=>setEditDescVal(e.target.value)}
+                        onBlur={()=>commitDesc(item)}
+                        onKeyDown={e=>{if(e.key==="Enter")commitDesc(item);if(e.key==="Escape")setEditDescId(null);}}
+                        style={{width:"100%",fontSize:13,fontWeight:600,padding:"3px 7px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
+                    :<span onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(item.description||"");}}} title={wsLocked?"":""} style={{cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{item.description}</span>
+                  }
+                  {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
                   {supCosts.length>0&&(
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
                       {supCosts.map((sc,i)=>{
@@ -5249,7 +5269,15 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             );
             return (
               <table className="tbl" style={{width:"100%"}}>
-                <thead><tr>{["",t.wsqtType,t.wsqPdfDescription,t.qty,t.unitPrice,t.total,""].map((h,i)=><th key={i}>{h}</th>)}</tr></thead>
+                <thead><tr>
+                  <th style={{width:32}}></th>
+                  <th style={{width:90,whiteSpace:"nowrap"}}>{t.wsqtType}</th>
+                  <th>{t.wsqPdfDescription}</th>
+                  <th style={{width:60,textAlign:"right"}}>{t.qty}</th>
+                  <th style={{width:130,textAlign:"right"}}>{t.unitPrice}</th>
+                  <th style={{width:110,textAlign:"right"}}>{t.total}</th>
+                  <th style={{width:36}}></th>
+                </tr></thead>
                 <tbody>
                   {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.07)"}}><td colSpan={7} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--blue)",borderBottom:"1px solid rgba(96,165,250,.2)",letterSpacing:".04em"}}>🔩 {t.wsqtPart} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{partItems.length} item{partItems.length!==1?"s":""}</span></td></tr>}
                   {partItems.map(desktopRow)}

@@ -35,8 +35,6 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [search,         setSearch]         = useState("");
   const [bookIn,         setBookIn]         = useState(false);
   const [wsTab,          setWsTab]          = useState(initialTab||"jobs");
-  // Sync external tab navigation (main app nav) into internal wsTab without remounting
-  useEffect(()=>{ if(initialTab) setWsTab(initialTab); },[initialTab]);
   const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:"", code:""});
   const [stmtCust,       setStmtCust]       = useState("");
   const [qInvModal,      setQInvModal]      = useState(null);
@@ -7463,12 +7461,16 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
   );
 }
 
+// Module-level cache so spare shop parts survive WorkshopPage remounts (tab switches)
+const _spCache={data:null,branchId:null};
+
 function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",ads=[],userCtx=null,onClearJobFilter}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
   const [showCheckout,setShowCheckout]=useState(false);
-  const [loading,setLoading]=useState(true);
+  const cachedMatch=_spCache.branchId===linkedBranchId&&_spCache.data;
+  const [loading,setLoading]=useState(!cachedMatch);
   const [myRequests,setMyRequests]=useState([]);
   const [printLabelPart,setPrintLabelPart]=useState(null);
   const [shelfModal,setShelfModal]=useState(false);
@@ -7498,7 +7500,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     return()=>clearInterval(timer);
   },[wsId,reqsRefreshKey]);
   const [reqsRefreshKey,setReqsRefreshKey]=useState(0);
-  const [shopParts,setShopParts]=useState([]);
+  const [shopParts,setShopPartsRaw]=useState(cachedMatch?_spCache.data:[]);
+  const setShopParts=(d)=>{_spCache.data=d;_spCache.branchId=linkedBranchId;setShopPartsRaw(d);};
   const [page,setPage]=useState(0);
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [stockOnly,setStockOnly]=useState(false);

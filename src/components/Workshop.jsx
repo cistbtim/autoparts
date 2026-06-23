@@ -81,6 +81,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [kanbanPayJob,    setKanbanPayJob]    = useState(null);
   const [dragOverColId,   setDragOverColId]   = useState(null);
   const dragJobRef = useRef(null);
+  const kanbanScrollRef = useRef(null);
+  const kDrag = useRef({on:false, x:0, sl:0, moved:false});
   const [jobsRefreshing,  setJobsRefreshing]  = useState(false);
 
   // Keep activeJob in sync when jobs array refreshes
@@ -963,7 +965,35 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           };
 
           return (
-            <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:24,alignItems:"flex-start",marginLeft:-4,marginRight:-4,paddingLeft:4,paddingRight:4}}>
+            <div
+              ref={kanbanScrollRef}
+              className="kanban-scroll"
+              style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:24,alignItems:"flex-start",marginLeft:-4,marginRight:-4,paddingLeft:4,paddingRight:4,cursor:"grab"}}
+              onMouseDown={e=>{
+                const el=kanbanScrollRef.current;
+                if(!el||e.button!==0) return;
+                kDrag.current={on:true,x:e.pageX,sl:el.scrollLeft,moved:false};
+                el.style.cursor="grabbing";
+                el.style.userSelect="none";
+              }}
+              onMouseMove={e=>{
+                if(!kDrag.current.on) return;
+                const dx=e.pageX-kDrag.current.x;
+                if(Math.abs(dx)>5) kDrag.current.moved=true;
+                if(kanbanScrollRef.current) kanbanScrollRef.current.scrollLeft=kDrag.current.sl-dx;
+              }}
+              onMouseUp={()=>{
+                kDrag.current.on=false;
+                if(kanbanScrollRef.current){kanbanScrollRef.current.style.cursor="grab";kanbanScrollRef.current.style.userSelect="";}
+              }}
+              onMouseLeave={()=>{
+                kDrag.current.on=false;
+                if(kanbanScrollRef.current){kanbanScrollRef.current.style.cursor="grab";kanbanScrollRef.current.style.userSelect="";}
+              }}
+              onClickCapture={e=>{
+                if(kDrag.current.moved){e.stopPropagation();kDrag.current.moved=false;}
+              }}
+            >
               {COLS.map(col=>{
                 const isCollapsed=collapsedCols.has(col.id);
                 if(isCollapsed) return (

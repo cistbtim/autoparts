@@ -4,3 +4,9 @@ dist
 .env.local
 .gstack/
 migration_secrets.py
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example

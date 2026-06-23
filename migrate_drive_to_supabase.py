@@ -43,17 +43,22 @@ DB_HEADERS = {
 # ── Table / column definitions ─────────────────────────────────────────────────
 # Format: (table_name, [(col_name, storage_subfolder, is_pdf)], extra_select_cols)
 MIGRATION_TARGETS = [
-    ("parts",                  [("image_url",  "parts",     False)], []),
-    ("supplier_catalogue",     [("image_url",  "supplier_catalogue", False)], ["supplier_id"]),
-    ("vehicles",               [("photo_front","catalogue", False),
-                                ("photo_rear", "catalogue", False),
-                                ("photo_side", "catalogue", False)], []),
-    ("workshop_vehicles",      [("photo_front","ws_vehicles",False),
-                                ("photo_rear", "ws_vehicles",False),
-                                ("photo_side", "ws_vehicles",False)], []),
-    ("workshop_job_photos",    [("url",        "bookings",  False)], ["job_id"]),
-    ("workshop_job_checklist", [("photo_url",  "checklist", False)], ["item_key"]),
-    ("workshop_documents",     [("file_url",   "documents", None)],  ["mime_type","file_type"]),
+    ("parts",                  [("image_url",  "parts",            False)], []),
+    ("supplier_catalogue",     [("image_url",  "supplier_catalogue",False)], ["supplier_id"]),
+    ("vehicles",               [("photo_front","catalogue",         False),
+                                ("photo_rear", "catalogue",         False),
+                                ("photo_side", "catalogue",         False)], []),
+    ("workshop_vehicles",      [("photo_front","ws_vehicles",       False),
+                                ("photo_rear", "ws_vehicles",       False),
+                                ("photo_side", "ws_vehicles",       False)], []),
+    ("workshop_job_photos",    [("url",        "bookings",          False)], ["job_id"]),
+    ("workshop_job_checklist", [("photo_url",  "checklist",         False)], ["item_key"]),
+    ("workshop_documents",     [("file_url",   "documents",         None)],  ["mime_type","file_type"]),
+    # Logos & banners
+    ("settings",               [("logo_url",   "logos/settings",    False)], []),
+    ("workshop_profiles",      [("logo_url",   "logos/workshops",   False)], ["name"]),
+    ("branches",               [("logo_url",   "logos/branches",    False)], ["name"]),
+    ("ads",                    [("image_url",  "banners",           False)], ["title","page"]),
 ]
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -239,6 +244,13 @@ def main():
         "job_photos":         "workshop_job_photos",
         "checklist":          "workshop_job_checklist",
         "documents":          "workshop_documents",
+        "settings":           "settings",
+        "logos":              "settings",
+        "workshop_profiles":  "workshop_profiles",
+        "ws_profiles":        "workshop_profiles",
+        "branches":           "branches",
+        "ads":                "ads",
+        "banners":            "ads",
     }
 
     print("=" * 62)

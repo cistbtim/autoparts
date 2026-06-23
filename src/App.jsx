@@ -1011,7 +1011,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   // Parts
   const savePart=async(data, keepOpen=false)=>{
     const ep=mData("editPart");
-    if(ep){
+    if(ep?.id){
       const d2={...data,image_url:toSaveUrl(data.image_url)};
       setBusyMsg(`Saving ${d2.sku||ep.sku||"part"}…`);
       const result=await api.patch("parts","id",ep.id,d2).finally(()=>setBusyMsg(null));

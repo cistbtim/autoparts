@@ -44,6 +44,7 @@ DB_HEADERS = {
 # Format: (table_name, [(col_name, storage_subfolder, is_pdf)], extra_select_cols)
 MIGRATION_TARGETS = [
     ("parts",                  [("image_url",  "parts",     False)], []),
+    ("supplier_catalogue",     [("image_url",  "supplier_catalogue", False)], ["supplier_id"]),
     ("vehicles",               [("photo_front","catalogue", False),
                                 ("photo_rear", "catalogue", False),
                                 ("photo_side", "catalogue", False)], []),
@@ -228,14 +229,16 @@ def main():
     args = parser.parse_args()
 
     TABLE_ALIASES = {
-        "parts":      "parts",
-        "vehicles":   "vehicles",
-        "catalogue":  "vehicles",
-        "ws_vehicles":"workshop_vehicles",
-        "workshop_vehicles":"workshop_vehicles",
-        "job_photos": "workshop_job_photos",
-        "checklist":  "workshop_job_checklist",
-        "documents":  "workshop_documents",
+        "parts":              "parts",
+        "supplier_catalogue": "supplier_catalogue",
+        "sup_catalogue":      "supplier_catalogue",
+        "vehicles":           "vehicles",
+        "catalogue":          "vehicles",
+        "ws_vehicles":        "workshop_vehicles",
+        "workshop_vehicles":  "workshop_vehicles",
+        "job_photos":         "workshop_job_photos",
+        "checklist":          "workshop_job_checklist",
+        "documents":          "workshop_documents",
     }
 
     print("=" * 62)

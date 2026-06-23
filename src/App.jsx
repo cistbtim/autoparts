@@ -109,10 +109,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const wsRole = user.wsRole || "main"; // workshop sub-role: "main" | "manager" | "mechanic"
   // workshop_id scopes all workshop data to this user's own records
   const wsId  = role==="workshop"  ? String(user.id) : null;
-  const scrapId = role==="scrapyard" ? String(user.id) : null;
+  const scrapId = (role==="scrapyard"||role==="scrapyard_admin") ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const isBranchUser = BRANCH_ROLES.includes(role);
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":role==="scrapyard"?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":isBranchUser?"inventory":role==="demo"?"inventory":"dashboard";
+  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":isBranchUser?"inventory":role==="demo"?"inventory":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
@@ -359,7 +359,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   setDemoMode(isDemo, ()=>showToast("🔒 Demo mode — sign up to save changes","err"));
 
   // Spare shop mode: scrapyard account that only manages parts, no sales/orders system
-  const isSpareShop = role==="scrapyard" && !!workshopProfile.spare_shop_mode;
+  const isSpareShop = (role==="scrapyard"||role==="scrapyard_admin") && !!workshopProfile.spare_shop_mode;
 
   // For workshop/scrapyard roles: merge their profile over shop settings so logo/name/contacts show correctly
   const wsDisplaySettings = (wsId || scrapId) ? {
@@ -489,7 +489,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     // LAZY: load secondary data in background
     // Role-scoped: skip tables the current role will never use
     const needsWs  = !isSalesman&&(role==="admin"||role==="manager"||role==="workshop"||role==="demo");
-    const needsScrap = !isSalesman&&(role==="admin"||role==="scrapyard"||role==="demo");
+    const needsScrap = !isSalesman&&(role==="admin"||role==="scrapyard"||role==="scrapyard_admin"||role==="demo");
     const needsAdmin = !isSalesman&&(role==="admin"||role==="demo");
     const BG_TABLES=["customers","users","inventory_logs",needsAdmin?"login_logs":null,"inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","vehicles","part_fitments","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes",needsWs?"workshop_jobs":null,needsWs?"workshop_job_items":null,needsWs?"workshop_invoices":null,needsWs?"workshop_quotes":null,needsWs?"workshop_customers":null,needsWs?"workshop_vehicles":null,"customer_queries",needsWs?"workshop_stock":null,needsWs?"workshop_services":null,needsWs?"workshop_documents":null,needsWs?"workshop_profiles":null,needsWs?"workshop_suppliers":null,needsWs?"ws_supplier_requests":null,needsWs?"ws_supplier_quotes":null,needsWs?"ws_supplier_invoices":null,needsWs?"ws_supplier_invoice_items":null,needsWs?"ws_supplier_payments":null,needsWs?"ws_supplier_returns":null,needsWs?"ws_sq_replies":null,needsWs?"ws_purchase_orders":null,needsWs?"ws_po_items":null,needsWs?"ws_licence_renewals":null,needsWs?"workshop_bookings":null,needsScrap?"scrapyard_vehicles":null,needsScrap?"scrapyard_parts":null,needsScrap?"scrapyard_profiles":null].filter(Boolean);
     setBgLoading(BG_TABLES.length);
@@ -2910,7 +2910,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {id:"stocktake",icon:"🔢",label:t.stockTake},
       {id:"stockmove",icon:"🔀",label:t.stockMove},
     ];
-    if(role==="scrapyard") return [
+    if(role==="scrapyard"||role==="scrapyard_admin") return [
       {id:"sy_dashboard",icon:"📊", label:t.syDashboard||"Dashboard"},
       {id:"sy_parts",    icon:"📦", label:t.syParts||"Parts", badge:scrapLowStock.length},
       ...(!isSpareShop?[
@@ -3986,7 +3986,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {tab.startsWith("sy_")&&<AdBanner ads={liveAds} page="scrapyard" userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}/>}
 
         {/* ── SCRAPYARD DASHBOARD ── */}
-        {tab==="sy_dashboard"&&role==="scrapyard"&&(
+        {tab==="sy_dashboard"&&(role==="scrapyard"||role==="scrapyard_admin")&&(
           <SyDashboardPage
             scrapVehicles={scrapVehicles}
             scrapParts={scrapParts}
@@ -4020,37 +4020,37 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {/* ── SCRAPYARD SETTINGS ── */}
-        {tab==="sy_settings"&&role==="scrapyard"&&(
+        {tab==="sy_settings"&&(role==="scrapyard"||role==="scrapyard_admin")&&(
           <ScrapyardProfilePage profile={workshopProfile} onSave={saveScrapProfile}/>
         )}
 
         {/* ── SCRAPYARD ORDERS ── */}
-        {tab==="sy_orders"&&role==="scrapyard"&&(
+        {tab==="sy_orders"&&(role==="scrapyard"||role==="scrapyard_admin")&&(
           <SyOrdersPage scrapId={scrapId} syOrders={syOrders} syCustomers={syCustomers} scrapParts={scrapParts} scrapVehicles={scrapVehicles} syInvoices={syInvoices} onRefresh={refreshScrapyardData} showToast={showToast} settings={wsDisplaySettings}/>
         )}
 
         {/* ── SCRAPYARD PICKING ── */}
-        {tab==="sy_picking"&&role==="scrapyard"&&(
+        {tab==="sy_picking"&&(role==="scrapyard"||role==="scrapyard_admin")&&(
           <SyPickingPage scrapId={scrapId} syOrders={syOrders} scrapParts={scrapParts} onRefresh={refreshScrapyardData} showToast={showToast}/>
         )}
 
         {/* ── SCRAPYARD INVOICES ── */}
-        {tab==="sy_invoices"&&role==="scrapyard"&&(
+        {tab==="sy_invoices"&&(role==="scrapyard"||role==="scrapyard_admin")&&(
           <SyInvoicesPage scrapId={scrapId} syInvoices={syInvoices} syOrders={syOrders} onRefresh={refreshScrapyardData} showToast={showToast} settings={wsDisplaySettings}/>
         )}
 
         {/* ── SCRAPYARD CUSTOMERS ── */}
-        {tab==="sy_customers"&&role==="scrapyard"&&(
+        {tab==="sy_customers"&&(role==="scrapyard"||role==="scrapyard_admin")&&(
           <SyCustomersPage scrapId={scrapId} syCustomers={syCustomers} onRefresh={refreshScrapyardData} showToast={showToast}/>
         )}
 
         {/* ── SCRAPYARD RETURNS ── */}
-        {tab==="sy_returns"&&role==="scrapyard"&&(
+        {tab==="sy_returns"&&(role==="scrapyard"||role==="scrapyard_admin")&&(
           <SyReturnsPage scrapId={scrapId} syReturns={syReturns} syInvoices={syInvoices} syOrders={syOrders} onRefresh={refreshScrapyardData} showToast={showToast}/>
         )}
 
         {/* ── SCRAPYARD GATE CHECK ── */}
-        {tab==="sy_gate"&&role==="scrapyard"&&(
+        {tab==="sy_gate"&&(role==="scrapyard"||role==="scrapyard_admin")&&(
           <SyGatePage scrapId={scrapId} syInvoices={syInvoices} syOrders={syOrders} onRefresh={refreshScrapyardData} showToast={showToast} settings={wsDisplaySettings}/>
         )}
 

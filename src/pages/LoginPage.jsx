@@ -193,7 +193,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(!scrapUser||!scrapPass){setErr(t.wrongPass);return;}
     setLoading(true);setErr("");setExpiredInfo(null);
     const company = scrapCompany.trim();
-    let q = `username=eq.${encodeURIComponent(scrapUser)}&password=eq.${encodeURIComponent(scrapPass)}&role=eq.scrapyard&select=*`;
+    let q = `username=eq.${encodeURIComponent(scrapUser)}&password=eq.${encodeURIComponent(scrapPass)}&role=in.(scrapyard,scrapyard_admin)&select=*`;
     if(company) q += `&name=ilike.*${encodeURIComponent(company)}*`;
     const res = await api.get("users", q);
     if(Array.isArray(res)&&res.length>0){
@@ -232,7 +232,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
     const today=new Date().toISOString().slice(0,10);
     const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
-    const newUser=await api.insert("users",{username:scrapRegUser,password:scrapRegPass,name:scrapRegName,role:"scrapyard",phone:scrapRegPhone||"",email:scrapRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
+    const newUser=await api.insert("users",{username:scrapRegUser,password:scrapRegPass,name:scrapRegName,role:"scrapyard_admin",phone:scrapRegPhone||"",email:scrapRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
     if(!newUser||newUser.code){setErr("Signup failed: "+(newUser?.message||"unknown error"));setLoading(false);return;}
     const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
     if(!loginUser||loginUser.code){setErr("Signup failed");setLoading(false);return;}

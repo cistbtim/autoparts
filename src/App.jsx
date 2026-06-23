@@ -129,6 +129,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [loginLogs,setLoginLogs]=useState([]);
   const [adClicks,setAdClicks]=useState([]);
   const [adClicksLoading,setAdClicksLoading]=useState(false);
+  const [trialRegs,setTrialRegs]=useState([]);
+  const [trialRegsLoading,setTrialRegsLoading]=useState(false);
   const [loginLogsLoading,setLoginLogsLoading]=useState(false);
   const [confirmRefreshLogs,setConfirmRefreshLogs]=useState(false);
   const [selectedMapCountry,setSelectedMapCountry]=useState(null);
@@ -4838,6 +4840,65 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {/* ── USERS ── */}
         {tab==="users"&&role==="admin"&&(
           <div className="fu">
+            {/* Trial Registrations */}
+            <div className="card" style={{marginBottom:18,overflow:"hidden"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderBottom:"1px solid var(--border)"}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:15}}>🎁 Trial Registrations</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>Spare shops &amp; scrapyards that signed up via the supplier reply page</div>
+                </div>
+                <button className="btn btn-ghost btn-sm" disabled={trialRegsLoading}
+                  onClick={async()=>{
+                    setTrialRegsLoading(true);
+                    const rows=await api.get("registrations","select=*&order=created_at.desc").catch(()=>[]);
+                    setTrialRegs(Array.isArray(rows)?rows:[]);
+                    setTrialRegsLoading(false);
+                  }}>
+                  <span style={{display:"inline-block",animation:trialRegsLoading?"spin 0.8s linear infinite":"none"}}>🔄</span> {trialRegs.length>0?`${trialRegs.length} loaded`:"Load"}
+                </button>
+              </div>
+              {trialRegs.length>0&&(
+                <div className="tbl-wrap">
+                  <table className="tbl">
+                    <thead><tr>{["Business","Type","Contact","Phone","City","Registered",""].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {trialRegs.map(r=>(
+                        <tr key={r.id} style={{opacity:r.status==="handled"?0.45:1}}>
+                          <td><div style={{fontWeight:600}}>{r.business_name||"—"}</div></td>
+                          <td><span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:11}}>{r.business_type==="scrapyard"?"♻️ Scrapyard":"🏪 Spare Shop"}</span></td>
+                          <td style={{fontSize:13}}>{r.contact_name||"—"}</td>
+                          <td style={{fontSize:13,fontFamily:"DM Mono,monospace"}}>{r.phone||"—"}</td>
+                          <td style={{fontSize:12,color:"var(--text3)"}}>{r.city||"—"}</td>
+                          <td style={{fontSize:11,color:"var(--text3)"}}>{r.created_at?new Date(r.created_at).toLocaleDateString():""}</td>
+                          <td>
+                            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                              {r.status!=="handled"&&(
+                                <button className="btn btn-primary btn-sm"
+                                  onClick={()=>openM("editUser",{name:r.contact_name||"",phone:r.phone||"",email:r.email||"",role:"manager",username:"",password:"",_regId:r.id})}>
+                                  👤 Create Account
+                                </button>
+                              )}
+                              {r.status==="handled"
+                                ?<span style={{fontSize:11,color:"var(--green)",fontWeight:600}}>✅ Done</span>
+                                :<button className="btn btn-ghost btn-sm" style={{fontSize:11}}
+                                    onClick={async()=>{
+                                      await api.patch("registrations","id",r.id,{status:"handled"});
+                                      setTrialRegs(p=>p.map(x=>x.id===r.id?{...x,status:"handled"}:x));
+                                    }}>Mark Done</button>
+                              }
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {trialRegs.length===0&&!trialRegsLoading&&(
+                <div style={{padding:"20px 16px",color:"var(--text3)",fontSize:13,textAlign:"center"}}>Click Load to fetch registrations</div>
+              )}
+            </div>
+
             <PH title={t.users} subtitle={`${users.length} users`}
               action={<div style={{display:"flex",gap:8}}><button className="btn btn-ghost" onClick={()=>openM("editUser",{role:"workshop",username:"",password:"",name:"",phone:"",email:""})}>🔧 Add Workshop</button><button className="btn btn-primary" onClick={()=>openM("editUser")}>+ Add User</button></div>}/>
             <div className="card" style={{overflow:"hidden"}}>

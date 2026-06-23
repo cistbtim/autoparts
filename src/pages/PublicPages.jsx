@@ -1052,8 +1052,23 @@ export function WsSupplierQuoteReplyPage({token}) {
             background:saving?"#334155":"#0ea5e9",color:"#fff",fontSize:15,fontWeight:700,cursor:saving?"not-allowed":"pointer",marginTop:8}}>
           {saving?"Submitting…":"✅ Submit Quote"}
         </button>
-        <div style={{textAlign:"center",fontSize:11,color:"#475569",marginTop:12}}>
-          Powered by MotorDesk
+        {/* Promo banner */}
+        <div style={{marginTop:20,borderRadius:14,overflow:"hidden",background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0ea5e9 100%)",padding:"18px 20px",textAlign:"center",boxShadow:"0 4px 24px rgba(14,165,233,.25)"}}>
+          <div style={{fontSize:20,marginBottom:4}}>🔧🚗📱</div>
+          <div style={{fontWeight:800,fontSize:15,color:"#fff",lineHeight:1.3,marginBottom:6}}>
+            Register your Spare Shop or Scrapyard
+          </div>
+          <div style={{fontSize:12,color:"#bae6fd",marginBottom:12,lineHeight:1.5}}>
+            Get your own web system on desktop &amp; mobile phone.<br/>
+            Manage inventory, quotes, invoices &amp; customers — all in one place.
+          </div>
+          <div style={{display:"inline-block",background:"#f97316",color:"#fff",fontWeight:700,fontSize:13,
+            borderRadius:8,padding:"8px 20px",marginBottom:10,letterSpacing:".3px"}}>
+            🎁 2-Month Free Trial
+          </div>
+          <div style={{fontSize:11,color:"#7dd3fc"}}>
+            Powered by <strong style={{color:"#fff"}}>MotorDesk</strong>
+          </div>
         </div>
       </div>
     </div>

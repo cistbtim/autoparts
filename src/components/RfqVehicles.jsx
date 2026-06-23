@@ -1725,7 +1725,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, t}) {
+export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, onAddPart, t}) {
   const [selMake, setSelMake] = useState(null);  // null = makes level
   const [search,  setSearch]  = useState("");
   const [searchD, setSearchD] = useState("");
@@ -1905,6 +1905,8 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
               <div style={{display:"flex",gap:6,flexShrink:0}}>
                 {onViewInShop&&<button className="btn btn-ghost btn-xs" style={{color:"var(--green)",borderColor:"var(--green)"}}
                   onClick={()=>onViewInShop(v.make,v.model)}>🛒 Shop</button>}
+                {onAddPart&&<button className="btn btn-ghost btn-xs" style={{color:"var(--accent)",borderColor:"var(--accent)"}}
+                  onClick={()=>onAddPart(v)} title={`Add new part with SKU ${v.code}-`}>+ Part</button>}
                 <button className="btn btn-ghost btn-xs" onClick={()=>setEditV({...v})}>✏️ Edit</button>
                 <button className="btn btn-danger btn-xs"
                   onClick={()=>{if(window.confirm(`Delete ${v.make} ${v.model}?`))onDelete(v.id);}}>🗑</button>

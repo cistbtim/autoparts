@@ -5466,7 +5466,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
 
         {tab==="vehicles"&&(role==="admin"||role==="branch_admin")&&(
           <VehiclesPage vehicles={vehicles} partFitments={partFitments} onSave={saveVehicle} onDelete={deleteVehicle}
-            onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}} t={t}/>
+            onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
+            onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
+            t={t}/>
         )}
 
         {tab==="branches"&&role==="admin"&&(
@@ -5711,6 +5713,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           part={ep}
           initialTab={ep?._tab}
           initialFitSearch={ep?._fitSearch||""}
+          initialF={ep?._initialF||null}
           prevPart={prevPart}
           nextPart={nextPart}
           vehicles={vehicles} partFitments={partFitments}

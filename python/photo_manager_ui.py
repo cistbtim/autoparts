@@ -102,12 +102,14 @@ class PasteCleanTab:
         self.tab = ttk.Frame(notebook)
         notebook.add(self.tab, text="  ✂️  Paste & Clean  ")
 
-        self.orig_pil  = None   # original PIL image
-        self.work_pil  = None   # current working copy (after previous removes)
-        self.scale     = 1.0
-        self.rects     = []     # confirmed rectangles (canvas coords)
+        self.orig_pil    = None   # original PIL image
+        self.work_pil    = None   # current working copy (after previous removes)
+        self.scale       = 1.0
+        self.selections  = []     # list of {"type":"rect","coords":(...)} or {"type":"poly","points":[...]}
+        self.sel_mode    = "rect"
         self._drag_start = None
-        self._cur_rect   = None
+        self._poly_pts   = []     # in-progress freehand points
+        self._cur_item   = None   # canvas item being drawn
 
         self._build()
         # Bind Ctrl+V globally
@@ -117,6 +119,16 @@ class PasteCleanTab:
     def _build(self):
         top = tk.Frame(self.tab, bg=BG)
         top.pack(fill="x", padx=16, pady=(10, 4))
+
+        # Mode toggle row
+        mode_row = tk.Frame(top, bg=BG)
+        mode_row.pack(fill="x", pady=(0, 4))
+        lbl(mode_row, "Selection:", colour=FG2).pack(side="left", padx=(0, 6))
+        self._btn_rect = self._btn("▭ Rectangle", mode_row, lambda: self._set_mode("rect"), ACCENT)
+        self._btn_rect.pack(side="left", padx=(0, 4))
+        self._btn_free = self._btn("✏ Freehand", mode_row, lambda: self._set_mode("free"), SURFACE)
+        self._btn_free.config(fg=FG)
+        self._btn_free.pack(side="left")
 
         # Buttons row
         btn_row = tk.Frame(top, bg=BG)
@@ -149,6 +161,15 @@ class PasteCleanTab:
         self.canvas.bind("<B1-Motion>",       self._on_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
 
+    def _set_mode(self, mode):
+        self.sel_mode = mode
+        if mode == "rect":
+            self._btn_rect.config(bg=ACCENT, fg=BG)
+            self._btn_free.config(bg=SURFACE, fg=FG)
+        else:
+            self._btn_rect.config(bg=SURFACE, fg=FG)
+            self._btn_free.config(bg=ACCENT, fg=BG)
+
     def _btn(self, text, parent, cmd, colour=ACCENT):
         return tk.Button(parent, text=text, command=cmd,
                          bg=colour, fg=BG, font=("Segoe UI", 9, "bold"),
@@ -168,10 +189,10 @@ class PasteCleanTab:
             if not hasattr(img, "size"):
                 self._status("⚠  Clipboard does not contain an image.", RED_C)
                 return
-            self.orig_pil  = img.convert("RGB")
-            self.work_pil  = self.orig_pil.copy()
-            self._history  = []
-            self.rects     = []
+            self.orig_pil    = img.convert("RGB")
+            self.work_pil    = self.orig_pil.copy()
+            self._history    = []
+            self.selections  = []
             self._render()
             self._status(f"✓ Image pasted  ({img.width}×{img.height})  — drag to select area to remove", GREEN)
         except Exception as e:
@@ -197,9 +218,13 @@ class PasteCleanTab:
         self._tk_img = ImageTk.PhotoImage(img)
         self.canvas.delete("all")
         self.canvas.create_image(self._ox, self._oy, anchor="nw", image=self._tk_img)
-        # Redraw confirmed rects
-        for r in self.rects:
-            self.canvas.create_rectangle(*r, outline="#f9e2af", width=2, dash=(4, 2))
+        for sel in self.selections:
+            if sel["type"] == "rect":
+                self.canvas.create_rectangle(*sel["coords"], outline="#f9e2af", width=2, dash=(4, 2))
+            else:
+                flat = [c for pt in sel["points"] for c in pt] + list(sel["points"][0])
+                if len(flat) >= 4:
+                    self.canvas.create_line(flat, fill="#f9e2af", width=2, dash=(4, 2))
 
     # ── mouse drag ─────────────────────────────────────────────────────────────
 
@@ -207,32 +232,61 @@ class PasteCleanTab:
         if self.work_pil is None:
             return
         self._drag_start = (e.x, e.y)
-        if self._cur_rect:
-            self.canvas.delete(self._cur_rect)
-        self._cur_rect = None
+        if self._cur_item:
+            self.canvas.delete(self._cur_item)
+        self._cur_item = None
+        if self.sel_mode == "free":
+            self._poly_pts = [(e.x, e.y)]
 
     def _on_drag(self, e):
         if self._drag_start is None:
             return
-        if self._cur_rect:
-            self.canvas.delete(self._cur_rect)
-        x0, y0 = self._drag_start
-        self._cur_rect = self.canvas.create_rectangle(
-            x0, y0, e.x, e.y,
-            outline=YELLOW, width=2, dash=(4, 2)
-        )
+        if self.sel_mode == "rect":
+            if self._cur_item:
+                self.canvas.delete(self._cur_item)
+            x0, y0 = self._drag_start
+            self._cur_item = self.canvas.create_rectangle(
+                x0, y0, e.x, e.y,
+                outline=YELLOW, width=2, dash=(4, 2)
+            )
+        else:
+            # freehand — skip if barely moved from last point
+            if self._poly_pts:
+                px, py = self._poly_pts[-1]
+                if abs(e.x - px) < 2 and abs(e.y - py) < 2:
+                    return
+            self._poly_pts.append((e.x, e.y))
+            if self._cur_item:
+                self.canvas.delete(self._cur_item)
+            if len(self._poly_pts) >= 2:
+                flat = [c for pt in self._poly_pts for c in pt]
+                self._cur_item = self.canvas.create_line(
+                    flat, fill=YELLOW, width=2, dash=(4, 2)
+                )
 
     def _on_release(self, e):
         if self._drag_start is None:
             return
-        x0, y0 = self._drag_start
-        x1, y1 = e.x, e.y
-        if abs(x1 - x0) < 5 or abs(y1 - y0) < 5:
-            self._drag_start = None
-            return
-        self.rects.append((min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)))
+        if self._cur_item:
+            self.canvas.delete(self._cur_item)
+            self._cur_item = None
+        if self.sel_mode == "rect":
+            x0, y0 = self._drag_start
+            x1, y1 = e.x, e.y
+            if abs(x1 - x0) < 5 or abs(y1 - y0) < 5:
+                self._drag_start = None
+                return
+            self.selections.append({"type": "rect", "coords": (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))})
+        else:
+            if len(self._poly_pts) < 3:
+                self._drag_start = None
+                self._poly_pts = []
+                return
+            self.selections.append({"type": "poly", "points": list(self._poly_pts)})
+            self._poly_pts = []
         self._drag_start = None
-        self._status(f"{len(self.rects)} area(s) selected — click ✂️ Remove Selection", YELLOW)
+        self._render()
+        self._status(f"{len(self.selections)} area(s) selected — click ✂️ Remove Selection", YELLOW)
 
     # ── remove ─────────────────────────────────────────────────────────────────
 
@@ -240,8 +294,8 @@ class PasteCleanTab:
         return (cx - self._ox) / self.scale, (cy - self._oy) / self.scale
 
     def _remove_selection(self):
-        if not self.rects:
-            self._status("⚠  Draw a selection rectangle first.", RED_C)
+        if not self.selections:
+            self._status("⚠  Draw a selection first.", RED_C)
             return
         if self.work_pil is None:
             return
@@ -253,21 +307,29 @@ class PasteCleanTab:
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             h, w = img.shape[:2]
             mask = np.zeros((h, w), np.uint8)
-            for (cx0, cy0, cx1, cy1) in self.rects:
-                ix0, iy0 = self._canvas_to_img(cx0, cy0)
-                ix1, iy1 = self._canvas_to_img(cx1, cy1)
-                x0 = max(0, int(min(ix0, ix1)))
-                y0 = max(0, int(min(iy0, iy1)))
-                x1 = min(w, int(max(ix0, ix1)))
-                y1 = min(h, int(max(iy0, iy1)))
-                mask[y0:y1, x0:x1] = 255
+            for sel in self.selections:
+                if sel["type"] == "rect":
+                    cx0, cy0, cx1, cy1 = sel["coords"]
+                    ix0, iy0 = self._canvas_to_img(cx0, cy0)
+                    ix1, iy1 = self._canvas_to_img(cx1, cy1)
+                    x0 = max(0, int(min(ix0, ix1)))
+                    y0 = max(0, int(min(iy0, iy1)))
+                    x1 = min(w, int(max(ix0, ix1)))
+                    y1 = min(h, int(max(iy0, iy1)))
+                    mask[y0:y1, x0:x1] = 255
+                else:
+                    pts_img = np.array([[
+                        int(round((px - self._ox) / self.scale)),
+                        int(round((py - self._oy) / self.scale))
+                    ] for px, py in sel["points"]], dtype=np.int32)
+                    cv2.fillPoly(mask, [pts_img], 255)
             result = cv2.inpaint(img, mask, inpaintRadius=12, flags=cv2.INPAINT_TELEA)
             from PIL import Image
             if not hasattr(self, "_history"):
                 self._history = []
             self._history.append(self.work_pil.copy())
             self.work_pil = Image.fromarray(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
-            self.rects = []
+            self.selections = []
             self._render()
             self._status("✓ Area removed. Draw more selections or Save.", GREEN)
         except ImportError:
@@ -316,7 +378,7 @@ class PasteCleanTab:
             cy0 = iy0 * self.scale + self._oy
             cx1 = ix1 * self.scale + self._ox
             cy1 = iy1 * self.scale + self._oy
-            self.rects.append((cx0, cy0, cx1, cy1))
+            self.selections.append({"type": "rect", "coords": (cx0, cy0, cx1, cy1)})
             self._render()
             self._status("✓ Logo detected! Click ✂️ Remove Selection to apply.", GREEN)
         except Exception as e:
@@ -329,12 +391,12 @@ class PasteCleanTab:
             self._status("⚠  Nothing to undo.", FG2)
             return
         self.work_pil = self._history.pop()
-        self.rects = []
+        self.selections = []
         self._render()
         self._status("↩ Undone.", YELLOW)
 
     def _clear_rects(self):
-        self.rects = []
+        self.selections = []
         self._render()
         self._status("Selections cleared.", FG2)
 

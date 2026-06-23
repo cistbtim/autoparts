@@ -3066,6 +3066,13 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
                       style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",background:existingQuote?"rgba(52,211,153,.12)":"var(--surface3)",cursor:"pointer",color:existingQuote?"var(--green)":"var(--text2)",fontWeight:600}}>
                       {existingQuote?"✏️ Edit Quote":"💰 Enter Quote"}
                     </button>
+                    {r.token&&(
+                      <button
+                        onClick={()=>{const url=`${window.location.origin}?wsq=${r.token}`;navigator.clipboard.writeText(url).then(()=>alert("Link copied!")).catch(()=>alert(url));}}
+                        style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(56,189,248,.4)",background:"rgba(56,189,248,.08)",cursor:"pointer",color:"#38bdf8",fontWeight:600}}>
+                        📋 Copy Link
+                      </button>
+                    )}
                     {onDeleteSend&&(
                       <button
                         onClick={()=>{ if(window.confirm("Delete this send record and its entered quote prices?")) onDeleteSend(r.id); }}

@@ -5710,7 +5710,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         const prevPart=idx>0?sortedBySku[idx-1]:null;
         const nextPart=idx>=0&&idx<sortedBySku.length-1?sortedBySku[idx+1]:null;
         return isOpen("editPart")&&<PartModal
-          part={ep}
+          part={ep?._initialF ? null : ep}
           initialTab={ep?._tab}
           initialFitSearch={ep?._fitSearch||""}
           initialF={ep?._initialF||null}

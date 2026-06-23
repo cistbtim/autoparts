@@ -3104,7 +3104,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
                     </button>
                     {r.token&&(
                       <button
-                        onClick={()=>{const url=`${window.location.origin}?wsq=${r.token}`;navigator.clipboard.writeText(url).then(()=>alert("Link copied!")).catch(()=>alert(url));}}
+                        onClick={()=>{const url=`${window.location.origin}?ws_supreq=${r.token}`;navigator.clipboard.writeText(url).then(()=>alert("Link copied!")).catch(()=>alert(url));}}
                         style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(56,189,248,.4)",background:"rgba(56,189,248,.08)",cursor:"pointer",color:"#38bdf8",fontWeight:600}}>
                         📋 Copy Link
                       </button>

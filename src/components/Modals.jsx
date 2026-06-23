@@ -4789,7 +4789,7 @@ export function CustomerModal({customer,onSave,onClose,t}) {
 
 export function UserModal({user,onSave,onClose,t}) {
   const isEdit=!!user?.id;
-  const [f,setF]=useState(isEdit?{username:user.username,password:"",role:user.role,name:user.name||"",phone:user.phone||"",email:user.email||""}:{username:"",password:"",role:user?.role||"customer",name:"",phone:"",email:""});
+  const [f,setF]=useState(isEdit?{username:user.username,password:"",role:user.role,name:user.name||"",phone:user.phone||"",email:user.email||""}:{username:user?.username||"",password:"",role:user?.role||"customer",name:user?.name||"",phone:user?.phone||"",email:user?.email||""});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   return (
     <Overlay onClose={onClose}>

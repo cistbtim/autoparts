@@ -5713,7 +5713,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           part={ep?._initialF ? null : ep}
           initialTab={ep?._tab}
           initialFitSearch={ep?._fitSearch||""}
-          initialF={ep?._initialF||null}
           prevPart={prevPart}
           nextPart={nextPart}
           vehicles={vehicles} partFitments={partFitments}
@@ -5746,7 +5745,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           branches={branches} currentBranch={currentBranch} allParts={parts}
           branchSkuPrefix={currentBranch?.sku_prefix||""}
           partSuppliers={getPartSupps(ep?.id)} suppliers={suppliers} allPartSuppliers={partSuppliers}
-          initialF={newPartInitialF}
+          initialF={ep?._initialF||newPartInitialF}
           onSavePartSupplier={savePartSupplier} onDeletePartSupplier={deletePartSupplier} onUpdatePartSupplier={updatePartSupplier} onLoadSuppliers={loadPartSuppliers}
           onAddSupplier={()=>openM("editSupplier")}
           onRequestNewPart={role==="branch_admin"?()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);closeM("editPart");openM("partRequest");}:null}

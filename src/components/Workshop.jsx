@@ -2905,6 +2905,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
               // Open blank window NOW (synchronous) so browsers don't block the popup
               const win=window.open("about:blank","_blank");
               let link=generatedLink;
+              let linkFailed=false;
               if(!link&&onGenerateLink&&selectedItems.length>0){
                 setGeneratingLink(true);
                 try{
@@ -2912,10 +2913,13 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
                   const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false,...vehiclePayload};
                   link=await onGenerateLink(info,linkItems);
                   setGeneratedLink(link);
-                }catch(e){/* link generation failed — send without */}
+                  // Wait 2s for DB write to complete before supplier can access the link
+                  await new Promise(r=>setTimeout(r,2000));
+                }catch(e){ linkFailed=true; }
                 finally{setGeneratingLink(false);}
               }
-              logSend(false);
+              // onGenerateLink already inserted the DB record — only log manually if it failed
+              if(linkFailed) logSend(false);
               const fullMsg=buildMsg(link||"");
               const url=`https://wa.me/${phone}?text=${encodeURIComponent(fullMsg)}`;
               if(win) win.location=url; else window.open(url,"_blank");
@@ -2928,6 +2932,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
           <button style={{width:"100%",background:"#128C7E",border:"none",fontSize:14,padding:"12px 0",fontWeight:700,borderRadius:10,color:"#fff",cursor:"pointer"}}
             onClick={async()=>{
               let link=generatedLink;
+              let linkFailed=false;
               if(!link&&onGenerateLink&&selectedItems.length>0){
                 setGeneratingLink(true);
                 try{
@@ -2935,10 +2940,11 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
                   const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false,...vehiclePayload};
                   link=await onGenerateLink(info,linkItems);
                   setGeneratedLink(link);
-                }catch(e){}
+                  await new Promise(r=>setTimeout(r,2000));
+                }catch(e){ linkFailed=true; }
                 finally{setGeneratingLink(false);}
               }
-              logSend(true);
+              if(linkFailed) logSend(true);
               const fullMsg=buildMsg(link||"");
               navigator.clipboard.writeText(fullMsg).then(()=>{ window.open(chosenSupplier.group_link,"_blank"); });
             }}>

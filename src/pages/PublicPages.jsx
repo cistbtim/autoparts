@@ -1120,7 +1120,8 @@ export function WsSupplierQuoteReplyPage({token}) {
                     if(!regForm.name.trim()||!regForm.contact.trim()||!regForm.phone.trim()){setRegErr("Please fill in Business Name, Your Name and Phone.");return;}
                     setRegSaving(true);setRegErr("");
                     try{
-                      await api.insert("registrations",{business_name:regForm.name.trim(),business_type:regForm.type,contact_name:regForm.contact.trim(),phone:regForm.phone.trim(),email:regForm.email.trim()||null,city:regForm.city.trim()||null,source:"supplier_reply"});
+                      const res=await api.insert("registrations",{business_name:regForm.name.trim(),business_type:regForm.type,contact_name:regForm.contact.trim(),phone:regForm.phone.trim(),email:regForm.email.trim()||null,city:regForm.city.trim()||null,source:"supplier_reply"});
+                      if(res?.code||res?.message){setRegErr(`Error: ${res.message||res.code}`);return;}
                       setRegDone(true);
                     }catch(e){setRegErr("Submit failed, please try again.");}
                     finally{setRegSaving(false);}

@@ -2741,24 +2741,24 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       ]
     },
     {
-      id:"grp_scrapyard", icon:"🚗", label:t.grpScrapyard||"Scrapyard", roles:["scrapyard"],
+      id:"grp_scrapyard", icon:"🚗", label:t.grpScrapyard||"Scrapyard", roles:["scrapyard","scrapyard_admin"],
       children:[
-        {id:"sy_dashboard",icon:"📊", label:t.syDashboard||"Dashboard", roles:["scrapyard"]},
-        {id:"sy_vehicles", icon:"🚗", label:t.syVehicles||"Vehicles",   roles:["scrapyard"]},
-        {id:"sy_parts",    icon:"📦", label:t.syParts||"Parts",         roles:["scrapyard"], badge:scrapLowStock.length},
-        {id:"sy_settings", icon:"⚙️", label:t.sySettings||"Settings",   roles:["scrapyard"]},
+        {id:"sy_dashboard",icon:"📊", label:t.syDashboard||"Dashboard", roles:["scrapyard","scrapyard_admin"]},
+        {id:"sy_vehicles", icon:"🚗", label:t.syVehicles||"Vehicles",   roles:["scrapyard","scrapyard_admin"]},
+        {id:"sy_parts",    icon:"📦", label:t.syParts||"Parts",         roles:["scrapyard","scrapyard_admin"], badge:scrapLowStock.length},
+        {id:"sy_settings", icon:"⚙️", label:t.sySettings||"Settings",   roles:["scrapyard","scrapyard_admin"]},
       ]
     },
     {
-      id:"grp_sy_sales", icon:"🛒", label:t.grpSySales||"Sales", roles:["scrapyard"],
+      id:"grp_sy_sales", icon:"🛒", label:t.grpSySales||"Sales", roles:["scrapyard","scrapyard_admin"],
       badge: syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0,
       children:[
-        {id:"sy_orders",    icon:"📋", label:t.syOrders||"Orders",     roles:["scrapyard"], badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
-        {id:"sy_picking",   icon:"🔍", label:t.syPicking||"Picking",   roles:["scrapyard"]},
-        {id:"sy_invoices",  icon:"🧾", label:t.syInvoices||"Invoices", roles:["scrapyard"]},
-        {id:"sy_customers", icon:"👥", label:t.syCustomers||"Customers",roles:["scrapyard"]},
-        {id:"sy_returns",   icon:"↩️", label:t.syReturns||"Returns",   roles:["scrapyard"]},
-        {id:"sy_gate",      icon:"🛡️", label:t.syGate||"Gate Check",   roles:["scrapyard"]},
+        {id:"sy_orders",    icon:"📋", label:t.syOrders||"Orders",     roles:["scrapyard","scrapyard_admin"], badge:syOrders.filter(o=>o.status==="Processing"||o.status==="Quoted").length||0},
+        {id:"sy_picking",   icon:"🔍", label:t.syPicking||"Picking",   roles:["scrapyard","scrapyard_admin"]},
+        {id:"sy_invoices",  icon:"🧾", label:t.syInvoices||"Invoices", roles:["scrapyard","scrapyard_admin"]},
+        {id:"sy_customers", icon:"👥", label:t.syCustomers||"Customers",roles:["scrapyard","scrapyard_admin"]},
+        {id:"sy_returns",   icon:"↩️", label:t.syReturns||"Returns",   roles:["scrapyard","scrapyard_admin"]},
+        {id:"sy_gate",      icon:"🛡️", label:t.syGate||"Gate Check",   roles:["scrapyard","scrapyard_admin"]},
       ]
     },
     {

@@ -833,6 +833,11 @@ export function WsSupplierQuoteReplyPage({token}) {
   const [done,    setDone]    = useState(false);
   const [err,     setErr]     = useState("");
   const [lightbox,setLightbox]= useState("");
+  const [regOpen,  setRegOpen]  = useState(false);
+  const [regForm,  setRegForm]  = useState({name:"",type:"spare_shop",contact:"",phone:"",email:"",city:""});
+  const [regSaving,setRegSaving]= useState(false);
+  const [regDone,  setRegDone]  = useState(false);
+  const [regErr,   setRegErr]   = useState("");
   const shopSettings = getSettings();
 
   useEffect(()=>{
@@ -1052,24 +1057,84 @@ export function WsSupplierQuoteReplyPage({token}) {
             background:saving?"#334155":"#0ea5e9",color:"#fff",fontSize:15,fontWeight:700,cursor:saving?"not-allowed":"pointer",marginTop:8}}>
           {saving?"Submitting…":"✅ Submit Quote"}
         </button>
-        {/* Promo banner */}
-        <div style={{marginTop:20,borderRadius:14,overflow:"hidden",background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0ea5e9 100%)",padding:"18px 20px",textAlign:"center",boxShadow:"0 4px 24px rgba(14,165,233,.25)"}}>
-          <div style={{fontSize:20,marginBottom:4}}>🔧🚗📱</div>
-          <div style={{fontWeight:800,fontSize:15,color:"#fff",lineHeight:1.3,marginBottom:6}}>
-            Register your Spare Shop or Scrapyard
+        {/* Promo banner / Registration form */}
+        {regDone ? (
+          <div style={{marginTop:20,borderRadius:14,background:"linear-gradient(135deg,#0f172a 0%,#14532d 60%,#22c55e 100%)",padding:"24px 20px",textAlign:"center",boxShadow:"0 4px 24px rgba(34,197,94,.25)"}}>
+            <div style={{fontSize:32,marginBottom:8}}>🎉</div>
+            <div style={{fontWeight:800,fontSize:16,color:"#fff",marginBottom:6}}>Registration Received!</div>
+            <div style={{fontSize:13,color:"#bbf7d0",lineHeight:1.6}}>Thank you! Our team will contact you shortly to set up your free 2-month trial account.</div>
+            <div style={{fontSize:11,color:"#4ade80",marginTop:12}}>Powered by <strong style={{color:"#fff"}}>MotorDesk</strong></div>
           </div>
-          <div style={{fontSize:12,color:"#bae6fd",marginBottom:12,lineHeight:1.5}}>
-            Get your own web system on desktop &amp; mobile phone.<br/>
-            Manage inventory, quotes, invoices &amp; customers — all in one place.
+        ) : (
+          <div style={{marginTop:20,borderRadius:14,background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0ea5e9 100%)",padding:"18px 20px",boxShadow:"0 4px 24px rgba(14,165,233,.25)"}}>
+            {!regOpen ? (
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:20,marginBottom:4}}>🔧🚗📱</div>
+                <div style={{fontWeight:800,fontSize:15,color:"#fff",lineHeight:1.3,marginBottom:6}}>Register your Spare Shop or Scrapyard</div>
+                <div style={{fontSize:12,color:"#bae6fd",marginBottom:14,lineHeight:1.6}}>
+                  Get your own web system on desktop &amp; mobile phone.<br/>
+                  Manage inventory, quotes, invoices &amp; customers — all in one place.
+                </div>
+                <button onClick={()=>setRegOpen(true)}
+                  style={{display:"inline-block",background:"#f97316",color:"#fff",fontWeight:700,fontSize:13,borderRadius:8,padding:"10px 24px",marginBottom:10,border:"none",cursor:"pointer",letterSpacing:".3px"}}>
+                  🎁 2-Month Free Trial — Register Now
+                </button>
+                <div style={{fontSize:11,color:"#7dd3fc"}}>Powered by <strong style={{color:"#fff"}}>MotorDesk</strong></div>
+              </div>
+            ) : (
+              <div>
+                <div style={{fontWeight:800,fontSize:15,color:"#fff",textAlign:"center",marginBottom:16}}>🎁 Start Your Free Trial</div>
+                {/* Business type */}
+                <div style={{marginBottom:12}}>
+                  <label style={{fontSize:11,color:"#bae6fd",display:"block",marginBottom:6,fontWeight:600}}>Business Type</label>
+                  <div style={{display:"flex",gap:8}}>
+                    {[["spare_shop","🏪 Spare Shop"],["scrapyard","♻️ Scrapyard"]].map(([val,lbl])=>(
+                      <label key={val} onClick={()=>setRegForm(p=>({...p,type:val}))}
+                        style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 10px",borderRadius:8,
+                          border:`1.5px solid ${regForm.type===val?"#f97316":"rgba(255,255,255,.2)"}`,
+                          background:regForm.type===val?"rgba(249,115,22,.18)":"rgba(255,255,255,.05)",
+                          cursor:"pointer",color:"#fff",fontSize:12,fontWeight:700}}>
+                        {lbl}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {/* Fields */}
+                {[
+                  {label:"Business Name *",key:"name",type:"text",ph:"e.g. Speed Auto Parts"},
+                  {label:"Your Name *",key:"contact",type:"text",ph:"Contact person"},
+                  {label:"Phone *",key:"phone",type:"tel",ph:"+27 ..."},
+                  {label:"Email",key:"email",type:"email",ph:"email@example.com (optional)"},
+                  {label:"City / Area",key:"city",type:"text",ph:"e.g. Johannesburg"},
+                ].map(f=>(
+                  <div key={f.key} style={{marginBottom:9}}>
+                    <label style={{fontSize:11,color:"#bae6fd",display:"block",marginBottom:3,fontWeight:600}}>{f.label}</label>
+                    <input type={f.type} placeholder={f.ph} value={regForm[f.key]}
+                      onChange={e=>setRegForm(p=>({...p,[f.key]:e.target.value}))}
+                      style={{width:"100%",padding:"9px 12px",borderRadius:8,border:"1px solid rgba(255,255,255,.18)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:13,outline:"none",fontFamily:"inherit"}}/>
+                  </div>
+                ))}
+                {regErr&&<div style={{color:"#fca5a5",fontSize:12,marginBottom:8}}>{regErr}</div>}
+                <button disabled={regSaving}
+                  onClick={async()=>{
+                    if(!regForm.name.trim()||!regForm.contact.trim()||!regForm.phone.trim()){setRegErr("Please fill in Business Name, Your Name and Phone.");return;}
+                    setRegSaving(true);setRegErr("");
+                    try{
+                      await api.insert("registrations",{business_name:regForm.name.trim(),business_type:regForm.type,contact_name:regForm.contact.trim(),phone:regForm.phone.trim(),email:regForm.email.trim()||null,city:regForm.city.trim()||null,source:"supplier_reply"});
+                      setRegDone(true);
+                    }catch(e){setRegErr("Submit failed, please try again.");}
+                    finally{setRegSaving(false);}
+                  }}
+                  style={{width:"100%",padding:"12px 0",borderRadius:8,border:"none",background:regSaving?"#475569":"#f97316",color:"#fff",fontSize:14,fontWeight:700,cursor:regSaving?"not-allowed":"pointer",marginTop:4,marginBottom:8}}>
+                  {regSaving?"Submitting…":"✅ Submit Registration"}
+                </button>
+                <div style={{textAlign:"center"}}>
+                  <button onClick={()=>setRegOpen(false)} style={{background:"none",border:"none",color:"#7dd3fc",fontSize:12,cursor:"pointer"}}>← Back</button>
+                </div>
+              </div>
+            )}
           </div>
-          <div style={{display:"inline-block",background:"#f97316",color:"#fff",fontWeight:700,fontSize:13,
-            borderRadius:8,padding:"8px 20px",marginBottom:10,letterSpacing:".3px"}}>
-            🎁 2-Month Free Trial
-          </div>
-          <div style={{fontSize:11,color:"#7dd3fc"}}>
-            Powered by <strong style={{color:"#fff"}}>MotorDesk</strong>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

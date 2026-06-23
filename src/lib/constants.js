@@ -13,6 +13,7 @@ export const ROLES = {
   customer:          { color: "#34d399", bg: "rgba(52,211,153,0.12)",   icon: "👤" },
   workshop:          { color: "#f59e0b", bg: "rgba(245,158,11,0.12)",   icon: "🔧" },
   scrapyard:         { color: "#6b7280", bg: "rgba(107,114,128,0.12)",  icon: "🚗" },
+  scrapyard_admin:   { color: "#a78bfa", bg: "rgba(167,139,250,0.12)",  icon: "♻️" },
 };
 
 export const BRANCH_ROLES = ["branch_admin","branch_manager","branch_warehouse","branch_picker","branch_salesman"];
@@ -99,6 +100,7 @@ export const TRIAL_DAYS = 30;
 export const getSubInfo = (u) => {
   if (!u || u.role === "admin") return { status: "admin", label: "Admin", color: "#f97316" };
   if (u.role === "branch_admin")      return { status: "admin", label: "Branch Admin",     color: "#0ea5e9" };
+  if (u.role === "scrapyard_admin")   return { status: "admin", label: "Scrapyard Admin",  color: "#a78bfa" };
   if (u.role === "branch_manager")    return { status: "admin", label: "Branch Manager",   color: "#06b6d4" };
   if (u.role === "branch_warehouse")  return { status: "admin", label: "Branch Warehouse", color: "#84cc16" };
   if (u.role === "branch_picker")     return { status: "admin", label: "Branch Picker",    color: "#f59e0b" };
@@ -132,6 +134,7 @@ export const canAccess = (u) => {
   if (u.role === "demo") return true;
   if (u.role === "workshop") return true;
   if (u.role === "scrapyard") return true;
+  if (u.role === "scrapyard_admin") return true;
   if (u._isCustomer) return true;
   const s = getSubInfo(u);
   return s.status === "active" || s.status === "trial";

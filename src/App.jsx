@@ -4874,7 +4874,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                               {r.status!=="handled"&&(
                                 <button className="btn btn-primary btn-sm"
-                                  onClick={()=>openM("editUser",{name:r.business_name||r.contact_name||"",phone:r.phone||"",email:r.email||"",role:"branch_admin",username:(r.business_name||r.contact_name||"").toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,20),password:"",_regId:r.id})}>
+                                  onClick={()=>openM("editUser",{name:r.business_name||r.contact_name||"",phone:r.phone||"",email:r.email||"",role:r.business_type==="scrapyard"?"scrapyard_admin":"branch_admin",username:(r.business_name||r.contact_name||"").toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,20),password:"",_regId:r.id})}>
                                   👤 Create Account
                                 </button>
                               )}

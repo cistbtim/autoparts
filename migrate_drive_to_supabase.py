@@ -150,7 +150,7 @@ def make_path(subfolder, rec_id, col, mime_type, ext_hint):
     return f"{subfolder}/{safe_id}/{col}_{ts}{ext}"
 
 # ── Migration runner ───────────────────────────────────────────────────────────
-def migrate_table(table, col_defs, extra_cols, dry_run=False):
+def migrate_table(table, col_defs, extra_cols, dry_run=False, skip=0):
     all_cols = [c for c, _, _ in col_defs] + extra_cols
     print(f"\n{'='*62}")
     print(f"  {table}")
@@ -162,6 +162,9 @@ def migrate_table(table, col_defs, extra_cols, dry_run=False):
 
     print(f"  Total records:      {len(records)}")
     print(f"  Have Drive URLs:    {len(pending)}")
+    if skip:
+        print(f"  Skipping first:     {skip} (resuming from record {skip+1})")
+        pending = pending[skip:]
 
     ok = fail = already = 0
 
@@ -220,6 +223,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Show what would be migrated without making changes")
     parser.add_argument("--table",   type=str, default=None,
                         help="Migrate a single table only. Options: parts, vehicles, ws_vehicles, job_photos, checklist, documents")
+    parser.add_argument("--skip",    type=int, default=0,
+                        help="Skip the first N pending records (use to resume after a crash)")
     args = parser.parse_args()
 
     TABLE_ALIASES = {
@@ -250,7 +255,7 @@ def main():
             if alias != table:
                 continue
 
-        ok, fail = migrate_table(table, col_defs, extra_cols, dry_run=args.dry_run)
+        ok, fail = migrate_table(table, col_defs, extra_cols, dry_run=args.dry_run, skip=args.skip)
         total_ok += ok
         total_fail += fail
 

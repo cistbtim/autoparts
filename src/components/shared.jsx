@@ -384,14 +384,14 @@ export function AdBanner({ads=[], page="shop", userCtx=null, height=220, mobileH
       {ad._static
         ? ad.render
         : ad.image_url
-          ? <img src={ad.image_url} alt={ad.title||"Ad"}
+          ? <img key={idx} src={ad.image_url} alt={ad.title||"Ad"}
               style={{display:"block",width:"100%",height:"100%",objectFit:"contain"}}
               onError={e=>{e.target.style.display="none";const p=e.target.parentElement;if(p){p.style.minHeight="56px";const fb=p.querySelector('.ad-fb');if(fb)fb.style.display="flex";}}}/>
           : <div style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",
               fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
               {ad.title}
             </div>}
-      {!ad._static&&ad.image_url&&<div className="ad-fb" style={{display:"none",minHeight:56,alignItems:"center",justifyContent:"center",
+      {!ad._static&&ad.image_url&&<div key={`fb-${idx}`} className="ad-fb" style={{display:"none",minHeight:56,alignItems:"center",justifyContent:"center",
           fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
         {ad.title}
       </div>}

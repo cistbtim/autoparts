@@ -10215,19 +10215,6 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
               <input className="inp" type="number" value={form.year_to} onChange={e=>sf("year_to",e.target.value===""?"":+e.target.value)} placeholder="2005 (blank = present)"/>
             </div>
           </FG>
-          <FG>
-            <div>
-              <FL label="Model Code"/>
-              <input className="inp" value={form.code} onChange={e=>sf("code",uc(e.target.value))} placeholder="MZ11A" style={{textTransform:"uppercase"}}/>
-            </div>
-            <div>
-              <FL label="Variant"/>
-              <input className="inp" value={form.variant} onChange={e=>sf("variant",uc(e.target.value))} placeholder="GL, LX, 4X4..." style={{textTransform:"uppercase"}}/>
-            </div>
-          </FG>
-          <FD label="Engine">
-            <input className="inp" value={form.engine} onChange={e=>sf("engine",uc(e.target.value))} placeholder="1.3, 2.0TD..." style={{textTransform:"uppercase"}}/>
-          </FD>
           <FD label="Notes">
             <input className="inp" value={form.notes} onChange={e=>sf("notes",e.target.value)} placeholder="Any extra details for admin..."/>
           </FD>

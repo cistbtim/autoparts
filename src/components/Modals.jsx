@@ -9907,6 +9907,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
   const [form,          setForm]          = useState(blankForm);
   const [formErr,       setFormErr]       = useState({});
   const [saving,        setSaving]        = useState(false);
+  const [showMakeSuggs, setShowMakeSuggs] = useState(false);
   const [showSuggs,     setShowSuggs]     = useState(false);
   const [existingMatch, setExistingMatch] = useState(null);
   const [rejectingId,   setRejectingId]   = useState(null);
@@ -9916,6 +9917,12 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
 
   const sf = (k,v) => setForm(p=>({...p,[k]:v}));
   const uc = v => v.toUpperCase();
+
+  const makeSuggs = useMemo(()=>{
+    const q = form.make.trim().toUpperCase();
+    const allMakes = [...new Set(vehicles.map(v=>v.make).filter(Boolean))].sort();
+    return q ? allMakes.filter(m=>m.toUpperCase().includes(q)) : allMakes;
+  },[vehicles, form.make]);
 
   const makeVehicles = useMemo(()=>{
     if(!form.make.trim()) return [];
@@ -10072,11 +10079,26 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
         <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"16px",marginBottom:20}}>
           <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>New Vehicle Request</div>
           <FG>
-            <div>
+            <div style={{position:"relative"}}>
               <FL label="Make *"/>
-              <input className="inp" value={form.make} onChange={e=>{sf("make",uc(e.target.value));sf("model","");setExistingMatch(null);}}
+              <input className="inp" value={form.make}
+                onChange={e=>{sf("make",uc(e.target.value));sf("model","");setExistingMatch(null);setShowMakeSuggs(true);}}
+                onFocus={()=>setShowMakeSuggs(true)}
+                onBlur={()=>setTimeout(()=>setShowMakeSuggs(false),150)}
                 placeholder="MAZDA" style={{textTransform:"uppercase",borderColor:formErr.make?"var(--red)":undefined}}/>
               {formErr.make&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>{formErr.make}</div>}
+              {showMakeSuggs&&makeSuggs.length>0&&(
+                <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:200,background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",maxHeight:200,overflowY:"auto",marginTop:2}}>
+                  {makeSuggs.map(make=>(
+                    <div key={make} onMouseDown={()=>{sf("make",make);sf("model","");setExistingMatch(null);setShowMakeSuggs(false);}}
+                      style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid var(--border)",fontWeight:600,fontSize:13}}
+                      onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
+                      onMouseLeave={e=>e.currentTarget.style.background=""}>
+                      {make}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div style={{position:"relative"}}>
               <FL label="Model *"/>

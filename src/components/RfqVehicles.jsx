@@ -1779,15 +1779,13 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
   ,[inMake, searchD]);
 
   const nextCodeFromList = (vList, make) => {
-    const m = make || vList[0]?.make || '';
-    if (!m) return '';
-    const prefix = m.replace(/\s+/g,'').slice(0,2).toUpperCase();
-    const codes = vList
-      .map(v=>(v.code||'').toUpperCase())
-      .filter(c=>c.startsWith(prefix))
-      .sort();
-    if (!codes.length) return prefix + '01A';
+    const codes = vList.map(v=>(v.code||'').toUpperCase()).filter(Boolean).sort();
+    if (!codes.length) {
+      const prefix = (make||'').replace(/\s+/g,'').slice(0,2).toUpperCase() || 'XX';
+      return prefix + '01A';
+    }
     const last = codes[codes.length-1];
+    const prefix = last.slice(0,2);
     const lastChar = last.slice(-1);
     if (lastChar >= 'A' && lastChar < 'Z') return last.slice(0,-1) + String.fromCharCode(lastChar.charCodeAt(0)+1);
     const num = parseInt(last.slice(2,-1),10)||1;

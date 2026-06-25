@@ -9902,7 +9902,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
   const pending = myReqs.filter(r=>r.status==="pending");
   const done    = myReqs.filter(r=>r.status==="approved"||r.status==="rejected");
 
-  const blankForm = {make:"",model:"",year_from:"",year_to:"",engine:"",variant:"",code:"",notes:"",photo1:"",photo2:""};
+  const blankForm = {make:"",model:"",year_from:"",year_to:"",notes:"",photo1:"",photo2:""};
   const [showForm,      setShowForm]      = useState(false);
   const [form,          setForm]          = useState(blankForm);
   const [formErr,       setFormErr]       = useState({});
@@ -10014,8 +10014,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       branch_id: currentBranch?.id||user.branch_id||null,
       make: form.make.trim(), model: form.model.trim(),
       year_from: form.year_from||null, year_to: form.year_to||null,
-      engine: form.engine.trim()||null, variant: form.variant.trim()||null,
-      code: form.code.trim()||null, notes: form.notes.trim()||null,
+      notes: form.notes.trim()||null,
       photo1: form.photo1||null, photo2: form.photo2||null,
       status:"pending", requested_by: user.id,
     });
@@ -10029,7 +10028,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
   const approve = async (r) => {
     setBusy(r.id);
     try {
-      await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to,engine:r.engine,variant:r.variant,code:r.code});
+      await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
       await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
     } catch{}
     await onRefresh();
@@ -10059,8 +10058,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
     const isRejecting = rejectingId===r.id;
     const matchV = vehicles.find(v=>
       v.make.toUpperCase()===r.make.toUpperCase() &&
-      v.model.toUpperCase()===r.model.toUpperCase() &&
-      (!r.code || !v.code || v.code.toUpperCase()===r.code.toUpperCase())
+      v.model.toUpperCase()===r.model.toUpperCase()
     );
     const dbPhotos = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean);
     const reqPhotos = [r.photo1, r.photo2].filter(Boolean);
@@ -10083,14 +10081,11 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
           <div style={{flex:1,minWidth:200}}>
             <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
               <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
-              {r.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>{r.code}</span>}
               {statusBadge(r.status)}
             </div>
             {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
             <div style={{fontSize:12,display:"flex",gap:12,flexWrap:"wrap",color:"var(--text3)"}}>
               {(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}
-              {r.engine&&<span>{r.engine}</span>}
-              {r.variant&&<span>{r.variant}</span>}
             </div>
             {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
             {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}

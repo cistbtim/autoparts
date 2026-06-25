@@ -1734,6 +1734,15 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
   useEffect(()=>{ if(jumpMake) setSelMake(jumpMake); },[jumpMake]);
   useEffect(()=>{ setHighlightModel(jumpModel); },[jumpModel]);
   const [editV,   setEditV]   = useState(null);
+
+  useEffect(()=>{
+    if(!jumpModel || !jumpMake) return;
+    const match = vehicles.find(v=>
+      v.make.toUpperCase()===jumpMake.toUpperCase() &&
+      v.model.toUpperCase()===jumpModel.toUpperCase()
+    );
+    if(match) setEditV({...match});
+  },[jumpModel, jumpMake, vehicles]);
   const [lightbox, setLightbox] = useState(null); // {urls,labels,idx}
 
   useEffect(()=>{

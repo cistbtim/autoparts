@@ -9912,6 +9912,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
   const [rejectingId,   setRejectingId]   = useState(null);
   const [rejectReason,  setRejectReason]  = useState("");
   const [busy,          setBusy]          = useState(null);
+  const [lightboxUrl,   setLightboxUrl]   = useState(null);
 
   const sf = (k,v) => setForm(p=>({...p,[k]:v}));
   const uc = v => v.toUpperCase();
@@ -9994,22 +9995,40 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
 
   const ReqCard = ({r}) => {
     const isRejecting = rejectingId===r.id;
+    const matchV = vehicles.find(v=>
+      v.make.toUpperCase()===r.make.toUpperCase() &&
+      v.model.toUpperCase()===r.model.toUpperCase() &&
+      (!r.code || !v.code || v.code.toUpperCase()===r.code.toUpperCase())
+    );
+    const photos = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean);
     return (
       <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
-        <div style={{flex:1,minWidth:200}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-            <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
-            {r.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>{r.code}</span>}
-            {statusBadge(r.status)}
+        <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+          {photos.length>0&&(
+            <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
+              {photos.map((url,i)=>(
+                <img key={i} src={toImgUrl(url)} alt="" loading="lazy"
+                  onClick={()=>setLightboxUrl(url)}
+                  style={{width:72,height:54,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in",display:"block"}}
+                  onError={e=>e.target.style.display="none"}/>
+              ))}
+            </div>
+          )}
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+              <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
+              {r.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>{r.code}</span>}
+              {statusBadge(r.status)}
+            </div>
+            {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
+            <div style={{fontSize:12,display:"flex",gap:12,flexWrap:"wrap",color:"var(--text3)"}}>
+              {(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}
+              {r.engine&&<span>{r.engine}</span>}
+              {r.variant&&<span>{r.variant}</span>}
+            </div>
+            {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
+            {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
           </div>
-          {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
-          <div style={{fontSize:12,display:"flex",gap:12,flexWrap:"wrap",color:"var(--text3)"}}>
-            {(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}
-            {r.engine&&<span>{r.engine}</span>}
-            {r.variant&&<span>{r.variant}</span>}
-          </div>
-          {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
-          {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
         </div>
         {isAdmin&&r.status==="pending"&&(
           <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
@@ -10148,6 +10167,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
           {done.map(r=><ReqCard key={r.id} r={r}/>)}
         </>
       )}
+      {lightboxUrl&&<ImgLightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>}
     </div>
   );
 }

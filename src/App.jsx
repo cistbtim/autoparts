@@ -210,6 +210,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [shopVehicleFilter,setShopVehicleFilter]=useState({make:"",model:""});
+  const [vehiclesJumpMake,setVehiclesJumpMake]=useState(null);
   const [workshopJobs,setWorkshopJobs]=useState([]);
   const [workshopJobItems,setWorkshopJobItems]=useState([]);
   const [workshopInvoices,setWorkshopInvoices]=useState([]);
@@ -5537,13 +5538,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           <VehiclesPage vehicles={vehicles} partFitments={partFitments} onSave={saveVehicle} onDelete={deleteVehicle}
             onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
             onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
-            t={t}/>
+            jumpMake={vehiclesJumpMake} t={t}/>
         )}
 
         {tab==="vehicleRequests"&&(role==="admin"||role==="branch_admin")&&(
           <VehicleRequestsPage vehicleRequests={vehicleRequests} vehicles={vehicles} branches={branches} user={user} role={role}
             currentBranch={currentBranch}
             onApprove={saveVehicle}
+            onGoToVehicles={(make)=>{setVehiclesJumpMake(make);setTab("vehicles");}}
             onRefresh={()=>refreshTables("vehicle_requests")} t={t}/>
         )}
 

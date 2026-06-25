@@ -9896,7 +9896,7 @@ export function BulkImageImportModal({ parts, partSuppliers=[], onClose, onImage
 }
 
 // ─── Vehicle Requests Page ──────────────────────────────────────────────
-export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],user,role,currentBranch,onRefresh,onApprove,t={}}) {
+export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],user,role,currentBranch,onRefresh,onApprove,onGoToVehicles,t={}}) {
   const isAdmin = role==="admin";
   const myReqs  = isAdmin ? vehicleRequests : vehicleRequests.filter(r=>r.branch_id===currentBranch?.id);
   const pending = myReqs.filter(r=>r.status==="pending");
@@ -10030,6 +10030,10 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
     try {
       await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
       await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
+      await onRefresh();
+      setBusy(null);
+      onGoToVehicles&&onGoToVehicles(r.make);
+      return;
     } catch{}
     await onRefresh();
     setBusy(null);

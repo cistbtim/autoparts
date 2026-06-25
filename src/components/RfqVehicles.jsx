@@ -1725,10 +1725,12 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, onAddPart, t}) {
-  const [selMake, setSelMake] = useState(null);  // null = makes level
+export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, onAddPart, t, jumpMake=null}) {
+  const [selMake, setSelMake] = useState(jumpMake);  // null = makes level
   const [search,  setSearch]  = useState("");
   const [searchD, setSearchD] = useState("");
+
+  useEffect(()=>{ if(jumpMake) setSelMake(jumpMake); },[jumpMake]);
   const [editV,   setEditV]   = useState(null);
   const [lightbox, setLightbox] = useState(null); // {urls,labels,idx}
 

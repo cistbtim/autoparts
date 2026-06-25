@@ -187,6 +187,7 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
   const list  = urls && urls.length ? urls : (url ? [url] : []);
   const [idx, setIdx]   = useState(Math.min(startIdx, Math.max(list.length-1,0)));
   const currentUrl      = list[idx] || "";
+  const touchX = useRef(null);
 
   const getSizes = (u) => {
     if(!u) return [u];
@@ -223,8 +224,19 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
     alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:22,
     zIndex:100000};
 
+  const onTouchStart = (e) => { touchX.current = e.touches[0].clientX; };
+  const onTouchEnd   = (e) => {
+    if(touchX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchX.current;
+    touchX.current = null;
+    if(Math.abs(dx) < 40) return;
+    if(dx < 0 && idx < list.length-1) goTo(idx+1);
+    if(dx > 0 && idx > 0)             goTo(idx-1);
+  };
+
   return (
     <div onClick={onClose}
+      onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
       style={{position:"fixed",top:0,left:0,right:0,bottom:0,
         background:"rgba(0,0,0,0.96)",zIndex:99999,
         display:"flex",alignItems:"center",justifyContent:"center",

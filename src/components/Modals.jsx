@@ -9912,7 +9912,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
   const [rejectingId,   setRejectingId]   = useState(null);
   const [rejectReason,  setRejectReason]  = useState("");
   const [busy,          setBusy]          = useState(null);
-  const [lightboxUrl,   setLightboxUrl]   = useState(null);
+  const [lightbox,      setLightbox]       = useState(null); // {urls, idx, labels}
 
   const sf = (k,v) => setForm(p=>({...p,[k]:v}));
   const uc = v => v.toUpperCase();
@@ -10001,6 +10001,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       (!r.code || !v.code || v.code.toUpperCase()===r.code.toUpperCase())
     );
     const photos = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean);
+    const openPhotos = (i) => setLightbox({urls:photos.map(toImgUrl),idx:i,labels:["Front","Rear","Side"].slice(0,photos.length)});
     return (
       <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
         <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
@@ -10008,7 +10009,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
             <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
               {photos.map((url,i)=>(
                 <img key={i} src={toImgUrl(url)} alt="" loading="lazy"
-                  onClick={()=>setLightboxUrl(url)}
+                  onClick={()=>openPhotos(i)}
                   style={{width:72,height:54,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in",display:"block"}}
                   onError={e=>e.target.style.display="none"}/>
               ))}
@@ -10105,11 +10106,11 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
             </div>
           </FG>
 
-          {existingMatch&&(
+          {existingMatch&&(()=>{const ep=[existingMatch.photo_front,existingMatch.photo_rear,existingMatch.photo_side].filter(Boolean);return(
             <div style={{marginBottom:10,padding:"10px 12px",background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.4)",borderRadius:8,fontSize:12,display:"flex",gap:10,alignItems:"flex-start"}}>
-              {[existingMatch.photo_front,existingMatch.photo_rear,existingMatch.photo_side].filter(Boolean).map((url,i)=>(
+              {ep.map((url,i)=>(
                 <img key={i} src={toImgUrl(url)} alt="" loading="lazy"
-                  onClick={()=>setLightboxUrl(url)}
+                  onClick={()=>setLightbox({urls:ep.map(toImgUrl),idx:i,labels:["Front","Rear","Side"].slice(0,ep.length)})}
                   style={{width:80,height:60,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid rgba(251,191,36,.4)",cursor:"zoom-in",flexShrink:0}}
                   onError={e=>e.target.style.display="none"}/>
               ))}
@@ -10121,7 +10122,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
                 {" Only submit if you need a different year range or variant."}
               </div>
             </div>
-          )}
+          );})()}
 
           <FG>
             <div>
@@ -10175,7 +10176,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
           {done.map(r=><ReqCard key={r.id} r={r}/>)}
         </>
       )}
-      {lightboxUrl&&<ImgLightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>}
+      {lightbox&&<ImgLightbox urls={lightbox.urls} startIdx={lightbox.idx} labels={lightbox.labels} onClose={()=>setLightbox(null)}/>}
     </div>
   );
 }

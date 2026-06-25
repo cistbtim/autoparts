@@ -6455,6 +6455,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(supplier?._search||"");
+  const [matchFilter, setMatchFilter] = useState(null); // "matched" | "unmatched" | null
   const [page, setPage] = useState(supplier?._page||1);
   const PAGE_SIZE = 20;
   const [lightboxUrl, setLightboxUrl] = useState(null);
@@ -6653,17 +6654,28 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
     setItems(prev => prev.filter(x => x.id !== id));
   };
 
-  const filtered = search.trim()
-    ? items.filter(x => {
-        const haystack = [x.supplier_part_no, x.description, x.oem_number, x.application]
-          .map(v => (v||"").toLowerCase()).join(" ");
-        return search.trim().toLowerCase().split(/\s+/).every(w => haystack.includes(w));
-      })
-    : items;
+  const filtered = items.filter(x => {
+    if (search.trim()) {
+      const haystack = [x.supplier_part_no, x.description, x.oem_number, x.application]
+        .map(v => (v||"").toLowerCase()).join(" ");
+      if (!search.trim().toLowerCase().split(/\s+/).every(w => haystack.includes(w))) return false;
+    }
+    if (matchFilter === "matched")   return getMatchedSkus(x).length > 0;
+    if (matchFilter === "unmatched") return getMatchedSkus(x).length === 0;
+    return true;
+  });
 
   const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage    = Math.min(page, totalPages);
   const pageItems   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const matchStats = useMemo(() => {
+    let matched = 0;
+    for (const item of items) {
+      if (getMatchedSkus(item).length > 0) matched++;
+    }
+    return { matched, unmatched: items.length - matched };
+  }, [items, oemToParts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetImport = () => { setImportStep(1); setRawRows([]); setImportResult(null); setFileErr(""); };
 
@@ -6737,7 +6749,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                   /* ── DESKTOP: table ── */
                   <div style={{overflowX:"auto"}}>
                     <div style={{maxHeight:440,overflowY:"auto"}}>
-                      <table className="tbl" style={{fontSize:12,tableLayout:"fixed",width:"100%"}}>
+                      <table className="tbl" style={{fontSize:14,tableLayout:"fixed",width:"100%"}}>
                         <colgroup>
                           <col style={{width:"7%"}}/><col style={{width:"14%"}}/><col style={{width:"5%"}}/><col style={{width:"14%"}}/><col style={{width:"21%"}}/><col style={{width:"31%"}}/><col style={{width:"8%"}}/>
                         </colgroup>
@@ -6760,7 +6772,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                                     {dups.length>0&&<span title={`OEM also in: ${dups.map(d=>d.supplier_part_no).join(", ")}`} style={{marginLeft:4,color:"var(--amber,#f59e0b)",fontSize:10}}>⚠</span>}
                                   </div>
                                   {matchedSkus.length>0&&<div style={{display:"flex",flexDirection:"column",gap:2,marginTop:2}}>{matchedSkus.map(p=>(
-                                    <span key={p.id} style={{fontFamily:"DM Mono,monospace",fontSize:10,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"1px 5px",display:"inline-block"}}>{p.sku}</span>
+                                    <span key={p.id} style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,background:"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"1px 5px",display:"inline-block"}}>{p.sku}</span>
                                   ))}</div>}
                                 </td>
                                 {/* pencil column — navigate to matched part or open drawer */}
@@ -6772,8 +6784,8 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                                   )}
                                 </td>
                                 <td style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={item.description||""}>{item.description||"—"}</td>
-                                <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.oem_number||"—"}</td>
-                                <td style={{color:"var(--text2)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:11}}>{item.application||"—"}</td>
+                                <td style={{fontFamily:"DM Mono,monospace",color:"var(--text3)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:13}}>{item.oem_number||"—"}</td>
+                                <td style={{color:"var(--text2)",whiteSpace:"pre-wrap",lineHeight:1.5,fontSize:13}}>{item.application||"—"}</td>
                                 <td style={{textAlign:"center",paddingRight:8,whiteSpace:"nowrap"}} onClick={e=>e.stopPropagation()}>
                                   <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",padding:"2px 10px",minWidth:32}} onClick={()=>deleteItem(item.id)} title="Delete row">✕</button>
                                 </td>
@@ -7002,8 +7014,12 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
 
                 {/* Footer: pagination + result count + delete */}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)",gap:8,flexWrap:"wrap"}}>
-                  <span style={{fontSize:12,color:"var(--text3)"}}>
-                    {search.trim()?`${filtered.length} of ${items.length} items`:`${items.length} items`}
+                  <span style={{fontSize:12,color:"var(--text3)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <span>{search.trim()?`${filtered.length} of ${items.length} items`:`${items.length} items`}</span>
+                    <span style={{display:"flex",alignItems:"center",gap:4}}>
+                      <button onClick={()=>{setMatchFilter(f=>f==="matched"?null:"matched");setPage(1);}} style={{background:matchFilter==="matched"?"rgba(52,211,153,.3)":"rgba(52,211,153,.15)",color:"#047857",border:"1px solid rgba(52,211,153,.4)",borderRadius:4,padding:"1px 7px",fontWeight:600,fontSize:11,cursor:"pointer",outline:"none",fontFamily:"inherit"}}>✓ {matchStats.matched} matched</button>
+                      <button onClick={()=>{setMatchFilter(f=>f==="unmatched"?null:"unmatched");setPage(1);}} style={{background:matchFilter==="unmatched"?"rgba(0,0,0,.1)":"rgba(0,0,0,.04)",color:"var(--text3)",border:matchFilter==="unmatched"?"1px solid var(--text3)":"1px solid var(--border)",borderRadius:4,padding:"1px 7px",fontSize:11,cursor:"pointer",outline:"none",fontFamily:"inherit"}}>{matchStats.unmatched} unmatched</button>
+                    </span>
                   </span>
                   {totalPages > 1 && (
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -9876,5 +9892,204 @@ export function BulkImageImportModal({ parts, partSuppliers=[], onClose, onImage
         </div>}
       </div>
     </Overlay>
+  );
+}
+
+// ─── Vehicle Requests Page ────────────────────────────────────────────────────
+export function VehicleRequestsPage({vehicleRequests=[],branches=[],user,role,currentBranch,onRefresh,onApprove,t={}}) {
+  const isAdmin = role==="admin";
+  const myReqs  = isAdmin ? vehicleRequests : vehicleRequests.filter(r=>r.branch_id===currentBranch?.id);
+  const pending = myReqs.filter(r=>r.status==="pending");
+  const done    = myReqs.filter(r=>r.status==="approved"||r.status==="rejected");
+
+  const blankForm = {make:"",model:"",year_from:"",year_to:"",engine:"",variant:"",code:"",notes:""};
+  const [showForm,  setShowForm]  = useState(false);
+  const [form,      setForm]      = useState(blankForm);
+  const [formErr,   setFormErr]   = useState({});
+  const [saving,    setSaving]    = useState(false);
+  const [rejectingId, setRejectingId] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [busy, setBusy] = useState(null);
+
+  const sf = (k,v) => setForm(p=>({...p,[k]:v}));
+  const uc = v => v.toUpperCase();
+
+  const submitRequest = async () => {
+    const e={};
+    if(!form.make.trim()) e.make="Make required";
+    if(!form.model.trim()) e.model="Model required";
+    if(!form.year_from) e.year_from="Year from required";
+    setFormErr(e);
+    if(Object.keys(e).length) return;
+    setSaving(true);
+    await api.insert("vehicle_requests",{
+      branch_id: currentBranch?.id||user.branch_id||null,
+      make: form.make.trim(), model: form.model.trim(),
+      year_from: form.year_from||null, year_to: form.year_to||null,
+      engine: form.engine.trim()||null, variant: form.variant.trim()||null,
+      code: form.code.trim()||null, notes: form.notes.trim()||null,
+      status:"pending", requested_by: user.id,
+    });
+    setSaving(false);
+    setForm(blankForm);
+    setShowForm(false);
+    await onRefresh();
+  };
+
+  const approve = async (r) => {
+    setBusy(r.id);
+    try {
+      await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to,engine:r.engine,variant:r.variant,code:r.code});
+      await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
+    } catch{}
+    await onRefresh();
+    setBusy(null);
+  };
+
+  const reject = async (id) => {
+    if(!rejectReason.trim()) return;
+    setBusy(id);
+    await api.patch("vehicle_requests","id",id,{status:"rejected",rejection_reason:rejectReason});
+    setRejectingId(null); setRejectReason("");
+    await onRefresh();
+    setBusy(null);
+  };
+
+  const branchName = id => branches.find(b=>b.id===id)?.name||"Unknown Branch";
+
+  const statusBadge = status => (
+    <span style={{fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:600,
+      background:status==="pending"?"rgba(251,191,36,.15)":status==="approved"?"rgba(34,197,94,.12)":"rgba(248,113,113,.12)",
+      color:status==="pending"?"var(--yellow)":status==="approved"?"var(--green)":"var(--red)"}}>
+      {status==="pending"?"Pending":status==="approved"?"Approved":"Rejected"}
+    </span>
+  );
+
+  const ReqCard = ({r}) => {
+    const isRejecting = rejectingId===r.id;
+    return (
+      <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+              <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
+              {r.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>{r.code}</span>}
+              {statusBadge(r.status)}
+            </div>
+            {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
+            <div style={{fontSize:12,display:"flex",gap:12,flexWrap:"wrap",color:"var(--text3)"}}>
+              {(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}
+              {r.engine&&<span>{r.engine}</span>}
+              {r.variant&&<span>{r.variant}</span>}
+            </div>
+            {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
+            {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
+          </div>
+        </div>
+        {isAdmin&&r.status==="pending"&&(
+          <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+            {!isRejecting&&(
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn btn-primary btn-sm" onClick={()=>approve(r)} disabled={busy===r.id}>{busy===r.id?"...":"Approve & Add Vehicle"}</button>
+                <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setRejectingId(r.id);setRejectReason("");}}>Reject</button>
+              </div>
+            )}
+            {isRejecting&&(
+              <div>
+                <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>Rejection reason:</div>
+                <input className="inp" value={rejectReason} onChange={e=>setRejectReason(e.target.value)} placeholder="e.g. Already exists as MAZDA 121" autoFocus/>
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <button className="btn btn-primary btn-sm" style={{background:"var(--red)"}} onClick={()=>reject(r.id)} disabled={busy===r.id||!rejectReason.trim()}>{busy===r.id?"...":"Confirm Reject"}</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setRejectingId(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{padding:"0 0 40px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>Vehicle Requests</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:2}}>{isAdmin?"Review vehicle add requests from branches":"Request admin to add a new vehicle model"}</p>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-ghost btn-sm" onClick={onRefresh}>Refresh</button>
+          {!isAdmin&&<button className="btn btn-primary btn-sm" onClick={()=>setShowForm(v=>!v)}>+ Request Vehicle</button>}
+        </div>
+      </div>
+
+      {!isAdmin&&showForm&&(
+        <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"16px",marginBottom:20}}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>New Vehicle Request</div>
+          <FG>
+            <div>
+              <FL label="Make *"/>
+              <input className="inp" value={form.make} onChange={e=>sf("make",uc(e.target.value))} placeholder="MAZDA" style={{textTransform:"uppercase",borderColor:formErr.make?"var(--red)":undefined}}/>
+              {formErr.make&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>{formErr.make}</div>}
+            </div>
+            <div>
+              <FL label="Model *"/>
+              <input className="inp" value={form.model} onChange={e=>sf("model",uc(e.target.value))} placeholder="121" style={{textTransform:"uppercase",borderColor:formErr.model?"var(--red)":undefined}}/>
+              {formErr.model&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>{formErr.model}</div>}
+            </div>
+          </FG>
+          <FG>
+            <div>
+              <FL label="Year From *"/>
+              <input className="inp" type="number" value={form.year_from} onChange={e=>sf("year_from",e.target.value===""?"":+e.target.value)} placeholder="1990" style={{borderColor:formErr.year_from?"var(--red)":undefined}}/>
+              {formErr.year_from&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>{formErr.year_from}</div>}
+            </div>
+            <div>
+              <FL label="Year To"/>
+              <input className="inp" type="number" value={form.year_to} onChange={e=>sf("year_to",e.target.value===""?"":+e.target.value)} placeholder="2005 (blank = present)"/>
+            </div>
+          </FG>
+          <FG>
+            <div>
+              <FL label="Model Code"/>
+              <input className="inp" value={form.code} onChange={e=>sf("code",uc(e.target.value))} placeholder="MZ11A" style={{textTransform:"uppercase"}}/>
+            </div>
+            <div>
+              <FL label="Variant"/>
+              <input className="inp" value={form.variant} onChange={e=>sf("variant",uc(e.target.value))} placeholder="GL, LX, 4X4..." style={{textTransform:"uppercase"}}/>
+            </div>
+          </FG>
+          <FD label="Engine">
+            <input className="inp" value={form.engine} onChange={e=>sf("engine",uc(e.target.value))} placeholder="1.3, 2.0TD..." style={{textTransform:"uppercase"}}/>
+          </FD>
+          <FD label="Notes">
+            <input className="inp" value={form.notes} onChange={e=>sf("notes",e.target.value)} placeholder="Any extra details for admin..."/>
+          </FD>
+          <div style={{display:"flex",gap:8,marginTop:4}}>
+            <button className="btn btn-primary" onClick={submitRequest} disabled={saving}>{saving?"Submitting...":"Submit Request"}</button>
+            <button className="btn btn-ghost" onClick={()=>{setShowForm(false);setForm(blankForm);setFormErr({});}}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {pending.length>0&&(
+        <>
+          <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,marginBottom:8}}>Pending ({pending.length})</div>
+          {pending.map(r=><ReqCard key={r.id} r={r}/>)}
+        </>
+      )}
+      {pending.length===0&&done.length===0&&(
+        <div style={{textAlign:"center",padding:"40px 0",color:"var(--text3)"}}>
+          <div style={{fontSize:32,marginBottom:8}}>&#x1F697;</div>
+          <div>{isAdmin?"No pending vehicle requests":"No requests yet — click + Request Vehicle to submit one"}</div>
+        </div>
+      )}
+      {done.length>0&&(
+        <>
+          <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,margin:"16px 0 8px"}}>Completed ({done.length})</div>
+          {done.map(r=><ReqCard key={r.id} r={r}/>)}
+        </>
+      )}
+    </div>
   );
 }

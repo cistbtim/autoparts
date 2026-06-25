@@ -1945,8 +1945,8 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
     make:        vehicle.make||"GWM",
     model:       vehicle.model||"",
     code:        vehicle.code||"",
-    year_from:   vehicle.year_from||new Date().getFullYear()-2,
-    year_to:     vehicle.year_to||new Date().getFullYear(),
+    year_from:   vehicle.year_from||"",
+    year_to:     vehicle.year_to||"",
     engine:      vehicle.engine||"",
     variant:     vehicle.variant||"",
     photo_front: vehicle.photo_front||"",
@@ -1979,48 +1979,48 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
       <FG>
         <div>
           <FL label="Make *"/>
-          <input className="inp" value={f.make} onChange={e=>s("make",e.target.value)}
-            placeholder="GWM, Toyota, Ford..." style={{borderColor:err.make?"var(--red)":undefined}}/>
+          <input className="inp" value={f.make} onChange={e=>s("make",e.target.value.toUpperCase())}
+            placeholder="GWM, TOYOTA, FORD..." style={{borderColor:err.make?"var(--red)":undefined,textTransform:"uppercase"}}/>
           {err.make&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {err.make}</div>}
         </div>
         <div>
           <FL label="Model *"/>
-          <input className="inp" value={f.model} onChange={e=>s("model",e.target.value)}
-            placeholder="P-Series, Hilux..." style={{borderColor:err.model?"var(--red)":undefined}}/>
+          <input className="inp" value={f.model} onChange={e=>s("model",e.target.value.toUpperCase())}
+            placeholder="P-SERIES, HILUX..." style={{borderColor:err.model?"var(--red)":undefined,textTransform:"uppercase"}}/>
           {err.model&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {err.model}</div>}
         </div>
       </FG>
       <FG>
         <div>
           <FL label="Year From *"/>
-          <input className="inp" type="number" value={f.year_from} onChange={e=>s("year_from",+e.target.value)}
+          <input className="inp" type="number" value={f.year_from} onChange={e=>s("year_from",e.target.value===""?"":+e.target.value)}
             placeholder="2020" style={{borderColor:err.year_from?"var(--red)":undefined}}/>
           {err.year_from&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {err.year_from}</div>}
         </div>
         <div>
           <FL label="Year To"/>
-          <input className="inp" type="number" value={f.year_to} onChange={e=>s("year_to",+e.target.value)}
+          <input className="inp" type="number" value={f.year_to} onChange={e=>s("year_to",e.target.value===""?"":+e.target.value)}
             placeholder="2024 (leave blank = present)"/>
         </div>
       </FG>
       <FG>
         <div>
           <FL label="Model Code"/>
-          <input className="inp" value={f.code} onChange={e=>{s("code",e.target.value);setCodeErr("");}}
-            placeholder="FD50A, BA3, GJ..." style={{borderColor:codeErr?"var(--red)":undefined}}/>
+          <input className="inp" value={f.code} onChange={e=>{s("code",e.target.value.toUpperCase());setCodeErr("");}}
+            placeholder="FD50A, BA3, GJ..." style={{borderColor:codeErr?"var(--red)":undefined,textTransform:"uppercase"}}/>
           {codeErr&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {codeErr}</div>}
         </div>
         <div>
           <FL label="Variant"/>
-          <input className="inp" value={f.variant} onChange={e=>s("variant",e.target.value)}
-            placeholder="SX 4x4, Double-Cab, LT..."/>
+          <input className="inp" value={f.variant} onChange={e=>s("variant",e.target.value.toUpperCase())}
+            placeholder="SX 4X4, DOUBLE-CAB, LT..." style={{textTransform:"uppercase"}}/>
         </div>
       </FG>
       <FG>
         <div>
           <FL label="Engine"/>
-          <input className="inp" value={f.engine} onChange={e=>s("engine",e.target.value)}
-            placeholder="2.0TD, 1.5T, 2.8GD6..."/>
+          <input className="inp" value={f.engine} onChange={e=>s("engine",e.target.value.toUpperCase())}
+            placeholder="2.0TD, 1.5T, 2.8GD6..." style={{textTransform:"uppercase"}}/>
         </div>
       </FG>
       {/* Photos — drag & drop upload */}

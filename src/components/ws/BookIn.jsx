@@ -288,7 +288,7 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
                       onMouseEnter={e=>{if(!isSel){e.currentTarget.style.borderColor="var(--accent)";e.currentTarget.style.boxShadow="var(--glow)";}}}
                       onMouseLeave={e=>{if(!isSel){e.currentTarget.style.borderColor="var(--border)";e.currentTarget.style.boxShadow="none";}}}>
                         {img
-                          ? <img src={img} alt={v.model} style={{width:"100%",height:100,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
+                          ? <img src={img} alt={v.model} style={{width:"100%",height:100,objectFit:"contain",display:"block",background:"#f5f5f5"}} onError={e=>e.target.style.display="none"}/>
                           : <div style={{width:"100%",height:100,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🚗</div>
                         }
                         <div style={{padding:"8px 10px"}}>

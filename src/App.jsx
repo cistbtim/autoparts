@@ -8,7 +8,7 @@ import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./l
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AdBanner, AdGridCard } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { SupplierImportModal } from "./components/SupplierImport.jsx";
@@ -171,6 +171,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [branches,setBranches]=useState([]);
   const [currentBranch,setCurrentBranch]=useState(null); // null = all branches (admin); object = active branch
   const [partRequests,setPartRequests]=useState([]);
+  const [vehicleRequests,setVehicleRequests]=useState([]);
   const [branchStock,setBranchStock]=useState([]);
   const [branchStockRequests,setBranchStockRequests]=useState([]);
   const [wsShopRequests,setWsShopRequests]=useState([]);
@@ -595,6 +596,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(!isSalesman&&(role==="admin"||isBranchUser)){
       const prF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
       api.get("part_requests",`${prF}select=*&order=created_at.desc`).catch(()=>[]).then(r=>{if(Array.isArray(r))setPartRequests(r);});
+      api.get("vehicle_requests",`${prF}select=*&order=created_at.desc`).catch(()=>[]).then(r=>{if(Array.isArray(r))setVehicleRequests(r);});
     }
     // Branch stock requests: workshop sees own, branch users see both sides (requesting or supplying), admin sees all
     if(!isSalesman){
@@ -696,6 +698,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       stock_moves:              [`${bF}select=*&order=moved_at.desc&limit=200`,                   d=>setStockMoves(Array.isArray(d)?d:[])],
       stock_takes:              ["select=*&order=created_at.desc",                   d=>setStockTakes(Array.isArray(d)?d:[])],
       part_requests:            [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setPartRequests(Array.isArray(d)?d:[])],
+      vehicle_requests:         [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setVehicleRequests(Array.isArray(d)?d:[])],
       branch_stock_requests:    [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`or=(requesting_branch_id.eq.${user.branch_id},supplying_branch_id.eq.${user.branch_id})&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setBranchStockRequests(Array.isArray(d)?d:[])],
       ws_shop_requests:         [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setWsShopRequests(Array.isArray(d)?d:[])],
       branch_stock:             [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*`:"select=*", d=>setBranchStock(Array.isArray(d)?d:[])],
@@ -2585,6 +2588,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       })
     :parts;
   const pendingPartRequests=partRequests.filter(r=>r.status==="pending").length||0;
+  const pendingVehicleRequests=vehicleRequests.filter(r=>r.status==="pending").length||0;
   const pendingTransferRequests=branchStockRequests.filter(r=>r.status==="pending"||r.status==="quoted"||r.status==="confirmed"||r.status==="dispatched").length||0;
   const pendingWsShopRequests=wsShopRequests.filter(r=>r.status==="pending").length||0;
   // Multi-word search using DEBOUNCED value — fast typing won't lag UI
@@ -2736,6 +2740,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {id:"stockmove",icon:"🔀",label:t.stockMove,roles:["admin","manager","shipper","stockman"]},
         {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager","branch_admin"]},
         {id:"partRequests",icon:"📬",label:"Part Requests",roles:["admin"],badge:pendingPartRequests},
+        {id:"vehicleRequests",icon:"🚗",label:"Vehicle Requests",roles:["admin"],badge:pendingVehicleRequests},
         {id:"transferRequests",icon:"🔄",label:"Transfer Requests",roles:["admin","branch_admin","branch_manager"],badge:pendingTransferRequests},
         {id:"wsShopRequests",icon:"🏪",label:"Workshop Requests",roles:["admin","manager"],badge:pendingWsShopRequests},
       ]
@@ -2868,8 +2873,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {id:"branches",icon:"🏢",label:t.branchMgmt||"Branches",roles:["admin"],badge:branches.filter(b=>b.status==="pending").length||0},
         {id:"settings",icon:"⚙️",label:t.settings,roles:["admin"]},
         {id:"users",icon:"🔑",label:t.users,roles:["admin"]},
-        {id:"branchProfile",  icon:"🏢",label:"My Branch",  roles:["admin"],branchAdminOnly:true},
-        {id:"branch_users",   icon:"👤",label:"Branch Users",roles:["admin"],branchAdminOnly:true},
+        {id:"branchProfile",    icon:"🏢",label:"My Branch",        roles:["admin"],branchAdminOnly:true},
+        {id:"branch_users",     icon:"👤",label:"Branch Users",     roles:["admin"],branchAdminOnly:true},
+        {id:"vehicleRequests",  icon:"🚗",label:"Vehicle Requests", roles:["admin"],branchAdminOnly:true,badge:pendingVehicleRequests},
       ]
     },
   ].filter(g=>
@@ -2880,7 +2886,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     children:g.children.filter(c=>{
       if(isBranchUser){
         // branch users see admin tabs scoped to their role
-        const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","adcontracts","branches","settings","users","wssubscriptions"]);
+        const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","adcontracts","branches","settings","users","wssubscriptions","vehicles"]);
         if(!c.roles.includes("admin")||BA_HIDE.has(c.id)) return false;
         // branchAdminOnly items only visible to branch_admin
         if(c.branchAdminOnly && role!=="branch_admin") return false;
@@ -2962,12 +2968,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {id:"suppliers", icon:"🏭",label:t.suppliers},
     ];
     if(role==="branch_admin") return [
-      {id:"inventory",   icon:"📦",label:t.inventory,badge:lowStock.length},
-      {id:"orders",      icon:"📋",label:t.orders,badge:pendingCnt},
-      {id:"customers",   icon:"👥",label:t.customers},
-      {id:"rfq",         icon:"📋",label:t.rfqSession||"RFQ",badge:overdueAutoRfq||0},
-      {id:"suppliers",   icon:"🏭",label:t.suppliers},
-      {id:"branch_users",icon:"👤",label:"Users"},
+      {id:"inventory",       icon:"📦",label:t.inventory,badge:lowStock.length},
+      {id:"orders",          icon:"📋",label:t.orders,badge:pendingCnt},
+      {id:"customers",       icon:"👥",label:t.customers},
+      {id:"rfq",             icon:"📋",label:t.rfqSession||"RFQ",badge:overdueAutoRfq||0},
+      {id:"suppliers",       icon:"🏭",label:t.suppliers},
+      {id:"vehicleRequests", icon:"🚗",label:"Vehicle Requests",badge:pendingVehicleRequests},
+      {id:"branch_users",    icon:"👤",label:"Users"},
     ];
     // admin — show most used
     return [
@@ -5525,11 +5532,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             t={t} lang={lang}/>
         )}
 
-        {tab==="vehicles"&&(role==="admin"||role==="branch_admin")&&(
+        {tab==="vehicles"&&role==="admin"&&(
           <VehiclesPage vehicles={vehicles} partFitments={partFitments} onSave={saveVehicle} onDelete={deleteVehicle}
             onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
             onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
             t={t}/>
+        )}
+
+        {tab==="vehicleRequests"&&(role==="admin"||role==="branch_admin")&&(
+          <VehicleRequestsPage vehicleRequests={vehicleRequests} branches={branches} user={user} role={role}
+            currentBranch={currentBranch}
+            onApprove={saveVehicle}
+            onRefresh={()=>refreshTables("vehicle_requests")} t={t}/>
         )}
 
         {tab==="branches"&&role==="admin"&&(

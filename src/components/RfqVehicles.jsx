@@ -2027,6 +2027,17 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
           <input className="inp" value={f.code} onChange={e=>{s("code",e.target.value.toUpperCase());setCodeErr("");}}
             placeholder="FD50A, BA3, GJ..." style={{borderColor:codeErr?"var(--red)":undefined,textTransform:"uppercase"}}/>
           {codeErr&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {codeErr}</div>}
+          {!f.code && nextCodeForMake&&(()=>{const sugg=nextCodeForMake(f.make);return sugg?(
+            <div style={{marginTop:4,fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:6}}>
+              Suggested:
+              <button type="button" onClick={()=>{s("code",sugg);codeUserEdited.current=true;}}
+                style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",
+                  background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.3)",
+                  borderRadius:5,padding:"1px 8px",cursor:"pointer"}}>
+                {sugg}
+              </button>
+            </div>
+          ):null;})()}
         </div>
         <div>
           <FL label="Variant"/>

@@ -864,6 +864,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     tabRef.current === "pos" ||         // manual refresh only on POS
     tabRef.current === "shop" ||        // manual refresh only on shop
     tabRef.current === "inventory" ||   // manual refresh only on inventory
+    tabRef.current === "vehicleRequests" || // always pause on vehicle requests
     tabRef.current === "settings" ||    // always pause on settings page
     tabRef.current === "wsprofile" ||   // always pause on workshop profile/settings
     (Date.now() - lastActivityRef.current) < 8000;

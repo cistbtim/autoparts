@@ -9902,7 +9902,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
   const pending = myReqs.filter(r=>r.status==="pending");
   const done    = myReqs.filter(r=>r.status==="approved"||r.status==="rejected");
 
-  const blankForm = {make:"",model:"",year_from:"",year_to:"",engine:"",variant:"",code:"",notes:""};
+  const blankForm = {make:"",model:"",year_from:"",year_to:"",engine:"",variant:"",code:"",notes:"",photo1:"",photo2:""};
   const [showForm,      setShowForm]      = useState(false);
   const [form,          setForm]          = useState(blankForm);
   const [formErr,       setFormErr]       = useState({});
@@ -9917,6 +9917,52 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
 
   const sf = (k,v) => setForm(p=>({...p,[k]:v}));
   const uc = v => v.toUpperCase();
+
+  const resizeToBase64 = (file) => new Promise(resolve=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const MAX=800, scale=Math.min(1,MAX/Math.max(img.width,img.height));
+        const c=document.createElement('canvas');
+        c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        resolve(c.toDataURL('image/jpeg',0.75));
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const PhotoSlot = ({val, onSet}) => {
+    const fileRef = useRef(null);
+    const camRef  = useRef(null);
+    const process = async (file) => { if(file) onSet(await resizeToBase64(file)); };
+    const onPaste = (e) => {
+      const item=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image'));
+      if(item){e.preventDefault();process(item.getAsFile());}
+    };
+    if(val) return (
+      <div style={{position:"relative",flexShrink:0}}>
+        <img src={val} onClick={()=>setLightbox({urls:[val],idx:0,labels:["Photo"]})}
+          style={{width:120,height:90,objectFit:"contain",borderRadius:8,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in",display:"block"}}/>
+        <button onClick={()=>onSet("")}
+          style={{position:"absolute",top:-7,right:-7,width:22,height:22,borderRadius:"50%",background:"var(--red)",color:"#fff",border:"none",cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",padding:0,lineHeight:1}}>×</button>
+      </div>
+    );
+    return (
+      <div onPaste={onPaste} tabIndex={0}
+        style={{border:"2px dashed var(--border)",borderRadius:8,padding:"10px 14px",display:"flex",gap:8,alignItems:"center",background:"var(--surface2)",outline:"none",cursor:"text"}}
+        onFocus={e=>e.currentTarget.style.borderColor="var(--accent)"}
+        onBlur={e=>e.currentTarget.style.borderColor=""}>
+        <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{process(e.target.files[0]);e.target.value="";}}/>
+        <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{process(e.target.files[0]);e.target.value="";}}/>
+        <button className="btn btn-ghost btn-xs" onClick={()=>camRef.current.click()} title="Camera">📷</button>
+        <button className="btn btn-ghost btn-xs" onClick={()=>fileRef.current.click()} title="File">📁</button>
+        <span style={{fontSize:11,color:"var(--text3)"}}>or Ctrl+V paste</span>
+      </div>
+    );
+  };
 
   const makeSuggs = useMemo(()=>{
     const q = form.make.trim().toUpperCase();
@@ -9962,6 +10008,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       year_from: form.year_from||null, year_to: form.year_to||null,
       engine: form.engine.trim()||null, variant: form.variant.trim()||null,
       code: form.code.trim()||null, notes: form.notes.trim()||null,
+      photo1: form.photo1||null, photo2: form.photo2||null,
       status:"pending", requested_by: user.id,
     });
     setSaving(false);
@@ -10007,15 +10054,18 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       v.model.toUpperCase()===r.model.toUpperCase() &&
       (!r.code || !v.code || v.code.toUpperCase()===r.code.toUpperCase())
     );
-    const photos = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean);
-    const openPhotos = (i) => setLightbox({urls:photos.map(toImgUrl),idx:i,labels:["Front","Rear","Side"].slice(0,photos.length)});
+    const dbPhotos = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean);
+    const reqPhotos = [r.photo1, r.photo2].filter(Boolean);
+    const photos = [...reqPhotos, ...dbPhotos.map(toImgUrl)];
+    const labels = [...reqPhotos.map((_,i)=>`Photo ${i+1}`), ...["Front","Rear","Side"].slice(0,dbPhotos.length)];
+    const openPhotos = (i) => setLightbox({urls:photos,idx:i,labels});
     return (
       <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
         <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
           {photos.length>0&&(
             <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
               {photos.map((url,i)=>(
-                <img key={i} src={toImgUrl(url)} alt="" loading="lazy"
+                <img key={i} src={url} alt="" loading="lazy"
                   onClick={()=>openPhotos(i)}
                   style={{width:72,height:54,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in",display:"block"}}
                   onError={e=>e.target.style.display="none"}/>
@@ -10173,6 +10223,13 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
           <FD label="Notes">
             <input className="inp" value={form.notes} onChange={e=>sf("notes",e.target.value)} placeholder="Any extra details for admin..."/>
           </FD>
+          <div style={{marginBottom:12}}>
+            <FL label="Photos (optional — up to 2)"/>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:6}}>
+              <PhotoSlot val={form.photo1} onSet={v=>sf("photo1",v)}/>
+              <PhotoSlot val={form.photo2} onSet={v=>sf("photo2",v)}/>
+            </div>
+          </div>
           <div style={{display:"flex",gap:8,marginTop:4}}>
             <button className="btn btn-primary" onClick={submitRequest} disabled={saving}>{saving?"Submitting...":"Submit Request"}</button>
             <button className="btn btn-ghost" onClick={()=>{setShowForm(false);setForm(blankForm);setFormErr({});setExistingMatch(null);}}>Cancel</button>

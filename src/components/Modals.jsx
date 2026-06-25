@@ -9895,24 +9895,50 @@ export function BulkImageImportModal({ parts, partSuppliers=[], onClose, onImage
   );
 }
 
-// ─── Vehicle Requests Page ────────────────────────────────────────────────────
-export function VehicleRequestsPage({vehicleRequests=[],branches=[],user,role,currentBranch,onRefresh,onApprove,t={}}) {
+// ─── Vehicle Requests Page ──────────────────────────────────────────────
+export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],user,role,currentBranch,onRefresh,onApprove,t={}}) {
   const isAdmin = role==="admin";
   const myReqs  = isAdmin ? vehicleRequests : vehicleRequests.filter(r=>r.branch_id===currentBranch?.id);
   const pending = myReqs.filter(r=>r.status==="pending");
   const done    = myReqs.filter(r=>r.status==="approved"||r.status==="rejected");
 
   const blankForm = {make:"",model:"",year_from:"",year_to:"",engine:"",variant:"",code:"",notes:""};
-  const [showForm,  setShowForm]  = useState(false);
-  const [form,      setForm]      = useState(blankForm);
-  const [formErr,   setFormErr]   = useState({});
-  const [saving,    setSaving]    = useState(false);
-  const [rejectingId, setRejectingId] = useState(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [busy, setBusy] = useState(null);
+  const [showForm,      setShowForm]      = useState(false);
+  const [form,          setForm]          = useState(blankForm);
+  const [formErr,       setFormErr]       = useState({});
+  const [saving,        setSaving]        = useState(false);
+  const [showSuggs,     setShowSuggs]     = useState(false);
+  const [existingMatch, setExistingMatch] = useState(null);
+  const [rejectingId,   setRejectingId]   = useState(null);
+  const [rejectReason,  setRejectReason]  = useState("");
+  const [busy,          setBusy]          = useState(null);
 
   const sf = (k,v) => setForm(p=>({...p,[k]:v}));
   const uc = v => v.toUpperCase();
+
+  const makeVehicles = useMemo(()=>{
+    if(!form.make.trim()) return [];
+    return vehicles.filter(v=>v.make.toUpperCase()===form.make.trim().toUpperCase());
+  },[vehicles, form.make]);
+
+  const modelSuggs = useMemo(()=>{
+    if(!makeVehicles.length) return [];
+    const q = form.model.trim().toUpperCase();
+    return q ? makeVehicles.filter(v=>(v.model||"").toUpperCase().includes(q)) : makeVehicles;
+  },[makeVehicles, form.model]);
+
+  const pickSugg = (v) => {
+    setForm(p=>({...p,
+      model:     v.model||"",
+      year_from: v.year_from||"",
+      year_to:   v.year_to||"",
+      engine:    (v.engine||"").toUpperCase(),
+      variant:   (v.variant||"").toUpperCase(),
+      code:      (v.code||"").toUpperCase(),
+    }));
+    setExistingMatch(v);
+    setShowSuggs(false);
+  };
 
   const submitRequest = async () => {
     const e={};
@@ -9933,6 +9959,7 @@ export function VehicleRequestsPage({vehicleRequests=[],branches=[],user,role,cu
     setSaving(false);
     setForm(blankForm);
     setShowForm(false);
+    setExistingMatch(null);
     await onRefresh();
   };
 
@@ -9969,22 +9996,20 @@ export function VehicleRequestsPage({vehicleRequests=[],branches=[],user,role,cu
     const isRejecting = rejectingId===r.id;
     return (
       <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-          <div style={{flex:1,minWidth:200}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-              <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
-              {r.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>{r.code}</span>}
-              {statusBadge(r.status)}
-            </div>
-            {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
-            <div style={{fontSize:12,display:"flex",gap:12,flexWrap:"wrap",color:"var(--text3)"}}>
-              {(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}
-              {r.engine&&<span>{r.engine}</span>}
-              {r.variant&&<span>{r.variant}</span>}
-            </div>
-            {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
-            {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
+        <div style={{flex:1,minWidth:200}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+            <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
+            {r.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>{r.code}</span>}
+            {statusBadge(r.status)}
           </div>
+          {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
+          <div style={{fontSize:12,display:"flex",gap:12,flexWrap:"wrap",color:"var(--text3)"}}>
+            {(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}
+            {r.engine&&<span>{r.engine}</span>}
+            {r.variant&&<span>{r.variant}</span>}
+          </div>
+          {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
+          {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
         </div>
         {isAdmin&&r.status==="pending"&&(
           <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
@@ -10019,7 +10044,7 @@ export function VehicleRequestsPage({vehicleRequests=[],branches=[],user,role,cu
         </div>
         <div style={{display:"flex",gap:8}}>
           <button className="btn btn-ghost btn-sm" onClick={onRefresh}>Refresh</button>
-          {!isAdmin&&<button className="btn btn-primary btn-sm" onClick={()=>setShowForm(v=>!v)}>+ Request Vehicle</button>}
+          {!isAdmin&&<button className="btn btn-primary btn-sm" onClick={()=>{setShowForm(v=>!v);setExistingMatch(null);setFormErr({});}}>+ Request Vehicle</button>}
         </div>
       </div>
 
@@ -10029,15 +10054,48 @@ export function VehicleRequestsPage({vehicleRequests=[],branches=[],user,role,cu
           <FG>
             <div>
               <FL label="Make *"/>
-              <input className="inp" value={form.make} onChange={e=>sf("make",uc(e.target.value))} placeholder="MAZDA" style={{textTransform:"uppercase",borderColor:formErr.make?"var(--red)":undefined}}/>
+              <input className="inp" value={form.make} onChange={e=>{sf("make",uc(e.target.value));sf("model","");setExistingMatch(null);}}
+                placeholder="MAZDA" style={{textTransform:"uppercase",borderColor:formErr.make?"var(--red)":undefined}}/>
               {formErr.make&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>{formErr.make}</div>}
             </div>
-            <div>
+            <div style={{position:"relative"}}>
               <FL label="Model *"/>
-              <input className="inp" value={form.model} onChange={e=>sf("model",uc(e.target.value))} placeholder="121" style={{textTransform:"uppercase",borderColor:formErr.model?"var(--red)":undefined}}/>
+              <input className="inp" value={form.model}
+                onChange={e=>{sf("model",uc(e.target.value));setExistingMatch(null);setShowSuggs(true);}}
+                onFocus={()=>setShowSuggs(true)}
+                onBlur={()=>setTimeout(()=>setShowSuggs(false),150)}
+                placeholder="121" style={{textTransform:"uppercase",borderColor:formErr.model?"var(--red)":undefined}}/>
               {formErr.model&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>{formErr.model}</div>}
+              {showSuggs&&modelSuggs.length>0&&(
+                <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:200,background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",maxHeight:220,overflowY:"auto",marginTop:2}}>
+                  {modelSuggs.map(v=>(
+                    <div key={v.id} onMouseDown={()=>pickSugg(v)}
+                      style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}
+                      onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
+                      onMouseLeave={e=>e.currentTarget.style.background=""}>
+                      <div>
+                        <span style={{fontWeight:600,fontSize:13}}>{v.model}</span>
+                        {v.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--accent)",marginLeft:6}}>{v.code}</span>}
+                        {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
+                      </div>
+                      <span style={{fontSize:12,color:"var(--blue)",whiteSpace:"nowrap"}}>{v.year_from||"?"}–{v.year_to||"present"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </FG>
+
+          {existingMatch&&(
+            <div style={{marginBottom:10,padding:"8px 12px",background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.4)",borderRadius:8,fontSize:12}}>
+              <strong>Already in database:</strong> {existingMatch.make} {existingMatch.model}
+              {existingMatch.code&&<span style={{fontFamily:"DM Mono,monospace",color:"var(--accent)",marginLeft:4}}>{existingMatch.code}</span>}
+              {" · "}{existingMatch.year_from||"?"}–{existingMatch.year_to||"present"}
+              {existingMatch.engine&&<span> · {existingMatch.engine}</span>}
+              {". Only submit if you need a different year range or variant."}
+            </div>
+          )}
+
           <FG>
             <div>
               <FL label="Year From *"/>
@@ -10067,7 +10125,7 @@ export function VehicleRequestsPage({vehicleRequests=[],branches=[],user,role,cu
           </FD>
           <div style={{display:"flex",gap:8,marginTop:4}}>
             <button className="btn btn-primary" onClick={submitRequest} disabled={saving}>{saving?"Submitting...":"Submit Request"}</button>
-            <button className="btn btn-ghost" onClick={()=>{setShowForm(false);setForm(blankForm);setFormErr({});}}>Cancel</button>
+            <button className="btn btn-ghost" onClick={()=>{setShowForm(false);setForm(blankForm);setFormErr({});setExistingMatch(null);}}>Cancel</button>
           </div>
         </div>
       )}

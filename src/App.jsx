@@ -5540,7 +5540,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {tab==="vehicleRequests"&&(role==="admin"||role==="branch_admin")&&(
-          <VehicleRequestsPage vehicleRequests={vehicleRequests} branches={branches} user={user} role={role}
+          <VehicleRequestsPage vehicleRequests={vehicleRequests} vehicles={vehicles} branches={branches} user={user} role={role}
             currentBranch={currentBranch}
             onApprove={saveVehicle}
             onRefresh={()=>refreshTables("vehicle_requests")} t={t}/>

@@ -1793,12 +1793,19 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
     const num = parseInt(last.slice(2,-1),10)||1;
     return prefix + String(num+1).padStart(2,'0') + 'A';
   };
-  // When search is active, base the new code on the visible filtered group (e.g. searching "x1" → BM01G → BM01H).
-  // When no search, fall back to all vehicles for the make.
-  const nextCodeForMake = (make) => nextCodeFromList(
-    search.trim() && filtered.length ? filtered : inMake.length ? inMake : vehicles.filter(v=>v.make===make),
-    make
-  );
+  // When search is active, base the new code on the visible filtered group.
+  // When a model is provided, first try to find the model-group codes (e.g. "121" → MZ11x).
+  const nextCodeForMake = (make, model) => {
+    const pool = search.trim() && filtered.length ? filtered : inMake.length ? inMake : vehicles.filter(v=>v.make===make);
+    if (model) {
+      const token = model.split(/[\s\/\(]/)[0].toUpperCase();
+      if (token.length >= 2) {
+        const group = pool.filter(v=>v.model.toUpperCase().startsWith(token) && v.code);
+        if (group.length > 0) return nextCodeFromList(group, make);
+      }
+    }
+    return nextCodeFromList(pool, make);
+  };
 
   const newVehicleDefaults = { make: selMake!==null?selMake:"GWM", model:"", code: nextCodeForMake(selMake!==null?selMake:"GWM"), year_from:"", year_to:"", engine:"", variant:"" };
 
@@ -1975,7 +1982,7 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
   const s = (k,v) => {
     if (k==="code") codeUserEdited.current = true;
     if (k==="make" && isNew && !codeUserEdited.current && nextCodeForMake)
-      setF(p=>({...p, make:v, code: nextCodeForMake(v)}));
+      setF(p=>({...p, make:v, code: nextCodeForMake(v, p.model)}));
     else
       setF(p=>({...p,[k]:v}));
   };
@@ -2027,7 +2034,7 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
           <input className="inp" value={f.code} onChange={e=>{s("code",e.target.value.toUpperCase());setCodeErr("");}}
             placeholder="FD50A, BA3, GJ..." style={{borderColor:codeErr?"var(--red)":undefined,textTransform:"uppercase"}}/>
           {codeErr&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {codeErr}</div>}
-          {!f.code && nextCodeForMake&&(()=>{const sugg=nextCodeForMake(f.make);return sugg?(
+          {!f.code && nextCodeForMake&&(()=>{const sugg=nextCodeForMake(f.make,f.model);return sugg?(
             <div style={{marginTop:4,fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:6}}>
               Suggested:
               <button type="button" onClick={()=>{s("code",sugg);codeUserEdited.current=true;}}

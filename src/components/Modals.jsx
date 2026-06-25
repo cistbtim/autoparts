@@ -10064,43 +10064,61 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       v.make.toUpperCase()===r.make.toUpperCase() &&
       v.model.toUpperCase()===r.model.toUpperCase()
     );
-    const dbPhotos = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean);
-    const reqPhotos = [r.photo1, r.photo2].filter(Boolean);
-    const photos = [...reqPhotos, ...dbPhotos.map(toImgUrl)];
-    const labels = [...reqPhotos.map((_,i)=>`Photo ${i+1}`), ...["Front","Rear","Side"].slice(0,dbPhotos.length)];
-    const openPhotos = (i) => setLightbox({urls:photos,idx:i,labels});
+    const dbPhotoUrls = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean).map(toImgUrl);
+    const reqPhotos   = [r.photo1, r.photo2].filter(Boolean);
+    const allUrls  = [...reqPhotos, ...dbPhotoUrls];
+    const allLabels= [...reqPhotos.map((_,i)=>`Branch Photo ${i+1}`), ...["Front","Rear","Side"].slice(0,dbPhotoUrls.length)];
+    const openAt = (i) => setLightbox({urls:allUrls, idx:i, labels:allLabels});
+
+    const PhotoRow = ({urls, startIdx, label}) => urls.length===0 ? null : (
+      <div style={{marginTop:8}}>
+        <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>{label}</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {urls.map((url,i)=>(
+            <img key={i} src={url} alt="" loading="lazy" onClick={()=>openAt(startIdx+i)}
+              style={{width:80,height:60,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in"}}
+              onError={e=>e.target.style.display="none"}/>
+          ))}
+        </div>
+      </div>
+    );
+
     return (
       <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
-        <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-          {photos.length>0&&(
-            <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
-              {photos.map((url,i)=>(
-                <img key={i} src={url} alt="" loading="lazy"
-                  onClick={()=>openPhotos(i)}
-                  style={{width:72,height:54,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in",display:"block"}}
-                  onError={e=>e.target.style.display="none"}/>
-              ))}
-            </div>
-          )}
-          <div style={{flex:1,minWidth:200}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-              <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
-              {statusBadge(r.status)}
-            </div>
-            {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
-            <div style={{fontSize:12,display:"flex",gap:12,flexWrap:"wrap",color:"var(--text3)"}}>
-              {(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}
-            </div>
-            {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
-            {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
-            {isAdmin&&r.status==="approved"&&onGoToVehicles&&(
-              <button className="btn btn-ghost btn-sm" style={{marginTop:8,fontSize:12}}
-                onClick={()=>onGoToVehicles(r.make, r.model)}>
-                Edit in Vehicles →
-              </button>
-            )}
-          </div>
+        {/* Header row */}
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+          <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
+          {statusBadge(r.status)}
         </div>
+        {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
+        <div style={{fontSize:12,color:"var(--text3)"}}>{(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}</div>
+        {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2,fontStyle:"italic"}}>"{r.notes}"</div>}
+
+        {/* Two-column photo section */}
+        {(reqPhotos.length>0||dbPhotoUrls.length>0)&&(
+          <div style={{display:"flex",gap:16,marginTop:10,flexWrap:"wrap"}}>
+            <PhotoRow urls={reqPhotos} startIdx={0} label="Branch Photos"/>
+            <PhotoRow urls={dbPhotoUrls} startIdx={reqPhotos.length} label="Vehicle in Database"/>
+          </div>
+        )}
+
+        {/* Approved vehicle details */}
+        {r.status==="approved"&&matchV&&(matchV.code||matchV.engine||matchV.variant)&&(
+          <div style={{marginTop:10,padding:"8px 12px",background:"rgba(34,197,94,.06)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+            <span style={{fontSize:11,fontWeight:700,color:"var(--green)"}}>Added as:</span>
+            {matchV.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 7px",borderRadius:4}}>{matchV.code}</span>}
+            {matchV.engine&&<span style={{fontSize:12,color:"var(--blue)"}}>🔧 {matchV.engine}</span>}
+            {matchV.variant&&<span style={{fontSize:12,color:"var(--text3)"}}>{matchV.variant}</span>}
+          </div>
+        )}
+
+        {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:8,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
+        {isAdmin&&r.status==="approved"&&onGoToVehicles&&(
+          <button className="btn btn-ghost btn-sm" style={{marginTop:8,fontSize:12}} onClick={()=>onGoToVehicles(r.make, r.model)}>
+            Edit in Vehicles →
+          </button>
+        )}
+
         {isAdmin&&r.status==="pending"&&(
           <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
             {!isRejecting&&(

@@ -10106,12 +10106,20 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
           </FG>
 
           {existingMatch&&(
-            <div style={{marginBottom:10,padding:"8px 12px",background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.4)",borderRadius:8,fontSize:12}}>
-              <strong>Already in database:</strong> {existingMatch.make} {existingMatch.model}
-              {existingMatch.code&&<span style={{fontFamily:"DM Mono,monospace",color:"var(--accent)",marginLeft:4}}>{existingMatch.code}</span>}
-              {" · "}{existingMatch.year_from||"?"}–{existingMatch.year_to||"present"}
-              {existingMatch.engine&&<span> · {existingMatch.engine}</span>}
-              {". Only submit if you need a different year range or variant."}
+            <div style={{marginBottom:10,padding:"10px 12px",background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.4)",borderRadius:8,fontSize:12,display:"flex",gap:10,alignItems:"flex-start"}}>
+              {[existingMatch.photo_front,existingMatch.photo_rear,existingMatch.photo_side].filter(Boolean).map((url,i)=>(
+                <img key={i} src={toImgUrl(url)} alt="" loading="lazy"
+                  onClick={()=>setLightboxUrl(url)}
+                  style={{width:80,height:60,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid rgba(251,191,36,.4)",cursor:"zoom-in",flexShrink:0}}
+                  onError={e=>e.target.style.display="none"}/>
+              ))}
+              <div>
+                <strong>Already in database:</strong> {existingMatch.make} {existingMatch.model}
+                {existingMatch.code&&<span style={{fontFamily:"DM Mono,monospace",color:"var(--accent)",marginLeft:4}}>{existingMatch.code}</span>}
+                {" · "}{existingMatch.year_from||"?"}–{existingMatch.year_to||"present"}
+                {existingMatch.engine&&<span> · {existingMatch.engine}</span>}
+                {" Only submit if you need a different year range or variant."}
+              </div>
             </div>
           )}
 

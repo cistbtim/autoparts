@@ -10048,6 +10048,14 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
     setBusy(null);
   };
 
+  const deleteRequest = async (id) => {
+    if(!window.confirm("Delete this vehicle request?")) return;
+    setBusy(id);
+    await api.delete("vehicle_requests","id",id);
+    await onRefresh();
+    setBusy(null);
+  };
+
   const branchName = id => branches.find(b=>b.id===id)?.name||"Unknown Branch";
 
   const statusBadge = status => (
@@ -10113,11 +10121,16 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
         )}
 
         {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:8,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
-        {isAdmin&&r.status==="approved"&&onGoToVehicles&&(
-          <button className="btn btn-ghost btn-sm" style={{marginTop:8,fontSize:12}} onClick={()=>onGoToVehicles(r.make, r.model)}>
-            Edit in Vehicles →
+        <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
+          {isAdmin&&r.status==="approved"&&onGoToVehicles&&(
+            <button className="btn btn-ghost btn-sm" style={{fontSize:12}} onClick={()=>onGoToVehicles(r.make, r.model)}>
+              Edit in Vehicles →
+            </button>
+          )}
+          <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",fontSize:12}} onClick={()=>deleteRequest(r.id)} disabled={busy===r.id}>
+            🗑 Delete
           </button>
-        )}
+        </div>
 
         {isAdmin&&r.status==="pending"&&(
           <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>

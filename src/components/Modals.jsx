@@ -10093,6 +10093,12 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
             </div>
             {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
             {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
+            {isAdmin&&r.status==="approved"&&onGoToVehicles&&(
+              <button className="btn btn-ghost btn-sm" style={{marginTop:8,fontSize:12}}
+                onClick={()=>onGoToVehicles(r.make)}>
+                Edit in Vehicles →
+              </button>
+            )}
           </div>
         </div>
         {isAdmin&&r.status==="pending"&&(

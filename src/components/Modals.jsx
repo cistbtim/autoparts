@@ -10032,7 +10032,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
       await onRefresh();
       setBusy(null);
-      onGoToVehicles&&onGoToVehicles(r.make);
+      onGoToVehicles&&onGoToVehicles(r.make, r.model);
       return;
     } catch{}
     await onRefresh();
@@ -10095,7 +10095,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
             {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
             {isAdmin&&r.status==="approved"&&onGoToVehicles&&(
               <button className="btn btn-ghost btn-sm" style={{marginTop:8,fontSize:12}}
-                onClick={()=>onGoToVehicles(r.make)}>
+                onClick={()=>onGoToVehicles(r.make, r.model)}>
                 Edit in Vehicles →
               </button>
             )}

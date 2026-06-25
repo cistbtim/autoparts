@@ -1725,12 +1725,14 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, onAddPart, t, jumpMake=null}) {
+export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, onAddPart, t, jumpMake=null, jumpModel=null}) {
   const [selMake, setSelMake] = useState(jumpMake);  // null = makes level
   const [search,  setSearch]  = useState("");
   const [searchD, setSearchD] = useState("");
+  const [highlightModel, setHighlightModel] = useState(jumpModel);
 
   useEffect(()=>{ if(jumpMake) setSelMake(jumpMake); },[jumpMake]);
+  useEffect(()=>{ setHighlightModel(jumpModel); },[jumpModel]);
   const [editV,   setEditV]   = useState(null);
   const [lightbox, setLightbox] = useState(null); // {urls,labels,idx}
 
@@ -1875,8 +1877,10 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
             const thumb = v.photo_front||v.photo_rear||v.photo_side;
             const thumbUrl = thumb ? toImgUrl(thumb) : null;
             const hasPhotos = !!(v.photo_front||v.photo_rear||v.photo_side);
+            const needsEdit = highlightModel && v.model.toUpperCase()===highlightModel.toUpperCase();
             return (
-            <div key={v.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+            <div key={v.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",
+              ...(needsEdit?{border:"2px solid var(--accent)",background:"rgba(249,115,22,.04)"}:{})}}>
               {/* Photo thumbnail */}
               <div style={{flexShrink:0,width:160,height:160,borderRadius:10,overflow:"hidden",
                 background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",
@@ -1888,8 +1892,11 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
               </div>
               {/* Main info */}
               <div style={{flex:1,minWidth:140}}>
-                <div style={{fontWeight:700,fontSize:14}}>{v.model}</div>
-                {v.code&&<div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--accent)",fontWeight:700}}>{v.code}</div>}
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <span style={{fontWeight:700,fontSize:14}}>{v.model}</span>
+                  {needsEdit&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:"rgba(249,115,22,.15)",color:"var(--accent)",fontWeight:700}}>Needs editing</span>}
+                </div>
+                {v.code&&<div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--accent)",fontWeight:700,marginTop:1}}>{v.code}</div>}
                 <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
                   {v.year_from}–{v.year_to||"present"}
                   {v.engine&&<span style={{marginLeft:8,color:"var(--blue)"}}>🔧 {v.engine}</span>}
@@ -1909,7 +1916,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
                   onClick={()=>onViewInShop(v.make,v.model)}>🛒 Shop</button>}
                 {onAddPart&&<button className="btn btn-ghost btn-xs" style={{color:"var(--accent)",borderColor:"var(--accent)"}}
                   onClick={()=>onAddPart(v)} title={`Add new part with SKU ${v.code}-`}>+ Part</button>}
-                <button className="btn btn-ghost btn-xs" onClick={()=>setEditV({...v})}>✏️ Edit</button>
+                <button className="btn btn-ghost btn-xs" onClick={()=>{setEditV({...v});setHighlightModel(null);}}>✏️ Edit</button>
                 <button className="btn btn-danger btn-xs"
                   onClick={()=>{if(window.confirm(`Delete ${v.make} ${v.model}?`))onDelete(v.id);}}>🗑</button>
               </div>

@@ -9959,7 +9959,15 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
         <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{process(e.target.files[0]);e.target.value="";}}/>
         <button className="btn btn-ghost btn-xs" onClick={()=>camRef.current.click()} title="Camera">📷</button>
         <button className="btn btn-ghost btn-xs" onClick={()=>fileRef.current.click()} title="File">📁</button>
-        <span style={{fontSize:11,color:"var(--text3)"}}>or Ctrl+V paste</span>
+        <button className="btn btn-ghost btn-xs" title="Paste from clipboard" onClick={async()=>{
+          try{
+            const items=await navigator.clipboard.read();
+            for(const item of items){
+              const type=item.types.find(t=>t.startsWith('image/'));
+              if(type){process(await item.getType(type));break;}
+            }
+          }catch{/* permission denied or no image */}
+        }}>📋 Paste</button>
       </div>
     );
   };

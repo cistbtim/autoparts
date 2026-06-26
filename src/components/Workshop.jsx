@@ -7823,7 +7823,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const finalize=(extra=[])=>{
         const combined=[
           ...ownArr.map(p=>({...applyBs(p),_source:srcOf(p)})),
-          ...mainOnlyArr.map(p=>({...applyBs(p),_source:"main"})),
+          ...mainOnlyArr.map(p=>({...applyBs(p),_source:srcOf(p)})),
           ...extra.filter(p=>!allSeen.has(String(p.id))).map(p=>({...applyBs(p),_source:"other"})),
         ];
         setShopParts(combined);

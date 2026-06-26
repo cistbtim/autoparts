@@ -7806,11 +7806,13 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       // Apply branch_stock pricing directly to own + main parts — no separate sequential fetch needed
       const applyBs=p=>{const bs=bStockMap[String(p.id)];return bs?{...p,stock:bs.stock??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;};
       const seen=new Set(ownArr.map(p=>String(p.id)));
-      const linkedParts=[...ownArr.map(applyBs),...mainArr.filter(p=>!seen.has(String(p.id))).map(applyBs)];
+      const mainOnlyArr=mainArr.filter(p=>!seen.has(String(p.id)));
+      const linkedParts=[...ownArr.map(applyBs),...mainOnlyArr.map(applyBs)];
       const allSeen=new Set(linkedParts.map(p=>String(p.id)));
       const finalize=(extra=[])=>{
         const combined=[
-          ...linkedParts.map(p=>({...p,_source:"local"})),
+          ...ownArr.map(applyBs).map(p=>({...p,_source:"local"})),
+          ...mainOnlyArr.map(applyBs).map(p=>({...p,_source:"main"})),
           ...extra.filter(p=>!allSeen.has(String(p.id))).map(p=>({...applyBs(p),_source:"other"})),
         ];
         setShopParts(combined);
@@ -8155,7 +8157,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                       <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,
                         background:p._source==="local"?"rgba(52,211,153,.15)":"rgba(96,165,250,.15)",
                         color:p._source==="local"?"var(--green)":"var(--blue)"}}>
-                        {p._source==="local"?"🏪 Local":"🏬 Main Store"}
+                        {p._source==="local"?"🏪 Local":"🏬 Main Branch"}
                       </span>
                     </div>
                     {showSku&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2,fontFamily:"DM Mono,monospace"}}>{p.sku}{p.brand?` · ${p.brand}`:""}</div>}
@@ -8170,7 +8172,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                       ?<div style={{fontSize:16,fontWeight:800,color:"var(--accent)",marginBottom:4}}>{Cs}{(+p.price||0).toFixed(2)}</div>
                       :<div style={{fontSize:12,color:"var(--text3)",marginBottom:4,fontStyle:"italic"}}>Price on request</div>}
                     <div style={{marginBottom:10}}>
-                      <span style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)"}}>{p.stock>0?`${p.stock} in stock`:"Out of Stock"}</span>
+                      {p._source==="local"
+                        ?<span style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)"}}>{p.stock>0?`${p.stock} in stock`:"Out of Stock"}</span>
+                        :<span style={{fontSize:12,color:"var(--blue)"}}>Available at main branch</span>}
                     </div>
                     {inCart
                       ? <div style={{display:"flex",alignItems:"center",gap:7}}>
@@ -8179,7 +8183,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                           <button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty+1)}>+</button>
                           <button className="btn btn-danger btn-xs" onClick={()=>removeFromCart(p.id)}>✕</button>
                         </div>
-                      : p._source==="other"
+                      : p._source!=="local"
                       ? <button className="btn btn-sm" style={{width:"100%",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.4)"}} onClick={()=>addToCart(p)}>+ Request from Main</button>
                       : p.stock===0
                       ? <button className="btn btn-sm" style={{width:"100%",background:"rgba(249,115,22,.12)",color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}} onClick={()=>addToCart({...p,_source:"request"})}>📦 Request Stock</button>

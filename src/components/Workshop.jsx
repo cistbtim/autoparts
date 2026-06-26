@@ -7803,16 +7803,18 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const ownArr=Array.isArray(ownParts)?ownParts:[];
       const mainArr=Array.isArray(mainParts)?mainParts:[];
       const bStockMap=Object.fromEntries(bStockArr.map(bs=>[String(bs.part_id),bs]));
-      // Apply branch_stock pricing directly to own + main parts — no separate sequential fetch needed
+      // Source = 'local' only when the linked branch has an explicit branch_stock entry
+      // (it physically stocks the part). Otherwise it's 'main' (admin catalog only).
       const applyBs=p=>{const bs=bStockMap[String(p.id)];return bs?{...p,stock:bs.stock??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;};
+      const srcOf=p=>bStockMap[String(p.id)]?"local":"main";
       const seen=new Set(ownArr.map(p=>String(p.id)));
       const mainOnlyArr=mainArr.filter(p=>!seen.has(String(p.id)));
       const linkedParts=[...ownArr.map(applyBs),...mainOnlyArr.map(applyBs)];
       const allSeen=new Set(linkedParts.map(p=>String(p.id)));
       const finalize=(extra=[])=>{
         const combined=[
-          ...ownArr.map(applyBs).map(p=>({...p,_source:"local"})),
-          ...mainOnlyArr.map(applyBs).map(p=>({...p,_source:"main"})),
+          ...ownArr.map(p=>({...applyBs(p),_source:srcOf(p)})),
+          ...mainOnlyArr.map(p=>({...applyBs(p),_source:"main"})),
           ...extra.filter(p=>!allSeen.has(String(p.id))).map(p=>({...applyBs(p),_source:"other"})),
         ];
         setShopParts(combined);

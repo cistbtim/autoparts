@@ -506,6 +506,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                   {frontPhoto?(
                     <img src={toImgUrl(frontPhoto)} alt="car"
                       style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+                      loading="lazy"
                       referrerPolicy="no-referrer"
                       onError={e=>{const m=frontPhoto.match(/thumbnail[?]id=([^&]+)/)||frontPhoto.match(/[?&]id=([^&]+)/)||frontPhoto.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view"))e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;else e.target.style.display="none";}}/>
                   ):(
@@ -753,6 +754,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                     {fp
                       ? <>
                           <img src={toImgUrl(fp)} alt="car" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}
+                            loading="lazy"
                             referrerPolicy="no-referrer"
                             onError={e=>{e.target.style.display="none";}}/>
                           <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.4) 0%,transparent 60%)"}}/>

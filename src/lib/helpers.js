@@ -1,8 +1,16 @@
 import { C } from "./settings.js";
 
-// Convert Google Drive share link → direct thumbnail URL
+// Return a Supabase Storage thumbnail URL via the render/image transform API
+const _supThumb = (url, w = 400, q = 75) => {
+  const base = url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
+  const sep = base.includes('?') ? '&' : '?';
+  return `${base}${sep}width=${w}&quality=${q}&resize=contain`;
+};
+
+// Convert any photo URL → thumbnail for card/grid display
 const toImgUrl = (url) => {
   if (!url) return null;
+  if (url.includes('/storage/v1/object/public/')) return _supThumb(url, 400, 75);
   const m = url.match(/\/file\/d\/([^/]+)/);
   if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w200`;
   const m2 = url.match(/[?&]id=([^&]+)/);
@@ -48,9 +56,10 @@ export const extractDriveId = (url) => {
 // Strip cache-buster &t=... from Drive URLs before saving to DB
 export const stripCacheBuster = (url) => url ? url.replace(/&t=\d+/, "") : url;
 
-// Convert any URL → large thumbnail for lightbox
+// Convert any URL → large image for lightbox
 export const toFullUrl = (url) => {
   if (!url) return null;
+  if (url.includes('/storage/v1/object/public/')) return _supThumb(url, 1200, 85);
   const mThumb = url.match(/thumbnail[?]id=([^&]+)/);
   if (mThumb) return `https://drive.google.com/thumbnail?id=${mThumb[1]}&sz=w800`;
   const mFile = url.match(/file\/d\/([^/?]+)/);

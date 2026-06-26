@@ -110,11 +110,15 @@ export const FD = ({children}) => <div style={{marginBottom:14}}>{children}</div
 // tries thumbnail sz=w800 → sz=w400 → uc?export=view → hide
 export function DriveImg({url, alt, style, onClick, eager}) {
   const id = extractDriveId(url);
+  const isSupabase = url && url.includes('/storage/v1/object/public/');
+  const supThumb = isSupabase
+    ? url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + (url.includes('?') ? '&' : '?') + 'width=400&quality=75&resize=contain'
+    : null;
   const urls = id ? [
     `https://drive.google.com/thumbnail?id=${id}&sz=w400`,
     `https://drive.google.com/thumbnail?id=${id}&sz=w800`,
     `https://drive.google.com/uc?export=view&id=${id}`,
-  ] : (url ? [url] : []);
+  ] : isSupabase ? [supThumb, url] : (url ? [url] : []);
   const [idx, setIdx] = useState(0);
   const [failed, setFailed] = useState(false);
   if (!urls.length || failed) return null;

@@ -7781,13 +7781,16 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     // part_fitments) must NOT fall back to the full catalog — that's only correct
     // for standalone browse mode (no vehicle context at all). Method 3 below still
     // covers make/model-field matches even when idFilter is empty.
+    // Fetch branch_stock for both linked and main branch so we find records regardless
+    // of which branch_id the admin used when clicking "Set Stock" in the inventory view.
+    const bsIds=[linkedBranchId,...(mainBranchId&&mainBranchId!==linkedBranchId?[mainBranchId]:[])];
     const fetches=[
       idFilter
         ? fetchPartsByIds(idFilter,`branch_id=eq.${linkedBranchId}&`)
         : jobMode
           ? Promise.resolve([])
           : api.get("parts",`branch_id=eq.${linkedBranchId}&select=${COLS}&order=sku.asc`).catch(()=>[]),
-      api.get("branch_stock",`branch_id=eq.${linkedBranchId}&select=id,part_id,stock,price,bin_location`).catch(()=>[]),
+      api.get("branch_stock",`branch_id=in.(${bsIds.join(",")})&select=id,part_id,stock,price,bin_location,branch_id`).catch(()=>[]),
       // Fetch from ALL branches in both modes — job mode scoped by fitment ids,
       // standalone mode fetches main-branch catalog (scoped to avoid full 44k-row scan)
       idFilter
@@ -7802,10 +7805,15 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       const bStockArr=Array.isArray(bStock)?bStock:[];
       const ownArr=Array.isArray(ownParts)?ownParts:[];
       const mainArr=Array.isArray(mainParts)?mainParts:[];
-      const bStockMap=Object.fromEntries(bStockArr.map(bs=>[String(bs.part_id),bs]));
-      // Source = 'local' only when the linked branch has an explicit branch_stock entry
-      // (it physically stocks the part). Otherwise it's 'main' (admin catalog only).
+      // Build map by part_id, preferring the linked-branch record over the main-branch record
+      const bStockMap={};
+      bStockArr.forEach(bs=>{
+        const k=String(bs.part_id);
+        if(!bStockMap[k]||String(bs.branch_id)===String(linkedBranchId)) bStockMap[k]=bs;
+      });
       const applyBs=p=>{const bs=bStockMap[String(p.id)];return bs?{...p,stock:bs.stock??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;};
+      // A part is "local" (Main Branch, can buy) only if admin has explicitly set branch stock for it.
+      // Parts with no branch_stock entry are "main" (Head Office, request only).
       const srcOf=p=>bStockMap[String(p.id)]?"local":"main";
       const seen=new Set(ownArr.map(p=>String(p.id)));
       const mainOnlyArr=mainArr.filter(p=>!seen.has(String(p.id)));

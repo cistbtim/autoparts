@@ -3750,7 +3750,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                     <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                       {/* Photo */}
                       {img
-                        ? <img src={img} alt={p.name} onClick={()=>setLightbox({url:toFullUrl(p.image_url),name:p.name})}
+                        ? <img src={img} alt={p.name} loading="lazy" onClick={()=>setLightbox({url:toFullUrl(p.image_url),name:p.name})}
                             style={{width:56,height:56,objectFit:"contain",borderRadius:8,background:"var(--surface2)",border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}/>
                         : <div style={{width:56,height:56,borderRadius:8,background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🔩</div>}
                       {/* Info */}
@@ -3857,7 +3857,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         <tr key={p.id} id={`part-row-${p.id}`}>
                           <td style={{width:52,padding:"10px 8px"}}>
                             {img
-                              ? <img className="part-img" src={img} alt={p.name}
+                              ? <img className="part-img" src={img} alt={p.name} loading="lazy"
                                   onClick={()=>setLightbox({url:toFullUrl(p.image_url),name:p.name})}
                                   onError={e=>{e.target.style.display="none";e.target.nextSibling&&(e.target.nextSibling.style.display="flex");}}/>
                               : <div className="part-emoji">{p.image||"🔩"}</div>}

@@ -8550,15 +8550,24 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
   const existingReply = (() => {try{return JSON.parse(req.reply_items||"[]");}catch{return [];}})();
 
   const [replyLines, setReplyLines] = useState(()=>
-    reqItems.map((item,i)=>({
-      description: item.description||"",
-      sku: item.sku||"",
-      qty: item.qty||1,
-      price: existingReply[i]?.price||"",
-      available: existingReply[i]?.available!==false,
-      part_id: existingReply[i]?.part_id||null,
-      notes: existingReply[i]?.notes||"",
-    }))
+    reqItems.map((item,i)=>{
+      // Auto-match by SKU if admin hasn't replied yet
+      const autoMatched=(()=>{
+        if(existingReply[i]?.part_id) return null;
+        const sku=(item.sku||"").toLowerCase().trim();
+        if(!sku) return null;
+        return parts.find(p=>(p.sku||"").toLowerCase()===sku||(p.oe_number||"").toLowerCase()===sku)||null;
+      })();
+      return {
+        description: item.description||"",
+        sku: item.sku||"",
+        qty: item.qty||1,
+        price: existingReply[i]?.price||autoMatched?.price||"",
+        available: existingReply[i]?.available!==false,
+        part_id: existingReply[i]?.part_id||(autoMatched?String(autoMatched.id):null),
+        notes: existingReply[i]?.notes||"",
+      };
+    })
   );
   const [replyNotes, setReplyNotes] = useState(req.reply_notes||"");
   const [saving, setSaving] = useState(false);
@@ -8750,6 +8759,11 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
               {linkedPart&&(
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,padding:"6px 10px",background:"rgba(52,211,153,.1)",borderRadius:8,border:"1px solid rgba(52,211,153,.25)"}}>
                   <span style={{fontSize:12,color:"#34d399",flex:1}}>✅ Linked: <strong>{linkedPart.name}</strong>{linkedPart.sku?` · ${linkedPart.sku}`:""}</span>
+                  <span style={{fontSize:12,fontWeight:700,padding:"2px 8px",borderRadius:6,
+                    background:linkedPart.stock>0?"rgba(52,211,153,.2)":"rgba(239,68,68,.12)",
+                    color:linkedPart.stock>0?"#34d399":"#ef4444"}}>
+                    {linkedPart.stock>0?`${linkedPart.stock} in stock`:"Out of stock"}
+                  </span>
                   <button onClick={()=>updateLine(idx,{part_id:null})} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,padding:"0 2px"}}>✕</button>
                 </div>
               )}

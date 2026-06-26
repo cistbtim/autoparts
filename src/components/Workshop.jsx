@@ -7616,7 +7616,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
           <div style={{fontSize:13,color:"var(--text2)"}}>Order #{result.localOid} sent to branch for processing.</div>
         </div>}
         {result.bsrId&&<div style={{marginBottom:12,padding:"12px 16px",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",borderRadius:10}}>
-          <div style={{fontWeight:700,color:"var(--blue)",marginBottom:4}}>🏬 Main Branch Request Sent</div>
+          <div style={{fontWeight:700,color:"var(--blue)",marginBottom:4}}>🏭 Head Office Request Sent</div>
           <div style={{fontSize:13,color:"var(--text2)",marginBottom:10}}>The main branch will confirm stock and contact you at {wsProfile.phone||wsProfile.whatsapp||"your saved number"}.</div>
           {(wsProfile.phone||wsProfile.whatsapp)&&<a href={waLink(wsProfile.phone||wsProfile.whatsapp,"")} target="_blank" rel="noreferrer"
             style={{display:"inline-block",padding:"8px 16px",background:"#25D366",color:"#fff",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none"}}>💬 Open WhatsApp</a>}
@@ -7650,8 +7650,8 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
           ))}
         </div>}
         {mainCart.length>0&&<div style={{marginBottom:20}}>
-          <div style={{fontWeight:700,fontSize:14,color:"var(--blue)",marginBottom:6}}>🏬 From Main Branch — Request</div>
-          <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>These items will be requested from the main branch. They'll confirm stock and contact you before ordering.</div>
+          <div style={{fontWeight:700,fontSize:14,color:"var(--blue)",marginBottom:6}}>🏭 Head Office — Request</div>
+          <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>These items will be requested from head office. They'll confirm stock and contact you before ordering.</div>
           {mainCart.map(i=>(
             <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"rgba(96,165,250,.06)",border:"1px solid rgba(96,165,250,.2)",borderRadius:8,marginBottom:6}}>
               <div><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
@@ -7811,7 +7811,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         const k=String(bs.part_id);
         if(!bStockMap[k]||String(bs.branch_id)===String(linkedBranchId)) bStockMap[k]=bs;
       });
-      const applyBs=p=>{const bs=bStockMap[String(p.id)];return bs?{...p,stock:bs.stock??p.stock,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;};
+      // For local parts (branch_stock exists), use branch qty exclusively — don't leak global catalog stock
+      const applyBs=p=>{const bs=bStockMap[String(p.id)];return bs?{...p,stock:bs.stock??0,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;};
       // A part is "local" (Main Branch, can buy) only if admin has explicitly set branch stock for it.
       // Parts with no branch_stock entry are "main" (Head Office, request only).
       const srcOf=p=>bStockMap[String(p.id)]?"local":"main";
@@ -8167,7 +8168,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                       <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,
                         background:p._source==="local"?"rgba(52,211,153,.15)":"rgba(96,165,250,.15)",
                         color:p._source==="local"?"var(--green)":"var(--blue)"}}>
-                        {p._source==="local"?"🏬 Main Branch":"🏭 Head Office"}
+                        {p._source==="local"?"🏬 Local Stock":"🏭 Head Office"}
                       </span>
                     </div>
                     {showSku&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2,fontFamily:"DM Mono,monospace"}}>{p.sku}{p.brand?` · ${p.brand}`:""}</div>}

@@ -35,7 +35,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [search,         setSearch]         = useState("");
   const [bookIn,         setBookIn]         = useState(false);
   const [wsTab,          setWsTab]          = useState(initialTab||"jobs");
-  const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:"", code:""});
+  const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:"", code:"", vin:"", engineNo:"", reg:""});
   const [stmtCust,       setStmtCust]       = useState("");
   const [qInvModal,      setQInvModal]      = useState(null);
   const [sortBy,         setSortBy]         = useState("date_desc");
@@ -275,7 +275,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onViewPurchaseOrders={()=>{ setView("list"); setWsTab("wssuporders"); }}
         onViewPO={(poId)=>{ setPendingViewPoId(poId); setView("list"); setWsTab("wssuporders"); }}
         onGoToStock={()=>{ setView("list"); setWsTab("wsstock"); }}
-        onGoToSpareShop={(make,model,code)=>{ setSpareShopFilter({make:make||"",model:model||"",code:code||""}); setView("list"); setWsTab("spareshop"); }}
+        onGoToSpareShop={(make,model,code,vin,engineNo,reg)=>{ setSpareShopFilter({make:make||"",model:model||"",code:code||"",vin:vin||"",engineNo:engineNo||"",reg:reg||""}); setView("list"); setWsTab("spareshop"); }}
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
@@ -1738,7 +1738,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   <div style={{fontWeight:600,marginBottom:6}}>No spare shop linked</div>
                   <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
                 </div>
-              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab}/>
+              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab}/>
             }
           </div>
         );
@@ -4199,7 +4199,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               {row2.length>0&&<div style={{display:"flex",gap:isMobile?8:12}}>{row2.map(renderTile)}</div>}
               {hasSpareShop&&(
                 isCodeLinked
-                  ? <button onClick={()=>onGoToSpareShop(job.vehicle_make||"",_linkedV.model||"",_linkedV.code||"")}
+                  ? <button onClick={()=>onGoToSpareShop(job.vehicle_make||"",_linkedV.model||"",_linkedV.code||"",job.vin||"",job.engine_no||"",job.vehicle_reg||"")}
                       style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"none",cursor:"pointer",
                         background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",color:"#fff",
                         boxShadow:"0 4px 14px rgba(29,78,216,.35)",textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
@@ -5534,7 +5534,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 const shopMake=job.vehicle_make;
                 const shopModel=mv?.model||job.vehicle_model||"";
                 return(
-                  <button onClick={()=>onGoToSpareShop(shopMake,shopModel,mv?.code||"")} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(96,165,250,.3)",background:"rgba(96,165,250,.08)",color:"var(--blue)",fontWeight:700,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
+                  <button onClick={()=>onGoToSpareShop(shopMake,shopModel,mv?.code||"",job.vin||"",job.engine_no||"",job.vehicle_reg||"")} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(96,165,250,.3)",background:"rgba(96,165,250,.08)",color:"var(--blue)",fontWeight:700,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
                     🏪 {job.vehicle_make}{displayCode?` · ${displayCode}`:""}
                   </button>
                 );
@@ -7673,7 +7673,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
 // Module-level cache so spare shop parts survive WorkshopPage remounts (tab switches)
 const _spCache={data:null,branchId:null,ts:null};
 
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",ads=[],userCtx=null,onClearJobFilter}) {
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",initialVin="",initialEngineNo="",initialReg="",ads=[],userCtx=null,onClearJobFilter}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
@@ -8095,7 +8095,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         );
       })():(
         <VehicleSearchBar vehicles={vehicles} partFitments={partFitments} parts={shopParts}
-          t={{}} onFilter={(ids)=>{setVehicleFilterIds(ids);setPage(0);}}/>
+          t={{}} onFilter={(ids)=>{setVehicleFilterIds(ids);setPage(0);}}
+          vin={initialVin} engineNo={initialEngineNo} reg={initialReg}
+          user={userCtx?.id?{id:userCtx.id}:null}/>
       )}
 
       {!jobMode&&vehicleFilterIds&&<div style={{fontSize:12,color:"var(--blue)",marginBottom:12,fontWeight:600}}>

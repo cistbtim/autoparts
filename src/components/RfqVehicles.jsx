@@ -1456,7 +1456,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 // ═══════════════════════════════════════════════════════════════
 // onFilter   — fitment-based filter (shop/POS): passes a Set of part IDs
 // onVehicleChange — direct make/model filter (inventory): passes {make, model}
-export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onAddPart, t, initialMake="", initialModel=""}) {
+export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onAddPart, t, initialMake="", initialModel="", vin="", engineNo="", reg="", user=null, currentBranch=null}) {
   const [selMake,  setSelMake]  = useState(initialMake);
   const [selModel, setSelModel] = useState(initialModel);
   const [makeInput,  setMakeInput]  = useState(initialMake);
@@ -1464,6 +1464,10 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
   const [active,   setActive]   = useState(false);
   const [lightbox, setLightbox] = useState(null); // {photos:[{url,label}], idx}
   const _vsbId = useRef(`vsb_${Math.random().toString(36).slice(2)}`).current;
+  const [reqOpen,   setReqOpen]   = useState(false);
+  const [reqSaving, setReqSaving] = useState(false);
+  const [reqDone,   setReqDone]   = useState(false);
+  const [reqForm,   setReqForm]   = useState({make:"",model:"",year_from:"",year_to:"",vin:"",engine_no:"",reg:"",notes:""});
 
   // Auto-apply filter when pre-populated from vehicle management
   useEffect(()=>{
@@ -1565,6 +1569,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
     if(onFilter) onFilter(null);
     if(onVehicleChange) onVehicleChange(null);
     setActive(false);
+    setReqOpen(false); setReqDone(false);
   };
 
   // Build model display options (label → code/model value)
@@ -1634,6 +1639,14 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
         </div>
       </div>
 
+      {/* Make not in database hint */}
+      {makeInput.length>=2&&!active&&!makes.find(m=>m.toLowerCase()===makeInput.toLowerCase())&&!reqDone&&(
+        <div style={{marginTop:8,fontSize:12,color:"var(--text3)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <span>Make "{makeInput}" not in database.</span>
+          {!reqOpen&&<button className="btn btn-ghost btn-xs" onClick={()=>{setReqOpen(true);setReqForm({make:makeInput.toUpperCase(),model:modelInput.toUpperCase(),year_from:"",year_to:"",vin,engine_no:engineNo,reg,notes:""});}}>+ Request this vehicle</button>}
+        </div>
+      )}
+
       {/* Vehicle photos + result info */}
       {active && (()=>{
         const matchV = !selModel
@@ -1647,6 +1660,13 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
         const codes = [...new Set(matchV.map(v=>v.code).filter(Boolean))];
         const codeLabel = codes.length === 1 ? codes[0] : codes.length > 1 ? codes.join("/") : "";
         const photos = matchV.find(v=>v.photo_front||v.photo_rear||v.photo_side) || matchV[0];
+        if(matchV.length===0) return (
+          <div style={{marginTop:10,textAlign:"center",padding:"8px 0"}}>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>"{selMake}{selModel?` · ${selModel}`:""}" not found in database</div>
+            {!reqOpen&&!reqDone&&<button className="btn btn-ghost btn-sm" onClick={()=>{setReqOpen(true);setReqForm({make:selMake,model:selModel||modelInput,year_from:"",year_to:"",vin,engine_no:engineNo,reg,notes:""});}}> + Request this vehicle</button>}
+            {reqDone&&<div style={{fontSize:12,color:"var(--green)",fontWeight:600,marginTop:4}}>✅ Request sent</div>}
+          </div>
+        );
         return (
           <div style={{marginTop:10}}>
             {/* 3 photos side by side — only when model is selected */}
@@ -1692,6 +1712,45 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
           </div>
         );
       })()}
+
+      {/* Vehicle request form */}
+      {reqDone&&<div style={{marginTop:8,padding:"8px 12px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,fontSize:12,color:"var(--green)",fontWeight:600}}>✅ Vehicle request sent — admin will add it shortly.</div>}
+      {reqOpen&&(
+        <div style={{marginTop:10,background:"rgba(99,102,241,.06)",border:"1px solid rgba(99,102,241,.25)",borderRadius:10,padding:"12px 14px"}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:"var(--accent)"}}>🚗 Request New Vehicle</div>
+          <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+            <input className="inp" placeholder="Make *" value={reqForm.make} onChange={e=>setReqForm(p=>({...p,make:e.target.value.toUpperCase()}))} style={{flex:"1 1 100px",textTransform:"uppercase"}}/>
+            <input className="inp" placeholder="Model *" value={reqForm.model} onChange={e=>setReqForm(p=>({...p,model:e.target.value.toUpperCase()}))} style={{flex:"1 1 100px",textTransform:"uppercase"}}/>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:8}}>
+            <input className="inp" placeholder="Year from *" type="number" value={reqForm.year_from} onChange={e=>setReqForm(p=>({...p,year_from:e.target.value}))} style={{flex:1}}/>
+            <input className="inp" placeholder="Year to" type="number" value={reqForm.year_to} onChange={e=>setReqForm(p=>({...p,year_to:e.target.value}))} style={{flex:1}}/>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+            <input className="inp" placeholder="VIN" value={reqForm.vin} onChange={e=>setReqForm(p=>({...p,vin:e.target.value.toUpperCase()}))} style={{flex:"2 1 120px",fontFamily:"monospace",textTransform:"uppercase"}}/>
+            <input className="inp" placeholder="Engine No" value={reqForm.engine_no} onChange={e=>setReqForm(p=>({...p,engine_no:e.target.value.toUpperCase()}))} style={{flex:"1 1 80px",fontFamily:"monospace",textTransform:"uppercase"}}/>
+            <input className="inp" placeholder="Reg" value={reqForm.reg} onChange={e=>setReqForm(p=>({...p,reg:e.target.value.toUpperCase()}))} style={{flex:"1 1 70px",textTransform:"uppercase"}}/>
+          </div>
+          <input className="inp" placeholder="Notes (optional)" value={reqForm.notes} onChange={e=>setReqForm(p=>({...p,notes:e.target.value}))} style={{marginBottom:10}}/>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-primary btn-sm" disabled={reqSaving||!reqForm.make.trim()||!reqForm.model.trim()||!reqForm.year_from} onClick={async()=>{
+              setReqSaving(true);
+              try{
+                await api.insert("vehicle_requests",{
+                  make:reqForm.make.trim(),model:reqForm.model.trim(),
+                  year_from:reqForm.year_from?+reqForm.year_from:null,
+                  year_to:reqForm.year_to?+reqForm.year_to:null,
+                  vin:reqForm.vin||null,engine_no:reqForm.engine_no||null,reg:reqForm.reg||null,
+                  notes:reqForm.notes||null,
+                  status:"pending",requested_by:user?.id||null,branch_id:currentBranch?.id||null,
+                });
+                setReqDone(true);setReqOpen(false);
+              }catch{}finally{setReqSaving(false);}
+            }}>{reqSaving?"Sending…":"Send Request"}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setReqOpen(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightbox&&(

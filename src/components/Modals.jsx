@@ -9902,7 +9902,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
   const pending = myReqs.filter(r=>r.status==="pending");
   const done    = myReqs.filter(r=>r.status==="approved"||r.status==="rejected");
 
-  const blankForm = {make:"",model:"",year_from:"",year_to:"",notes:"",photo1:"",photo2:""};
+  const blankForm = {make:"",model:"",year_from:"",year_to:"",notes:"",photo1:"",photo2:"",vin:"",engine_no:"",reg:""};
   const [showForm,      setShowForm]      = useState(false);
   const [form,          setForm]          = useState(blankForm);
   const [formErr,       setFormErr]       = useState({});
@@ -10016,6 +10016,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       year_from: form.year_from||null, year_to: form.year_to||null,
       notes: form.notes.trim()||null,
       photo1: form.photo1||null, photo2: form.photo2||null,
+      vin: form.vin.trim()||null, engine_no: form.engine_no.trim()||null, reg: form.reg.trim()||null,
       status:"pending", requested_by: user.id,
     });
     setSaving(false);
@@ -10100,6 +10101,13 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
         </div>
         {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
         <div style={{fontSize:12,color:"var(--text3)"}}>{(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}</div>
+        {(r.vin||r.engine_no||r.reg)&&(
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:4,fontSize:11,fontFamily:"monospace",color:"var(--text2)"}}>
+            {r.vin&&<span style={{background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>VIN: <strong>{r.vin}</strong></span>}
+            {r.engine_no&&<span style={{background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>Eng: <strong>{r.engine_no}</strong></span>}
+            {r.reg&&<span style={{background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>Reg: <strong>{r.reg}</strong></span>}
+          </div>
+        )}
         {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2,fontStyle:"italic"}}>"{r.notes}"</div>}
 
         {/* Two-column photo section */}
@@ -10126,6 +10134,18 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
             <button className="btn btn-ghost btn-sm" style={{fontSize:12}} onClick={()=>onGoToVehicles(r.make, r.model)}>
               Edit in Vehicles →
             </button>
+          )}
+          {isAdmin&&r.vin&&(
+            <a href={`https://www.vindecoderz.com/EN/check-lookup/${r.vin}`} target="_blank" rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm" style={{fontSize:12,color:"var(--blue)",textDecoration:"none"}}>
+              🔍 Search VIN
+            </a>
+          )}
+          {isAdmin&&r.vin&&(
+            <a href={`https://www.google.com/search?q=${encodeURIComponent(r.vin+' '+r.make+' '+r.model)}`} target="_blank" rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm" style={{fontSize:12,color:"var(--text2)",textDecoration:"none"}}>
+              🌐 Google
+            </a>
           )}
           <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",fontSize:12}} onClick={()=>deleteRequest(r.id)} disabled={busy===r.id}>
             🗑 Delete
@@ -10250,6 +10270,11 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
               <FL label="Year To"/>
               <input className="inp" type="number" value={form.year_to} onChange={e=>sf("year_to",e.target.value===""?"":+e.target.value)} placeholder="2005 (blank = present)"/>
             </div>
+          </FG>
+          <FG>
+            <FD label="VIN (optional)"><input className="inp" value={form.vin} onChange={e=>sf("vin",e.target.value.toUpperCase())} placeholder="e.g. WBATX36030NA40660" style={{fontFamily:"monospace",textTransform:"uppercase"}}/></FD>
+            <FD label="Engine No (optional)"><input className="inp" value={form.engine_no} onChange={e=>sf("engine_no",e.target.value.toUpperCase())} style={{fontFamily:"monospace",textTransform:"uppercase"}}/></FD>
+            <FD label="Reg (optional)"><input className="inp" value={form.reg} onChange={e=>sf("reg",e.target.value.toUpperCase())} style={{textTransform:"uppercase"}}/></FD>
           </FG>
           <FD label="Notes">
             <input className="inp" value={form.notes} onChange={e=>sf("notes",e.target.value)} placeholder="Any extra details for admin..."/>

@@ -3602,7 +3602,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               partFitments={partFitments}
               parts={parts}
               onVehicleChange={(partIds)=>{setInvVehicleFilterIds(partIds||null);setInvPage(0);}}
-              t={t}/>
+              t={t} user={user} currentBranch={currentBranch}/>
             <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
               <div style={{position:"relative",flex:"1 1 220px",maxWidth:340}}>
                 <input className="inp" type="text"
@@ -4280,7 +4280,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 setPendingVehicleIds(vehIds);
                 openM("editPart",null);
               }):undefined}
-              t={t}/>
+              t={t} user={user} currentBranch={currentBranch}/>
 
             {searchDebounced&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>
               🔍 {fp.length} result{fp.length!==1?"s":""} for <span style={{color:"var(--accent)",fontWeight:600}}>"{searchDebounced}"</span>

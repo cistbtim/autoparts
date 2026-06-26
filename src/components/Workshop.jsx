@@ -8143,6 +8143,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                     ? <div style={{marginBottom:12,flexShrink:0}}>
                         <img src={img} alt={p.name}
                           style={{width:"100%",height:120,objectFit:"contain",background:"#fff",borderRadius:9,cursor:"zoom-in",display:"block"}}
+                          loading="lazy"
                           onClick={()=>setLightbox({url:img,name:p.name})}
                           onError={e=>e.target.parentNode.style.display="none"}/>
                       </div>

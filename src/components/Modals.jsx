@@ -8465,7 +8465,7 @@ export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP REQUESTS PAGE  (spare-shop side)
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onReply,onRefresh,userRole="",userBranchId=null}) {
+export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onReply,onDelete,onRefresh,userRole="",userBranchId=null}) {
   const [selId,    setSelId]    = useState(null);
   const [filter,   setFilter]   = useState("pending");
   const [refreshing,setRefreshing]=useState(false);
@@ -8502,6 +8502,8 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onR
         <div style={{marginBottom:20,border:"2px solid var(--accent)",borderRadius:14,overflow:"hidden"}}>
           <div style={{padding:"10px 16px",background:"rgba(251,146,60,.08)",display:"flex",alignItems:"center",gap:8}}>
             <span style={{fontWeight:700,flex:1}}>Reviewing: {selected.workshop_name} — {selected.job_car||"—"}</span>
+            {onDelete&&<button onClick={async()=>{if(!window.confirm("Delete this request?"))return;await onDelete(selected.id);setSelId(null);}}
+              style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",color:"#ef4444",borderRadius:7,padding:"3px 10px",cursor:"pointer",fontSize:12,fontWeight:600}}>🗑️ Delete</button>}
             <button onClick={()=>setSelId(null)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:18,padding:"0 4px"}}>✕</button>
           </div>
           <WsShopRequestDetail req={selected} parts={parts} settings={settings} onReply={async(...a)=>{await onReply(...a);setSelId(null);}} userRole={userRole} userBranchId={userBranchId}/>
@@ -8533,6 +8535,8 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onR
                         color:req.status==="pending"?"#f59e0b":"#34d399"}}>
                         {req.status==="pending"?"⏳ Pending":"✅ Replied"}
                       </span>
+                      {onDelete&&<button onClick={async(e)=>{e.stopPropagation();if(!window.confirm("Delete this request?"))return;await onDelete(req.id);if(isSel)setSelId(null);}}
+                        style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:"#ef4444",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:11,fontWeight:600}}>🗑️</button>}
                       <span style={{fontSize:12,color:"var(--accent)",fontWeight:600}}>{isSel?"▲ Close":"▼ Review"}</span>
                     </div>
                   </div>

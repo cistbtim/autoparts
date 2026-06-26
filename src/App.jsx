@@ -2739,6 +2739,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     await refreshTables("ws_shop_requests");
     showToast("✅ Reply sent to workshop");
   };
+  const deleteWsShopRequest=async(id)=>{
+    const res=await api.delete("ws_shop_requests","id",id);
+    if(res?.code){showToast(`Error: ${res.message||res.code}`,"err");return;}
+    setWsShopRequests(prev=>prev.filter(r=>r.id!==id));
+    showToast("🗑️ Request deleted");
+  };
 
   // Grouped nav for sidebar
   const navGroups=[
@@ -5591,7 +5597,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {tab==="wsShopRequests"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
-          <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} onReply={replyWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
+          <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} onReply={replyWsShopRequest} onDelete={deleteWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
         )}
 
         {tab==="settings"&&role==="admin"&&(

@@ -80,6 +80,9 @@ export const api = {
     return fresh;
   },
 
+  // Fetch all pages, always fresh — no cache read or write (used for price/qty sync)
+  fresh: (t, q = "") => fetchAll(t, q),
+
   // Single-page fetch — no loop, no cache. Used for first-paint of large tables.
   getFirst: async (t, q = "", limit = 200) => {
     const sep = q ? "&" : "";

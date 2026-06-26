@@ -11,6 +11,7 @@ import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg,
 import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
+import db from "./lib/db.js";
 import { SupplierImportModal } from "./components/SupplierImport.jsx";
 import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
@@ -44,7 +45,7 @@ export default function App() {
     }catch{return null;}
   });
   const handleLogin=(u)=>{api.cacheClearAll();setUser(u);try{localStorage.setItem("ap_user",JSON.stringify(u));localStorage.setItem("ap_login_date",_today());}catch{}};
-  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");};
+  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");db.parts.clear().catch(()=>{});};
   const [settingsLoaded,setSettingsLoaded] = useState(false);
   const [availLangs,setAvailLangs] = useState(getLangs());
   useEffect(()=>{ document.documentElement.setAttribute("data-theme","light"); localStorage.removeItem("ap_theme"); },[]);
@@ -421,26 +422,27 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       });
     };
 
-    // FAST: load critical data first so UI shows quickly
-    // Parts uses first-page-fast: show first 200 rows immediately, load rest in background
+    // FAST: load parts from IndexedDB (persists across sessions, handles 44k+ rows)
     const PARTS_Q="select=*&order=id.asc";
-    const cachedParts=api.cacheGet("parts",PARTS_Q);
+    const SLIM_Q="select=id,price,stock,cost_price&order=id.asc";
+    const idbParts=await db.parts.toArray().catch(()=>[]);
+    const idbHasData=idbParts.length>0;
 
     let partsFirst;
-    if(cachedParts){
-      // Full dataset already cached — instant
-      setLoadingItems(prev=>[...prev,{label:'parts',status:'cached',ms:1,rows:cachedParts.length}]);
-      partsFirst=cachedParts;
+    if(idbHasData){
+      setLoadingItems(prev=>[...prev,{label:'parts',status:'cached',ms:1,rows:idbParts.length}]);
+      setParts(idbParts);
+      partsFirst=idbParts;
     } else {
-      // Cache miss — fetch first 200 rows only so loading screen clears fast
+      // Cold start — fetch first 200 rows only so loading screen clears fast
       const t0p=Date.now();
       setLoadingItems(prev=>[...prev,{label:'parts (first 200)',status:'loading',ms:null,rows:null}]);
       partsFirst=await api.getFirst("parts",PARTS_Q,200);
       const msp=Date.now()-t0p;
       setLoadingItems(prev=>prev.map(i=>i.label==='parts (first 200)'
         ?{label:'parts (first 200)',status:'done',ms:msp,rows:Array.isArray(partsFirst)?partsFirst.length:0}:i));
+      setParts(Array.isArray(partsFirst)?partsFirst:[]);
     }
-    setParts(Array.isArray(partsFirst)?partsFirst:[]);
 
     const [o,s,st,br]=await Promise.all([
       isSalesman ? Promise.resolve([]) : track('orders',    api.get("orders",`${isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:""}select=*&order=created_at.desc`)),
@@ -476,17 +478,27 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     }
     if(isInitial) setLoading(false); // ← show UI immediately after critical data (initial load only)
 
-    // Background load remaining parts pages (only when cache was cold)
-    if(!cachedParts){
-      setPartsLoading(true);
+    // Background sync: full IndexedDB write on cold start, slim price/qty sync on warm start
+    setPartsLoading(true);
+    if(!idbHasData){
+      // Cold start — load all remaining pages then persist to IndexedDB
       api.loadRest("parts",PARTS_Q,partsFirst.length,(extra)=>{
         setParts([...partsFirst,...extra]);
-      }).then(extra=>{
+      }).then(async extra=>{
         const full=[...partsFirst,...extra];
         setParts(full);
-        api.cacheSet("parts",PARTS_Q,full); // cache full dataset for next load
+        try{await db.parts.bulkPut(full);}catch{}
         setPartsLoading(false);
       });
+    } else {
+      // Warm start — slim fetch refreshes price/qty/cost_price (always fresh from server)
+      api.fresh("parts",SLIM_Q).then(async slim=>{
+        if(!Array.isArray(slim)||slim.length===0){setPartsLoading(false);return;}
+        const slimMap=new Map(slim.map(r=>[String(r.id),r]));
+        setParts(prev=>prev.map(p=>{const s=slimMap.get(String(p.id));return s?{...p,price:s.price,stock:s.stock,cost_price:s.cost_price}:p;}));
+        try{await db.parts.toCollection().modify(p=>{const s=slimMap.get(String(p.id));if(s){p.price=s.price;p.stock=s.stock;p.cost_price=s.cost_price;}});}catch{}
+        setPartsLoading(false);
+      }).catch(()=>setPartsLoading(false));
     }
 
     // LAZY: load secondary data in background
@@ -1036,6 +1048,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       // Update local parts state — no full reload needed
       const updated={...ep,...d2};
       setParts(prev=>prev.map(p=>String(p.id)===String(ep.id)?updated:p));
+      db.parts.put(updated).catch(()=>{});
       if(!keepOpen) await releaseLock("part",ep.id);
       if(keepOpen){
         closeM("editPart");
@@ -1081,6 +1094,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             await api.upsert("part_fitments",{part_id:newPart.id,vehicle_id:vid,notes:""});
           await refreshTables("part_fitments");
           setParts(prev=>[...prev,newPart]);
+          db.parts.put(newPart).catch(()=>{});
           // Add new part to active vehicle filter so it appears immediately in shop
           setVehicleFilterIds(prev=>{ const s=new Set(prev||[]); s.add(String(newPart.id)); return s; });
           closeM("editPart");
@@ -1088,6 +1102,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           // Stay on shop — do not navigate away
         } else {
           setParts(prev=>[...prev,newPart]);
+          db.parts.put(newPart).catch(()=>{});
           closeM("editPart");
           // Navigate to inventory, clear filters that could hide a new 0-stock/no-fitment part
           setFilterInStock(false);setFilterFits("__all__");setInvVehicleFilterIds(null);setFilterSupplier("__all__");
@@ -1849,12 +1864,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     await api.delete("vehicles","id",id);
     await refreshTables("vehicles"); showToast("Deleted","err");
   };
-  const deletePart=async(id)=>{const p=parts.find(pt=>pt.id===id);setBusyMsg(`Deleting ${p?.sku||""}${p?.name?" · "+p.name:""}`);const t0=Date.now();try{if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await Promise.all([api.delete("part_suppliers","part_id",id),api.delete("part_fitments","part_id",id),api.delete("parts","id",id)]);setParts(prev=>prev.filter(pt=>String(pt.id)!==String(id)));setPartSuppliers(prev=>prev.filter(ps=>String(ps.part_id)!==String(id)));setPartFitments(prev=>prev.filter(f=>String(f.part_id)!==String(id)));const ms=Date.now()-t0;showToast(`Deleted in ${ms<1000?(ms+"ms"):((ms/1000).toFixed(1)+"s")}`,"err");}finally{setBusyMsg(null);}};
+  const deletePart=async(id)=>{const p=parts.find(pt=>pt.id===id);setBusyMsg(`Deleting ${p?.sku||""}${p?.name?" · "+p.name:""}`);const t0=Date.now();try{if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await Promise.all([api.delete("part_suppliers","part_id",id),api.delete("part_fitments","part_id",id),api.delete("parts","id",id)]);setParts(prev=>prev.filter(pt=>String(pt.id)!==String(id)));db.parts.delete(id).catch(()=>{});setPartSuppliers(prev=>prev.filter(ps=>String(ps.part_id)!==String(id)));setPartFitments(prev=>prev.filter(f=>String(f.part_id)!==String(id)));const ms=Date.now()-t0;showToast(`Deleted in ${ms<1000?(ms+"ms"):((ms/1000).toFixed(1)+"s")}`,"err");}finally{setBusyMsg(null);}};
   const approvePart=async(id)=>{await api.patch("parts","id",id,{review_status:null,created_by_branch_id:null});await refreshTables("parts");showToast("✅ Part approved");};
   const applyAdjust=async(part,nq,reason)=>{
     await api.patch("parts","id",part.id,{stock:nq});
     await logInv(part,part.stock,nq,"Manual Adj.",reason||"Manual");
     setParts(prev=>prev.map(p=>String(p.id)===String(part.id)?{...p,stock:nq}:p));
+    db.parts.update(part.id,{stock:nq}).catch(()=>{});
     closeM("adjust");
     showToast(`Stock → ${nq}`);
     if(nq<part.stock) await checkAutoReorder(part.id,nq);
@@ -5876,7 +5892,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {isOpen("viewSupplierInvoice")&&<ViewSupplierInvoiceModal inv={mData("viewSupplierInvoice")} onClose={()=>closeM("viewSupplierInvoice")} settings={settings}/>}
       {isOpen("printPartLabel")&&<PrintPartLabelModal part={mData("printPartLabel")} settings={{...settings,...(currentBranch||{})}} onClose={()=>closeM("printPartLabel")}/>}
       {isOpen("printShelfLabel")&&<PrintShelfLabelModal settings={{...settings,...(currentBranch||{})}} onClose={()=>closeM("printShelfLabel")}/>}
-      {isOpen("importCatalogue")&&<CatalogueImportModal suppliers={suppliers} parts={parts} vehicles={vehicles} onClose={()=>closeM("importCatalogue")} onImportDone={({newParts,newLinks,newFits})=>{if(newParts.length)setParts(prev=>[...prev,...newParts]);if(newLinks.length)setPartSuppliers(prev=>[...prev,...newLinks]);if(newFits.length)setPartFitments(prev=>[...prev,...newFits]);}}/>}
+      {isOpen("importCatalogue")&&<CatalogueImportModal suppliers={suppliers} parts={parts} vehicles={vehicles} onClose={()=>closeM("importCatalogue")} onImportDone={({newParts,newLinks,newFits})=>{if(newParts.length){setParts(prev=>[...prev,...newParts]);db.parts.bulkPut(newParts).catch(()=>{});}if(newLinks.length)setPartSuppliers(prev=>[...prev,...newLinks]);if(newFits.length)setPartFitments(prev=>[...prev,...newFits]);}}/>}
       {isOpen("bulkImages")&&<BulkImageImportModal parts={parts} partSuppliers={partSuppliers} onClose={()=>closeM("bulkImages")} onImageUpdated={(id,url)=>setParts(prev=>prev.map(p=>p.id===id?{...p,image_url:url}:p))}/>}
       {isOpen("supplierReturn")&&<SupplierReturnModal data={mData("supplierReturn")} suppliers={suppliers} parts={parts} supplierInvoices={supplierInvoices} onSave={saveSupplierReturn} onClose={()=>closeM("supplierReturn")} t={t} settings={settings}/>}
       {isOpen("customerInvoice")&&<CustomerInvoiceModal data={mData("customerInvoice")} customers={customers} parts={parts} orders={orders} onSave={saveCustomerInvoice} onClose={()=>closeM("customerInvoice")} t={t} settings={settings}/>}

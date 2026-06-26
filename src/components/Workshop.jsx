@@ -3327,29 +3327,41 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [matchAutoSuggestion, setMatchAutoSuggestion] = useState(null); // { vehicle, source: 'cache'|'year', yearDecoded? }
 
   useEffect(()=>{
-    if(!matchModelOpen){ setMatchAutoSuggestion(null); return; }
+    if(!matchModelOpen){ setMatchAutoSuggestion(null); setMatchModelSelected(null); return; }
     const scannedMake=(job.vehicle_make||"").toLowerCase().split(" ")[0];
 
-    const tryYearMatch=()=>{
-      // job.vehicle_year is the most reliable source; fall back to VIN decode
-      let year=parseInt(job.vehicle_year);
-      if(isNaN(year)&&job.vin){
-        const d=decodeVin(job.vin);
-        if(d&&d.year&&d.year!=="?"){
-          // For dual-year VINs (e.g. "2013 / 1983") pick the later year as more likely
-          const yearStr=d.year.includes("/")?d.year.split("/").map(s=>s.trim()).sort((a,b)=>b-a)[0]:d.year;
-          year=parseInt(yearStr);
-        }
+    // Score a vehicle by similarity to search term + year proximity
+    const scoreV=(v,term,year)=>{
+      const vCode=(v.code||"").toUpperCase(),vModel=(v.model||"").toUpperCase(),t=(term||"").toUpperCase().trim();
+      let s=0;
+      if(t){
+        if(vCode&&vCode===t) s+=80;
+        else if(vModel===t) s+=70;
+        else if(vCode&&t.length>=4&&vCode.slice(0,4)===t.slice(0,4)) s+=40;
+        else if(vCode&&t.length>=3&&(vCode.includes(t.slice(0,5))||t.includes(vCode.slice(0,5)))) s+=25;
+        else if(t.length>=3&&(vModel.includes(t.slice(0,5))||t.includes(vModel.slice(0,5)))) s+=20;
       }
-      if(isNaN(year)) return;
-      const match=vehicles.find(v=>{
-        if(!v.model||!v.year_from) return false;
-        if(scannedMake&&!(v.make||"").toLowerCase().includes(scannedMake)) return false;
-        const from=parseInt(v.year_from);
-        const to=v.year_to?parseInt(v.year_to):new Date().getFullYear()+1;
-        return year>=from&&year<=to;
-      });
-      if(match) setMatchAutoSuggestion({vehicle:match,source:"year",yearDecoded:year});
+      if(year&&!isNaN(year)){
+        const from=parseInt(v.year_from||0),to=v.year_to?parseInt(v.year_to):new Date().getFullYear()+1;
+        if(year>=from&&year<=to){const range=Math.max(1,to-from);s+=Math.max(2,Math.min(20,Math.round(20-range*0.4)));}
+      }
+      return Math.min(100,s);
+    };
+
+    let year=parseInt(job.vehicle_year);
+    if(isNaN(year)&&job.vin){
+      const d=decodeVin(job.vin);
+      if(d&&d.year&&d.year!=="?"){
+        const ys=d.year.includes("/")?d.year.split("/").map(s=>s.trim()).sort((a,b)=>b-a)[0]:d.year;
+        year=parseInt(ys);
+      }
+    }
+    const initSearch=(job.vehicle_model||job.vehicle_make||"").trim();
+
+    const autoSelectBest=(term)=>{
+      const candidates=vehicles.filter(v=>v.model&&(!scannedMake||(v.make||"").toLowerCase().includes(scannedMake)));
+      const best=candidates.map(v=>({v,s:scoreV(v,term,year)})).filter(x=>x.s>=30).sort((a,b)=>b.s-a.s)[0];
+      if(best) setMatchModelSelected(best.v);
     };
 
     if(job.vin&&job.vin.length>=12){
@@ -3358,15 +3370,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         .then(rows=>{
           if(rows&&rows.length>0){
             const cached=rows[0];
-            const v=vehicles.find(v=>v.model===cached.model&&
-              (!scannedMake||(v.make||"").toLowerCase().includes(scannedMake)));
-            if(v){ setMatchAutoSuggestion({vehicle:v,source:"cache"}); return; }
+            const v=vehicles.find(v=>v.model===cached.model&&(!scannedMake||(v.make||"").toLowerCase().includes(scannedMake)));
+            if(v){ setMatchAutoSuggestion({vehicle:v,source:"cache"}); setMatchModelSelected(v); return; }
           }
-          tryYearMatch();
+          autoSelectBest(initSearch);
         })
-        .catch(()=>tryYearMatch());
+        .catch(()=>autoSelectBest(initSearch));
     } else {
-      tryYearMatch();
+      autoSelectBest(initSearch);
     }
   },[matchModelOpen]);
 
@@ -5991,13 +6002,18 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       {matchModelOpen&&(()=>{
         const scannedMake=(job.vehicle_make||"").toLowerCase().split(" ")[0];
         const seen=new Set();
-        const sorted=[...vehicles].sort((a,b)=>{
-          const ca=a.code||"",cb=b.code||"";
-          if(ca&&!cb) return -1; if(!ca&&cb) return 1;
-          return ca.localeCompare(cb)||a.model.localeCompare(b.model);
-        });
         const sq=matchModelSearch.trim().toLowerCase();
-        const modelCards=sorted.filter(v=>{
+        let _jobYear=parseInt(job.vehicle_year);
+        if(isNaN(_jobYear)&&job.vin){const _d=decodeVin(job.vin);if(_d?.year&&_d.year!=="?"){const _ys=_d.year.includes("/")?_d.year.split("/").map(s=>s.trim()).sort((a,b)=>b-a)[0]:_d.year;_jobYear=parseInt(_ys);}}
+        const _scoreTerm=(matchModelSearch.trim()||(job.vehicle_model||"")).toUpperCase();
+        const _scoreCard=(v)=>{
+          const vCode=(v.code||"").toUpperCase(),vModel=(v.model||"").toUpperCase(),t=_scoreTerm;
+          let s=0;
+          if(t){if(vCode&&vCode===t)s+=80;else if(vModel===t)s+=70;else if(vCode&&t.length>=4&&vCode.slice(0,4)===t.slice(0,4))s+=40;else if(vCode&&t.length>=3&&(vCode.includes(t.slice(0,5))||t.includes(vCode.slice(0,5))))s+=25;else if(t.length>=3&&(vModel.includes(t.slice(0,5))||t.includes(vModel.slice(0,5))))s+=20;}
+          if(!isNaN(_jobYear)){const from=parseInt(v.year_from||0),to=v.year_to?parseInt(v.year_to):new Date().getFullYear()+1;if(_jobYear>=from&&_jobYear<=to){const range=Math.max(1,to-from);s+=Math.max(2,Math.min(20,Math.round(20-range*0.4)));}}
+          return Math.min(100,s);
+        };
+        const modelCards=vehicles.filter(v=>{
           if(!v.model) return false;
           if(scannedMake&&!(v.make||"").toLowerCase().includes(scannedMake)) return false;
           const dedupKey=v.code?`code:${v.code}`:`model:${v.model}`;
@@ -6005,7 +6021,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           seen.add(dedupKey);
           if(sq&&!`${v.model} ${v.make} ${v.code||""} ${v.variant||""}`.toLowerCase().includes(sq)) return false;
           return true;
-        });
+        }).map(v=>({...v,_score:_scoreCard(v)})).sort((a,b)=>b._score-a._score);
         const pickModel=async(model)=>{
           setMatchModelOpen(false);
           // Update job
@@ -6046,7 +6062,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       {photos.map((p,i)=>(
                         <div key={p.label} style={{position:"relative",borderRadius:8,overflow:"hidden",cursor:"zoom-in",border:"2px solid var(--accent)"}}
                           onClick={()=>setMatchJobCarLightbox(i)}>
-                          <img src={p.src} alt={p.label} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}
+                          <img src={p.src} alt={p.label} style={{width:"100%",height:130,objectFit:"contain",display:"block",background:"#f0f0f0"}}
                             onError={e=>e.target.parentNode.style.display="none"}/>
                           <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"2px 7px",background:"rgba(0,0,0,.55)",fontSize:10,fontWeight:700,color:"#fff",textAlign:"center"}}>
                             {p.label}
@@ -6107,40 +6123,22 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 </div>
               );
             })()}
-            {/* Auto-suggestion banner */}
-            {matchAutoSuggestion&&!matchModelSelected&&(()=>{
+            {/* VIN cache banner — only when from previously confirmed match */}
+            {matchAutoSuggestion?.source==="cache"&&(()=>{
               const sv=matchAutoSuggestion.vehicle;
               const img=toImgUrl(sv.photo_front||"");
-              const isCurrent=sv.model===job.vehicle_model||sv.code===job.vehicle_model;
-              const sourceLabel=matchAutoSuggestion.source==="cache"
-                ? "Previously matched on a vehicle with the same VIN prefix"
-                : `VIN decodes to ${matchAutoSuggestion.yearDecoded} — fits ${sv.year_from||"?"}${sv.year_to&&sv.year_to!==sv.year_from?`–${sv.year_to}`:"+"} range`;
               return(
-                <div style={{marginBottom:14,padding:12,background:"rgba(52,211,153,.08)",border:"2px solid rgba(52,211,153,.45)",borderRadius:12}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"var(--green)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
-                    {matchAutoSuggestion.source==="cache"?"🧠 Auto-match — VIN cache":"📅 Auto-match — year range"}
+                <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.35)",borderRadius:10,display:"flex",gap:10,alignItems:"center"}}>
+                  {img
+                    ?<img src={img} alt={sv.model} style={{width:56,height:40,objectFit:"cover",borderRadius:7,flexShrink:0}} onError={e=>e.target.style.display="none"}/>
+                    :<div style={{width:56,height:40,background:"var(--surface3)",borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🚗</div>
+                  }
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:10,fontWeight:700,color:"var(--green)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>🧠 VIN cache — previously confirmed</div>
+                    <div style={{fontWeight:700,fontSize:13}}>{sv.model}</div>
+                    {sv.code&&<div style={{fontSize:11,color:"var(--accent)"}}>{sv.code}</div>}
                   </div>
-                  <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
-                    {img
-                      ?<img src={img} alt={sv.model} style={{width:72,height:52,objectFit:"cover",borderRadius:8,flexShrink:0}} onError={e=>e.target.style.display="none"}/>
-                      :<div style={{width:72,height:52,background:"var(--surface3)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>🚗</div>
-                    }
-                    <div>
-                      <div style={{fontWeight:700,fontSize:14}}>{sv.model}{isCurrent?" ✓":""}</div>
-                      {sv.code&&<div style={{fontSize:11,color:"var(--accent)",fontWeight:600}}>{sv.code}</div>}
-                      <div style={{fontSize:11,color:"var(--text3)"}}>{sv.make}</div>
-                      {(sv.year_from||sv.year_to)&&<div style={{fontSize:11,color:"var(--blue)"}}>{sv.year_from||"?"}{sv.year_to&&sv.year_to!==sv.year_from?`–${sv.year_to}`:""}</div>}
-                    </div>
-                  </div>
-                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>{sourceLabel}</div>
-                  <div style={{display:"flex",gap:8}}>
-                    <button className="btn btn-primary" style={{flex:2,fontSize:13}} onClick={()=>{ pickModel(sv.code||sv.model); setMatchAutoSuggestion(null); }}>
-                      ✅ Use this match
-                    </button>
-                    <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setMatchAutoSuggestion(null)}>
-                      Dismiss
-                    </button>
-                  </div>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setMatchAutoSuggestion(null)} style={{flexShrink:0}}>✕</button>
                 </div>
               );
             })()}
@@ -6158,17 +6156,25 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     const img=toImgUrl(v.photo_front||"");
                     const isCurrent=v.model===job.vehicle_model||v.code===job.vehicle_model;
                     const isSel=matchModelSelected?.id===v.id;
+                    const pct=v._score||0;
+                    const isTopMatch=isSel&&pct>=30;
+                    const borderColor=isSel?(isTopMatch?"var(--green)":"var(--accent)"):isCurrent?"rgba(52,211,153,.4)":"var(--border)";
+                    const bgColor=isSel?(isTopMatch?"rgba(52,211,153,.1)":"rgba(249,115,22,.12)"):isCurrent?"rgba(52,211,153,.06)":"var(--surface2)";
                     return(
                       <button key={v.id} onClick={()=>setMatchModelSelected(isSel?null:v)} style={{
-                        background:isSel?"rgba(249,115,22,.12)":isCurrent?"rgba(52,211,153,.1)":"var(--surface2)",
-                        border:`2px solid ${isSel?"var(--accent)":isCurrent?"var(--green)":"var(--border)"}`,
+                        background:bgColor,
+                        border:`2px solid ${borderColor}`,
                         borderRadius:12,padding:0,cursor:"pointer",overflow:"hidden",textAlign:"left",
-                        transition:"border-color .15s,box-shadow .15s",
+                        transition:"border-color .15s,box-shadow .15s",position:"relative",
                       }}
                       onMouseEnter={e=>{if(!isSel){e.currentTarget.style.borderColor="var(--accent)";e.currentTarget.style.boxShadow="var(--glow)";}}}
-                      onMouseLeave={e=>{if(!isSel){e.currentTarget.style.borderColor=isCurrent?"var(--green)":"var(--border)";e.currentTarget.style.boxShadow="none";}}}>
+                      onMouseLeave={e=>{if(!isSel){e.currentTarget.style.borderColor=isCurrent?"rgba(52,211,153,.4)":"var(--border)";e.currentTarget.style.boxShadow="none";}}}>
+                        {/* Score badge */}
+                        {pct>0&&<div style={{position:"absolute",top:5,right:5,zIndex:2,background:pct>=70?"rgba(52,211,153,.85)":pct>=40?"rgba(251,191,36,.85)":"rgba(100,116,139,.7)",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:8,lineHeight:1.4}}>
+                          {isSel&&isTopMatch?"✓ ":""}{pct}%
+                        </div>}
                         {img
-                          ? <img src={img} alt={v.model} style={{width:"100%",height:100,objectFit:"contain",display:"block",background:"#f5f5f5"}} onError={e=>e.target.style.display="none"}/>
+                          ? <img src={img} alt={v.model} style={{width:"100%",height:110,objectFit:"contain",display:"block",background:"#f0f0f0"}} onError={e=>e.target.style.display="none"}/>
                           : <div style={{width:"100%",height:100,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🚗</div>
                         }
                         <div style={{padding:"8px 10px"}}>

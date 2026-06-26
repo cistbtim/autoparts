@@ -8157,7 +8157,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                       <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,
                         background:p._source==="local"?"rgba(52,211,153,.15)":"rgba(96,165,250,.15)",
                         color:p._source==="local"?"var(--green)":"var(--blue)"}}>
-                        {p._source==="local"?"🏪 Local":"🏬 Main Branch"}
+                        {p._source==="local"?"🏬 Main Branch":"🏭 Head Office"}
                       </span>
                     </div>
                     {showSku&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2,fontFamily:"DM Mono,monospace"}}>{p.sku}{p.brand?` · ${p.brand}`:""}</div>}

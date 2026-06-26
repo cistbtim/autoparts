@@ -2698,8 +2698,10 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
       .finally(()=>setRefreshing(false));
   },[]);
 
-  const toggleItem = id =>
+  const toggleItem = id => {
     setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+    setGeneratedLink("");
+  };
 
   const addExtra = async () => {
     const v = extraInput.trim();
@@ -2887,7 +2889,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
               <option value="Used Parts">Used Parts</option>
               <option value="Dealer">Dealer</option>
             </select>
-            <select className="inp" style={{flex:1}} value={supplierId} onChange={e=>{setSupplierId(e.target.value);setManualPhone("");}}>
+            <select className="inp" style={{flex:1}} value={supplierId} onChange={e=>{setSupplierId(e.target.value);setManualPhone("");setGeneratedLink("");}}>
               <option value="">— Select supplier —</option>
               {brandPool.filter(s=>{
                 if(!typeFilter) return true;
@@ -2906,7 +2908,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
         </div>
       )}
       <input className="inp" placeholder="Or enter phone number: +27 83 123 4567"
-        value={manualPhone} onChange={e=>{setManualPhone(e.target.value);setSupplierId("");}}
+        value={manualPhone} onChange={e=>{setManualPhone(e.target.value);setSupplierId("");setGeneratedLink("");}}
         style={{marginBottom:14}}/>
 
       {/* Custom note */}
@@ -2943,8 +2945,6 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
                   const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false,...vehiclePayload};
                   link=await onGenerateLink(info,linkItems);
                   setGeneratedLink(link);
-                  // Wait 2s for DB write to complete before supplier can access the link
-                  await new Promise(r=>setTimeout(r,2000));
                 }catch(e){ linkFailed=true; }
                 finally{setGeneratingLink(false);}
               }

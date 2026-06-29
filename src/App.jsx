@@ -11,6 +11,7 @@ import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg,
 import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
+import { SystemMapPage } from "./components/SystemMap.jsx";
 import db from "./lib/db.js";
 import { SupplierImportModal } from "./components/SupplierImport.jsx";
 import { PosPage } from "./components/Pos.jsx";
@@ -94,6 +95,12 @@ export default function App() {
   if(bsrConfirmToken) return <BranchStockRequestConfirmPage token={bsrConfirmToken}/>;
   const wsRegToken = new URLSearchParams(window.location.search).get("ws_register");
   if(wsRegToken) return <WorkshopRegisterPage token={wsRegToken}/>;
+  if(new URLSearchParams(window.location.search).get("sysmap")==="1") return(
+    <div style={{minHeight:"100vh"}} data-theme={document.documentElement.getAttribute("data-theme")||"dark"}>
+      <style>{CSS}</style>
+      <SystemMapPage onNavigate={null}/>
+    </div>
+  );
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
   const wsLoginOnly = !!new URLSearchParams(window.location.search).get("ws_login");
   if(!user) return <LoginPage onLogin={handleLogin} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs} wsLoginOnly={wsLoginOnly}/>;
@@ -714,7 +721,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       part_requests:            [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setPartRequests(Array.isArray(d)?d:[])],
       vehicle_requests:         [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setVehicleRequests(Array.isArray(d)?d:[])],
       branch_stock_requests:    [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`or=(requesting_branch_id.eq.${user.branch_id},supplying_branch_id.eq.${user.branch_id})&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setBranchStockRequests(Array.isArray(d)?d:[])],
-      ws_shop_requests:         [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setWsShopRequests(Array.isArray(d)?d:[])],
+      ws_shop_requests:         [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&status=in.(pending,escalated,main_replied)&select=*&order=created_at.desc`:`status=in.(escalated,main_replied,ordered)&select=*&order=created_at.desc`, d=>setWsShopRequests(Array.isArray(d)?d:[])],
       branch_stock:             [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*`:"select=*", d=>setBranchStock(Array.isArray(d)?d:[])],
       workshop_jobs:            [`select=*&order=date_in.desc${wsF}`,                d=>setWorkshopJobs(Array.isArray(d)?d:[])],
       workshop_job_items:       [`select=*${wsF}`,                                   d=>setWorkshopJobItems(Array.isArray(d)?d:[])],
@@ -792,7 +799,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
       api.get("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
-      api.get("ws_shop_requests",role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user?.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:`select=*&order=created_at.desc`).catch(()=>[]),
+      api.get("ws_shop_requests",role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user?.branch_id?`branch_id=eq.${user.branch_id}&status=in.(pending,escalated,main_replied)&select=*&order=created_at.desc`:`status=in.(escalated,main_replied,ordered)&select=*&order=created_at.desc`).catch(()=>[]),
     ]);
     setWsSqReplies(Array.isArray(sqReps)?sqReps:[]);
     setWsPurchaseOrders(Array.isArray(wsPOs)?wsPOs:[]);
@@ -2609,7 +2616,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const pendingPartRequests=partRequests.filter(r=>r.status==="pending").length||0;
   const pendingVehicleRequests=vehicleRequests.filter(r=>r.status==="pending").length||0;
   const pendingTransferRequests=branchStockRequests.filter(r=>r.status==="pending"||r.status==="quoted"||r.status==="confirmed"||r.status==="dispatched").length||0;
-  const pendingWsShopRequests=wsShopRequests.filter(r=>r.status==="pending").length||0;
+  const pendingWsShopRequests=wsShopRequests.filter(r=>isBranchUser?r.status==="pending":r.status==="escalated").length||0;
   // Multi-word search using DEBOUNCED value — fast typing won't lag UI
   const suppNoByPart={};
   partSuppliers.forEach(ps=>{if(ps.supplier_part_no)suppNoByPart[ps.part_id]=(suppNoByPart[ps.part_id]||[]).concat(ps.supplier_part_no.toLowerCase());});
@@ -2730,8 +2737,38 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const saveWsShopRequest=async(data)=>{
     const res=await api.upsert("ws_shop_requests",data);
     if(res?.code){showToast(`Error: ${res.message||res.code}`,"err");return;}
+
+    // Auto-check main shop stock for each requested item by SKU
+    const reqItems=(()=>{try{return JSON.parse(data.items||"[]");}catch{return[];}})();
+    const mainReplyItems=reqItems.map(item=>{
+      const skuLow=(item.sku||"").toLowerCase().trim();
+      const found=skuLow?parts.find(p=>
+        !p.branch_id&&+(p.stock||0)>0&&
+        ((p.sku||"").toLowerCase()===skuLow||(p.oe_number||"").toLowerCase()===skuLow)
+      ):null;
+      return {
+        description:item.description, sku:item.sku, qty:item.qty,
+        price:found?+(found.price||0):0,
+        available:!!found,
+        notes:found?`In main stock (${found.stock} available)`:"Not found in main stock",
+        part_id:found?String(found.id):null,
+        part_name:found?found.name:item.description,
+        source:"stock",
+      };
+    });
+    const anyFound=mainReplyItems.some(r=>r.available);
+    if(anyFound){
+      await api.patch("ws_shop_requests","id",data.id,{
+        status:"main_replied",
+        main_reply_items:JSON.stringify(mainReplyItems),
+        main_reply_notes:"Auto-detected from main stock",
+        main_replied_at:new Date().toISOString(),
+      }).catch(()=>{});
+      showToast("📦 Main stock has these parts — spare shop notified automatically");
+    } else {
+      showToast("📬 Parts request sent to spare shop");
+    }
     await refreshTables("ws_shop_requests");
-    showToast("📬 Parts request sent to spare shop");
   };
   const replyWsShopRequest=async(id,replyItems,replyNotes)=>{
     const res=await api.patch("ws_shop_requests","id",id,{reply_items:JSON.stringify(replyItems),reply_notes:replyNotes||null,status:"replied",replied_at:new Date().toISOString()});
@@ -2739,11 +2776,29 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     await refreshTables("ws_shop_requests");
     showToast("✅ Reply sent to workshop");
   };
+  const escalateWsShopRequest=async(id,escalateNotes)=>{
+    const res=await api.patch("ws_shop_requests","id",id,{status:"escalated",escalate_notes:escalateNotes||null,escalated_at:new Date().toISOString()});
+    if(res?.code){showToast(`Error: ${res.message||res.code}`,"err");return;}
+    setWsShopRequests(prev=>prev.map(r=>r.id===id?{...r,status:"escalated",escalate_notes:escalateNotes||null}:r));
+    showToast("⬆️ Escalated to main stock");
+  };
+  const mainReplyWsShopRequest=async(id,mainReplyItems,mainReplyNotes)=>{
+    const res=await api.patch("ws_shop_requests","id",id,{status:"main_replied",main_reply_items:JSON.stringify(mainReplyItems),main_reply_notes:mainReplyNotes||null,main_replied_at:new Date().toISOString()});
+    if(res?.code){showToast(`Error: ${res.message||res.code}`,"err");return;}
+    setWsShopRequests(prev=>prev.map(r=>r.id===id?{...r,status:"main_replied",main_reply_items:JSON.stringify(mainReplyItems),main_reply_notes:mainReplyNotes||null}:r));
+    showToast("✅ Main stock reply sent");
+  };
   const deleteWsShopRequest=async(id)=>{
     const res=await api.delete("ws_shop_requests","id",id);
     if(res?.code){showToast(`Error: ${res.message||res.code}`,"err");return;}
     setWsShopRequests(prev=>prev.filter(r=>r.id!==id));
     showToast("🗑️ Request deleted");
+  };
+  const deleteBranchStockRequest=async(id)=>{
+    const res=await api.delete("branch_stock_requests","id",id);
+    if(res?.code){showToast(`Error: ${res.message||res.code}`,"err");return;}
+    setBranchStockRequests(prev=>prev.filter(r=>r.id!==id));
+    showToast("🗑️ Transfer request deleted");
   };
 
   // Grouped nav for sidebar
@@ -2752,6 +2807,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       id:"grp_dashboard", icon:"📊", label:t.grpDashboard, roles:["admin"],
       children:[
         {id:"dashboard",icon:"📊",label:t.dashboard,roles:["admin"]},
+        {id:"systemMap",icon:"🗺️",label:"System Map",roles:["admin"]},
         {id:"loginlogs",icon:"🌍",label:t.loginLogs,roles:["admin"]},
         {id:"adclicks",icon:"📢",label:"Ad Clicks",roles:["admin"]},
         {id:"adcontracts",icon:"📑",label:"Ad Contracts",roles:["admin"]},
@@ -4979,6 +5035,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           </div>
         )}
 
+        {/* ── SYSTEM MAP ── */}
+        {tab==="systemMap"&&role==="admin"&&(
+          <SystemMapPage onNavigate={setTab}/>
+        )}
+
         {/* ── LOGIN LOGS ── */}
         {tab==="loginlogs"&&role==="admin"&&(
           <div className="fu">
@@ -5593,11 +5654,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {tab==="transferRequests"&&(role==="admin"||role==="branch_admin")&&(
-          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} onRefresh={()=>refreshTables("branch_stock_requests")}/>
+          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} onRefresh={()=>refreshTables("branch_stock_requests")} onDelete={deleteBranchStockRequest}/>
         )}
 
         {tab==="wsShopRequests"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
-          <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} onReply={replyWsShopRequest} onDelete={deleteWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
+          <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest} onDelete={deleteWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
         )}
 
         {tab==="settings"&&role==="admin"&&(

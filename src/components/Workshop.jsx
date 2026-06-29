@@ -5552,7 +5552,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   </button>
                 );
               })()}
-              {wsProfile?.linked_branch_id&&onSaveWsShopRequest&&(()=>{
+              {wsProfile?.linked_branch_id&&wsProfile.linked_branch_id!==mainBranchId&&onSaveWsShopRequest&&(()=>{
                 const pending=localShopRequests.filter(r=>r.status==="pending");
                 const replied=localShopRequests.filter(r=>r.status==="replied");
                 const ordered=localShopRequests.filter(r=>r.status==="ordered");
@@ -5989,7 +5989,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       )}
 
       {/* Spare shop parts request modal */}
-      {wsShopReqModal&&onSaveWsShopRequest&&(
+      {wsShopReqModal&&onSaveWsShopRequest&&wsProfile?.linked_branch_id!==mainBranchId&&(
         <WsShopRequestModal
           job={job} items={items} wsProfile={wsProfile}
           existingRequests={localShopRequests}
@@ -7334,7 +7334,13 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
   const [newCost,     setNewCost]     = useState("");
   const [newSell,     setNewSell]     = useState("");
   const [createSaving,setCreateSaving]= useState(false);
+  const [showSkuDrop, setShowSkuDrop] = useState(false);
   const descRef = useRef(null);
+  const skuTrim=newSku.trim();
+  const skuSuggs=skuTrim.length>0
+    ? wsStock.filter(s=>s.sku&&s.sku.toLowerCase().includes(skuTrim.toLowerCase())).slice(0,8)
+    : [];
+  const skuDup=skuTrim?wsStock.find(s=>s.sku&&s.sku.toLowerCase()===skuTrim.toLowerCase()):null;
 
   const baseList = type==="part" ? wsStock : wsServices;
   const list = [...localExtras, ...baseList];
@@ -7523,7 +7529,34 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
             {type==="part"&&(
               <FD style={{marginBottom:10}}>
                 <FL label="Part Number / SKU"/>
-                <input className="inp" value={newSku} onChange={e=>setNewSku(e.target.value)} placeholder="e.g. OIL-15W40"/>
+                <div style={{position:"relative"}}>
+                  <input className="inp" value={newSku}
+                    onChange={e=>{setNewSku(e.target.value);setShowSkuDrop(true);}}
+                    onFocus={()=>setShowSkuDrop(true)}
+                    onBlur={()=>setTimeout(()=>setShowSkuDrop(false),150)}
+                    placeholder="e.g. OIL-15W40"
+                    style={skuDup?{borderColor:"var(--red)",outline:"none"}:{}}/>
+                  {skuDup&&(
+                    <div style={{fontSize:11,color:"var(--red)",marginTop:3,fontWeight:600}}>
+                      ⚠️ SKU already in use: <b>{skuDup.name}</b>
+                    </div>
+                  )}
+                  {showSkuDrop&&skuSuggs.length>0&&(
+                    <div style={{position:"absolute",top:"calc(100% + 2px)",left:0,right:0,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,zIndex:200,maxHeight:180,overflowY:"auto",boxShadow:"0 6px 20px rgba(0,0,0,.18)"}}>
+                      <div style={{padding:"5px 10px",fontSize:10,color:"var(--text3)",borderBottom:"1px solid var(--border)",letterSpacing:".05em",textTransform:"uppercase"}}>Existing SKUs — click to copy</div>
+                      {skuSuggs.map(s=>(
+                        <div key={s.id}
+                          onMouseDown={()=>{setNewSku(s.sku);setShowSkuDrop(false);}}
+                          style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",gap:10,alignItems:"center"}}
+                          onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
+                          onMouseLeave={e=>e.currentTarget.style.background=""}>
+                          <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)",flexShrink:0}}>{s.sku}</code>
+                          <span style={{fontSize:12,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </FD>
             )}
             <FG style={{marginBottom:12}}>
@@ -7540,7 +7573,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
             </FG>
             <div style={{display:"flex",gap:8}}>
               <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setCreating(false)}>Cancel</button>
-              <button className="btn btn-primary btn-sm" style={{flex:2}} onClick={handleCreateAndSelect} disabled={createSaving}>
+              <button className="btn btn-primary btn-sm" style={{flex:2}} onClick={handleCreateAndSelect} disabled={createSaving||!!skuDup} title={skuDup?"SKU already exists — change it or clear the SKU field":""}>
                 {createSaving?"Creating...":"✅ Create & Select"}
               </button>
             </div>
@@ -7767,13 +7800,25 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         api.get("parts",`${extra}id=in.(${c.join(",")})&select=${COLS}&order=sku.asc`).catch(()=>[])
       )).then(pages=>pages.flat());
     };
+    // On explicit refresh in job mode, re-fetch part_fitments from DB so newly added parts/fitments appear
+    // without requiring a logout. On initial load (refreshKey===0) the prop is fine.
+    const getFitments=async()=>{
+      if(!initialMake||vehicles.length===0||refreshKey===0) return partFitments;
+      const matchV=(!initialModel?vehicles.filter(v=>v.make===initialMake):initialCode?vehicles.filter(v=>v.make===initialMake&&v.code===initialCode):((bc=vehicles.filter(v=>v.make===initialMake&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make===initialMake&&v.model===initialModel))());
+      if(!matchV.length) return partFitments;
+      const vIds=matchV.map(v=>String(v.id));
+      const FC=50;const fchunks=[];for(let i=0;i<vIds.length;i+=FC)fchunks.push(vIds.slice(i,i+FC));
+      const pages=await Promise.all(fchunks.map(c=>api.get("part_fitments",`vehicle_id=in.(${c.join(",")})&select=part_id,vehicle_id`).catch(()=>[])));
+      return pages.flat();
+    };
+    getFitments().then(currentFitments=>{
     let idFilter=null;
     let jobModeMatchV=[];
     if(initialMake&&vehicles.length>0){
       jobModeMatchV=(!initialModel?vehicles.filter(v=>v.make===initialMake):initialCode?vehicles.filter(v=>v.make===initialMake&&v.code===initialCode):((bc=vehicles.filter(v=>v.make===initialMake&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make===initialMake&&v.model===initialModel))());
-      if(partFitments.length>0&&jobModeMatchV.length>0){
+      if(currentFitments.length>0&&jobModeMatchV.length>0){
         const vIds=new Set(jobModeMatchV.map(v=>String(v.id)));
-        const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
+        const fitIds=[...new Set(currentFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
         if(fitIds.length>0) idFilter=fitIds;
       }
     }
@@ -7836,6 +7881,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       if(missingIds.length>0) fetchPartsByIds(missingIds).then(finalize);
       else finalize();
     });
+    }); // end getFitments().then
   },[linkedBranchId,mainBranchId,refreshKey]);
 
   // When in job mode, filter to fitment-linked parts only.
@@ -8047,6 +8093,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
               api.cacheInvalidate("parts");
               api.cacheInvalidate("branch_stock");
               api.cacheInvalidate("branch_stock_requests");
+              api.cacheInvalidate("part_fitments");
               _spCache.data=null;_spCache.branchId=null;
               setRefreshing(true);
               setRefreshKey(k=>k+1);
@@ -8237,17 +8284,21 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
   const [refreshing, setRefreshing] = useState(false);
   const [modalPartPhotoLightbox, setModalPartPhotoLightbox] = useState(null);
 
-  const hasPending = existingRequests.some(r=>r.status==="pending");
-  const hasReplied = existingRequests.some(r=>r.status==="replied");
-  const hasOrdered = existingRequests.some(r=>r.status==="ordered");
-  const hasAnyReply = hasReplied||hasOrdered;
+  const hasPending     = existingRequests.some(r=>r.status==="pending");
+  const hasEscalated   = existingRequests.some(r=>r.status==="escalated");
+  const hasMainReplied = existingRequests.some(r=>r.status==="main_replied");
+  const hasReplied     = existingRequests.some(r=>r.status==="replied");
+  const hasOrdered     = existingRequests.some(r=>r.status==="ordered");
+  const hasAnyReply    = hasReplied||hasOrdered||hasMainReplied;
 
   // Build reply lookup: description (lower) → {available, price, notes, part_name, part_id, part_photo}
   const _safeJ=(v)=>{if(Array.isArray(v))return v;if(v&&typeof v==="object")return[v];try{return JSON.parse(v||"[]");}catch{return[];};};
   const replyMap={};
   existingRequests.forEach(req=>{
     const origItems=_safeJ(req.items);
-    const replyItems=_safeJ(req.reply_items);
+    // Prefer main_reply_items when main stock has replied
+    const mainReplyItems=_safeJ(req.main_reply_items);
+    const replyItems=mainReplyItems.length>0?mainReplyItems:_safeJ(req.reply_items);
     replyItems.forEach((ri,idx)=>{
       const desc=(origItems[idx]?.description||ri.description||"").toLowerCase().trim();
       if(!desc) return;
@@ -8268,6 +8319,7 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
         available:!!ri.available, price:+ri.price||0,
         notes:ri.notes||"", part_name:ri.part_name||linkedPart?.name||ri.description||"",
         sku:resolvedSku, part_id:ri.part_id||"", part_photo:resolvedPhoto,
+        source:ri.source||null,
       };
     });
   });
@@ -8328,10 +8380,28 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
         <span style={{flex:1}}>✅ Spare shop has replied — click the 🏪 green chip on a part then tap &ldquo;Order from Spare Shop&rdquo;</span>
         {onRefresh&&<button onClick={handleRefresh} disabled={refreshing} style={{padding:"2px 10px",borderRadius:6,border:"1px solid rgba(52,211,153,.4)",background:"none",color:"#34d399",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}}>{refreshing?"…":"↻ Refresh"}</button>}
       </div>}
-      {hasPending&&!hasReplied&&!hasOrdered&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(251,146,60,.12)",border:"1px solid rgba(251,146,60,.3)",fontSize:12,color:"#f59e0b",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+      {hasPending&&!hasEscalated&&!hasMainReplied&&!hasReplied&&!hasOrdered&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(251,146,60,.12)",border:"1px solid rgba(251,146,60,.3)",fontSize:12,color:"#f59e0b",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
         <span style={{flex:1}}>⏳ Request sent — waiting for spare shop to reply</span>
         {onRefresh&&<button onClick={handleRefresh} disabled={refreshing} style={{padding:"2px 10px",borderRadius:6,border:"1px solid rgba(251,146,60,.4)",background:"none",color:"#f59e0b",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}}>{refreshing?"…":"↻ Check"}</button>}
       </div>}
+      {hasEscalated&&!hasMainReplied&&!hasReplied&&!hasOrdered&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",fontSize:12,color:"var(--blue)",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+        <span style={{flex:1}}>⬆️ Spare shop is checking with Main Stock — reply coming soon</span>
+        {onRefresh&&<button onClick={handleRefresh} disabled={refreshing} style={{padding:"2px 10px",borderRadius:6,border:"1px solid rgba(96,165,250,.4)",background:"none",color:"var(--blue)",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}}>{refreshing?"…":"↻ Check"}</button>}
+      </div>}
+      {hasMainReplied&&!hasReplied&&!hasOrdered&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",fontSize:12,color:"#34d399",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+        <span style={{flex:1}}>📦 Main Stock has replied — see prices below</span>
+        {onRefresh&&<button onClick={handleRefresh} disabled={refreshing} style={{padding:"2px 10px",borderRadius:6,border:"1px solid rgba(52,211,153,.4)",background:"none",color:"#34d399",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}}>{refreshing?"…":"↻ Refresh"}</button>}
+      </div>}
+
+      {/* Vehicle info */}
+      {(job.vehicle_make||job.vehicle_year||job.vin)&&(
+        <div style={{padding:"8px 12px",marginBottom:10,borderRadius:8,background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.2)",fontSize:12,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <span style={{fontWeight:700,color:"var(--blue)"}}>🚗</span>
+          <span style={{fontWeight:700,color:"var(--text)"}}>{[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")||"—"}</span>
+          {job.vin&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",background:"var(--surface2)",borderRadius:5,padding:"2px 7px",border:"1px solid var(--border)"}}>VIN: {job.vin}</span>}
+          {job.engine_no&&<span style={{fontSize:11,color:"var(--text3)"}}>Engine: <strong>{job.engine_no}</strong></span>}
+        </div>
+      )}
 
       {/* Part list */}
       <div style={{marginBottom:12}}>
@@ -8369,6 +8439,8 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
                       </code>
                     )}
                     {reply.notes&&<span style={{fontSize:10,color:"var(--text3)",fontStyle:"italic"}}>{reply.notes}</span>}
+                    {reply.source==="stock"&&<span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:"rgba(52,211,153,.13)",color:"#34d399",border:"1px solid rgba(52,211,153,.3)"}}>📦 Main Stock</span>}
+                    {reply.source==="supplier"&&<span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:"rgba(96,165,250,.13)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.3)"}}>🏭 Local Supplier</span>}
                   </div>
                 )}
                 {hasAnyReply&&!reply&&<div style={{marginTop:4,fontSize:10,color:"var(--text3)"}}>— no reply for this part</div>}

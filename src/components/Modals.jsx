@@ -8079,7 +8079,7 @@ export function BranchUsersPage({branchId, branchName, user}) {
 // ═══════════════════════════════════════════════════════════════
 // BRANCH TRANSFER REQUESTS PAGE
 // ═══════════════════════════════════════════════════════════════
-export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],onRefresh}) {
+export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],onRefresh,onDelete}) {
   const Cs=curSym(settings?.currency||"ZAR R");
   const [acting,setActing]=useState(null);
   const [replyingId,setReplyingId]=useState(null); // which request is in reply-edit mode
@@ -8400,6 +8400,10 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
               </>}
               {!isSupplier&&r.status==="completed"&&<span style={{fontSize:12,color:"var(--text3)"}}>✅ Completed</span>}
               {!isSupplier&&r.status==="cancelled"&&<span style={{fontSize:12,color:"var(--red)"}}>✕ Cancelled</span>}
+              {onDelete&&<button className="btn btn-danger btn-sm" style={{marginLeft:"auto"}} disabled={isBusy}
+                onClick={async()=>{if(!window.confirm("Delete this transfer request?"))return;await onDelete(r.id);}}>
+                🗑️ Delete
+              </button>}
             </div>
           </div>
         );
@@ -8465,18 +8469,28 @@ export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP REQUESTS PAGE  (spare-shop side)
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onReply,onDelete,onRefresh,userRole="",userBranchId=null}) {
+export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onReply,onEscalate,onMainReply,onDelete,onRefresh,userRole="",userBranchId=null}) {
   const [selId,    setSelId]    = useState(null);
   const [filter,   setFilter]   = useState("pending");
   const [refreshing,setRefreshing]=useState(false);
 
-  const pendingCount=wsShopRequests.filter(r=>r.status==="pending").length;
+  const pendingCount   = wsShopRequests.filter(r=>r.status==="pending").length;
+  const escalatedCount = wsShopRequests.filter(r=>r.status==="escalated").length;
+  const mainRepliedCount = wsShopRequests.filter(r=>r.status==="main_replied").length;
   const visible=wsShopRequests
     .filter(r=>filter==="all"?true:r.status===filter)
     .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
   const selected=selId?wsShopRequests.find(r=>r.id===selId)||null:null;
 
   const doRefresh=async()=>{setRefreshing(true);try{await onRefresh();}finally{setRefreshing(false);}};
+
+  const statusMeta={
+    pending:     {icon:"⏳",label:"Pending",     bg:"rgba(251,146,60,.15)",  color:"var(--orange)"},
+    escalated:   {icon:"⬆️",label:"Escalated",   bg:"rgba(96,165,250,.15)",  color:"var(--blue)"},
+    main_replied:{icon:"📦",label:"Main Replied", bg:"rgba(52,211,153,.15)",  color:"var(--green)"},
+    replied:     {icon:"✅",label:"Replied",      bg:"rgba(52,211,153,.15)",  color:"var(--green)"},
+    ordered:     {icon:"🛒",label:"Ordered",      bg:"rgba(22,163,74,.15)",   color:"#16a34a"},
+  };
 
   return (
     <div>
@@ -8487,8 +8501,14 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onR
       </div>
 
       {/* Filter tabs */}
-      <div style={{display:"flex",gap:6,marginBottom:16}}>
-        {[["pending",`⏳ Pending${pendingCount>0?` (${pendingCount})`:""}`],["replied","✅ Replied"],["all","All"]].map(([v,lbl])=>(
+      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+        {[
+          ["pending",   `⏳ Pending${pendingCount>0?` (${pendingCount})`:""}`],
+          ["escalated", `⬆️ Escalated${escalatedCount>0?` (${escalatedCount})`:""}`],
+          ["main_replied",`📦 Main Replied${mainRepliedCount>0?` (${mainRepliedCount})`:""}`],
+          ["replied",   "✅ Replied"],
+          ["all",       "All"],
+        ].map(([v,lbl])=>(
           <button key={v} onClick={()=>{setFilter(v);setSelId(null);}}
             style={{padding:"6px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
               background:filter===v?"var(--accent)":"var(--surface2)",color:filter===v?"#fff":"var(--text3)"}}>
@@ -8506,7 +8526,10 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onR
               style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",color:"#ef4444",borderRadius:7,padding:"3px 10px",cursor:"pointer",fontSize:12,fontWeight:600}}>🗑️ Delete</button>}
             <button onClick={()=>setSelId(null)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:18,padding:"0 4px"}}>✕</button>
           </div>
-          <WsShopRequestDetail req={selected} parts={parts} settings={settings} onReply={async(...a)=>{await onReply(...a);setSelId(null);}} userRole={userRole} userBranchId={userBranchId}/>
+          <WsShopRequestDetail req={selected} parts={parts} settings={settings}
+            onReply={async(...a)=>{await onReply(...a);setSelId(null);}}
+            onEscalate={onEscalate} onMainReply={onMainReply}
+            userRole={userRole} userBranchId={userBranchId}/>
         </div>
       )}
 
@@ -8530,11 +8553,9 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onR
                       <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{items.length} part{items.length!==1?"s":""} · {req.created_at?new Date(req.created_at).toLocaleString():"—"}</div>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                      <span style={{fontSize:11,padding:"3px 10px",borderRadius:99,fontWeight:600,
-                        background:req.status==="pending"?"rgba(251,146,60,.15)":"rgba(52,211,153,.15)",
-                        color:req.status==="pending"?"#f59e0b":"#34d399"}}>
-                        {req.status==="pending"?"⏳ Pending":"✅ Replied"}
-                      </span>
+                      {(()=>{const m=statusMeta[req.status]||{icon:"•",label:req.status,bg:"var(--surface2)",color:"var(--text3)"};return(
+                        <span style={{fontSize:11,padding:"3px 10px",borderRadius:99,fontWeight:600,background:m.bg,color:m.color}}>{m.icon} {m.label}</span>
+                      );})()}
                       {onDelete&&<button onClick={async(e)=>{e.stopPropagation();if(!window.confirm("Delete this request?"))return;await onDelete(req.id);if(isSel)setSelId(null);}}
                         style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:"#ef4444",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:11,fontWeight:600}}>🗑️</button>}
                       <span style={{fontSize:12,color:"var(--accent)",fontWeight:600}}>{isSel?"▲ Close":"▼ Review"}</span>
@@ -8549,9 +8570,10 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onR
   );
 }
 
-function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", userBranchId=null}) {
+function WsShopRequestDetail({req, parts=[], settings={}, onReply, onEscalate, onMainReply, userRole="", userBranchId=null}) {
   const reqItems = (() => {try{return JSON.parse(req.items||"[]");}catch{return [];}})();
   const existingReply = (() => {try{return JSON.parse(req.reply_items||"[]");}catch{return [];}})();
+  const existingMainReply = (() => {try{return JSON.parse(req.main_reply_items||"[]");}catch{return [];}})();
 
   const [replyLines, setReplyLines] = useState(()=>
     reqItems.map((item,i)=>{
@@ -8570,6 +8592,7 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
         available: existingReply[i]?.available!==false,
         part_id: existingReply[i]?.part_id||(autoMatched?String(autoMatched.id):null),
         notes: existingReply[i]?.notes||"",
+        source: existingReply[i]?.source||null,
       };
     })
   );
@@ -8580,6 +8603,45 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
   const [newPart, setNewPart] = useState({name:"",sku:"",cost:"",price:""});
   const [createSaving, setCreateSaving] = useState(false);
   const [lightbox, setLightbox] = useState(null);
+
+  // Escalation state (spare shop → main stock)
+  const [showEscalate, setShowEscalate] = useState(false);
+  const [escalateNotes, setEscalateNotes] = useState("");
+  const [escalateSaving, setEscalateSaving] = useState(false);
+
+  // Main stock reply state (admin replies to escalated request)
+  const isAdminOrManager = userRole==="admin"||userRole==="manager";
+  const [mainReplyLines, setMainReplyLines] = useState(()=>
+    reqItems.map((item,i)=>({
+      description: item.description||"",
+      sku: item.sku||"",
+      qty: item.qty||1,
+      price: existingMainReply[i]?.price||"",
+      available: existingMainReply[i]?.available!==false,
+      notes: existingMainReply[i]?.notes||"",
+    }))
+  );
+  const [mainReplyNotes, setMainReplyNotes] = useState(req.main_reply_notes||"");
+  const [mainReplySaving, setMainReplySaving] = useState(false);
+
+  const handleEscalate=async()=>{
+    if(!escalateNotes.trim()){alert("Please enter a reason / note for main stock.");return;}
+    setEscalateSaving(true);
+    try{await onEscalate(req.id,escalateNotes);}finally{setEscalateSaving(false);setShowEscalate(false);}
+  };
+
+  const updateMainLine=(idx,patch)=>setMainReplyLines(prev=>prev.map((l,i)=>i===idx?{...l,...patch}:l));
+
+  const handleMainReply=async()=>{
+    setMainReplySaving(true);
+    try{
+      const payload=mainReplyLines.map(l=>({
+        description:l.description, sku:l.sku, qty:l.qty,
+        price:+l.price||0, available:l.available, notes:l.notes||"",
+      }));
+      await onMainReply(req.id, payload, mainReplyNotes);
+    }finally{setMainReplySaving(false);}
+  };
 
   const Cs = C();
 
@@ -8645,6 +8707,7 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
           notes:l.notes||"",
           part_name:linkedPart?.name||l.description,
           part_photo:lPhotos[0]||linkedPart?.photo_url||"",
+          source:l.source||null,
         };
       });
       await onReply(req.id, payload, replyNotes);
@@ -8652,9 +8715,10 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
   };
 
   const waMsg=`Hi 👋\n\nParts request reply from *${settings.shop_name||"Spare Shop"}*\n\nJob: ${req.job_car||"—"}\n\n`+
-    replyLines.map((l,i)=>
-      `${i+1}. ${l.description}${l.sku?` (${l.sku})`:""}  —  ${l.available?`✅ Available @ ${settings.currency_symbol||"R"}${l.price||"0"}`:"❌ Not available"}${l.notes?`  (${l.notes})`:""}`
-    ).join("\n")+
+    replyLines.map((l,i)=>{
+      const srcLabel=l.source==="stock"?" 📦 Main Stock":l.source==="supplier"?" 🏭 Local Supplier":"";
+      return `${i+1}. ${l.description}${l.sku?` (${l.sku})`:""}  —  ${l.available?`✅ Available @ ${settings.currency_symbol||"R"}${l.price||"0"}${srcLabel}`:"❌ Not available"}${l.notes?`  (${l.notes})`:""}`
+    }).join("\n")+
     (replyNotes?`\n\nNotes: ${replyNotes}`:"")+"\n\nPlease check your workshop app for details.";
   const workshopPhone=req.workshop_phone||"";
 
@@ -8845,6 +8909,26 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
                 <input className="inp" value={line.notes} onChange={e=>updateLine(idx,{notes:e.target.value})}
                   placeholder="Note (condition, ETA…)" style={{flex:1,minWidth:140,fontSize:12}}/>
               </div>
+              {/* Fulfill source decision */}
+              {line.available&&(
+                <div style={{display:"flex",gap:6,marginTop:8,alignItems:"center"}}>
+                  <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>Fulfill from:</span>
+                  <button onClick={()=>updateLine(idx,{source:line.source==="stock"?null:"stock"})}
+                    style={{padding:"4px 12px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",border:"none",
+                      background:line.source==="stock"?"rgba(52,211,153,.2)":"var(--surface)",
+                      outline:line.source==="stock"?"2px solid rgba(52,211,153,.5)":"1px solid var(--border)",
+                      color:line.source==="stock"?"#34d399":"var(--text3)"}}>
+                    📦 Main Stock
+                  </button>
+                  <button onClick={()=>updateLine(idx,{source:line.source==="supplier"?null:"supplier"})}
+                    style={{padding:"4px 12px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",border:"none",
+                      background:line.source==="supplier"?"rgba(96,165,250,.2)":"var(--surface)",
+                      outline:line.source==="supplier"?"2px solid rgba(96,165,250,.5)":"1px solid var(--border)",
+                      color:line.source==="supplier"?"var(--blue)":"var(--text3)"}}>
+                    🏭 Local Supplier
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -8869,6 +8953,119 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, userRole="", 
           </button>
         </div>
       </div>
+
+      {/* ── ESCALATION SECTION (shown only for pending requests) ───────── */}
+      {req.status==="pending"&&onEscalate&&(
+        <div style={{marginTop:14,padding:14,background:"rgba(96,165,250,.05)",border:"1px dashed rgba(96,165,250,.35)",borderRadius:10}}>
+          <div style={{fontWeight:700,fontSize:13,color:"var(--blue)",marginBottom:8}}>⬆️ Parts not available? Escalate to Main Stock</div>
+          {showEscalate?(
+            <>
+              <textarea className="inp" rows={2} value={escalateNotes} onChange={e=>setEscalateNotes(e.target.value)}
+                placeholder="Reason for escalating — e.g. 'Not in local stock, need main to source this'"
+                style={{width:"100%",resize:"vertical",marginBottom:8,fontSize:12}}/>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setShowEscalate(false)}
+                  style={{flex:1,padding:"8px",borderRadius:8,border:"1px solid var(--border)",background:"none",cursor:"pointer",fontSize:12}}>Cancel</button>
+                <button onClick={handleEscalate} disabled={escalateSaving||!escalateNotes.trim()}
+                  style={{flex:2,padding:"8px",borderRadius:8,border:"none",background:"var(--blue)",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",opacity:escalateSaving||!escalateNotes.trim()?0.5:1}}>
+                  {escalateSaving?"Sending…":"⬆️ Send to Main Stock"}
+                </button>
+              </div>
+            </>
+          ):(
+            <button onClick={()=>setShowEscalate(true)}
+              style={{padding:"8px 16px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.08)",color:"var(--blue)",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+              ⬆️ Escalate to Main Stock
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── ESCALATED STATUS BANNER (spare shop sees while waiting) ──────── */}
+      {req.status==="escalated"&&(
+        <div style={{marginTop:14,padding:14,background:"rgba(96,165,250,.07)",border:"1.5px solid rgba(96,165,250,.3)",borderRadius:10}}>
+          <div style={{fontWeight:700,fontSize:13,color:"var(--blue)",marginBottom:6}}>⬆️ Escalated to Main Stock</div>
+          {req.escalate_notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:10,padding:"6px 10px",background:"var(--surface2)",borderRadius:7}}>📝 Note: {req.escalate_notes}</div>}
+          {isAdminOrManager&&onMainReply?(
+            <>
+              <div style={{fontWeight:700,fontSize:12,color:"var(--text2)",marginBottom:8}}>📦 Main Stock Reply</div>
+              {mainReplyLines.map((line,idx)=>(
+                <div key={idx} style={{marginBottom:10,padding:10,borderRadius:8,border:"1px solid var(--border)",background:"var(--surface2)"}}>
+                  <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>{line.description}{line.sku&&<code style={{fontSize:10,color:"var(--blue)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>{line.sku}</code>}</div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                    <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer"}}>
+                      <input type="checkbox" checked={line.available} onChange={e=>updateMainLine(idx,{available:e.target.checked})} style={{accentColor:"#34d399",width:14,height:14}}/>
+                      <span style={{fontSize:11,fontWeight:600,color:line.available?"#34d399":"var(--red)"}}>{line.available?"✅ Available":"❌ Not available"}</span>
+                    </label>
+                    <input className="inp" type="number" min="0" step="0.01" value={line.price}
+                      onChange={e=>updateMainLine(idx,{price:e.target.value})} placeholder="Price"
+                      disabled={!line.available}
+                      style={{width:110,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,opacity:line.available?1:0.4}}/>
+                    <input className="inp" value={line.notes} onChange={e=>updateMainLine(idx,{notes:e.target.value})}
+                      placeholder="Note / ETA / source…" style={{flex:1,minWidth:140,fontSize:12}}/>
+                  </div>
+                </div>
+              ))}
+              <textarea className="inp" rows={2} value={mainReplyNotes} onChange={e=>setMainReplyNotes(e.target.value)}
+                placeholder="Overall notes for spare shop & workshop…" style={{width:"100%",resize:"vertical",marginBottom:10,fontSize:12}}/>
+              <button onClick={handleMainReply} disabled={mainReplySaving}
+                style={{width:"100%",padding:"10px",borderRadius:10,border:"none",background:"var(--blue)",color:"#fff",fontWeight:700,fontSize:13,cursor:mainReplySaving?"not-allowed":"pointer",opacity:mainReplySaving?0.7:1}}>
+                {mainReplySaving?"Sending…":"📦 Send Main Stock Reply"}
+              </button>
+            </>
+          ):(
+            <div style={{fontSize:12,color:"var(--text3)",fontStyle:"italic"}}>⏳ Waiting for Main Stock to respond…</div>
+          )}
+        </div>
+      )}
+
+      {/* ── MAIN STOCK REPLY DISPLAY (both spare shop + workshop can see) ── */}
+      {(req.status==="main_replied"||existingMainReply.length>0)&&(
+        <div style={{marginTop:14,padding:14,background:"rgba(52,211,153,.06)",border:"1.5px solid rgba(52,211,153,.3)",borderRadius:10}}>
+          <div style={{fontWeight:700,fontSize:13,color:"#34d399",marginBottom:8}}>📦 Main Stock Reply</div>
+          {req.escalate_notes&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>Spare shop note: {req.escalate_notes}</div>}
+          {existingMainReply.map((item,idx)=>(
+            <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:"var(--surface2)",borderRadius:7,marginBottom:4,gap:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:13,fontWeight:600}}>{item.description}{item.sku&&<code style={{fontSize:10,color:"var(--blue)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>{item.sku}</code>}</span>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",flexShrink:0}}>
+                <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,
+                  background:item.available?"rgba(52,211,153,.15)":"rgba(239,68,68,.12)",
+                  color:item.available?"#34d399":"#ef4444"}}>
+                  {item.available?"✅ Available":"❌ Not available"}
+                </span>
+                {item.available&&item.price>0&&<span style={{fontSize:13,fontWeight:700,color:"var(--accent)"}}>{C()}{fmtAmt(item.price)}</span>}
+                {item.notes&&<span style={{fontSize:11,color:"var(--text3)"}}>({item.notes})</span>}
+              </div>
+            </div>
+          ))}
+          {req.main_reply_notes&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6,padding:"6px 10px",background:"var(--surface2)",borderRadius:7}}>📝 {req.main_reply_notes}</div>}
+          {/* Allow admin to revise the main reply */}
+          {req.status==="main_replied"&&isAdminOrManager&&onMainReply&&(
+            <details style={{marginTop:10}}>
+              <summary style={{fontSize:11,color:"var(--text3)",cursor:"pointer"}}>✏️ Revise Main Stock Reply</summary>
+              <div style={{marginTop:8}}>
+                {mainReplyLines.map((line,idx)=>(
+                  <div key={idx} style={{marginBottom:8,padding:8,borderRadius:7,border:"1px solid var(--border)",background:"var(--surface)"}}>
+                    <div style={{fontSize:12,fontWeight:600,marginBottom:4}}>{line.description}</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                      <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer"}}>
+                        <input type="checkbox" checked={line.available} onChange={e=>updateMainLine(idx,{available:e.target.checked})} style={{accentColor:"#34d399",width:13,height:13}}/>
+                        <span style={{fontSize:11,color:line.available?"#34d399":"var(--red)",fontWeight:600}}>{line.available?"✅":"❌"}</span>
+                      </label>
+                      <input className="inp" type="number" min="0" step="0.01" value={line.price} onChange={e=>updateMainLine(idx,{price:e.target.value})} placeholder="Price" disabled={!line.available} style={{width:90,fontSize:12,opacity:line.available?1:0.4}}/>
+                      <input className="inp" value={line.notes} onChange={e=>updateMainLine(idx,{notes:e.target.value})} placeholder="Note…" style={{flex:1,fontSize:11}}/>
+                    </div>
+                  </div>
+                ))}
+                <textarea className="inp" rows={1} value={mainReplyNotes} onChange={e=>setMainReplyNotes(e.target.value)} placeholder="Notes…" style={{width:"100%",resize:"vertical",marginBottom:8,fontSize:11}}/>
+                <button onClick={handleMainReply} disabled={mainReplySaving} style={{width:"100%",padding:"7px",borderRadius:8,border:"none",background:"var(--blue)",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",opacity:mainReplySaving?0.7:1}}>
+                  {mainReplySaving?"Saving…":"📦 Update Main Reply"}
+                </button>
+              </div>
+            </details>
+          )}
+        </div>
+      )}
 
       {lightbox&&<ImgLightbox src={toImgUrl(lightbox)} onClose={()=>setLightbox(null)}/>}
     </div>

@@ -5040,7 +5040,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
 
         {/* ── SYSTEM MAP ── */}
         {tab==="systemMap"&&(role==="admin"||role==="workshop"||role==="branch_admin")&&(
-          <SystemMapPage onNavigate={setTab}/>
+          <SystemMapPage onNavigate={setTab} role={role}/>
         )}
 
         {/* ── LOGIN LOGS ── */}

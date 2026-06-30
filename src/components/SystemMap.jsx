@@ -123,9 +123,9 @@ function calcSubNodes(children, bx, by, angle, isOpen) {
   });
 }
 
-function calcLayout(expanded) {
-  const n = MAP_DATA.children.length;
-  return MAP_DATA.children.map((branch, i) => {
+function calcLayout(expanded, children = MAP_DATA.children) {
+  const n = children.length;
+  return children.map((branch, i) => {
     const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
     const bx = BRANCH_R * Math.cos(angle);
     const by = BRANCH_R * Math.sin(angle);
@@ -182,7 +182,13 @@ function getDefaultView() {
   };
 }
 
-export function SystemMapPage({ onNavigate }) {
+// Modules visible per restricted role (admin sees all)
+const ROLE_MODULES = {
+  workshop:    new Set(["workshop"]),
+  branch_admin:new Set(["inventory","procurement","sales","branches","reports"]),
+};
+
+export function SystemMapPage({ onNavigate, role }) {
   const [expanded, setExpanded] = useState(new Set());
   const [tip, setTip] = useState(null);
   const [pan, setPan] = useState(() => getDefaultView().pan);
@@ -290,7 +296,7 @@ export function SystemMapPage({ onNavigate }) {
     toggle(id);
     // On mobile, pan so the tapped branch node is centred after expanding
     if (window.innerWidth < 768) {
-      const branch = calcLayout(new Set([id])).find(b => b.id === id);
+      const branch = calcLayout(new Set([id]), visibleChildren).find(b => b.id === id);
       if (branch) {
         const v = getDefaultView();
         setPan({ x: v.pan.x - branch.x * zoom, y: v.pan.y - branch.y * zoom });
@@ -306,9 +312,12 @@ export function SystemMapPage({ onNavigate }) {
 
   const showTip = (e, label, desc) => setTip({ label, desc, cx: e.clientX, cy: e.clientY });
 
-  const rawBranches = calcLayout(expanded);
+  const visibleChildren = ROLE_MODULES[role]
+    ? MAP_DATA.children.filter(b => ROLE_MODULES[role].has(b.id))
+    : MAP_DATA.children;
+  const rawBranches = calcLayout(expanded, visibleChildren);
   const branches = applyOverrides(rawBranches, nodePositions);
-  const allExpanded = MAP_DATA.children.every(b => expanded.has(b.id));
+  const allExpanded = visibleChildren.every(b => expanded.has(b.id));
   const hasCustomLayout = Object.keys(nodePositions).length > 0;
   const BR = 38, CR = 52;
 
@@ -332,7 +341,7 @@ export function SystemMapPage({ onNavigate }) {
         <span className="hide-mobile" style={{ fontSize:10.5, color:"var(--text3)", flex:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
           Drag nodes to rearrange · Click module to expand · Hover for details · Drag canvas to pan · Scroll to zoom
         </span>
-        <button style={BTN} onClick={() => setExpanded(allExpanded ? new Set() : new Set(MAP_DATA.children.map(b => b.id)))}>
+        <button style={BTN} onClick={() => setExpanded(allExpanded ? new Set() : new Set(visibleChildren.map(b => b.id)))}>
           {allExpanded ? "⊟ Collapse All" : "⊞ Expand All"}
         </button>
         <button style={BTN} onClick={resetView}>⟲ View</button>
@@ -367,7 +376,7 @@ export function SystemMapPage({ onNavigate }) {
             <stop offset="0%" stopColor="#fb923c"/>
             <stop offset="100%" stopColor="#c2410c"/>
           </radialGradient>
-          {MAP_DATA.children.map(b => (
+          {visibleChildren.map(b => (
             <radialGradient key={b.id} id={`sm-${b.id}`} cx="40%" cy="30%">
               <stop offset="0%" stopColor={b.color} stopOpacity="0.95"/>
               <stop offset="100%" stopColor={b.color} stopOpacity="0.65"/>
@@ -455,7 +464,7 @@ export function SystemMapPage({ onNavigate }) {
             <text x={0} y={-14} textAnchor="middle" style={{ fontSize:24, pointerEvents:"none" }}>🚗</text>
             <text x={0} y={7}   textAnchor="middle" style={{ fontSize:11.5, fontWeight:800, fill:"#fff", pointerEvents:"none" }}>MotorDesk</text>
             <text x={0} y={21}  textAnchor="middle" style={{ fontSize:8, fill:"rgba(255,255,255,0.7)", pointerEvents:"none" }}>
-              {MAP_DATA.children.length} modules
+              {visibleChildren.length} modules
             </text>
           </g>
         </g>
@@ -482,7 +491,7 @@ export function SystemMapPage({ onNavigate }) {
         border:"1px solid var(--border)", maxWidth:"calc(100% - 24px)",
         alignItems:"center"
       }}>
-        {MAP_DATA.children.map(b => (
+        {visibleChildren.map(b => (
           <div key={b.id}
             style={{ display:"flex", alignItems:"center", gap:4, fontSize:10, cursor:"pointer" }}
             onClick={() => toggle(b.id)}

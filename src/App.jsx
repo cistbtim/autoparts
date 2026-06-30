@@ -120,7 +120,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const scrapId = (role==="scrapyard"||role==="scrapyard_admin") ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const isBranchUser = BRANCH_ROLES.includes(role);
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"systemMap":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"systemMap":"dashboard";
+  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"systemMap":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"systemMap":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"systemMap":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
@@ -5039,7 +5039,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {/* ── SYSTEM MAP ── */}
-        {tab==="systemMap"&&(role==="admin"||role==="workshop")&&(
+        {tab==="systemMap"&&(role==="admin"||role==="workshop"||role==="branch_admin")&&(
           <SystemMapPage onNavigate={setTab}/>
         )}
 

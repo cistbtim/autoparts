@@ -8956,8 +8956,8 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, onEscalate, o
         </div>
       </div>
 
-      {/* ── ESCALATION SECTION (shown only for pending requests) ───────── */}
-      {req.status==="pending"&&onEscalate&&(
+      {/* ── ESCALATION SECTION (pending or ordered requests) ───────── */}
+      {(req.status==="pending"||req.status==="ordered")&&onEscalate&&(
         <div style={{marginTop:14,padding:14,background:"rgba(96,165,250,.05)",border:"1px dashed rgba(96,165,250,.35)",borderRadius:10}}>
           <div style={{fontWeight:700,fontSize:13,color:"var(--blue)",marginBottom:8}}>⬆️ Parts not available? Escalate to Main Stock</div>
           {showEscalate?(

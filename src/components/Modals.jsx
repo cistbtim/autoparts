@@ -8469,7 +8469,7 @@ export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP REQUESTS PAGE  (spare-shop side)
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onReply,onEscalate,onMainReply,onDelete,onRefresh,userRole="",userBranchId=null}) {
+export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},suppliers=[],onReply,onEscalate,onMainReply,onDelete,onRefresh,userRole="",userBranchId=null}) {
   const [selId,    setSelId]    = useState(null);
   const [filter,   setFilter]   = useState("pending");
   const [refreshing,setRefreshing]=useState(false);
@@ -8528,7 +8528,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onR
               style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",color:"#ef4444",borderRadius:7,padding:"3px 10px",cursor:"pointer",fontSize:12,fontWeight:600}}>🗑️ Delete</button>}
             <button onClick={()=>setSelId(null)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:18,padding:"0 4px"}}>✕</button>
           </div>
-          <WsShopRequestDetail req={selected} parts={parts} settings={settings}
+          <WsShopRequestDetail req={selected} parts={parts} settings={settings} suppliers={suppliers}
             onReply={async(...a)=>{await onReply(...a);setSelId(null);}}
             onEscalate={onEscalate} onMainReply={onMainReply}
             userRole={userRole} userBranchId={userBranchId}/>
@@ -8572,7 +8572,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onR
   );
 }
 
-function WsShopRequestDetail({req, parts=[], settings={}, onReply, onEscalate, onMainReply, userRole="", userBranchId=null}) {
+function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], onReply, onEscalate, onMainReply, userRole="", userBranchId=null}) {
   const reqItems = (() => {try{return JSON.parse(req.items||"[]");}catch{return [];}})();
   const existingReply = (() => {try{return JSON.parse(req.reply_items||"[]");}catch{return [];}})();
   const existingMainReply = (() => {try{return JSON.parse(req.main_reply_items||"[]");}catch{return [];}})();
@@ -8606,7 +8606,7 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, onEscalate, o
   const [createSaving, setCreateSaving] = useState(false);
   const [lightbox, setLightbox] = useState(null);
   const [dispatching, setDispatching] = useState(false);
-  const [supplierPhone, setSupplierPhone] = useState("");
+  const [chosenSupplier, setChosenSupplier] = useState(null);
   const [showSupplier, setShowSupplier] = useState(false);
 
   // Escalation state (spare shop → main stock)
@@ -8802,8 +8802,8 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, onEscalate, o
         const supplierMsg=`🛒 *Purchase Order — ${settings.shop_name||"Spare Shop"}*\n\nKindly supply the following:\n\n`+
           reqItems.map((item,i)=>{const r=existingReply[i]||{};return `• ${r.part_name||item.description}${item.sku?` [${item.sku}]`:""} ×${item.qty||1}`}).join("\n")+
           `\n\nVehicle: ${req.job_car||"—"}\n\nPlease confirm price & availability.`;
+        const supPhone=(chosenSupplier?.phone||"").replace(/\D/g,"");
         const workshopPhone=(req.workshop_phone||"").replace(/\D/g,"");
-        const supPhone=(supplierPhone||"").replace(/\D/g,"");
         return (
           <div style={{marginBottom:20}}>
             {/* Order summary */}
@@ -8853,22 +8853,37 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, onEscalate, o
                 <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Enter your supplier's WhatsApp number to send them a purchase order.</div>
                 {showSupplier?(
                   <>
-                    <div style={{display:"flex",gap:8,marginBottom:8}}>
-                      <input className="inp" type="tel" placeholder="Supplier WhatsApp number"
-                        value={supplierPhone} onChange={e=>setSupplierPhone(e.target.value)}
-                        style={{flex:1,fontSize:13}}/>
-                    </div>
+                    {suppliers.length===0?(
+                      <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>No suppliers found. Add suppliers in the Procurement tab.</div>
+                    ):(
+                      <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:8}}>
+                        {suppliers.filter(s=>s.phone).map(s=>(
+                          <div key={s.id} onClick={()=>setChosenSupplier(chosenSupplier?.id===s.id?null:s)}
+                            style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,cursor:"pointer",border:`1.5px solid ${chosenSupplier?.id===s.id?"rgba(96,165,250,.6)":"var(--border)"}`,background:chosenSupplier?.id===s.id?"rgba(96,165,250,.1)":"var(--surface2)"}}>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontWeight:600,fontSize:13}}>{s.name}</div>
+                              {s.contact_person&&<div style={{fontSize:11,color:"var(--text3)"}}>{s.contact_person}</div>}
+                            </div>
+                            <div style={{fontSize:12,color:"var(--text3)",flexShrink:0}}>{s.phone}</div>
+                            {chosenSupplier?.id===s.id&&<span style={{fontSize:16}}>✓</span>}
+                          </div>
+                        ))}
+                        {suppliers.filter(s=>!s.phone).length>0&&(
+                          <div style={{fontSize:11,color:"var(--text3)",padding:"4px 2px"}}>{suppliers.filter(s=>!s.phone).length} supplier{suppliers.filter(s=>!s.phone).length!==1?"s":""} hidden (no phone number)</div>
+                        )}
+                      </div>
+                    )}
                     <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>setShowSupplier(false)}
+                      <button onClick={()=>{setShowSupplier(false);setChosenSupplier(null);}}
                         style={{flex:1,padding:"9px",borderRadius:8,border:"1px solid var(--border)",background:"none",cursor:"pointer",fontSize:12}}>Cancel</button>
                       {supPhone?(
                         <a href={`https://wa.me/${supPhone}?text=${encodeURIComponent(supplierMsg)}`} target="_blank" rel="noreferrer"
                           style={{flex:2,padding:"9px",borderRadius:8,background:"#25D366",color:"#fff",fontWeight:700,fontSize:13,textDecoration:"none",textAlign:"center"}}>
-                          💬 Send WhatsApp to Supplier
+                          💬 WhatsApp {chosenSupplier?.name}
                         </a>
                       ):(
                         <button disabled style={{flex:2,padding:"9px",borderRadius:8,border:"none",background:"var(--border)",color:"var(--text3)",fontWeight:700,fontSize:13,cursor:"not-allowed"}}>
-                          Enter number first
+                          Select a supplier
                         </button>
                       )}
                     </div>

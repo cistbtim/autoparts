@@ -8477,6 +8477,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onR
   const pendingCount   = wsShopRequests.filter(r=>r.status==="pending").length;
   const escalatedCount = wsShopRequests.filter(r=>r.status==="escalated").length;
   const mainRepliedCount = wsShopRequests.filter(r=>r.status==="main_replied").length;
+  const orderedCount   = wsShopRequests.filter(r=>r.status==="ordered").length;
   const visible=wsShopRequests
     .filter(r=>filter==="all"?true:r.status===filter)
     .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
@@ -8507,6 +8508,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},onR
           ["escalated", `⬆️ Escalated${escalatedCount>0?` (${escalatedCount})`:""}`],
           ["main_replied",`📦 Main Replied${mainRepliedCount>0?` (${mainRepliedCount})`:""}`],
           ["replied",   "✅ Replied"],
+          ["ordered",   `🛒 Ordered${orderedCount>0?` (${orderedCount})`:""}`],
           ["all",       "All"],
         ].map(([v,lbl])=>(
           <button key={v} onClick={()=>{setFilter(v);setSelId(null);}}

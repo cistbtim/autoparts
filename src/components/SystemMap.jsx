@@ -169,14 +169,24 @@ function applyOverrides(branches, pos) {
 
 const LS_KEY = "md_sysmap_positions";
 
+function getDefaultView() {
+  const mobile = window.innerWidth < 768;
+  const sidebar = mobile ? 0 : 240;
+  const toolbar = 44;
+  return {
+    pan: {
+      x: (window.innerWidth - sidebar) / 2,
+      y: (window.innerHeight - toolbar) / 2,
+    },
+    zoom: mobile ? 0.55 : 1.0,
+  };
+}
+
 export function SystemMapPage({ onNavigate }) {
   const [expanded, setExpanded] = useState(new Set());
   const [tip, setTip] = useState(null);
-  const [pan, setPan] = useState(() => ({
-    x: Math.max(500, (window.innerWidth - 240) / 2),
-    y: Math.max(350, (window.innerHeight - 110) / 2),
-  }));
-  const [zoom, setZoom] = useState(1.0);
+  const [pan, setPan] = useState(() => getDefaultView().pan);
+  const [zoom, setZoom] = useState(() => getDefaultView().zoom);
   const [nodePositions, setNodePositions] = useState(() => {
     try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); }
     catch { return {}; }
@@ -275,11 +285,9 @@ export function SystemMapPage({ onNavigate }) {
   const BR = 38, CR = 52;
 
   const resetView = () => {
-    setPan({
-      x: Math.max(500, (window.innerWidth - 240) / 2),
-      y: Math.max(350, (window.innerHeight - 110) / 2),
-    });
-    setZoom(0.9);
+    const v = getDefaultView();
+    setPan(v.pan);
+    setZoom(v.zoom);
   };
 
   const resetLayout = () => {

@@ -2890,6 +2890,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {
         id:"grp_ws_jobs", icon:"🔧", label:t.grpWorkshop||"Workshop — Jobs", roles:["workshop"],
         children:[
+          {id:"systemMap",   icon:"🗺️",label:"System Map",   roles:["workshop"]},
           {id:"workshop",    icon:"🔧",label:t.wsJobs,       roles:["workshop"]},
           {id:"wscustomers", icon:"👥",label:t.wsCustomers,  roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsquotations",icon:"📝",label:t.wsQuotations, roles:["workshop"], wsRoles:["main","manager"]},

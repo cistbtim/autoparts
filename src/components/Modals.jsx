@@ -8608,6 +8608,11 @@ function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], onReply,
   const [dispatching, setDispatching] = useState(false);
   const [chosenSupplier, setChosenSupplier] = useState(null);
   const [showSupplier, setShowSupplier] = useState(false);
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [addingPhone, setAddingPhone] = useState(null); // supplier id being edited
+  const [addPhoneVal, setAddPhoneVal] = useState("");
+  const [addPhoneSaving, setAddPhoneSaving] = useState(false);
+  const [localSuppliers, setLocalSuppliers] = useState(suppliers);
 
   // Escalation state (spare shop → main stock)
   const [showEscalate, setShowEscalate] = useState(false);
@@ -8853,28 +8858,72 @@ function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], onReply,
                 <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Enter your supplier's WhatsApp number to send them a purchase order.</div>
                 {showSupplier?(
                   <>
-                    {suppliers.length===0?(
+                    {/* Search */}
+                    <input className="inp" placeholder="🔍 Search suppliers…" value={supplierSearch}
+                      onChange={e=>setSupplierSearch(e.target.value)}
+                      style={{fontSize:12,marginBottom:8,width:"100%"}}/>
+                    {localSuppliers.length===0?(
                       <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>No suppliers found. Add suppliers in the Procurement tab.</div>
-                    ):(
-                      <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:8}}>
-                        {suppliers.filter(s=>s.phone).map(s=>(
-                          <div key={s.id} onClick={()=>setChosenSupplier(chosenSupplier?.id===s.id?null:s)}
-                            style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,cursor:"pointer",border:`1.5px solid ${chosenSupplier?.id===s.id?"rgba(96,165,250,.6)":"var(--border)"}`,background:chosenSupplier?.id===s.id?"rgba(96,165,250,.1)":"var(--surface2)"}}>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontWeight:600,fontSize:13}}>{s.name}</div>
-                              {s.contact_person&&<div style={{fontSize:11,color:"var(--text3)"}}>{s.contact_person}</div>}
-                            </div>
-                            <div style={{fontSize:12,color:"var(--text3)",flexShrink:0}}>{s.phone}</div>
-                            {chosenSupplier?.id===s.id&&<span style={{fontSize:16}}>✓</span>}
-                          </div>
-                        ))}
-                        {suppliers.filter(s=>!s.phone).length>0&&(
-                          <div style={{fontSize:11,color:"var(--text3)",padding:"4px 2px"}}>{suppliers.filter(s=>!s.phone).length} supplier{suppliers.filter(s=>!s.phone).length!==1?"s":""} hidden (no phone number)</div>
-                        )}
-                      </div>
-                    )}
+                    ):(()=>{
+                      const filtered=localSuppliers.filter(s=>!supplierSearch||(s.name+"|"+(s.contact_person||"")).toLowerCase().includes(supplierSearch.toLowerCase()));
+                      return (
+                        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:8,maxHeight:280,overflowY:"auto"}}>
+                          {filtered.map(s=>{
+                            const hasPhone=!!(s.phone||"").trim();
+                            const isChosen=chosenSupplier?.id===s.id;
+                            const isAdding=addingPhone===s.id;
+                            return (
+                              <div key={s.id} style={{borderRadius:9,border:`1.5px solid ${isChosen?"rgba(96,165,250,.6)":"var(--border)"}`,background:isChosen?"rgba(96,165,250,.08)":"var(--surface2)",overflow:"hidden"}}>
+                                <div onClick={()=>hasPhone&&setChosenSupplier(isChosen?null:s)}
+                                  style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",cursor:hasPhone?"pointer":"default"}}>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontWeight:600,fontSize:13}}>{s.name}</div>
+                                    {s.contact_person&&<div style={{fontSize:11,color:"var(--text3)"}}>{s.contact_person}</div>}
+                                  </div>
+                                  {hasPhone?(
+                                    <>
+                                      <div style={{fontSize:12,color:"var(--text3)",flexShrink:0}}>{s.phone}</div>
+                                      {isChosen&&<span style={{fontSize:16,color:"var(--blue)"}}>✓</span>}
+                                    </>
+                                  ):(
+                                    <button onClick={e=>{e.stopPropagation();setAddingPhone(isAdding?null:s.id);setAddPhoneVal("");}}
+                                      style={{fontSize:11,padding:"3px 9px",borderRadius:6,border:"1px dashed rgba(96,165,250,.5)",background:"rgba(96,165,250,.07)",color:"var(--blue)",cursor:"pointer",flexShrink:0}}>
+                                      + Add WhatsApp
+                                    </button>
+                                  )}
+                                </div>
+                                {isAdding&&(
+                                  <div style={{padding:"8px 12px",borderTop:"1px solid var(--border)",background:"var(--surface)"}}>
+                                    <div style={{display:"flex",gap:6}}>
+                                      <input className="inp" type="tel" placeholder="WhatsApp number"
+                                        value={addPhoneVal} onChange={e=>setAddPhoneVal(e.target.value)}
+                                        style={{flex:1,fontSize:12}}/>
+                                      <button onClick={async()=>{
+                                        if(!addPhoneVal.trim()) return;
+                                        setAddPhoneSaving(true);
+                                        try{
+                                          await api.patch("suppliers",`id=eq.${s.id}`,{phone:addPhoneVal.trim()});
+                                          setLocalSuppliers(ls=>ls.map(x=>x.id===s.id?{...x,phone:addPhoneVal.trim()}:x));
+                                          setAddingPhone(null);
+                                        }finally{setAddPhoneSaving(false);}
+                                      }} disabled={addPhoneSaving||!addPhoneVal.trim()}
+                                        style={{padding:"6px 12px",borderRadius:7,border:"none",background:"var(--blue)",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",opacity:addPhoneSaving||!addPhoneVal.trim()?0.5:1}}>
+                                        {addPhoneSaving?"…":"Save"}
+                                      </button>
+                                      <button onClick={()=>setAddingPhone(null)}
+                                        style={{padding:"6px 10px",borderRadius:7,border:"1px solid var(--border)",background:"none",cursor:"pointer",fontSize:12}}>✕</button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {filtered.length===0&&<div style={{fontSize:12,color:"var(--text3)",padding:"8px 4px"}}>No suppliers match "{supplierSearch}"</div>}
+                        </div>
+                      );
+                    })()}
                     <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>{setShowSupplier(false);setChosenSupplier(null);}}
+                      <button onClick={()=>{setShowSupplier(false);setChosenSupplier(null);setSupplierSearch("");}}
                         style={{flex:1,padding:"9px",borderRadius:8,border:"1px solid var(--border)",background:"none",cursor:"pointer",fontSize:12}}>Cancel</button>
                       {supPhone?(
                         <a href={`https://wa.me/${supPhone}?text=${encodeURIComponent(supplierMsg)}`} target="_blank" rel="noreferrer"

@@ -176,7 +176,7 @@ export function SystemMapPage({ onNavigate }) {
     x: Math.max(500, (window.innerWidth - 240) / 2),
     y: Math.max(350, (window.innerHeight - 110) / 2),
   }));
-  const [zoom, setZoom] = useState(1.56);
+  const [zoom, setZoom] = useState(1.0);
   const [nodePositions, setNodePositions] = useState(() => {
     try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); }
     catch { return {}; }

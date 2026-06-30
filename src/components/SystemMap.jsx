@@ -219,7 +219,7 @@ export function SystemMapPage({ onNavigate }) {
     return n;
   });
 
-  // Canvas pan — only starts if no node drag is active
+  // Canvas pan — mouse
   const mDown = e => {
     if (e.button !== 0 || nodeDragRef.current) return;
     e.preventDefault();
@@ -264,10 +264,38 @@ export function SystemMapPage({ onNavigate }) {
     dragRef.current = null;
   };
 
+  // Touch pan
+  const tDown = e => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    dragRef.current = { sx: t.clientX - pan.x, sy: t.clientY - pan.y, moved: false, startX: t.clientX, startY: t.clientY };
+  };
+  const tMove = e => {
+    if (!dragRef.current || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dist = Math.hypot(t.clientX - dragRef.current.startX, t.clientY - dragRef.current.startY);
+    if (dist > 4) dragRef.current.moved = true;
+    setPan({ x: t.clientX - dragRef.current.sx, y: t.clientY - dragRef.current.sy });
+  };
+  const tUp = e => {
+    if (dragRef.current && !dragRef.current.moved && e.changedTouches.length === 1) {
+      // short tap on canvas — no action needed
+    }
+    dragRef.current = null;
+  };
+
   const handleToggle = (e, id) => {
     e.stopPropagation();
     if (lastDragMoved.current) { lastDragMoved.current = false; return; }
     toggle(id);
+    // On mobile, pan so the tapped branch node is centred after expanding
+    if (window.innerWidth < 768) {
+      const branch = calcLayout(new Set([id])).find(b => b.id === id);
+      if (branch) {
+        const v = getDefaultView();
+        setPan({ x: v.pan.x - branch.x * zoom, y: v.pan.y - branch.y * zoom });
+      }
+    }
   };
 
   const handleSubClick = (e, s) => {
@@ -322,11 +350,14 @@ export function SystemMapPage({ onNavigate }) {
       <svg
         ref={svgRef}
         width="100%" height="100%"
-        style={{ display:"block", paddingTop:44, cursor:"grab", boxSizing:"border-box" }}
+        style={{ display:"block", paddingTop:44, cursor:"grab", boxSizing:"border-box", touchAction:"none" }}
         onMouseDown={mDown}
         onMouseMove={mMove}
         onMouseUp={mUp}
         onMouseLeave={mUp}
+        onTouchStart={tDown}
+        onTouchMove={tMove}
+        onTouchEnd={tUp}
       >
         <defs>
           <filter id="sm-sh">

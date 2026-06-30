@@ -3022,6 +3022,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {id:"workshop",    icon:"🔧",label:"Jobs"},
     ];
     if(role==="workshop") return [
+      {id:"systemMap",   icon:"🗺️",label:"System Map"},
       {id:"workshop",    icon:"🔧",label:"Jobs"},
       {id:"wscustomers", icon:"👥",label:"WS Customers"},
       {id:"wsquotations",icon:"📝",label:"Quotations"},
@@ -3344,6 +3345,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           {
             label:t.grpWorkshop||"Jobs",
             items:[
+              {id:"systemMap",  icon:"🗺️",label:"System Map"},
               {id:"wsspareshop",icon:"🏪",label:"Spare Shop"},
               ...(wsRole!=="mechanic"?[
                 {id:"wspayments", icon:"💳", label:t.wsPayments||"Payments"},

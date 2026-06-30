@@ -301,7 +301,7 @@ export function SystemMapPage({ onNavigate }) {
       {/* Toolbar */}
       <div style={{ position:"absolute", top:0, left:0, right:0, height:44, display:"flex", alignItems:"center", padding:"0 16px", gap:10, zIndex:10, background:"var(--surface)", borderBottom:"1px solid var(--border)" }}>
         <span style={{ fontWeight:800, fontSize:16, whiteSpace:"nowrap" }}>🗺️ MotorDesk System Map</span>
-        <span style={{ fontSize:10.5, color:"var(--text3)", flex:1 }}>
+        <span className="hide-mobile" style={{ fontSize:10.5, color:"var(--text3)", flex:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
           Drag nodes to rearrange · Click module to expand · Hover for details · Drag canvas to pan · Scroll to zoom
         </span>
         <button style={BTN} onClick={() => setExpanded(allExpanded ? new Set() : new Set(MAP_DATA.children.map(b => b.id)))}>

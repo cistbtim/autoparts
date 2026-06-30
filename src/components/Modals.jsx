@@ -8605,6 +8605,9 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, onEscalate, o
   const [newPart, setNewPart] = useState({name:"",sku:"",cost:"",price:""});
   const [createSaving, setCreateSaving] = useState(false);
   const [lightbox, setLightbox] = useState(null);
+  const [dispatching, setDispatching] = useState(false);
+  const [supplierPhone, setSupplierPhone] = useState("");
+  const [showSupplier, setShowSupplier] = useState(false);
 
   // Escalation state (spare shop → main stock)
   const [showEscalate, setShowEscalate] = useState(false);
@@ -8790,8 +8793,102 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, onEscalate, o
         )}
       </div>
 
-      {/* Parts list */}
-      <div style={{marginBottom:20}}>
+      {/* ── ORDERED: Fulfil panel ───────────────────────────────────── */}
+      {req.status==="ordered"&&(()=>{
+        const Cs=C();
+        const dispatchMsg=`✅ *Dispatched — ${settings.shop_name||"Spare Shop"}*\n\n🚗 ${req.job_car||"—"}\n\n*Parts dispatching now:*\n`+
+          reqItems.map((item,i)=>{const r=existingReply[i]||{};return `• ${r.part_name||item.description}${item.sku?` [${item.sku}]`:""} ×${item.qty||1}${r.price?` @ ${Cs}${r.price}`:""}`}).join("\n")+
+          `\n\nParts are on their way — please confirm receipt. 🚚`;
+        const supplierMsg=`🛒 *Purchase Order — ${settings.shop_name||"Spare Shop"}*\n\nKindly supply the following:\n\n`+
+          reqItems.map((item,i)=>{const r=existingReply[i]||{};return `• ${r.part_name||item.description}${item.sku?` [${item.sku}]`:""} ×${item.qty||1}`}).join("\n")+
+          `\n\nVehicle: ${req.job_car||"—"}\n\nPlease confirm price & availability.`;
+        const workshopPhone=(req.workshop_phone||"").replace(/\D/g,"");
+        const supPhone=(supplierPhone||"").replace(/\D/g,"");
+        return (
+          <div style={{marginBottom:20}}>
+            {/* Order summary */}
+            <div style={{padding:14,borderRadius:12,background:"rgba(22,163,74,.07)",border:"1.5px solid rgba(22,163,74,.25)",marginBottom:16}}>
+              <div style={{fontWeight:700,fontSize:13,color:"#16a34a",marginBottom:10}}>🛒 Confirmed Order — {reqItems.length} part{reqItems.length!==1?"s":""}</div>
+              {reqItems.map((item,i)=>{
+                const r=existingReply[i]||{};
+                return (
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<reqItems.length-1?"1px solid rgba(22,163,74,.15)":"none"}}>
+                    {r.part_photo&&<img src={toImgUrl(r.part_photo)} alt="" style={{width:40,height:40,objectFit:"cover",borderRadius:6,flexShrink:0,border:"1px solid var(--border)"}}/>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:13}}>{r.part_name||item.description}</div>
+                      {item.sku&&<code style={{fontSize:10,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{item.sku}</code>}
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:15,color:"var(--accent)"}}>{r.price?`${Cs}${r.price}`:"—"}</div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>×{item.qty||1}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Action cards */}
+            <div style={{fontWeight:700,fontSize:12,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:10}}>What will you do?</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+              {/* 1 — Dispatch from stock */}
+              <div style={{padding:14,borderRadius:12,background:"rgba(52,211,153,.07)",border:"1.5px solid rgba(52,211,153,.25)"}}>
+                <div style={{fontWeight:700,fontSize:13,color:"#34d399",marginBottom:6}}>📦 I have it — Dispatch from stock</div>
+                <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Send a WhatsApp to the workshop confirming the parts are on their way.</div>
+                <div style={{display:"flex",gap:8}}>
+                  {workshopPhone?(
+                    <a href={`https://wa.me/${workshopPhone}?text=${encodeURIComponent(dispatchMsg)}`} target="_blank" rel="noreferrer"
+                      style={{flex:1,padding:"10px",borderRadius:9,background:"#25D366",color:"#fff",fontWeight:700,fontSize:13,textDecoration:"none",textAlign:"center"}}>
+                      💬 WhatsApp Workshop
+                    </a>
+                  ):(
+                    <div style={{fontSize:12,color:"var(--red)"}}>No workshop phone on record.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* 2 — Order from supplier */}
+              <div style={{padding:14,borderRadius:12,background:"rgba(96,165,250,.07)",border:"1.5px solid rgba(96,165,250,.25)"}}>
+                <div style={{fontWeight:700,fontSize:13,color:"var(--blue)",marginBottom:6}}>🏭 Order from Supplier</div>
+                <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Enter your supplier's WhatsApp number to send them a purchase order.</div>
+                {showSupplier?(
+                  <>
+                    <div style={{display:"flex",gap:8,marginBottom:8}}>
+                      <input className="inp" type="tel" placeholder="Supplier WhatsApp number"
+                        value={supplierPhone} onChange={e=>setSupplierPhone(e.target.value)}
+                        style={{flex:1,fontSize:13}}/>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>setShowSupplier(false)}
+                        style={{flex:1,padding:"9px",borderRadius:8,border:"1px solid var(--border)",background:"none",cursor:"pointer",fontSize:12}}>Cancel</button>
+                      {supPhone?(
+                        <a href={`https://wa.me/${supPhone}?text=${encodeURIComponent(supplierMsg)}`} target="_blank" rel="noreferrer"
+                          style={{flex:2,padding:"9px",borderRadius:8,background:"#25D366",color:"#fff",fontWeight:700,fontSize:13,textDecoration:"none",textAlign:"center"}}>
+                          💬 Send WhatsApp to Supplier
+                        </a>
+                      ):(
+                        <button disabled style={{flex:2,padding:"9px",borderRadius:8,border:"none",background:"var(--border)",color:"var(--text3)",fontWeight:700,fontSize:13,cursor:"not-allowed"}}>
+                          Enter number first
+                        </button>
+                      )}
+                    </div>
+                  </>
+                ):(
+                  <button onClick={()=>setShowSupplier(true)}
+                    style={{padding:"9px 18px",borderRadius:9,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.1)",color:"var(--blue)",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                    🏭 Order from Supplier
+                  </button>
+                )}
+              </div>
+
+              {/* 3 — Escalate to main (rendered below in existing section) */}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Parts list + Reply form — shown only for non-ordered requests */}
+      {req.status!=="ordered"&&<><div style={{marginBottom:20}}>
         <div style={{fontWeight:700,fontSize:13,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>
           Parts Needed ({reqItems.length})
         </div>
@@ -8955,11 +9052,14 @@ function WsShopRequestDetail({req, parts=[], settings={}, onReply, onEscalate, o
           </button>
         </div>
       </div>
+      </> }
 
       {/* ── ESCALATION SECTION (pending or ordered requests) ───────── */}
       {(req.status==="pending"||req.status==="ordered")&&onEscalate&&(
-        <div style={{marginTop:14,padding:14,background:"rgba(96,165,250,.05)",border:"1px dashed rgba(96,165,250,.35)",borderRadius:10}}>
-          <div style={{fontWeight:700,fontSize:13,color:"var(--blue)",marginBottom:8}}>⬆️ Parts not available? Escalate to Main Stock</div>
+        <div style={{marginTop:req.status==="ordered"?10:14,padding:14,background:"rgba(96,165,250,.05)",border:"1px dashed rgba(96,165,250,.35)",borderRadius:10}}>
+          <div style={{fontWeight:700,fontSize:13,color:"var(--blue)",marginBottom:8}}>
+            {req.status==="ordered"?"⬆️ Request from Main Branch":"⬆️ Parts not available? Escalate to Main Stock"}
+          </div>
           {showEscalate?(
             <>
               <textarea className="inp" rows={2} value={escalateNotes} onChange={e=>setEscalateNotes(e.target.value)}

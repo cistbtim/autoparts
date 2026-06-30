@@ -6767,7 +6767,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                                     : <span style={{fontSize:18,opacity:.25}}>🖼</span>}
                                 </td>
                                 <td title={item.supplier_part_no||""}>
-                                  <div style={{fontFamily:"DM Mono,monospace",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                  <div style={{fontFamily:"DM Mono,monospace",fontWeight:600,wordBreak:"break-all"}}>
                                     {item.supplier_part_no||"—"}
                                     {dups.length>0&&<span title={`OEM also in: ${dups.map(d=>d.supplier_part_no).join(", ")}`} style={{marginLeft:4,color:"var(--amber,#f59e0b)",fontSize:10}}>⚠</span>}
                                   </div>

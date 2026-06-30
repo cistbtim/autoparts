@@ -814,7 +814,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
                   {/* vehicle make/model */}
                   {(job.vehicle_make||job.vehicle_model||job.vehicle_year)&&(()=>{
-                    const _jv=job.vehicle_model&&job.vehicle_make?vehicles.find(v=>v.code===job.vehicle_model&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()):null;
+                    const _jv=job.vehicle_model&&job.vehicle_make?vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()):null;
                     const dispModel=_jv?_jv.model:job.vehicle_model;
                     return(
                     <div style={{textAlign:"center",marginBottom:5}}>
@@ -2768,7 +2768,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
 
   // Resolve display model name: catalog lookup first (code→name), then workshop vehicle record, then raw job field
   const _catVeh = job.vehicle_model && job.vehicle_make
-    ? vehicles.find(v => v.code === job.vehicle_model && (v.make||"").toLowerCase() === (job.vehicle_make||"").toLowerCase())
+    ? vehicles.find(v => (v.code===job.vehicle_model||v.model===job.vehicle_model) && (v.make||"").toLowerCase() === (job.vehicle_make||"").toLowerCase())
     : null;
   const dispModel = _catVeh?.model || jobVehicle?.model || job.vehicle_model || "";
 
@@ -3258,7 +3258,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
   // Resolve catalog vehicle code to display model name (e.g. "FD57E" → "RANGER S-CAB DRL-H.LAMP")
-  const resolvedVehicleModel = vehicles.find(v=>v.code===job.vehicle_model&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase())?.model||job.vehicle_model;
+  const resolvedVehicleModel = vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase())?.model||job.vehicle_model;
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);
@@ -4203,7 +4203,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           );
           const hasSpareShop = !!wsProfile?.linked_branch_id && !!onGoToSpareShop;
           const _linkedV = job.vehicle_make&&job.vehicle_model
-            ? vehicles.find(v=>v.code===job.vehicle_model&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase())
+            ? vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase())
             : null;
           const isCodeLinked = !!_linkedV;
           return (
@@ -5542,7 +5542,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>Actions</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))",gap:8}}>
               {wsProfile?.linked_branch_id&&job.vehicle_make&&onGoToSpareShop&&(()=>{
-                const mv=vehicles.find(v=>v.code===job.vehicle_model&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase());
+                const mv=vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase());
                 const displayCode=mv?.code||job.vehicle_model||"";
                 const shopMake=job.vehicle_make;
                 const shopModel=mv?.model||job.vehicle_model||"";

@@ -997,7 +997,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
               }}
             >
               {COLS.map(col=>{
-                const isCollapsed=collapsedCols.has(col.id);
+                const isCollapsed=collapsedCols.has(col.id)||(col.id==="booking"&&col.items.length===0);
                 if(isCollapsed) return (
                   <div key={col.id} style={{minWidth:34,maxWidth:34,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",paddingTop:6,gap:8}}
                     title={`Expand ${col.label}`}

@@ -5045,7 +5045,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             // A) WhatsApp to spare shop
             const shopPhone=(wsProfile?.spare_shop_wa||wsProfile?.spare_shop_phone||settings?.spare_shop_wa||"").replace(/\D/g,"");
             const jobCar=[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ");
-            const msg=`🔧 *Order — ${wsProfile?.name||"Workshop"}*\n\n🚗 ${jobCar||job.complaint||""}\nJob: ${job.id}\n\n*Ordering:*\n• ${item.description}${item.part_sku?` (${item.part_sku})`:""} ×${+item.qty||1} @ ${fmtAmt(sc.price)}\n\nPlease confirm and advise delivery time.`;
+            const shopSku=sc.sku||"";
+            const wsSku=item.part_sku||"";
+            const skuLine=shopSku?` [SKU: ${shopSku}]`:wsSku?` (${wsSku})`:"";
+            const msg=`🔧 *Order — ${wsProfile?.name||"Workshop"}*\n\n🚗 ${jobCar||job.complaint||""}\nJob: ${job.id}\n\n*Ordering:*\n• ${item.description}${skuLine} ×${+item.qty||1} @ ${fmtAmt(sc.price)}\n\nPlease confirm and advise delivery time.`;
             window.open(`https://wa.me/${shopPhone}?text=${encodeURIComponent(msg)}`,"_blank");
             setPricePopup(null);
           };

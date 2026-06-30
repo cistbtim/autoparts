@@ -721,7 +721,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       part_requests:            [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setPartRequests(Array.isArray(d)?d:[])],
       vehicle_requests:         [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setVehicleRequests(Array.isArray(d)?d:[])],
       branch_stock_requests:    [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`or=(requesting_branch_id.eq.${user.branch_id},supplying_branch_id.eq.${user.branch_id})&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setBranchStockRequests(Array.isArray(d)?d:[])],
-      ws_shop_requests:         [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&status=in.(pending,escalated,main_replied)&select=*&order=created_at.desc`:`status=in.(escalated,main_replied,ordered)&select=*&order=created_at.desc`, d=>setWsShopRequests(Array.isArray(d)?d:[])],
+      ws_shop_requests:         [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&status=in.(pending,escalated,main_replied,ordered)&select=*&order=created_at.desc`:`status=in.(escalated,main_replied,ordered)&select=*&order=created_at.desc`, d=>setWsShopRequests(Array.isArray(d)?d:[])],
       branch_stock:             [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*`:"select=*", d=>setBranchStock(Array.isArray(d)?d:[])],
       workshop_jobs:            [`select=*&order=date_in.desc${wsF}`,                d=>setWorkshopJobs(Array.isArray(d)?d:[])],
       workshop_job_items:       [`select=*${wsF}`,                                   d=>setWorkshopJobItems(Array.isArray(d)?d:[])],
@@ -799,7 +799,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
       api.get("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
-      api.get("ws_shop_requests",role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user?.branch_id?`branch_id=eq.${user.branch_id}&status=in.(pending,escalated,main_replied)&select=*&order=created_at.desc`:`status=in.(escalated,main_replied,ordered)&select=*&order=created_at.desc`).catch(()=>[]),
+      api.get("ws_shop_requests",role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user?.branch_id?`branch_id=eq.${user.branch_id}&status=in.(pending,escalated,main_replied,ordered)&select=*&order=created_at.desc`:`status=in.(escalated,main_replied,ordered)&select=*&order=created_at.desc`).catch(()=>[]),
     ]);
     setWsSqReplies(Array.isArray(sqReps)?sqReps:[]);
     setWsPurchaseOrders(Array.isArray(wsPOs)?wsPOs:[]);

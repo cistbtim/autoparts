@@ -8609,10 +8609,21 @@ function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], onReply,
   const [chosenSupplier, setChosenSupplier] = useState(null);
   const [showSupplier, setShowSupplier] = useState(false);
   const [supplierSearch, setSupplierSearch] = useState("");
-  const [addingPhone, setAddingPhone] = useState(null); // supplier id being edited
+  const [addingPhone, setAddingPhone] = useState(null);
   const [addPhoneVal, setAddPhoneVal] = useState("");
   const [addPhoneSaving, setAddPhoneSaving] = useState(false);
   const [localSuppliers, setLocalSuppliers] = useState(suppliers);
+  const [partSupLinks, setPartSupLinks] = useState([]); // part_suppliers rows for linked parts
+
+  // Fetch supplier part numbers when supplier panel opens
+  useEffect(()=>{
+    if(!showSupplier) return;
+    const partIds=[...new Set(existingReply.map(r=>r.part_id).filter(Boolean))];
+    if(!partIds.length) return;
+    api.get("part_suppliers",`part_id=in.(${partIds.join(",")})&select=part_id,supplier_id,supplier_part_no`)
+      .then(d=>setPartSupLinks(Array.isArray(d)?d:[]))
+      .catch(()=>{});
+  },[showSupplier]);
 
   // Escalation state (spare shop → main stock)
   const [showEscalate, setShowEscalate] = useState(false);
@@ -8804,8 +8815,17 @@ function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], onReply,
         const dispatchMsg=`✅ *Dispatched — ${settings.shop_name||"Spare Shop"}*\n\n🚗 ${req.job_car||"—"}\n\n*Parts dispatching now:*\n`+
           reqItems.map((item,i)=>{const r=existingReply[i]||{};return `• ${r.part_name||item.description}${item.sku?` [${item.sku}]`:""} ×${item.qty||1}${r.price?` @ ${Cs}${r.price}`:""}`}).join("\n")+
           `\n\nParts are on their way — please confirm receipt. 🚚`;
+        const getSupPartNo=(partId)=>{
+          if(!chosenSupplier||!partId) return null;
+          return partSupLinks.find(ps=>ps.part_id===partId&&ps.supplier_id===chosenSupplier.id)?.supplier_part_no||null;
+        };
         const supplierMsg=`🛒 *Purchase Order — ${settings.shop_name||"Spare Shop"}*\n\nKindly supply the following:\n\n`+
-          reqItems.map((item,i)=>{const r=existingReply[i]||{};return `• ${r.part_name||item.description}${item.sku?` [${item.sku}]`:""} ×${item.qty||1}`}).join("\n")+
+          reqItems.map((item,i)=>{
+            const r=existingReply[i]||{};
+            const supPn=getSupPartNo(r.part_id);
+            const ref=supPn?`[Ref: ${supPn}]`:item.sku?`[SKU: ${item.sku}]`:"";
+            return `• ${r.part_name||item.description}${ref?` ${ref}`:""} ×${item.qty||1}`;
+          }).join("\n")+
           `\n\nVehicle: ${req.job_car||"—"}\n\nPlease confirm price & availability.`;
         const supPhone=(chosenSupplier?.phone||"").replace(/\D/g,"");
         const workshopPhone=(req.workshop_phone||"").replace(/\D/g,"");
@@ -8821,7 +8841,10 @@ function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], onReply,
                     {r.part_photo&&<img src={toImgUrl(r.part_photo)} alt="" style={{width:40,height:40,objectFit:"cover",borderRadius:6,flexShrink:0,border:"1px solid var(--border)"}}/>}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:600,fontSize:13}}>{r.part_name||item.description}</div>
-                      {item.sku&&<code style={{fontSize:10,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{item.sku}</code>}
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:2}}>
+                        {item.sku&&<code style={{fontSize:10,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{item.sku}</code>}
+                        {(()=>{const spn=getSupPartNo(r.part_id);return spn?<code style={{fontSize:10,color:"#f59e0b",fontFamily:"DM Mono,monospace",background:"rgba(245,158,11,.1)",padding:"1px 4px",borderRadius:3}}>Sup: {spn}</code>:null;})()}
+                      </div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
                       <div style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:15,color:"var(--accent)"}}>{r.price?`${Cs}${r.price}`:"—"}</div>

@@ -1243,6 +1243,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     const chk=(r,label)=>{ if(r&&!Array.isArray(r)&&r.message){ throw new Error(`${label}: ${r.message}`); } return r; };
     try {
       let d={...data};
+      // If customer_id is set but the customer no longer exists locally, clear it so it gets re-created below
+      if(d.workshop_customer_id && !workshopCustomers.some(c=>c.id===d.workshop_customer_id)){
+        d.workshop_customer_id=null;
+      }
       // Auto-create workshop_customer if not linked yet — dedup by name first
       if(!d.workshop_customer_id && d.customer_name?.trim()){
         const nameNorm=d.customer_name.trim().toLowerCase();

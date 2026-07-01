@@ -7143,8 +7143,8 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
             </div>
           )}
           {/* hidden OCR file inputs */}
-          <input ref={plateOcrRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>handleOcrFile(e,"plate")}/>
-          <input ref={vinOcrRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>handleOcrFile(e,"vin")}/>
+          <input ref={plateOcrRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleOcrFile(e,"plate")}/>
+          <input ref={vinOcrRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleOcrFile(e,"vin")}/>
           {/* Mileage + Date In — critical at top */}
           <FG>
             <div>

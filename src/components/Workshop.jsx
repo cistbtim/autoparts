@@ -6931,7 +6931,7 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
     ctx.strokeRect(x,y,w,h);
   },[sel]);
 
-  // Scale up 3x + grayscale + contrast + binarize for better Tesseract accuracy
+  // Scale 3x + grayscale + auto-invert + binarize for Tesseract
   const enhance=(srcCanvas)=>{
     const scale=3;
     const dst=document.createElement("canvas");
@@ -6940,16 +6940,16 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
     ctx.drawImage(srcCanvas,0,0,dst.width,dst.height);
     const id=ctx.getImageData(0,0,dst.width,dst.height);
     const d=id.data;
-    // Compute mean luminance for adaptive threshold
+    // Compute mean luminance
     let sum=0;
     for(let i=0;i<d.length;i+=4) sum+=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
     const mean=sum/(d.length/4);
-    const thresh=Math.min(Math.max(mean,80),180);
+    // Dark-background plates (green, black) have mean < 128 — invert so text ends up dark
+    const invert=mean<128;
     for(let i=0;i<d.length;i+=4){
-      const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
-      // Binarize: dark text on light background → pure black/white
-      const b=g<thresh?0:255;
-      d[i]=d[i+1]=d[i+2]=b;
+      let g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+      if(invert) g=255-g;
+      d[i]=d[i+1]=d[i+2]=g<128?0:255;
     }
     ctx.putImageData(id,0,0);
     return dst;

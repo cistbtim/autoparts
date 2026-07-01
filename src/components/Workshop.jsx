@@ -14,6 +14,7 @@ import { WsTransferPage } from "./ws/Transfer.jsx";
 import { WsDocumentsPage } from "./ws/Documents.jsx";
 import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote } from "./ws/Print.jsx";
 import { BookInModal } from "./ws/BookIn.jsx";
+import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 import { WsCustomersPage, WsCustomerForm, WsVehicleForm, LicenceRenewalModal, WsLicenceRenewalsPage } from "./ws/Customers.jsx";
 import { WsSupplierInvoicesPage, WsSupInvoiceModal, WsSupInvoiceViewModal, WsSupPaymentModal, WsSupReturnModal } from "./ws/SupplierInvoices.jsx";
 import { WsCreatePoFromJobModal, WsPurchaseOrdersPage, WsPurchaseOrderModal, WsReceiveGoodsModal } from "./ws/PurchaseOrders.jsx";
@@ -6856,6 +6857,31 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
   const [returnReason,setReturnReason]=useState("");
   const [returnMode,setReturnMode]=useState("new");
   const [reopenJobId,setReopenJobId]=useState(null);
+  const [scanLoading,setScanLoading]=useState(false);
+  const [scanError,setScanError]=useState(null);
+  const scanInputRef=useRef(null);
+
+  const handleScanFile=async(e)=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    e.target.value="";
+    setScanLoading(true); setScanError(null);
+    try{
+      const dataUrl=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
+      const raw=await decodePDF417fromImage(dataUrl);
+      const p=parseLicenceDisc(raw);
+      if(p.reg) s("vehicle_reg",p.reg.replace(/\s/g,"").toUpperCase());
+      if(p.vin) s("vin",p.vin.toUpperCase());
+      if(p.engine_no) s("engine_no",p.engine_no.toUpperCase());
+      if(p.make) s("vehicle_make",p.make);
+      if(p.model) s("vehicle_model",p.model);
+      if(p.color) s("vehicle_color",p.color);
+      if(p.expiry_date) s("licence_disc_expiry",p.expiry_date);
+      setTab("vehicle");
+    }catch(ex){
+      setScanError("Could not read disc — try a clearer photo. ("+ex.message+")");
+    }
+    setScanLoading(false);
+  };
 
   const photoCount=[f.photo_front,f.photo_rear,f.photo_side].filter(Boolean).length;
   const canTakePhotos=!!(f.customer_name.trim()&&f.vehicle_reg.trim()&&f.mileage&&f.complaint.trim());
@@ -7031,6 +7057,15 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
               ))}
             </div>
           )}
+          {/* Licence disc scan */}
+          <div style={{marginBottom:12}}>
+            <input ref={scanInputRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleScanFile}/>
+            <button className="btn btn-ghost" style={{width:"100%",padding:"10px 0",border:"2px dashed var(--border)",borderRadius:10,fontSize:13,fontWeight:600,color:"var(--text2)",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
+              onClick={()=>scanInputRef.current?.click()} disabled={scanLoading}>
+              {scanLoading?"⏳ Scanning...":"📷 Scan Licence Disc → Auto-fill fields"}
+            </button>
+            {scanError&&<div style={{marginTop:6,fontSize:12,color:"var(--red)",padding:"6px 10px",background:"rgba(248,113,113,.08)",borderRadius:8}}>{scanError}</div>}
+          </div>
           {/* Mileage + Date In — critical at top */}
           <FG>
             <div>

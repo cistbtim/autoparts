@@ -529,6 +529,7 @@ export function QuoteConfirmPage({token}) {
   const [job,setJob]=useState(null);
   const [items,setItems]=useState([]);
   const [shopSettings,setShopSettings]=useState({});
+  const [wsProfile,setWsProfile]=useState({});
   const [loading,setLoading]=useState(true);
   const [note,setNote]=useState("");
   const [done,setDone]=useState(null); // null | "confirmed" | "declined"
@@ -546,12 +547,14 @@ export function QuoteConfirmPage({token}) {
       if(q){
         setQuote(q);
         if(q.confirm_status==="confirmed"||q.confirm_status==="declined") setDone(q.confirm_status);
-        const [ji,jj]=await Promise.all([
+        const [ji,jj,wp]=await Promise.all([
           api.get("workshop_job_items",`job_id=eq.${q.job_id}&select=*`).catch(()=>[]),
           api.get("workshop_jobs",`id=eq.${q.job_id}&select=*`).catch(()=>[]),
+          q.workshop_id?api.get("workshop_profiles",`id=eq.${q.workshop_id}&select=*`).catch(()=>[]):Promise.resolve([]),
         ]);
         setItems(Array.isArray(ji)?ji:[]);
         if(Array.isArray(jj)&&jj[0]) setJob(jj[0]);
+        if(Array.isArray(wp)&&wp[0]) setWsProfile(wp[0]);
       }
       setShopSettings(shopSett);
       // Load shop language translation pack
@@ -579,15 +582,21 @@ export function QuoteConfirmPage({token}) {
 
   const sym=curSym(shopSettings.currency||"R");
   const fmt=v=>`${sym} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-  const shopName=shopSettings.shop_name||"Auto Workshop";
+  // Use workshop profile info if available, fall back to main shop settings
+  const bizName=wsProfile.name||shopSettings.shop_name||"Auto Workshop";
+  const bizPhone=wsProfile.phone||wsProfile.whatsapp||shopSettings.phone||"";
+  const bizEmail=wsProfile.email||shopSettings.email||"";
+  const bizAddress=wsProfile.address||shopSettings.address||"";
+  const bizVat=wsProfile.vat_number||shopSettings.vat_number||"";
+  const bizLogo=wsProfile.logo_url||shopSettings.logo_data||shopSettings.logo_url||"";
 
   const downloadPdf=()=>{
     if(!quote) return;
     const subtotal=items.reduce((s,i)=>s+(+i.total||0),0);
-    const taxRate=shopSettings.vat_number?(shopSettings.tax_rate||0):0;
+    const taxRate=bizVat?(shopSettings.tax_rate||0):0;
     const taxAmt=subtotal*taxRate/100;
     const total=subtotal+taxAmt;
-    const logoSrc=shopSettings.logo_data||shopSettings.logo_url||"";
+    const logoSrc=bizLogo;
     const logoHtml=logoSrc?`<img src="${logoSrc}" style="max-height:60px;max-width:180px;object-fit:contain;display:block;margin-bottom:8px"/>`:"";
     const rowsHtml=items.map((it,i)=>`
       <tr style="background:${i%2===0?"#fff":"#f9f9f9"}">
@@ -629,12 +638,12 @@ export function QuoteConfirmPage({token}) {
   @media print{body{padding:18px}}
 </style></head><body>
 <div class="hdr">
-  <div>${logoHtml}<div class="shop">${shopName}</div>
+  <div>${logoHtml}<div class="shop">${bizName}</div>
     <div class="shop-info">
-      ${shopSettings.phone?`📞 ${shopSettings.phone}<br/>`:""}
-      ${shopSettings.email?`✉️ ${shopSettings.email}<br/>`:""}
-      ${shopSettings.address?`📍 ${shopSettings.address}<br/>`:""}
-      ${shopSettings.vat_number?`VAT Reg No: <strong>${shopSettings.vat_number}</strong>`:""}
+      ${bizPhone?`📞 ${bizPhone}<br/>`:""}
+      ${bizEmail?`✉️ ${bizEmail}<br/>`:""}
+      ${bizAddress?`📍 ${bizAddress}<br/>`:""}
+      ${bizVat?`VAT Reg No: <strong>${bizVat}</strong>`:""}
     </div>
   </div>
   <div class="qblock">
@@ -681,7 +690,7 @@ export function QuoteConfirmPage({token}) {
 </div>
 ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote.notes}</div>`:""}
 <div class="footer">
-  ${shopName}${shopSettings.phone?` · 📞 ${shopSettings.phone}`:""}${shopSettings.email?` · ✉️ ${shopSettings.email}`:""}
+  ${bizName}${bizPhone?` · 📞 ${bizPhone}`:""}${bizEmail?` · ✉️ ${bizEmail}`:""}
 </div>
 </body></html>`;
     const w=window.open("","_blank");
@@ -713,7 +722,7 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
         {/* Header */}
         <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{fontSize:28,marginBottom:6}}>🔧</div>
-          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:24,fontWeight:700,color:"var(--accent)"}}>{shopName}</div>
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:24,fontWeight:700,color:"var(--accent)"}}>{bizName}</div>
           <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>{t.wsqApprovalTitle}</div>
         </div>
 
@@ -727,8 +736,8 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
               {done==="confirmed"?t.wsqApprovedMsg:t.wsqDeclinedMsg}
             </div>
             <div style={{marginTop:16,fontSize:13,color:"var(--text3)"}}>
-              {shopSettings.phone&&<div>📞 {shopSettings.phone}</div>}
-              {shopSettings.email&&<div>✉️ {shopSettings.email}</div>}
+              {bizPhone&&<div>📞 {bizPhone}</div>}
+              {bizEmail&&<div>✉️ {bizEmail}</div>}
             </div>
           </div>
         ):(
@@ -810,9 +819,9 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
             {/* Workshop contact */}
             <div style={{textAlign:"center",color:"var(--text3)",fontSize:12}}>
               <div style={{marginBottom:4}}>{t.wsqContact}</div>
-              {shopSettings.phone&&<div>📞 {shopSettings.phone}</div>}
-              {shopSettings.email&&<div>✉️ {shopSettings.email}</div>}
-              {shopSettings.address&&<div>📍 {shopSettings.address}</div>}
+              {bizPhone&&<div>📞 {bizPhone}</div>}
+              {bizEmail&&<div>✉️ {bizEmail}</div>}
+              {bizAddress&&<div>📍 {bizAddress}</div>}
             </div>
           </>
         )}

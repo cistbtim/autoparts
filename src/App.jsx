@@ -1449,7 +1449,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       ws_phone:workshopProfile.phone||workshopProfile.whatsapp||"",
       ws_email:workshopProfile.email||"",
       ws_address:workshopProfile.address||"",
-      ws_logo_url:workshopProfile.logo_url||"",
+      ws_logo_url:workshopProfile.logo_url||workshopProfile.logo_data||"",
       ws_vat:workshopProfile.vat_number||"",
     });
     await refreshWorkshopData();

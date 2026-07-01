@@ -819,10 +819,10 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
             </div>
 
             {/* Read & agree checkbox */}
-            <label style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px",marginBottom:14,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",borderRadius:12,cursor:"pointer"}}>
+            <label style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 18px",marginBottom:14,background:"#fffbeb",border:"2px solid #f59e0b",borderRadius:12,cursor:"pointer"}}>
               <input type="checkbox" checked={agreed} onChange={e=>setAgreed(e.target.checked)}
-                style={{width:20,height:20,marginTop:2,accentColor:"#f97316",flexShrink:0,cursor:"pointer"}}/>
-              <span style={{fontSize:14,color:"var(--text)",lineHeight:1.5}}>
+                style={{width:22,height:22,marginTop:2,accentColor:"#f97316",flexShrink:0,cursor:"pointer"}}/>
+              <span style={{fontSize:15,fontWeight:600,color:"#1a1a1a",lineHeight:1.5}}>
                 I have read and understood the quotation and agree to the terms stated above.
               </span>
             </label>

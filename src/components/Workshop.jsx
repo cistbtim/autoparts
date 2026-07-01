@@ -6832,6 +6832,7 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
   const [sel,setSel]=useState(null);
   const [scanning,setScanning]=useState(false);
   const [err,setErr]=useState(null);
+  const [ocrResult,setOcrResult]=useState(null); // editable result after scan
 
   useEffect(()=>{
     const canvas=canvasRef.current; if(!canvas) return;
@@ -6847,6 +6848,24 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
     ctx.setLineDash([8,4]);
     ctx.strokeRect(x,y,w,h);
   },[sel]);
+
+  // Scale up 3x + grayscale + 2x contrast for better Tesseract accuracy
+  const enhance=(srcCanvas)=>{
+    const scale=3;
+    const dst=document.createElement("canvas");
+    dst.width=srcCanvas.width*scale; dst.height=srcCanvas.height*scale;
+    const ctx=dst.getContext("2d");
+    ctx.drawImage(srcCanvas,0,0,dst.width,dst.height);
+    const id=ctx.getImageData(0,0,dst.width,dst.height);
+    const d=id.data;
+    for(let i=0;i<d.length;i+=4){
+      const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+      const c=Math.max(0,Math.min(255,128+(g-128)*2.2));
+      d[i]=d[i+1]=d[i+2]=c;
+    }
+    ctx.putImageData(id,0,0);
+    return dst;
+  };
 
   const getXY=(e)=>{
     const rect=canvasRef.current.getBoundingClientRect();
@@ -6875,10 +6894,13 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
       const el=new Image(); el.src=imgSrc;
       await new Promise(r=>{el.onload=r; if(el.complete)r();});
       crop.getContext("2d").drawImage(el,x,y,w,h,0,0,w,h);
-      const croppedUrl=crop.toDataURL("image/jpeg",0.95);
+      const enhanced=enhance(crop);
       const worker=await createWorker("eng");
-      if(field==="vin") await worker.setParameters({tessedit_char_whitelist:"0123456789ABCDEFGHJKLMNPRSTUVWXYZ"});
-      const {data:{text}}=await worker.recognize(croppedUrl);
+      await worker.setParameters({
+        tessedit_pageseg_mode:"7",
+        tessedit_char_whitelist:field==="vin"?"0123456789ABCDEFGHJKLMNPRSTUVWXYZ":"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+      });
+      const {data:{text}}=await worker.recognize(enhanced.toDataURL("image/png"));
       await worker.terminate();
       let result="";
       if(field==="plate"){
@@ -6888,13 +6910,16 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
         const m=c.match(/[A-HJ-NPR-Z0-9]{17}/i);
         result=m?m[0]:c.slice(0,17);
       }
-      if(!result) throw new Error("No text found in selection — try again");
-      onResult(result);
-    }catch(ex){ setErr(ex.message); setScanning(false); }
+      if(!result) throw new Error("No text found — try a tighter selection");
+      setOcrResult(result);
+    }catch(ex){ setErr(ex.message); }
+    setScanning(false);
   };
 
+  const btnBase={padding:"13px 0",borderRadius:10,fontSize:14,cursor:"pointer"};
+
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 10px"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 10px",overflowY:"auto"}}>
       <div style={{width:"100%",maxWidth:600}}>
         <div style={{color:"#fff",fontWeight:700,fontSize:15,marginBottom:10,textAlign:"center"}}>
           {field==="plate"?"🚗 Drag over the number plate":"🔢 Drag over the VIN number"}
@@ -6907,14 +6932,33 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
             onTouchStart={onPD} onTouchMove={onPM} onTouchEnd={onPU}/>
         </div>
         {err&&<div style={{marginTop:8,color:"#f87171",fontSize:13,textAlign:"center",padding:"6px 10px",background:"rgba(248,113,113,.1)",borderRadius:8}}>{err}</div>}
-        <div style={{display:"flex",gap:10,marginTop:14}}>
-          <button style={{flex:1,padding:"13px 0",borderRadius:10,border:"1px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:14,cursor:"pointer"}}
-            onClick={onClose}>✕ Cancel</button>
-          <button style={{flex:2,padding:"13px 0",borderRadius:10,border:"none",background:sel?"#f97316":"rgba(249,115,22,.35)",color:"#fff",fontSize:15,fontWeight:700,cursor:sel?"pointer":"not-allowed"}}
-            disabled={!sel||scanning} onClick={doScan}>
-            {scanning?"⏳ Reading...":"📷 Read Text"}
-          </button>
-        </div>
+
+        {ocrResult!==null?(
+          <div style={{marginTop:14}}>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.55)",marginBottom:8,textAlign:"center"}}>
+              Result — tap to correct if needed
+            </div>
+            <input value={ocrResult} onChange={e=>setOcrResult(e.target.value.toUpperCase())}
+              style={{width:"100%",padding:"12px 16px",fontSize:24,fontWeight:700,fontFamily:"DM Mono,monospace",
+                textAlign:"center",background:"rgba(255,255,255,.1)",border:"2px solid #f97316",
+                borderRadius:10,color:"#fff",letterSpacing:3,boxSizing:"border-box"}}/>
+            <div style={{display:"flex",gap:10,marginTop:10}}>
+              <button style={{...btnBase,flex:1,border:"1px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",color:"#fff"}}
+                onClick={()=>{setOcrResult(null);setSel(null);setErr(null);}}>🔄 Re-scan</button>
+              <button style={{...btnBase,flex:2,border:"none",background:"#f97316",color:"#fff",fontWeight:700,fontSize:16}}
+                onClick={()=>onResult(ocrResult)} disabled={!ocrResult.trim()}>✅ Use This</button>
+            </div>
+          </div>
+        ):(
+          <div style={{display:"flex",gap:10,marginTop:14}}>
+            <button style={{...btnBase,flex:1,border:"1px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",color:"#fff"}}
+              onClick={onClose}>✕ Cancel</button>
+            <button style={{...btnBase,flex:2,border:"none",background:sel?"#f97316":"rgba(249,115,22,.35)",color:"#fff",fontWeight:700,fontSize:15,cursor:sel?"pointer":"not-allowed"}}
+              disabled={!sel||scanning} onClick={doScan}>
+              {scanning?"⏳ Reading...":"📷 Read Text"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

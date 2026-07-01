@@ -7052,6 +7052,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
   }
 
   return (
+    <>
     <Overlay onClose={onClose} wide>
       <MHead title={f.id?"✏️ Edit Job Card":"🔧 New Job Card"} onClose={onClose}/>
       <div className="tabs" style={{marginBottom:18}}>
@@ -7295,6 +7296,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
         onResult={(text)=>{ if(ocrField==="plate") s("vehicle_reg",text); else s("vin",text); setOcrCropImg(null); setOcrField(null); }}
         onClose={()=>{ setOcrCropImg(null); setOcrField(null); }}/>
     )}
+    </>
   );
 }
 

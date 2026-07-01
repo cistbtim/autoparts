@@ -924,6 +924,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                       onClick={()=>setKanbanAssignEdit({jobId:job.id,draft:job.assigned_to||""})}>👤</button>
                     <button title="Print job sheet" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11}}
                       onClick={()=>printJobSheet(job)}>🖨️</button>
+                    {wsRole==="main"&&!wsLocked&&<button title="Delete job" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--red)"}}
+                      onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob(job.id);}}>🗑</button>}
                   </div>
 
                   {/* status action buttons */}

@@ -24,7 +24,7 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
   const [reopenJobId,setReopenJobId]=useState(null);
   // VIN model cache
   const [vinCacheResult,setVinCacheResult]=useState(null); // null | {vin_prefix,make,model}
-  const [vinPickLoading,setVinPickLoading]=useState(false);
+  const [vinPickLoading]=useState(false);
   const [vinPickSearch,setVinPickSearch]=useState("");
   const [vinPickSelected,setVinPickSelected]=useState(null);
   const [vinPickLightbox,setVinPickLightbox]=useState(null);
@@ -188,19 +188,6 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
     }
     if(openJobs.length>0&&decision==="new"&&!returnReason.trim()){
       alert("Return reason required when vehicle has open jobs");return;
-    }
-    // If no existing vehicle record but we have a VIN, check global model cache
-    if(!foundVehicle&&scanResult?.vin&&scanResult.vin.length>=12){
-      setVinPickLoading(true);
-      setVinCacheResult(null);
-      try{
-        const prefix=scanResult.vin.slice(0,12).toUpperCase();
-        const cached=await api.get("ws_vin_model_cache",`vin_prefix=eq.${prefix}`);
-        setVinCacheResult(Array.isArray(cached)&&cached[0]?cached[0]:null);
-      }catch{ setVinCacheResult(null); }
-      setVinPickLoading(false);
-      setStep("vinpick");
-      return;
     }
     proceedToJob();
   };

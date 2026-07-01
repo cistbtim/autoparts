@@ -6931,7 +6931,7 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
     ctx.strokeRect(x,y,w,h);
   },[sel]);
 
-  // Scale 3x + grayscale + auto-invert + binarize for Tesseract
+  // Scale 3x + Otsu binarization + auto-invert for Tesseract
   const enhance=(srcCanvas)=>{
     const scale=3;
     const dst=document.createElement("canvas");
@@ -6940,16 +6940,36 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
     ctx.drawImage(srcCanvas,0,0,dst.width,dst.height);
     const id=ctx.getImageData(0,0,dst.width,dst.height);
     const d=id.data;
-    // Compute mean luminance
-    let sum=0;
-    for(let i=0;i<d.length;i+=4) sum+=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
-    const mean=sum/(d.length/4);
-    // Dark-background plates (green, black) have mean < 128 — invert so text ends up dark
-    const invert=mean<128;
-    for(let i=0;i<d.length;i+=4){
-      let g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
-      if(invert) g=255-g;
-      d[i]=d[i+1]=d[i+2]=g<128?0:255;
+    const n=d.length/4;
+    // Build grayscale values + luminance histogram
+    const grays=new Float32Array(n);
+    const hist=new Int32Array(256);
+    for(let i=0;i<n;i++){
+      const j=i*4;
+      const g=0.299*d[j]+0.587*d[j+1]+0.114*d[j+2];
+      grays[i]=g; hist[Math.round(g)]++;
+    }
+    // Otsu: find threshold that maximises between-class variance
+    let sum=0; for(let i=0;i<256;i++) sum+=i*hist[i];
+    let sumB=0,wB=0,maxVar=0,thresh=128;
+    for(let i=0;i<256;i++){
+      wB+=hist[i]; if(!wB) continue;
+      const wF=n-wB; if(!wF) break;
+      sumB+=i*hist[i];
+      const mB=sumB/wB, mF=(sum-sumB)/wF;
+      const v=wB*wF*(mB-mF)*(mB-mF);
+      if(v>maxVar){maxVar=v;thresh=i;}
+    }
+    // Binarize and count dark pixels
+    let dark=0;
+    for(let i=0;i<n;i++){
+      const b=grays[i]<thresh?0:255;
+      if(b===0) dark++;
+      const j=i*4; d[j]=d[j+1]=d[j+2]=b; d[j+3]=255;
+    }
+    // If >55% dark, image is inverted (light text on dark bg) — flip it
+    if(dark/n>0.55){
+      for(let i=0;i<d.length;i+=4) d[i]=d[i+1]=d[i+2]=255-d[i];
     }
     ctx.putImageData(id,0,0);
     return dst;

@@ -547,14 +547,24 @@ export function QuoteConfirmPage({token}) {
       if(q){
         setQuote(q);
         if(q.confirm_status==="confirmed"||q.confirm_status==="declined") setDone(q.confirm_status);
-        const [ji,jj]=await Promise.all([
+        const [ji,jj,wp]=await Promise.all([
           api.get("workshop_job_items",`job_id=eq.${q.job_id}&select=*`).catch(()=>[]),
           api.get("workshop_jobs",`id=eq.${q.job_id}&select=*`).catch(()=>[]),
+          // Try to fetch workshop profile for logo — may be blocked by RLS, that's fine
+          q.workshop_id?api.get("workshop_profiles",`id=eq.${q.workshop_id}&select=name,phone,whatsapp,email,address,logo_url,logo_data,vat_number`).catch(()=>[]):Promise.resolve([]),
         ]);
         setItems(Array.isArray(ji)?ji:[]);
         if(Array.isArray(jj)&&jj[0]) setJob(jj[0]);
-        // Workshop info is denormalized into the quote on send — no separate profile fetch needed
-        if(q.ws_name) setWsProfile({name:q.ws_name,phone:q.ws_phone||"",email:q.ws_email||"",address:q.ws_address||"",logo_url:q.ws_logo_url||"",vat_number:q.ws_vat||""});
+        // Build workshop info: denormalized quote fields for text, profile fetch for logo
+        const prof=Array.isArray(wp)&&wp[0]?wp[0]:null;
+        setWsProfile({
+          name:     q.ws_name||prof?.name||"",
+          phone:    q.ws_phone||prof?.phone||prof?.whatsapp||"",
+          email:    q.ws_email||prof?.email||"",
+          address:  q.ws_address||prof?.address||"",
+          logo_url: prof?.logo_url||prof?.logo_data||q.ws_logo_url||"",
+          vat_number: q.ws_vat||prof?.vat_number||"",
+        });
       }
       setShopSettings(shopSett);
       // Load shop language translation pack
@@ -588,7 +598,8 @@ export function QuoteConfirmPage({token}) {
   const bizEmail=wsProfile.email||shopSettings.email||"";
   const bizAddress=wsProfile.address||shopSettings.address||"";
   const bizVat=wsProfile.vat_number||shopSettings.vat_number||"";
-  const bizLogo=wsProfile.logo_url||shopSettings.logo_data||shopSettings.logo_url||"";
+  // Only fall back to main shop logo if we have NO workshop info at all
+  const bizLogo=wsProfile.logo_url||(wsProfile.name?"":shopSettings.logo_data||shopSettings.logo_url||"");
 
   const downloadPdf=()=>{
     if(!quote) return;

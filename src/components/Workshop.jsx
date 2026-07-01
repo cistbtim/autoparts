@@ -6839,14 +6839,33 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
   const [memData,setMemData]=useState({});
   const [zoom,setZoom]=useState(1);
   const [panMode,setPanMode]=useState(false);
+  const [rotation,setRotation]=useState(0);
+  const [rotatedSrc,setRotatedSrc]=useState(imgSrc);
 
-  // Resize canvas to match image after zoom change
+  // Redraw image at current rotation angle
+  useEffect(()=>{
+    if(rotation===0){setRotatedSrc(imgSrc);return;}
+    const img=new Image();
+    img.onload=()=>{
+      const rad=rotation*Math.PI/180;
+      const cos=Math.abs(Math.cos(rad)), sin=Math.abs(Math.sin(rad));
+      const w=img.width*cos+img.height*sin, h=img.width*sin+img.height*cos;
+      const c=document.createElement("canvas"); c.width=w; c.height=h;
+      const ctx=c.getContext("2d");
+      ctx.translate(w/2,h/2); ctx.rotate(rad);
+      ctx.drawImage(img,-img.width/2,-img.height/2);
+      setRotatedSrc(c.toDataURL("image/jpeg",.95));
+    };
+    img.src=imgSrc;
+  },[rotation,imgSrc]);
+
+  // Resize canvas to match image after zoom or rotation change
   useEffect(()=>{
     requestAnimationFrame(()=>{
       const img=imgRef.current, c=canvasRef.current;
       if(img&&c&&img.complete&&img.naturalWidth){c.width=img.offsetWidth;c.height=img.offsetHeight;setSel(null);}
     });
-  },[zoom]);
+  },[zoom,rotatedSrc]);
 
   // ── Correction memory (Supabase) ──────────────────────────────
   useEffect(()=>{
@@ -6952,7 +6971,7 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
       if(w<20||h<8) throw new Error("Selection too small — drag a bigger box");
       const crop=document.createElement("canvas");
       crop.width=w; crop.height=h;
-      const el=new Image(); el.src=imgSrc;
+      const el=new Image(); el.src=rotatedSrc;
       await new Promise(r=>{el.onload=r; if(el.complete)r();});
       crop.getContext("2d").drawImage(el,x,y,w,h,0,0,w,h);
       const enhanced=enhance(crop);
@@ -6989,6 +7008,19 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
         <div style={{color:"#fff",fontWeight:700,fontSize:15,marginBottom:10,textAlign:"center"}}>
           {field==="plate"?"🚗 Drag over the number plate":"🔢 Drag over the VIN number"}
         </div>
+        {/* Rotation toolbar */}
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+          <button onClick={()=>setRotation(r=>r-90)} title="-90°"
+            style={{width:32,height:32,borderRadius:8,border:"1px solid rgba(255,255,255,.25)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:15,cursor:"pointer"}}>↺</button>
+          <input type="range" min={-45} max={45} step={1} value={rotation}
+            onChange={e=>setRotation(+e.target.value)}
+            style={{flex:1,accentColor:"#f97316",height:4,cursor:"pointer"}}/>
+          <button onClick={()=>setRotation(r=>r+90)} title="+90°"
+            style={{width:32,height:32,borderRadius:8,border:"1px solid rgba(255,255,255,.25)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:15,cursor:"pointer"}}>↻</button>
+          <button onClick={()=>setRotation(0)}
+            style={{minWidth:46,height:32,borderRadius:8,border:`1px solid ${rotation!==0?"rgba(249,115,22,.5)":"rgba(255,255,255,.15)"}`,background:rotation!==0?"rgba(249,115,22,.15)":"rgba(255,255,255,.06)",color:rotation!==0?"#f97316":"rgba(255,255,255,.5)",fontSize:11,cursor:"pointer"}}>
+            {rotation!==0?`${rotation}°`:"0°"}</button>
+        </div>
         {/* Zoom toolbar */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:8}}>
           <button onClick={()=>setZoom(z=>Math.max(.5,+(z-.25).toFixed(2)))}
@@ -7008,7 +7040,7 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
         {/* Scrollable image + canvas */}
         <div style={{overflow:"auto",borderRadius:8,WebkitOverflowScrolling:"touch"}}>
           <div style={{position:"relative",userSelect:"none",width:`${zoom*100}%`}}>
-            <img ref={imgRef} src={imgSrc} alt="" draggable={false} style={{width:"100%",display:"block",borderRadius:8}}
+            <img ref={imgRef} src={rotatedSrc} alt="" draggable={false} style={{width:"100%",display:"block",borderRadius:8}}
               onLoad={e=>{const c=canvasRef.current; if(c){c.width=e.target.offsetWidth;c.height=e.target.offsetHeight;}}}/>
             <canvas ref={canvasRef}
               style={{position:"absolute",inset:0,width:"100%",height:"100%",cursor:panMode?"grab":"crosshair",touchAction:"none",pointerEvents:panMode?"none":"auto"}}

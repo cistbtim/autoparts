@@ -6837,6 +6837,16 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
   const [autoFixes,setAutoFixes]=useState([]);
   const [memSuggestion,setMemSuggestion]=useState("");
   const [memData,setMemData]=useState({});
+  const [zoom,setZoom]=useState(1);
+  const [panMode,setPanMode]=useState(false);
+
+  // Resize canvas to match image after zoom change
+  useEffect(()=>{
+    requestAnimationFrame(()=>{
+      const img=imgRef.current, c=canvasRef.current;
+      if(img&&c&&img.complete&&img.naturalWidth){c.width=img.offsetWidth;c.height=img.offsetHeight;setSel(null);}
+    });
+  },[zoom]);
 
   // ── Correction memory (Supabase) ──────────────────────────────
   useEffect(()=>{
@@ -6979,12 +6989,32 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
         <div style={{color:"#fff",fontWeight:700,fontSize:15,marginBottom:10,textAlign:"center"}}>
           {field==="plate"?"🚗 Drag over the number plate":"🔢 Drag over the VIN number"}
         </div>
-        <div style={{position:"relative",touchAction:"none",userSelect:"none"}}>
-          <img ref={imgRef} src={imgSrc} alt="" draggable={false} style={{width:"100%",display:"block",borderRadius:8}}
-            onLoad={e=>{const c=canvasRef.current; if(c){c.width=e.target.offsetWidth;c.height=e.target.offsetHeight;}}}/>
-          <canvas ref={canvasRef} style={{position:"absolute",inset:0,width:"100%",height:"100%",cursor:"crosshair"}}
-            onMouseDown={onPD} onMouseMove={onPM} onMouseUp={onPU} onMouseLeave={onPU}
-            onTouchStart={onPD} onTouchMove={onPM} onTouchEnd={onPU}/>
+        {/* Zoom toolbar */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:8}}>
+          <button onClick={()=>setZoom(z=>Math.max(.5,+(z-.25).toFixed(2)))}
+            style={{width:32,height:32,borderRadius:8,border:"1px solid rgba(255,255,255,.25)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:18,cursor:"pointer",lineHeight:1}}>−</button>
+          <button onClick={()=>setZoom(1)}
+            style={{minWidth:50,height:32,borderRadius:8,border:"1px solid rgba(255,255,255,.15)",background:"rgba(255,255,255,.06)",color:"rgba(255,255,255,.7)",fontSize:12,cursor:"pointer"}}>
+            {Math.round(zoom*100)}%</button>
+          <button onClick={()=>setZoom(z=>Math.min(4,+(z+.25).toFixed(2)))}
+            style={{width:32,height:32,borderRadius:8,border:"1px solid rgba(255,255,255,.25)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:18,cursor:"pointer",lineHeight:1}}>+</button>
+          {zoom>1&&(
+            <button onClick={()=>setPanMode(p=>!p)}
+              title={panMode?"Switch to draw mode — drag to select area":"Switch to pan mode — scroll the zoomed image"}
+              style={{height:32,padding:"0 10px",borderRadius:8,border:`1px solid ${panMode?"#f97316":"rgba(255,255,255,.25)"}`,background:panMode?"rgba(249,115,22,.2)":"rgba(255,255,255,.06)",color:panMode?"#f97316":"rgba(255,255,255,.6)",fontSize:12,cursor:"pointer"}}>
+              {panMode?"✋ Pan":"✏ Draw"}</button>
+          )}
+        </div>
+        {/* Scrollable image + canvas */}
+        <div style={{overflow:"auto",borderRadius:8,WebkitOverflowScrolling:"touch"}}>
+          <div style={{position:"relative",userSelect:"none",width:`${zoom*100}%`}}>
+            <img ref={imgRef} src={imgSrc} alt="" draggable={false} style={{width:"100%",display:"block",borderRadius:8}}
+              onLoad={e=>{const c=canvasRef.current; if(c){c.width=e.target.offsetWidth;c.height=e.target.offsetHeight;}}}/>
+            <canvas ref={canvasRef}
+              style={{position:"absolute",inset:0,width:"100%",height:"100%",cursor:panMode?"grab":"crosshair",touchAction:"none",pointerEvents:panMode?"none":"auto"}}
+              onMouseDown={onPD} onMouseMove={onPM} onMouseUp={onPU} onMouseLeave={onPU}
+              onTouchStart={onPD} onTouchMove={onPM} onTouchEnd={onPU}/>
+          </div>
         </div>
         {err&&<div style={{marginTop:8,color:"#f87171",fontSize:13,textAlign:"center",padding:"6px 10px",background:"rgba(248,113,113,.1)",borderRadius:8}}>{err}</div>}
 

@@ -6834,7 +6834,8 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
   const [err,setErr]=useState(null);
   const [ocrRaw,setOcrRaw]=useState("");           // raw Tesseract output (before corrections)
   const [ocrResult,setOcrResult]=useState(null);   // editable result after corrections
-  const [autoFixes,setAutoFixes]=useState([]);      // [{from,to,count}] applied automatically
+  const [autoFixes,setAutoFixes]=useState([]);      // [{from,to,count}] memory suggestions
+  const [memSuggestion,setMemSuggestion]=useState(""); // full corrected string suggestion
 
   // ── Correction memory (localStorage) ─────────────────────────
   const loadMem=()=>{try{return JSON.parse(localStorage.getItem("ws_ocr_mem")||"{}");}catch{return{};}};
@@ -6948,8 +6949,9 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
       if(!result) throw new Error("No text found — try a tighter selection");
       setOcrRaw(result);
       const {corrected,fixes}=applyMem(result);
-      setOcrResult(corrected);
-      setAutoFixes(fixes);
+      setOcrResult(result);       // raw OCR in the editable field — user decides
+      if(corrected!==result){ setAutoFixes(fixes); setMemSuggestion(corrected); }
+      else { setAutoFixes([]); setMemSuggestion(""); }
     }catch(ex){ setErr(ex.message); }
     setScanning(false);
   };
@@ -6976,10 +6978,11 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
             <div style={{fontSize:12,color:"rgba(255,255,255,.55)",marginBottom:8,textAlign:"center"}}>
               Result — tap to correct if needed
             </div>
-            {autoFixes.length>0&&(
-              <div style={{fontSize:11,color:"rgba(249,115,22,.85)",marginBottom:6,textAlign:"center"}}>
-                🧠 Auto-corrected: {autoFixes.map(f=>`${f.from}→${f.to}`).join(", ")} (learned from {Math.min(...autoFixes.map(f=>f.count))}× before)
-              </div>
+            {autoFixes.length>0&&memSuggestion&&(
+              <button onClick={()=>{setOcrResult(memSuggestion);setAutoFixes([]);setMemSuggestion("");}}
+                style={{width:"100%",marginBottom:8,padding:"7px 12px",borderRadius:8,border:"1px solid rgba(249,115,22,.5)",background:"rgba(249,115,22,.12)",color:"rgba(249,115,22,1)",fontSize:12,cursor:"pointer",textAlign:"center"}}>
+                🧠 Memory suggests: <strong style={{fontFamily:"DM Mono,monospace",letterSpacing:1}}>{memSuggestion}</strong> ({autoFixes.map(f=>`${f.from}→${f.to}`).join(", ")}, {Math.min(...autoFixes.map(f=>f.count))}× seen) — tap to apply
+              </button>
             )}
             <input value={ocrResult} onChange={e=>setOcrResult(e.target.value.toUpperCase())}
               style={{width:"100%",padding:"12px 16px",fontSize:24,fontWeight:700,fontFamily:"DM Mono,monospace",
@@ -6987,7 +6990,7 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
                 borderRadius:10,color:"#fff",letterSpacing:3,boxSizing:"border-box"}}/>
             <div style={{display:"flex",gap:10,marginTop:10}}>
               <button style={{...btnBase,flex:1,border:"1px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",color:"#fff"}}
-                onClick={()=>{setOcrResult(null);setOcrRaw("");setAutoFixes([]);setSel(null);setErr(null);}}>🔄 Re-scan</button>
+                onClick={()=>{setOcrResult(null);setOcrRaw("");setAutoFixes([]);setMemSuggestion("");setSel(null);setErr(null);}}>🔄 Re-scan</button>
               <button style={{...btnBase,flex:2,border:"none",background:"#f97316",color:"#fff",fontWeight:700,fontSize:16}}
                 onClick={()=>{recordMem(ocrRaw,ocrResult);onResult(ocrResult);}} disabled={!ocrResult.trim()}>✅ Use This</button>
             </div>

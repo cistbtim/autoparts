@@ -14,7 +14,6 @@ import { WsTransferPage } from "./ws/Transfer.jsx";
 import { WsDocumentsPage } from "./ws/Documents.jsx";
 import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote } from "./ws/Print.jsx";
 import { BookInModal } from "./ws/BookIn.jsx";
-import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 import { WsCustomersPage, WsCustomerForm, WsVehicleForm, LicenceRenewalModal, WsLicenceRenewalsPage } from "./ws/Customers.jsx";
 import { WsSupplierInvoicesPage, WsSupInvoiceModal, WsSupInvoiceViewModal, WsSupPaymentModal, WsSupReturnModal } from "./ws/SupplierInvoices.jsx";
 import { WsCreatePoFromJobModal, WsPurchaseOrdersPage, WsPurchaseOrderModal, WsReceiveGoodsModal } from "./ws/PurchaseOrders.jsx";
@@ -6857,30 +6856,36 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
   const [returnReason,setReturnReason]=useState("");
   const [returnMode,setReturnMode]=useState("new");
   const [reopenJobId,setReopenJobId]=useState(null);
-  const [scanLoading,setScanLoading]=useState(false);
-  const [scanError,setScanError]=useState(null);
-  const scanInputRef=useRef(null);
+  const [ocrField,setOcrField]=useState(null); // 'plate' | 'vin' | null
+  const [ocrError,setOcrError]=useState(null);
+  const plateOcrRef=useRef(null);
+  const vinOcrRef=useRef(null);
 
-  const handleScanFile=async(e)=>{
+  const handleOcrFile=async(e,field)=>{
     const file=e.target.files?.[0]; if(!file) return;
     e.target.value="";
-    setScanLoading(true); setScanError(null);
+    setOcrField(field); setOcrError(null);
     try{
       const dataUrl=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
-      const raw=await decodePDF417fromImage(dataUrl);
-      const p=parseLicenceDisc(raw);
-      if(p.reg) s("vehicle_reg",p.reg.replace(/\s/g,"").toUpperCase());
-      if(p.vin) s("vin",p.vin.toUpperCase());
-      if(p.engine_no) s("engine_no",p.engine_no.toUpperCase());
-      if(p.make) s("vehicle_make",p.make);
-      if(p.model) s("vehicle_model",p.model);
-      if(p.color) s("vehicle_color",p.color);
-      if(p.expiry_date) s("licence_disc_expiry",p.expiry_date);
-      setTab("vehicle");
+      const worker=await createWorker("eng");
+      if(field==="vin") await worker.setParameters({tessedit_char_whitelist:"0123456789ABCDEFGHJKLMNPRSTUVWXYZ"});
+      const {data:{text}}=await worker.recognize(dataUrl);
+      await worker.terminate();
+      if(field==="plate"){
+        const clean=text.replace(/[^A-Z0-9\s\-]/gi,"").replace(/\s+/g," ").trim().toUpperCase();
+        if(!clean) throw new Error("No text found");
+        s("vehicle_reg",clean);
+      } else {
+        const clean=text.replace(/[^A-HJ-NPR-Z0-9]/gi,"").toUpperCase();
+        const match=clean.match(/[A-HJ-NPR-Z0-9]{17}/i);
+        if(match) s("vin",match[0]);
+        else if(clean.length>=8) s("vin",clean.slice(0,17));
+        else throw new Error("No VIN detected");
+      }
     }catch(ex){
-      setScanError("Could not read disc — try a clearer photo. ("+ex.message+")");
+      setOcrError(field==="plate"?"Plate OCR failed — try a clearer photo of the plate. ("+ex.message+")":"VIN OCR failed — try a clearer photo of the VIN plate. ("+ex.message+")");
     }
-    setScanLoading(false);
+    setOcrField(null);
   };
 
   const photoCount=[f.photo_front,f.photo_rear,f.photo_side].filter(Boolean).length;
@@ -7057,15 +7062,10 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
               ))}
             </div>
           )}
-          {/* Licence disc scan */}
-          <div style={{marginBottom:12}}>
-            <input ref={scanInputRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleScanFile}/>
-            <button className="btn btn-ghost" style={{width:"100%",padding:"10px 0",border:"2px dashed var(--border)",borderRadius:10,fontSize:13,fontWeight:600,color:"var(--text2)",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
-              onClick={()=>scanInputRef.current?.click()} disabled={scanLoading}>
-              {scanLoading?"⏳ Scanning...":"📷 Scan Licence Disc → Auto-fill fields"}
-            </button>
-            {scanError&&<div style={{marginTop:6,fontSize:12,color:"var(--red)",padding:"6px 10px",background:"rgba(248,113,113,.08)",borderRadius:8}}>{scanError}</div>}
-          </div>
+          {/* hidden OCR file inputs */}
+          <input ref={plateOcrRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>handleOcrFile(e,"plate")}/>
+          <input ref={vinOcrRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>handleOcrFile(e,"vin")}/>
+          {ocrError&&<div style={{marginBottom:8,fontSize:12,color:"var(--red)",padding:"6px 10px",background:"rgba(248,113,113,.08)",borderRadius:8}}>{ocrError}</div>}
           {/* Mileage + Date In — critical at top */}
           <FG>
             <div>
@@ -7076,7 +7076,15 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
             <div><FL label={t.dateIn||"Date In"}/><input className="inp" type="date" value={f.date_in} onChange={e=>s("date_in",e.target.value)}/></div>
           </FG>
           <FG>
-            <div><FL label="🚗 Plate / Reg *"/><input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="GP 123-456" style={{fontFamily:"DM Mono,monospace",fontWeight:700,letterSpacing:".05em"}}/></div>
+            <div>
+              <FL label="🚗 Plate / Reg *"/>
+              <div style={{display:"flex",gap:4}}>
+                <input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="GP 123-456" style={{flex:1,fontFamily:"DM Mono,monospace",fontWeight:700,letterSpacing:".05em"}}/>
+                <button title="Scan number plate" className="btn btn-ghost" style={{padding:"0 10px",fontSize:18,flexShrink:0,border:"1px solid var(--border)"}} onClick={()=>plateOcrRef.current?.click()} disabled={!!ocrField}>
+                  {ocrField==="plate"?"⏳":"📷"}
+                </button>
+              </div>
+            </div>
             <div><FL label={t.vehicleColor||"Color"}/><input className="inp" value={f.vehicle_color} onChange={e=>s("vehicle_color",e.target.value)} placeholder="White, Black..."/></div>
           </FG>
           <FG cols="1fr 1fr 1fr">
@@ -7087,7 +7095,12 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
           <FG>
             <div>
               <FL label="VIN"/>
-              <input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value.toUpperCase())} placeholder="17-char VIN..." style={{fontFamily:"DM Mono,monospace",fontSize:12}}/>
+              <div style={{display:"flex",gap:4}}>
+                <input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value.toUpperCase())} placeholder="17-char VIN..." style={{flex:1,fontFamily:"DM Mono,monospace",fontSize:12}}/>
+                <button title="Scan VIN from body" className="btn btn-ghost" style={{padding:"0 10px",fontSize:18,flexShrink:0,border:"1px solid var(--border)"}} onClick={()=>vinOcrRef.current?.click()} disabled={!!ocrField}>
+                  {ocrField==="vin"?"⏳":"📷"}
+                </button>
+              </div>
               {f.vin&&(
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:5}}>
                   <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent(f.vin)}`} target="_blank" rel="noopener noreferrer"

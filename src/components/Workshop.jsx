@@ -27,7 +27,7 @@ import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, Wor
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -1740,7 +1740,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   <div style={{fontWeight:600,marginBottom:6}}>No spare shop linked</div>
                   <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
                 </div>
-              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab}/>
+              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab} onEditPart={onEditPart}/>
             }
           </div>
         );
@@ -7717,7 +7717,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
 // Module-level cache so spare shop parts survive WorkshopPage remounts (tab switches)
 const _spCache={data:null,branchId:null,ts:null};
 
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",initialVin="",initialEngineNo="",initialReg="",ads=[],userCtx=null,onClearJobFilter}) {
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",initialVin="",initialEngineNo="",initialReg="",ads=[],userCtx=null,onClearJobFilter,onEditPart}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
@@ -7727,6 +7727,11 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const [myRequests,setMyRequests]=useState([]);
   const [printLabelPart,setPrintLabelPart]=useState(null);
   const [shelfModal,setShelfModal]=useState(false);
+  const [adminUnlocked,setAdminUnlocked]=useState(false);
+  const [showUnlock,setShowUnlock]=useState(false);
+  const [unlockPw,setUnlockPw]=useState("");
+  const [unlockErr,setUnlockErr]=useState("");
+  const [unlockLoading,setUnlockLoading]=useState(false);
   const wsId=wsProfile?.id?String(wsProfile.id):null;
   const prevReqStatusRef=useRef({});
   const [reqsRefreshKey,setReqsRefreshKey]=useState(0);
@@ -7927,10 +7932,40 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const sortedFiltered=[...filtered].sort((a,b)=>(a.sku||"").localeCompare(b.sku||""));
   const paged=sortedFiltered.slice(page*WS_SHOP_PAGE_SIZE,(page+1)*WS_SHOP_PAGE_SIZE);
 
+  const doUnlock=async()=>{
+    if(!unlockPw.trim()){setUnlockErr("Enter admin password");return;}
+    setUnlockLoading(true);setUnlockErr("");
+    const res=await api.get("users",`role=eq.admin&password=eq.${encodeURIComponent(unlockPw)}&select=id`).catch(()=>[]);
+    setUnlockLoading(false);
+    if(Array.isArray(res)&&res.length>0){
+      setAdminUnlocked(true);setShowUnlock(false);setUnlockPw("");
+    } else {
+      setUnlockErr("Incorrect admin password");
+    }
+  };
+
   return (
     <div>
       <AdBanner ads={ads} page="spareshop" userCtx={userCtx}/>
       {lightbox&&<ImgLightbox url={lightbox.url} name={lightbox.name} onClose={()=>setLightbox(null)}/>}
+      {showUnlock&&(
+        <Overlay onClose={()=>{setShowUnlock(false);setUnlockPw("");setUnlockErr("");}}>
+          <MHead title="🔐 Admin Unlock" onClose={()=>{setShowUnlock(false);setUnlockPw("");setUnlockErr("");}}/>
+          <p style={{fontSize:13,color:"var(--text2)",marginBottom:14}}>Enter admin password to enable part editing in this session.</p>
+          <FD>
+            <FL label="Admin Password"/>
+            <input className="inp" type="password" value={unlockPw} autoFocus
+              onChange={e=>setUnlockPw(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&doUnlock()}
+              placeholder="Admin password"/>
+          </FD>
+          {unlockErr&&<div style={{color:"var(--red)",fontSize:12,marginTop:4}}>{unlockErr}</div>}
+          <div style={{display:"flex",gap:10,marginTop:18}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setShowUnlock(false);setUnlockPw("");setUnlockErr("");}}>Cancel</button>
+            <button className="btn btn-primary" style={{flex:2}} disabled={unlockLoading} onClick={doUnlock}>{unlockLoading?"Checking…":"Unlock"}</button>
+          </div>
+        </Overlay>
+      )}
       {showCheckout&&<WsShopCheckoutModal
         localCart={localCart} mainCart={mainCart} requestCart={requestCart}
         wsProfile={wsProfile} Cs={Cs}
@@ -8113,6 +8148,11 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
           <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}} onClick={()=>setShowCheckout(true)} disabled={!cart.length}>
             🛒 {cartCount>0?`(${cartCount}) `:""}{ (mainCart.length>0||requestCart.length>0)&&localCart.length>0?"Checkout & Request":(mainCart.length>0||requestCart.length>0)?"Send Request":"Checkout"}
           </button>
+          {onEditPart&&(
+            adminUnlocked
+              ? <button title="Admin mode active — click to lock" style={{background:"none",border:"none",cursor:"pointer",fontSize:16,padding:"4px 6px",opacity:.7,flexShrink:0}} onClick={()=>setAdminUnlocked(false)}>🔓</button>
+              : <button title="Admin unlock" style={{background:"none",border:"none",cursor:"pointer",fontSize:16,padding:"4px 6px",opacity:.25,flexShrink:0}} onClick={()=>setShowUnlock(true)}>🔒</button>
+          )}
         </div>
       </div>
 
@@ -8249,6 +8289,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                       : p.stock===0
                       ? <button className="btn btn-sm" style={{width:"100%",background:"rgba(249,115,22,.12)",color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}} onClick={()=>addToCart({...p,_source:"request"})}>📦 Request Stock</button>
                       : <button className="btn btn-primary" style={{width:"100%"}} onClick={()=>addToCart(p)}>Add to Cart</button>}
+                    {onEditPart&&adminUnlocked&&<button className="btn btn-ghost btn-xs" style={{width:"100%",marginTop:6,fontSize:11}} onClick={()=>onEditPart(p)}>✏️ Edit / Add Photo</button>}
                   </div>
                 </div>
               );

@@ -5615,6 +5615,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             wsExpiresAt={role==="workshop"?(subStatus?.expiresAt??sub?.expiresAt??null):null}
             wsSubStatus={role==="workshop"?(subStatus?.status??sub?.status??null):null}
             onGoToSpareShopTab={()=>setTab("wsspareshop")}
+            onEditPart={async(p)=>{const ok=await acquireLock("part",p.id);if(!ok)return;const fresh=await api.get("parts",`id=eq.${p.id}&select=*`);openM("editPart",Array.isArray(fresh)&&fresh[0]?fresh[0]:p);}}
             t={t} lang={lang}/>
         )}
 

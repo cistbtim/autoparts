@@ -804,9 +804,9 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
 
             {/* Notes from workshop */}
             {quote.notes&&(
-              <div className="card" style={{padding:"10px 16px",marginBottom:14,background:"rgba(96,165,250,.06)",borderLeft:"3px solid var(--blue)"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>{t.wsqWorkshopNotes}</div>
-                <div style={{fontSize:13}}>{quote.notes}</div>
+              <div style={{padding:"14px 18px",marginBottom:14,background:"rgba(251,191,36,.13)",border:"2px solid rgba(251,191,36,.6)",borderRadius:12}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#b45309",textTransform:"uppercase",letterSpacing:".08em",marginBottom:6}}>📋 {t.wsqWorkshopNotes}</div>
+                <div style={{fontSize:15,fontWeight:600,color:"var(--text)",lineHeight:1.5}}>{quote.notes}</div>
               </div>
             )}
 

@@ -6832,7 +6832,42 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
   const [sel,setSel]=useState(null);
   const [scanning,setScanning]=useState(false);
   const [err,setErr]=useState(null);
-  const [ocrResult,setOcrResult]=useState(null); // editable result after scan
+  const [ocrRaw,setOcrRaw]=useState("");           // raw Tesseract output (before corrections)
+  const [ocrResult,setOcrResult]=useState(null);   // editable result after corrections
+  const [autoFixes,setAutoFixes]=useState([]);      // [{from,to,count}] applied automatically
+
+  // ── Correction memory (localStorage) ─────────────────────────
+  const loadMem=()=>{try{return JSON.parse(localStorage.getItem("ws_ocr_mem")||"{}");}catch{return{};}};
+  const saveMem=(m)=>{try{localStorage.setItem("ws_ocr_mem",JSON.stringify(m));}catch{}};
+
+  // Apply learned corrections to raw OCR text
+  const applyMem=(text)=>{
+    const mem=loadMem(); const fc=mem[field]||{};
+    let out=""; const fixes=[];
+    for(let i=0;i<text.length;i++){
+      const ch=text[i]; const opts=fc[ch];
+      if(opts){
+        const best=Object.entries(opts).sort((a,b)=>b[1]-a[1])[0];
+        if(best&&best[1]>=2){out+=best[0];fixes.push({from:ch,to:best[0],count:best[1]});continue;}
+      }
+      out+=ch;
+    }
+    return{corrected:out,fixes};
+  };
+
+  // Record what the user changed vs raw OCR
+  const recordMem=(raw,final)=>{
+    if(!raw||raw===final||raw.length!==final.length) return;
+    const mem=loadMem(); if(!mem[field]) mem[field]={};
+    for(let i=0;i<raw.length;i++){
+      if(raw[i]!==final[i]){
+        const from=raw[i],to=final[i];
+        if(!mem[field][from]) mem[field][from]={};
+        mem[field][from][to]=(mem[field][from][to]||0)+1;
+      }
+    }
+    saveMem(mem);
+  };
 
   useEffect(()=>{
     const canvas=canvasRef.current; if(!canvas) return;
@@ -6911,7 +6946,10 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
         result=m?m[0]:c.slice(0,17);
       }
       if(!result) throw new Error("No text found — try a tighter selection");
-      setOcrResult(result);
+      setOcrRaw(result);
+      const {corrected,fixes}=applyMem(result);
+      setOcrResult(corrected);
+      setAutoFixes(fixes);
     }catch(ex){ setErr(ex.message); }
     setScanning(false);
   };
@@ -6938,15 +6976,20 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
             <div style={{fontSize:12,color:"rgba(255,255,255,.55)",marginBottom:8,textAlign:"center"}}>
               Result — tap to correct if needed
             </div>
+            {autoFixes.length>0&&(
+              <div style={{fontSize:11,color:"rgba(249,115,22,.85)",marginBottom:6,textAlign:"center"}}>
+                🧠 Auto-corrected: {autoFixes.map(f=>`${f.from}→${f.to}`).join(", ")} (learned from {Math.min(...autoFixes.map(f=>f.count))}× before)
+              </div>
+            )}
             <input value={ocrResult} onChange={e=>setOcrResult(e.target.value.toUpperCase())}
               style={{width:"100%",padding:"12px 16px",fontSize:24,fontWeight:700,fontFamily:"DM Mono,monospace",
                 textAlign:"center",background:"rgba(255,255,255,.1)",border:"2px solid #f97316",
                 borderRadius:10,color:"#fff",letterSpacing:3,boxSizing:"border-box"}}/>
             <div style={{display:"flex",gap:10,marginTop:10}}>
               <button style={{...btnBase,flex:1,border:"1px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",color:"#fff"}}
-                onClick={()=>{setOcrResult(null);setSel(null);setErr(null);}}>🔄 Re-scan</button>
+                onClick={()=>{setOcrResult(null);setOcrRaw("");setAutoFixes([]);setSel(null);setErr(null);}}>🔄 Re-scan</button>
               <button style={{...btnBase,flex:2,border:"none",background:"#f97316",color:"#fff",fontWeight:700,fontSize:16}}
-                onClick={()=>onResult(ocrResult)} disabled={!ocrResult.trim()}>✅ Use This</button>
+                onClick={()=>{recordMem(ocrRaw,ocrResult);onResult(ocrResult);}} disabled={!ocrResult.trim()}>✅ Use This</button>
             </div>
           </div>
         ):(

@@ -534,6 +534,7 @@ export function QuoteConfirmPage({token}) {
   const [note,setNote]=useState("");
   const [done,setDone]=useState(null); // null | "confirmed" | "declined"
   const [saving,setSaving]=useState(false);
+  const [agreed,setAgreed]=useState(false);
   const [t,setT]=useState(T.en);
 
   useEffect(()=>{
@@ -817,14 +818,23 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
                 placeholder={t.wsqMsgPlaceholder}/>
             </div>
 
+            {/* Read & agree checkbox */}
+            <label style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px",marginBottom:14,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",borderRadius:12,cursor:"pointer"}}>
+              <input type="checkbox" checked={agreed} onChange={e=>setAgreed(e.target.checked)}
+                style={{width:20,height:20,marginTop:2,accentColor:"#f97316",flexShrink:0,cursor:"pointer"}}/>
+              <span style={{fontSize:14,color:"var(--text)",lineHeight:1.5}}>
+                I have read and understood the quotation and agree to the terms stated above.
+              </span>
+            </label>
+
             {/* Action buttons */}
             <div style={{display:"flex",gap:12,marginBottom:24}}>
               <button className="btn" style={{flex:1,padding:16,fontSize:15,fontWeight:700,background:"rgba(248,113,113,.15)",color:"var(--red)",border:"2px solid rgba(248,113,113,.4)",borderRadius:12}}
                 onClick={()=>respond("declined")} disabled={saving}>
                 ❌ {t.wsqDeclineBtn}
               </button>
-              <button className="btn btn-primary" style={{flex:2,padding:16,fontSize:15,fontWeight:700,borderRadius:12}}
-                onClick={()=>respond("confirmed")} disabled={saving}>
+              <button className="btn btn-primary" style={{flex:2,padding:16,fontSize:15,fontWeight:700,borderRadius:12,opacity:agreed?1:.4,cursor:agreed?"pointer":"not-allowed",transition:"opacity .2s"}}
+                onClick={()=>agreed&&respond("confirmed")} disabled={saving||!agreed}>
                 {saving?t.wsqSubmitting:`✅ ${t.wsqApproveBtn}`}
               </button>
             </div>

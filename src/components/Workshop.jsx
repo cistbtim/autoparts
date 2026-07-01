@@ -6914,6 +6914,8 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
     saveMem(m);
   };
 
+  const clearFieldMem=()=>{ const m={...memData}; delete m[field]; saveMem(m); setAutoFixes([]); setMemSuggestion(""); };
+
   useEffect(()=>{
     const canvas=canvasRef.current; if(!canvas) return;
     const ctx=canvas.getContext("2d");
@@ -6929,7 +6931,7 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
     ctx.strokeRect(x,y,w,h);
   },[sel]);
 
-  // Scale up 3x + grayscale + 2x contrast for better Tesseract accuracy
+  // Scale up 3x + grayscale + contrast + binarize for better Tesseract accuracy
   const enhance=(srcCanvas)=>{
     const scale=3;
     const dst=document.createElement("canvas");
@@ -6938,10 +6940,16 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
     ctx.drawImage(srcCanvas,0,0,dst.width,dst.height);
     const id=ctx.getImageData(0,0,dst.width,dst.height);
     const d=id.data;
+    // Compute mean luminance for adaptive threshold
+    let sum=0;
+    for(let i=0;i<d.length;i+=4) sum+=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    const mean=sum/(d.length/4);
+    const thresh=Math.min(Math.max(mean,80),180);
     for(let i=0;i<d.length;i+=4){
       const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
-      const c=Math.max(0,Math.min(255,128+(g-128)*2.2));
-      d[i]=d[i+1]=d[i+2]=c;
+      // Binarize: dark text on light background → pure black/white
+      const b=g<thresh?0:255;
+      d[i]=d[i+1]=d[i+2]=b;
     }
     ctx.putImageData(id,0,0);
     return dst;
@@ -6977,14 +6985,16 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
       const enhanced=enhance(crop);
       const worker=await createWorker("eng");
       await worker.setParameters({
-        tessedit_pageseg_mode:"7",
+        tessedit_pageseg_mode:field==="vin"?"7":"8",
         tessedit_char_whitelist:field==="vin"?"0123456789ABCDEFGHJKLMNPRSTUVWXYZ":"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",
       });
       const {data:{text}}=await worker.recognize(enhanced.toDataURL("image/png"));
       await worker.terminate();
       let result="";
       if(field==="plate"){
-        result=text.replace(/[^A-Z0-9]/gi,"").toUpperCase();
+        const stripped=text.replace(/[^A-Z0-9]/gi,"").toUpperCase();
+        if(stripped.length>10) throw new Error(`Read ${stripped.length} chars — too many. Crop tighter: drag just under the plate digits/letters and avoid the badge or bottom text.`);
+        result=stripped;
       } else {
         const c=text.replace(/[^A-HJ-NPR-Z0-9]/gi,"").toUpperCase();
         const m=c.match(/[A-HJ-NPR-Z0-9]{17}/i);
@@ -7056,10 +7066,14 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
               Result — tap to correct if needed
             </div>
             {autoFixes.length>0&&memSuggestion&&(
-              <button onClick={()=>{setOcrResult(memSuggestion);setAutoFixes([]);setMemSuggestion("");}}
-                style={{width:"100%",marginBottom:8,padding:"7px 12px",borderRadius:8,border:"1px solid rgba(249,115,22,.5)",background:"rgba(249,115,22,.12)",color:"rgba(249,115,22,1)",fontSize:12,cursor:"pointer",textAlign:"center"}}>
-                🧠 Memory suggests: <strong style={{fontFamily:"DM Mono,monospace",letterSpacing:1}}>{memSuggestion}</strong> ({autoFixes.map(f=>`${f.from}→${f.to}`).join(", ")}, {Math.min(...autoFixes.map(f=>f.count))}× seen) — tap to apply
-              </button>
+              <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"stretch"}}>
+                <button onClick={()=>{setOcrResult(memSuggestion);setAutoFixes([]);setMemSuggestion("");}}
+                  style={{flex:1,padding:"7px 12px",borderRadius:8,border:"1px solid rgba(249,115,22,.5)",background:"rgba(249,115,22,.12)",color:"rgba(249,115,22,1)",fontSize:12,cursor:"pointer",textAlign:"center"}}>
+                  🧠 Memory suggests: <strong style={{fontFamily:"DM Mono,monospace",letterSpacing:1}}>{memSuggestion}</strong> ({autoFixes.map(f=>`${f.from}→${f.to}`).join(", ")}, {Math.min(...autoFixes.map(f=>f.count))}× seen) — tap to apply
+                </button>
+                <button onClick={clearFieldMem} title="Clear stored corrections for this field"
+                  style={{padding:"7px 10px",borderRadius:8,border:"1px solid rgba(248,113,113,.4)",background:"rgba(248,113,113,.1)",color:"rgba(248,113,113,.8)",fontSize:13,cursor:"pointer"}}>🗑</button>
+              </div>
             )}
             <input value={ocrResult} onChange={e=>setOcrResult(e.target.value.toUpperCase())}
               style={{width:"100%",padding:"12px 16px",fontSize:24,fontWeight:700,fontFamily:"DM Mono,monospace",

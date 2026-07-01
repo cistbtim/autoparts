@@ -547,14 +547,14 @@ export function QuoteConfirmPage({token}) {
       if(q){
         setQuote(q);
         if(q.confirm_status==="confirmed"||q.confirm_status==="declined") setDone(q.confirm_status);
-        const [ji,jj,wp]=await Promise.all([
+        const [ji,jj]=await Promise.all([
           api.get("workshop_job_items",`job_id=eq.${q.job_id}&select=*`).catch(()=>[]),
           api.get("workshop_jobs",`id=eq.${q.job_id}&select=*`).catch(()=>[]),
-          q.workshop_id?api.get("workshop_profiles",`id=eq.${q.workshop_id}&select=*`).catch(()=>[]):Promise.resolve([]),
         ]);
         setItems(Array.isArray(ji)?ji:[]);
         if(Array.isArray(jj)&&jj[0]) setJob(jj[0]);
-        if(Array.isArray(wp)&&wp[0]) setWsProfile(wp[0]);
+        // Workshop info is denormalized into the quote on send — no separate profile fetch needed
+        if(q.ws_name) setWsProfile({name:q.ws_name,phone:q.ws_phone||"",email:q.ws_email||"",address:q.ws_address||"",logo_url:q.ws_logo_url||"",vat_number:q.ws_vat||""});
       }
       setShopSettings(shopSett);
       // Load shop language translation pack

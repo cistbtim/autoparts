@@ -1443,7 +1443,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   };
   const sendQuoteForApproval=async(quoteId)=>{
     const token=makeToken();
-    await api.patch("workshop_quotes","id",quoteId,{confirm_token:token,confirm_status:"pending"});
+    await api.patch("workshop_quotes","id",quoteId,{
+      confirm_token:token,confirm_status:"pending",
+      ws_name:workshopProfile.name||"",
+      ws_phone:workshopProfile.phone||workshopProfile.whatsapp||"",
+      ws_email:workshopProfile.email||"",
+      ws_address:workshopProfile.address||"",
+      ws_logo_url:workshopProfile.logo_url||"",
+      ws_vat:workshopProfile.vat_number||"",
+    });
     await refreshWorkshopData();
     return token;
   };

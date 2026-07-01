@@ -6882,7 +6882,7 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
       await worker.terminate();
       let result="";
       if(field==="plate"){
-        result=text.replace(/[^A-Z0-9\s\-]/gi,"").replace(/\s+/g," ").trim().toUpperCase();
+        result=text.replace(/[^A-Z0-9]/gi,"").toUpperCase();
       } else {
         const c=text.replace(/[^A-HJ-NPR-Z0-9]/gi,"").toUpperCase();
         const m=c.match(/[A-HJ-NPR-Z0-9]{17}/i);

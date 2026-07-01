@@ -1978,7 +1978,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           onClose={()=>setBookIn(false)} t={t}/>
       )}
       {editJob&&(
-        <WorkshopJobModal job={editJob} wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs}
+        <WorkshopJobModal job={editJob} wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={jobs} wsId={wsId}
           onSave={async(d,onProgress)=>{ await onSaveJob(d,onProgress); setEditJob(null); }}
           onReopenJob={async(d)=>{ await onSaveJob(d); setEditJob(null); }}
           onClose={()=>setEditJob(null)} t={t}/>
@@ -6241,7 +6241,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
 
       {/* Edit job modal */}
       {editJob&&(
-        <WorkshopJobModal job={job} wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={[]}
+        <WorkshopJobModal job={job} wsCustomers={wsCustomers} wsVehicles={wsVehicles} jobs={[]} wsId={wsId}
           onSave={async(d,onProgress)=>{ await onSaveJob(d,onProgress); setEditJob(false); }}
           onReopenJob={async(d)=>{ await onSaveJob(d); setEditJob(false); }}
           onClose={()=>setEditJob(false)} t={t}/>
@@ -6825,25 +6825,41 @@ function MoveJobModal({job,onMove,onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // OCR CROP MODAL — draw selection on photo then run Tesseract
 // ═══════════════════════════════════════════════════════════════
-function OcrCropModal({imgSrc, field, onResult, onClose}) {
+function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
   const imgRef=useRef(null);
   const canvasRef=useRef(null);
   const dragRef=useRef(null);
   const [sel,setSel]=useState(null);
   const [scanning,setScanning]=useState(false);
   const [err,setErr]=useState(null);
-  const [ocrRaw,setOcrRaw]=useState("");           // raw Tesseract output (before corrections)
-  const [ocrResult,setOcrResult]=useState(null);   // editable result after corrections
-  const [autoFixes,setAutoFixes]=useState([]);      // [{from,to,count}] memory suggestions
-  const [memSuggestion,setMemSuggestion]=useState(""); // full corrected string suggestion
+  const [ocrRaw,setOcrRaw]=useState("");
+  const [ocrResult,setOcrResult]=useState(null);
+  const [autoFixes,setAutoFixes]=useState([]);
+  const [memSuggestion,setMemSuggestion]=useState("");
+  const [memData,setMemData]=useState({});
 
-  // ── Correction memory (localStorage) ─────────────────────────
-  const loadMem=()=>{try{return JSON.parse(localStorage.getItem("ws_ocr_mem")||"{}");}catch{return{};}};
-  const saveMem=(m)=>{try{localStorage.setItem("ws_ocr_mem",JSON.stringify(m));}catch{}};
+  // ── Correction memory (Supabase) ──────────────────────────────
+  useEffect(()=>{
+    if(!wsId) return;
+    fetch(`${SUPABASE_URL}/rest/v1/ocr_corrections?workshop_id=eq.${wsId}&select=data`,
+      {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}})
+      .then(r=>r.ok?r.json():[])
+      .then(rows=>{ if(rows[0]?.data) setMemData(rows[0].data); })
+      .catch(()=>{});
+  },[wsId]);
 
-  // Apply learned corrections to raw OCR text
+  const saveMem=(m)=>{
+    setMemData(m);
+    if(!wsId) return;
+    fetch(`${SUPABASE_URL}/rest/v1/ocr_corrections`,{
+      method:"POST",
+      headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates"},
+      body:JSON.stringify({workshop_id:wsId,data:m}),
+    }).catch(()=>{});
+  };
+
   const applyMem=(text)=>{
-    const mem=loadMem(); const fc=mem[field]||{};
+    const fc=memData[field]||{};
     let out=""; const fixes=[];
     for(let i=0;i<text.length;i++){
       const ch=text[i]; const opts=fc[ch];
@@ -6856,18 +6872,17 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
     return{corrected:out,fixes};
   };
 
-  // Record what the user changed vs raw OCR
   const recordMem=(raw,final)=>{
     if(!raw||raw===final||raw.length!==final.length) return;
-    const mem=loadMem(); if(!mem[field]) mem[field]={};
+    const m={...memData}; if(!m[field]) m[field]={};
     for(let i=0;i<raw.length;i++){
       if(raw[i]!==final[i]){
         const from=raw[i],to=final[i];
-        if(!mem[field][from]) mem[field][from]={};
-        mem[field][from][to]=(mem[field][from][to]||0)+1;
+        if(!m[field][from]) m[field][from]={};
+        m[field][from][to]=(m[field][from][to]||0)+1;
       }
     }
-    saveMem(mem);
+    saveMem(m);
   };
 
   useEffect(()=>{
@@ -7013,7 +7028,7 @@ function OcrCropModal({imgSrc, field, onResult, onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB MODAL — Create/Edit
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, onReopenJob, onClose, t}) {
+function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], wsId=null, onSave, onReopenJob, onClose, t}) {
   const [f,setF]=useState({
     id:job.id||null,
     workshop_customer_id:job.workshop_customer_id||null,
@@ -7382,7 +7397,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
     </Overlay>
 
     {ocrCropImg&&(
-      <OcrCropModal imgSrc={ocrCropImg} field={ocrField}
+      <OcrCropModal imgSrc={ocrCropImg} field={ocrField} wsId={wsId}
         onResult={(text)=>{ if(ocrField==="plate") s("vehicle_reg",text); else s("vin",text); setOcrCropImg(null); setOcrField(null); }}
         onClose={()=>{ setOcrCropImg(null); setOcrField(null); }}/>
     )}

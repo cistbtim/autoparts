@@ -6823,6 +6823,104 @@ function MoveJobModal({job,onMove,onClose}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// OCR CROP MODAL — draw selection on photo then run Tesseract
+// ═══════════════════════════════════════════════════════════════
+function OcrCropModal({imgSrc, field, onResult, onClose}) {
+  const imgRef=useRef(null);
+  const canvasRef=useRef(null);
+  const dragRef=useRef(null);
+  const [sel,setSel]=useState(null);
+  const [scanning,setScanning]=useState(false);
+  const [err,setErr]=useState(null);
+
+  useEffect(()=>{
+    const canvas=canvasRef.current; if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(!sel) return;
+    const x=Math.min(sel.x0,sel.x1),y=Math.min(sel.y0,sel.y1);
+    const w=Math.abs(sel.x1-sel.x0),h=Math.abs(sel.y1-sel.y0);
+    ctx.fillStyle="rgba(249,115,22,.15)";
+    ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle="#f97316";
+    ctx.lineWidth=2.5;
+    ctx.setLineDash([8,4]);
+    ctx.strokeRect(x,y,w,h);
+  },[sel]);
+
+  const getXY=(e)=>{
+    const rect=canvasRef.current.getBoundingClientRect();
+    const pt=e.touches?e.touches[0]:e;
+    return {x:pt.clientX-rect.left,y:pt.clientY-rect.top};
+  };
+  const onPD=(e)=>{ const p=getXY(e); dragRef.current=true; setSel({x0:p.x,y0:p.y,x1:p.x,y1:p.y}); };
+  const onPM=(e)=>{ if(!dragRef.current) return; const p=getXY(e); setSel(s=>s?{...s,x1:p.x,y1:p.y}:s); };
+  const onPU=()=>{ dragRef.current=false; };
+
+  const doScan=async()=>{
+    if(!sel) return;
+    setScanning(true); setErr(null);
+    try{
+      const img=imgRef.current;
+      const canvas=canvasRef.current;
+      const sx=img.naturalWidth/canvas.width;
+      const sy=img.naturalHeight/canvas.height;
+      const x=Math.round(Math.min(sel.x0,sel.x1)*sx);
+      const y=Math.round(Math.min(sel.y0,sel.y1)*sy);
+      const w=Math.round(Math.abs(sel.x1-sel.x0)*sx);
+      const h=Math.round(Math.abs(sel.y1-sel.y0)*sy);
+      if(w<20||h<8) throw new Error("Selection too small — drag a bigger box");
+      const crop=document.createElement("canvas");
+      crop.width=w; crop.height=h;
+      const el=new Image(); el.src=imgSrc;
+      await new Promise(r=>{el.onload=r; if(el.complete)r();});
+      crop.getContext("2d").drawImage(el,x,y,w,h,0,0,w,h);
+      const croppedUrl=crop.toDataURL("image/jpeg",0.95);
+      const worker=await createWorker("eng");
+      if(field==="vin") await worker.setParameters({tessedit_char_whitelist:"0123456789ABCDEFGHJKLMNPRSTUVWXYZ"});
+      const {data:{text}}=await worker.recognize(croppedUrl);
+      await worker.terminate();
+      let result="";
+      if(field==="plate"){
+        result=text.replace(/[^A-Z0-9\s\-]/gi,"").replace(/\s+/g," ").trim().toUpperCase();
+      } else {
+        const c=text.replace(/[^A-HJ-NPR-Z0-9]/gi,"").toUpperCase();
+        const m=c.match(/[A-HJ-NPR-Z0-9]{17}/i);
+        result=m?m[0]:c.slice(0,17);
+      }
+      if(!result) throw new Error("No text found in selection — try again");
+      onResult(result);
+    }catch(ex){ setErr(ex.message); setScanning(false); }
+  };
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 10px"}}>
+      <div style={{width:"100%",maxWidth:600}}>
+        <div style={{color:"#fff",fontWeight:700,fontSize:15,marginBottom:10,textAlign:"center"}}>
+          {field==="plate"?"🚗 Drag over the number plate":"🔢 Drag over the VIN number"}
+        </div>
+        <div style={{position:"relative",touchAction:"none",userSelect:"none"}}>
+          <img ref={imgRef} src={imgSrc} alt="" draggable={false} style={{width:"100%",display:"block",borderRadius:8}}
+            onLoad={e=>{const c=canvasRef.current; if(c){c.width=e.target.offsetWidth;c.height=e.target.offsetHeight;}}}/>
+          <canvas ref={canvasRef} style={{position:"absolute",inset:0,width:"100%",height:"100%",cursor:"crosshair"}}
+            onMouseDown={onPD} onMouseMove={onPM} onMouseUp={onPU} onMouseLeave={onPU}
+            onTouchStart={onPD} onTouchMove={onPM} onTouchEnd={onPU}/>
+        </div>
+        {err&&<div style={{marginTop:8,color:"#f87171",fontSize:13,textAlign:"center",padding:"6px 10px",background:"rgba(248,113,113,.1)",borderRadius:8}}>{err}</div>}
+        <div style={{display:"flex",gap:10,marginTop:14}}>
+          <button style={{flex:1,padding:"13px 0",borderRadius:10,border:"1px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:14,cursor:"pointer"}}
+            onClick={onClose}>✕ Cancel</button>
+          <button style={{flex:2,padding:"13px 0",borderRadius:10,border:"none",background:sel?"#f97316":"rgba(249,115,22,.35)",color:"#fff",fontSize:15,fontWeight:700,cursor:sel?"pointer":"not-allowed"}}
+            disabled={!sel||scanning} onClick={doScan}>
+            {scanning?"⏳ Reading...":"📷 Read Text"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB MODAL — Create/Edit
 // ═══════════════════════════════════════════════════════════════
 function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, onReopenJob, onClose, t}) {
@@ -6857,35 +6955,16 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
   const [returnMode,setReturnMode]=useState("new");
   const [reopenJobId,setReopenJobId]=useState(null);
   const [ocrField,setOcrField]=useState(null); // 'plate' | 'vin' | null
-  const [ocrError,setOcrError]=useState(null);
+  const [ocrCropImg,setOcrCropImg]=useState(null); // dataUrl while crop modal is open
   const plateOcrRef=useRef(null);
   const vinOcrRef=useRef(null);
 
   const handleOcrFile=async(e,field)=>{
     const file=e.target.files?.[0]; if(!file) return;
     e.target.value="";
-    setOcrField(field); setOcrError(null);
-    try{
-      const dataUrl=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
-      const worker=await createWorker("eng");
-      if(field==="vin") await worker.setParameters({tessedit_char_whitelist:"0123456789ABCDEFGHJKLMNPRSTUVWXYZ"});
-      const {data:{text}}=await worker.recognize(dataUrl);
-      await worker.terminate();
-      if(field==="plate"){
-        const clean=text.replace(/[^A-Z0-9\s\-]/gi,"").replace(/\s+/g," ").trim().toUpperCase();
-        if(!clean) throw new Error("No text found");
-        s("vehicle_reg",clean);
-      } else {
-        const clean=text.replace(/[^A-HJ-NPR-Z0-9]/gi,"").toUpperCase();
-        const match=clean.match(/[A-HJ-NPR-Z0-9]{17}/i);
-        if(match) s("vin",match[0]);
-        else if(clean.length>=8) s("vin",clean.slice(0,17));
-        else throw new Error("No VIN detected");
-      }
-    }catch(ex){
-      setOcrError(field==="plate"?"Plate OCR failed — try a clearer photo of the plate. ("+ex.message+")":"VIN OCR failed — try a clearer photo of the VIN plate. ("+ex.message+")");
-    }
-    setOcrField(null);
+    const dataUrl=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
+    setOcrField(field);
+    setOcrCropImg(dataUrl);
   };
 
   const photoCount=[f.photo_front,f.photo_rear,f.photo_side].filter(Boolean).length;
@@ -7065,7 +7144,6 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
           {/* hidden OCR file inputs */}
           <input ref={plateOcrRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>handleOcrFile(e,"plate")}/>
           <input ref={vinOcrRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>handleOcrFile(e,"vin")}/>
-          {ocrError&&<div style={{marginBottom:8,fontSize:12,color:"var(--red)",padding:"6px 10px",background:"rgba(248,113,113,.08)",borderRadius:8}}>{ocrError}</div>}
           {/* Mileage + Date In — critical at top */}
           <FG>
             <div>
@@ -7080,9 +7158,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
               <FL label="🚗 Plate / Reg *"/>
               <div style={{display:"flex",gap:4}}>
                 <input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="GP 123-456" style={{flex:1,fontFamily:"DM Mono,monospace",fontWeight:700,letterSpacing:".05em"}}/>
-                <button title="Scan number plate" className="btn btn-ghost" style={{padding:"0 10px",fontSize:18,flexShrink:0,border:"1px solid var(--border)"}} onClick={()=>plateOcrRef.current?.click()} disabled={!!ocrField}>
-                  {ocrField==="plate"?"⏳":"📷"}
-                </button>
+                <button title="Scan number plate" className="btn btn-ghost" style={{padding:"0 10px",fontSize:18,flexShrink:0,border:"1px solid var(--border)"}} onClick={()=>plateOcrRef.current?.click()} disabled={!!ocrCropImg}>📷</button>
               </div>
             </div>
             <div><FL label={t.vehicleColor||"Color"}/><input className="inp" value={f.vehicle_color} onChange={e=>s("vehicle_color",e.target.value)} placeholder="White, Black..."/></div>
@@ -7097,9 +7173,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
               <FL label="VIN"/>
               <div style={{display:"flex",gap:4}}>
                 <input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value.toUpperCase())} placeholder="17-char VIN..." style={{flex:1,fontFamily:"DM Mono,monospace",fontSize:12}}/>
-                <button title="Scan VIN from body" className="btn btn-ghost" style={{padding:"0 10px",fontSize:18,flexShrink:0,border:"1px solid var(--border)"}} onClick={()=>vinOcrRef.current?.click()} disabled={!!ocrField}>
-                  {ocrField==="vin"?"⏳":"📷"}
-                </button>
+                <button title="Scan VIN from body" className="btn btn-ghost" style={{padding:"0 10px",fontSize:18,flexShrink:0,border:"1px solid var(--border)"}} onClick={()=>vinOcrRef.current?.click()} disabled={!!ocrCropImg}>📷</button>
               </div>
               {f.vin&&(
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:5}}>
@@ -7215,6 +7289,12 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], onSave, 
         </button>
       </div>
     </Overlay>
+
+    {ocrCropImg&&(
+      <OcrCropModal imgSrc={ocrCropImg} field={ocrField}
+        onResult={(text)=>{ if(ocrField==="plate") s("vehicle_reg",text); else s("vin",text); setOcrCropImg(null); setOcrField(null); }}
+        onClose={()=>{ setOcrCropImg(null); setOcrField(null); }}/>
+    )}
   );
 }
 

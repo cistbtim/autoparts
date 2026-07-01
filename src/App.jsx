@@ -1443,13 +1443,32 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   };
   const sendQuoteForApproval=async(quoteId)=>{
     const token=makeToken();
+    // Shrink base64 logo to ~150px JPEG so it's small enough to store reliably in the quote record
+    const rawLogo=workshopProfile.logo_url||workshopProfile.logo_data||"";
+    let storedLogo=rawLogo;
+    if(rawLogo.startsWith("data:")){
+      storedLogo=await new Promise(res=>{
+        const img=new Image();
+        img.onload=()=>{
+          const MAX=150;
+          const canvas=document.createElement("canvas");
+          let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          canvas.width=w;canvas.height=h;
+          canvas.getContext("2d").drawImage(img,0,0,w,h);
+          res(canvas.toDataURL("image/jpeg",0.6));
+        };
+        img.onerror=()=>res(rawLogo);
+        img.src=rawLogo;
+      });
+    }
     await api.patch("workshop_quotes","id",quoteId,{
       confirm_token:token,confirm_status:"pending",
       ws_name:workshopProfile.name||"",
       ws_phone:workshopProfile.phone||workshopProfile.whatsapp||"",
       ws_email:workshopProfile.email||"",
       ws_address:workshopProfile.address||"",
-      ws_logo_url:workshopProfile.logo_url||workshopProfile.logo_data||"",
+      ws_logo_url:storedLogo,
       ws_vat:workshopProfile.vat_number||"",
     });
     await refreshWorkshopData();

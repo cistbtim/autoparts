@@ -732,7 +732,9 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
       <div style={{width:"100%",maxWidth:520,paddingTop:16}}>
         {/* Header */}
         <div style={{textAlign:"center",marginBottom:24}}>
-          <div style={{fontSize:28,marginBottom:6}}>🔧</div>
+          {bizLogo
+            ?<img src={bizLogo} alt={bizName} style={{maxHeight:72,maxWidth:200,objectFit:"contain",marginBottom:8,borderRadius:8}}/>
+            :<div style={{fontSize:28,marginBottom:6}}>🔧</div>}
           <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:24,fontWeight:700,color:"var(--accent)"}}>{bizName}</div>
           <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>{t.wsqApprovalTitle}</div>
         </div>

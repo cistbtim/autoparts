@@ -304,6 +304,8 @@ export const T = {
     wsbkTryClearer: "Try a clearer, closer photo.",
     wsbkLanguage: "Language",
     wsbkGetDirections: "Get Directions",
+    wsbkCall: "Call",
+    wsbkWhatsApp: "WhatsApp",
   },
 };
 

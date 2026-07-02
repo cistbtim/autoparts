@@ -95,10 +95,13 @@ export const Overlay = ({onClose,children,wide,maxWidth}) => (
   </div>
 );
 
-export const MHead = ({title,sub,onClose}) => (
+export const MHead = ({title,sub,actions,onClose}) => (
   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
     <div><h2 style={{fontSize:18,fontWeight:700}}>{title}</h2>{sub&&<p style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{sub}</p>}</div>
-    <button className="btn btn-ghost btn-sm" onClick={onClose} style={{flexShrink:0}}>✕</button>
+    <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+      {actions}
+      <button className="btn btn-ghost btn-sm" onClick={onClose} style={{flexShrink:0}}>✕</button>
+    </div>
   </div>
 );
 

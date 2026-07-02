@@ -4,7 +4,7 @@ import { fmtAmt } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 import { printWorkshopQuote } from "./Print.jsx";
 
-export function WsQuoteModal({job,items,existing,settings,wsSupplierQuotes=[],onSave,onClose}) {
+export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplierQuotes=[],onSave,onClose}) {
   const C=curSym(settings.currency||getSettings().currency);
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [selectedIds,setSelectedIds]=useState(()=>{
@@ -143,7 +143,7 @@ export function WsQuoteModal({job,items,existing,settings,wsSupplierQuotes=[],on
         <button className="btn btn-ghost" style={{flex:1}} disabled={saving||selItems.length===0} onClick={async()=>{
           setSaving(true);
           const q={...f,subtotal:selSubtotal,tax:selTax,total:selTotal,selected_item_ids:JSON.stringify([...selectedIds])};
-          try{ await onSave(q); printWorkshopQuote(job,selItems,q,settings); }catch(e){alert(e.message);}
+          try{ await onSave(q); printWorkshopQuote(job,selItems,q,settings,{},false,vehicles); }catch(e){alert(e.message);}
           finally{setSaving(false);}
         }}>💾 Save &amp; Print</button>
         <button className="btn btn-primary" style={{flex:1}} disabled={saving||selItems.length===0} onClick={async()=>{

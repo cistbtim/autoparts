@@ -5537,6 +5537,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             parts={parts}
             partFitments={partFitments}
             vehicles={vehicles}
+            onRefreshVehicles={()=>refreshTables("vehicles")}
             customers={customers}
             wsCustomers={workshopCustomers}
             wsVehicles={workshopVehicles}

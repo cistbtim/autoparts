@@ -27,7 +27,7 @@ import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, Wor
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -249,7 +249,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       <WorkshopJobDetail
         job={activeJob} items={items} invoice={inv} quote={quote}
         jobs={jobs}
-        parts={parts} partFitments={partFitments} vehicles={vehicles} settings={settings}
+        parts={parts} partFitments={partFitments} vehicles={vehicles} onRefreshVehicles={onRefreshVehicles} settings={settings}
         wsVehicles={wsVehicles} wsCustomers={wsCustomers} wsStock={wsStock} wsServices={wsServices}
         suppliers={suppliers} wsSuppliers={wsSuppliers} wsSupplierRequests={wsSupplierRequests}
         wsSupplierQuotes={wsSupplierQuotes}
@@ -1163,7 +1163,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                                 {j&&q.status==="accepted"&&!invoices.find(i=>i.job_id===q.job_id)&&(
                                   <button className="btn btn-primary btn-xs" onClick={()=>{const its=jobItems.filter(i=>i.job_id===q.job_id);const sub=its.reduce((s,i)=>s+(+i.total||0),0);const tx=settings.vat_number?sub*(settings.tax_rate||0)/100:0;setQInvModal({job:j,items:its,quote:q,subtotal:sub,tax:tx,total:sub+tx});}}>🧾 Invoice</button>
                                 )}
-                                {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
+                                {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},false,vehicles);}}>🖨️</button>}
                               </div>
                             </td>
                           </tr>
@@ -1207,7 +1207,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                           {j&&q.status==="accepted"&&!invoices.find(i=>i.job_id===q.job_id)&&(
                             <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={()=>{const its=jobItems.filter(i=>i.job_id===q.job_id);const sub=its.reduce((s,i)=>s+(+i.total||0),0);const tx=settings.vat_number?sub*(settings.tax_rate||0)/100:0;setQInvModal({job:j,items:its,quote:q,subtotal:sub,tax:tx,total:sub+tx});}}>🧾 Invoice</button>
                           )}
-                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
+                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},false,vehicles);}}>🖨️</button>}
                         </div>
                       </div>
                     );
@@ -1545,7 +1545,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                             <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ "+t.paid:inv.status==="partial"?"💛 "+t.partial:"⏳ "+t.unpaid}</span></td>
                             <td><div style={{display:"flex",gap:4}}>
                               {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{setActiveJob(j);setView("job");}}>{t.stOpen}</button>}
-                              {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
+                              {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},vehicles);}}>🖨️</button>}
                             </div></td>
                           </tr>
                         );
@@ -1587,7 +1587,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         </div>
                         <div style={{display:"flex",gap:8,padding:"8px 12px 10px",borderTop:"1px solid var(--border2)"}}>
                           {j&&<button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{setActiveJob(j);setView("job");}}>🔧 {t.stOpen}</button>}
-                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""});}}>🖨️</button>}
+                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},vehicles);}}>🖨️</button>}
                         </div>
                       </div>
                     );
@@ -2786,6 +2786,29 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
     photo_side:    jobVehicle?.photo_side  || "",
   };
 
+  // Pre-generate the supplier quote link in the background as soon as we have a
+  // phone number + selected items, instead of waiting until the "Send via
+  // WhatsApp" click. Kicking off the network call *after* the click and only
+  // then navigating the popup loses the browser's fresh user-gesture by the
+  // time it resolves, which leaves the wa.me tab stuck on its redirect screen
+  // (a second click works because generatedLink is cached by then). Generating
+  // ahead of time means the click can navigate synchronously.
+  const autoLinkKeyRef = useRef("");
+  useEffect(()=>{
+    if(!phone||!onGenerateLink||selectedItems.length===0||generatedLink||generatingLink) return;
+    const key=phone+"|"+selectedItems.map(i=>i.id).join(",");
+    if(autoLinkKeyRef.current===key) return;
+    const t=setTimeout(()=>{
+      autoLinkKeyRef.current=key;
+      setGeneratingLink(true);
+      const linkItems=selectedItems.map(i=>({description:i.label,qty:i.qty,sku:i.sku}));
+      const info={job_id:job.id,vehicle_reg:job.vehicle_reg||"",supplier_id:chosenSupplier?.id||null,supplier_name:chosenSupplier?.name||"",supplier_phone:chosenSupplier?.phone||manualPhone||"",supplier_vat_inclusive:chosenSupplier?.vat_inclusive||false,...vehiclePayload};
+      onGenerateLink(info,linkItems).then(setGeneratedLink).catch(()=>{}).finally(()=>setGeneratingLink(false));
+    },400);
+    return ()=>clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[phone,selectedItems.map(i=>i.id).join(","),generatedLink,generatingLink]);
+
   const logSend = (viaGroup=false) => {
     if (!onLogSend) return;
     onLogSend({
@@ -3255,7 +3278,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,wsLocked=false,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,wsLocked=false,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -3450,6 +3473,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     }).catch(()=>{});
   },[wsShopPartView?.part_id, wsShopPartView?.sku, wsShopPartView?.part_photo]);
   const [refreshing,    setRefreshing]    = useState(false);
+  const [quoteRefreshing, setQuoteRefreshing] = useState(false);
+  const [vehRefreshing, setVehRefreshing] = useState(false);
   const [noteEdit,      setNoteEdit]      = useState(false);
   const [noteVal,       setNoteVal]       = useState(job.notes||"");
   const [savingNote,    setSavingNote]    = useState(false);
@@ -4821,7 +4846,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       {/* ══ QUOTE/INVOICE popup ══ */}
       {quotePopup&&wsRole!=="mechanic"&&(
         <Overlay wide maxWidth={1100} onClose={()=>setQuotePopup(false)}>
-          <MHead title={quotePopupQuoteOnly?"📋 Parts Quotation":"📝 Quote / Invoice"} onClose={()=>setQuotePopup(false)}/>
+          <MHead title={quotePopupQuoteOnly?"📋 Parts Quotation":"📝 Quote / Invoice"} onClose={()=>setQuotePopup(false)}
+            actions={onRefresh&&(
+              <button className="btn btn-ghost btn-sm" disabled={quoteRefreshing}
+                onClick={async()=>{ setQuoteRefreshing(true); try{await onRefresh();}finally{setQuoteRefreshing(false);} }}
+                style={{padding:"6px 10px",minWidth:32}} title="Refresh supplier reply prices">
+                <span style={{display:"inline-block",animation:quoteRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
+              </button>
+            )}/>
           {!quotePopupQuoteOnly&&<div style={{display:"flex",gap:6,padding:"8px 14px",borderBottom:"1px solid var(--border)"}}>
             {["quote","invoice"].map(tid=>(
               <button key={tid} onClick={()=>setQuotePopupTab(tid)} style={{
@@ -5641,7 +5673,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           )}
           {/* Actions */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
-            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos)}>🖨️ {t.wsqtPrintPdf}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos,false,vehicles)}>🖨️ {t.wsqtPrintPdf}</button>
             {/* Send Customer Quotation — prominent green button */}
             {(quote.quote_phone||job.customer_phone||quote.quote_email||job.customer_email)&&quote.status!=="converted"&&(
               <button className="btn btn-sm" style={{background:"#0f766e",color:"#fff",border:"none",fontWeight:700,flex:1,minWidth:160}}
@@ -5801,7 +5833,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               <button className="btn btn-success btn-sm" onClick={()=>setPaymentModal(true)}>💳 Payment</button>
             )}
             {!wsLocked&&<button className="btn btn-ghost btn-sm" onClick={()=>setEditingInv(true)}>✏️ Edit</button>}
-            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos)}>🖨️ Print</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos,vehicles)}>🖨️ Print</button>
             {(invoice.inv_phone||job.customer_phone)&&(
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
                 const phone=(invoice.inv_phone||job.customer_phone||"").replace(/\D/g,"");
@@ -5909,7 +5941,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             }
             <div style={{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
               <button className="btn btn-ghost btn-sm" onClick={()=>setStatementModal(true)}>📋 Statement</button>
-              <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos)}>🖨️ Print</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos,vehicles)}>🖨️ Print</button>
             </div>
           </>) : (
             <div style={{textAlign:"center",padding:"36px 16px",color:"var(--text3)"}}>
@@ -6043,7 +6075,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         };
         return(
           <Overlay onClose={()=>setMatchModelOpen(false)} wide>
-            <MHead title="🔗 Match Vehicle Model" onClose={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelLightbox(null); setMatchJobCarLightbox(null); setMatchAutoSuggestion(null); }}/>
+            <MHead title="🔗 Match Vehicle Model" onClose={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelLightbox(null); setMatchJobCarLightbox(null); setMatchAutoSuggestion(null); }}
+              actions={onRefreshVehicles&&(
+                <button className="btn btn-ghost btn-sm" disabled={vehRefreshing}
+                  onClick={async()=>{ setVehRefreshing(true); try{await onRefreshVehicles();}finally{setVehRefreshing(false);} }}
+                  style={{padding:"6px 10px",minWidth:32}} title="Fetch new vehicle data">
+                  <span style={{display:"inline-block",animation:vehRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
+                </button>
+              )}/>
             {/* Job car photos for comparison */}
             {(()=>{
               const photos=[
@@ -6294,14 +6333,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         <WsStatementModal
           invoice={invoice} job={job} items={items} settings={settings}
           onClose={()=>setStatementModal(false)}
-          onPrint={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos)}/>
+          onPrint={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos,vehicles)}/>
       )}
 
       {/* Create/Edit quote modal */}
       {quoteModal&&(
         <WsQuoteModal
           job={job} items={quoteItems} subtotal={quoteSubtotal} tax={quoteTax} total={quoteTotal}
-          existing={quote} settings={settings}
+          existing={quote} settings={settings} vehicles={vehicles}
           wsSupplierQuotes={wsSupplierQuotes}
           onSave={async(q)=>{ await onSaveQuote(q); setQuoteModal(false); }}
           onClose={()=>setQuoteModal(false)}/>

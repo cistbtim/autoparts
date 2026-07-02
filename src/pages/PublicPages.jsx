@@ -1196,6 +1196,23 @@ export function WorkshopBookingPage({token}) {
   const [problemPhotos, setProblemPhotos] = useState([null, null, null]);
   const [avail,        setAvail]        = useState(null);
 
+  // ── Language switcher — languages are whatever the shop has configured
+  // in Settings › Languages (app_translations table); English is the built-in fallback.
+  const [lang,    setLangCode] = useState(()=>{ try{ return localStorage.getItem("wsbk_lang")||"en"; }catch{ return "en"; } });
+  const [langs,   setLangs]    = useState([{lang:"en",name:"English",flag:"🇬🇧"}]);
+  const [tPacks,  setTPacks]   = useState({en:{}});
+  const t = {...T.en, ...(tPacks[lang]||{})};
+  const chooseLang = (l) => { setLangCode(l); try{ localStorage.setItem("wsbk_lang",l); }catch{} };
+
+  useEffect(()=>{
+    api.get("app_translations","active=eq.true&select=lang,name,flag,t").then(rows=>{
+      if(!Array.isArray(rows)) return;
+      const packs={en:{}}; rows.forEach(r=>{ packs[r.lang]=r.t||{}; });
+      setTPacks(packs);
+      setLangs([{lang:"en",name:"English",flag:"🇬🇧"}, ...rows.map(r=>({lang:r.lang,name:r.name||r.lang,flag:r.flag||""}))]);
+    }).catch(()=>{});
+  },[]);
+
   const cameraRef  = useRef(null);
   const galleryRef = useRef(null);
   const photoRef0  = useRef(null);
@@ -1209,12 +1226,12 @@ export function WorkshopBookingPage({token}) {
     const jsDay = d.getDay(); // 0=Sun
     const isoDay = jsDay===0 ? 7 : jsDay; // 1=Mon…7=Sun
     if(avail.working_days&&!avail.working_days.includes(isoDay)){
-      return `We are not open on ${d.toLocaleDateString("en-ZA",{weekday:"long"})}s`;
+      return `${t.wsbkNotOpenOn} ${d.toLocaleDateString("en-ZA",{weekday:"long"})}s`;
     }
     const hol = (avail.public_holidays||[]).find(h=>h.date===dateStr);
-    if(hol) return `Public holiday — ${hol.name||"Workshop closed"}`;
+    if(hol) return `${t.wsbkPublicHoliday} — ${hol.name||t.wsbkWorkshopClosedLbl}`;
     const cl = (avail.closed_dates||[]).find(c=>c.date===dateStr);
-    if(cl) return `Workshop closed — ${cl.reason||"Unavailable on this date"}`;
+    if(cl) return `${t.wsbkWorkshopClosedLbl} — ${cl.reason||"Unavailable on this date"}`;
     return null;
   };
 
@@ -1275,7 +1292,7 @@ export function WorkshopBookingPage({token}) {
       setScanLoading(false);
       setStep("details");
     }catch(e){
-      setScanError("Could not read licence disc — "+e.message+". Try a clearer, closer photo.");
+      setScanError(`${t.wsbkCouldNotRead} ${e.message}. ${t.wsbkTryClearer}`);
       setScanLoading(false);
     }
   };
@@ -1329,16 +1346,16 @@ export function WorkshopBookingPage({token}) {
 
   const submit=async()=>{
     if(!name.trim()||!phone.trim()||!complaint.trim()){
-      alert("Please fill in your name, phone number, and describe the problem.");
+      alert(t.wsbkFillRequired);
       return;
     }
     if(problemPhotos.some(p=>p?.status==="uploading")){
-      alert("Please wait for photos to finish uploading.");
+      alert(t.wsbkWaitPhotos);
       return;
     }
     if(prefDate){
       const reason=getDateUnavailableReason(prefDate);
-      if(reason){ alert(`⚠️ ${reason}\n\nPlease choose a different date before submitting.`); return; }
+      if(reason){ alert(`⚠️ ${reason}\n\n${t.wsbkChooseDifferentDate}`); return; }
     }
     setSubmitting(true);
     try{
@@ -1370,7 +1387,7 @@ export function WorkshopBookingPage({token}) {
       if(!resp.ok){ const err=await resp.text(); throw new Error(err); }
       setBookingId(id);
       setStep("done");
-    }catch(e){ alert("Failed to submit: "+e.message); }
+    }catch(e){ alert(`${t.wsbkFailedSubmit} ${e.message}`); }
     setSubmitting(false);
   };
 
@@ -1383,21 +1400,39 @@ export function WorkshopBookingPage({token}) {
   const card={background:CL.surf,borderRadius:12,padding:16,border:`1px solid ${CL.border}`,marginBottom:14};
   const lbl={fontSize:12,fontWeight:700,color:CL.text2,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6,display:"block"};
 
+  const LangSwitch=()=>(
+    langs.length>1 && (
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {langs.map(l=>(
+          <button key={l.lang} onClick={()=>chooseLang(l.lang)} title={l.name}
+            style={{padding:"4px 10px",borderRadius:20,border:`1px solid ${lang===l.lang?CL.accent:CL.border}`,
+              background:lang===l.lang?"rgba(249,115,22,.15)":"transparent",
+              color:lang===l.lang?CL.accent:CL.text2,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            {l.flag?`${l.flag} `:""}{l.lang.toUpperCase()}
+          </button>
+        ))}
+      </div>
+    )
+  );
+
   const Header=()=>(
-    <div style={{background:CL.surf,borderBottom:`1px solid ${CL.border}`,padding:"16px 20px",marginBottom:20}}>
-      <div style={{fontWeight:700,fontSize:18,color:CL.text}}>{shopInfo?.name||"Workshop"}</div>
-      <div style={{color:CL.text2,fontSize:13,marginTop:2}}>Online Booking</div>
+    <div style={{background:CL.surf,borderBottom:`1px solid ${CL.border}`,padding:"16px 20px",marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+      <div>
+        <div style={{fontWeight:700,fontSize:18,color:CL.text}}>{shopInfo?.name||"Workshop"}</div>
+        <div style={{color:CL.text2,fontSize:13,marginTop:2}}>{t.wsbkOnlineBooking}</div>
+      </div>
+      <LangSwitch/>
     </div>
   );
 
   if(shopLoading) return(
     <div style={{minHeight:"100vh",background:CL.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{color:CL.accent,fontSize:16,fontWeight:600}}>⏳ Loading…</div>
+      <div style={{color:CL.accent,fontSize:16,fontWeight:600}}>⏳ {t.wsbkLoading}</div>
     </div>
   );
   if(!wsId) return(
     <div style={{minHeight:"100vh",background:CL.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center",color:CL.text2,fontSize:15}}>❌ Invalid booking link.<br/>Please contact the workshop for a new link.</div>
+      <div style={{textAlign:"center",color:CL.text2,fontSize:15}}>❌ {t.wsbkInvalidLink}<br/>{t.wsbkInvalidLinkSub}</div>
     </div>
   );
 
@@ -1407,15 +1442,15 @@ export function WorkshopBookingPage({token}) {
       <div style={{maxWidth:460,margin:"0 auto",padding:"0 16px"}}>
         <div style={{...card,textAlign:"center",padding:"36px 20px"}}>
           <div style={{fontSize:52,marginBottom:14}}>✅</div>
-          <div style={{fontWeight:700,fontSize:20,color:CL.green,marginBottom:8}}>Booking Submitted!</div>
+          <div style={{fontWeight:700,fontSize:20,color:CL.green,marginBottom:8}}>{t.wsbkSubmitted}</div>
           <div style={{color:CL.text2,fontSize:14,lineHeight:1.6,marginBottom:16}}>
-            We received your booking request for{" "}
+            {t.wsbkReceivedFor}{" "}
             <strong style={{color:CL.text}}>{scanResult?.reg}</strong>.<br/>
-            We will contact you to confirm the appointment.
+            {t.wsbkWillContact}
           </div>
           {shopInfo?.phone&&(
             <div style={{fontSize:13,color:CL.text2}}>
-              Questions? Call us: <strong style={{color:CL.text}}>{shopInfo.phone}</strong>
+              {t.wsbkQuestionsCall} <strong style={{color:CL.text}}>{shopInfo.phone}</strong>
             </div>
           )}
           <div style={{marginTop:14,fontSize:11,color:CL.text3,fontFamily:"monospace"}}>{bookingId}</div>
@@ -1429,10 +1464,10 @@ export function WorkshopBookingPage({token}) {
       <Header/>
       <div style={{maxWidth:460,margin:"0 auto",padding:"0 16px"}}>
         <div style={card}>
-          <div style={{fontWeight:700,fontSize:16,color:CL.text,marginBottom:6}}>📷 Scan Your Licence Disc</div>
+          <div style={{fontWeight:700,fontSize:16,color:CL.text,marginBottom:6}}>📷 {t.wsbkScanTitle}</div>
           <div style={{fontSize:13,color:CL.text2,marginBottom:18,lineHeight:1.5}}>
-            Take or choose a photo of your vehicle's <strong style={{color:CL.text}}>licence disc</strong>.
-            We read the barcode to get your vehicle details automatically — no typing needed.
+            {t.wsbkScanDescPre} <strong style={{color:CL.text}}>{t.wsbkLicenceDisc}</strong>.
+            {" "}{t.wsbkScanDescPost}
           </div>
 
           {!capturedImg&&!scanLoading&&(
@@ -1440,11 +1475,11 @@ export function WorkshopBookingPage({token}) {
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
                 <button style={{...mkBtn(CL.accent),display:"flex",flexDirection:"column",alignItems:"center",gap:10,padding:"24px 12px",fontSize:13}}
                   onClick={()=>cameraRef.current?.click()}>
-                  <span style={{fontSize:36}}>📷</span>Take Photo
+                  <span style={{fontSize:36}}>📷</span>{t.wsbkTakePhoto}
                 </button>
                 <button style={{...mkBtn(CL.border,CL.text),display:"flex",flexDirection:"column",alignItems:"center",gap:10,padding:"24px 12px",fontSize:13}}
                   onClick={()=>galleryRef.current?.click()}>
-                  <span style={{fontSize:36}}>🖼️</span>Gallery / Files
+                  <span style={{fontSize:36}}>🖼️</span>{t.wsbkGalleryFiles}
                 </button>
               </div>
               <input ref={cameraRef}  type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFile}/>
@@ -1460,7 +1495,7 @@ export function WorkshopBookingPage({token}) {
 
           {scanLoading&&(
             <div style={{textAlign:"center",padding:"20px 0",color:CL.blue,fontSize:14,fontWeight:600}}>
-              🔍 Reading barcode…
+              🔍 {t.wsbkReadingBarcode}
             </div>
           )}
 
@@ -1468,12 +1503,12 @@ export function WorkshopBookingPage({token}) {
             <div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.3)",borderRadius:10,padding:14,marginTop:8}}>
               <div style={{color:CL.red,fontWeight:600,fontSize:13,marginBottom:10}}>⚠️ {scanError}</div>
               <button style={{...mkBtn(CL.border,CL.text),padding:"10px 0",fontSize:13}}
-                onClick={()=>{setCapturedImg(null);setScanError(null);}}>↺ Try Again</button>
+                onClick={()=>{setCapturedImg(null);setScanError(null);}}>↺ {t.wsbkTryAgain}</button>
             </div>
           )}
 
           <div style={{marginTop:14,padding:"10px 12px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.25)",borderRadius:8,fontSize:12,color:CL.yellow,lineHeight:1.5}}>
-            💡 <strong>Tip:</strong> Lay the disc flat on a dark surface. Make sure the silver/white barcode square is fully in frame and in focus.
+            💡 <strong>{t.wsbkTip}</strong> {t.wsbkTipBody}
           </div>
         </div>
       </div>
@@ -1492,14 +1527,14 @@ export function WorkshopBookingPage({token}) {
             <div style={{flex:1}}>
               <div style={{fontWeight:700,fontSize:18,color:CL.text,fontFamily:"monospace"}}>{scanResult?.reg}</div>
               <div style={{fontSize:13,color:CL.text2,marginTop:2}}>
-                {[scanResult?.make,scanResult?.model,scanResult?.color].filter(Boolean).join(" · ")||"Vehicle"}
+                {[scanResult?.make,scanResult?.model,scanResult?.color].filter(Boolean).join(" · ")||t.wsbkVehicleFallback}
               </div>
               {scanResult?.expiry_date&&(
                 <div style={{fontSize:11,marginTop:3,color:expiryExpired?CL.red:CL.green}}>
-                  Disc: {scanResult.expiry_date} {expiryExpired?"⚠️ EXPIRED":"✅"}
+                  {t.wsbkDiscLabel} {scanResult.expiry_date} {expiryExpired?`⚠️ ${t.wsbkExpired}`:"✅"}
                 </div>
               )}
-              {foundVehicle&&<div style={{fontSize:11,marginTop:3,color:CL.blue}}>✓ Vehicle found in our records</div>}
+              {foundVehicle&&<div style={{fontSize:11,marginTop:3,color:CL.blue}}>✓ {t.wsbkVehicleFound}</div>}
             </div>
           </div>
         </div>
@@ -1507,7 +1542,7 @@ export function WorkshopBookingPage({token}) {
         {history.length>0&&(
           <div style={card}>
             <div style={{fontWeight:700,fontSize:12,color:CL.text2,textTransform:"uppercase",letterSpacing:".04em",marginBottom:12}}>
-              📋 Your Service History — {history.length} visit{history.length!==1?"s":""}
+              📋 {t.wsbkServiceHistory} — {history.length} {history.length!==1?t.wsbkVisits:t.wsbkVisit}
             </div>
             <div style={{maxHeight:200,overflowY:"auto"}}>
               {history.map((j,i)=>(
@@ -1525,26 +1560,26 @@ export function WorkshopBookingPage({token}) {
         )}
 
         <div style={card}>
-          <div style={{fontWeight:700,fontSize:15,color:CL.text,marginBottom:16}}>Your Details</div>
+          <div style={{fontWeight:700,fontSize:15,color:CL.text,marginBottom:16}}>{t.wsbkYourDetails}</div>
           <div style={{marginBottom:14}}>
-            <label style={lbl}>Full Name *</label>
-            <input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Your full name"/>
+            <label style={lbl}>{t.wsbkFullName} *</label>
+            <input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder={t.wsbkFullNamePh}/>
           </div>
           <div style={{marginBottom:14}}>
-            <label style={lbl}>Phone Number *</label>
+            <label style={lbl}>{t.wsbkPhoneNumber} *</label>
             <input style={inp} type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+27 82 000 0000"/>
           </div>
           <div style={{marginBottom:14}}>
-            <label style={lbl}>Email (optional)</label>
+            <label style={lbl}>{t.wsbkEmailOpt}</label>
             <input style={inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com"/>
           </div>
           <div style={{marginBottom:14}}>
-            <label style={lbl}>What is the problem? *</label>
+            <label style={lbl}>{t.wsbkProblemQ} *</label>
             <textarea style={{...inp,minHeight:90,resize:"vertical"}} value={complaint}
-              onChange={e=>setComplaint(e.target.value)} placeholder="Describe the issue with your vehicle…"/>
+              onChange={e=>setComplaint(e.target.value)} placeholder={t.wsbkProblemPh}/>
           </div>
           <div style={{marginBottom:14}}>
-            <label style={lbl}>📷 Photos of the problem (optional)</label>
+            <label style={lbl}>📷 {t.wsbkPhotosLabel}</label>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:6}}>
               {[0,1,2].map(i=>{
                 const ph=problemPhotos[i];
@@ -1553,29 +1588,29 @@ export function WorkshopBookingPage({token}) {
                     style={{aspectRatio:"1",background:CL.bg,border:`2px dashed ${ph?.status==="done"?"transparent":CL.border}`,borderRadius:10,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",overflow:"hidden",position:"relative",cursor:"pointer"}}
                     onClick={()=>photoRefs[i].current?.click()}>
                     {ph?.status==="done"&&<img src={ph.dataUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>}
-                    {(!ph)&&<><span style={{fontSize:28}}>📷</span><span style={{fontSize:10,color:CL.text3,marginTop:4}}>Add photo</span></>}
-                    {ph?.status==="uploading"&&<div style={{color:CL.blue,fontSize:11,textAlign:"center",padding:4}}>⏳<br/>Uploading…</div>}
-                    {ph?.status==="error"&&<div style={{color:CL.red,fontSize:10,textAlign:"center",padding:4}}>❌ Failed<br/><span style={{fontSize:9}}>{ph.error?.slice(0,25)}</span></div>}
+                    {(!ph)&&<><span style={{fontSize:28}}>📷</span><span style={{fontSize:10,color:CL.text3,marginTop:4}}>{t.wsbkAddPhoto}</span></>}
+                    {ph?.status==="uploading"&&<div style={{color:CL.blue,fontSize:11,textAlign:"center",padding:4}}>⏳<br/>{t.wsbkUploading}</div>}
+                    {ph?.status==="error"&&<div style={{color:CL.red,fontSize:10,textAlign:"center",padding:4}}>❌ {t.wsbkFailed}<br/><span style={{fontSize:9}}>{ph.error?.slice(0,25)}</span></div>}
                     {ph?.status==="done"&&<div style={{position:"absolute",top:4,right:4,background:"rgba(52,211,153,.9)",borderRadius:99,width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}}>✓</div>}
                     <input ref={photoRefs[i]} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleProblemPhoto(e,i)}/>
                   </div>
                 );
               })}
             </div>
-            <div style={{fontSize:11,color:CL.text3}}>Tap a slot to take or choose a photo (up to 3)</div>
+            <div style={{fontSize:11,color:CL.text3}}>{t.wsbkTapSlot}</div>
           </div>
 
           <div style={{marginBottom:20}}>
-            <label style={lbl}>Preferred Date (optional)</label>
+            <label style={lbl}>{t.wsbkPrefDate}</label>
             <input style={inp} type="date" value={prefDate} onChange={e=>setPrefDate(e.target.value)}
               min={new Date().toISOString().slice(0,10)}/>
             {prefDate&&getDateUnavailableReason(prefDate)&&(
               <div style={{marginTop:8,padding:"10px 12px",background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.3)",borderRadius:8,fontSize:13,color:"#f87171",lineHeight:1.4}}>
-                ⚠️ {getDateUnavailableReason(prefDate)} — please choose a different date.
+                ⚠️ {getDateUnavailableReason(prefDate)} — {t.wsbkChooseDifferentDate}
               </div>
             )}
             {prefDate&&!getDateUnavailableReason(prefDate)&&(
-              <div style={{marginTop:6,fontSize:12,color:CL.green}}>✓ This date looks good</div>
+              <div style={{marginTop:6,fontSize:12,color:CL.green}}>✓ {t.wsbkDateGood}</div>
             )}
           </div>
           {(()=>{
@@ -1585,7 +1620,7 @@ export function WorkshopBookingPage({token}) {
             return(
               <button style={{...mkBtn((submitting||photosUploading)?"#334155":CL.accent),opacity:(submitting||photosUploading)?0.7:1}}
                 onClick={submit} disabled={submitting||photosUploading}>
-                {photosUploading?"📤 Uploading photos…":submitting?"⏳ Submitting…":"📅 Submit Booking Request"}
+                {photosUploading?`📤 ${t.wsbkUploadingPhotos}`:submitting?`⏳ ${t.wsbkSubmitting}`:`📅 ${t.wsbkSubmitBooking}`}
               </button>
             );
           })()}
@@ -1594,7 +1629,7 @@ export function WorkshopBookingPage({token}) {
         <div style={{textAlign:"center",paddingBottom:20}}>
           <button style={{background:"none",border:"none",color:CL.text3,cursor:"pointer",fontSize:12}}
             onClick={()=>{setCapturedImg(null);setScanResult(null);setFoundVehicle(null);setHistory([]);setStep("scan");}}>
-            ← Scan a different disc
+            ← {t.wsbkScanDifferent}
           </button>
         </div>
       </div>

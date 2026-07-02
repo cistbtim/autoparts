@@ -3047,7 +3047,7 @@ function GrabImageOverlay({supplierUrl,partSku,onSave,onClose}) {
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onGoBack=null}) {
+export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onGoBack=null}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -3072,6 +3072,7 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
   const [saved, setSaved] = useState(false);
   const [oppConfirm, setOppConfirm] = useState(null);
   const [newPartConfirm, setNewPartConfirm] = useState(null); // {copyFits, copyVehicleInfo}
+  const [deleting, setDeleting] = useState(false);
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
   const [catalogSearch,setCatalogSearch]=useState("");
   const [suppId,setSuppId]=useState("");
@@ -3158,7 +3159,14 @@ export function PartModal({part,onSave,onClose,t,vehicles=[],partFitments=[],onS
 
   return (
     <Overlay onClose={handleClose} wide>
-      <MHead title={part?`✏️ ${t.pmEditPart}`:`+ ${t.pmNewPart}`} onClose={handleClose}/>
+      <MHead title={part?`✏️ ${t.pmEditPart}`:`+ ${t.pmNewPart}`} onClose={handleClose}
+        actions={part&&onDelete&&(
+          <button className="btn btn-danger btn-sm" disabled={deleting} onClick={async()=>{
+            if(!window.confirm(`Delete ${part.sku||"this part"}${part.name?" · "+part.name:""}? This cannot be undone.`)) return;
+            setDeleting(true);
+            try{ await onDelete(part); }finally{ setDeleting(false); }
+          }}>{deleting?"Deleting…":"🗑️ Delete"}</button>
+        )}/>
       {onGoBack&&(
         <button className="btn btn-ghost btn-sm" style={{marginBottom:10,fontSize:12,color:"var(--blue)"}} onClick={onGoBack}>
           ← Back to Supplier Catalogue

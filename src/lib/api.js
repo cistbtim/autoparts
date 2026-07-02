@@ -91,6 +91,16 @@ export const api = {
     try { return JSON.parse(await resp.text()); } catch { return []; }
   },
 
+  // Row count only — no data transferred. Uses HEAD + Prefer:count=exact so
+  // polling loops (e.g. "any new bookings?") stay cheap even on a tight interval.
+  count: async (t, q = "") => {
+    const url = `${SUPABASE_URL}/rest/v1/${t}?${q}`;
+    const resp = await fetch(url, { method: "HEAD", headers: H({ Prefer: "count=exact" }) });
+    const range = resp.headers.get("content-range") || "";
+    const total = parseInt(range.split("/")[1], 10);
+    return isNaN(total) ? 0 : total;
+  },
+
   // Fetch remaining pages starting from startOffset.
   // Calls onPage(allExtraRowsSoFar) after each page arrives.
   // Returns all extra rows when done.

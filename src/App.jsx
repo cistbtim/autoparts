@@ -1736,6 +1736,34 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setWsBookings(Array.isArray(bk)?bk:[]);
   };
 
+  // ── Lightweight booking-count poll ──────────────────────────────
+  // Runs continuously while inside the workshop module without re-triggering
+  // the full loadAll() sync (which stays paused there to save reads/avoid
+  // interrupting kanban work). Each tick is a HEAD request — no row data —
+  // so it's cheap enough to run every 45s. Only does a real (cached-busting)
+  // refresh + toast when the pending count actually goes up.
+  const pendingBookingCountRef = useRef(null); // null until first successful check
+  useEffect(()=>{
+    if(!(role==="workshop"||role==="admin"||role==="manager")) return;
+    const WORKSHOP_TABS=["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop"];
+    const check=async()=>{
+      if(document.hidden) return; // don't burn quota while backgrounded/minimized
+      if(!WORKSHOP_TABS.includes(tabRef.current)) return; // only relevant inside the workshop module
+      const n=await api.count("workshop_bookings",`status=eq.pending${wsF}`).catch(()=>null);
+      if(n===null) return;
+      if(pendingBookingCountRef.current!==null && n>pendingBookingCountRef.current){
+        const added=n-pendingBookingCountRef.current;
+        api.cacheInvalidate("workshop_bookings");
+        await refreshWsBookings();
+        showToast(`🔔 ${added} new booking${added>1?"s":""} received`);
+      }
+      pendingBookingCountRef.current=n;
+    };
+    check();
+    const id=setInterval(check,45000);
+    return ()=>clearInterval(id);
+  },[role,wsF]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Workshop Supplier Invoices ────────────────────────────────
   const saveWsSupplierInvoice=async(inv,lineItems=[])=>{
     const chk=(r,l)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${l}: ${r.message||r.code}`); return r; };
@@ -5912,6 +5940,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           nextPart={nextPart}
           vehicles={vehicles} partFitments={partFitments}
           onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart}
+          onDelete={ep&&canEditPart(ep)?async(p)=>{ if(p.id)releaseLock("part",p.id); await deletePart(p.id); closeM("editPart"); }:null}
           onCreateOpposite={createOpposite}
           onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}}
           onGoSupplier={async(p)=>{closeM("editPart");await loadPartSuppliers();openM("partSupplier",p);}}

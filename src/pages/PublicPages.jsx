@@ -7,6 +7,25 @@ import { CSS } from "../styles.js";
 import { ShopLogo, MHead, FG, FD, FL } from "../components/shared.jsx";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
+// Match the browser/device's preferred language against a list of configured
+// lang codes (arbitrary, admin-chosen — not guaranteed to be strict ISO 639-1).
+// Tries exact tag, then primary subtag, then a small alias table for common
+// mismatches (e.g. shop configured "cn" for Chinese instead of "zh").
+const detectDeviceLang = (availableCodes) => {
+  if (typeof navigator === "undefined") return null;
+  const avail = new Set((availableCodes || []).map(c => (c || "").toLowerCase()));
+  const aliases = { zh: ["cn", "zh-cn", "zh-hans", "zh-hant", "zh-tw", "zh-hk"], cn: ["zh"] };
+  const prefs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language].filter(Boolean);
+  for (const raw of prefs) {
+    const full = (raw || "").toLowerCase();     // e.g. "zh-cn"
+    const primary = full.split("-")[0];         // e.g. "zh"
+    if (avail.has(full)) return full;
+    if (avail.has(primary)) return primary;
+    for (const alt of (aliases[primary] || [])) if (avail.has(alt)) return alt;
+  }
+  return null;
+};
+
 export function RfqReplyPage({token,lang}) {
   const [inq,setInq]=useState(null);const [loaded,setLoaded]=useState(false);
   const [rp,setRp]=useState("");const [rs,setRs]=useState("");const [rn,setRn]=useState("");
@@ -1198,7 +1217,9 @@ export function WorkshopBookingPage({token}) {
 
   // ── Language switcher — languages are whatever the shop has configured
   // in Settings › Languages (app_translations table); English is the built-in fallback.
-  const [lang,    setLangCode] = useState(()=>{ try{ return localStorage.getItem("wsbk_lang")||"en"; }catch{ return "en"; } });
+  // Preference order: explicit past choice (localStorage) > device language > English.
+  const storedLangRef = useRef((()=>{ try{ return localStorage.getItem("wsbk_lang"); }catch{ return null; } })());
+  const [lang,    setLangCode] = useState(()=> storedLangRef.current || "en");
   const [langs,   setLangs]    = useState([{lang:"en",name:"English",flag:"🇬🇧"}]);
   const [tPacks,  setTPacks]   = useState({en:{}});
   const t = {...T.en, ...(tPacks[lang]||{})};
@@ -1209,7 +1230,13 @@ export function WorkshopBookingPage({token}) {
       if(!Array.isArray(rows)) return;
       const packs={en:{}}; rows.forEach(r=>{ packs[r.lang]=r.t||{}; });
       setTPacks(packs);
-      setLangs([{lang:"en",name:"English",flag:"🇬🇧"}, ...rows.map(r=>({lang:r.lang,name:r.name||r.lang,flag:r.flag||""}))]);
+      const list=[{lang:"en",name:"English",flag:"🇬🇧"}, ...rows.map(r=>({lang:r.lang,name:r.name||r.lang,flag:r.flag||""}))];
+      setLangs(list);
+      // First-time visitor (no saved preference) — try to match their device/browser language.
+      if(!storedLangRef.current){
+        const detected=detectDeviceLang(list.map(l=>l.lang));
+        if(detected && detected!=="en") setLangCode(detected);
+      }
     }).catch(()=>{});
   },[]);
 

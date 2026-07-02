@@ -30,7 +30,7 @@ window.addEventListener("popstate",()=>{
 },{capture:true});
 
 const APP_VERSION = "2.0.0.1";
-const APP_UPDATE_DATE = "2026-07-02";
+const APP_UPDATE_DATE = __BUILD_DATE__;
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {

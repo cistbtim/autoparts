@@ -5,7 +5,7 @@ import { decodePDF417fromImage, parseLicenceDisc } from "../../lib/barcode.js";
 import { Overlay, MHead, FL, ImgLightbox } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 
-export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],onSaveJob,onReopenJob,onClose}) {
+export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],onSaveJob,onReopenJob,onClose,userCtx=null}) {
   const [step,setStep]=useState("scan");
   const [plate,setPlate]=useState("");
   const [scanLoading,setScanLoading]=useState(false);
@@ -28,6 +28,11 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
   const [vinPickSearch,setVinPickSearch]=useState("");
   const [vinPickSelected,setVinPickSelected]=useState(null);
   const [vinPickLightbox,setVinPickLightbox]=useState(null);
+  // request-unmatched-vehicle-to-admin
+  const [reqOpen,setReqOpen]=useState(false);
+  const [reqSaving,setReqSaving]=useState(false);
+  const [reqDone,setReqDone]=useState(false);
+  const [reqForm,setReqForm]=useState({make:"",model:"",year_from:"",year_to:"",vin:"",engine_no:"",reg:"",notes:""});
   // job prefill for WorkshopJobModal
   const [jobPrefill,setJobPrefill]=useState(null);
   const [savingIntake,setSavingIntake]=useState(false);
@@ -259,7 +264,7 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
             {modelCards.length===0
               ? <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>
                   No {scanResult?.make||""} vehicles found in your records yet.<br/>
-                  <span style={{fontSize:12}}>Skip and enter the model manually.</span>
+                  <span style={{fontSize:12}}>Skip and enter the model manually, or send a request to admin below.</span>
                 </div>
               : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:16}}>
                   {modelCards.map(v=>{
@@ -333,6 +338,54 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
               );
             })()}
           </>
+        )}
+
+        {/* Can't match the car — send request to admin */}
+        {reqDone&&<div style={{marginBottom:16,padding:"8px 12px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,fontSize:12,color:"var(--green)",fontWeight:600}}>✅ Vehicle request sent — admin will add it shortly.</div>}
+        {!reqDone&&!reqOpen&&(
+          <button className="btn btn-ghost btn-sm" style={{marginBottom:16,color:"var(--text3)"}}
+            onClick={()=>{
+              setReqForm({make:(scanResult?.make||"").toUpperCase(),model:vinPickSearch.toUpperCase(),year_from:"",year_to:"",vin:scanResult?.vin||"",engine_no:"",reg:plate||"",notes:""});
+              setReqOpen(true);
+            }}>
+            🚗 Can't find the right car? Send request to admin
+          </button>
+        )}
+        {reqOpen&&(
+          <div style={{marginBottom:16,background:"rgba(99,102,241,.06)",border:"1px solid rgba(99,102,241,.25)",borderRadius:10,padding:"12px 14px"}}>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:"var(--accent)"}}>🚗 Request New Vehicle</div>
+            <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+              <input className="inp" placeholder="Make *" value={reqForm.make} onChange={e=>setReqForm(p=>({...p,make:e.target.value.toUpperCase()}))} style={{flex:"1 1 100px",textTransform:"uppercase"}}/>
+              <input className="inp" placeholder="Model *" value={reqForm.model} onChange={e=>setReqForm(p=>({...p,model:e.target.value.toUpperCase()}))} style={{flex:"1 1 100px",textTransform:"uppercase"}}/>
+            </div>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <input className="inp" placeholder="Year from *" type="number" value={reqForm.year_from} onChange={e=>setReqForm(p=>({...p,year_from:e.target.value}))} style={{flex:1}}/>
+              <input className="inp" placeholder="Year to" type="number" value={reqForm.year_to} onChange={e=>setReqForm(p=>({...p,year_to:e.target.value}))} style={{flex:1}}/>
+            </div>
+            <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+              <input className="inp" placeholder="VIN" value={reqForm.vin} onChange={e=>setReqForm(p=>({...p,vin:e.target.value.toUpperCase()}))} style={{flex:"2 1 120px",fontFamily:"monospace",textTransform:"uppercase"}}/>
+              <input className="inp" placeholder="Engine No" value={reqForm.engine_no} onChange={e=>setReqForm(p=>({...p,engine_no:e.target.value.toUpperCase()}))} style={{flex:"1 1 80px",fontFamily:"monospace",textTransform:"uppercase"}}/>
+              <input className="inp" placeholder="Reg" value={reqForm.reg} onChange={e=>setReqForm(p=>({...p,reg:e.target.value.toUpperCase()}))} style={{flex:"1 1 70px",textTransform:"uppercase"}}/>
+            </div>
+            <input className="inp" placeholder="Notes (optional)" value={reqForm.notes} onChange={e=>setReqForm(p=>({...p,notes:e.target.value}))} style={{marginBottom:10}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-primary btn-sm" disabled={reqSaving||!reqForm.make.trim()||!reqForm.model.trim()||!reqForm.year_from} onClick={async()=>{
+                setReqSaving(true);
+                try{
+                  await api.insert("vehicle_requests",{
+                    make:reqForm.make.trim(),model:reqForm.model.trim(),
+                    year_from:reqForm.year_from?+reqForm.year_from:null,
+                    year_to:reqForm.year_to?+reqForm.year_to:null,
+                    vin:reqForm.vin||null,engine_no:reqForm.engine_no||null,reg:reqForm.reg||null,
+                    notes:reqForm.notes||null,
+                    status:"pending",requested_by:userCtx?.id||null,branch_id:null,
+                  });
+                  setReqDone(true);setReqOpen(false);
+                }catch{}finally{setReqSaving(false);}
+              }}>{reqSaving?"Sending…":"Send Request"}</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setReqOpen(false)}>Cancel</button>
+            </div>
+          </div>
         )}
 
         <div style={{display:"flex",gap:8,marginTop:4}}>

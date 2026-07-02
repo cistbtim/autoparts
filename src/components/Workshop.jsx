@@ -286,6 +286,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         initialTab={jobDetailTab}
         onRefresh={onRefresh}
         wsLocked={wsLocked}
+        userCtx={userCtx}
         t={t} lang={lang}/>
     );
   }
@@ -1972,7 +1973,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
       {/* ── Modals ── */}
       {bookIn&&(
-        <BookInModal wsCustomers={wsCustomers} wsVehicles={wsVehicles} vehicles={vehicles} jobs={jobs} settings={settings}
+        <BookInModal wsCustomers={wsCustomers} wsVehicles={wsVehicles} vehicles={vehicles} jobs={jobs} settings={settings} userCtx={userCtx}
           onSaveJob={async(d)=>{ await onSaveJob(d); setBookIn(false); }}
           onReopenJob={async(d)=>{ await onSaveJob(d); setBookIn(false); setActiveJob(d); setView("job"); }}
           onClose={()=>setBookIn(false)} t={t}/>
@@ -3278,7 +3279,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,wsLocked=false,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -3352,6 +3353,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [matchJobCarLightbox, setMatchJobCarLightbox] = useState(null); // null | index — for job car photos at top
   const [matchModelSelected, setMatchModelSelected] = useState(null);
   const [matchAutoSuggestion, setMatchAutoSuggestion] = useState(null); // { vehicle, source: 'cache'|'year', yearDecoded? }
+  // request-unmatched-vehicle-to-admin (Match Vehicle Model modal)
+  const [matchReqOpen, setMatchReqOpen] = useState(false);
+  const [matchReqSaving, setMatchReqSaving] = useState(false);
+  const [matchReqDone, setMatchReqDone] = useState(false);
+  const [matchReqForm, setMatchReqForm] = useState({make:"",model:"",year_from:"",year_to:"",vin:"",engine_no:"",reg:"",notes:"",photo1:"",photo2:""});
 
   useEffect(()=>{
     if(!matchModelOpen){ setMatchAutoSuggestion(null); setMatchModelSelected(null); return; }
@@ -6273,7 +6279,65 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 </div>
               );
             })()}
-            <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelSelected(null); setMatchAutoSuggestion(null); }}>Cancel</button>
+            {/* Can't match the car — send request to admin */}
+            {matchReqDone&&<div style={{marginBottom:12,padding:"8px 12px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,fontSize:12,color:"var(--green)",fontWeight:600}}>✅ Vehicle request sent — admin will add it shortly.</div>}
+            {!matchReqDone&&!matchReqOpen&&(
+              <button className="btn btn-ghost btn-sm" style={{width:"100%",marginBottom:12,color:"var(--text3)"}}
+                onClick={()=>{
+                  setMatchReqForm({make:(job.vehicle_make||"").toUpperCase(),model:(matchModelSearch||job.vehicle_model||"").toUpperCase(),year_from:job.vehicle_year||"",year_to:"",vin:job.vin||"",engine_no:job.engine_no||"",reg:job.vehicle_reg||"",notes:"",photo1:toImgUrl(vehiclePhotos.front||""),photo2:toImgUrl(vehiclePhotos.rear||"")});
+                  setMatchReqOpen(true);
+                }}>
+                🚗 Can't find the right car? Send request to admin
+              </button>
+            )}
+            {matchReqOpen&&(
+              <div style={{marginBottom:12,background:"rgba(99,102,241,.06)",border:"1px solid rgba(99,102,241,.25)",borderRadius:10,padding:"12px 14px"}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:"var(--accent)"}}>🚗 Request New Vehicle</div>
+                <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                  <input className="inp" placeholder="Make *" value={matchReqForm.make} onChange={e=>setMatchReqForm(p=>({...p,make:e.target.value.toUpperCase()}))} style={{flex:"1 1 100px",textTransform:"uppercase"}}/>
+                  <input className="inp" placeholder="Model *" value={matchReqForm.model} onChange={e=>setMatchReqForm(p=>({...p,model:e.target.value.toUpperCase()}))} style={{flex:"1 1 100px",textTransform:"uppercase"}}/>
+                </div>
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  <input className="inp" placeholder="Year from *" type="number" value={matchReqForm.year_from} onChange={e=>setMatchReqForm(p=>({...p,year_from:e.target.value}))} style={{flex:1}}/>
+                  <input className="inp" placeholder="Year to" type="number" value={matchReqForm.year_to} onChange={e=>setMatchReqForm(p=>({...p,year_to:e.target.value}))} style={{flex:1}}/>
+                </div>
+                <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                  <input className="inp" placeholder="VIN" value={matchReqForm.vin} onChange={e=>setMatchReqForm(p=>({...p,vin:e.target.value.toUpperCase()}))} style={{flex:"2 1 120px",fontFamily:"monospace",textTransform:"uppercase"}}/>
+                  <input className="inp" placeholder="Engine No" value={matchReqForm.engine_no} onChange={e=>setMatchReqForm(p=>({...p,engine_no:e.target.value.toUpperCase()}))} style={{flex:"1 1 80px",fontFamily:"monospace",textTransform:"uppercase"}}/>
+                  <input className="inp" placeholder="Reg" value={matchReqForm.reg} onChange={e=>setMatchReqForm(p=>({...p,reg:e.target.value.toUpperCase()}))} style={{flex:"1 1 70px",textTransform:"uppercase"}}/>
+                </div>
+                <input className="inp" placeholder="Notes (optional)" value={matchReqForm.notes} onChange={e=>setMatchReqForm(p=>({...p,notes:e.target.value}))} style={{marginBottom:10}}/>
+                {(matchReqForm.photo1||matchReqForm.photo2)&&(
+                  <div style={{display:"flex",gap:8,marginBottom:10}}>
+                    {[["Front",matchReqForm.photo1],["Rear",matchReqForm.photo2]].filter(([,u])=>u).map(([label,url])=>(
+                      <div key={label} style={{flex:1,borderRadius:8,overflow:"hidden",border:"1px solid var(--border)"}}>
+                        <img src={url} alt={label} style={{width:"100%",height:80,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
+                        <div style={{fontSize:10,textAlign:"center",padding:"3px 0",color:"var(--text3)",background:"var(--surface2)"}}>📎 {label} attached</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn btn-primary btn-sm" disabled={matchReqSaving||!matchReqForm.make.trim()||!matchReqForm.model.trim()||!matchReqForm.year_from} onClick={async()=>{
+                    setMatchReqSaving(true);
+                    try{
+                      await api.insert("vehicle_requests",{
+                        make:matchReqForm.make.trim(),model:matchReqForm.model.trim(),
+                        year_from:matchReqForm.year_from?+matchReqForm.year_from:null,
+                        year_to:matchReqForm.year_to?+matchReqForm.year_to:null,
+                        vin:matchReqForm.vin||null,engine_no:matchReqForm.engine_no||null,reg:matchReqForm.reg||null,
+                        notes:matchReqForm.notes||null,
+                        photo1:matchReqForm.photo1||null,photo2:matchReqForm.photo2||null,
+                        status:"pending",requested_by:userCtx?.id||null,branch_id:null,
+                      });
+                      setMatchReqDone(true);setMatchReqOpen(false);
+                    }catch{}finally{setMatchReqSaving(false);}
+                  }}>{matchReqSaving?"Sending…":"Send Request"}</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setMatchReqOpen(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
+            <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelSelected(null); setMatchAutoSuggestion(null); setMatchReqOpen(false); setMatchReqDone(false); }}>Cancel</button>
           </Overlay>
         );
       })()}

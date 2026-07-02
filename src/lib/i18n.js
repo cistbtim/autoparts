@@ -303,6 +303,7 @@ export const T = {
     wsbkCouldNotRead: "Could not read licence disc —",
     wsbkTryClearer: "Try a clearer, closer photo.",
     wsbkLanguage: "Language",
+    wsbkGetDirections: "Get Directions",
   },
 };
 

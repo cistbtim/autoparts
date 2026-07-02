@@ -1264,7 +1264,7 @@ export function WorkshopBookingPage({token}) {
 
   useEffect(()=>{
     // Look up workshop by opaque booking token — never expose the UUID in the URL
-    fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles?booking_token=eq.${encodeURIComponent(token)}&select=id,name,phone,email,working_days,public_holidays,closed_dates`,
+    fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles?booking_token=eq.${encodeURIComponent(token)}&select=id,name,phone,email,address,logo_url,logo_data,working_days,public_holidays,closed_dates`,
       {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}})
       .then(r=>r.json())
       .then(rows=>{
@@ -1442,13 +1442,31 @@ export function WorkshopBookingPage({token}) {
     )
   );
 
+  const shopLogo = shopInfo?.logo_url || shopInfo?.logo_data || "";
+  const shopAddress = shopInfo?.address || "";
+  const directionsUrl = shopAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shopAddress)}` : "";
+
   const Header=()=>(
-    <div style={{background:CL.surf,borderBottom:`1px solid ${CL.border}`,padding:"16px 20px",marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
-      <div>
-        <div style={{fontWeight:700,fontSize:18,color:CL.text}}>{shopInfo?.name||"Workshop"}</div>
-        <div style={{color:CL.text2,fontSize:13,marginTop:2}}>{t.wsbkOnlineBooking}</div>
+    <div style={{background:CL.surf,borderBottom:`1px solid ${CL.border}`,padding:"16px 20px",marginBottom:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {shopLogo&&<img src={shopLogo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:"contain",background:"#fff",flexShrink:0}} onError={e=>e.target.style.display="none"}/>}
+          <div>
+            <div style={{fontWeight:700,fontSize:18,color:CL.text}}>{shopInfo?.name||"Workshop"}</div>
+            <div style={{color:CL.text2,fontSize:13,marginTop:2}}>{t.wsbkOnlineBooking}</div>
+          </div>
+        </div>
+        <LangSwitch/>
       </div>
-      <LangSwitch/>
+      {shopAddress&&(
+        <div style={{marginTop:10,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <span style={{color:CL.text2,fontSize:12}}>📍 {shopAddress}</span>
+          <a href={directionsUrl} target="_blank" rel="noopener noreferrer"
+            style={{fontSize:12,fontWeight:700,color:CL.accent,textDecoration:"none",border:`1px solid ${CL.accent}55`,borderRadius:20,padding:"3px 10px"}}>
+            🧭 {t.wsbkGetDirections}
+          </a>
+        </div>
+      )}
     </div>
   );
 

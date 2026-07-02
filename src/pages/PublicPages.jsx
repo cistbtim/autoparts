@@ -1452,40 +1452,40 @@ export function WorkshopBookingPage({token}) {
   const pillLink = {fontSize:12,fontWeight:700,textDecoration:"none",borderRadius:20,padding:"3px 10px",display:"inline-flex",alignItems:"center",gap:4};
 
   const Header=()=>(
-    <div style={{background:CL.surf,borderBottom:`1px solid ${CL.border}`,padding:"16px 20px",marginBottom:20}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          {shopLogo&&<img src={shopLogo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:"contain",background:"#fff",flexShrink:0}} onError={e=>e.target.style.display="none"}/>}
-          <div>
-            <div style={{fontWeight:700,fontSize:18,color:CL.text}}>{shopInfo?.name||"Workshop"}</div>
-            <div style={{color:CL.text2,fontSize:13,marginTop:2}}>{t.wsbkOnlineBooking}</div>
+    <div style={{background:CL.surf,borderBottom:`1px solid ${CL.border}`,paddingBottom:16,marginBottom:20}}>
+      <div style={{maxWidth:460,margin:"0 auto",padding:"16px 16px 0",display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center"}}>
+        {shopLogo&&<img src={shopLogo} alt="" style={{width:"100%",height:200,borderRadius:14,objectFit:"contain",background:"#fff",marginBottom:14,display:"block"}} onError={e=>e.target.style.display="none"}/>}
+        <div style={{fontWeight:700,fontSize:20,color:CL.text}}>{shopInfo?.name||"Workshop"}</div>
+        <div style={{color:CL.text2,fontSize:13,marginTop:2}}>{t.wsbkOnlineBooking}</div>
+
+        <div style={{marginTop:10}}><LangSwitch/></div>
+
+        {(shopPhone||shopWhatsApp)&&(
+          <div style={{marginTop:10,display:"flex",justifyContent:"center",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            {shopPhone&&(
+              <a href={`tel:${shopPhone}`}
+                style={{...pillLink,color:CL.blue,border:`1px solid ${CL.blue}55`}}>
+                📞 {t.wsbkCall}
+              </a>
+            )}
+            {shopWhatsApp&&(
+              <a href={waLink(shopWhatsApp,waMsg)} target="_blank" rel="noopener noreferrer"
+                style={{...pillLink,color:CL.green,border:`1px solid ${CL.green}55`}}>
+                💬 {t.wsbkWhatsApp}
+              </a>
+            )}
           </div>
-        </div>
-        <LangSwitch/>
-      </div>
-      {(shopAddress||shopPhone||shopWhatsApp)&&(
-        <div style={{marginTop:10,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          {shopAddress&&<span style={{color:CL.text2,fontSize:12}}>📍 {shopAddress}</span>}
-          {shopAddress&&(
+        )}
+        {shopAddress&&(
+          <div style={{marginTop:8,display:"flex",justifyContent:"center",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{color:CL.text2,fontSize:12}}>📍 {shopAddress}</span>
             <a href={directionsUrl} target="_blank" rel="noopener noreferrer"
               style={{...pillLink,color:CL.accent,border:`1px solid ${CL.accent}55`}}>
               🧭 {t.wsbkGetDirections}
             </a>
-          )}
-          {shopPhone&&(
-            <a href={`tel:${shopPhone}`}
-              style={{...pillLink,color:CL.blue,border:`1px solid ${CL.blue}55`}}>
-              📞 {t.wsbkCall}
-            </a>
-          )}
-          {shopWhatsApp&&(
-            <a href={waLink(shopWhatsApp,waMsg)} target="_blank" rel="noopener noreferrer"
-              style={{...pillLink,color:CL.green,border:`1px solid ${CL.green}55`}}>
-              💬 {t.wsbkWhatsApp}
-            </a>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 

@@ -695,6 +695,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(tab==="inventory"||tab==="suppliers"||tab==="pos") loadPartSuppliers();
   },[tab,loadPartSuppliers]);
 
+  // Scoped load — when the Edit Part modal opens for a specific part (e.g. from Workshop's
+  // Spare Shop tab, which never visits inventory/suppliers/pos), fetch just that part's
+  // supplier links instead of waiting on the full-table lazy load above. Re-fires whenever
+  // the open part changes so switching parts always shows the right supplier code.
+  useEffect(()=>{
+    const pid=M.editPart?.data?.id;
+    if(!pid||psLoadedRef.current) return;
+    let cancelled=false;
+    (async()=>{
+      const data=await api.get("part_suppliers",`part_id=eq.${pid}&select=*`);
+      if(cancelled||!Array.isArray(data)) return;
+      setPartSuppliers(prev=>[...prev.filter(ps=>ps.part_id!==pid),...data]);
+    })();
+    return ()=>{cancelled=true;};
+  },[M.editPart?.data?.id]);
+
   // Targeted refresh — fetch only the tables that a mutation actually dirtied.
   // Cuts ~40-table loadAll() down to 1-4 requests per save operation.
   const refreshTables=useCallback(async(...names)=>{
@@ -5678,6 +5694,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             wsSubStatus={role==="workshop"?(subStatus?.status??sub?.status??null):null}
             onGoToSpareShopTab={()=>setTab("wsspareshop")}
             onEditPart={async(p)=>{const ok=await acquireLock("part",p.id);if(!ok)return;const fresh=await api.get("parts",`id=eq.${p.id}&select=*`);openM("editPart",Array.isArray(fresh)&&fresh[0]?fresh[0]:p);}}
+            onDeletePart={async(p)=>{await deletePart(p.id);}}
             t={t} lang={lang}/>
         )}
 

@@ -384,6 +384,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     email:      workshopProfile.email     || settings.email,
     address:    workshopProfile.address   || settings.address,
     vat_number: workshopProfile.vat_number|| settings.vat_number,
+    tax_rate:   workshopProfile.tax_rate  ?? settings.tax_rate,
     currency:   workshopProfile.currency  || settings.currency || "ZAR R",
     city:       workshopProfile.city      || "",
     country:    workshopProfile.country   || "",
@@ -400,6 +401,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     email:     currentBranch.email     || settings.email,
     address:   currentBranch.address   || settings.address,
     currency:  currentBranch.currency  || settings.currency || "ZAR R",
+  } : settings;
+
+  // Branch-scoped tax override for the main shop invoice/report flow (not workshop/scrapyard —
+  // those use wsDisplaySettings above). Falls back to global settings when the branch has no
+  // override, so single-country (South Africa) behavior is unchanged.
+  const invoiceSettings = currentBranch ? {
+    ...settings,
+    tax_rate:   currentBranch.tax_rate ?? settings.tax_rate,
+    vat_number: currentBranch.vat_number || settings.vat_number,
   } : settings;
 
   const _bId=isBranchUser?user.branch_id||null:null; // branch_id for save-side isolation
@@ -2778,7 +2788,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(role==="branch_admin"){const isMain=!p.branch_id||p.branch_id===mainBranchId;const isOwn=p.branch_id===branchId;return (isMain||isOwn)&&p.stock<=p.min_stock;}
     return (branchId?p.branch_id===branchId:true)&&p.stock<=p.min_stock;
   });
-  const _vatMult=1+(settings.tax_rate||0)/100;
+  const _vatMult=1+(invoiceSettings.tax_rate||0)/100;
   const quantumStockValue=+displayParts.reduce((s,p)=>p.is_quantum&&(p.stock??0)>0?s+(p.stock??0)*(p.cost_price??0)*_vatMult:s,0).toFixed(2);
   const hiaceStockValue=+displayParts.reduce((s,p)=>p.is_hiace&&(p.stock??0)>0?s+(p.stock??0)*(p.cost_price??0)*_vatMult:s,0).toFixed(2);
   const othersStockValue=+displayParts.reduce((s,p)=>!p.is_quantum&&!p.is_hiace&&(p.stock??0)>0?s+(p.stock??0)*(p.cost_price??0)*_vatMult:s,0).toFixed(2);
@@ -6036,15 +6046,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {isOpen("editCustomer")&&<CustomerModal customer={mData("editCustomer")} onSave={saveCustomer} onClose={()=>closeM("editCustomer")} t={t}/>}
       {isOpen("editUser")&&<UserModal user={mData("editUser")} onSave={saveUser} onClose={()=>closeM("editUser")} t={t}/>}
       {isOpen("custHistory")&&<CustHistoryModal customer={mData("custHistory")} orders={orders.filter(o=>o.customer_phone===mData("custHistory")?.phone)} onClose={()=>closeM("custHistory")}/>}
-      {isOpen("supplierInvoice")&&<SupplierInvoiceModal data={mData("supplierInvoice")} suppliers={suppliers} parts={parts} onSave={saveSupplierInvoice} onDelete={deleteSupplierInvoice} onStockIn={stockInInvoice} onClose={()=>closeM("supplierInvoice")} t={t} settings={settings} role={role} branchId={branchId} branchStock={branchStock}/>}
-      {isOpen("viewSupplierInvoice")&&<ViewSupplierInvoiceModal inv={mData("viewSupplierInvoice")} onClose={()=>closeM("viewSupplierInvoice")} settings={settings}/>}
+      {isOpen("supplierInvoice")&&<SupplierInvoiceModal data={mData("supplierInvoice")} suppliers={suppliers} parts={parts} onSave={saveSupplierInvoice} onDelete={deleteSupplierInvoice} onStockIn={stockInInvoice} onClose={()=>closeM("supplierInvoice")} t={t} settings={invoiceSettings} role={role} branchId={branchId} branchStock={branchStock}/>}
+      {isOpen("viewSupplierInvoice")&&<ViewSupplierInvoiceModal inv={mData("viewSupplierInvoice")} onClose={()=>closeM("viewSupplierInvoice")} settings={invoiceSettings}/>}
       {isOpen("printPartLabel")&&<PrintPartLabelModal part={mData("printPartLabel")} settings={{...settings,...(currentBranch||{})}} onClose={()=>closeM("printPartLabel")}/>}
       {isOpen("printShelfLabel")&&<PrintShelfLabelModal settings={{...settings,...(currentBranch||{})}} onClose={()=>closeM("printShelfLabel")}/>}
       {isOpen("importCatalogue")&&<CatalogueImportModal suppliers={suppliers} parts={parts} vehicles={vehicles} onClose={()=>closeM("importCatalogue")} onImportDone={({newParts,newLinks,newFits})=>{if(newParts.length){setParts(prev=>[...prev,...newParts]);db.parts.bulkPut(newParts).catch(()=>{});}if(newLinks.length)setPartSuppliers(prev=>[...prev,...newLinks]);if(newFits.length)setPartFitments(prev=>[...prev,...newFits]);}}/>}
       {isOpen("bulkImages")&&<BulkImageImportModal parts={parts} partSuppliers={partSuppliers} onClose={()=>closeM("bulkImages")} onImageUpdated={(id,url)=>setParts(prev=>prev.map(p=>p.id===id?{...p,image_url:url}:p))}/>}
       {isOpen("supplierReturn")&&<SupplierReturnModal data={mData("supplierReturn")} suppliers={suppliers} parts={parts} supplierInvoices={supplierInvoices} onSave={saveSupplierReturn} onClose={()=>closeM("supplierReturn")} t={t} settings={settings}/>}
-      {isOpen("customerInvoice")&&<CustomerInvoiceModal data={mData("customerInvoice")} customers={customers} parts={parts} orders={orders} onSave={saveCustomerInvoice} onClose={()=>closeM("customerInvoice")} t={t} settings={settings}/>}
-      {isOpen("viewCustomerInvoice")&&<ViewCustomerInvoiceModal inv={mData("viewCustomerInvoice")} onClose={()=>closeM("viewCustomerInvoice")} settings={settings}/>}
+      {isOpen("customerInvoice")&&<CustomerInvoiceModal data={mData("customerInvoice")} customers={customers} parts={parts} orders={orders} onSave={saveCustomerInvoice} onClose={()=>closeM("customerInvoice")} t={t} settings={invoiceSettings}/>}
+      {isOpen("viewCustomerInvoice")&&<ViewCustomerInvoiceModal inv={mData("viewCustomerInvoice")} onClose={()=>closeM("viewCustomerInvoice")} settings={invoiceSettings}/>}
 
       {/* Workshop order ready popup — shown after invoice save when confirmed BSRs exist */}
       {wsReadyPopup&&wsReadyPopup.length>0&&(()=>{
@@ -6160,7 +6170,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {invReport&&(()=>{
         const isQ=invReport==="quantum";
         const isH=invReport==="hiace";
-        const vatRate=settings.tax_rate||0;
+        const vatRate=invoiceSettings.tax_rate||0;
         const cur=C();
         const rows=[...displayParts]
           .filter(p=>{
@@ -6313,7 +6323,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
 
       {/* PDF INVOICE VIEWER */}
       {isOpen("pdfInvoice")&&<PdfInvoiceModal
-        inv={mData("pdfInvoice")} settings={settings} onClose={()=>closeM("pdfInvoice")}/>}
+        inv={mData("pdfInvoice")} settings={invoiceSettings} onClose={()=>closeM("pdfInvoice")}/>}
 
       {isOpen("changePassword")&&<ChangePasswordModal user={user} onClose={()=>closeM("changePassword")} showToast={showToast}/>}
 

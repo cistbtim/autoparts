@@ -44,7 +44,7 @@ function detectSide(sku, name) {
 export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=[],user=null}) {
   const [pTab,setPTab]=useState("profile"); // "profile" | "users"
   const [f,setF]=useState({
-    name:"", vat_number:"", phone:"", whatsapp:"", email:"",
+    name:"", vat_number:"", tax_rate:0, phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
     licence_renewal_agent_name:"", licence_renewal_agent_phone:"", default_markup_pct:0, move_pin:"",
     label_width_mm:98, label_height_mm:45, linked_branch_id:"",
@@ -242,6 +242,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
           <div style={{gridColumn:"1/-1"}}><FL label="Workshop Name *"/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
           <div><FL label="VAT / Tax Number"/><input className="inp" value={f.vat_number} onChange={e=>s("vat_number",e.target.value)}/></div>
+          <div><FL label="Tax Rate (%)"/><input className="inp" type="number" value={f.tax_rate} onChange={e=>s("tax_rate",+e.target.value||0)} placeholder="15"/></div>
           <div><FL label="Website"/><input className="inp" value={f.website} onChange={e=>s("website",e.target.value)} placeholder="https://..."/></div>
           <div><FL label="Phone"/><input className="inp" value={f.phone} onChange={e=>s("phone",e.target.value)} placeholder="+27..."/></div>
           <div><FL label="WhatsApp"/><input className="inp" value={f.whatsapp} onChange={e=>s("whatsapp",e.target.value)} placeholder="+27..."/></div>
@@ -7162,6 +7163,8 @@ export function BranchesPage({branches:propBranches=[], onRefresh, _t={}}) {
   const [userF,           setUserF]           = useState({username:"",password:"",role:"branch_admin",name:""});
   const [userErr,         setUserErr]         = useState("");
   const [doneApproved,    setDoneApproved]    = useState(null);
+  const [editingSettings, setEditingSettings] = useState(null); // branch getting country/currency/tax edited
+  const [settingsF,       setSettingsF]       = useState({country:"",currency:"ZAR R",tax_rate:0,vat_number:""});
 
   const refresh = async (notifyParent=true) => {
     setRefreshing(true);
@@ -7238,6 +7241,19 @@ export function BranchesPage({branches:propBranches=[], onRefresh, _t={}}) {
     if(!window.confirm(`Reject "${b.name}"? This will delete the registration.`)) return;
     setBusy(b.id);
     await api.delete("branches","id",b.id);
+    await refresh();
+    setBusy(null);
+  };
+
+  const startEditSettings = (b) => {
+    setEditingSettings(b);
+    setSettingsF({country:b.country||"",currency:b.currency||"ZAR R",tax_rate:b.tax_rate??0,vat_number:b.vat_number||""});
+  };
+
+  const saveSettings = async () => {
+    setBusy(editingSettings.id);
+    await api.patch("branches","id",editingSettings.id,settingsF);
+    setEditingSettings(null);
     await refresh();
     setBusy(null);
   };
@@ -7393,13 +7409,35 @@ export function BranchesPage({branches:propBranches=[], onRefresh, _t={}}) {
                 <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{[b.city,b.address].filter(Boolean).join(" · ")}{b.phone?` · ${b.phone}`:""}</div>
               </div>
               {b.code&&<span style={{fontSize:11,color:"var(--text3)",background:"var(--surface2)",padding:"2px 8px",borderRadius:6}}>{b.code}</span>}
-              {!b.is_main&&creatingUserFor?.id!==b.id&&(
+              {editingSettings?.id!==b.id&&creatingUserFor?.id!==b.id&&(
                 <div style={{display:"flex",gap:6}}>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>startCreateUser(b)} disabled={!!busy}>🔑 Create User</button>
-                  <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>suspend(b)} disabled={!!busy}>⏸ Suspend</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>startEditSettings(b)} disabled={!!busy}>⚙️ Settings</button>
+                  {!b.is_main&&<button className="btn btn-ghost btn-sm" onClick={()=>startCreateUser(b)} disabled={!!busy}>🔑 Create User</button>}
+                  {!b.is_main&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>suspend(b)} disabled={!!busy}>⏸ Suspend</button>}
                 </div>
               )}
             </div>
+            {editingSettings?.id===b.id&&(
+              <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid var(--border)"}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:"var(--accent)"}}>⚙️ Settings for {b.name}</div>
+                <FG>
+                  <div><FL label="Country"/><input className="inp" value={settingsF.country} onChange={e=>setSettingsF(p=>({...p,country:e.target.value}))} placeholder="e.g. South Africa"/></div>
+                  <div><FL label="Currency"/><select className="inp" value={settingsF.currency||"ZAR R"} onChange={e=>setSettingsF(p=>({...p,currency:e.target.value}))}>
+                    {["ZAR R","USD $","EUR €","GBP £","TWD NT$","CNY ¥","JPY ¥","AUD A$","CAD C$","SGD S$","MYR RM","THB ฿","INR ₹","AED د.إ","NGN ₦","KES KSh","GHS GH₵"].map(c=>(
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select></div>
+                </FG>
+                <FG>
+                  <div><FL label="Tax Rate (%)"/><input className="inp" type="number" value={settingsF.tax_rate} onChange={e=>setSettingsF(p=>({...p,tax_rate:+e.target.value||0}))} placeholder="15"/></div>
+                  <div><FL label="VAT / Tax Number"/><input className="inp" value={settingsF.vat_number} onChange={e=>setSettingsF(p=>({...p,vat_number:e.target.value}))}/></div>
+                </FG>
+                <div style={{display:"flex",gap:8,marginTop:4}}>
+                  <button className="btn btn-primary" onClick={saveSettings} disabled={busy===b.id}>{busy===b.id?"Saving…":"✓ Save"}</button>
+                  <button className="btn btn-ghost" onClick={()=>setEditingSettings(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
             {!b.is_main&&(
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
                 <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
@@ -7714,6 +7752,9 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
     logo_url:   branch?.logo_url||"",
     logo_data:  branch?.logo_data||"",
     currency:   branch?.currency||getSettings().currency||"ZAR R",
+    country:    branch?.country||"",
+    tax_rate:   branch?.tax_rate??getSettings().tax_rate??0,
+    vat_number: branch?.vat_number||"",
     sku_prefix: branch?.sku_prefix||"",
     part_label_w: branch?.part_label_w||98,
     part_label_h: branch?.part_label_h||45,
@@ -7738,6 +7779,14 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
               <option key={c} value={c}>{c}</option>
             ))}
           </select></div>
+        </FG>
+        <FG>
+          <div><FL label="Country"/><input className="inp" value={f.country} onChange={e=>s("country",e.target.value)} placeholder="e.g. South Africa"/></div>
+          <div><FL label="Tax Rate (%)"/><input className="inp" type="number" value={f.tax_rate} onChange={e=>s("tax_rate",+e.target.value||0)} placeholder="15"/></div>
+        </FG>
+        <FG>
+          <div><FL label="VAT / Tax Number"/><input className="inp" value={f.vat_number} onChange={e=>s("vat_number",e.target.value)}/></div>
+          <div/>
         </FG>
         <FG>
           <div>

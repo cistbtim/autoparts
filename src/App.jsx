@@ -120,7 +120,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const scrapId = (role==="scrapyard"||role==="scrapyard_admin") ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const isBranchUser = BRANCH_ROLES.includes(role);
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"systemMap":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"systemMap":"dashboard";
+  const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth<768;
+  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?(isMobileDevice?"inventory":"systemMap"):isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?(isMobileDevice?"dashboard":"systemMap"):"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
@@ -3024,6 +3025,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   ).map(g=>({
     ...g,
     children:g.children.filter(c=>{
+      if(isMobileDevice&&c.id==="systemMap") return false;
       if(isBranchUser){
         // branch users see admin tabs scoped to their role
         const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","adcontracts","branches","settings","users","wssubscriptions","vehicles"]);

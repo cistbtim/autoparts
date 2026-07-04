@@ -1471,7 +1471,13 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 
   // Auto-apply filter when pre-populated from vehicle management
   useEffect(()=>{
-    if(initialMake && vehicles.length > 0) applyFilter(initialMake, initialModel);
+    if(initialMake && vehicles.length > 0){
+      applyFilter(initialMake, initialModel);
+      if(initialModel){
+        const opt=modelOpts.find(o=>o.val===initialModel);
+        setModelInput(opt?opt.label:initialModel);
+      }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[vehicles.length > 0]);
 

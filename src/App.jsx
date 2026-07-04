@@ -4413,7 +4413,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               parts={parts}
               initialMake={shopVehicleFilter.make}
               initialModel={shopVehicleFilter.model}
-              onFilter={(ids)=>{setVehicleFilterIds(ids);setShopPage(0);}}
+              onFilter={(ids)=>{setVehicleFilterIds(ids);setShopPage(0);if(ids)setSearchPart("");}}
               onAddPart={(role==="admin"||role==="manager"||role==="demo")?((vehIds)=>{
                 setNewPartInitialF({price:0,cost_price:0});
                 setPendingVehicleIds(vehIds);

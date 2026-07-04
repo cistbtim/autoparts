@@ -1847,14 +1847,14 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
     const codes = vList.map(v=>(v.code||'').toUpperCase()).filter(Boolean).sort();
     if (!codes.length) {
       const prefix = (make||'').replace(/\s+/g,'').slice(0,2).toUpperCase() || 'XX';
-      return prefix + '01A';
+      return prefix + '001A';
     }
     const last = codes[codes.length-1];
     const prefix = last.slice(0,2);
     const lastChar = last.slice(-1);
     if (lastChar >= 'A' && lastChar < 'Z') return last.slice(0,-1) + String.fromCharCode(lastChar.charCodeAt(0)+1);
     const num = parseInt(last.slice(2,-1),10)||1;
-    return prefix + String(num+1).padStart(2,'0') + 'A';
+    return prefix + String(num+1).padStart(3,'0') + 'A';
   };
   // When search is active, base the new code on the visible filtered group.
   // When a model is provided, first try to find the model-group codes (e.g. "121" → MZ11x).

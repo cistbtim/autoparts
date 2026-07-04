@@ -1220,6 +1220,17 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
   const [pending, setPending] = useState(new Set()); // selected but not yet saved
   const [saving,  setSaving]  = useState(false);
   const [toDelete,setToDelete]= useState(new Set()); // marked for removal
+  const [lightbox, setLightbox] = useState(null); // {urls,labels,idx}
+
+  const openVehicleLightbox = (v) => {
+    const entries = [
+      {key:"photo_front", label:"Front"},
+      {key:"photo_rear",  label:"Rear"},
+      {key:"photo_side",  label:"Side"},
+    ].filter(e=>v[e.key]);
+    if(!entries.length) return;
+    setLightbox({ urls: entries.map(e=>toFullUrl(v[e.key])), labels: entries.map(e=>e.label), idx: 0 });
+  };
 
   const linked    = partFitments; // already filtered by part_id
   const linkedIds = new Set(linked.map(f => String(f.vehicle_id)));
@@ -1273,6 +1284,8 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 
   return (
     <div>
+      {lightbox&&<ImgLightbox urls={lightbox.urls} labels={lightbox.labels} startIdx={lightbox.idx}
+        onClose={()=>setLightbox(null)}/>}
       {/* ── Part vehicle info + Go to Vehicles button ── */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
         marginBottom:14,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,
@@ -1336,11 +1349,19 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
                 {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
                 {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
               </div>
-              <button className="btn btn-ghost btn-xs"
-                style={{color:marked?"var(--green)":"var(--red)",flexShrink:0}}
-                onClick={()=>toggleDelete(f.id)}>
-                {marked ? "↩ Undo" : "✕"}
-              </button>
+              <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                {(v.photo_front||v.photo_rear||v.photo_side)&&(
+                  <button className="btn btn-ghost btn-xs" title="Enlarge vehicle photos"
+                    onClick={()=>openVehicleLightbox(v)}>
+                    🔍 Photos
+                  </button>
+                )}
+                <button className="btn btn-ghost btn-xs"
+                  style={{color:marked?"var(--green)":"var(--red)"}}
+                  onClick={()=>toggleDelete(f.id)}>
+                  {marked ? "↩ Undo" : "✕"}
+                </button>
+              </div>
             </div>
           );
         })}

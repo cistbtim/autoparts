@@ -12,6 +12,7 @@ import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocat
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { SystemMapPage } from "./components/SystemMap.jsx";
+import { RequestsKanbanPage } from "./components/RequestsKanban.jsx";
 import db from "./lib/db.js";
 import { SupplierImportModal } from "./components/SupplierImport.jsx";
 import { PosPage } from "./components/Pos.jsx";
@@ -121,7 +122,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const isBranchUser = BRANCH_ROLES.includes(role);
   const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth<768;
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?(isMobileDevice?"inventory":"systemMap"):isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?(isMobileDevice?"dashboard":"systemMap"):"dashboard";
+  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"requestsKanban":role==="branch_manager"?"requestsKanban":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"requestsKanban":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
@@ -2906,6 +2907,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {id:"stocktake",icon:"🔢",label:t.stockTake,roles:["admin","manager","shipper","stockman"]},
         {id:"stockmove",icon:"🔀",label:t.stockMove,roles:["admin","manager","shipper","stockman"]},
         {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager","branch_admin"]},
+        {id:"requestsKanban",icon:"🗂️",label:"Requests",roles:["admin","manager","branch_admin","branch_manager"],
+          badge:pendingPartRequests+pendingVehicleRequests+pendingTransferRequests+pendingWsShopRequests},
         {id:"partRequests",icon:"📬",label:"Part Requests",roles:["admin"],badge:pendingPartRequests},
         {id:"vehicleRequests",icon:"🚗",label:"Vehicle Requests",roles:["admin"],badge:pendingVehicleRequests},
         {id:"transferRequests",icon:"🔄",label:"Transfer Requests",roles:["admin","branch_admin","branch_manager"],badge:pendingTransferRequests},
@@ -3054,7 +3057,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       if(isMobileDevice&&c.id==="systemMap") return false;
       if(isBranchUser){
         // branch users see admin tabs scoped to their role
-        const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","adcontracts","branches","settings","users","wssubscriptions","vehicles"]);
+        const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","adcontracts","branches","settings","users","wssubscriptions","vehicles","systemMap"]);
         if(!c.roles.includes("admin")||BA_HIDE.has(c.id)) return false;
         // branchAdminOnly items only visible to branch_admin
         if(c.branchAdminOnly && role!=="branch_admin") return false;
@@ -5749,6 +5752,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
 
         {tab==="wsShopRequests"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
           <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} suppliers={suppliers} onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest} onDelete={deleteWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
+        )}
+
+        {tab==="requestsKanban"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
+          <RequestsKanbanPage
+            wsShopRequests={wsShopRequests} branchStockRequests={branchStockRequests}
+            vehicleRequests={vehicleRequests} partRequests={partRequests}
+            branches={branches} parts={parts} vehicles={vehicles} suppliers={suppliers}
+            settings={settings} branchStock={branchStock} user={user} role={role} currentBranch={currentBranch}
+            onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest}
+            onDeleteWsShop={deleteWsShopRequest} onDeleteTransfer={deleteBranchStockRequest}
+            onApproveVehicle={saveVehicle}
+            onGoToVehicles={(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}}
+            onRefresh={()=>refreshTables("ws_shop_requests","branch_stock_requests","vehicle_requests","part_requests")}/>
         )}
 
         {tab==="settings"&&role==="admin"&&(

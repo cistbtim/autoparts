@@ -7600,114 +7600,112 @@ export function PartRequestModal({currentBranch, user, onClose, onSave, t={}}) {
 }
 
 // ─── Part Requests Page (admin reviews + approves; branch tracks status) ──────
-export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role,currentBranch,onRefresh,t={}}) {
-  const [linkingId,setLinkingId]=useState(null);
+export function PartRequestCard({r,isAdmin,branches=[],parts=[],user,onRefresh}) {
+  const [isLinking,setIsLinking]=useState(false);
   const [linkSearch,setLinkSearch]=useState("");
-  const [rejectingId,setRejectingId]=useState(null);
+  const [isRejecting,setIsRejecting]=useState(false);
   const [rejectReason,setRejectReason]=useState("");
-  const [busy,setBusy]=useState(null);
-
-  const isAdmin=role==="admin";
-  const myReqs=isAdmin?partRequests:partRequests.filter(r=>r.branch_id===currentBranch?.id);
-  const pending=myReqs.filter(r=>r.status==="pending");
-  const done=myReqs.filter(r=>r.status==="approved"||r.status==="rejected");
+  const [busy,setBusy]=useState(false);
 
   const branchName=id=>branches.find(b=>b.id===id)?.name||"Unknown Branch";
+  const linked=r.part_id?parts.find(p=>p.id===r.part_id):null;
+  const linkHits=isLinking&&linkSearch.trim()?parts.filter(p=>p.is_main!==false&&((p.sku||"").toLowerCase().includes(linkSearch.toLowerCase())||(p.name||"").toLowerCase().includes(linkSearch.toLowerCase()))).slice(0,6):[];
 
-  const linkPart=async(reqId,part)=>{
-    setBusy(reqId);
-    await api.patch("part_requests","id",reqId,{
+  const linkPart=async(part)=>{
+    setBusy(true);
+    await api.patch("part_requests","id",r.id,{
       part_id:part.id,
       status:"approved",
       approved_by:user.id,
       approved_at:new Date().toISOString(),
     });
-    setLinkingId(null);setLinkSearch("");
+    setIsLinking(false);setLinkSearch("");
     await onRefresh();
-    setBusy(null);
+    setBusy(false);
   };
 
-  const reject=async(reqId)=>{
+  const reject=async()=>{
     if(!rejectReason.trim())return;
-    setBusy(reqId);
-    await api.patch("part_requests","id",reqId,{status:"rejected",rejection_reason:rejectReason});
-    setRejectingId(null);setRejectReason("");
+    setBusy(true);
+    await api.patch("part_requests","id",r.id,{status:"rejected",rejection_reason:rejectReason});
+    setIsRejecting(false);setRejectReason("");
     await onRefresh();
-    setBusy(null);
+    setBusy(false);
   };
 
-  const ReqCard=({r})=>{
-    const linked=r.part_id?parts.find(p=>p.id===r.part_id):null;
-    const isLinking=linkingId===r.id;
-    const isRejecting=rejectingId===r.id;
-    const linkHits=isLinking&&linkSearch.trim()?parts.filter(p=>p.is_main!==false&&((p.sku||"").toLowerCase().includes(linkSearch.toLowerCase())||(p.name||"").toLowerCase().includes(linkSearch.toLowerCase()))).slice(0,6):[];
-    return (
-      <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
-        <div style={{display:"flex",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
-          {r.image_url&&<img src={toImgUrl(r.image_url)} alt="" referrerPolicy="no-referrer" style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",flexShrink:0}} onError={e=>e.target.style.display="none"}/>}
-          <div style={{flex:1,minWidth:200}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-              <span style={{fontWeight:700,fontSize:13}}>{r.name}</span>
-              <span style={{fontSize:11,fontFamily:"monospace",color:"var(--text3)",background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>{r.temp_sku}</span>
-              <span style={{fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:600,background:r.status==="pending"?"rgba(251,191,36,.15)":r.status==="approved"?"rgba(34,197,94,.12)":"rgba(248,113,113,.12)",color:r.status==="pending"?"var(--yellow)":r.status==="approved"?"var(--green)":"var(--red)"}}>
-                {r.status==="pending"?"⏳ Pending":r.status==="approved"?"✅ Approved":"❌ Rejected"}
-              </span>
-            </div>
-            {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>🏢 {branchName(r.branch_id)}</div>}
-            <div style={{fontSize:12,display:"flex",gap:12,flexWrap:"wrap"}}>
-              {r.oe_number&&<span style={{fontFamily:"monospace",color:"var(--accent)"}}>{r.oe_number}</span>}
-              {r.category&&<span style={{color:"var(--text3)"}}>{r.category}</span>}
-              {r.vehicle_make&&<span style={{color:"var(--text3)"}}>{r.vehicle_make}{r.vehicle_model?" — "+r.vehicle_model:""}{r.year_from?" ("+r.year_from+(r.year_to?"–"+r.year_to:"+")+")":""}</span>}
-            </div>
-            {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
-            {r.suggested_price&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Suggested price: <strong>{C()}{(+r.suggested_price).toFixed(2)}</strong></div>}
-            {r.status==="approved"&&linked&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:7,fontSize:12}}>✅ Linked to <strong>{linked.sku}</strong> — {linked.name}</div>}
-            {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
+  return (
+    <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+        {r.image_url&&<img src={toImgUrl(r.image_url)} alt="" referrerPolicy="no-referrer" style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",flexShrink:0}} onError={e=>e.target.style.display="none"}/>}
+        <div style={{flex:1,minWidth:200}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+            <span style={{fontWeight:700,fontSize:13}}>{r.name}</span>
+            <span style={{fontSize:11,fontFamily:"monospace",color:"var(--text3)",background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>{r.temp_sku}</span>
+            <span style={{fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:600,background:r.status==="pending"?"rgba(251,191,36,.15)":r.status==="approved"?"rgba(34,197,94,.12)":"rgba(248,113,113,.12)",color:r.status==="pending"?"var(--yellow)":r.status==="approved"?"var(--green)":"var(--red)"}}>
+              {r.status==="pending"?"⏳ Pending":r.status==="approved"?"✅ Approved":"❌ Rejected"}
+            </span>
           </div>
+          {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>🏢 {branchName(r.branch_id)}</div>}
+          <div style={{fontSize:12,display:"flex",gap:12,flexWrap:"wrap"}}>
+            {r.oe_number&&<span style={{fontFamily:"monospace",color:"var(--accent)"}}>{r.oe_number}</span>}
+            {r.category&&<span style={{color:"var(--text3)"}}>{r.category}</span>}
+            {r.vehicle_make&&<span style={{color:"var(--text3)"}}>{r.vehicle_make}{r.vehicle_model?" — "+r.vehicle_model:""}{r.year_from?" ("+r.year_from+(r.year_to?"–"+r.year_to:"+")+")":""}</span>}
+          </div>
+          {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
+          {r.suggested_price&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Suggested price: <strong>{C()}{(+r.suggested_price).toFixed(2)}</strong></div>}
+          {r.status==="approved"&&linked&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:7,fontSize:12}}>✅ Linked to <strong>{linked.sku}</strong> — {linked.name}</div>}
+          {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
         </div>
-
-        {/* Admin actions */}
-        {isAdmin&&r.status==="pending"&&(
-          <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
-            {!isLinking&&!isRejecting&&(
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn btn-primary btn-sm" onClick={()=>{setLinkingId(r.id);setRejectingId(null);setLinkSearch("");}}>🔗 Link to Part</button>
-                <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setRejectingId(r.id);setLinkingId(null);}}>❌ Reject</button>
-              </div>
-            )}
-            {isLinking&&(
-              <div>
-                <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>Search main catalog to link:</div>
-                <input className="inp" value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="SKU or part name…" autoFocus/>
-                {linkHits.map(p=>(
-                  <div key={p.id} onClick={()=>linkPart(r.id,p)} style={{display:"flex",gap:10,padding:"6px 8px",borderRadius:7,cursor:"pointer",border:"1px solid var(--border)",background:"var(--surface2)",marginTop:4}}
-                    onMouseEnter={e=>e.currentTarget.style.background="var(--surface3)"} onMouseLeave={e=>e.currentTarget.style.background="var(--surface2)"}>
-                    <span style={{fontWeight:700,color:"var(--accent)",minWidth:80,fontSize:12}}>{p.sku}</span>
-                    <span style={{flex:1,fontSize:12}}>{p.name}</span>
-                    <span style={{fontSize:11,color:"var(--text3)"}}>{C()}{p.price}</span>
-                  </div>
-                ))}
-                {linkSearch.trim()&&!linkHits.length&&<div style={{fontSize:12,color:"var(--text3)",padding:"6px 0"}}>No parts found — go to Inventory to create it first, then come back to link.</div>}
-                <div style={{display:"flex",gap:8,marginTop:8}}>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>{setLinkingId(null);setLinkSearch("");}}>Cancel</button>
-                </div>
-              </div>
-            )}
-            {isRejecting&&(
-              <div>
-                <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>Rejection reason:</div>
-                <input className="inp" value={rejectReason} onChange={e=>setRejectReason(e.target.value)} placeholder="e.g. Duplicate of SKU-1234 / Not approved" autoFocus/>
-                <div style={{display:"flex",gap:8,marginTop:8}}>
-                  <button className="btn btn-primary btn-sm" style={{background:"var(--red)"}} onClick={()=>reject(r.id)} disabled={busy===r.id||!rejectReason.trim()}>{busy===r.id?"…":"Confirm Reject"}</button>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>{setRejectingId(null);setRejectReason("");}}>Cancel</button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
-    );
-  };
+
+      {/* Admin actions */}
+      {isAdmin&&r.status==="pending"&&(
+        <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+          {!isLinking&&!isRejecting&&(
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-primary btn-sm" onClick={()=>{setIsLinking(true);setIsRejecting(false);setLinkSearch("");}}>🔗 Link to Part</button>
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setIsRejecting(true);setIsLinking(false);}}>❌ Reject</button>
+            </div>
+          )}
+          {isLinking&&(
+            <div>
+              <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>Search main catalog to link:</div>
+              <input className="inp" value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="SKU or part name…" autoFocus/>
+              {linkHits.map(p=>(
+                <div key={p.id} onClick={()=>linkPart(p)} style={{display:"flex",gap:10,padding:"6px 8px",borderRadius:7,cursor:"pointer",border:"1px solid var(--border)",background:"var(--surface2)",marginTop:4}}
+                  onMouseEnter={e=>e.currentTarget.style.background="var(--surface3)"} onMouseLeave={e=>e.currentTarget.style.background="var(--surface2)"}>
+                  <span style={{fontWeight:700,color:"var(--accent)",minWidth:80,fontSize:12}}>{p.sku}</span>
+                  <span style={{flex:1,fontSize:12}}>{p.name}</span>
+                  <span style={{fontSize:11,color:"var(--text3)"}}>{C()}{p.price}</span>
+                </div>
+              ))}
+              {linkSearch.trim()&&!linkHits.length&&<div style={{fontSize:12,color:"var(--text3)",padding:"6px 0"}}>No parts found — go to Inventory to create it first, then come back to link.</div>}
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setIsLinking(false);setLinkSearch("");}}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {isRejecting&&(
+            <div>
+              <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>Rejection reason:</div>
+              <input className="inp" value={rejectReason} onChange={e=>setRejectReason(e.target.value)} placeholder="e.g. Duplicate of SKU-1234 / Not approved" autoFocus/>
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <button className="btn btn-primary btn-sm" style={{background:"var(--red)"}} onClick={reject} disabled={busy||!rejectReason.trim()}>{busy?"…":"Confirm Reject"}</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setIsRejecting(false);setRejectReason("");}}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role,currentBranch,onRefresh,t={}}) {
+  const isAdmin=role==="admin";
+  const myReqs=isAdmin?partRequests:partRequests.filter(r=>r.branch_id===currentBranch?.id);
+  const pending=myReqs.filter(r=>r.status==="pending");
+  const done=myReqs.filter(r=>r.status==="approved"||r.status==="rejected");
 
   return (
     <div style={{padding:"0 0 40px"}}>
@@ -7729,14 +7727,14 @@ export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role
       {pending.length>0&&(
         <div style={{marginBottom:24}}>
           <div style={{fontSize:14,fontWeight:700,marginBottom:10,color:"var(--yellow)"}}>⏳ Pending ({pending.length})</div>
-          {pending.map(r=><ReqCard key={r.id} r={r}/>)}
+          {pending.map(r=><PartRequestCard key={r.id} r={r} isAdmin={isAdmin} branches={branches} parts={parts} user={user} onRefresh={onRefresh}/>)}
         </div>
       )}
 
       {done.length>0&&(
         <div>
           <div style={{fontSize:14,fontWeight:700,marginBottom:10,color:"var(--text3)"}}>History ({done.length})</div>
-          {done.map(r=><ReqCard key={r.id} r={r}/>)}
+          {done.map(r=><PartRequestCard key={r.id} r={r} isAdmin={isAdmin} branches={branches} parts={parts} user={user} onRefresh={onRefresh}/>)}
         </div>
       )}
     </div>
@@ -8136,15 +8134,290 @@ export function BranchUsersPage({branchId, branchName, user}) {
 // ═══════════════════════════════════════════════════════════════
 // BRANCH TRANSFER REQUESTS PAGE
 // ═══════════════════════════════════════════════════════════════
-export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],onRefresh,onDelete}) {
+export function TransferRequestCard({r,branches=[],role,currentBranch,settings,branchStock=[],parts=[],onRefresh,onDelete}) {
   const Cs=curSym(settings?.currency||"ZAR R");
-  const [acting,setActing]=useState(null);
-  const [replyingId,setReplyingId]=useState(null); // which request is in reply-edit mode
+  const [acting,setActing]=useState(false);
+  const [isReplying,setIsReplying]=useState(false);
   const [replyForm,setReplyForm]=useState({});      // {itemIdx: {price,availability,notes}}
   const [replyNotes,setReplyNotes]=useState("");
+  const [patchErr,setPatchErr]=useState(null);
+
+  const isSupplier=role==="admin"||String(r.supplying_branch_id)===String(currentBranch?.id);
+  const supplyingBranch=branches.find(b=>String(b.id)===String(r.supplying_branch_id));
+  const reqBranch=branches.find(b=>String(b.id)===String(r.requesting_branch_id));
+  const items=Array.isArray(r.items)?r.items:[];
+  const replyItems=Array.isArray(r.reply_items)?r.reply_items:[];
+  const isBusy=acting&&!isReplying;
+  const borderColor={pending:"var(--orange)",quoted:"var(--purple)",confirmed:"var(--blue)",dispatched:"var(--green)"}[r.status]||"var(--border)";
+
+  const patch=async(data)=>{
+    setActing(true);setPatchErr(null);
+    const res=await api.patch("branch_stock_requests","id",r.id,data);
+    if(res?.code||res?.message){setPatchErr(res.message||res.code||"Save failed");setActing(false);return false;}
+    await onRefresh?.();setActing(false);return true;
+  };
+
+  const acceptQuote=async()=>{
+    setActing(true);
+    try{
+      // 1. Confirm the request
+      await api.patch("branch_stock_requests","id",r.id,{status:"confirmed",confirmed_at:new Date().toISOString()});
+      // 2. Write quoted prices back to branch_stock for the requesting branch
+      const H={apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json",Prefer:"return=representation"};
+      for(const item of replyItems){
+        if(!item.partId||item.availability==="not_available"||!(+item.price>0))continue;
+        // PATCH branch_stock where part_id and branch_id both match
+        await fetch(`${SUPABASE_URL}/rest/v1/branch_stock?part_id=eq.${item.partId}&branch_id=eq.${r.requesting_branch_id}`,
+          {method:"PATCH",headers:H,body:JSON.stringify({price:+item.price})});
+      }
+      api.cacheInvalidate("branch_stock");
+      await onRefresh?.();
+    }finally{setActing(false);}
+  };
+
+  // Look up live stock for a BSR item in the supplying branch
+  const getItemStock=(it,supplyingBranchId)=>{
+    const part=parts.find(p=>String(p.id)===String(it.partId));
+    const bs=Array.isArray(branchStock)?branchStock.find(b=>String(b.part_id)===String(it.partId)&&String(b.branch_id)===String(supplyingBranchId)):null;
+    const stock=bs!=null?+(bs.stock)||0:part?+(part.stock)||0:null;
+    return stock;
+  };
+
+  const startReply=()=>{
+    const existing=Array.isArray(r.reply_items)?r.reply_items:[];
+    const form={};
+    items.forEach((it,idx)=>{
+      const prev=existing[idx]||{};
+      const stock=getItemStock(it,r.supplying_branch_id);
+      const autoAvail=stock==null?"in_stock":stock>0?"in_stock":"can_source";
+      form[idx]={price:prev.price??it.price??"",availability:prev.availability||autoAvail,notes:prev.notes||""};
+    });
+    setReplyForm(form);
+    setReplyNotes(r.reply_notes||"");
+    setIsReplying(true);
+  };
+
+  const submitReply=async()=>{
+    const reply_items=items.map((it,idx)=>({
+      ...it,
+      price:+replyForm[idx]?.price||0,
+      availability:replyForm[idx]?.availability||"in_stock",
+      notes:replyForm[idx]?.notes||"",
+    }));
+    const ok=await patch({status:"quoted",reply_items,reply_notes:replyNotes,reply_at:new Date().toISOString()});
+    if(!ok)return;
+    // Write quoted prices back — branch_stock for catalog parts, parts.price for branch-owned parts
+    const H={apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json",Prefer:"return=representation"};
+    for(const item of reply_items){
+      if(!item.partId||item.availability==="not_available"||!(+item.price>0))continue;
+      // Update branch_stock price (main catalog parts)
+      await fetch(`${SUPABASE_URL}/rest/v1/branch_stock?part_id=eq.${item.partId}&branch_id=eq.${r.supplying_branch_id}`,
+        {method:"PATCH",headers:H,body:JSON.stringify({price:+item.price})});
+      // Update parts.price for branch-owned parts (branch_id matches supplying branch)
+      await fetch(`${SUPABASE_URL}/rest/v1/parts?id=eq.${item.partId}&branch_id=eq.${r.supplying_branch_id}`,
+        {method:"PATCH",headers:H,body:JSON.stringify({price:+item.price})});
+    }
+    api.cacheInvalidate("branch_stock");
+    api.cacheInvalidate("parts");
+    setIsReplying(false);
+  };
+
+  const statusBadge=(s)=>{
+    const map={
+      pending:{l:"Pending",c:"var(--orange)"},
+      quoted:{l:"Quoted",c:"var(--purple)"},
+      confirmed:{l:"Confirmed",c:"var(--blue)"},
+      dispatched:{l:"Dispatched",c:"var(--green)"},
+      completed:{l:"Completed",c:"var(--text3)"},
+      cancelled:{l:"Cancelled",c:"var(--red)"},
+    };
+    const m=map[s]||{l:s,c:"var(--text3)"};
+    return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${m.c}20`,color:m.c}}>{m.l}</span>;
+  };
+
+  const availBadge=(a)=>{
+    const map={in_stock:{l:"✅ In Stock",c:"var(--green)"},can_source:{l:"🔍 Can Source",c:"var(--yellow)"},not_available:{l:"❌ Not Available",c:"var(--red)"}};
+    const m=map[a]||{l:a,c:"var(--text3)"};
+    return <span style={{fontSize:11,padding:"2px 7px",borderRadius:99,background:`${m.c}20`,color:m.c,fontWeight:600}}>{m.l}</span>;
+  };
+
+  // WhatsApp messages
+  const quotedList=replyItems.map(i=>`• ${i.name}${i.qty>1?` ×${i.qty}`:""} — ${i.availability==="not_available"?"❌ Not available":i.availability==="can_source"?`🔍 Can source · ${Cs}${(+i.price||0).toFixed(2)}`:`✅ In stock · ${Cs}${(+i.price||0).toFixed(2)}`}${i.notes?` (${i.notes})`:""}`).join("\n");
+  const waQuoteMsg=`Hi ${r.workshop_name||"there"}, here is your parts quote from ${supplyingBranch?.name||"the branch"}:\n\n${quotedList}${r.reply_notes?`\n\nNotes: ${r.reply_notes}`:""}\n\nPlease confirm if you'd like to proceed.`;
+  const waReadyMsg=`Hi ${r.workshop_name||"there"}, your parts are ready for collection at ${supplyingBranch?.name||"the branch"}. Thank you!`;
+
+  return (
+    <div className="card" style={{padding:18,marginBottom:14,borderLeft:`3px solid ${borderColor}`}}>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:10}}>
+        <div>
+          <div style={{fontWeight:700,fontSize:15}}>{r.workshop_name||"Workshop"}</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
+            {isSupplier&&reqBranch&&<span>From: <strong>{reqBranch.name}</strong> · </span>}
+            {!isSupplier&&supplyingBranch&&<span>To: <strong>{supplyingBranch.name}</strong> · </span>}
+            {r.created_at&&new Date(r.created_at).toLocaleDateString()}
+            {r.workshop_phone&&<span> · 📱 {r.workshop_phone}</span>}
+            {r.workshop_email&&<span> · ✉️ {r.workshop_email}</span>}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,fontWeight:600,
+            background:isSupplier?"rgba(52,211,153,.12)":"rgba(96,165,250,.12)",
+            color:isSupplier?"var(--green)":"var(--blue)"}}>
+            {isSupplier?"📥 Incoming":"📤 Outgoing"}
+          </span>
+          {statusBadge(r.status)}
+        </div>
+      </div>
+
+      {/* Requested items */}
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:5}}>Requested Items</div>
+        {items.map((i,idx)=>{
+          const stock=getItemStock(i,r.supplying_branch_id);
+          const stockColor=stock==null?"var(--text3)":stock>0?"var(--green)":"var(--orange)";
+          const stockLabel=stock==null?"—":stock>0?`${stock} in stock`:"0 — need to order";
+          return(
+            <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 10px",background:"var(--surface2)",borderRadius:6,marginBottom:3,gap:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:13}}>{i.name}{i.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>{i.sku}</span>}</span>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+                <span style={{fontSize:11,fontWeight:600,color:stockColor}}>📦 {stockLabel}</span>
+                <span style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {r.notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:10,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>📝 {r.notes}</div>}
+
+      {/* Quote — shown after supplier replies */}
+      {replyItems.length>0&&!isReplying&&<div style={{marginBottom:12,padding:"10px 12px",background:"rgba(167,139,250,.06)",border:"1px solid rgba(167,139,250,.2)",borderRadius:8}}>
+        <div style={{fontSize:11,fontWeight:700,color:"var(--purple)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>💬 Quote from {supplyingBranch?.name||"Supplier"}</div>
+        {replyItems.map((i,idx)=>(
+          <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 10px",background:"var(--surface)",borderRadius:6,marginBottom:3,gap:8,flexWrap:"wrap"}}>
+            <span style={{fontSize:13,fontWeight:600}}>{i.name}</span>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+              {availBadge(i.availability)}
+              {i.price>0&&i.availability!=="not_available"&&<span style={{fontSize:13,fontWeight:700,color:"var(--accent)"}}>{Cs}{(+i.price).toFixed(2)}</span>}
+              {i.notes&&<span style={{fontSize:11,color:"var(--text3)"}}>({i.notes})</span>}
+            </div>
+          </div>
+        ))}
+        {r.reply_notes&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6}}>📝 {r.reply_notes}</div>}
+      </div>}
+
+      {/* Inline reply form — supplier fills in price + availability per item */}
+      {isReplying&&<div style={{marginBottom:12,padding:"12px 14px",background:"rgba(167,139,250,.07)",border:"1.5px solid rgba(167,139,250,.3)",borderRadius:10}}>
+        <div style={{fontSize:13,fontWeight:700,color:"var(--purple)",marginBottom:10}}>💬 Reply with Quote</div>
+        {items.map((it,idx)=>{
+          const stock=getItemStock(it,r.supplying_branch_id);
+          const stockColor=stock==null?"var(--text3)":stock>0?"var(--green)":"var(--orange)";
+          const stockLabel=stock==null?"stock unknown":stock>0?`${stock} in stock`:"0 in stock — need to order";
+          return(
+          <div key={idx} style={{marginBottom:12,paddingBottom:12,borderBottom:idx<items.length-1?"1px solid var(--border)":"none"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
+              <div style={{fontWeight:600,fontSize:13}}>{it.name}{it.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{it.sku}</span>} <span style={{color:"var(--text3)"}}>×{it.qty}</span></div>
+              <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${stockColor}18`,color:stockColor}}>📦 {stockLabel}</span>
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <div style={{flex:"1 1 120px"}}>
+                <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Availability</label>
+                <select className="inp" value={replyForm[idx]?.availability||"in_stock"} onChange={e=>setReplyForm(f=>({...f,[idx]:{...f[idx],availability:e.target.value}}))} style={{fontSize:12}}>
+                  <option value="in_stock">✅ In Stock</option>
+                  <option value="can_source">🔍 Can Source</option>
+                  <option value="not_available">❌ Not Available</option>
+                </select>
+              </div>
+              {replyForm[idx]?.availability!=="not_available"&&<div style={{flex:"1 1 100px"}}>
+                <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Price ({Cs})</label>
+                <input className="inp" type="number" min="0" step="0.01" placeholder="0.00"
+                  value={replyForm[idx]?.price??""} onChange={e=>setReplyForm(f=>({...f,[idx]:{...f[idx],price:e.target.value}}))} style={{fontSize:12}}/>
+              </div>}
+              <div style={{flex:"2 1 160px"}}>
+                <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Notes (optional)</label>
+                <input className="inp" placeholder="Lead time, brand, etc."
+                  value={replyForm[idx]?.notes||""} onChange={e=>setReplyForm(f=>({...f,[idx]:{...f[idx],notes:e.target.value}}))} style={{fontSize:12}}/>
+              </div>
+            </div>
+          </div>
+        );})}
+        <div style={{marginBottom:10}}>
+          <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Overall Notes</label>
+          <textarea className="inp" rows={2} placeholder="Delivery time, payment terms, etc."
+            value={replyNotes} onChange={e=>setReplyNotes(e.target.value)} style={{fontSize:12,resize:"vertical"}}/>
+        </div>
+        {patchErr&&<div style={{fontSize:12,color:"var(--red)",marginBottom:8,padding:"6px 10px",background:"rgba(248,113,113,.1)",borderRadius:6}}>❌ {patchErr}</div>}
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-primary btn-sm" disabled={acting} onClick={submitReply}>📨 Send Quote</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>{setIsReplying(false);setPatchErr(null);}}>Cancel</button>
+        </div>
+      </div>}
+
+      {/* Supplier: confirmed / cancelled alert banners */}
+      {isSupplier&&r.status==="confirmed"&&replyItems.length>0&&(
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",marginBottom:10,background:"rgba(52,211,153,.1)",border:"1.5px solid rgba(52,211,153,.35)",borderRadius:8}}>
+          <span style={{fontSize:18}}>✅</span>
+          <div>
+            <div style={{fontWeight:700,fontSize:13,color:"var(--green)"}}>Workshop accepted your quote!</div>
+            <div style={{fontSize:12,color:"var(--text2)",marginTop:1}}>Please prepare the parts and mark ready when done.</div>
+          </div>
+        </div>
+      )}
+      {isSupplier&&r.status==="cancelled"&&replyItems.length>0&&(
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",marginBottom:10,background:"rgba(248,113,113,.1)",border:"1.5px solid rgba(248,113,113,.3)",borderRadius:8}}>
+          <span style={{fontSize:18}}>✕</span>
+          <div>
+            <div style={{fontWeight:700,fontSize:13,color:"var(--red)"}}>Workshop declined the quote</div>
+            <div style={{fontSize:12,color:"var(--text2)",marginTop:1}}>No action needed — this request is closed.</div>
+          </div>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        {isSupplier&&!isReplying&&(r.status==="pending"||r.status==="quoted")&&
+          <button className="btn btn-purple btn-sm" onClick={startReply}>
+            {r.status==="quoted"?"✏️ Edit Quote":"💬 Reply with Quote"}
+          </button>}
+        {isSupplier&&r.status==="quoted"&&replyItems.length>0&&r.workshop_phone&&
+          <a href={waLink(r.workshop_phone,waQuoteMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Quote</a>}
+        {isSupplier&&r.status==="confirmed"&&<>
+          {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Workshop</a>}
+          <button className="btn btn-success btn-sm" disabled={isBusy} onClick={()=>patch({status:"dispatched",dispatched_at:new Date().toISOString()})}>🚚 Mark Ready for Collection</button>
+        </>}
+        {isSupplier&&r.status==="dispatched"&&<>
+          {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 Notify Workshop</a>}
+          <button className="btn btn-ghost btn-sm" disabled={isBusy} onClick={()=>patch({status:"completed"})}>✅ Mark Collected</button>
+        </>}
+        {isSupplier&&!["completed","cancelled"].includes(r.status)&&
+          <button className="btn btn-danger btn-sm" disabled={isBusy} onClick={()=>patch({status:"cancelled"})}>✕ Cancel</button>}
+
+        {/* Requester side */}
+        {!isSupplier&&r.status==="pending"&&<span style={{fontSize:12,color:"var(--orange)",fontWeight:600}}>⏳ Awaiting quote from {supplyingBranch?.name||"branch"}…</span>}
+        {!isSupplier&&r.status==="quoted"&&<>
+          <span style={{fontSize:12,color:"var(--purple)",fontWeight:600}}>💬 Quote received — review above and confirm</span>
+          <button className="btn btn-primary btn-sm" disabled={isBusy} onClick={acceptQuote}>✅ Accept & Update Prices</button>
+          <button className="btn btn-danger btn-sm" disabled={isBusy} onClick={()=>patch({status:"cancelled"})}>✕ Decline</button>
+        </>}
+        {!isSupplier&&r.status==="confirmed"&&<span style={{fontSize:12,color:"var(--blue)",fontWeight:600}}>✅ Accepted — {supplyingBranch?.name||"branch"} is preparing your parts</span>}
+        {!isSupplier&&r.status==="dispatched"&&<>
+          <span style={{fontSize:12,color:"var(--green)",fontWeight:700}}>📦 Parts ready! Notify your workshop customer.</span>
+          {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Workshop</a>}
+        </>}
+        {!isSupplier&&r.status==="completed"&&<span style={{fontSize:12,color:"var(--text3)"}}>✅ Completed</span>}
+        {!isSupplier&&r.status==="cancelled"&&<span style={{fontSize:12,color:"var(--red)"}}>✕ Cancelled</span>}
+        {onDelete&&<button className="btn btn-danger btn-sm" style={{marginLeft:"auto"}} disabled={isBusy}
+          onClick={async()=>{if(!window.confirm("Delete this transfer request?"))return;await onDelete(r.id);}}>
+          🗑️ Delete
+        </button>}
+      </div>
+    </div>
+  );
+}
+
+export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],onRefresh,onDelete}) {
   const [refreshing,setRefreshing]=useState(false);
-  const mainBranch=branches.find(b=>b.is_main);
-  const baseUrl=window.location.origin+window.location.pathname;
   const onRefreshRef=useRef(onRefresh);
   useEffect(()=>{onRefreshRef.current=onRefresh;},[onRefresh]);
 
@@ -8167,101 +8440,6 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
     return oa!==ob?oa-ob:new Date(b.created_at)-new Date(a.created_at);
   });
 
-  const [patchErr,setPatchErr]=useState(null);
-  const patch=async(id,data)=>{
-    setActing(id);setPatchErr(null);
-    const res=await api.patch("branch_stock_requests","id",id,data);
-    if(res?.code||res?.message){setPatchErr(res.message||res.code||"Save failed");setActing(null);return false;}
-    await onRefresh?.();setActing(null);return true;
-  };
-
-  const acceptQuote=async(r)=>{
-    setActing(r.id);
-    try{
-      // 1. Confirm the request
-      await api.patch("branch_stock_requests","id",r.id,{status:"confirmed",confirmed_at:new Date().toISOString()});
-      // 2. Write quoted prices back to branch_stock for the requesting branch
-      const replyItems=Array.isArray(r.reply_items)?r.reply_items:[];
-      const H={apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json",Prefer:"return=representation"};
-      for(const item of replyItems){
-        if(!item.partId||item.availability==="not_available"||!(+item.price>0))continue;
-        // PATCH branch_stock where part_id and branch_id both match
-        await fetch(`${SUPABASE_URL}/rest/v1/branch_stock?part_id=eq.${item.partId}&branch_id=eq.${r.requesting_branch_id}`,
-          {method:"PATCH",headers:H,body:JSON.stringify({price:+item.price})});
-      }
-      api.cacheInvalidate("branch_stock");
-      await onRefresh?.();
-    }finally{setActing(null);}
-  };
-
-  // Look up live stock for a BSR item in the supplying branch
-  const getItemStock=(it,supplyingBranchId)=>{
-    const part=parts.find(p=>String(p.id)===String(it.partId));
-    const bs=Array.isArray(branchStock)?branchStock.find(b=>String(b.part_id)===String(it.partId)&&String(b.branch_id)===String(supplyingBranchId)):null;
-    const stock=bs!=null?+(bs.stock)||0:part?+(part.stock)||0:null;
-    return stock;
-  };
-
-  const startReply=(r)=>{
-    const items=Array.isArray(r.items)?r.items:[];
-    const existing=Array.isArray(r.reply_items)?r.reply_items:[];
-    const form={};
-    items.forEach((it,idx)=>{
-      const prev=existing[idx]||{};
-      const stock=getItemStock(it,r.supplying_branch_id);
-      const autoAvail=stock==null?"in_stock":stock>0?"in_stock":"can_source";
-      form[idx]={price:prev.price??it.price??"",availability:prev.availability||autoAvail,notes:prev.notes||""};
-    });
-    setReplyForm(form);
-    setReplyNotes(r.reply_notes||"");
-    setReplyingId(r.id);
-  };
-
-  const submitReply=async(r)=>{
-    const items=Array.isArray(r.items)?r.items:[];
-    const reply_items=items.map((it,idx)=>({
-      ...it,
-      price:+replyForm[idx]?.price||0,
-      availability:replyForm[idx]?.availability||"in_stock",
-      notes:replyForm[idx]?.notes||"",
-    }));
-    const ok=await patch(r.id,{status:"quoted",reply_items,reply_notes:replyNotes,reply_at:new Date().toISOString()});
-    if(!ok)return;
-    // Write quoted prices back — branch_stock for catalog parts, parts.price for branch-owned parts
-    const H={apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json",Prefer:"return=representation"};
-    for(const item of reply_items){
-      if(!item.partId||item.availability==="not_available"||!(+item.price>0))continue;
-      // Update branch_stock price (main catalog parts)
-      await fetch(`${SUPABASE_URL}/rest/v1/branch_stock?part_id=eq.${item.partId}&branch_id=eq.${r.supplying_branch_id}`,
-        {method:"PATCH",headers:H,body:JSON.stringify({price:+item.price})});
-      // Update parts.price for branch-owned parts (branch_id matches supplying branch)
-      await fetch(`${SUPABASE_URL}/rest/v1/parts?id=eq.${item.partId}&branch_id=eq.${r.supplying_branch_id}`,
-        {method:"PATCH",headers:H,body:JSON.stringify({price:+item.price})});
-    }
-    api.cacheInvalidate("branch_stock");
-    api.cacheInvalidate("parts");
-    setReplyingId(null);
-  };
-
-  const statusBadge=(s)=>{
-    const map={
-      pending:{l:"Pending",c:"var(--orange)"},
-      quoted:{l:"Quoted",c:"var(--purple)"},
-      confirmed:{l:"Confirmed",c:"var(--blue)"},
-      dispatched:{l:"Dispatched",c:"var(--green)"},
-      completed:{l:"Completed",c:"var(--text3)"},
-      cancelled:{l:"Cancelled",c:"var(--red)"},
-    };
-    const m=map[s]||{l:s,c:"var(--text3)"};
-    return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${m.c}20`,color:m.c}}>{m.l}</span>;
-  };
-
-  const availBadge=(a)=>{
-    const map={in_stock:{l:"✅ In Stock",c:"var(--green)"},can_source:{l:"🔍 Can Source",c:"var(--yellow)"},not_available:{l:"❌ Not Available",c:"var(--red)"}};
-    const m=map[a]||{l:a,c:"var(--text3)"};
-    return <span style={{fontSize:11,padding:"2px 7px",borderRadius:99,background:`${m.c}20`,color:m.c,fontWeight:600}}>{m.l}</span>;
-  };
-
   const pendingCount=branchStockRequests.filter(r=>r.status==="pending").length;
   const quotedCount=branchStockRequests.filter(r=>r.status==="quoted").length;
 
@@ -8281,190 +8459,9 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
 
       {sorted.length===0&&<div style={{textAlign:"center",padding:48,color:"var(--text3)"}}>No transfer requests yet</div>}
 
-      {sorted.map(r=>{
-        const isSupplier=role==="admin"||String(r.supplying_branch_id)===String(currentBranch?.id);
-        const supplyingBranch=branches.find(b=>String(b.id)===String(r.supplying_branch_id));
-        const reqBranch=branches.find(b=>String(b.id)===String(r.requesting_branch_id));
-        const items=Array.isArray(r.items)?r.items:[];
-        const replyItems=Array.isArray(r.reply_items)?r.reply_items:[];
-        const isReplying=replyingId===r.id;
-        const isBusy=acting===r.id&&!isReplying;
-        const borderColor={pending:"var(--orange)",quoted:"var(--purple)",confirmed:"var(--blue)",dispatched:"var(--green)"}[r.status]||"var(--border)";
-
-        // WhatsApp messages
-        const quotedList=replyItems.map(i=>`• ${i.name}${i.qty>1?` ×${i.qty}`:""} — ${i.availability==="not_available"?"❌ Not available":i.availability==="can_source"?`🔍 Can source · ${Cs}${(+i.price||0).toFixed(2)}`:`✅ In stock · ${Cs}${(+i.price||0).toFixed(2)}`}${i.notes?` (${i.notes})`:""}`).join("\n");
-        const waQuoteMsg=`Hi ${r.workshop_name||"there"}, here is your parts quote from ${supplyingBranch?.name||"the branch"}:\n\n${quotedList}${r.reply_notes?`\n\nNotes: ${r.reply_notes}`:""}\n\nPlease confirm if you'd like to proceed.`;
-        const waReadyMsg=`Hi ${r.workshop_name||"there"}, your parts are ready for collection at ${supplyingBranch?.name||"the branch"}. Thank you!`;
-
-        return (
-          <div key={r.id} className="card" style={{padding:18,marginBottom:14,borderLeft:`3px solid ${borderColor}`}}>
-            {/* Header */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:10}}>
-              <div>
-                <div style={{fontWeight:700,fontSize:15}}>{r.workshop_name||"Workshop"}</div>
-                <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
-                  {isSupplier&&reqBranch&&<span>From: <strong>{reqBranch.name}</strong> · </span>}
-                  {!isSupplier&&supplyingBranch&&<span>To: <strong>{supplyingBranch.name}</strong> · </span>}
-                  {r.created_at&&new Date(r.created_at).toLocaleDateString()}
-                  {r.workshop_phone&&<span> · 📱 {r.workshop_phone}</span>}
-                  {r.workshop_email&&<span> · ✉️ {r.workshop_email}</span>}
-                </div>
-              </div>
-              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,fontWeight:600,
-                  background:isSupplier?"rgba(52,211,153,.12)":"rgba(96,165,250,.12)",
-                  color:isSupplier?"var(--green)":"var(--blue)"}}>
-                  {isSupplier?"📥 Incoming":"📤 Outgoing"}
-                </span>
-                {statusBadge(r.status)}
-              </div>
-            </div>
-
-            {/* Requested items */}
-            <div style={{marginBottom:10}}>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:5}}>Requested Items</div>
-              {items.map((i,idx)=>{
-                const stock=getItemStock(i,r.supplying_branch_id);
-                const stockColor=stock==null?"var(--text3)":stock>0?"var(--green)":"var(--orange)";
-                const stockLabel=stock==null?"—":stock>0?`${stock} in stock`:"0 — need to order";
-                return(
-                  <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 10px",background:"var(--surface2)",borderRadius:6,marginBottom:3,gap:8,flexWrap:"wrap"}}>
-                    <span style={{fontSize:13}}>{i.name}{i.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>{i.sku}</span>}</span>
-                    <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
-                      <span style={{fontSize:11,fontWeight:600,color:stockColor}}>📦 {stockLabel}</span>
-                      <span style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {r.notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:10,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>📝 {r.notes}</div>}
-
-            {/* Quote — shown after supplier replies */}
-            {replyItems.length>0&&!isReplying&&<div style={{marginBottom:12,padding:"10px 12px",background:"rgba(167,139,250,.06)",border:"1px solid rgba(167,139,250,.2)",borderRadius:8}}>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--purple)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>💬 Quote from {supplyingBranch?.name||"Supplier"}</div>
-              {replyItems.map((i,idx)=>(
-                <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 10px",background:"var(--surface)",borderRadius:6,marginBottom:3,gap:8,flexWrap:"wrap"}}>
-                  <span style={{fontSize:13,fontWeight:600}}>{i.name}</span>
-                  <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                    {availBadge(i.availability)}
-                    {i.price>0&&i.availability!=="not_available"&&<span style={{fontSize:13,fontWeight:700,color:"var(--accent)"}}>{Cs}{(+i.price).toFixed(2)}</span>}
-                    {i.notes&&<span style={{fontSize:11,color:"var(--text3)"}}>({i.notes})</span>}
-                  </div>
-                </div>
-              ))}
-              {r.reply_notes&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6}}>📝 {r.reply_notes}</div>}
-            </div>}
-
-            {/* Inline reply form — supplier fills in price + availability per item */}
-            {isReplying&&<div style={{marginBottom:12,padding:"12px 14px",background:"rgba(167,139,250,.07)",border:"1.5px solid rgba(167,139,250,.3)",borderRadius:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:"var(--purple)",marginBottom:10}}>💬 Reply with Quote</div>
-              {items.map((it,idx)=>{
-                const stock=getItemStock(it,r.supplying_branch_id);
-                const stockColor=stock==null?"var(--text3)":stock>0?"var(--green)":"var(--orange)";
-                const stockLabel=stock==null?"stock unknown":stock>0?`${stock} in stock`:"0 in stock — need to order";
-                return(
-                <div key={idx} style={{marginBottom:12,paddingBottom:12,borderBottom:idx<items.length-1?"1px solid var(--border)":"none"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
-                    <div style={{fontWeight:600,fontSize:13}}>{it.name}{it.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{it.sku}</span>} <span style={{color:"var(--text3)"}}>×{it.qty}</span></div>
-                    <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${stockColor}18`,color:stockColor}}>📦 {stockLabel}</span>
-                  </div>
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                    <div style={{flex:"1 1 120px"}}>
-                      <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Availability</label>
-                      <select className="inp" value={replyForm[idx]?.availability||"in_stock"} onChange={e=>setReplyForm(f=>({...f,[idx]:{...f[idx],availability:e.target.value}}))} style={{fontSize:12}}>
-                        <option value="in_stock">✅ In Stock</option>
-                        <option value="can_source">🔍 Can Source</option>
-                        <option value="not_available">❌ Not Available</option>
-                      </select>
-                    </div>
-                    {replyForm[idx]?.availability!=="not_available"&&<div style={{flex:"1 1 100px"}}>
-                      <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Price ({Cs})</label>
-                      <input className="inp" type="number" min="0" step="0.01" placeholder="0.00"
-                        value={replyForm[idx]?.price??""} onChange={e=>setReplyForm(f=>({...f,[idx]:{...f[idx],price:e.target.value}}))} style={{fontSize:12}}/>
-                    </div>}
-                    <div style={{flex:"2 1 160px"}}>
-                      <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Notes (optional)</label>
-                      <input className="inp" placeholder="Lead time, brand, etc."
-                        value={replyForm[idx]?.notes||""} onChange={e=>setReplyForm(f=>({...f,[idx]:{...f[idx],notes:e.target.value}}))} style={{fontSize:12}}/>
-                    </div>
-                  </div>
-                </div>
-              );})}
-              <div style={{marginBottom:10}}>
-                <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Overall Notes</label>
-                <textarea className="inp" rows={2} placeholder="Delivery time, payment terms, etc."
-                  value={replyNotes} onChange={e=>setReplyNotes(e.target.value)} style={{fontSize:12,resize:"vertical"}}/>
-              </div>
-              {patchErr&&<div style={{fontSize:12,color:"var(--red)",marginBottom:8,padding:"6px 10px",background:"rgba(248,113,113,.1)",borderRadius:6}}>❌ {patchErr}</div>}
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn btn-primary btn-sm" disabled={acting===r.id} onClick={()=>submitReply(r)}>📨 Send Quote</button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setReplyingId(null);setPatchErr(null);}}>Cancel</button>
-              </div>
-            </div>}
-
-            {/* Supplier: confirmed / cancelled alert banners */}
-            {isSupplier&&r.status==="confirmed"&&replyItems.length>0&&(
-              <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",marginBottom:10,background:"rgba(52,211,153,.1)",border:"1.5px solid rgba(52,211,153,.35)",borderRadius:8}}>
-                <span style={{fontSize:18}}>✅</span>
-                <div>
-                  <div style={{fontWeight:700,fontSize:13,color:"var(--green)"}}>Workshop accepted your quote!</div>
-                  <div style={{fontSize:12,color:"var(--text2)",marginTop:1}}>Please prepare the parts and mark ready when done.</div>
-                </div>
-              </div>
-            )}
-            {isSupplier&&r.status==="cancelled"&&replyItems.length>0&&(
-              <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",marginBottom:10,background:"rgba(248,113,113,.1)",border:"1.5px solid rgba(248,113,113,.3)",borderRadius:8}}>
-                <span style={{fontSize:18}}>✕</span>
-                <div>
-                  <div style={{fontWeight:700,fontSize:13,color:"var(--red)"}}>Workshop declined the quote</div>
-                  <div style={{fontSize:12,color:"var(--text2)",marginTop:1}}>No action needed — this request is closed.</div>
-                </div>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-              {isSupplier&&!isReplying&&(r.status==="pending"||r.status==="quoted")&&
-                <button className="btn btn-purple btn-sm" onClick={()=>startReply(r)}>
-                  {r.status==="quoted"?"✏️ Edit Quote":"💬 Reply with Quote"}
-                </button>}
-              {isSupplier&&r.status==="quoted"&&replyItems.length>0&&r.workshop_phone&&
-                <a href={waLink(r.workshop_phone,waQuoteMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Quote</a>}
-              {isSupplier&&r.status==="confirmed"&&<>
-                {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Workshop</a>}
-                <button className="btn btn-success btn-sm" disabled={isBusy} onClick={()=>patch(r.id,{status:"dispatched",dispatched_at:new Date().toISOString()})}>🚚 Mark Ready for Collection</button>
-              </>}
-              {isSupplier&&r.status==="dispatched"&&<>
-                {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 Notify Workshop</a>}
-                <button className="btn btn-ghost btn-sm" disabled={isBusy} onClick={()=>patch(r.id,{status:"completed"})}>✅ Mark Collected</button>
-              </>}
-              {isSupplier&&!["completed","cancelled"].includes(r.status)&&
-                <button className="btn btn-danger btn-sm" disabled={isBusy} onClick={()=>patch(r.id,{status:"cancelled"})}>✕ Cancel</button>}
-
-              {/* Requester side */}
-              {!isSupplier&&r.status==="pending"&&<span style={{fontSize:12,color:"var(--orange)",fontWeight:600}}>⏳ Awaiting quote from {supplyingBranch?.name||"branch"}…</span>}
-              {!isSupplier&&r.status==="quoted"&&<>
-                <span style={{fontSize:12,color:"var(--purple)",fontWeight:600}}>💬 Quote received — review above and confirm</span>
-                <button className="btn btn-primary btn-sm" disabled={isBusy} onClick={()=>acceptQuote(r)}>✅ Accept & Update Prices</button>
-                <button className="btn btn-danger btn-sm" disabled={isBusy} onClick={()=>patch(r.id,{status:"cancelled"})}>✕ Decline</button>
-              </>}
-              {!isSupplier&&r.status==="confirmed"&&<span style={{fontSize:12,color:"var(--blue)",fontWeight:600}}>✅ Accepted — {supplyingBranch?.name||"branch"} is preparing your parts</span>}
-              {!isSupplier&&r.status==="dispatched"&&<>
-                <span style={{fontSize:12,color:"var(--green)",fontWeight:700}}>📦 Parts ready! Notify your workshop customer.</span>
-                {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Workshop</a>}
-              </>}
-              {!isSupplier&&r.status==="completed"&&<span style={{fontSize:12,color:"var(--text3)"}}>✅ Completed</span>}
-              {!isSupplier&&r.status==="cancelled"&&<span style={{fontSize:12,color:"var(--red)"}}>✕ Cancelled</span>}
-              {onDelete&&<button className="btn btn-danger btn-sm" style={{marginLeft:"auto"}} disabled={isBusy}
-                onClick={async()=>{if(!window.confirm("Delete this transfer request?"))return;await onDelete(r.id);}}>
-                🗑️ Delete
-              </button>}
-            </div>
-          </div>
-        );
-      })}
+      {sorted.map(r=>(
+        <TransferRequestCard key={r.id} r={r} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} onRefresh={onRefresh} onDelete={onDelete}/>
+      ))}
     </div>
   );
 }
@@ -8629,7 +8626,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},sup
   );
 }
 
-function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], onReply, onEscalate, onMainReply, userRole="", userBranchId=null}) {
+export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], onReply, onEscalate, onMainReply, userRole="", userBranchId=null}) {
   const reqItems = (() => {try{return JSON.parse(req.items||"[]");}catch{return [];}})();
   const existingReply = (() => {try{return JSON.parse(req.reply_items||"[]");}catch{return [];}})();
   const existingMainReply = (() => {try{return JSON.parse(req.main_reply_items||"[]");}catch{return [];}})();
@@ -10357,6 +10354,161 @@ export function BulkImageImportModal({ parts, partSuppliers=[], onClose, onImage
 }
 
 // ─── Vehicle Requests Page ──────────────────────────────────────────────
+const VehiclePhotoRow = ({urls, startIdx, label, onImageClick}) => urls.length===0 ? null : (
+  <div style={{marginTop:8}}>
+    <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>{label}</div>
+    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+      {urls.map((url,i)=>(
+        <img key={i} src={url} alt="" loading="lazy" onClick={()=>onImageClick(startIdx+i)}
+          style={{width:80,height:60,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in"}}
+          onError={e=>e.target.style.display="none"}/>
+      ))}
+    </div>
+  </div>
+);
+
+export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApprove,onGoToVehicles,onRefresh}) {
+  const [isRejecting,setIsRejecting] = useState(false);
+  const [rejectReason,setRejectReason] = useState("");
+  const [busy,setBusy] = useState(false);
+  const [lightbox,setLightbox] = useState(null); // {urls, idx, labels}
+
+  const branchName = id => branches.find(b=>b.id===id)?.name||"Unknown Branch";
+
+  const statusBadge = status => (
+    <span style={{fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:600,
+      background:status==="pending"?"rgba(251,191,36,.15)":status==="approved"?"rgba(34,197,94,.12)":"rgba(248,113,113,.12)",
+      color:status==="pending"?"var(--yellow)":status==="approved"?"var(--green)":"var(--red)"}}>
+      {status==="pending"?"Pending":status==="approved"?"Approved":"Rejected"}
+    </span>
+  );
+
+  const approve = async () => {
+    setBusy(true);
+    try {
+      await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
+      await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
+      await onRefresh();
+      setBusy(false);
+      onGoToVehicles&&onGoToVehicles(r.make, r.model);
+      return;
+    } catch{}
+    await onRefresh();
+    setBusy(false);
+  };
+
+  const reject = async () => {
+    if(!rejectReason.trim()) return;
+    setBusy(true);
+    await api.patch("vehicle_requests","id",r.id,{status:"rejected",rejection_reason:rejectReason});
+    setIsRejecting(false); setRejectReason("");
+    await onRefresh();
+    setBusy(false);
+  };
+
+  const deleteRequest = async () => {
+    if(!window.confirm("Delete this vehicle request?")) return;
+    setBusy(true);
+    await api.delete("vehicle_requests","id",r.id);
+    await onRefresh();
+    setBusy(false);
+  };
+
+  const matchV = vehicles.find(v=>
+    v.make.toUpperCase()===r.make.toUpperCase() &&
+    v.model.toUpperCase()===r.model.toUpperCase()
+  );
+  const dbPhotoUrls = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean).map(toImgUrl);
+  const reqPhotos   = [r.photo1, r.photo2].filter(Boolean);
+  const allUrls  = [...reqPhotos, ...dbPhotoUrls];
+  const allLabels= [...reqPhotos.map((_,i)=>`Branch Photo ${i+1}`), ...["Front","Rear","Side"].slice(0,dbPhotoUrls.length)];
+  const openAt = (i) => setLightbox({urls:allUrls, idx:i, labels:allLabels});
+
+  return (
+    <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
+      {/* Header row */}
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+        <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
+        {statusBadge(r.status)}
+      </div>
+      {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
+      <div style={{fontSize:12,color:"var(--text3)"}}>{(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}</div>
+      {(r.vin||r.engine_no||r.reg)&&(
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:4,fontSize:11,fontFamily:"monospace",color:"var(--text2)"}}>
+          {r.vin&&<span style={{background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>VIN: <strong>{r.vin}</strong></span>}
+          {r.engine_no&&<span style={{background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>Eng: <strong>{r.engine_no}</strong></span>}
+          {r.reg&&<span style={{background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>Reg: <strong>{r.reg}</strong></span>}
+        </div>
+      )}
+      {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2,fontStyle:"italic"}}>"{r.notes}"</div>}
+
+      {/* Two-column photo section */}
+      {(reqPhotos.length>0||dbPhotoUrls.length>0)&&(
+        <div style={{display:"flex",gap:16,marginTop:10,flexWrap:"wrap"}}>
+          <VehiclePhotoRow urls={reqPhotos} startIdx={0} label="Branch Photos" onImageClick={openAt}/>
+          <VehiclePhotoRow urls={dbPhotoUrls} startIdx={reqPhotos.length} label="Vehicle in Database" onImageClick={openAt}/>
+        </div>
+      )}
+
+      {/* Approved vehicle details */}
+      {r.status==="approved"&&matchV&&(matchV.code||matchV.engine||matchV.variant)&&(
+        <div style={{marginTop:10,padding:"8px 12px",background:"rgba(34,197,94,.06)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{fontSize:11,fontWeight:700,color:"var(--green)"}}>Added as:</span>
+          {matchV.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 7px",borderRadius:4}}>{matchV.code}</span>}
+          {matchV.engine&&<span style={{fontSize:12,color:"var(--blue)"}}>🔧 {matchV.engine}</span>}
+          {matchV.variant&&<span style={{fontSize:12,color:"var(--text3)"}}>{matchV.variant}</span>}
+        </div>
+      )}
+
+      {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:8,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
+      <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
+        {isAdmin&&r.status==="approved"&&onGoToVehicles&&(
+          <button className="btn btn-ghost btn-sm" style={{fontSize:12}} onClick={()=>onGoToVehicles(r.make, r.model)}>
+            Edit in Vehicles →
+          </button>
+        )}
+        {isAdmin&&r.vin&&(
+          <a href={`https://www.vindecoderz.com/EN/check-lookup/${r.vin}`} target="_blank" rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm" style={{fontSize:12,color:"var(--blue)",textDecoration:"none"}}>
+            🔍 Search VIN
+          </a>
+        )}
+        {isAdmin&&r.vin&&(
+          <a href={`https://www.google.com/search?q=${encodeURIComponent(r.vin+' '+r.make+' '+r.model)}`} target="_blank" rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm" style={{fontSize:12,color:"var(--text2)",textDecoration:"none"}}>
+            🌐 Google
+          </a>
+        )}
+        <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",fontSize:12}} onClick={deleteRequest} disabled={busy}>
+          🗑 Delete
+        </button>
+      </div>
+
+      {isAdmin&&r.status==="pending"&&(
+        <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+          {!isRejecting&&(
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-primary btn-sm" onClick={approve} disabled={busy}>{busy?"...":"Approve & Add Vehicle"}</button>
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setIsRejecting(true);setRejectReason("");}}>Reject</button>
+            </div>
+          )}
+          {isRejecting&&(
+            <div>
+              <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>Rejection reason:</div>
+              <input className="inp" value={rejectReason} onChange={e=>setRejectReason(e.target.value)} placeholder="e.g. Already exists as MAZDA 121" autoFocus/>
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <button className="btn btn-primary btn-sm" style={{background:"var(--red)"}} onClick={reject} disabled={busy||!rejectReason.trim()}>{busy?"...":"Confirm Reject"}</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>setIsRejecting(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {lightbox&&<ImgLightbox urls={lightbox.urls} startIdx={lightbox.idx} labels={lightbox.labels} onClose={()=>setLightbox(null)}/>}
+    </div>
+  );
+}
+
 export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],user,role,currentBranch,onRefresh,onApprove,onGoToVehicles,t={}}) {
   const isAdmin = role==="admin";
   const myReqs  = isAdmin ? vehicleRequests : vehicleRequests.filter(r=>r.branch_id===currentBranch?.id);
@@ -10371,10 +10523,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
   const [showMakeSuggs, setShowMakeSuggs] = useState(false);
   const [showSuggs,     setShowSuggs]     = useState(false);
   const [existingMatch, setExistingMatch] = useState(null);
-  const [rejectingId,   setRejectingId]   = useState(null);
-  const [rejectReason,  setRejectReason]  = useState("");
-  const [busy,          setBusy]          = useState(null);
-  const [lightbox,      setLightbox]       = useState(null); // {urls, idx, labels}
+  const [lightbox,      setLightbox]       = useState(null); // {urls, idx, labels} — for the new-request form's photo slots
 
   const sf = (k,v) => setForm(p=>({...p,[k]:v}));
   const uc = v => v.toUpperCase();
@@ -10485,156 +10634,6 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
     setShowForm(false);
     setExistingMatch(null);
     await onRefresh();
-  };
-
-  const approve = async (r) => {
-    setBusy(r.id);
-    try {
-      await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
-      await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
-      await onRefresh();
-      setBusy(null);
-      onGoToVehicles&&onGoToVehicles(r.make, r.model);
-      return;
-    } catch{}
-    await onRefresh();
-    setBusy(null);
-  };
-
-  const reject = async (id) => {
-    if(!rejectReason.trim()) return;
-    setBusy(id);
-    await api.patch("vehicle_requests","id",id,{status:"rejected",rejection_reason:rejectReason});
-    setRejectingId(null); setRejectReason("");
-    await onRefresh();
-    setBusy(null);
-  };
-
-  const deleteRequest = async (id) => {
-    if(!window.confirm("Delete this vehicle request?")) return;
-    setBusy(id);
-    await api.delete("vehicle_requests","id",id);
-    await onRefresh();
-    setBusy(null);
-  };
-
-  const branchName = id => branches.find(b=>b.id===id)?.name||"Unknown Branch";
-
-  const statusBadge = status => (
-    <span style={{fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:600,
-      background:status==="pending"?"rgba(251,191,36,.15)":status==="approved"?"rgba(34,197,94,.12)":"rgba(248,113,113,.12)",
-      color:status==="pending"?"var(--yellow)":status==="approved"?"var(--green)":"var(--red)"}}>
-      {status==="pending"?"Pending":status==="approved"?"Approved":"Rejected"}
-    </span>
-  );
-
-  const ReqCard = ({r}) => {
-    const isRejecting = rejectingId===r.id;
-    const matchV = vehicles.find(v=>
-      v.make.toUpperCase()===r.make.toUpperCase() &&
-      v.model.toUpperCase()===r.model.toUpperCase()
-    );
-    const dbPhotoUrls = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean).map(toImgUrl);
-    const reqPhotos   = [r.photo1, r.photo2].filter(Boolean);
-    const allUrls  = [...reqPhotos, ...dbPhotoUrls];
-    const allLabels= [...reqPhotos.map((_,i)=>`Branch Photo ${i+1}`), ...["Front","Rear","Side"].slice(0,dbPhotoUrls.length)];
-    const openAt = (i) => setLightbox({urls:allUrls, idx:i, labels:allLabels});
-
-    const PhotoRow = ({urls, startIdx, label}) => urls.length===0 ? null : (
-      <div style={{marginTop:8}}>
-        <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>{label}</div>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          {urls.map((url,i)=>(
-            <img key={i} src={url} alt="" loading="lazy" onClick={()=>openAt(startIdx+i)}
-              style={{width:80,height:60,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in"}}
-              onError={e=>e.target.style.display="none"}/>
-          ))}
-        </div>
-      </div>
-    );
-
-    return (
-      <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
-        {/* Header row */}
-        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-          <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
-          {statusBadge(r.status)}
-        </div>
-        {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
-        <div style={{fontSize:12,color:"var(--text3)"}}>{(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}</div>
-        {(r.vin||r.engine_no||r.reg)&&(
-          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:4,fontSize:11,fontFamily:"monospace",color:"var(--text2)"}}>
-            {r.vin&&<span style={{background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>VIN: <strong>{r.vin}</strong></span>}
-            {r.engine_no&&<span style={{background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>Eng: <strong>{r.engine_no}</strong></span>}
-            {r.reg&&<span style={{background:"var(--surface2)",padding:"2px 6px",borderRadius:4}}>Reg: <strong>{r.reg}</strong></span>}
-          </div>
-        )}
-        {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2,fontStyle:"italic"}}>"{r.notes}"</div>}
-
-        {/* Two-column photo section */}
-        {(reqPhotos.length>0||dbPhotoUrls.length>0)&&(
-          <div style={{display:"flex",gap:16,marginTop:10,flexWrap:"wrap"}}>
-            <PhotoRow urls={reqPhotos} startIdx={0} label="Branch Photos"/>
-            <PhotoRow urls={dbPhotoUrls} startIdx={reqPhotos.length} label="Vehicle in Database"/>
-          </div>
-        )}
-
-        {/* Approved vehicle details */}
-        {r.status==="approved"&&matchV&&(matchV.code||matchV.engine||matchV.variant)&&(
-          <div style={{marginTop:10,padding:"8px 12px",background:"rgba(34,197,94,.06)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
-            <span style={{fontSize:11,fontWeight:700,color:"var(--green)"}}>Added as:</span>
-            {matchV.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 7px",borderRadius:4}}>{matchV.code}</span>}
-            {matchV.engine&&<span style={{fontSize:12,color:"var(--blue)"}}>🔧 {matchV.engine}</span>}
-            {matchV.variant&&<span style={{fontSize:12,color:"var(--text3)"}}>{matchV.variant}</span>}
-          </div>
-        )}
-
-        {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:8,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
-        <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
-          {isAdmin&&r.status==="approved"&&onGoToVehicles&&(
-            <button className="btn btn-ghost btn-sm" style={{fontSize:12}} onClick={()=>onGoToVehicles(r.make, r.model)}>
-              Edit in Vehicles →
-            </button>
-          )}
-          {isAdmin&&r.vin&&(
-            <a href={`https://www.vindecoderz.com/EN/check-lookup/${r.vin}`} target="_blank" rel="noopener noreferrer"
-              className="btn btn-ghost btn-sm" style={{fontSize:12,color:"var(--blue)",textDecoration:"none"}}>
-              🔍 Search VIN
-            </a>
-          )}
-          {isAdmin&&r.vin&&(
-            <a href={`https://www.google.com/search?q=${encodeURIComponent(r.vin+' '+r.make+' '+r.model)}`} target="_blank" rel="noopener noreferrer"
-              className="btn btn-ghost btn-sm" style={{fontSize:12,color:"var(--text2)",textDecoration:"none"}}>
-              🌐 Google
-            </a>
-          )}
-          <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",fontSize:12}} onClick={()=>deleteRequest(r.id)} disabled={busy===r.id}>
-            🗑 Delete
-          </button>
-        </div>
-
-        {isAdmin&&r.status==="pending"&&(
-          <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
-            {!isRejecting&&(
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn btn-primary btn-sm" onClick={()=>approve(r)} disabled={busy===r.id}>{busy===r.id?"...":"Approve & Add Vehicle"}</button>
-                <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setRejectingId(r.id);setRejectReason("");}}>Reject</button>
-              </div>
-            )}
-            {isRejecting&&(
-              <div>
-                <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>Rejection reason:</div>
-                <input className="inp" value={rejectReason} onChange={e=>setRejectReason(e.target.value)} placeholder="e.g. Already exists as MAZDA 121" autoFocus/>
-                <div style={{display:"flex",gap:8,marginTop:8}}>
-                  <button className="btn btn-primary btn-sm" style={{background:"var(--red)"}} onClick={()=>reject(r.id)} disabled={busy===r.id||!rejectReason.trim()}>{busy===r.id?"...":"Confirm Reject"}</button>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>setRejectingId(null)}>Cancel</button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -10757,7 +10756,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       {pending.length>0&&(
         <>
           <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,marginBottom:8}}>Pending ({pending.length})</div>
-          {pending.map(r=><ReqCard key={r.id} r={r}/>)}
+          {pending.map(r=><VehicleRequestCard key={r.id} r={r} isAdmin={isAdmin} vehicles={vehicles} branches={branches} user={user} onApprove={onApprove} onGoToVehicles={onGoToVehicles} onRefresh={onRefresh}/>)}
         </>
       )}
       {pending.length===0&&done.length===0&&(
@@ -10769,7 +10768,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       {done.length>0&&(
         <>
           <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,margin:"16px 0 8px"}}>Completed ({done.length})</div>
-          {done.map(r=><ReqCard key={r.id} r={r}/>)}
+          {done.map(r=><VehicleRequestCard key={r.id} r={r} isAdmin={isAdmin} vehicles={vehicles} branches={branches} user={user} onApprove={onApprove} onGoToVehicles={onGoToVehicles} onRefresh={onRefresh}/>)}
         </>
       )}
       {lightbox&&<ImgLightbox urls={lightbox.urls} startIdx={lightbox.idx} labels={lightbox.labels} onClose={()=>setLightbox(null)}/>}

@@ -2887,6 +2887,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setBranchStockRequests(prev=>prev.filter(r=>r.id!==id));
     showToast("🗑️ Transfer request deleted");
   };
+  const openPartEditor=async(p)=>{
+    if(!p)return;
+    const ok=await acquireLock("part",p.id);
+    if(!ok)return;
+    const fresh=await api.get("parts",`id=eq.${p.id}&select=*`);
+    openM("editPart",Array.isArray(fresh)&&fresh[0]?fresh[0]:p);
+  };
 
   // Grouped nav for sidebar
   const navGroups=[
@@ -5743,26 +5750,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {tab==="partRequests"&&(role==="admin"||role==="branch_admin")&&(
-          <PartRequestsPage partRequests={partRequests} branches={branches} parts={parts} user={user} role={role} currentBranch={currentBranch} onRefresh={()=>refreshTables("part_requests")} t={t}/>
+          <PartRequestsPage partRequests={partRequests} branches={branches} parts={parts} user={user} role={role} currentBranch={currentBranch} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={sendInquiry} onEditPart={openPartEditor} onRefresh={()=>refreshTables("part_requests")} t={t}/>
         )}
 
         {tab==="transferRequests"&&(role==="admin"||role==="branch_admin")&&(
-          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} onRefresh={()=>refreshTables("branch_stock_requests")} onDelete={deleteBranchStockRequest}/>
+          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={sendInquiry} onEditPart={openPartEditor} t={t} onRefresh={()=>refreshTables("branch_stock_requests")} onDelete={deleteBranchStockRequest}/>
         )}
 
         {tab==="wsShopRequests"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
-          <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} suppliers={suppliers} onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest} onDelete={deleteWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
+          <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={sendInquiry} onEditPart={openPartEditor} t={t} onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest} onDelete={deleteWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
         )}
 
         {tab==="requestsKanban"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
           <RequestsKanbanPage
             wsShopRequests={wsShopRequests} branchStockRequests={branchStockRequests}
             vehicleRequests={vehicleRequests} partRequests={partRequests}
-            branches={branches} parts={parts} vehicles={vehicles} suppliers={suppliers}
-            settings={settings} branchStock={branchStock} user={user} role={role} currentBranch={currentBranch}
+            branches={branches} parts={parts} vehicles={vehicles} suppliers={suppliers} partSuppliers={partSuppliers}
+            settings={settings} branchStock={branchStock} user={user} role={role} currentBranch={currentBranch} t={t}
             onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest}
             onDeleteWsShop={deleteWsShopRequest} onDeleteTransfer={deleteBranchStockRequest}
-            onApproveVehicle={saveVehicle}
+            onApproveVehicle={saveVehicle} onSendInquiry={sendInquiry} onEditPart={openPartEditor}
             onGoToVehicles={(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}}
             onRefresh={()=>refreshTables("ws_shop_requests","branch_stock_requests","vehicle_requests","part_requests")}/>
         )}
@@ -6017,6 +6024,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           initialF={ep?._initialF||newPartInitialF}
           onSavePartSupplier={savePartSupplier} onDeletePartSupplier={deletePartSupplier} onUpdatePartSupplier={updatePartSupplier} onLoadSuppliers={loadPartSuppliers}
           onAddSupplier={()=>openM("editSupplier")}
+          onEditSupplier={(s)=>openM("editSupplier",s)}
           onRequestNewPart={role==="branch_admin"?()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);closeM("editPart");openM("partRequest");}:null}
           onAddNewPart={(role==="admin"||role==="demo")?({copyFits,copyVehicleInfo}={})=>{
             const cur=mData("editPart");
@@ -6056,8 +6064,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           openM("editPart",null);
         }}
         onClose={()=>closeM("supplierCatalogue")}/>}
-      {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} vehicles={vehicles} partFitments={partFitments} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} onEditPart={(p,tab)=>{closeM("partSupplier");openM("editPart",{...p,_tab:tab||"info"});}} onMergePart={mergePart} branches={branches} allParts={parts} onGoToMainPart={(targetPart)=>{closeM("partSupplier");setTimeout(()=>{setTab("inventory");setFilterBranch("__all__");setSearchPart(targetPart.sku||"");},0);}} onAddSupplier={()=>openM("editSupplier")} t={t}/>}
-      {isOpen("inquiry")&&<InquiryModal part={mData("inquiry")} suppliers={suppliers} partSuppliers={getPartSupps(mData("inquiry")?.id)} onSend={sendInquiry} onClose={()=>closeM("inquiry")} t={t}/>}
+      {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} vehicles={vehicles} partFitments={partFitments} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} onEditPart={(p,tab)=>{closeM("partSupplier");openM("editPart",{...p,_tab:tab||"info"});}} onMergePart={mergePart} branches={branches} allParts={parts} onGoToMainPart={(targetPart)=>{closeM("partSupplier");setTimeout(()=>{setTab("inventory");setFilterBranch("__all__");setSearchPart(targetPart.sku||"");},0);}} onAddSupplier={()=>openM("editSupplier")} onEditSupplier={(s)=>openM("editSupplier",s)} t={t}/>}
+      {isOpen("inquiry")&&<InquiryModal part={mData("inquiry")} suppliers={suppliers} partSuppliers={getPartSupps(mData("inquiry")?.id)} onSend={sendInquiry} onClose={()=>closeM("inquiry")} t={t} isAdmin={role==="admin"} onEditPart={openPartEditor}/>}
       {isOpen("inquiryDetail")&&<InquiryDetailModal inquiry={mData("inquiryDetail")} onUpdate={updateInquiry} onAccept={async(inq)=>{closeM("inquiryDetail");await acceptInquiry(inq);}} onClose={()=>closeM("inquiryDetail")} settings={settings} t={t}/>}
       {isOpen("editCustomer")&&<CustomerModal customer={mData("editCustomer")} onSave={saveCustomer} onClose={()=>closeM("editCustomer")} t={t}/>}
       {isOpen("editUser")&&<UserModal user={mData("editUser")} onSave={saveUser} onClose={()=>closeM("editUser")} t={t}/>}

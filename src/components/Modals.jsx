@@ -3048,7 +3048,7 @@ function GrabImageOverlay({supplierUrl,partSku,onSave,onClose}) {
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onGoBack=null}) {
+export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onEditSupplier,onGoBack=null}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -3613,7 +3613,10 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                         {ps.min_order&&<span>📦 Min: {ps.min_order}</span>}
                       </div>
                     </div>
-                    {onDeletePartSupplier&&<button className="btn btn-danger btn-xs" onClick={()=>onDeletePartSupplier(ps.id)}>{t.delete}</button>}
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      {onEditSupplier&&ps.supplier&&<button className="btn btn-ghost btn-xs" onClick={()=>onEditSupplier(ps.supplier)}>✏️ Edit Supplier</button>}
+                      {onDeletePartSupplier&&<button className="btn btn-danger btn-xs" onClick={()=>onDeletePartSupplier(ps.id)}>{t.delete}</button>}
+                    </div>
                   </div>
                   <div style={{borderTop:"1px solid var(--border)",paddingTop:9,marginTop:4}}>
                     {editingPsId===ps.id?(
@@ -3644,13 +3647,6 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                               onClick={()=>window.open(searchUrl,"_blank")}>
                               {isGoogle?"🔍 Google":"🔍 Search"}
                             </button>
-                            {!isGoogle&&(
-                              <button className="btn btn-ghost btn-xs" title="Open supplier page and grab product image"
-                                style={{color:"var(--green)",fontWeight:600}}
-                                onClick={()=>{window.open(searchUrl,"_blank");setGrabImg({url:searchUrl,partNo:ps.supplier_part_no,suppName:ps.supplier?.name||""});}}>
-                                🖼 Get Image
-                              </button>
-                            )}
                           </>);
                         })()}
                         <button className="btn btn-ghost btn-xs" style={{color:"var(--accent)"}}
@@ -4082,7 +4078,7 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
   );
 }
 
-export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],partFitments=[],onSave,onDelete,onUpdate,onClose,onEditPart,onMergePart,branches=[],allParts=[],onGoToMainPart,onAddSupplier,t}) {
+export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],partFitments=[],onSave,onDelete,onUpdate,onClose,onEditPart,onEditSupplier,onMergePart,branches=[],allParts=[],onGoToMainPart,onAddSupplier,t}) {
   const [suppId,setSuppId]=useState("");
   const [price,setPrice]=useState("");
   const [lead,setLead]=useState("");
@@ -4168,7 +4164,10 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
                     <button className="btn btn-ghost btn-xs" onClick={()=>setConfirmDeleteId(null)}>✕</button>
                   </div>
                 ) : (
-                  <button className="btn btn-danger btn-xs" onClick={()=>setConfirmDeleteId(ps.id)}>{t.delete}</button>
+                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    {onEditSupplier&&ps.supplier&&<button className="btn btn-ghost btn-xs" onClick={()=>onEditSupplier(ps.supplier)}>✏️ Edit Supplier</button>}
+                    <button className="btn btn-danger btn-xs" onClick={()=>setConfirmDeleteId(ps.id)}>{t.delete}</button>
+                  </div>
                 )}
               </div>
 
@@ -4511,7 +4510,7 @@ export function CustomerQueryReplyModal({query,onReply,onClose,t,settings,onGoIn
   );
 }
 
-export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t}) {
+export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t,isAdmin,onEditPart}) {
   // Build professional RFQ message — each field on its own clear line
   // buildMsg now accepts optional supplierPartNo from part_suppliers record
   const buildMsg = (supplierName, qtyVal, supplierPartNo="") => {
@@ -4551,11 +4550,26 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t}) {
     return lines.join("\n");
   };
 
+  const defaultQty=part?.min_stock||part?.reorder_qty||1;
   const [selectedSuppliers,setSelectedSuppliers]=useState([]);
-  const [qty,setQty]=useState(10);
-  const [msg,setMsg]=useState(()=>buildMsg("Supplier", 10, ""));
+  const [qty,setQty]=useState(()=>defaultQty);
+  const [msg,setMsg]=useState(()=>buildMsg("Supplier", defaultQty, ""));
+  const [showPhoto,setShowPhoto]=useState(false);
+  const [supplierSearch,setSupplierSearch]=useState("");
+  const [matchedOnly,setMatchedOnly]=useState(true);
+
+  // Preview the message for the most recently selected supplier (with their known part# if any)
+  useEffect(()=>{
+    if(selectedSuppliers.length===0){setMsg(buildMsg("Supplier", qty, ""));return;}
+    const last=selectedSuppliers[selectedSuppliers.length-1];
+    const suppPartNo=partSuppliers.find(ps=>ps.supplier_id===last.id)?.supplier_part_no||"";
+    setMsg(buildMsg(last.name, qty, suppPartNo));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[selectedSuppliers, qty]);
 
   if(!part) return null;
+
+  const partPhoto=part.image_url||"";
 
   const toggleSupplier=(s)=>setSelectedSuppliers(p=>p.find(x=>x.id===s.id)?p.filter(x=>x.id!==s.id):[...p,s]);
 
@@ -4582,6 +4596,15 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t}) {
   const linkedPsMap=Object.fromEntries(partSuppliers.map(ps=>[ps.supplier_id, ps]));
   const linkedSupps=partSuppliers.map(ps=>ps.supplier).filter(Boolean);
   const allSupps=[...linkedSupps,...suppliers.filter(s=>!linkedSupps.find(l=>l.id===s.id))];
+  const filteredSupps=allSupps.filter(s=>{
+    if(matchedOnly&&!linkedPsMap[s.id]?.supplier_part_no)return false;
+    if(supplierSearch.trim()){
+      const q=supplierSearch.toLowerCase();
+      const hay=`${s.name||""} ${s.country||""} ${s.phone||""} ${s.email||""}`.toLowerCase();
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  });
 
   return (
     <Overlay onClose={onClose} wide>
@@ -4589,30 +4612,45 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t}) {
 
       {/* Part info preview */}
       <div style={{background:"var(--surface2)",borderRadius:10,padding:13,marginBottom:16,border:"1px solid var(--border)"}}>
-        <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:9}}>Part Details to Send</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"5px 16px",fontSize:13}}>
-          {[
-            ["Name",part.name],
-            ["中文",part.chinese_desc||"—"],
-            ["SKU",part.sku],
-            ["OE#",part.oe_number||"—"],
-            ["Make",part.make||"—"],
-            ["Model",part.model||"—"],
-            ["Year",part.year_range||"—"],
-            ["Brand",part.brand||"—"],
-          ].map(([k,v])=>(
-            <div key={k} style={{display:"flex",gap:6}}>
-              <span style={{color:"var(--text3)",minWidth:40,flexShrink:0}}>{k}</span>
-              <span style={{fontWeight:500,fontFamily:k==="SKU"||k==="OE#"?"DM Mono,monospace":"inherit",fontSize:k==="SKU"||k==="OE#"?12:13}}>{v}</span>
-            </div>
-          ))}
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:9}}>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",flex:1}}>Part Details to Send</div>
+          {isAdmin&&onEditPart&&<button className="btn btn-ghost btn-xs" title="Edit this part" onClick={()=>onEditPart(part)}>✏️ Edit Part</button>}
+        </div>
+        <div style={{display:"flex",gap:14}}>
+          {partPhoto&&<img src={toImgUrl(partPhoto)} alt="" referrerPolicy="no-referrer" onClick={()=>setShowPhoto(true)}
+            style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}
+            onError={e=>e.target.style.display="none"}/>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"5px 16px",fontSize:13,flex:1}}>
+            {[
+              ["Name",part.name],
+              ["中文",part.chinese_desc||"—"],
+              ["SKU",part.sku],
+              ["OE#",part.oe_number||"—"],
+              ["Make",part.make||"—"],
+              ["Model",part.model||"—"],
+              ["Year",part.year_range||"—"],
+              ["Brand",part.brand||"—"],
+            ].map(([k,v])=>(
+              <div key={k} style={{display:"flex",gap:6}}>
+                <span style={{color:"var(--text3)",minWidth:40,flexShrink:0}}>{k}</span>
+                <span style={{fontWeight:500,fontFamily:k==="SKU"||k==="OE#"?"DM Mono,monospace":"inherit",fontSize:k==="SKU"||k==="OE#"?12:13}}>{v}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       <FD>
         <FL label={`${t.selectSuppliers} *`}/>
+        <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+          <input className="inp" placeholder="🔍 Search suppliers…" value={supplierSearch} onChange={e=>setSupplierSearch(e.target.value)} style={{flex:1,fontSize:12}}/>
+          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--text2)",whiteSpace:"nowrap",cursor:"pointer"}}>
+            <input type="checkbox" className="chk" checked={matchedOnly} onChange={e=>setMatchedOnly(e.target.checked)}/>
+            ✓ Matched only
+          </label>
+        </div>
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:180,overflowY:"auto",background:"var(--surface2)",borderRadius:10,padding:11,border:"1px solid var(--border)"}}>
-          {allSupps.map(s=>{
+          {filteredSupps.map(s=>{
             const isLinked=!!linkedSupps.find(l=>l.id===s.id);
             const isSelected=!!selectedSuppliers.find(x=>x.id===s.id);
             return (
@@ -4637,7 +4675,16 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t}) {
               </label>
             );
           })}
-          {allSupps.length===0&&<p style={{color:"var(--text3)",fontSize:13,textAlign:"center"}}>No suppliers — add them first</p>}
+          {filteredSupps.length===0&&(
+            <div style={{textAlign:"center"}}>
+              <p style={{color:"var(--text3)",fontSize:13,margin:0}}>
+                {allSupps.length===0?"No suppliers — add them first"
+                  :matchedOnly?"No suppliers already carry this exact part yet."
+                  :"No suppliers match your search"}
+              </p>
+              {allSupps.length>0&&matchedOnly&&<button className="btn btn-ghost btn-xs" style={{marginTop:6}} onClick={()=>setMatchedOnly(false)}>Show all suppliers instead →</button>}
+            </div>
+          )}
         </div>
         {selectedSuppliers.length>0&&<div style={{fontSize:12,color:"var(--green)",marginTop:5}}>✓ {selectedSuppliers.length} supplier{selectedSuppliers.length>1?"s":""} selected</div>}
       </FD>
@@ -4649,6 +4696,8 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t}) {
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={handleSend} disabled={selectedSuppliers.length===0||!qty}>📩 {t.sendToSelected} ({selectedSuppliers.length})</button>
       </div>
+
+      {showPhoto&&partPhoto&&<ImgLightbox url={toImgUrl(partPhoto)} onClose={()=>setShowPhoto(false)}/>}
     </Overlay>
   );
 }
@@ -7600,12 +7649,13 @@ export function PartRequestModal({currentBranch, user, onClose, onSave, t={}}) {
 }
 
 // ─── Part Requests Page (admin reviews + approves; branch tracks status) ──────
-export function PartRequestCard({r,isAdmin,branches=[],parts=[],user,onRefresh}) {
+export function PartRequestCard({r,isAdmin,branches=[],parts=[],user,suppliers=[],partSuppliers=[],onSendInquiry,onEditPart,t={},onRefresh}) {
   const [isLinking,setIsLinking]=useState(false);
   const [linkSearch,setLinkSearch]=useState("");
   const [isRejecting,setIsRejecting]=useState(false);
   const [rejectReason,setRejectReason]=useState("");
   const [busy,setBusy]=useState(false);
+  const [rfqPart,setRfqPart]=useState(null);
 
   const branchName=id=>branches.find(b=>b.id===id)?.name||"Unknown Branch";
   const linked=r.part_id?parts.find(p=>p.id===r.part_id):null;
@@ -7653,7 +7703,11 @@ export function PartRequestCard({r,isAdmin,branches=[],parts=[],user,onRefresh})
           </div>
           {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
           {r.suggested_price&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Suggested price: <strong>{C()}{(+r.suggested_price).toFixed(2)}</strong></div>}
-          {r.status==="approved"&&linked&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:7,fontSize:12}}>✅ Linked to <strong>{linked.sku}</strong> — {linked.name}</div>}
+          {r.status==="approved"&&linked&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:7,fontSize:12,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{flex:1}}>✅ Linked to <strong>{linked.sku}</strong> — {linked.name}</span>
+            {onSendInquiry&&<button className="btn btn-ghost btn-xs" title="Request price/stock from suppliers" onClick={()=>setRfqPart(linked)}>📩 Ask Suppliers</button>}
+            {isAdmin&&onEditPart&&<button className="btn btn-ghost btn-xs" title="Edit this part" onClick={()=>onEditPart(linked)}>✏️ Edit Part</button>}
+          </div>}
           {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
         </div>
       </div>
@@ -7697,11 +7751,14 @@ export function PartRequestCard({r,isAdmin,branches=[],parts=[],user,onRefresh})
           )}
         </div>
       )}
+
+      {rfqPart&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)}
+        onSend={async(data)=>{await onSendInquiry(data);}} onClose={()=>setRfqPart(null)} t={t} isAdmin={isAdmin} onEditPart={onEditPart}/>}
     </div>
   );
 }
 
-export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role,currentBranch,onRefresh,t={}}) {
+export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role,currentBranch,suppliers=[],partSuppliers=[],onSendInquiry,onEditPart,onRefresh,t={}}) {
   const isAdmin=role==="admin";
   const myReqs=isAdmin?partRequests:partRequests.filter(r=>r.branch_id===currentBranch?.id);
   const pending=myReqs.filter(r=>r.status==="pending");
@@ -7727,14 +7784,14 @@ export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role
       {pending.length>0&&(
         <div style={{marginBottom:24}}>
           <div style={{fontSize:14,fontWeight:700,marginBottom:10,color:"var(--yellow)"}}>⏳ Pending ({pending.length})</div>
-          {pending.map(r=><PartRequestCard key={r.id} r={r} isAdmin={isAdmin} branches={branches} parts={parts} user={user} onRefresh={onRefresh}/>)}
+          {pending.map(r=><PartRequestCard key={r.id} r={r} isAdmin={isAdmin} branches={branches} parts={parts} user={user} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t} onRefresh={onRefresh}/>)}
         </div>
       )}
 
       {done.length>0&&(
         <div>
           <div style={{fontSize:14,fontWeight:700,marginBottom:10,color:"var(--text3)"}}>History ({done.length})</div>
-          {done.map(r=><PartRequestCard key={r.id} r={r} isAdmin={isAdmin} branches={branches} parts={parts} user={user} onRefresh={onRefresh}/>)}
+          {done.map(r=><PartRequestCard key={r.id} r={r} isAdmin={isAdmin} branches={branches} parts={parts} user={user} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t} onRefresh={onRefresh}/>)}
         </div>
       )}
     </div>
@@ -8134,13 +8191,15 @@ export function BranchUsersPage({branchId, branchName, user}) {
 // ═══════════════════════════════════════════════════════════════
 // BRANCH TRANSFER REQUESTS PAGE
 // ═══════════════════════════════════════════════════════════════
-export function TransferRequestCard({r,branches=[],role,currentBranch,settings,branchStock=[],parts=[],onRefresh,onDelete}) {
+export function TransferRequestCard({r,branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],onSendInquiry,onEditPart,t={},onRefresh,onDelete}) {
   const Cs=curSym(settings?.currency||"ZAR R");
   const [acting,setActing]=useState(false);
   const [isReplying,setIsReplying]=useState(false);
   const [replyForm,setReplyForm]=useState({});      // {itemIdx: {price,availability,notes}}
   const [replyNotes,setReplyNotes]=useState("");
   const [patchErr,setPatchErr]=useState(null);
+  const [rfqPart,setRfqPart]=useState(null);
+  const [lightbox,setLightbox]=useState(null);
 
   const isSupplier=role==="admin"||String(r.supplying_branch_id)===String(currentBranch?.id);
   const supplyingBranch=branches.find(b=>String(b.id)===String(r.supplying_branch_id));
@@ -8277,12 +8336,25 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
           const stock=getItemStock(i,r.supplying_branch_id);
           const stockColor=stock==null?"var(--text3)":stock>0?"var(--green)":"var(--orange)";
           const stockLabel=stock==null?"—":stock>0?`${stock} in stock`:"0 — need to order";
+          const itemPart=i.partId?parts.find(p=>String(p.id)===String(i.partId)):null;
+          const itemPhoto=itemPart?.image_url||"";
           return(
             <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 10px",background:"var(--surface2)",borderRadius:6,marginBottom:3,gap:8,flexWrap:"wrap"}}>
-              <span style={{fontSize:13}}>{i.name}{i.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>{i.sku}</span>}</span>
+              <span style={{fontSize:13,display:"flex",alignItems:"center",gap:8}}>
+                {itemPhoto&&<img src={toImgUrl(itemPhoto)} alt="" referrerPolicy="no-referrer" onClick={()=>setLightbox(itemPhoto)}
+                  style={{width:32,height:32,objectFit:"cover",borderRadius:6,border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}
+                  onError={e=>e.target.style.display="none"}/>}
+                {i.name}{i.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>{i.sku}</span>}
+              </span>
               <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
                 <span style={{fontSize:11,fontWeight:600,color:stockColor}}>📦 {stockLabel}</span>
                 <span style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</span>
+                {itemPart&&onSendInquiry&&(
+                  <button className="btn btn-ghost btn-xs" style={{whiteSpace:"nowrap"}} title="Request price/stock from suppliers" onClick={()=>setRfqPart(itemPart)}>📩 Ask Suppliers</button>
+                )}
+                {itemPart&&role==="admin"&&onEditPart&&(
+                  <button className="btn btn-ghost btn-xs" style={{whiteSpace:"nowrap"}} title="Edit this part" onClick={()=>onEditPart(itemPart)}>✏️ Edit Part</button>
+                )}
               </div>
             </div>
           );
@@ -8391,14 +8463,16 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
           <button className="btn btn-ghost btn-sm" disabled={isBusy} onClick={()=>patch({status:"completed"})}>✅ Mark Collected</button>
         </>}
         {isSupplier&&!["completed","cancelled"].includes(r.status)&&
-          <button className="btn btn-danger btn-sm" disabled={isBusy} onClick={()=>patch({status:"cancelled"})}>✕ Cancel</button>}
+          <button className="btn btn-danger btn-sm" disabled={isBusy} title="Cancels this request — the requester will see it as Cancelled"
+            onClick={()=>{if(!window.confirm("Cancel this transfer request? The requester will be notified it's cancelled."))return;patch({status:"cancelled"});}}>✕ Cancel Request</button>}
 
         {/* Requester side */}
         {!isSupplier&&r.status==="pending"&&<span style={{fontSize:12,color:"var(--orange)",fontWeight:600}}>⏳ Awaiting quote from {supplyingBranch?.name||"branch"}…</span>}
         {!isSupplier&&r.status==="quoted"&&<>
           <span style={{fontSize:12,color:"var(--purple)",fontWeight:600}}>💬 Quote received — review above and confirm</span>
           <button className="btn btn-primary btn-sm" disabled={isBusy} onClick={acceptQuote}>✅ Accept & Update Prices</button>
-          <button className="btn btn-danger btn-sm" disabled={isBusy} onClick={()=>patch({status:"cancelled"})}>✕ Decline</button>
+          <button className="btn btn-danger btn-sm" disabled={isBusy} title="Declines the quote and cancels this request"
+            onClick={()=>{if(!window.confirm("Decline this quote and cancel the request?"))return;patch({status:"cancelled"});}}>✕ Decline Quote</button>
         </>}
         {!isSupplier&&r.status==="confirmed"&&<span style={{fontSize:12,color:"var(--blue)",fontWeight:600}}>✅ Accepted — {supplyingBranch?.name||"branch"} is preparing your parts</span>}
         {!isSupplier&&r.status==="dispatched"&&<>
@@ -8407,16 +8481,22 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
         </>}
         {!isSupplier&&r.status==="completed"&&<span style={{fontSize:12,color:"var(--text3)"}}>✅ Completed</span>}
         {!isSupplier&&r.status==="cancelled"&&<span style={{fontSize:12,color:"var(--red)"}}>✕ Cancelled</span>}
+        {r.status==="cancelled"&&
+          <button className="btn btn-ghost btn-sm" disabled={isBusy} onClick={()=>patch({status:"pending"})}>↩️ Reopen</button>}
         {onDelete&&<button className="btn btn-danger btn-sm" style={{marginLeft:"auto"}} disabled={isBusy}
           onClick={async()=>{if(!window.confirm("Delete this transfer request?"))return;await onDelete(r.id);}}>
           🗑️ Delete
         </button>}
       </div>
+
+      {rfqPart&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)}
+        onSend={async(data)=>{await onSendInquiry(data);}} onClose={()=>setRfqPart(null)} t={t} isAdmin={role==="admin"} onEditPart={onEditPart}/>}
+      {lightbox&&<ImgLightbox url={toImgUrl(lightbox)} onClose={()=>setLightbox(null)}/>}
     </div>
   );
 }
 
-export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],onRefresh,onDelete}) {
+export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],onSendInquiry,onEditPart,t={},onRefresh,onDelete}) {
   const [refreshing,setRefreshing]=useState(false);
   const onRefreshRef=useRef(onRefresh);
   useEffect(()=>{onRefreshRef.current=onRefresh;},[onRefresh]);
@@ -8460,7 +8540,7 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
       {sorted.length===0&&<div style={{textAlign:"center",padding:48,color:"var(--text3)"}}>No transfer requests yet</div>}
 
       {sorted.map(r=>(
-        <TransferRequestCard key={r.id} r={r} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} onRefresh={onRefresh} onDelete={onDelete}/>
+        <TransferRequestCard key={r.id} r={r} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t} onRefresh={onRefresh} onDelete={onDelete}/>
       ))}
     </div>
   );
@@ -8523,7 +8603,7 @@ export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP REQUESTS PAGE  (spare-shop side)
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},suppliers=[],onReply,onEscalate,onMainReply,onDelete,onRefresh,userRole="",userBranchId=null}) {
+export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},suppliers=[],partSuppliers=[],onSendInquiry,onEditPart,t={},onReply,onEscalate,onMainReply,onDelete,onRefresh,userRole="",userBranchId=null}) {
   const [selId,    setSelId]    = useState(null);
   const [filter,   setFilter]   = useState("pending");
   const [refreshing,setRefreshing]=useState(false);
@@ -8582,7 +8662,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},sup
               style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",color:"#ef4444",borderRadius:7,padding:"3px 10px",cursor:"pointer",fontSize:12,fontWeight:600}}>🗑️ Delete</button>}
             <button onClick={()=>setSelId(null)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:18,padding:"0 4px"}}>✕</button>
           </div>
-          <WsShopRequestDetail req={selected} parts={parts} settings={settings} suppliers={suppliers}
+          <WsShopRequestDetail req={selected} parts={parts} settings={settings} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t}
             onReply={async(...a)=>{await onReply(...a);setSelId(null);}}
             onEscalate={onEscalate} onMainReply={onMainReply}
             userRole={userRole} userBranchId={userBranchId}/>
@@ -8626,7 +8706,8 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},sup
   );
 }
 
-export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], onReply, onEscalate, onMainReply, userRole="", userBranchId=null}) {
+export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], partSuppliers=[], onSendInquiry, onEditPart, t={}, onReply, onEscalate, onMainReply, userRole="", userBranchId=null}) {
+  const [rfqPart, setRfqPart] = useState(null);
   const reqItems = (() => {try{return JSON.parse(req.items||"[]");}catch{return [];}})();
   const existingReply = (() => {try{return JSON.parse(req.reply_items||"[]");}catch{return [];}})();
   const existingMainReply = (() => {try{return JSON.parse(req.main_reply_items||"[]");}catch{return [];}})();
@@ -9036,7 +9117,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], o
         {replyLines.map((line,idx)=>{
           const reqItem=reqItems[idx]||{};
           const linkedPart=line.part_id?parts.find(p=>String(p.id)===String(line.part_id)):null;
-          const partPhotos=(() => {try{return JSON.parse(linkedPart?.photos||"[]");}catch{return [];}})();
+          const linkedPartPhoto=linkedPart?.image_url||"";
           const reqPhoto=reqItem.photo_url||"";
           const results=searchResults(idx);
           const isCreating=creating===idx;
@@ -9056,10 +9137,10 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], o
                   <div style={{fontSize:11,color:"var(--text3)"}}>Qty needed: {line.qty}</div>
                 </div>
                 {/* Linked part photo */}
-                {linkedPart&&(partPhotos[0]||linkedPart.photo_url)&&(
-                  <img src={toImgUrl(partPhotos[0]||linkedPart.photo_url)} alt=""
-                    onClick={()=>setLightbox(partPhotos[0]||linkedPart.photo_url)}
-                    style={{width:56,height:56,objectFit:"cover",borderRadius:8,cursor:"pointer",flexShrink:0,border:"2px solid var(--accent)"}}/>
+                {linkedPart&&linkedPartPhoto&&(
+                  <img src={toImgUrl(linkedPartPhoto)} alt=""
+                    onClick={()=>setLightbox(linkedPartPhoto)}
+                    style={{width:56,height:56,objectFit:"cover",borderRadius:8,cursor:"zoom-in",flexShrink:0,border:"2px solid var(--accent)"}}/>
                 )}
               </div>
 
@@ -9072,6 +9153,10 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], o
                     color:linkedPart.stock>0?"#34d399":"#ef4444"}}>
                     {linkedPart.stock>0?`${linkedPart.stock} in stock`:"Out of stock"}
                   </span>
+                  {onSendInquiry&&<button onClick={()=>setRfqPart(linkedPart)} title="Request price/stock from suppliers"
+                    style={{background:"none",border:"1px solid rgba(96,165,250,.4)",borderRadius:6,cursor:"pointer",color:"var(--blue)",fontSize:11,padding:"2px 8px"}}>📩 Ask Suppliers</button>}
+                  {userRole==="admin"&&onEditPart&&<button onClick={()=>onEditPart(linkedPart)} title="Edit this part"
+                    style={{background:"none",border:"1px solid var(--border2)",borderRadius:6,cursor:"pointer",color:"var(--text2)",fontSize:11,padding:"2px 8px"}}>✏️ Edit Part</button>}
                   <button onClick={()=>updateLine(idx,{part_id:null})} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,padding:"0 2px"}}>✕</button>
                 </div>
               )}
@@ -9310,7 +9395,10 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], o
         </div>
       )}
 
-      {lightbox&&<ImgLightbox src={toImgUrl(lightbox)} onClose={()=>setLightbox(null)}/>}
+      {lightbox&&<ImgLightbox url={toImgUrl(lightbox)} onClose={()=>setLightbox(null)}/>}
+
+      {rfqPart&&onSendInquiry&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)}
+        onSend={async(data)=>{await onSendInquiry(data);}} onClose={()=>setRfqPart(null)} t={t} isAdmin={userRole==="admin"} onEditPart={onEditPart}/>}
     </div>
   );
 }

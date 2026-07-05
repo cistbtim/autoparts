@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
-import { Overlay, MHead } from "./shared.jsx";
+import { toImgUrl } from "../lib/helpers.js";
+import { Overlay, MHead, ImgLightbox } from "./shared.jsx";
 import { WsShopRequestDetail, TransferRequestCard, VehicleRequestCard, PartRequestCard } from "./Modals.jsx";
+
+const partPhotoUrl=(part)=>part?.image_url||"";
 
 const COLUMNS = [
   {id:"new",        label:"New",         color:"#a78bfa"},
@@ -24,64 +27,83 @@ const TYPE_META={
   part:    {icon:"📬",label:"Catalog Part Request"},
 };
 
-function normalize(row,type,branches){
+function normalize(row,type,branches,parts){
   const branchName=id=>branches.find(b=>b.id===id)?.name||"Unknown Branch";
-  let title,subtitle;
+  let title,subtitle,photoUrl="";
   if(type==="ws"){
     title=row.workshop_name||row.requester_name||"Workshop";
-    const itemCount=(()=>{try{return JSON.parse(row.items||"[]").length;}catch{return 0;}})();
-    subtitle=[row.job_car,row.job_complaint].filter(Boolean).join(" · ")||`${itemCount} part${itemCount!==1?"s":""}`;
+    const reqItems=(()=>{try{return JSON.parse(row.items||"[]");}catch{return [];}})();
+    subtitle=[row.job_car,row.job_complaint].filter(Boolean).join(" · ")||`${reqItems.length} part${reqItems.length!==1?"s":""}`;
+    const firstWithPhoto=reqItems.find(i=>i.photo_url);
+    photoUrl=firstWithPhoto?.photo_url||"";
   }else if(type==="transfer"){
     const items=Array.isArray(row.items)?row.items:[];
     title=row.workshop_name||branchName(row.requesting_branch_id);
     subtitle=`${items.length} item${items.length!==1?"s":""} → ${branchName(row.supplying_branch_id)}`;
+    const firstItemPart=items.find(i=>i.partId)?.partId ? parts.find(p=>String(p.id)===String(items.find(i=>i.partId).partId)) : null;
+    photoUrl=partPhotoUrl(firstItemPart);
   }else if(type==="vehicle"){
     title=`${row.make} ${row.model}`;
     subtitle=branchName(row.branch_id);
+    photoUrl=row.photo1||row.photo2||"";
   }else{ // part
     title=row.name;
     subtitle=branchName(row.branch_id);
+    photoUrl=row.image_url||"";
   }
-  return {id:`${type}_${row.id}`,rawId:row.id,type,title,subtitle,status:row.status,kanbanColumn:mapToColumn(type,row.status),createdAt:row.created_at,raw:row};
+  return {id:`${type}_${row.id}`,rawId:row.id,type,title,subtitle,photoUrl,status:row.status,kanbanColumn:mapToColumn(type,row.status),createdAt:row.created_at,raw:row};
 }
 
 const RequestCard=({card,onClick})=>{
   const meta=TYPE_META[card.type];
+  const [lightbox,setLightbox]=useState(false);
   return (
     <div className="kb-card" style={{marginBottom:8}} onClick={onClick}>
-      <div style={{padding:"10px 11px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,marginBottom:4}}>
-          <span style={{fontSize:11,fontWeight:700,color:"var(--text3)"}}>{meta.icon} {meta.label}</span>
-          <span style={{fontSize:10,color:"var(--text3)",whiteSpace:"nowrap"}}>{card.createdAt?new Date(card.createdAt).toLocaleDateString():""}</span>
+      <div style={{padding:"10px 11px",display:"flex",gap:10}}>
+        {card.photoUrl&&<img src={toImgUrl(card.photoUrl)} alt="" referrerPolicy="no-referrer"
+          onClick={e=>{e.stopPropagation();setLightbox(true);}}
+          style={{width:40,height:40,objectFit:"cover",borderRadius:7,border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}
+          onError={e=>e.target.style.display="none"}/>}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,marginBottom:4}}>
+            <span style={{fontSize:11,fontWeight:700,color:"var(--text3)"}}>{meta.icon} {meta.label}</span>
+            <span style={{fontSize:10,color:"var(--text3)",whiteSpace:"nowrap"}}>{card.createdAt?new Date(card.createdAt).toLocaleDateString():""}</span>
+          </div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{card.title}</div>
+          {card.subtitle&&<div style={{fontSize:11,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{card.subtitle}</div>}
         </div>
-        <div style={{fontWeight:700,fontSize:13,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{card.title}</div>
-        {card.subtitle&&<div style={{fontSize:11,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{card.subtitle}</div>}
       </div>
+      {lightbox&&<div onClick={e=>e.stopPropagation()}><ImgLightbox url={toImgUrl(card.photoUrl)} onClose={()=>setLightbox(false)}/></div>}
     </div>
   );
 };
 
 export function RequestsKanbanPage({
   wsShopRequests=[],branchStockRequests=[],vehicleRequests=[],partRequests=[],
-  branches=[],parts=[],vehicles=[],suppliers=[],settings={},branchStock=[],
-  user,role,currentBranch,
+  branches=[],parts=[],vehicles=[],suppliers=[],partSuppliers=[],settings={},branchStock=[],
+  user,role,currentBranch,t={},
   onReply,onEscalate,onMainReply,onDeleteWsShop,onDeleteTransfer,
-  onApproveVehicle,onGoToVehicles,onRefresh,
+  onApproveVehicle,onGoToVehicles,onSendInquiry,onEditPart,onRefresh,
 }) {
   const [activeTypes,setActiveTypes]=useState(()=>new Set(["ws","transfer","vehicle","part"]));
-  const [openCard,setOpenCard]=useState(null); // normalized card currently shown in the detail Overlay
+  const [openCardId,setOpenCardId]=useState(null); // id of the card currently shown in the detail Overlay
 
   const isAdmin=role==="admin";
 
-  const cards=useMemo(()=>{
-    const all=[
-      ...wsShopRequests.map(r=>normalize(r,"ws",branches)),
-      ...branchStockRequests.map(r=>normalize(r,"transfer",branches)),
-      ...vehicleRequests.map(r=>normalize(r,"vehicle",branches)),
-      ...partRequests.map(r=>normalize(r,"part",branches)),
-    ];
-    return all.filter(c=>activeTypes.has(c.type)).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-  },[wsShopRequests,branchStockRequests,vehicleRequests,partRequests,branches,activeTypes]);
+  // Unfiltered — so the open detail Overlay always re-derives from live data (not a stale snapshot),
+  // and stays resolvable even if the user toggles a filter chip while it's open.
+  const allCards=useMemo(()=>[
+    ...wsShopRequests.map(r=>normalize(r,"ws",branches,parts)),
+    ...branchStockRequests.map(r=>normalize(r,"transfer",branches,parts)),
+    ...vehicleRequests.map(r=>normalize(r,"vehicle",branches,parts)),
+    ...partRequests.map(r=>normalize(r,"part",branches,parts)),
+  ],[wsShopRequests,branchStockRequests,vehicleRequests,partRequests,branches,parts]);
+
+  const cards=useMemo(()=>
+    allCards.filter(c=>activeTypes.has(c.type)).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)),
+  [allCards,activeTypes]);
+
+  const openCard=openCardId?allCards.find(c=>c.id===openCardId)||null:null;
 
   const toggleType=(type)=>setActiveTypes(prev=>{
     const next=new Set(prev);
@@ -89,7 +111,7 @@ export function RequestsKanbanPage({
     return next;
   });
 
-  const closeDetail=()=>setOpenCard(null);
+  const closeDetail=()=>setOpenCardId(null);
 
   const renderDetail=()=>{
     if(!openCard)return null;
@@ -103,7 +125,7 @@ export function RequestsKanbanPage({
               🗑️ Delete
             </button>
           )}/>
-        <WsShopRequestDetail req={raw} parts={parts} settings={settings} suppliers={suppliers}
+        <WsShopRequestDetail req={raw} parts={parts} settings={settings} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t}
           onReply={async(...a)=>{await onReply(...a);closeDetail();}}
           onEscalate={onEscalate} onMainReply={onMainReply}
           userRole={role} userBranchId={user?.branch_id||null}/>
@@ -113,7 +135,8 @@ export function RequestsKanbanPage({
       <Overlay onClose={closeDetail} wide>
         <MHead title="🔄 Branch Transfer Request" sub={raw.workshop_name||"Request"} onClose={closeDetail}/>
         <TransferRequestCard r={raw} branches={branches} role={role} currentBranch={currentBranch}
-          settings={settings} branchStock={branchStock} parts={parts} onRefresh={onRefresh} onDelete={onDeleteTransfer}/>
+          settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t}
+          onRefresh={onRefresh} onDelete={onDeleteTransfer}/>
       </Overlay>
     );
     if(type==="vehicle")return(
@@ -126,7 +149,7 @@ export function RequestsKanbanPage({
     return(
       <Overlay onClose={closeDetail}>
         <MHead title="📬 Catalog Part Request" sub={raw.name} onClose={closeDetail}/>
-        <PartRequestCard r={raw} isAdmin={isAdmin} branches={branches} parts={parts} user={user} onRefresh={onRefresh}/>
+        <PartRequestCard r={raw} isAdmin={isAdmin} branches={branches} parts={parts} user={user} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t} onRefresh={onRefresh}/>
       </Overlay>
     );
   };
@@ -168,7 +191,7 @@ export function RequestsKanbanPage({
                     <div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic"}}>No items</div>
                   </div>
                 )}
-                {items.map(card=><RequestCard key={card.id} card={card} onClick={()=>setOpenCard(card)}/>)}
+                {items.map(card=><RequestCard key={card.id} card={card} onClick={()=>setOpenCardId(card.id)}/>)}
               </div>
             </div>
           );

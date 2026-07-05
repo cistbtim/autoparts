@@ -2024,14 +2024,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       showToast(`Error saving: ${res.message||res.code}`, "err");
       return;
     }
-    await reloadPartSuppliers();showToast("Supplier linked!");
+    if(Array.isArray(res)&&res.length){
+      setPartSuppliers(prev=>{
+        const ids=new Set(res.map(r=>r.id));
+        return [...prev.filter(ps=>!ids.has(ps.id)), ...res];
+      });
+    }
+    showToast("Supplier linked!");
   };
   const updatePartSupplier=async(id,data)=>{
     const res = await api.patch("part_suppliers","id",id,data);
     if(res?.code) { showToast(`Error: ${res.message||res.code}`,"err"); return; }
-    await reloadPartSuppliers();showToast("Updated!");
+    if(Array.isArray(res)&&res.length){
+      setPartSuppliers(prev=>prev.map(ps=>ps.id===res[0].id?res[0]:ps));
+    }
+    showToast("Updated!");
   };
-  const deletePartSupplier=async(id)=>{await api.delete("part_suppliers","id",id);await reloadPartSuppliers();showToast("Removed","err");};
+  const deletePartSupplier=async(id)=>{await api.delete("part_suppliers","id",id);setPartSuppliers(prev=>prev.filter(ps=>ps.id!==id));showToast("Removed","err");};
   const deletePartSupplierMany=async(ids)=>{for(const id of ids)await api.delete("part_suppliers","id",id);await reloadPartSuppliers();showToast(`Removed ${ids.length} link${ids.length>1?"s":""}`, "err");};
   const mergePart=async(sourceId,targetId)=>{
     // Move supplier links — skip if target already has same supplier

@@ -3636,6 +3636,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                         ):(
                           <span style={{fontSize:12,color:"var(--yellow)",flex:1}}>⚠ Unknown — click to add</span>
                         )}
+                        {ps.supplier_part_no&&<button className="cp-btn" title="Copy supplier part number" onClick={()=>navigator.clipboard.writeText(ps.supplier_part_no)}>📋</button>}
                         {ps.supplier_part_no&&(()=>{
                           const searchUrl = ps.supplier?.search_url
                             ? ps.supplier.search_url.replace("{sku}", encodeURIComponent(ps.supplier_part_no))
@@ -4204,6 +4205,7 @@ export function PartSupplierModal({part,partSuppliers,suppliers,vehicles=[],part
                     ) : (
                       <span style={{fontSize:12,color:"var(--yellow)",flex:1}}>⚠ Unknown — click to add</span>
                     )}
+                    {ps.supplier_part_no&&<button className="cp-btn" title="Copy supplier part number" onClick={()=>navigator.clipboard.writeText(ps.supplier_part_no)}>📋</button>}
                     {ps.supplier?.search_url&&(()=>{
                       const tpl=ps.supplier.search_url;
                       const isVehicleSearch=/\{vehicle_code\}/i.test(tpl);

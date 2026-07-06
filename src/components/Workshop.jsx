@@ -6106,7 +6106,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       startIdx={matchJobCarLightbox}
                       onClose={()=>setMatchJobCarLightbox(null)}/>
                   )}
-                  <div style={{marginBottom:12}}>
+                  <div style={{position:"sticky",top:0,zIndex:5,background:"var(--surface)",paddingBottom:8,marginBottom:4,borderBottom:"1px solid var(--border)"}}>
                     <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>
                       🚗 This car — {[job.vehicle_reg,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" · ")}
                     </div>
@@ -6114,7 +6114,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       {photos.map((p,i)=>(
                         <div key={p.label} style={{position:"relative",borderRadius:8,overflow:"hidden",cursor:"zoom-in",border:"2px solid var(--accent)"}}
                           onClick={()=>setMatchJobCarLightbox(i)}>
-                          <img src={p.src} alt={p.label} style={{width:"100%",height:130,objectFit:"contain",display:"block",background:"#f0f0f0"}}
+                          <img src={p.src} alt={p.label} style={{width:"100%",height:90,objectFit:"contain",display:"block",background:"#f0f0f0"}}
                             onError={e=>e.target.parentNode.style.display="none"}/>
                           <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"2px 7px",background:"rgba(0,0,0,.55)",fontSize:10,fontWeight:700,color:"#fff",textAlign:"center"}}>
                             {p.label}

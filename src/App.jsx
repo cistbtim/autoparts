@@ -699,23 +699,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setPsLoading(false);
   },[]);
   const reloadPartSuppliers=useCallback(async()=>{
-    const data=await api.get("part_suppliers","select=*");
+    const data=await api.fresh("part_suppliers","select=*");
     setPartSuppliers(Array.isArray(data)?data:[]);
   },[]);
   useEffect(()=>{
     if(tab==="inventory"||tab==="suppliers"||tab==="pos") loadPartSuppliers();
   },[tab,loadPartSuppliers]);
 
-  // Scoped load — when the Edit Part modal opens for a specific part (e.g. from Workshop's
-  // Spare Shop tab, which never visits inventory/suppliers/pos), fetch just that part's
-  // supplier links instead of waiting on the full-table lazy load above. Re-fires whenever
-  // the open part changes so switching parts always shows the right supplier code.
+  // Scoped load — always runs fresh (bypassing the SWR cache) whenever the Edit Part modal
+  // opens for a specific part, so a stale full-table snapshot from earlier in the session
+  // (or a stale localStorage cache entry) can never hide supplier links that were just added.
+  // Re-fires whenever the open part changes so switching parts always shows the right data.
   useEffect(()=>{
     const pid=M.editPart?.data?.id;
-    if(!pid||psLoadedRef.current) return;
+    if(!pid) return;
     let cancelled=false;
     (async()=>{
-      const data=await api.get("part_suppliers",`part_id=eq.${pid}&select=*`);
+      const data=await api.fresh("part_suppliers",`part_id=eq.${pid}&select=*`);
       if(cancelled||!Array.isArray(data)) return;
       setPartSuppliers(prev=>[...prev.filter(ps=>ps.part_id!==pid),...data]);
     })();
@@ -6015,7 +6015,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           onDelete={ep&&canEditPart(ep)?async(p)=>{ if(p.id)releaseLock("part",p.id); await deletePart(p.id); closeM("editPart"); }:null}
           onCreateOpposite={createOpposite}
           onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}}
-          onGoSupplier={async(p)=>{closeM("editPart");await loadPartSuppliers();openM("partSupplier",p);}}
+          onGoSupplier={async(p)=>{closeM("editPart");await reloadPartSuppliers();openM("partSupplier",p);}}
           onGoToPart={(sku)=>{
             const target=parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase());
             if(target){

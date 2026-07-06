@@ -978,6 +978,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     };
   },[]);
 
+  // Requests board — poll for incoming workshop/branch requests every 20s while open.
+  // These queries are branch-scoped (cheap), unlike the 5-minute full loadAll() above.
+  useEffect(()=>{
+    if(tab!=="requestsKanban") return;
+    const poll=setInterval(()=>{
+      refreshTables("ws_shop_requests","branch_stock_requests","vehicle_requests","part_requests");
+    },20000);
+    return ()=>clearInterval(poll);
+  },[tab,refreshTables]);
+
   // Cart
   const addToCart=(part)=>{setCart(p=>{const ex=p.find(i=>i.id===part.id);return ex?p.map(i=>i.id===part.id?{...i,qty:i.qty+1}:i):[...p,{...part,qty:1}];});showToast(`Added: ${part.name}`);};
   const removeFromCart=(id)=>setCart(p=>p.filter(i=>i.id!==id));

@@ -1987,7 +1987,7 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
                 cursor:hasPhotos?"zoom-in":"default"}}
                 onClick={()=>hasPhotos&&openVehicleLightbox(v,"photo_front")}>
                 {thumbUrl
-                  ? <img src={thumbUrl} alt="vehicle" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  ? <img src={thumbUrl} alt="vehicle" style={{width:"100%",height:"100%",objectFit:"contain"}}/>
                   : <span style={{fontSize:24,opacity:.3}}>🚗</span>}
               </div>
               {/* Main info */}

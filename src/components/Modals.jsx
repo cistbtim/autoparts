@@ -9290,6 +9290,10 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
           </div>
           {showEscalate?(
             <>
+              <button type="button" onClick={()=>setEscalateNotes("International supplier only — needs Head Office to source.")}
+                style={{marginBottom:8,padding:"5px 10px",borderRadius:7,border:"1px solid rgba(96,165,250,.35)",background:"rgba(96,165,250,.08)",color:"var(--blue)",fontWeight:600,fontSize:11,cursor:"pointer"}}>
+                🌍 International supplier
+              </button>
               <textarea className="inp" rows={2} value={escalateNotes} onChange={e=>setEscalateNotes(e.target.value)}
                 placeholder="Reason for escalating — e.g. 'Not in local stock, need main to source this'"
                 style={{width:"100%",resize:"vertical",marginBottom:8,fontSize:12}}/>

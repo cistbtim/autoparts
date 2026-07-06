@@ -5609,9 +5609,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   </button>
                 );
               })()}
-              <button onClick={()=>setSupplierModal(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(37,211,102,.3)",background:"rgba(37,211,102,.08)",color:"#25D366",fontWeight:700,fontSize:12,cursor:"pointer"}}>
-                📤 {t.wsqtSendQuote}
-              </button>
+              {!wsProfile?.linked_branch_id&&(
+                <button onClick={()=>setSupplierModal(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(37,211,102,.3)",background:"rgba(37,211,102,.08)",color:"#25D366",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                  📤 {t.wsqtSendQuote}
+                </button>
+              )}
               {wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&(
                 <button onClick={()=>setReturnQuoteOpen(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(56,189,248,.3)",background:"rgba(56,189,248,.08)",color:"#38bdf8",fontWeight:700,fontSize:12,cursor:"pointer"}}>
                   ↩️ {t.wsqtReturnQuote}

@@ -3353,6 +3353,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [matchJobCarLightbox, setMatchJobCarLightbox] = useState(null); // null | index — for job car photos at top
   const [matchModelSelected, setMatchModelSelected] = useState(null);
   const [matchAutoSuggestion, setMatchAutoSuggestion] = useState(null); // { vehicle, source: 'cache'|'year', yearDecoded? }
+  const [matchVinInfoOpen, setMatchVinInfoOpen] = useState(false); // VIN Decoded panel — collapsed by default to save space for photo comparison
   // request-unmatched-vehicle-to-admin (Match Vehicle Model modal)
   const [matchReqOpen, setMatchReqOpen] = useState(false);
   const [matchReqSaving, setMatchReqSaving] = useState(false);
@@ -6089,40 +6090,71 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   <span style={{display:"inline-block",animation:vehRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
                 </button>
               )}/>
-            {/* Job car photos for comparison */}
+            {/* Job car photos + selected candidate photos — pinned together for direct comparison */}
             {(()=>{
               const photos=[
                 {src:toImgUrl(vehiclePhotos.front||""),label:"Front"},
                 {src:toImgUrl(vehiclePhotos.rear||""), label:"Rear"},
                 {src:toImgUrl(vehiclePhotos.side||""), label:"Side"},
               ].filter(p=>p.src);
-              if(!photos.length) return null;
+              const sv=matchModelSelected;
+              const svPhotos=sv?[
+                {src:toImgUrl(sv.photo_front||""),label:"Front"},
+                {src:toImgUrl(sv.photo_rear||""), label:"Rear"},
+                {src:toImgUrl(sv.photo_side||""), label:"Side"},
+              ].filter(p=>p.src):[];
+              if(!photos.length&&!sv) return null;
+              const photoRow=(list,border,onClick)=>(
+                <div style={{display:"grid",gridTemplateColumns:`repeat(${list.length},1fr)`,gap:6}}>
+                  {list.map((p,i)=>(
+                    <div key={p.label} style={{position:"relative",borderRadius:8,overflow:"hidden",cursor:"zoom-in",border:`2px solid ${border}`}}
+                      onClick={()=>onClick(i)}>
+                      <img src={p.src} alt={p.label} style={{width:"100%",height:90,objectFit:"contain",display:"block",background:"#f0f0f0"}}
+                        onError={e=>e.target.parentNode.style.display="none"}/>
+                      <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"2px 7px",background:"rgba(0,0,0,.55)",fontSize:10,fontWeight:700,color:"#fff",textAlign:"center"}}>
+                        {p.label}
+                      </div>
+                      <div style={{position:"absolute",top:4,right:6,fontSize:14,color:"rgba(255,255,255,.8)"}}>🔍</div>
+                    </div>
+                  ))}
+                </div>
+              );
               return(
                 <>
-                  {matchJobCarLightbox!==null&&(
+                  {matchJobCarLightbox!==null&&photos.length>0&&(
                     <ImgLightbox
                       urls={photos.map(p=>p.src)}
                       labels={photos.map(p=>p.label)}
                       startIdx={matchJobCarLightbox}
                       onClose={()=>setMatchJobCarLightbox(null)}/>
                   )}
+                  {matchModelLightbox!==null&&svPhotos.length>0&&(
+                    <ImgLightbox
+                      urls={svPhotos.map(p=>p.src)}
+                      labels={svPhotos.map(p=>p.label)}
+                      startIdx={matchModelLightbox}
+                      onClose={()=>setMatchModelLightbox(null)}/>
+                  )}
                   <div style={{position:"sticky",top:0,zIndex:5,background:"var(--surface)",paddingBottom:8,marginBottom:4,borderBottom:"1px solid var(--border)"}}>
-                    <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>
-                      🚗 This car — {[job.vehicle_reg,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" · ")}
-                    </div>
-                    <div style={{display:"grid",gridTemplateColumns:`repeat(${photos.length},1fr)`,gap:6}}>
-                      {photos.map((p,i)=>(
-                        <div key={p.label} style={{position:"relative",borderRadius:8,overflow:"hidden",cursor:"zoom-in",border:"2px solid var(--accent)"}}
-                          onClick={()=>setMatchJobCarLightbox(i)}>
-                          <img src={p.src} alt={p.label} style={{width:"100%",height:90,objectFit:"contain",display:"block",background:"#f0f0f0"}}
-                            onError={e=>e.target.parentNode.style.display="none"}/>
-                          <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"2px 7px",background:"rgba(0,0,0,.55)",fontSize:10,fontWeight:700,color:"#fff",textAlign:"center"}}>
-                            {p.label}
-                          </div>
-                          <div style={{position:"absolute",top:4,right:6,fontSize:14,color:"rgba(255,255,255,.8)"}}>🔍</div>
+                    {photos.length>0&&(
+                      <div style={{marginBottom:sv?8:0}}>
+                        <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>
+                          🚗 This car — {[job.vehicle_reg,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" · ")}
                         </div>
-                      ))}
-                    </div>
+                        {photoRow(photos,"var(--accent)",i=>setMatchJobCarLightbox(i))}
+                      </div>
+                    )}
+                    {sv&&(
+                      <div>
+                        <div style={{fontSize:11,fontWeight:700,color:"var(--blue)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>
+                          🔗 Our vehicle — {sv.model}{sv.code?` · ${sv.code}`:""}
+                        </div>
+                        {svPhotos.length>0
+                          ? photoRow(svPhotos,"var(--blue)",i=>setMatchModelLightbox(i))
+                          : <div style={{fontSize:12,color:"var(--text3)",textAlign:"center",padding:"14px 0",background:"var(--surface2)",borderRadius:8}}>No photos in database for this model</div>
+                        }
+                      </div>
+                    )}
                   </div>
                 </>
               );
@@ -6134,7 +6166,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               {job.vehicle_year&&<span>Year: <strong>{job.vehicle_year}</strong></span>}
               {job.vin&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11}}>VIN: {job.vin}</span>}
             </div>
-            {/* VIN decoded info */}
+            {/* VIN decoded info — collapsed by default to leave room for photo comparison */}
             {job.vin&&(()=>{
               const d=decodeVin(job.vin);
               if(!d) return null;
@@ -6147,31 +6179,38 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               ].filter(Boolean);
               if(!fields.length) return null;
               return(
-                <div style={{marginBottom:10,padding:"8px 12px",background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.25)",borderRadius:8}}>
-                  <div style={{fontSize:10,color:"var(--blue)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:5}}>📡 VIN Decoded</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-                    {fields.map(f=>(
-                      <div key={f.k} style={{fontSize:11,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 9px",lineHeight:1.5}}>
-                        <span style={{color:"var(--text3)",marginRight:4}}>{f.k}:</span>
-                        <span style={{fontWeight:700}}>{f.v}</span>
+                <div style={{marginBottom:10,background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.25)",borderRadius:8,overflow:"hidden"}}>
+                  <button type="button" onClick={()=>setMatchVinInfoOpen(o=>!o)} style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 12px",background:"none",border:"none",cursor:"pointer"}}>
+                    <span style={{fontSize:10,color:"var(--blue)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>📡 VIN Decoded</span>
+                    <span style={{fontSize:11,color:"var(--blue)",fontWeight:700}}>{matchVinInfoOpen?"▲ Hide":"▼ Show"}</span>
+                  </button>
+                  {matchVinInfoOpen&&(
+                    <div style={{padding:"0 12px 10px"}}>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                        {fields.map(f=>(
+                          <div key={f.k} style={{fontSize:11,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 9px",lineHeight:1.5}}>
+                            <span style={{color:"var(--text3)",marginRight:4}}>{f.k}:</span>
+                            <span style={{fontWeight:700}}>{f.v}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  {/* VIN tool links — small */}
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {[...vinSearchLinks,
-                      {label:"AutoZone",  icon:"🔴", color:"#dc2626", bg:"rgba(220,38,38,.12)",  href:`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`},
-                      {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)", href:"https://www.amayama.com"},
-                      {label:"WolfOil",   icon:"🛢️", color:"#f97316", bg:"rgba(249,115,22,.12)", href:"https://za.wolfoil.com/en-us/oil-finder"},
-                    ].map(lk=>(
-                      <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
-                        style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",
-                          background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:8,
-                          color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>
-                        <span>{lk.icon}</span><span>{lk.label.replace(/ 🔋/,"")}</span>
-                      </a>
-                    ))}
-                  </div>
+                      {/* VIN tool links — small */}
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {[...vinSearchLinks,
+                          {label:"AutoZone",  icon:"🔴", color:"#dc2626", bg:"rgba(220,38,38,.12)",  href:`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`},
+                          {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)", href:"https://www.amayama.com"},
+                          {label:"WolfOil",   icon:"🛢️", color:"#f97316", bg:"rgba(249,115,22,.12)", href:"https://za.wolfoil.com/en-us/oil-finder"},
+                        ].map(lk=>(
+                          <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                            style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",
+                              background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:8,
+                              color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>
+                            <span>{lk.icon}</span><span>{lk.label.replace(/ 🔋/,"")}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -6240,11 +6279,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   })}
                 </div>
             }
-            {/* Expanded preview when a card is selected */}
+            {/* Confirm bar when a card is selected — photos now shown pinned at top for comparison */}
             {matchModelSelected&&(()=>{
               const sv=matchModelSelected;
-              const photos=[sv.photo_front,sv.photo_rear,sv.photo_side].filter(Boolean).map(toImgUrl);
-              const labels=["Front","Rear","Side"];
               return(
                 <div style={{marginBottom:16,padding:14,background:"var(--surface)",border:"2px solid var(--accent)",borderRadius:14}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -6255,21 +6292,6 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     </div>
                     <button className="btn btn-ghost btn-sm" onClick={()=>setMatchModelSelected(null)}>✕</button>
                   </div>
-                  {photos.length>0
-                    ? <div style={{display:"flex",gap:8,marginBottom:12}}>
-                        {photos.map((p,i)=>(
-                          <div key={i} style={{flex:1,cursor:"pointer",borderRadius:8,overflow:"hidden",border:"1px solid var(--border)"}}
-                            onClick={()=>setMatchModelLightbox(i)}>
-                            <img src={p} alt={labels[i]} style={{width:"100%",height:90,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
-                            <div style={{fontSize:10,textAlign:"center",padding:"3px 0",color:"var(--text3)"}}>{labels[i]}</div>
-                          </div>
-                        ))}
-                      </div>
-                    : <div style={{textAlign:"center",padding:16,color:"var(--text3)",fontSize:13,marginBottom:12}}>No photos in database</div>
-                  }
-                  {matchModelLightbox!==null&&photos.length>0&&(
-                    <ImgLightbox urls={photos} startIdx={matchModelLightbox} labels={labels} onClose={()=>setMatchModelLightbox(null)}/>
-                  )}
                   <div style={{display:"flex",gap:8}}>
                     <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setMatchModelSelected(null)}>← Back</button>
                     <button className="btn btn-primary" style={{flex:2}} onClick={()=>{ pickModel(sv.code||sv.model); setMatchModelSelected(null); }}>

@@ -2749,12 +2749,18 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
   const phone = (chosenSupplier?.phone || manualPhone || "").replace(/\D/g, "");
   const jobVehicle = wsVehicles.find(v => v.id === job.workshop_vehicle_id);
 
+  // Resolve display model name: catalog lookup first (code→name), then workshop vehicle record, then raw job field
+  const _catVeh = job.vehicle_model && job.vehicle_make
+    ? vehicles.find(v => (v.code===job.vehicle_model||v.model===job.vehicle_model) && (v.make||"").toLowerCase() === (job.vehicle_make||"").toLowerCase())
+    : null;
+  const dispModel = _catVeh?.model || jobVehicle?.model || job.vehicle_model || "";
+  const dispYear  = jobVehicle?.year || job.vehicle_year || "";
+
   const SEP = "─".repeat(28);
   const buildMsg = (link="") => [
     `🔧 *Parts Request* — ${shopName}`,
     SEP,
-    `🚗 *${job.vehicle_reg||"—"}*  |  ${[job.vehicle_make, job.vehicle_model].filter(Boolean).join(" ")||"—"}${job.vehicle_color ? "  |  "+job.vehicle_color : ""}`,
-    job.vehicle_year ? `Year: ${job.vehicle_year}` : null,
+    `🚗 *${job.vehicle_reg||"—"}*  |  ${[job.vehicle_make, dispModel].filter(Boolean).join(" ")||"—"}${dispYear ? "  "+dispYear : ""}${job.vehicle_color ? "  |  "+job.vehicle_color : ""}`,
     job.vin          ? `VIN: \`${job.vin}\`` : null,
     job.engine_no    ? `Engine #: ${job.engine_no}` : null,
     `Job #: *${job.id}*  |  Date: ${job.date_in||"—"}`,
@@ -2769,16 +2775,10 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
   const msgLines = buildMsg(generatedLink);
   const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msgLines)}` : null;
 
-  // Resolve display model name: catalog lookup first (code→name), then workshop vehicle record, then raw job field
-  const _catVeh = job.vehicle_model && job.vehicle_make
-    ? vehicles.find(v => (v.code===job.vehicle_model||v.model===job.vehicle_model) && (v.make||"").toLowerCase() === (job.vehicle_make||"").toLowerCase())
-    : null;
-  const dispModel = _catVeh?.model || jobVehicle?.model || job.vehicle_model || "";
-
   const vehiclePayload = {
     vehicle_make:  jobVehicle?.make  || job.vehicle_make  || "",
     vehicle_model: dispModel,
-    vehicle_year:  jobVehicle?.year  || job.vehicle_year  || "",
+    vehicle_year:  dispYear,
     vehicle_color: jobVehicle?.color || job.vehicle_color || "",
     vin:           jobVehicle?.vin   || job.vin           || "",
     engine_no:     jobVehicle?.engine_no || job.engine_no || "",

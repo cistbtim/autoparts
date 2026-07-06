@@ -4454,7 +4454,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               initialModel={shopVehicleFilter.model}
               onFilter={(ids)=>{setVehicleFilterIds(ids);setShopPage(0);if(ids)setSearchPart("");}}
               onAddPart={(role==="admin"||role==="manager"||role==="demo")?((vehIds)=>{
-                setNewPartInitialF({price:0,cost_price:0});
+                const v=vehicles.find(v=>vehIds.includes(v.id));
+                setNewPartInitialF({price:0,cost_price:0,sku:(v?.code||"")+(v?.code?"-":""),category:"Body"});
                 setPendingVehicleIds(vehIds);
                 openM("editPart",null);
               }):undefined}

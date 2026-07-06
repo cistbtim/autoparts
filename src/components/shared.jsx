@@ -300,6 +300,77 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
   );
 }
 
+// Side-by-side two-photo comparison viewer (e.g. job car vs. catalog vehicle),
+// with shared prev/next navigation across a common set of labels (Front/Rear/Side).
+export function CompareLightbox({left, right, labels, startIdx=0, onClose}) {
+  const n = labels.length;
+  const [idx, setIdx] = useState(Math.min(startIdx, Math.max(n-1,0)));
+  const touchX = useRef(null);
+
+  const onTouchStart = (e) => { touchX.current = e.touches[0].clientX; };
+  const onTouchEnd = (e) => {
+    if(touchX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchX.current;
+    touchX.current = null;
+    if(Math.abs(dx) < 40) return;
+    if(dx < 0 && idx < n-1) setIdx(idx+1);
+    if(dx > 0 && idx > 0)   setIdx(idx-1);
+  };
+
+  const btnStyle = {position:"fixed",top:"50%",transform:"translateY(-50%)",
+    background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",
+    color:"#fff",borderRadius:"50%",width:44,height:44,display:"flex",
+    alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:22,
+    zIndex:100000};
+
+  const Pane = ({side}) => {
+    const src = side.photos.find(p=>p.label===labels[idx])?.src || "";
+    const [status, setStatus] = useState(src?"loading":"empty");
+    useEffect(()=>{ setStatus(src?"loading":"empty"); },[src]);
+    return (
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minWidth:0,padding:"8px 4px"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8,textAlign:"center"}}>{side.title}</div>
+        {status==="empty"&&<div style={{color:"rgba(255,255,255,.4)",fontSize:13}}>No photo</div>}
+        {status==="loading"&&<div style={{width:32,height:32,border:"3px solid rgba(255,255,255,.2)",borderTop:"3px solid #fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>}
+        {status==="error"&&<div style={{color:"rgba(255,255,255,.5)",fontSize:12}}>Failed to load</div>}
+        {src&&<img key={src} src={src} alt={side.title} referrerPolicy="no-referrer"
+          style={{maxWidth:"100%",maxHeight:"58vh",objectFit:"contain",display:status==="ok"?"block":"none",borderRadius:8}}
+          onLoad={()=>setStatus("ok")} onError={()=>setStatus("error")} onClick={e=>e.stopPropagation()}/>}
+      </div>
+    );
+  };
+
+  return (
+    <div onClick={onClose} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+      style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.96)",
+        zIndex:99999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{display:"flex",width:"100%",maxWidth:960,alignItems:"stretch"}} onClick={e=>e.stopPropagation()}>
+        <Pane side={left}/>
+        <div style={{width:1,background:"rgba(255,255,255,.2)"}}/>
+        <Pane side={right}/>
+      </div>
+
+      {n>1&&idx>0&&<div style={{...btnStyle,left:14}} onClick={e=>{e.stopPropagation();setIdx(idx-1);}}>‹</div>}
+      {n>1&&idx<n-1&&<div style={{...btnStyle,right:58}} onClick={e=>{e.stopPropagation();setIdx(idx+1);}}>›</div>}
+
+      {n>1&&(
+        <div style={{position:"fixed",bottom:20,left:"50%",transform:"translateX(-50%)",
+          background:"rgba(0,0,0,.6)",color:"#fff",borderRadius:20,padding:"4px 16px",
+          fontSize:13,display:"flex",gap:12,alignItems:"center",zIndex:100000}}>
+          <span style={{opacity:.8}}>{labels[idx]}</span>
+          <span style={{opacity:.5}}>{idx+1} / {n}</span>
+        </div>
+      )}
+
+      <div onClick={e=>{e.stopPropagation();onClose();}}
+        style={{position:"fixed",top:14,right:14,background:"rgba(255,255,255,.15)",
+          border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",
+          width:38,height:38,display:"flex",alignItems:"center",justifyContent:"center",
+          cursor:"pointer",fontSize:18,fontWeight:700,zIndex:100000}}>✕</div>
+    </div>
+  );
+}
+
 // ── Advertisement components ──────────────────────────────────────────────────
 
 // Cache geo+weather for the session so we only fetch once

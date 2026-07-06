@@ -5,7 +5,7 @@ import { getSettings, C, curSym } from "../lib/settings.js";
 import { fmtAmt, makeId, today, toImgUrl, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
-import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AdBanner } from "../components/shared.jsx";
+import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner } from "../components/shared.jsx";
 import { VehiclePhotoUploader, VehicleSearchBar } from "./RfqVehicles.jsx";
 import { WsStockPage, WsStockModal, WsStockAdjustModal } from "./ws/Stock.jsx";
 import { WsServicesPage, WsServiceModal } from "./ws/Services.jsx";
@@ -3349,8 +3349,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [quotePopupQuoteOnly, setQuotePopupQuoteOnly] = useState(false);
   const [matchModelOpen, setMatchModelOpen] = useState(false);
   const [matchModelSearch, setMatchModelSearch] = useState("");
-  const [matchModelLightbox, setMatchModelLightbox] = useState(null); // null | index — for selected vehicle
-  const [matchJobCarLightbox, setMatchJobCarLightbox] = useState(null); // null | index — for job car photos at top
+  const [matchCompareIdx, setMatchCompareIdx] = useState(null); // null | index into the Front/Rear/Side label set — opens side-by-side compare view
   const [matchModelSelected, setMatchModelSelected] = useState(null);
   const [matchAutoSuggestion, setMatchAutoSuggestion] = useState(null); // { vehicle, source: 'cache'|'year', yearDecoded? }
   const [matchVinInfoOpen, setMatchVinInfoOpen] = useState(false); // VIN Decoded panel — collapsed by default to save space for photo comparison
@@ -6082,7 +6081,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         };
         return(
           <Overlay onClose={()=>setMatchModelOpen(false)} wide>
-            <MHead title="🔗 Match Vehicle Model" onClose={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchModelLightbox(null); setMatchJobCarLightbox(null); setMatchAutoSuggestion(null); }}
+            <MHead title="🔗 Match Vehicle Model" onClose={()=>{ setMatchModelOpen(false); setMatchModelSearch(""); setMatchCompareIdx(null); setMatchAutoSuggestion(null); }}
               actions={onRefreshVehicles&&(
                 <button className="btn btn-ghost btn-sm" disabled={vehRefreshing}
                   onClick={async()=>{ setVehRefreshing(true); try{await onRefreshVehicles();}finally{setVehRefreshing(false);} }}
@@ -6090,25 +6089,31 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   <span style={{display:"inline-block",animation:vehRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
                 </button>
               )}/>
-            {/* Job car photos + selected candidate photos — pinned together for direct comparison */}
+            {/* Job car photos + selected candidate photos — pinned together, tap either to compare side-by-side */}
             {(()=>{
-              const photos=[
+              const PHOTO_LABELS=["Front","Rear","Side"];
+              const allPhotos=[
                 {src:toImgUrl(vehiclePhotos.front||""),label:"Front"},
                 {src:toImgUrl(vehiclePhotos.rear||""), label:"Rear"},
                 {src:toImgUrl(vehiclePhotos.side||""), label:"Side"},
-              ].filter(p=>p.src);
+              ];
+              const photos=allPhotos.filter(p=>p.src);
               const sv=matchModelSelected;
-              const svPhotos=sv?[
-                {src:toImgUrl(sv.photo_front||""),label:"Front"},
-                {src:toImgUrl(sv.photo_rear||""), label:"Rear"},
-                {src:toImgUrl(sv.photo_side||""), label:"Side"},
-              ].filter(p=>p.src):[];
+              const allSvPhotos=[
+                {src:toImgUrl(sv?.photo_front||""),label:"Front"},
+                {src:toImgUrl(sv?.photo_rear||""), label:"Rear"},
+                {src:toImgUrl(sv?.photo_side||""), label:"Side"},
+              ];
+              const svPhotos=allSvPhotos.filter(p=>p.src);
               if(!photos.length&&!sv) return null;
+              const jobTitle=`🚗 This car — ${[job.vehicle_reg,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" · ")}`;
+              const svTitle=sv?`🔗 Our vehicle — ${sv.model}${sv.code?` · ${sv.code}`:""}`:"";
+              const openCompare=(label)=>setMatchCompareIdx(PHOTO_LABELS.indexOf(label));
               const photoRow=(list,border,onClick)=>(
                 <div style={{display:"grid",gridTemplateColumns:`repeat(${list.length},1fr)`,gap:6}}>
-                  {list.map((p,i)=>(
+                  {list.map(p=>(
                     <div key={p.label} style={{position:"relative",borderRadius:8,overflow:"hidden",cursor:"zoom-in",border:`2px solid ${border}`}}
-                      onClick={()=>onClick(i)}>
+                      onClick={()=>onClick(p.label)}>
                       <img src={p.src} alt={p.label} style={{width:"100%",height:90,objectFit:"contain",display:"block",background:"#f0f0f0"}}
                         onError={e=>e.target.parentNode.style.display="none"}/>
                       <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"2px 7px",background:"rgba(0,0,0,.55)",fontSize:10,fontWeight:700,color:"#fff",textAlign:"center"}}>
@@ -6121,36 +6126,30 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               );
               return(
                 <>
-                  {matchJobCarLightbox!==null&&photos.length>0&&(
-                    <ImgLightbox
-                      urls={photos.map(p=>p.src)}
-                      labels={photos.map(p=>p.label)}
-                      startIdx={matchJobCarLightbox}
-                      onClose={()=>setMatchJobCarLightbox(null)}/>
-                  )}
-                  {matchModelLightbox!==null&&svPhotos.length>0&&(
-                    <ImgLightbox
-                      urls={svPhotos.map(p=>p.src)}
-                      labels={svPhotos.map(p=>p.label)}
-                      startIdx={matchModelLightbox}
-                      onClose={()=>setMatchModelLightbox(null)}/>
+                  {matchCompareIdx!==null&&(
+                    <CompareLightbox
+                      left={{title:jobTitle,photos:allPhotos}}
+                      right={{title:svTitle||"Select a candidate to compare",photos:allSvPhotos}}
+                      labels={PHOTO_LABELS}
+                      startIdx={matchCompareIdx}
+                      onClose={()=>setMatchCompareIdx(null)}/>
                   )}
                   <div style={{position:"sticky",top:0,zIndex:5,background:"var(--surface)",paddingBottom:8,marginBottom:4,borderBottom:"1px solid var(--border)"}}>
                     {photos.length>0&&(
                       <div style={{marginBottom:sv?8:0}}>
                         <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>
-                          🚗 This car — {[job.vehicle_reg,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" · ")}
+                          {jobTitle}
                         </div>
-                        {photoRow(photos,"var(--accent)",i=>setMatchJobCarLightbox(i))}
+                        {photoRow(photos,"var(--accent)",openCompare)}
                       </div>
                     )}
                     {sv&&(
                       <div>
                         <div style={{fontSize:11,fontWeight:700,color:"var(--blue)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>
-                          🔗 Our vehicle — {sv.model}{sv.code?` · ${sv.code}`:""}
+                          {svTitle}
                         </div>
                         {svPhotos.length>0
-                          ? photoRow(svPhotos,"var(--blue)",i=>setMatchModelLightbox(i))
+                          ? photoRow(svPhotos,"var(--blue)",openCompare)
                           : <div style={{fontSize:12,color:"var(--text3)",textAlign:"center",padding:"14px 0",background:"var(--surface2)",borderRadius:8}}>No photos in database for this model</div>
                         }
                       </div>

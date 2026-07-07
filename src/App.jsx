@@ -47,7 +47,7 @@ export default function App() {
     }catch{return null;}
   });
   const handleLogin=(u)=>{api.cacheClearAll();setUser(u);try{localStorage.setItem("ap_user",JSON.stringify(u));localStorage.setItem("ap_login_date",_today());}catch{}};
-  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");db.parts.clear().catch(()=>{});};
+  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");db.parts.clear().catch(()=>{});db.workshopJobs.clear().catch(()=>{});db.workshopJobItems.clear().catch(()=>{});};
   const [settingsLoaded,setSettingsLoaded] = useState(false);
   const [availLangs,setAvailLangs] = useState(getLangs());
   useEffect(()=>{ document.documentElement.setAttribute("data-theme","light"); localStorage.removeItem("ap_theme"); },[]);
@@ -525,6 +525,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     const needsWs  = !isSalesman&&(role==="admin"||role==="manager"||role==="workshop"||role==="demo");
     const needsScrap = !isSalesman&&(role==="admin"||role==="scrapyard"||role==="scrapyard_admin"||role==="demo");
     const needsAdmin = !isSalesman&&(role==="admin"||role==="demo");
+    // FAST: paint workshop Jobs board instantly from IndexedDB cache while fresh data loads in background
+    if(needsWs){
+      const [idbJobs,idbJobItems]=await Promise.all([db.workshopJobs.toArray().catch(()=>[]),db.workshopJobItems.toArray().catch(()=>[])]);
+      if(idbJobs.length) setWorkshopJobs(idbJobs);
+      if(idbJobItems.length) setWorkshopJobItems(idbJobItems);
+    }
     const BG_TABLES=["customers","users","inventory_logs",needsAdmin?"login_logs":null,"inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","vehicles","part_fitments","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes",needsWs?"workshop_jobs":null,needsWs?"workshop_job_items":null,needsWs?"workshop_invoices":null,needsWs?"workshop_quotes":null,needsWs?"workshop_customers":null,needsWs?"workshop_vehicles":null,"customer_queries",needsWs?"workshop_stock":null,needsWs?"workshop_services":null,needsWs?"workshop_documents":null,needsWs?"workshop_profiles":null,needsWs?"workshop_suppliers":null,needsWs?"ws_supplier_requests":null,needsWs?"ws_supplier_quotes":null,needsWs?"ws_supplier_invoices":null,needsWs?"ws_supplier_invoice_items":null,needsWs?"ws_supplier_payments":null,needsWs?"ws_supplier_returns":null,needsWs?"ws_sq_replies":null,needsWs?"ws_purchase_orders":null,needsWs?"ws_po_items":null,needsWs?"ws_licence_renewals":null,needsWs?"workshop_bookings":null,needsScrap?"scrapyard_vehicles":null,needsScrap?"scrapyard_parts":null,needsScrap?"scrapyard_profiles":null].filter(Boolean);
     setBgLoading(BG_TABLES.length);
     const [c,u,l,ll,inq,si,ci,sr,cr,veh,fit,py,...rest]=await Promise.all([
@@ -592,6 +598,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setStockTakes(Array.isArray(rest[4])?rest[4]:[]);
     setWorkshopJobs(Array.isArray(rest[5])?rest[5]:[]);
     setWorkshopJobItems(Array.isArray(rest[6])?rest[6]:[]);
+    if(needsWs){
+      const freshJobs=Array.isArray(rest[5])?rest[5]:[];
+      const freshItems=Array.isArray(rest[6])?rest[6]:[];
+      db.workshopJobs.clear().then(()=>db.workshopJobs.bulkPut(freshJobs)).catch(()=>{});
+      db.workshopJobItems.clear().then(()=>db.workshopJobItems.bulkPut(freshItems)).catch(()=>{});
+    }
     setWorkshopInvoices(Array.isArray(rest[7])?rest[7]:[]);
     setWorkshopQuotes(Array.isArray(rest[8])?rest[8]:[]);
     setWorkshopCustomers(Array.isArray(rest[9])?rest[9]:[]);
@@ -751,8 +763,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       branch_stock_requests:    [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`or=(requesting_branch_id.eq.${user.branch_id},supplying_branch_id.eq.${user.branch_id})&select=*&order=created_at.desc`:"select=*&order=created_at.desc", d=>setBranchStockRequests(Array.isArray(d)?d:[])],
       ws_shop_requests:         [role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&status=in.(pending,escalated,main_replied,ordered)&select=*&order=created_at.desc`:`status=in.(escalated,main_replied,ordered)&select=*&order=created_at.desc`, d=>setWsShopRequests(Array.isArray(d)?d:[])],
       branch_stock:             [isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&select=*`:"select=*", d=>setBranchStock(Array.isArray(d)?d:[])],
-      workshop_jobs:            [`select=*&order=date_in.desc${wsF}`,                d=>setWorkshopJobs(Array.isArray(d)?d:[])],
-      workshop_job_items:       [`select=*${wsF}`,                                   d=>setWorkshopJobItems(Array.isArray(d)?d:[])],
+      workshop_jobs:            [`select=*&order=date_in.desc${wsF}`,                d=>{const arr=Array.isArray(d)?d:[]; setWorkshopJobs(arr); db.workshopJobs.clear().then(()=>db.workshopJobs.bulkPut(arr)).catch(()=>{});}],
+      workshop_job_items:       [`select=*${wsF}`,                                   d=>{const arr=Array.isArray(d)?d:[]; setWorkshopJobItems(arr); db.workshopJobItems.clear().then(()=>db.workshopJobItems.bulkPut(arr)).catch(()=>{});}],
       workshop_invoices:        [`select=*&order=invoice_date.desc${wsF}`,           d=>setWorkshopInvoices(Array.isArray(d)?d:[])],
       workshop_quotes:          [`select=*&order=quote_date.desc${wsF}`,             d=>setWorkshopQuotes(Array.isArray(d)?d:[])],
       workshop_customers:       [`select=*&order=name.asc${wsF}`,                    d=>setWorkshopCustomers(Array.isArray(d)?d:[])],
@@ -801,12 +813,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       api.get("ws_supplier_invoice_items",`select=*${wsF}`).catch(()=>[]),
       api.get("ws_supplier_payments",`select=*&order=payment_date.desc${wsF}`).catch(()=>[]),
       api.get("ws_supplier_returns",`select=*&order=return_date.desc${wsF}`).catch(()=>[]),
-      api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
-      api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
-      api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
     ]);
     setWorkshopJobs(Array.isArray(jobs)?jobs:[]);
     setWorkshopJobItems(Array.isArray(items)?items:[]);
+    db.workshopJobs.clear().then(()=>db.workshopJobs.bulkPut(Array.isArray(jobs)?jobs:[])).catch(()=>{});
+    db.workshopJobItems.clear().then(()=>db.workshopJobItems.bulkPut(Array.isArray(items)?items:[])).catch(()=>{});
     setWorkshopInvoices(Array.isArray(invoices)?invoices:[]);
     setWorkshopQuotes(Array.isArray(quotes)?quotes:[]);
     setWorkshopCustomers(Array.isArray(wsCustomers)?wsCustomers:[]);
@@ -1397,13 +1408,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         }
       }
 
-      await refreshWorkshopData(); showToast("Job saved");
+      await refreshTables("workshop_jobs","workshop_customers","workshop_vehicles"); showToast("Job saved");
       return savedId;
     } catch(e){ alert("Save failed: "+e.message); }
   };
   const deleteWorkshopJob=async(id)=>{
     await api.delete("workshop_jobs","id",id);
-    await refreshWorkshopData(); showToast("Deleted","err");
+    await refreshTables("workshop_jobs","workshop_job_items"); showToast("Deleted","err");
   };
   const moveWorkshopJob=async(jobId,targetWsId)=>{
     const tid=targetWsId.trim();
@@ -1421,7 +1432,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     // Move quote(s) for this job
     const jobQuotes=workshopQuotes.filter(q=>q.job_id===jobId);
     for(const q of jobQuotes) await api.patch("workshop_quotes","id",q.id,{workshop_id:tid});
-    await refreshWorkshopData();
+    await refreshTables("workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes");
     showToast(`Job moved to workshop ${tid}`);
   };
   const saveJobItem=async(item)=>{
@@ -1448,11 +1459,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       }
     }
     if(res&&!Array.isArray(res)&&res.message) throw new Error(res.message);
-    await refreshWorkshopData();
+    await refreshTables("workshop_job_items","workshop_stock");
   };
   const deleteJobItem=async(id)=>{
     await api.delete("workshop_job_items","id",id);
-    await refreshWorkshopData();
+    await refreshTables("workshop_job_items");
   };
   const saveWorkshopInvoice=async(inv)=>{
     const {id,...rest}=inv;
@@ -1461,23 +1472,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(res&&!Array.isArray(res)&&(res.code||res.message))
       throw new Error(res.message||res.hint||res.code);
     await api.patch("workshop_jobs","id",inv.job_id,{status:"Done"});
-    await refreshWorkshopData(); showToast("Invoice created");
+    await refreshTables("workshop_invoices","workshop_jobs"); showToast("Invoice created");
   };
   const updateWorkshopInvoice=async(id,data)=>{
     const res=await api.patch("workshop_invoices","id",id,data);
     if(res&&!Array.isArray(res)&&res.message) throw new Error(res.message);
-    await refreshWorkshopData(); showToast("Invoice updated");
+    await refreshTables("workshop_invoices"); showToast("Invoice updated");
   };
   const deleteWorkshopInvoice=async(id,jobId)=>{
     await api.delete("workshop_invoices","id",id);
     if(jobId) await api.patch("workshop_jobs","id",jobId,{status:"In Progress"});
-    await refreshWorkshopData(); showToast("Invoice deleted","err");
+    await refreshTables("workshop_invoices","workshop_jobs"); showToast("Invoice deleted","err");
   };
   const saveWorkshopQuote=async(q)=>{
     const {id,...rest}=q;
     if(id){ await api.patch("workshop_quotes","id",id,rest); showToast("Quote updated"); }
     else { await api.insert("workshop_quotes",{...rest,id:makeId("WSQ"),workshop_id:wsId||null}); showToast("Quote created"); }
-    await refreshWorkshopData();
+    await refreshTables("workshop_quotes");
   };
   const sendQuoteForApproval=async(quoteId)=>{
     const token=makeToken();
@@ -1509,12 +1520,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       ws_logo_url:storedLogo,
       ws_vat:workshopProfile.vat_number||"",
     });
-    await refreshWorkshopData();
+    await refreshTables("workshop_quotes");
     return token;
   };
   const deleteWorkshopQuote=async(id)=>{
     await api.delete("workshop_quotes","id",id);
-    await refreshWorkshopData(); showToast("Quote deleted","err");
+    await refreshTables("workshop_quotes"); showToast("Quote deleted","err");
   };
   const convertQuoteToInvoice=async(quote,job,subtotal,tax,total)=>{
     const invId=makeId("WSI");
@@ -1529,28 +1540,28 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     });
     await api.patch("workshop_quotes","id",quote.id,{status:"converted"});
     await api.patch("workshop_jobs","id",job.id,{status:"Done"});
-    await refreshWorkshopData(); showToast("Invoice created from quote");
+    await refreshTables("workshop_invoices","workshop_quotes","workshop_jobs"); showToast("Invoice created from quote");
   };
   const saveWorkshopCustomer=async(data)=>{
     const {id,...rest}=data;
     if(id){ await api.patch("workshop_customers","id",id,rest); }
     else { await api.insert("workshop_customers",{...data, id:makeId("WSC"), workshop_id:wsId||null}); }
-    await refreshWorkshopData(); showToast("Customer saved");
+    await refreshTables("workshop_customers"); showToast("Customer saved");
   };
   const deleteWorkshopCustomer=async(id)=>{
     await api.delete("workshop_customers","id",id);
-    await refreshWorkshopData(); showToast("Deleted","err");
+    await refreshTables("workshop_customers"); showToast("Deleted","err");
   };
   const saveWorkshopVehicle=async(data)=>{
     const {id,...rest}=data;
     if(id){ await api.patch("workshop_vehicles","id",id,rest); }
     else { await api.insert("workshop_vehicles",{...data, id:makeId("WSV"), workshop_id:wsId||null}); }
-    await refreshWorkshopData(); showToast("Vehicle saved");
+    await refreshTables("workshop_vehicles"); showToast("Vehicle saved");
   };
   const patchWsVehicleLocal=(id,patch)=>setWorkshopVehicles(prev=>prev.map(v=>v.id===id?{...v,...patch}:v));
   const deleteWorkshopVehicle=async(id)=>{
     await api.delete("workshop_vehicles","id",id);
-    await refreshWorkshopData(); showToast("Deleted","err");
+    await refreshTables("workshop_vehicles"); showToast("Deleted","err");
   };
 
   // ── Workshop Stock ────────────────────────────────────────────
@@ -1559,11 +1570,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
     if(id){ chkR(await api.patch("workshop_stock","id",id,rest),"Update stock"); showToast("Stock item updated"); }
     else { chkR(await api.insert("workshop_stock",{...rest,id:makeId("WSK"),workshop_id:wsId||null}),"Add stock"); showToast("Stock item added"); }
-    await refreshWorkshopData();
+    await refreshTables("workshop_stock");
   };
   const deleteWsStockItem=async(id)=>{
     await api.delete("workshop_stock","id",id);
-    await refreshWorkshopData(); showToast("Deleted","err");
+    await refreshTables("workshop_stock"); showToast("Deleted","err");
   };
   const adjustWsStock=async({id,delta,reason,new_qty})=>{
     const stockItem=workshopStock.find(s=>s.id===id);
@@ -1573,7 +1584,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       move_type:"adjustment",qty_change:delta,qty_after:new_qty,
       notes:reason||"Manual adjustment",moved_at:new Date().toISOString(),
     });
-    await refreshWorkshopData(); showToast(`Stock → ${new_qty}`);
+    await refreshTables("workshop_stock"); showToast(`Stock → ${new_qty}`);
   };
 
   // ── Workshop Services ─────────────────────────────────────────
@@ -1582,11 +1593,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
     if(id){ chkR(await api.patch("workshop_services","id",id,rest),"Update service"); showToast("Service updated"); }
     else { chkR(await api.insert("workshop_services",{...rest,id:makeId("WSS"),workshop_id:wsId||null}),"Add service"); showToast("Service added"); }
-    await refreshWorkshopData();
+    await refreshTables("workshop_services");
   };
   const deleteWsService=async(id)=>{
     await api.delete("workshop_services","id",id);
-    await refreshWorkshopData(); showToast("Deleted","err");
+    await refreshTables("workshop_services"); showToast("Deleted","err");
   };
 
   // ── Workshop Suppliers ────────────────────────────────────────
@@ -1632,9 +1643,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         await api.patch("workshop_job_items","id",match.id,{cost_price:price,unit_price:newPrice,total:+(newPrice*(+match.qty||1)).toFixed(2),markup_pct:mu}).catch(()=>{});
       }
     }
-    const fresh=await api.get("ws_supplier_quotes",`select=*&order=quoted_at.desc${wsF}`).catch(()=>[]);
-    setWsSupplierQuotes(Array.isArray(fresh)?fresh:[]);
-    await refreshWorkshopData();
+    await refreshTables("ws_supplier_quotes","workshop_job_items");
   };
 
   const saveWsSupplierRequest=async(req)=>{
@@ -1685,7 +1694,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     for(const it of items){
       chk(await api.insert("ws_po_items",{...it,id:makeId("WSPI"),po_id:poId,workshop_id:wsId||null}),"Add PO item");
     }
-    await refreshWorkshopData();
+    await refreshTables("ws_purchase_orders","ws_po_items");
     showToast(isNew?"Purchase order created":"Purchase order updated");
     return {id:poId,...rest};
   };
@@ -1693,7 +1702,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const deleteWsPurchaseOrder=async(id)=>{
     await api.delete("ws_po_items","po_id",id);
     await api.delete("ws_purchase_orders","id",id);
-    await refreshWorkshopData();
+    await refreshTables("ws_purchase_orders","ws_po_items");
     showToast("Purchase order deleted","err");
   };
 
@@ -1734,7 +1743,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     const allDone=updatedItems.every(i=>(+i.received_qty||0)>=(+i.qty||0));
     const anyDone=updatedItems.some(i=>(+i.received_qty||0)>0);
     await api.patch("ws_purchase_orders","id",poId,{status:allDone?"received":anyDone?"partial":po.status});
-    await refreshWorkshopData();
+    await refreshTables("ws_purchase_orders","ws_po_items","ws_supplier_invoices","ws_supplier_invoice_items","workshop_stock");
     showToast("Goods received & stock updated");
   };
 
@@ -1828,12 +1837,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       chk(await api.patch("ws_supplier_invoices","id",invId,rest),"Update invoice");
       showToast("Invoice updated");
     }
-    await refreshWorkshopData();
+    await refreshTables("ws_supplier_invoices","ws_supplier_invoice_items","workshop_stock");
   };
   const deleteWsSupplierInvoice=async(id)=>{
     await api.delete("ws_supplier_invoice_items","invoice_id",id);
     await api.delete("ws_supplier_invoices","id",id);
-    await refreshWorkshopData(); showToast("Invoice deleted","err");
+    await refreshTables("ws_supplier_invoices","ws_supplier_invoice_items"); showToast("Invoice deleted","err");
   };
   const saveWsSupplierPayment=async(pay)=>{
     const chk=(r,l)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${l}: ${r.message||r.code}`); return r; };
@@ -1847,7 +1856,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       const status=paid>=total?"paid":paid>0?"partial":"pending";
       await api.patch("ws_supplier_invoices","id",pay.invoice_id,{paid_amount:paid,status});
     }
-    await refreshWorkshopData(); showToast("Payment recorded");
+    await refreshTables("ws_supplier_payments","ws_supplier_invoices"); showToast("Payment recorded");
   };
   const deleteWsSupplierPayment=async(id,invoiceId)=>{
     await api.delete("ws_supplier_payments","id",id);
@@ -1860,7 +1869,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       const status=paid>=total?"paid":paid>0?"partial":"pending";
       await api.patch("ws_supplier_invoices","id",invoiceId,{paid_amount:paid,status});
     }
-    await refreshWorkshopData(); showToast("Payment removed","err");
+    await refreshTables("ws_supplier_payments","ws_supplier_invoices"); showToast("Payment removed","err");
   };
   const saveWsSupplierReturn=async(ret,lineItems=[])=>{
     const chk=(r,l)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${l}: ${r.message||r.code}`); return r; };
@@ -1877,18 +1886,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         }
       }
     }
-    await refreshWorkshopData(); showToast("Return recorded & stock adjusted");
+    await refreshTables("ws_supplier_returns","workshop_stock"); showToast("Return recorded & stock adjusted");
   };
 
   // ── Workshop Documents ────────────────────────────────────────
   const saveWsDocument=async(doc)=>{
     const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
     chkR(await api.insert("workshop_documents",{...doc,id:makeId("WSD"),workshop_id:wsId||null,uploaded_at:new Date().toISOString()}),"Save document");
-    await refreshWorkshopData(); showToast("Document saved");
+    await refreshTables("workshop_documents"); showToast("Document saved");
   };
   const deleteWsDocument=async(id)=>{
     await api.delete("workshop_documents","id",id);
-    await refreshWorkshopData(); showToast("Deleted","err");
+    await refreshTables("workshop_documents"); showToast("Deleted","err");
   };
 
   // ── Workshop Transfer (Shop → Workshop Stock) ─────────────────
@@ -1937,7 +1946,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         });
       }
     }
-    await Promise.all([refreshWorkshopData(), refreshTables("parts","stock_moves","inventory_logs")]);
+    await refreshTables("workshop_stock","parts","stock_moves","inventory_logs");
     showToast("Transfer completed ✅");
   };
 

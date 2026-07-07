@@ -3850,7 +3850,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         </div>
         {/* Info grid */}
         <div style={{flex:1,padding:"10px 14px",display:"flex",flexDirection:"column",justifyContent:"space-between",gap:4}}>
-          {/* Row 1: customer name (left) + contact buttons (right) */}
+          {/* Row 1: customer name */}
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:6}}>
             <div style={{flex:1,minWidth:0}}>
               {job.customer_name&&(
@@ -3859,43 +3859,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 </div>
               )}
             </div>
-            {job.customer_phone&&(()=>{
-              const ph=(job.customer_phone||"").replace(/\D/g,"");
-              return(
-                <div style={{display:"flex",gap:4,flexShrink:0}}>
-                  <a href={`tel:${ph}`}
-                    style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.35)",borderRadius:7,textDecoration:"none",color:"var(--blue)",fontSize:11,fontWeight:700}}>
-                    📞
-                  </a>
-                  <a href={`https://wa.me/${ph}?text=${encodeURIComponent(`Hi ${(job.customer_name||"").split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}`}
-                    target="_blank" rel="noreferrer"
-                    style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.35)",borderRadius:7,textDecoration:"none",color:"#25d366",fontSize:11,fontWeight:700}}>
-                    💬
-                  </a>
-                  <button
-                    onClick={()=>{ navigator.clipboard.writeText(job.customer_name||"").then(()=>{ window.location.href="weixin://"; }).catch(()=>{ window.location.href="weixin://"; }); }}
-                    style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(9,187,7,.12)",border:"1px solid rgba(9,187,7,.35)",borderRadius:7,cursor:"pointer",color:"#09bb07",fontSize:11,fontWeight:700}}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8.5 10.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM12 2C6.477 2 2 6.253 2 11.5c0 2.304.87 4.411 2.304 6.03L3 22l4.682-1.558A10.46 10.46 0 0 0 12 21c5.523 0 10-4.253 10-9.5S17.523 2 12 2z"/></svg>
-                  </button>
-                </div>
-              );
-            })()}
           </div>
-          {/* Row 2: plate (left) + VIN button (right, under plate) */}
-          <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:6}}>
+          {/* Row 2: plate + job number */}
+          <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:6,flexWrap:"wrap",rowGap:4}}>
             <div>
               <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>🚗 Plate</div>
               <div style={{fontFamily:"DM Mono,monospace",fontWeight:800,fontSize:20,color:"#f97316",letterSpacing:".04em",lineHeight:1.1}}>{job.vehicle_reg||"—"}</div>
             </div>
-            {job.vin&&(
-              <button onClick={()=>setVinPopup(true)}
-                style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",
-                  background:"rgba(99,102,241,.12)",border:"1px solid rgba(99,102,241,.4)",
-                  borderRadius:8,cursor:"pointer",color:"#6366f1",fontSize:11,fontWeight:700,
-                  fontFamily:"DM Mono,monospace",letterSpacing:".04em"}}>
-                🔍 VIN
-              </button>
-            )}
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>Job #</div>
+              <div style={{fontFamily:"DM Mono,monospace",fontWeight:800,fontSize:16,color:"#6366f1",letterSpacing:".01em",lineHeight:1.1}}>{(job.id||"").replace(/^JOB-/i,"")}</div>
+            </div>
           </div>
           <div>
             <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>Make / Model</div>
@@ -3946,7 +3920,36 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             <span style={{display:"inline-block",animation:refreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
           </button>
         )}
-        <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{job.id}</code>
+        {job.customer_phone&&(()=>{
+          const ph=(job.customer_phone||"").replace(/\D/g,"");
+          return(
+            <div style={{display:"flex",gap:4,flexShrink:0}}>
+              <a href={`tel:${ph}`}
+                style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.35)",borderRadius:7,textDecoration:"none",color:"var(--blue)",fontSize:11,fontWeight:700}}>
+                📞
+              </a>
+              <a href={`https://wa.me/${ph}?text=${encodeURIComponent(`Hi ${(job.customer_name||"").split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}`}
+                target="_blank" rel="noreferrer"
+                style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.35)",borderRadius:7,textDecoration:"none",color:"#25d366",fontSize:11,fontWeight:700}}>
+                💬
+              </a>
+              <button
+                onClick={()=>{ navigator.clipboard.writeText(job.customer_name||"").then(()=>{ window.location.href="weixin://"; }).catch(()=>{ window.location.href="weixin://"; }); }}
+                style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(9,187,7,.12)",border:"1px solid rgba(9,187,7,.35)",borderRadius:7,cursor:"pointer",color:"#09bb07",fontSize:11,fontWeight:700}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8.5 10.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM12 2C6.477 2 2 6.253 2 11.5c0 2.304.87 4.411 2.304 6.03L3 22l4.682-1.558A10.46 10.46 0 0 0 12 21c5.523 0 10-4.253 10-9.5S17.523 2 12 2z"/></svg>
+              </button>
+            </div>
+          );
+        })()}
+        {job.vin&&(
+          <button onClick={()=>setVinPopup(true)}
+            style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",
+              background:"rgba(99,102,241,.12)",border:"1px solid rgba(99,102,241,.4)",
+              borderRadius:8,cursor:"pointer",color:"#6366f1",fontSize:11,fontWeight:700,
+              fontFamily:"DM Mono,monospace",letterSpacing:".04em"}}>
+            🔍 VIN
+          </button>
+        )}
         <div style={{flex:1}}/>
       </div>
       {/* ── Inspect shortcut ── */}

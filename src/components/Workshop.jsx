@@ -3389,7 +3389,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         year=parseInt(ys);
       }
     }
-    const initSearch=(job.vehicle_model||job.vehicle_make||"").trim();
+    // Strip a leading make prefix baked into the stored model text (e.g. "LEXUS IS" → "IS")
+    // so the search box and scoring both work off the model name alone.
+    const makeUC=(job.vehicle_make||"").trim().toUpperCase();
+    let initSearch=(job.vehicle_model||job.vehicle_make||"").trim();
+    if(makeUC&&initSearch.toUpperCase().startsWith(makeUC)) initSearch=initSearch.slice(makeUC.length).trim();
+    setMatchModelSearch(initSearch);
 
     const autoSelectBest=(term)=>{
       const candidates=vehicles.filter(v=>v.model&&(!scannedMake||(v.make||"").toLowerCase().includes(scannedMake)));

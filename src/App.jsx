@@ -525,11 +525,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     const needsWs  = !isSalesman&&(role==="admin"||role==="manager"||role==="workshop"||role==="demo");
     const needsScrap = !isSalesman&&(role==="admin"||role==="scrapyard"||role==="scrapyard_admin"||role==="demo");
     const needsAdmin = !isSalesman&&(role==="admin"||role==="demo");
-    // FAST: paint workshop Jobs board instantly from IndexedDB cache while fresh data loads in background
+    // FAST: paint workshop Jobs board instantly from IndexedDB cache while fresh data loads in background.
+    // Force-bust the localStorage SWR cache for these two tables so the background fetch below
+    // always hits the network — jobs get edited from other devices (e.g. phone) and a stale
+    // same-device 5-min cache would otherwise mask those changes on reload.
     if(needsWs){
       const [idbJobs,idbJobItems]=await Promise.all([db.workshopJobs.toArray().catch(()=>[]),db.workshopJobItems.toArray().catch(()=>[])]);
       if(idbJobs.length) setWorkshopJobs(idbJobs);
       if(idbJobItems.length) setWorkshopJobItems(idbJobItems);
+      api.cacheInvalidate("workshop_jobs");
+      api.cacheInvalidate("workshop_job_items");
     }
     const BG_TABLES=["customers","users","inventory_logs",needsAdmin?"login_logs":null,"inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","vehicles","part_fitments","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes",needsWs?"workshop_jobs":null,needsWs?"workshop_job_items":null,needsWs?"workshop_invoices":null,needsWs?"workshop_quotes":null,needsWs?"workshop_customers":null,needsWs?"workshop_vehicles":null,"customer_queries",needsWs?"workshop_stock":null,needsWs?"workshop_services":null,needsWs?"workshop_documents":null,needsWs?"workshop_profiles":null,needsWs?"workshop_suppliers":null,needsWs?"ws_supplier_requests":null,needsWs?"ws_supplier_quotes":null,needsWs?"ws_supplier_invoices":null,needsWs?"ws_supplier_invoice_items":null,needsWs?"ws_supplier_payments":null,needsWs?"ws_supplier_returns":null,needsWs?"ws_sq_replies":null,needsWs?"ws_purchase_orders":null,needsWs?"ws_po_items":null,needsWs?"ws_licence_renewals":null,needsWs?"workshop_bookings":null,needsScrap?"scrapyard_vehicles":null,needsScrap?"scrapyard_parts":null,needsScrap?"scrapyard_profiles":null].filter(Boolean);
     setBgLoading(BG_TABLES.length);
@@ -794,25 +799,27 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     }));
   },[]);
 
-  // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted
+  // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted.
+  // Always hits the network (api.fresh, never api.get's cache) — the manual refresh button
+  // exists precisely to pull changes made on another device, which a local SWR cache can't know about.
   const refreshWorkshopData=useCallback(async()=>{
     const [jobs,items,invoices,quotes,wsCustomers,wsVehicles,wsStock,wsServices,wsDocs,wsSupps,wsReqs,wsQts,wsInvs,wsInvItems,wsPayms,wsRets]=await Promise.all([
-      api.get("workshop_jobs",`select=*&order=date_in.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_job_items",`select=*${wsF}`).catch(()=>[]),
-      api.get("workshop_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_quotes",`select=*&order=quote_date.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_customers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
-      api.get("workshop_vehicles",`select=*&order=reg.asc${wsF}`).catch(()=>[]),
-      api.get("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]),
-      api.get("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]),
-      api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_suppliers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_requests",`select=*&order=sent_at.desc${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_quotes",`select=*&order=quoted_at.desc${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_invoice_items",`select=*${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_payments",`select=*&order=payment_date.desc${wsF}`).catch(()=>[]),
-      api.get("ws_supplier_returns",`select=*&order=return_date.desc${wsF}`).catch(()=>[]),
+      api.fresh("workshop_jobs",`select=*&order=date_in.desc${wsF}`).catch(()=>[]),
+      api.fresh("workshop_job_items",`select=*${wsF}`).catch(()=>[]),
+      api.fresh("workshop_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]),
+      api.fresh("workshop_quotes",`select=*&order=quote_date.desc${wsF}`).catch(()=>[]),
+      api.fresh("workshop_customers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.fresh("workshop_vehicles",`select=*&order=reg.asc${wsF}`).catch(()=>[]),
+      api.fresh("workshop_stock",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.fresh("workshop_services",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.fresh("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]),
+      api.fresh("workshop_suppliers",`select=*&order=name.asc${wsF}`).catch(()=>[]),
+      api.fresh("ws_supplier_requests",`select=*&order=sent_at.desc${wsF}`).catch(()=>[]),
+      api.fresh("ws_supplier_quotes",`select=*&order=quoted_at.desc${wsF}`).catch(()=>[]),
+      api.fresh("ws_supplier_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]),
+      api.fresh("ws_supplier_invoice_items",`select=*${wsF}`).catch(()=>[]),
+      api.fresh("ws_supplier_payments",`select=*&order=payment_date.desc${wsF}`).catch(()=>[]),
+      api.fresh("ws_supplier_returns",`select=*&order=return_date.desc${wsF}`).catch(()=>[]),
     ]);
     setWorkshopJobs(Array.isArray(jobs)?jobs:[]);
     setWorkshopJobItems(Array.isArray(items)?items:[]);
@@ -833,12 +840,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setWsSupplierPayments(Array.isArray(wsPayms)?wsPayms:[]);
     setWsSupplierReturns(Array.isArray(wsRets)?wsRets:[]);
     const [sqReps,wsPOs,wsPOItems,wsLicRen,wsBk,wsShopReqs]=await Promise.all([
-      api.get("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
-      api.get("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
-      api.get("ws_po_items",`select=*${wsF}`).catch(()=>[]),
-      api.get("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
-      api.get("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
-      api.get("ws_shop_requests",role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user?.branch_id?`branch_id=eq.${user.branch_id}&status=in.(pending,escalated,main_replied,ordered)&select=*&order=created_at.desc`:`status=in.(escalated,main_replied,ordered)&select=*&order=created_at.desc`).catch(()=>[]),
+      api.fresh("ws_sq_replies",`select=*${wsF}`).catch(()=>[]),
+      api.fresh("ws_purchase_orders",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
+      api.fresh("ws_po_items",`select=*${wsF}`).catch(()=>[]),
+      api.fresh("ws_licence_renewals",`select=*&order=submitted_at.desc${wsF}`).catch(()=>[]),
+      api.fresh("workshop_bookings",`select=*&order=created_at.desc${wsF}`).catch(()=>[]),
+      api.fresh("ws_shop_requests",role==="workshop"?`workshop_id=eq.${wsId}&select=*&order=created_at.desc`:isBranchUser&&user?.branch_id?`branch_id=eq.${user.branch_id}&status=in.(pending,escalated,main_replied,ordered)&select=*&order=created_at.desc`:`status=in.(escalated,main_replied,ordered)&select=*&order=created_at.desc`).catch(()=>[]),
     ]);
     setWsSqReplies(Array.isArray(sqReps)?sqReps:[]);
     setWsPurchaseOrders(Array.isArray(wsPOs)?wsPOs:[]);
@@ -847,7 +854,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setWsBookings(Array.isArray(wsBk)?wsBk:[]);
     setWsShopRequests(Array.isArray(wsShopReqs)?wsShopReqs:[]);
     if(wsId){
-      const prof=await api.get("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
+      const prof=await api.fresh("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
     }
   },[]);

@@ -5,6 +5,15 @@ import { decodePDF417fromImage, parseLicenceDisc } from "../../lib/barcode.js";
 import { Overlay, MHead, FL, ImgLightbox } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 
+// Sample framing guidance per angle — shown before capture so the job-car photo
+// matches the same angle/ratio as the reference photos stored on the vehicle model.
+const VIEW_INFO = {
+  Front: {icon:"🚘", tip:"Stand about 3m in front of the car, centered. Keep the whole front bumper, grille and number plate inside the frame."},
+  Rear:  {icon:"🚙", tip:"Stand about 3m behind the car, centered. Keep the whole rear bumper and number plate inside the frame."},
+  Side:  {icon:"🚗", tip:"Stand at a right angle to the car's side. Capture the full profile, front bumper to rear bumper, with all wheels visible."},
+};
+const REQUIRED_VIEWS = ["Front","Rear","Side"];
+
 export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],onSaveJob,onReopenJob,onClose,userCtx=null}) {
   const [step,setStep]=useState("scan");
   const [plate,setPlate]=useState("");
@@ -38,7 +47,8 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
   const [savingIntake,setSavingIntake]=useState(false);
   // photo step
   const [photoSession,setPhotoSession]=useState(null);   // {date,time} strings fixed at session start
-  const [photoList,setPhotoList]=useState([]);            // [{id,dataUrl,status,url,error}]
+  const [photoList,setPhotoList]=useState([]);            // [{id,dataUrl,status,url,error,view}]
+  const [skippedViews,setSkippedViews]=useState([]);      // required views the user chose to skip
   const [bookInJobId,setBookInJobId]=useState(null);      // job ID for linking photos to DB
   const photoCounter=useRef(0);
   const photoCamRef=useRef(null);
@@ -50,7 +60,7 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
   const [vinPopup,setVinPopup]=useState(false);
 
   // ── Upload one photo to Supabase Storage + save URL to DB ──────
-  const uploadBookInPhoto=async(photoId,dataUrl,session,reg,jobId)=>{
+  const uploadBookInPhoto=async(photoId,dataUrl,session,reg,jobId,view)=>{
     const setStatus=(s)=>setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:s}:x));
     setStatus("uploading");
     try{
@@ -71,14 +81,14 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
       const safeReg=reg.replace(/[\s/\\]/g,"_").toUpperCase();
       const path=`bookings/${safeReg}/${ts}_${n}.jpg`;
       const url=await uploadToStorage("cars_parts",path,blob);
-      if(jobId) await api.insert("workshop_job_photos",{id:makeId("PH"),job_id:jobId,url,folder_path:`bookings/${safeReg}`}).catch(()=>{});
+      if(jobId) await api.insert("workshop_job_photos",{id:makeId("PH"),job_id:jobId,url,folder_path:`bookings/${safeReg}`,view:view||null}).catch(()=>{});
       setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"done",url}:x));
     }catch(e){
       setPhotoList(p=>p.map(x=>x.id===photoId?{...x,status:"error",error:e.message}:x));
     }
   };
 
-  const handlePhotoFile=(e)=>{
+  const handlePhotoFile=(e,view=null)=>{
     const files=Array.from(e.target.files||[]);
     const fromCamera=e.target===photoCamRef.current;
     e.target.value="";
@@ -100,8 +110,8 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
       const fr=new FileReader();
       fr.onload=ev=>{
         const dataUrl=ev.target.result;
-        setPhotoList(p=>[...p,{id,dataUrl,status:"pending",url:null,error:null}]);
-        uploadBookInPhoto(id,dataUrl,session,reg,jid);
+        setPhotoList(p=>[...p,{id,dataUrl,status:"pending",url:null,error:null,view}]);
+        uploadBookInPhoto(id,dataUrl,session,reg,jid,view);
       };
       fr.readAsDataURL(file);
     });
@@ -425,7 +435,7 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
         const pad2=n=>String(n).padStart(2,"0");
         setBookInJobId(jobId||null);
         setPhotoSession({date:`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`,time:`${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`});
-        setPhotoList([]); photoCounter.current=0;
+        setPhotoList([]); photoCounter.current=0; setSkippedViews([]);
         setStep("photos");
       }catch(e){alert("Save failed: "+e.message);}
       setSavingIntake(false);
@@ -471,6 +481,23 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
       (window._VEHICLE_SCRIPT_URL&&window._VEHICLE_SCRIPT_URL.trim())||
       (window._APPS_SCRIPT_URL&&window._APPS_SCRIPT_URL.trim())
     );
+
+    // Which required angle (Front/Rear/Side) is still outstanding — drives the guided card below.
+    const capturedOrSkipped=new Set([
+      ...photoList.filter(p=>p.status!=="error"&&p.view).map(p=>p.view),
+      ...skippedViews,
+    ]);
+    const nextView=REQUIRED_VIEWS.find(v=>!capturedOrSkipped.has(v))||null;
+
+    // Sample reference photo — pulled from the matching vehicle model's own Front/Rear/Side
+    // reference photos, so the job-car shot lines up with the same angle/ratio for later comparison.
+    const jobMake=(jobPrefill?.vehicle_make||"").trim().toUpperCase();
+    const jobModel=(jobPrefill?.vehicle_model||"").trim().toUpperCase();
+    const matchedVehicle=(jobMake&&jobModel)
+      ? vehicles.find(v=>(v.make||"").trim().toUpperCase()===jobMake&&(v.model||"").trim().toUpperCase()===jobModel)
+      : null;
+    const sampleUrl=nextView?matchedVehicle?.[`photo_${nextView.toLowerCase()}`]:null;
+
     return (
       <Overlay onClose={onClose} wide>
         <MHead title={`📷 Vehicle Photos — ${reg}`} onClose={onClose}/>
@@ -478,7 +505,9 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
         {/* Job saved banner */}
         <div style={{marginBottom:14,padding:10,background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.25)",borderRadius:10,fontSize:13}}>
           <div style={{fontWeight:700,color:"var(--green)"}}>✅ Job card saved!</div>
-          <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Now take photos of the vehicle. Tap Done to skip.</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>
+            {nextView?"Take the 3 reference angles below, then add any extra photos.":"Now take any extra photos of the vehicle. Tap Done to skip."}
+          </div>
         </div>
 
         {/* Save path info */}
@@ -492,21 +521,65 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
           </div>
         )}
 
-        {/* Camera / gallery buttons */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-          <button className="btn btn-primary" style={{padding:18,flexDirection:"column",display:"flex",alignItems:"center",gap:6,fontSize:13}}
-            onClick={()=>photoCamRef.current?.click()}>
-            <span style={{fontSize:26}}>📷</span>
-            Take Photo
-          </button>
-          <button className="btn btn-ghost" style={{padding:18,flexDirection:"column",display:"flex",alignItems:"center",gap:6,fontSize:13}}
-            onClick={()=>photoGalRef.current?.click()}>
-            <span style={{fontSize:26}}>🖼️</span>
-            Gallery
-          </button>
-          <input ref={photoCamRef} type="file" accept="image/*" capture="environment" multiple style={{display:"none"}} onChange={handlePhotoFile}/>
-          <input ref={photoGalRef} type="file" multiple style={{display:"none"}} onChange={handlePhotoFile}/>
-        </div>
+        {/* Guided angle capture — Front → Rear → Side, each with a sample + framing tip */}
+        {nextView&&(
+          <div style={{marginBottom:16,padding:14,background:"var(--surface2)",borderRadius:12,border:"2px solid var(--accent)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontWeight:700,fontSize:14}}>
+                📷 Angle {REQUIRED_VIEWS.indexOf(nextView)+1} of {REQUIRED_VIEWS.length} — {nextView}
+              </div>
+              <button className="btn btn-ghost btn-sm" style={{color:"var(--text3)"}}
+                onClick={()=>setSkippedViews(p=>[...p,nextView])}>Skip →</button>
+            </div>
+            <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:12}}>
+              <div style={{flex:"0 0 120px",textAlign:"center"}}>
+                {sampleUrl
+                  ? <img src={toImgUrl(sampleUrl)} alt={`Sample ${nextView}`}
+                      style={{width:"100%",height:90,objectFit:"contain",borderRadius:8,background:"#f5f5f5",border:"1px solid var(--border)",display:"block"}}
+                      onError={e=>e.target.style.display="none"}/>
+                  : <div style={{width:"100%",height:90,borderRadius:8,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34}}>
+                      {VIEW_INFO[nextView].icon}
+                    </div>
+                }
+                <div style={{fontSize:10,color:"var(--text3)",marginTop:4,textTransform:"uppercase",letterSpacing:".05em"}}>
+                  {sampleUrl?"Sample — match this angle":"Example angle"}
+                </div>
+              </div>
+              <div style={{flex:1,fontSize:12,color:"var(--text3)",lineHeight:1.5}}>{VIEW_INFO[nextView].tip}</div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button className="btn btn-primary" style={{padding:14,flexDirection:"column",display:"flex",alignItems:"center",gap:4,fontSize:13}}
+                onClick={()=>photoCamRef.current?.click()}>
+                <span style={{fontSize:22}}>📷</span>
+                Take {nextView} Photo
+              </button>
+              <button className="btn btn-ghost" style={{padding:14,flexDirection:"column",display:"flex",alignItems:"center",gap:4,fontSize:13}}
+                onClick={()=>photoGalRef.current?.click()}>
+                <span style={{fontSize:22}}>🖼️</span>
+                Gallery
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Extra photos — free-form, once the 3 required angles are captured or skipped */}
+        {!nextView&&(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <button className="btn btn-primary" style={{padding:18,flexDirection:"column",display:"flex",alignItems:"center",gap:6,fontSize:13}}
+              onClick={()=>photoCamRef.current?.click()}>
+              <span style={{fontSize:26}}>📷</span>
+              Take Extra Photo
+            </button>
+            <button className="btn btn-ghost" style={{padding:18,flexDirection:"column",display:"flex",alignItems:"center",gap:6,fontSize:13}}
+              onClick={()=>photoGalRef.current?.click()}>
+              <span style={{fontSize:26}}>🖼️</span>
+              Gallery
+            </button>
+          </div>
+        )}
+
+        <input ref={photoCamRef} type="file" accept="image/*" capture="environment" multiple style={{display:"none"}} onChange={e=>handlePhotoFile(e,nextView)}/>
+        <input ref={photoGalRef} type="file" multiple style={{display:"none"}} onChange={e=>handlePhotoFile(e,nextView)}/>
 
         {/* Photo grid */}
         {photoList.length>0&&(
@@ -518,6 +591,9 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
               {photoList.map(p=>(
                 <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3"}}>
                   <img src={p.dataUrl} alt={`photo ${p.id}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  {p.view&&(
+                    <div style={{position:"absolute",top:3,left:3,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,.55)",borderRadius:4,padding:"1px 5px"}}>{p.view}</div>
+                  )}
                   {/* Status overlay */}
                   <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",
                     background:p.status==="done"?"rgba(0,0,0,0)":p.status==="error"?"rgba(200,30,30,.5)":"rgba(0,0,0,.45)"}}>
@@ -540,7 +616,7 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
 
         {photoList.length===0&&(
           <div style={{textAlign:"center",padding:"24px 0",color:"var(--text3)",fontSize:13}}>
-            No photos yet — tap <strong>Take Photo</strong> to start
+            No photos yet — tap <strong>Take {nextView||""} Photo</strong> to start
           </div>
         )}
 

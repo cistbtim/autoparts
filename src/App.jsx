@@ -154,6 +154,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [partSuppliers,setPartSuppliers]=useState([]);
   const [inquiries,setInquiries]=useState([]);
   const [customerQueries,setCustomerQueries]=useState([]);
+  const [workshopFeedback,setWorkshopFeedback]=useState([]);
   const [supplierInvoices,setSupplierInvoices]=useState([]);
   const [customerInvoices,setCustomerInvoices]=useState([]);
   const [supplierReturns,setSupplierReturns]=useState([]);
@@ -536,7 +537,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       api.cacheInvalidate("workshop_jobs");
       api.cacheInvalidate("workshop_job_items");
     }
-    const BG_TABLES=["customers","users","inventory_logs",needsAdmin?"login_logs":null,"inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","vehicles","part_fitments","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes",needsWs?"workshop_jobs":null,needsWs?"workshop_job_items":null,needsWs?"workshop_invoices":null,needsWs?"workshop_quotes":null,needsWs?"workshop_customers":null,needsWs?"workshop_vehicles":null,"customer_queries",needsWs?"workshop_stock":null,needsWs?"workshop_services":null,needsWs?"workshop_documents":null,needsWs?"workshop_profiles":null,needsWs?"workshop_suppliers":null,needsWs?"ws_supplier_requests":null,needsWs?"ws_supplier_quotes":null,needsWs?"ws_supplier_invoices":null,needsWs?"ws_supplier_invoice_items":null,needsWs?"ws_supplier_payments":null,needsWs?"ws_supplier_returns":null,needsWs?"ws_sq_replies":null,needsWs?"ws_purchase_orders":null,needsWs?"ws_po_items":null,needsWs?"ws_licence_renewals":null,needsWs?"workshop_bookings":null,needsScrap?"scrapyard_vehicles":null,needsScrap?"scrapyard_parts":null,needsScrap?"scrapyard_profiles":null].filter(Boolean);
+    const BG_TABLES=["customers","users","inventory_logs",needsAdmin?"login_logs":null,"inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","vehicles","part_fitments","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes",needsWs?"workshop_jobs":null,needsWs?"workshop_job_items":null,needsWs?"workshop_invoices":null,needsWs?"workshop_quotes":null,needsWs?"workshop_customers":null,needsWs?"workshop_vehicles":null,"customer_queries",needsWs?"workshop_stock":null,needsWs?"workshop_services":null,needsWs?"workshop_documents":null,needsWs?"workshop_profiles":null,needsWs?"workshop_suppliers":null,needsWs?"ws_supplier_requests":null,needsWs?"ws_supplier_quotes":null,needsWs?"ws_supplier_invoices":null,needsWs?"ws_supplier_invoice_items":null,needsWs?"ws_supplier_payments":null,needsWs?"ws_supplier_returns":null,needsWs?"ws_sq_replies":null,needsWs?"ws_purchase_orders":null,needsWs?"ws_po_items":null,needsWs?"ws_licence_renewals":null,needsWs?"workshop_bookings":null,needsScrap?"scrapyard_vehicles":null,needsScrap?"scrapyard_parts":null,needsScrap?"scrapyard_profiles":null,needsAdmin?"workshop_feedback":null].filter(Boolean);
     setBgLoading(BG_TABLES.length);
     const [c,u,l,ll,inq,si,ci,sr,cr,veh,fit,py,...rest]=await Promise.all([
       api.get("customers","select=*&order=total_spent.desc"),
@@ -582,6 +583,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       needsScrap ? api.get("scrapyard_vehicles","select=*&order=created_at.desc").catch(()=>[]) : Promise.resolve([]),
       needsScrap ? api.get("scrapyard_parts","select=*&order=created_at.desc").catch(()=>[]) : Promise.resolve([]),
       needsScrap ? api.get("scrapyard_profiles","select=*&order=id.asc").catch(()=>[]) : Promise.resolve([]),
+      needsAdmin ? api.get("workshop_feedback","select=*&order=created_at.desc").catch(()=>[]) : Promise.resolve([]),
     ]);
     setCustomers(Array.isArray(c)?c:[]);
     setUsers(Array.isArray(u)?u:[]);
@@ -633,6 +635,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setAllScrapVehicles(Array.isArray(rest[28])?rest[28]:[]);
     setAllScrapParts(Array.isArray(rest[29])?rest[29]:[]);
     setAllScrapProfiles(Array.isArray(rest[30])?rest[30]:[]);
+    setWorkshopFeedback(Array.isArray(rest[31])?rest[31]:[]);
     setBgLoading(0); // all background tables done
     // Ads — load for everyone, fail silently if table doesn't exist yet
     api.get("ads","select=*&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAds(r);});
@@ -790,6 +793,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       ws_po_items:              [`select=*${wsF}`,                                   d=>setWsPoItems(Array.isArray(d)?d:[])],
       ws_licence_renewals:      [`select=*&order=submitted_at.desc${wsF}`,           d=>setWsLicenceRenewals(Array.isArray(d)?d:[])],
       workshop_bookings:        [`select=*&order=created_at.desc${wsF}`,             d=>setWsBookings(Array.isArray(d)?d:[])],
+      workshop_feedback:        ["select=*&order=created_at.desc",                   d=>setWorkshopFeedback(Array.isArray(d)?d:[])],
     };
     await Promise.all(names.map(async name=>{
       const def=D[name]; if(!def) return;
@@ -2175,6 +2179,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     showToast("✅ Deposit marked as paid!");
   };
 
+  // Workshop Feedback — sent from the floating button inside the Workshop module.
+  // One-way: workshop users never read this list back, only admin does (see workshopfeedback tab).
+  const submitWorkshopFeedback=async(data)=>{
+    await api.insert("workshop_feedback",{
+      ...data, id:makeId("WSFB"),
+      workshop_id:wsId||null, workshop_name:workshopProfile?.name||"",
+      status:"new", created_at:new Date().toISOString(),
+    }).catch(()=>{});
+    showToast("✅ Feedback sent — thank you!");
+  };
+  const markWsFeedbackStatus=async(id,status)=>{
+    await api.patch("workshop_feedback","id",id,{status});
+    setWorkshopFeedback(p=>p.map(f=>f.id===id?{...f,status}:f));
+  };
+  const replyToWsFeedback=async(id,admin_reply)=>{
+    await api.patch("workshop_feedback","id",id,{admin_reply,status:"read"});
+    setWorkshopFeedback(p=>p.map(f=>f.id===id?{...f,admin_reply,status:"read"}:f));
+    showToast("✅ Reply saved");
+  };
+
   // Supplier Invoices
   const saveSupplierInvoice=async(data,items)=>{
     const {inv:invRaw,isNew}=data;
@@ -2840,6 +2864,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const pendingInq=inquiries.filter(i=>i.status==="pending").length;
   const overdueAutoRfq=rfqSessions.filter(s=>s.is_auto&&s.status==="pending"&&s.reply_deadline&&new Date(s.reply_deadline)<new Date()).length;
   const pendingCQ=customerQueries.filter(q=>q.status==="pending").length;
+  const pendingWsFeedback=workshopFeedback.filter(f=>f.status==="new").length;
   const getPartSupps=(pid)=>partSuppliers.filter(ps=>ps.part_id===pid).map(ps=>({...ps,supplier:suppliers.find(s=>s.id===ps.supplier_id)}));
   const OS = role==="shipper"
     ? [
@@ -3093,6 +3118,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {id:"branchProfile",    icon:"🏢",label:"My Branch",        roles:["admin"],branchAdminOnly:true},
         {id:"branch_users",     icon:"👤",label:"Branch Users",     roles:["admin"],branchAdminOnly:true},
         {id:"vehicleRequests",  icon:"🚗",label:"Vehicle Requests", roles:["admin"],branchAdminOnly:true,badge:pendingVehicleRequests},
+        {id:"workshopfeedback", icon:"💬",label:"App Feedback",     roles:["admin"],badge:pendingWsFeedback},
       ]
     },
   ].filter(g=>
@@ -3104,7 +3130,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       if(isMobileDevice&&c.id==="systemMap") return false;
       if(isBranchUser){
         // branch users see admin tabs scoped to their role
-        const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","adcontracts","branches","settings","users","wssubscriptions","vehicles","systemMap"]);
+        const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","adcontracts","branches","settings","users","wssubscriptions","vehicles","systemMap","workshopfeedback"]);
         if(!c.roles.includes("admin")||BA_HIDE.has(c.id)) return false;
         // branchAdminOnly items only visible to branch_admin
         if(c.branchAdminOnly && role!=="branch_admin") return false;
@@ -5715,6 +5741,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             onRefreshBookings={refreshWsBookings}
             onRefresh={refreshWorkshopData}
             onRefreshJobsBoard={refreshJobsBoard}
+            onSubmitFeedback={submitWorkshopFeedback}
             wsProfile={workshopProfile}
             wsShopRequests={wsShopRequests}
             onSaveWsShopRequest={saveWsShopRequest}
@@ -5964,6 +5991,68 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             }
           </div>
         )}
+
+        {/* ── APP FEEDBACK (admin) — sent from the floating button inside Workshop mode ── */}
+        {tab==="workshopfeedback"&&(()=>{
+          const TYPE_ICON={bug:"🐛",idea:"💡",other:"💬"};
+          const STATUS_COLOR={new:"var(--yellow)",read:"var(--blue)",resolved:"var(--green)"};
+          const STATUS_LABEL={new:"🆕 New",read:"👀 Read",resolved:"✅ Resolved"};
+          return (
+            <div className="fu">
+              <div style={{marginBottom:18}}>
+                <h1 style={{fontSize:20,fontWeight:700}}>App Feedback</h1>
+                <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{pendingWsFeedback} new · {workshopFeedback.length} total</p>
+              </div>
+              {workshopFeedback.length===0
+                ? <div style={{textAlign:"center",padding:60,color:"var(--text3)"}}>No feedback yet</div>
+                : (
+                  <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                    {workshopFeedback.map(f=>{
+                      const statusColor=STATUS_COLOR[f.status]||"var(--text3)";
+                      return (
+                        <div key={f.id} className="card" style={{padding:16,borderLeft:`3px solid ${statusColor}`}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
+                            <div style={{flex:1,minWidth:220}}>
+                              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                                <span style={{fontWeight:700,fontSize:15}}>{TYPE_ICON[f.type]||"💬"} {f.workshop_name||"Unknown workshop"}</span>
+                                <span style={{fontSize:11,fontWeight:600,color:statusColor,background:statusColor+"18",padding:"2px 8px",borderRadius:99}}>{STATUS_LABEL[f.status]||f.status}</span>
+                              </div>
+                              <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13,color:"var(--text2)",marginBottom:6}}>
+                                <span>📍 {f.page||"—"}</span>
+                                <span>👤 {f.user_name||"—"}{f.user_role?` (${f.user_role})`:""}</span>
+                              </div>
+                              <div style={{fontSize:14,color:"var(--text)",marginBottom:6,whiteSpace:"pre-wrap"}}>{f.message}</div>
+                              <div style={{fontSize:11,color:"var(--text3)"}}>{f.created_at?.slice(0,16)?.replace("T"," ")}</div>
+                              {f.admin_reply&&(
+                                <div style={{marginTop:8,background:"var(--surface2)",borderRadius:8,padding:"8px 12px",fontSize:13}}>
+                                  <div style={{fontWeight:600,marginBottom:4,color:"var(--blue)"}}>📩 Your note:</div>
+                                  <div style={{color:"var(--text2)"}}>{f.admin_reply}</div>
+                                </div>
+                              )}
+                            </div>
+                            <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+                              {f.status!=="resolved"&&(
+                                <button className="btn btn-ghost btn-sm" style={{color:"var(--green)",borderColor:"var(--green)"}}
+                                  onClick={()=>markWsFeedbackStatus(f.id,"resolved")}>✅ Mark Resolved</button>
+                              )}
+                              {f.status==="new"&&(
+                                <button className="btn btn-ghost btn-sm" onClick={()=>markWsFeedbackStatus(f.id,"read")}>👀 Mark Read</button>
+                              )}
+                              <button className="btn btn-ghost btn-sm" onClick={()=>{
+                                const note=prompt("Internal note (only you see this):",f.admin_reply||"");
+                                if(note!==null) replyToWsFeedback(f.id,note);
+                              }}>📝 {f.admin_reply?"Edit Note":"Add Note"}</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              }
+            </div>
+          );
+        })()}
 
         {/* ── MY QUERIES (customer) ── */}
         {tab==="myqueries"&&(()=>{

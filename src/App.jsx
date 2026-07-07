@@ -859,6 +859,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     }
   },[]);
 
+  // Lean refresh for the Jobs board poll — only the 4 tables that drive what a job card shows
+  // (status, item/quote/invoice badges). Deliberately skips the other ~18 workshop tables that
+  // refreshWorkshopData covers, so polling every 30s doesn't reintroduce the full-refetch cost.
+  const refreshJobsBoard=useCallback(()=>refreshTables("workshop_jobs","workshop_job_items","workshop_quotes","workshop_invoices"),[refreshTables]);
+
   const refreshLoginLogs=useCallback(async()=>{
     setLoginLogsLoading(true);
     try { api.cacheInvalidate("login_logs"); const r=await api.get("login_logs","select=*&order=created_at.desc&limit=200").catch(()=>[]); if(Array.isArray(r))setLoginLogs(r); } finally { setLoginLogsLoading(false); }
@@ -5709,6 +5714,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             onDeleteWsBooking={deleteWsBooking}
             onRefreshBookings={refreshWsBookings}
             onRefresh={refreshWorkshopData}
+            onRefreshJobsBoard={refreshJobsBoard}
             wsProfile={workshopProfile}
             wsShopRequests={wsShopRequests}
             onSaveWsShopRequest={saveWsShopRequest}

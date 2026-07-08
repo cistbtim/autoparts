@@ -64,6 +64,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .hide-mobile{display:none!important}
   .show-mobile{display:block!important}
   .toast{bottom:80px}
+  .ws-feedback-btn{bottom:82px!important;left:18px!important;right:auto!important}
   .modal{border-radius:var(--radius) var(--radius) 0 0;max-height:88vh}
   .tbl th,.tbl td{padding:9px 10px;font-size:13px}
 }

@@ -44,10 +44,10 @@ const rfqProgress=(items,inquiries,supplierInvoices)=>{
   if(matched.length===0) return "none";
   const allOrdered=skus.every(sk=>bySkuInq[sk]?.status==="ordered");
   if(!allOrdered) return "partial";
-  // acceptInquiry stamps the created invoice's notes with "From RFQ <id>" —
-  // that's the only link back from an inquiry to the PO it created.
+  // acceptInquiry stamps the created invoice's rfq_inquiry_id with the inquiry
+  // it came from — that's the link back from an inquiry to the PO it created.
   const allArrived=matched.every(inq=>
-    supplierInvoices.find(iv=>iv.notes===`From RFQ ${inq.id}`)?.stocked_in
+    supplierInvoices.find(iv=>String(iv.rfq_inquiry_id)===String(inq.id))?.stocked_in
   );
   return allArrived?"arrived":"ordered";
 };
@@ -59,6 +59,27 @@ const quoteSummary=(items,inquiries)=>{
   if(skus.length===0) return {quoted:0,total:0};
   const quoted=skus.filter(sk=>inquiries.some(inq=>(inq.part_sku||"").toUpperCase()===sk&&inq.reply_price!=null)).length;
   return {quoted,total:skus.length};
+};
+
+// Which supplier(s) this request's items were actually placed a PO with — one
+// entry per ordered SKU — so the kanban card can say "Ordered from CATO ×1 ·
+// 7/8/2026" instead of leaving the space under the quoted count blank once an
+// inquiry's gone through to a PO. Matched to its invoice via rfq_inquiry_id
+// (set by acceptInquiry) to pull the order date and any remark note.
+const orderedSummary=(items,inquiries,supplierInvoices)=>{
+  const skus=[...new Set(items.map(i=>(i.sku||i.part_sku||"").toUpperCase()).filter(Boolean))];
+  if(skus.length===0) return [];
+  const bySkuInq={};
+  inquiries.forEach(inq=>{
+    const sk=(inq.part_sku||"").toUpperCase();
+    if(!skus.includes(sk)||inq.status!=="ordered") return;
+    const prev=bySkuInq[sk];
+    if(!prev||new Date(inq.created_at||0)>new Date(prev.created_at||0)) bySkuInq[sk]=inq;
+  });
+  return Object.values(bySkuInq).filter(inq=>inq.supplier_name).map(inq=>{
+    const inv=supplierInvoices.find(iv=>String(iv.rfq_inquiry_id)===String(inq.id));
+    return {supplier:inq.supplier_name,qty:inq.qty_requested||1,date:inv?.invoice_date||"",note:inv?.notes||""};
+  });
 };
 
 const TYPE_META={
@@ -102,7 +123,8 @@ function normalize(row,type,branches,parts,inquiries=[],supplierInvoices=[]){
     else if(progress==="arrived") kanbanColumn="arrived";
   }
   const {quoted,total}=quoteSummary(rfqItems,inquiries);
-  return {id:`${type}_${row.id}`,rawId:row.id,type,title,subtitle,photoUrl,status:row.status,kanbanColumn,createdAt:row.created_at,quotedCount:quoted,totalItems:total,raw:row};
+  const orderedFrom=orderedSummary(rfqItems,inquiries,supplierInvoices);
+  return {id:`${type}_${row.id}`,rawId:row.id,type,title,subtitle,photoUrl,status:row.status,kanbanColumn,createdAt:row.created_at,quotedCount:quoted,totalItems:total,orderedFrom,raw:row};
 }
 
 const RequestCard=({card,onClick})=>{
@@ -127,6 +149,11 @@ const RequestCard=({card,onClick})=>{
               💬 {card.quotedCount}/{card.totalItems} quoted
             </div>
           )}
+          {card.orderedFrom.map((o,i)=>(
+            <div key={i} style={{fontSize:10,fontWeight:700,marginTop:2,color:"var(--blue)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={o.note||undefined}>
+              📦 {o.qty}× from {o.supplier}{o.date?` · ${new Date(o.date).toLocaleDateString()}`:""}{o.note?` — ${o.note}`:""}
+            </div>
+          ))}
         </div>
       </div>
       {lightbox&&<div onClick={e=>e.stopPropagation()}><ImgLightbox url={toImgUrl(card.photoUrl)} onClose={()=>setLightbox(false)}/></div>}
@@ -191,7 +218,7 @@ export function RequestsKanbanPage({
       <Overlay onClose={closeDetail} wide>
         <MHead title="🔄 Branch Transfer Request" sub={raw.workshop_name||"Request"} onClose={closeDetail}/>
         <TransferRequestCard r={raw} branches={branches} role={role} currentBranch={currentBranch}
-          settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t}
+          settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} supplierInvoices={supplierInvoices} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t}
           onRefresh={onRefresh} onDelete={onDeleteTransfer}/>
       </Overlay>
     );

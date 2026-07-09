@@ -2193,19 +2193,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     const inv={
       id:invId, supplier_id:+inq.supplier_id||null, supplier_name:inq.supplier_name,
       invoice_date:today(), status:"unpaid",
-      total:lineItem.total, notes:`From RFQ ${inq.id}`,...(_bId?{branch_id:_bId}:{})
+      total:lineItem.total, rfq_inquiry_id:inq.id,...(_bId?{branch_id:_bId}:{})
     };
     const invRes=await api.insert("supplier_invoices",inv);
     if(!Array.isArray(invRes)&&invRes?.code){ showToast(`Error creating invoice: ${invRes.message||invRes.code}`,"err"); return; }
     const itemRes=await api.insert("supplier_invoice_items",lineItem);
     if(!Array.isArray(itemRes)&&itemRes?.code){ showToast(`Error creating invoice line: ${itemRes.message||itemRes.code}`,"err"); return; }
-    // Update stock
-    const part=parts.find(p=>String(p.id)===String(inq.part_id));
-    if(part){
-      const ns=part.stock+(inq.qty_requested||1);
-      await api.patch("parts","id",part.id,{stock:ns});
-      await logInv(part,part.stock,ns,"Stock In",`RFQ Accept ${inq.id}`);
-    }
+    // Stock is added later via the "Stock In" button on this invoice (once parts
+    // actually arrive) — same as any other purchase invoice — not here, so
+    // ordering doesn't make stock look available before it physically is.
     await api.patch("inquiries","id",inq.id,{status:"ordered"});
     await refreshTables("inquiries","supplier_invoices","parts","inventory_logs");
     showToast(`✅ PO ${invId} created`);
@@ -2219,21 +2215,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     });
   };
 
-  // Undo an accepted quote — deletes the PO it created (matched via the "From
-  // RFQ <id>" note acceptInquiry stamps on it), reverses the stock it added,
-  // and drops the inquiry back to "replied" so it's actionable again.
+  // Undo an accepted quote — deletes the PO it created (matched via the
+  // rfq_inquiry_id acceptInquiry stamps on it), drops the inquiry back to
+  // "replied" so it's actionable again, and — only if the invoice had already
+  // been stocked in via the "Stock In" button — reverses that stock too.
   const cancelOrder=async(inq)=>{
-    if(!window.confirm(`Cancel the order for ${inq.qty_requested||1} × ${inq.part_name} from ${inq.supplier_name}?\n\nThis deletes the purchase invoice it created and reverses the stock added.`)) return;
-    const invs=await api.fresh("supplier_invoices",`notes=eq.${encodeURIComponent(`From RFQ ${inq.id}`)}&select=id`).catch(()=>[]);
+    if(!window.confirm(`Cancel the order for ${inq.qty_requested||1} × ${inq.part_name} from ${inq.supplier_name}?\n\nThis deletes the purchase invoice it created.`)) return;
+    const invs=await api.fresh("supplier_invoices",`rfq_inquiry_id=eq.${encodeURIComponent(inq.id)}&select=id,stocked_in`).catch(()=>[]);
+    const wasStockedIn=Array.isArray(invs)&&invs.some(inv=>inv.stocked_in);
     for(const inv of (Array.isArray(invs)?invs:[])){
       await api.delete("supplier_invoice_items","invoice_id",inv.id);
       await api.delete("supplier_invoices","id",inv.id);
     }
-    const part=parts.find(p=>String(p.id)===String(inq.part_id));
-    if(part){
-      const ns=Math.max(0,part.stock-(inq.qty_requested||1));
-      await api.patch("parts","id",part.id,{stock:ns});
-      await logInv(part,part.stock,ns,"Stock Out",`Cancelled PO — RFQ ${inq.id}`);
+    if(wasStockedIn){
+      const part=parts.find(p=>String(p.id)===String(inq.part_id));
+      if(part){
+        const ns=Math.max(0,part.stock-(inq.qty_requested||1));
+        await api.patch("parts","id",part.id,{stock:ns});
+        await logInv(part,part.stock,ns,"Stock Out",`Cancelled PO — RFQ ${inq.id}`);
+      }
     }
     await api.patch("inquiries","id",inq.id,{status:"replied"});
     await refreshTables("inquiries","supplier_invoices","parts","inventory_logs");
@@ -5901,7 +5901,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {tab==="transferRequests"&&(role==="admin"||role==="branch_admin")&&(
-          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor} t={t} onRefresh={()=>refreshTables("branch_stock_requests")} onDelete={deleteBranchStockRequest}/>
+          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} supplierInvoices={supplierInvoices} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor} t={t} onRefresh={()=>refreshTables("branch_stock_requests")} onDelete={deleteBranchStockRequest}/>
         )}
 
         {tab==="wsShopRequests"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(

@@ -8334,7 +8334,7 @@ export function BranchUsersPage({branchId, branchName, user}) {
 // ═══════════════════════════════════════════════════════════════
 // BRANCH TRANSFER REQUESTS PAGE
 // ═══════════════════════════════════════════════════════════════
-export function TransferRequestCard({r,branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],inquiries=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh,onDelete}) {
+export function TransferRequestCard({r,branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],inquiries=[],supplierInvoices=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh,onDelete}) {
   const Cs=curSym(settings?.currency||"ZAR R");
   const [acting,setActing]=useState(false);
   const [isReplying,setIsReplying]=useState(false);
@@ -8363,6 +8363,18 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
       if(!prev||new Date(i.created_at||0)>new Date(prev.created_at||0)) bySupplier[i.supplier_id]=i;
     });
     return Object.values(bySupplier).sort((a,b)=>(+a.reply_price)-(+b.reply_price));
+  };
+
+  // If this item's already been ordered from a supplier (via the RFQ accept
+  // flow), surface who, how many, when, and any remark — matched by SKU to the
+  // latest "ordered" inquiry, then to its invoice via rfq_inquiry_id.
+  const orderInfoFor=(sku)=>{
+    if(!sku) return null;
+    const ordered=inquiries.filter(i=>(i.part_sku||"").toUpperCase()===sku.toUpperCase()&&i.status==="ordered");
+    if(ordered.length===0) return null;
+    const latest=ordered.reduce((a,b)=>new Date(b.created_at||0)>new Date(a.created_at||0)?b:a);
+    const inv=supplierInvoices.find(iv=>String(iv.rfq_inquiry_id)===String(latest.id));
+    return {supplier:latest.supplier_name,qty:latest.qty_requested||1,date:inv?.invoice_date||"",note:inv?.notes||""};
   };
   const isBusy=acting&&!isReplying;
   const borderColor={pending:"var(--orange)",quoted:"var(--purple)",confirmed:"var(--blue)",dispatched:"var(--green)"}[r.status]||"var(--border)";
@@ -8496,6 +8508,7 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
           const stockLabel=stock==null?"—":stock>0?`${stock} in stock`:"0 — need to order";
           const itemPart=i.partId?parts.find(p=>String(p.id)===String(i.partId)):null;
           const itemPhoto=itemPart?.image_url||"";
+          const orderInfo=orderInfoFor(i.sku);
           return(
             <div key={idx} style={{padding:"8px 10px",background:"var(--surface2)",borderRadius:8,marginBottom:6}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
@@ -8519,6 +8532,12 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
                   )}
                 </div>
               </div>
+              {orderInfo&&(
+                <div style={{fontSize:11,fontWeight:600,color:"var(--blue)",marginTop:6}}>
+                  📦 Ordered {orderInfo.qty}× from {orderInfo.supplier}{orderInfo.date?` · ${new Date(orderInfo.date).toLocaleDateString()}`:""}
+                  {orderInfo.note&&<div style={{fontSize:11,fontWeight:400,color:"var(--text3)",marginTop:2}}>📝 {orderInfo.note}</div>}
+                </div>
+              )}
             </div>
           );
         })}
@@ -8698,7 +8717,7 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
   );
 }
 
-export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],inquiries=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh,onDelete}) {
+export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],inquiries=[],supplierInvoices=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh,onDelete}) {
   const [refreshing,setRefreshing]=useState(false);
   const onRefreshRef=useRef(onRefresh);
   useEffect(()=>{onRefreshRef.current=onRefresh;},[onRefresh]);
@@ -8742,7 +8761,7 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
       {sorted.length===0&&<div style={{textAlign:"center",padding:48,color:"var(--text3)"}}>No transfer requests yet</div>}
 
       {sorted.map(r=>(
-        <TransferRequestCard key={r.id} r={r} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t} onRefresh={onRefresh} onDelete={onDelete}/>
+        <TransferRequestCard key={r.id} r={r} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} supplierInvoices={supplierInvoices} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t} onRefresh={onRefresh} onDelete={onDelete}/>
       ))}
     </div>
   );

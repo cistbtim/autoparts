@@ -1969,7 +1969,7 @@ export function InvTotals({items,taxRate,costField="unit_cost",priceField}) {
 // SUPPLIER INVOICE — SMART LINE ITEM EDITOR
 // Primary input: Supplier Part # → auto-match → link
 // ═══════════════════════════════════════════════════════════════
-function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",branchId=null,branchStock=[],t={},settings={},disabled=false}) {
+function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",branchId=null,branchStock=[],t={},settings={},disabled=false,onEditPart}) {
   const mkRow=()=>({_k:String(Date.now()+Math.random()),supplier_part_id:"",part_id:null,part_name:"",part_sku:"",qty:1,unit_cost:0,_st:"idle",_hits:[],_drop:false,_needsBranchSetup:false,_bsPrice:"",_bsCost:"",_bsBin:"",_skuPart:null,_skuLinks:[]});
   const inputRefs=useRef({});
   const qtyRefs=useRef({});
@@ -2149,7 +2149,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
 
                 {/* ── SKU — also searchable when not linked ── */}
                 <div style={{position:"relative"}}>
-                  <input className="inp" style={{fontSize:11,fontFamily:"DM Mono,monospace",paddingRight:isLinked?4:22,
+                  <input className="inp" style={{fontSize:11,fontFamily:"DM Mono,monospace",paddingRight:isLinked?(onEditPart&&row.part_id?22:4):22,
                     ...( isLinked?linkedStyle
                       :_st==="sku_found"?{borderColor:"rgba(52,211,153,.5)",background:"rgba(52,211,153,.06)"}
                       :_st==="sku_no_match"?{borderColor:"var(--orange)"}
@@ -2167,6 +2167,13 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                   {!isLinked&&<span style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",fontSize:10,pointerEvents:"none",color:"var(--text3)"}}>
                     {_st==="sku_found"?"✅":_st==="sku_no_match"?"⚠️":_st==="searching"?"⏳":""}
                   </span>}
+                  {isLinked&&onEditPart&&row.part_id&&(
+                    <button type="button" title="Edit this part"
+                      onClick={()=>{const p=parts.find(pp=>String(pp.id)===String(row.part_id));if(p)onEditPart(p);}}
+                      style={{position:"absolute",right:3,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:12,padding:2,lineHeight:1}}>
+                      ✏️
+                    </button>
+                  )}
                 </div>
 
                 {/* ── Qty ── */}
@@ -2303,7 +2310,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER INVOICE MODAL
 // ═══════════════════════════════════════════════════════════════
-export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onStockIn,onClose,t,settings,role="admin",branchId=null,branchStock=[]}) {
+export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onStockIn,onEditPart,onClose,t,settings,role="admin",branchId=null,branchStock=[]}) {
   const isNew=data?.isNew;
   const isPaid=data?.status==="paid";
   const isStocked=!!data?.stocked_in;
@@ -2425,7 +2432,7 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
       </FG>
       <div className="divider"/>
       <FL label="Line Items"/>
-      <SupplierInvoiceLineEditor items={items} setItems={setItems} suppId={suppId} parts={parts} role={role} branchId={branchId} branchStock={branchStock} t={t} settings={settings} disabled={isStocked}/>
+      <SupplierInvoiceLineEditor items={items} setItems={setItems} suppId={suppId} parts={parts} role={role} branchId={branchId} branchStock={branchStock} t={t} settings={settings} disabled={isStocked} onEditPart={onEditPart}/>
       {items.length>0&&<InvTotals items={items} taxRate={settings.tax_rate} costField="unit_cost"/>}
 
       {/* Validation warning */}
@@ -4512,7 +4519,7 @@ export function CustomerQueryReplyModal({query,onReply,onClose,t,settings,onGoIn
   );
 }
 
-export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t,isAdmin,onEditPart}) {
+export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],onSend,onManualQuote,onAcceptQuote,onCancelOrder,onClose,t,isAdmin,onEditPart}) {
   // Build professional RFQ message — each field on its own clear line
   // buildMsg now accepts optional supplierPartNo from part_suppliers record
   const buildMsg = (supplierName, qtyVal, supplierPartNo="") => {
@@ -4559,6 +4566,11 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t,isAd
   const [showPhoto,setShowPhoto]=useState(false);
   const [supplierSearch,setSupplierSearch]=useState("");
   const [matchedOnly,setMatchedOnly]=useState(true);
+  // Manual quote entry — records a supplier's price directly (e.g. after a phone
+  // call) without needing them to click the RFQ reply link.
+  const [manualEdit,setManualEdit]=useState(null); // {supplierId,price,stock,notes,spn,existingId}
+  const [acceptingId,setAcceptingId]=useState(null); // supplier id currently creating a PO (shows spinner)
+  const [cancellingId,setCancellingId]=useState(null); // supplier id currently cancelling its order
 
   // Preview the message for the most recently selected supplier (with their known part# if any)
   useEffect(()=>{
@@ -4577,21 +4589,24 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t,isAd
 
   const handleSend=async()=>{
     if(selectedSuppliers.length===0||!qty)return;
-    for(const s of selectedSuppliers){
-      // Get this supplier's known part number for this part (if any)
+    // Build one personalised item per supplier and send as a batch — the caller
+    // (sendInquiry) creates all the DB records then opens a one-by-one WhatsApp/
+    // email send queue so nothing gets silently skipped when multiple suppliers
+    // are selected.
+    const items=selectedSuppliers.map(s=>{
       const ps = linkedPsMap[s.id];
       const suppPartNo = ps?.supplier_part_no || "";
-      // Personalised message with their part number
       const personalMsg = buildMsg(s.name, qty, suppPartNo);
-      await onSend({
+      return {
         part_id:part.id, part_name:part.name, part_sku:part.sku,
         part_oe_number:part.oe_number||"", part_make:part.make||"",
         part_model:part.model||"", part_year:part.year_range||"",
         supplier_id:s.id, supplier_name:s.name, supplier_email:s.email, supplier_phone:s.phone,
         qty_requested:+qty, message:personalMsg,
         known_supplier_part_no:suppPartNo
-      });
-    }
+      };
+    });
+    await onSend(items);
   };
 
   // Keep full partSupplier record so we can access supplier_part_no
@@ -4608,9 +4623,75 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t,isAd
     return true;
   });
 
+  // Most recent inquiry (if any) that already carries a reply for this supplier + part
+  const latestInqFor=(supplierId)=>inquiries
+    .filter(i=>i.part_id===part.id&&i.supplier_id===supplierId)
+    .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))[0]||null;
+
+  // Cheapest quoted supplier first, then the rest (unquoted suppliers keep their original order)
+  const sortedSupps=[...filteredSupps].sort((a,b)=>{
+    const pa=latestInqFor(a.id)?.reply_price, pb=latestInqFor(b.id)?.reply_price;
+    const ha=pa!=null&&pa!==""?1:0, hb=pb!=null&&pb!==""?1:0;
+    if(ha!==hb) return hb-ha;
+    if(ha&&hb) return (+pa)-(+pb);
+    return 0;
+  });
+
+  const openManual=(s,inq)=>setManualEdit({
+    supplierId:s.id,
+    price:inq?.reply_price??"", stock:inq?.reply_stock??"", notes:inq?.reply_notes||"",
+    spn:inq?.supplier_part_no||linkedPsMap[s.id]?.supplier_part_no||"",
+    existingId:inq?.id||null,
+  });
+
+  const saveManual=async(s)=>{
+    if(!onManualQuote||!manualEdit) return;
+    await onManualQuote({
+      part, supplier:s, qty:+qty||1,
+      price:manualEdit.price, stock:manualEdit.stock, notes:manualEdit.notes,
+      supplierPartNo:manualEdit.spn, existingId:manualEdit.existingId,
+    });
+    setManualEdit(null);
+  };
+
+  const acceptQuote=async(s,inq)=>{
+    if(!onAcceptQuote||!inq?.reply_price||acceptingId) return;
+    const partNoLine=inq.supplier_part_no?`\nSupplier code: ${inq.supplier_part_no}`:"";
+    if(!window.confirm(`Create a Purchase Invoice for ${inq.qty_requested||qty} × ${part.name} @ ${fmtAmt(inq.reply_price)} from ${s.name}?${partNoLine}`)) return;
+    setAcceptingId(s.id);
+    try{ await onAcceptQuote(inq); }
+    finally{ setAcceptingId(null); }
+  };
+
+  const cancelOrder=async(s,inq)=>{
+    if(!onCancelOrder||cancellingId) return;
+    setCancellingId(s.id);
+    try{ await onCancelOrder(inq); }
+    finally{ setCancellingId(null); }
+  };
+
+  // Already ordered? Surface it up top so reopening this part's RFQ doesn't look
+  // like it's still awaiting quotes when a PO was already created for it.
+  const orderedInq=inquiries
+    .filter(i=>i.part_id===part.id&&i.status==="ordered")
+    .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))[0]||null;
+
   return (
     <Overlay onClose={onClose} wide>
       <MHead title="📩 Send RFQ" sub={`${part.name}${part.chinese_desc?" / "+part.chinese_desc:""} · ${part.sku}`} onClose={onClose}/>
+
+      {orderedInq&&(
+        <div style={{background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.3)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:16}}>✅</span>
+          <span style={{fontSize:13,color:"var(--green)",fontWeight:700,flex:1}}>
+            Ordered from {orderedInq.supplier_name} — {orderedInq.qty_requested} × {fmtAmt(orderedInq.reply_price)}
+          </span>
+          {onCancelOrder&&(
+            <button type="button" className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
+              onClick={()=>onCancelOrder(orderedInq)}>✕ Cancel Order</button>
+          )}
+        </div>
+      )}
 
       {/* Part info preview */}
       <div style={{background:"var(--surface2)",borderRadius:10,padding:13,marginBottom:16,border:"1px solid var(--border)"}}>
@@ -4620,7 +4701,7 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t,isAd
         </div>
         <div style={{display:"flex",gap:14}}>
           {partPhoto&&<img src={toImgUrl(partPhoto)} alt="" referrerPolicy="no-referrer" onClick={()=>setShowPhoto(true)}
-            style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}
+            style={{width:144,height:144,objectFit:"contain",background:"#fff",borderRadius:8,border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}
             onError={e=>e.target.style.display="none"}/>}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"5px 16px",fontSize:13,flex:1}}>
             {[
@@ -4652,13 +4733,14 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t,isAd
           </label>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:180,overflowY:"auto",background:"var(--surface2)",borderRadius:10,padding:11,border:"1px solid var(--border)"}}>
-          {filteredSupps.map(s=>{
+          {sortedSupps.map(s=>{
             const isLinked=!!linkedSupps.find(l=>l.id===s.id);
             const isSelected=!!selectedSuppliers.find(x=>x.id===s.id);
+            const inq=latestInqFor(s.id);
             return (
-              <label key={s.id} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 10px",borderRadius:8,background:isSelected?"rgba(249,115,22,.1)":"transparent",border:isSelected?"1px solid rgba(249,115,22,.3)":"1px solid transparent"}}>
-                <input type="checkbox" className="chk" checked={isSelected} onChange={()=>toggleSupplier(s)}/>
-                <div style={{flex:1}}>
+              <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 10px",borderRadius:8,background:isSelected?"rgba(249,115,22,.1)":"transparent",border:isSelected?"1px solid rgba(249,115,22,.3)":"1px solid transparent"}} onClick={()=>toggleSupplier(s)}>
+                <input type="checkbox" className="chk" checked={isSelected} readOnly/>
+                <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:13,fontWeight:700}}>{s.name}</span>
                     {isLinked&&<span style={{fontSize:10,color:"var(--accent)",background:"rgba(249,115,22,.15)",borderRadius:4,padding:"1px 6px"}}>linked</span>}
@@ -4674,7 +4756,47 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t,isAd
                     {s.email?<span style={{color:"var(--blue)"}}>✉ {s.email}</span>:<span style={{color:"var(--text3)"}}>no email</span>}
                   </div>
                 </div>
-              </label>
+                <div style={{flexShrink:0,display:"flex",gap:6,alignItems:"center"}}>
+                  {inq?.status==="ordered"
+                    ? (onCancelOrder
+                        ? <button type="button" title={`Ordered ${inq.qty_requested}× @ ${fmtAmt(inq.reply_price)} — click to cancel this order`}
+                            disabled={cancellingId===s.id}
+                            onClick={e=>{e.stopPropagation();cancelOrder(s,inq);}}
+                            style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"5px 9px",borderRadius:7,whiteSpace:"nowrap",
+                              cursor:cancellingId===s.id?"wait":"pointer",opacity:cancellingId===s.id?.7:1,
+                              border:"1px solid rgba(52,211,153,.4)",background:"rgba(52,211,153,.15)",color:"var(--green)"}}>
+                            {cancellingId===s.id?"⏳ Cancelling…":"✅ Ordered ✕"}
+                          </button>
+                        : <span title={`Ordered ${inq.qty_requested}× @ ${fmtAmt(inq.reply_price)}`}
+                            style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"5px 9px",borderRadius:7,whiteSpace:"nowrap",
+                              border:"1px solid rgba(52,211,153,.4)",background:"rgba(52,211,153,.15)",color:"var(--green)"}}>
+                            ✅ Ordered
+                          </span>
+                      )
+                    : <>
+                      {onManualQuote&&(
+                        <button type="button" title={inq?.reply_price?"Adjust recorded quote":"Record a price manually — e.g. after a phone call"}
+                          onClick={e=>{e.stopPropagation();openManual(s,inq);}}
+                          style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"5px 9px",borderRadius:7,cursor:"pointer",whiteSpace:"nowrap",
+                            border:inq?.reply_price?"1px solid rgba(52,211,153,.35)":"1px solid var(--border)",
+                            background:inq?.reply_price?"rgba(52,211,153,.12)":"var(--surface3)",
+                            color:inq?.reply_price?"var(--green)":"var(--text2)"}}>
+                          {inq?.reply_price?`✏️ ${fmtAmt(inq.reply_price)}`:"💰 Enter Price"}
+                        </button>
+                      )}
+                      {onAcceptQuote&&inq?.reply_price&&(
+                        <button type="button" title="Create Purchase Invoice from this quote" disabled={acceptingId===s.id}
+                          onClick={e=>{e.stopPropagation();acceptQuote(s,inq);}}
+                          style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"5px 9px",borderRadius:7,whiteSpace:"nowrap",
+                            cursor:acceptingId===s.id?"wait":"pointer",opacity:acceptingId===s.id?.7:1,
+                            border:"1px solid rgba(249,115,22,.4)",background:"rgba(249,115,22,.12)",color:"var(--accent)"}}>
+                          {acceptingId===s.id?"⏳ Creating…":"🛒 Create PO"}
+                        </button>
+                      )}
+                    </>
+                  }
+                </div>
+              </div>
             );
           })}
           {filteredSupps.length===0&&(
@@ -4700,6 +4822,32 @@ export function InquiryModal({part,suppliers,partSuppliers,onSend,onClose,t,isAd
       </div>
 
       {showPhoto&&partPhoto&&<ImgLightbox url={toImgUrl(partPhoto)} onClose={()=>setShowPhoto(false)}/>}
+
+      {manualEdit&&(()=>{
+        const s=allSupps.find(x=>x.id===manualEdit.supplierId);
+        if(!s) return null;
+        const inq=latestInqFor(s.id);
+        return (
+          <Overlay onClose={()=>setManualEdit(null)}>
+            <MHead title={`💰 Record Quote — ${s.name}`} sub={`${part.name} · ${part.sku}`} onClose={()=>setManualEdit(null)}/>
+            <FG>
+              <div><FL label="Price"/><input className="inp" type="number" step="0.01" placeholder="0.00" autoFocus
+                value={manualEdit.price} onChange={e=>setManualEdit(m=>({...m,price:e.target.value}))}/></div>
+              <div><FL label="Available Stock"/><input className="inp" type="number" placeholder="qty"
+                value={manualEdit.stock} onChange={e=>setManualEdit(m=>({...m,stock:e.target.value}))}/></div>
+            </FG>
+            <FD><FL label="Their Part# / Reference"/><input className="inp" style={{fontFamily:"DM Mono,monospace"}}
+              value={manualEdit.spn} onChange={e=>setManualEdit(m=>({...m,spn:e.target.value}))}/></FD>
+            <FD><FL label="Notes (lead time, MOQ, conditions...)"/><textarea className="inp" value={manualEdit.notes}
+              onChange={e=>setManualEdit(m=>({...m,notes:e.target.value}))} placeholder="e.g. 7 days lead time, min order 10 pcs" style={{minHeight:70}}/></FD>
+            {inq?.replied_at&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:12}}>Last recorded: {inq.replied_at.slice(0,16).replace("T"," ")}</div>}
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setManualEdit(null)}>Cancel</button>
+              <button className="btn btn-primary" style={{flex:2}} onClick={()=>saveManual(s)}>💾 Save Quote</button>
+            </div>
+          </Overlay>
+        );
+      })()}
     </Overlay>
   );
 }
@@ -4973,18 +5121,11 @@ export function PdfInvoiceModal({inv,settings,onClose}) {
           {/* Header */}
           <div className="header" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:28,paddingBottom:18,borderBottom:"3px solid #111"}}>
             <div>
-              {/* Inline SVG logo — no white border, always looks clean on PDF */}
-              <svg height="70" viewBox="0 0 420 110" xmlns="http://www.w3.org/2000/svg" style={{display:"block",marginBottom:8}}>
-                <rect x="0" y="0" width="420" height="110" fill="#C0000A" rx="12"/>
-                <rect x="0" y="0" width="420" height="5" fill="#FFD700" rx="2"/>
-                <rect x="0" y="105" width="420" height="5" fill="#FFD700" rx="2"/>
-                <polygon points="36,16 40.5,30 55,30 43.5,38.5 47.5,52 36,44 24.5,52 28.5,38.5 17,30 31.5,30" fill="#FFD700"/>
-                <rect x="66" y="10" width="2.5" height="90" fill="#FFD700" opacity="0.6" rx="1"/>
-                <text x="80" y="48" fontFamily="Arial Black,Arial" fontSize="32" fontWeight="900" fill="#FFD700" letterSpacing="2">AUTO EXCEL</text>
-                <text x="82" y="68" fontFamily="Arial Black,Arial" fontSize="14" fontWeight="700" fill="#FFFFFF" letterSpacing="5">SOUTH AFRICA</text>
-                <rect x="80" y="75" width="316" height="1.5" fill="#FFD700" opacity="0.4" rx="1"/>
-                <text x="82" y="93" fontFamily="Arial Black,Arial" fontSize="13" fontWeight="700" fill="#FFFFFF" letterSpacing="2" opacity="0.95">CHINA CAR PARTS &amp; ENGINE OIL</text>
-              </svg>
+              {(settings.logo_data||settings.logo_url)
+                ? <img src={settings.logo_data||toLogoUrl(settings.logo_url)} alt={settings.shop_name||"Logo"}
+                    style={{height:64,maxWidth:240,objectFit:"contain",display:"block",marginBottom:8}}/>
+                : <div className="shop-name" style={{fontSize:28,fontWeight:900,color:"#f97316",letterSpacing:1}}>{settings.shop_name||"MotorDesk"}</div>
+              }
               <div className="shop-info" style={{fontSize:12,color:"#555",marginTop:5,lineHeight:1.7}}>
                 {settings.phone&&<div>📞 {settings.phone}</div>}
                 {settings.email&&<div>✉ {settings.email}</div>}
@@ -7651,7 +7792,7 @@ export function PartRequestModal({currentBranch, user, onClose, onSave, t={}}) {
 }
 
 // ─── Part Requests Page (admin reviews + approves; branch tracks status) ──────
-export function PartRequestCard({r,isAdmin,branches=[],parts=[],user,suppliers=[],partSuppliers=[],onSendInquiry,onEditPart,t={},onRefresh}) {
+export function PartRequestCard({r,isAdmin,branches=[],parts=[],user,suppliers=[],partSuppliers=[],inquiries=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh}) {
   const [isLinking,setIsLinking]=useState(false);
   const [linkSearch,setLinkSearch]=useState("");
   const [isRejecting,setIsRejecting]=useState(false);
@@ -7754,13 +7895,13 @@ export function PartRequestCard({r,isAdmin,branches=[],parts=[],user,suppliers=[
         </div>
       )}
 
-      {rfqPart&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)}
-        onSend={async(data)=>{await onSendInquiry(data);}} onClose={()=>setRfqPart(null)} t={t} isAdmin={isAdmin} onEditPart={onEditPart}/>}
+      {rfqPart&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)} inquiries={inquiries}
+        onSend={async(data)=>{await onSendInquiry(data);}} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onClose={()=>setRfqPart(null)} t={t} isAdmin={isAdmin} onEditPart={onEditPart}/>}
     </div>
   );
 }
 
-export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role,currentBranch,suppliers=[],partSuppliers=[],onSendInquiry,onEditPart,onRefresh,t={}}) {
+export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role,currentBranch,suppliers=[],partSuppliers=[],inquiries=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,onRefresh,t={}}) {
   const isAdmin=role==="admin";
   const myReqs=isAdmin?partRequests:partRequests.filter(r=>r.branch_id===currentBranch?.id);
   const pending=myReqs.filter(r=>r.status==="pending");
@@ -7786,14 +7927,14 @@ export function PartRequestsPage({partRequests=[],branches=[],parts=[],user,role
       {pending.length>0&&(
         <div style={{marginBottom:24}}>
           <div style={{fontSize:14,fontWeight:700,marginBottom:10,color:"var(--yellow)"}}>⏳ Pending ({pending.length})</div>
-          {pending.map(r=><PartRequestCard key={r.id} r={r} isAdmin={isAdmin} branches={branches} parts={parts} user={user} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t} onRefresh={onRefresh}/>)}
+          {pending.map(r=><PartRequestCard key={r.id} r={r} isAdmin={isAdmin} branches={branches} parts={parts} user={user} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t} onRefresh={onRefresh}/>)}
         </div>
       )}
 
       {done.length>0&&(
         <div>
           <div style={{fontSize:14,fontWeight:700,marginBottom:10,color:"var(--text3)"}}>History ({done.length})</div>
-          {done.map(r=><PartRequestCard key={r.id} r={r} isAdmin={isAdmin} branches={branches} parts={parts} user={user} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t} onRefresh={onRefresh}/>)}
+          {done.map(r=><PartRequestCard key={r.id} r={r} isAdmin={isAdmin} branches={branches} parts={parts} user={user} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t} onRefresh={onRefresh}/>)}
         </div>
       )}
     </div>
@@ -8193,7 +8334,7 @@ export function BranchUsersPage({branchId, branchName, user}) {
 // ═══════════════════════════════════════════════════════════════
 // BRANCH TRANSFER REQUESTS PAGE
 // ═══════════════════════════════════════════════════════════════
-export function TransferRequestCard({r,branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],onSendInquiry,onEditPart,t={},onRefresh,onDelete}) {
+export function TransferRequestCard({r,branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],inquiries=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh,onDelete}) {
   const Cs=curSym(settings?.currency||"ZAR R");
   const [acting,setActing]=useState(false);
   const [isReplying,setIsReplying]=useState(false);
@@ -8208,6 +8349,21 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
   const reqBranch=branches.find(b=>String(b.id)===String(r.requesting_branch_id));
   const items=Array.isArray(r.items)?r.items:[];
   const replyItems=Array.isArray(r.reply_items)?r.reply_items:[];
+
+  // Every supplier-quoted price on file for this SKU (from the RFQ flow),
+  // cheapest first — lets whoever's quoting the workshop see what we're paying
+  // before setting a price. One supplier per row (latest quote if they've
+  // quoted more than once) so a cheaper quote never gets hidden behind a more
+  // recently entered, pricier one.
+  const supplierQuotesFor=(sku)=>{
+    if(!sku) return [];
+    const bySupplier={};
+    inquiries.filter(i=>(i.part_sku||"").toUpperCase()===sku.toUpperCase()&&i.reply_price!=null).forEach(i=>{
+      const prev=bySupplier[i.supplier_id];
+      if(!prev||new Date(i.created_at||0)>new Date(prev.created_at||0)) bySupplier[i.supplier_id]=i;
+    });
+    return Object.values(bySupplier).sort((a,b)=>(+a.reply_price)-(+b.reply_price));
+  };
   const isBusy=acting&&!isReplying;
   const borderColor={pending:"var(--orange)",quoted:"var(--purple)",confirmed:"var(--blue)",dispatched:"var(--green)"}[r.status]||"var(--border)";
 
@@ -8341,22 +8497,27 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
           const itemPart=i.partId?parts.find(p=>String(p.id)===String(i.partId)):null;
           const itemPhoto=itemPart?.image_url||"";
           return(
-            <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 10px",background:"var(--surface2)",borderRadius:6,marginBottom:3,gap:8,flexWrap:"wrap"}}>
-              <span style={{fontSize:13,display:"flex",alignItems:"center",gap:8}}>
+            <div key={idx} style={{padding:"8px 10px",background:"var(--surface2)",borderRadius:8,marginBottom:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                 {itemPhoto&&<img src={toImgUrl(itemPhoto)} alt="" referrerPolicy="no-referrer" onClick={()=>setLightbox(itemPhoto)}
                   style={{width:32,height:32,objectFit:"cover",borderRadius:6,border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}
                   onError={e=>e.target.style.display="none"}/>}
-                {i.name}{i.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6,fontFamily:"DM Mono,monospace"}}>{i.sku}</span>}
-              </span>
-              <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.name}</div>
+                  {i.sku&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{i.sku}</div>}
+                </div>
+                <span style={{fontSize:13,color:"var(--text2)",fontWeight:600,flexShrink:0}}>×{i.qty}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
                 <span style={{fontSize:11,fontWeight:600,color:stockColor}}>📦 {stockLabel}</span>
-                <span style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</span>
-                {itemPart&&onSendInquiry&&(
-                  <button className="btn btn-ghost btn-xs" style={{whiteSpace:"nowrap"}} title="Request price/stock from suppliers" onClick={()=>setRfqPart(itemPart)}>📩 Ask Suppliers</button>
-                )}
-                {itemPart&&role==="admin"&&onEditPart&&(
-                  <button className="btn btn-ghost btn-xs" style={{whiteSpace:"nowrap"}} title="Edit this part" onClick={()=>onEditPart(itemPart)}>✏️ Edit Part</button>
-                )}
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {itemPart&&onSendInquiry&&(
+                    <button className="btn btn-ghost btn-xs" style={{whiteSpace:"nowrap"}} title="Request price/stock from suppliers" onClick={()=>setRfqPart(itemPart)}>📩 Ask Suppliers</button>
+                  )}
+                  {itemPart&&role==="admin"&&onEditPart&&(
+                    <button className="btn btn-ghost btn-xs" style={{whiteSpace:"nowrap"}} title="Edit this part" onClick={()=>onEditPart(itemPart)}>✏️ Edit Part</button>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -8388,12 +8549,28 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
           const stock=getItemStock(it,r.supplying_branch_id);
           const stockColor=stock==null?"var(--text3)":stock>0?"var(--green)":"var(--orange)";
           const stockLabel=stock==null?"stock unknown":stock>0?`${stock} in stock`:"0 in stock — need to order";
+          const sqs=supplierQuotesFor(it.sku);
           return(
           <div key={idx} style={{marginBottom:12,paddingBottom:12,borderBottom:idx<items.length-1?"1px solid var(--border)":"none"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
               <div style={{fontWeight:600,fontSize:13}}>{it.name}{it.sku&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{it.sku}</span>} <span style={{color:"var(--text3)"}}>×{it.qty}</span></div>
               <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${stockColor}18`,color:stockColor}}>📦 {stockLabel}</span>
             </div>
+            {sqs.length>0&&(
+              <div style={{marginBottom:8}}>
+                {sqs.map((sq,sqi)=>(
+                  <div key={sq.id} style={{marginTop:sqi>0?6:0,padding:"6px 8px",borderRadius:7,background:sq.reply_notes?"rgba(251,191,36,.08)":"transparent",border:sq.reply_notes?"1px solid rgba(251,191,36,.25)":"none"}}>
+                    <div style={{fontSize:11,color:"var(--text2)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      🏭 <strong style={{color:sqi===0?"var(--green)":"var(--accent)"}}>{Cs}{(+sq.reply_price).toFixed(2)}</strong> — {sq.supplier_name}
+                      {sqi===0&&sqs.length>1&&<span style={{fontSize:9,color:"var(--green)",fontWeight:700}}>CHEAPEST</span>}
+                      <button type="button" className="btn btn-ghost btn-xs" style={{padding:"1px 7px",fontSize:10}}
+                        onClick={()=>setReplyForm(f=>({...f,[idx]:{...f[idx],price:sq.reply_price}}))}>Use cost</button>
+                    </div>
+                    {sq.reply_notes&&<div style={{fontSize:12,color:"var(--yellow)",fontWeight:600,marginTop:4}}>📝 {sq.reply_notes}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <div style={{flex:"1 1 120px"}}>
                 <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Availability</label>
@@ -8404,9 +8581,23 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
                 </select>
               </div>
               {replyForm[idx]?.availability!=="not_available"&&<div style={{flex:"1 1 100px"}}>
-                <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Price ({Cs})</label>
+                <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Price ({Cs}, excl. VAT)</label>
                 <input className="inp" type="number" min="0" step="0.01" placeholder="0.00"
                   value={replyForm[idx]?.price??""} onChange={e=>setReplyForm(f=>({...f,[idx]:{...f[idx],price:e.target.value}}))} style={{fontSize:12}}/>
+              </div>}
+              {replyForm[idx]?.availability!=="not_available"&&sqs.length>0&&<div style={{flex:"1 1 100px"}}>
+                <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Markup %</label>
+                <div style={{display:"flex",gap:4}}>
+                  <input className="inp" type="number" min="0" step="1" placeholder="e.g. 20"
+                    value={replyForm[idx]?.markup??""} onChange={e=>setReplyForm(f=>({...f,[idx]:{...f[idx],markup:e.target.value}}))}
+                    style={{fontSize:12,width:0,flex:1}}/>
+                  <button type="button" className="btn btn-ghost btn-xs" style={{padding:"1px 8px",fontSize:11}}
+                    onClick={()=>{
+                      const cost=+sqs[0].reply_price;
+                      const mk=+(replyForm[idx]?.markup)||0;
+                      setReplyForm(f=>({...f,[idx]:{...f[idx],price:Math.round(cost*(1+mk/100)*100)/100}}));
+                    }}>Apply</button>
+                </div>
               </div>}
               <div style={{flex:"2 1 160px"}}>
                 <label style={{fontSize:11,color:"var(--text3)",display:"block",marginBottom:3}}>Notes (optional)</label>
@@ -8414,6 +8605,15 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
                   value={replyForm[idx]?.notes||""} onChange={e=>setReplyForm(f=>({...f,[idx]:{...f[idx],notes:e.target.value}}))} style={{fontSize:12}}/>
               </div>
             </div>
+            {replyForm[idx]?.availability!=="not_available"&&+replyForm[idx]?.price>0&&(settings?.tax_rate>0)&&(()=>{
+              const p=+replyForm[idx].price, vat=p*(settings.tax_rate/100);
+              return (
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>
+                  Excl. VAT: {Cs}{p.toFixed(2)} &nbsp;+&nbsp; VAT ({settings.tax_rate}%): {Cs}{vat.toFixed(2)} &nbsp;=&nbsp;
+                  <strong style={{color:"var(--text2)"}}> Incl. VAT: {Cs}{(p+vat).toFixed(2)}</strong>
+                </div>
+              );
+            })()}
           </div>
         );})}
         <div style={{marginBottom:10}}>
@@ -8491,14 +8691,14 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
         </button>}
       </div>
 
-      {rfqPart&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)}
-        onSend={async(data)=>{await onSendInquiry(data);}} onClose={()=>setRfqPart(null)} t={t} isAdmin={role==="admin"} onEditPart={onEditPart}/>}
+      {rfqPart&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)} inquiries={inquiries}
+        onSend={async(data)=>{await onSendInquiry(data);}} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onClose={()=>setRfqPart(null)} t={t} isAdmin={role==="admin"} onEditPart={onEditPart}/>}
       {lightbox&&<ImgLightbox url={toImgUrl(lightbox)} onClose={()=>setLightbox(null)}/>}
     </div>
   );
 }
 
-export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],onSendInquiry,onEditPart,t={},onRefresh,onDelete}) {
+export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],inquiries=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh,onDelete}) {
   const [refreshing,setRefreshing]=useState(false);
   const onRefreshRef=useRef(onRefresh);
   useEffect(()=>{onRefreshRef.current=onRefresh;},[onRefresh]);
@@ -8542,7 +8742,7 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
       {sorted.length===0&&<div style={{textAlign:"center",padding:48,color:"var(--text3)"}}>No transfer requests yet</div>}
 
       {sorted.map(r=>(
-        <TransferRequestCard key={r.id} r={r} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t} onRefresh={onRefresh} onDelete={onDelete}/>
+        <TransferRequestCard key={r.id} r={r} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t} onRefresh={onRefresh} onDelete={onDelete}/>
       ))}
     </div>
   );
@@ -8605,7 +8805,7 @@ export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP REQUESTS PAGE  (spare-shop side)
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},suppliers=[],partSuppliers=[],onSendInquiry,onEditPart,t={},onReply,onEscalate,onMainReply,onDelete,onRefresh,userRole="",userBranchId=null}) {
+export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},suppliers=[],partSuppliers=[],inquiries=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onReply,onEscalate,onMainReply,onDelete,onRefresh,userRole="",userBranchId=null}) {
   const [selId,    setSelId]    = useState(null);
   const [filter,   setFilter]   = useState("pending");
   const [refreshing,setRefreshing]=useState(false);
@@ -8664,7 +8864,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},sup
               style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",color:"#ef4444",borderRadius:7,padding:"3px 10px",cursor:"pointer",fontSize:12,fontWeight:600}}>🗑️ Delete</button>}
             <button onClick={()=>setSelId(null)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:18,padding:"0 4px"}}>✕</button>
           </div>
-          <WsShopRequestDetail req={selected} parts={parts} settings={settings} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t}
+          <WsShopRequestDetail req={selected} parts={parts} settings={settings} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t}
             onReply={async(...a)=>{await onReply(...a);setSelId(null);}}
             onEscalate={onEscalate} onMainReply={onMainReply}
             userRole={userRole} userBranchId={userBranchId}/>
@@ -8708,7 +8908,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},sup
   );
 }
 
-export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], partSuppliers=[], onSendInquiry, onEditPart, t={}, onReply, onEscalate, onMainReply, userRole="", userBranchId=null}) {
+export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], partSuppliers=[], inquiries=[], onSendInquiry, onManualQuote, onAcceptQuote, onCancelOrder, onEditPart, t={}, onReply, onEscalate, onMainReply, userRole="", userBranchId=null}) {
   const [rfqPart, setRfqPart] = useState(null);
   const reqItems = (() => {try{return JSON.parse(req.items||"[]");}catch{return [];}})();
   const existingReply = (() => {try{return JSON.parse(req.reply_items||"[]");}catch{return [];}})();
@@ -9403,8 +9603,8 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
 
       {lightbox&&<ImgLightbox url={toImgUrl(lightbox)} onClose={()=>setLightbox(null)}/>}
 
-      {rfqPart&&onSendInquiry&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)}
-        onSend={async(data)=>{await onSendInquiry(data);}} onClose={()=>setRfqPart(null)} t={t} isAdmin={userRole==="admin"} onEditPart={onEditPart}/>}
+      {rfqPart&&onSendInquiry&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)} inquiries={inquiries}
+        onSend={async(data)=>{await onSendInquiry(data);}} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onClose={()=>setRfqPart(null)} t={t} isAdmin={userRole==="admin"} onEditPart={onEditPart}/>}
     </div>
   );
 }

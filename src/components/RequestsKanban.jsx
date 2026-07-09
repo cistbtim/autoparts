@@ -6,10 +6,12 @@ import { WsShopRequestDetail, TransferRequestCard, VehicleRequestCard, PartReque
 const partPhotoUrl=(part)=>part?.image_url||"";
 
 const COLUMNS = [
-  {id:"new",        label:"New",         color:"#a78bfa"},
-  {id:"inprogress", label:"In Progress", color:"#fbbf24"},
-  {id:"fulfilled",  label:"Fulfilled",   color:"#34d399"},
-  {id:"closed",     label:"Closed",      color:"#f87171"},
+  {id:"new",         label:"New",          color:"#a78bfa"},
+  {id:"inprogress",  label:"In Progress",  color:"#fbbf24"},
+  {id:"finishorder", label:"Finish Order", color:"#fb923c"},
+  {id:"arrived",     label:"Order Arrived",color:"#38bdf8"},
+  {id:"fulfilled",   label:"Fulfilled",    color:"#34d399"},
+  {id:"closed",      label:"Closed",       color:"#f87171"},
 ];
 
 const COLUMN_MAP = {
@@ -20,6 +22,45 @@ const COLUMN_MAP = {
 };
 const mapToColumn=(type,status)=>COLUMN_MAP[type]?.[status]||"new";
 
+// An RFQ sent to suppliers doesn't change the request's own status (that still
+// reflects the branch-to-branch / workshop reply flow), so a "New" card would
+// otherwise sit still even after someone acted on it. Track how far the RFQ
+// side has gotten — matched by SKU since that's present on the raw item before
+// any catalog-part resolution — so the display column can move through
+// In Progress (sent) → Finish Order (all items ordered) → Order Arrived
+// (stock actually received) independently of the request's own status.
+const rfqProgress=(items,inquiries,supplierInvoices)=>{
+  const skus=[...new Set(items.map(i=>(i.sku||i.part_sku||"").toUpperCase()).filter(Boolean))];
+  if(skus.length===0) return "none";
+  // Latest inquiry per SKU
+  const bySkuInq={};
+  inquiries.forEach(inq=>{
+    const sk=(inq.part_sku||"").toUpperCase();
+    if(!skus.includes(sk)) return;
+    const prev=bySkuInq[sk];
+    if(!prev||new Date(inq.created_at||0)>new Date(prev.created_at||0)) bySkuInq[sk]=inq;
+  });
+  const matched=Object.values(bySkuInq);
+  if(matched.length===0) return "none";
+  const allOrdered=skus.every(sk=>bySkuInq[sk]?.status==="ordered");
+  if(!allOrdered) return "partial";
+  // acceptInquiry stamps the created invoice's notes with "From RFQ <id>" —
+  // that's the only link back from an inquiry to the PO it created.
+  const allArrived=matched.every(inq=>
+    supplierInvoices.find(iv=>iv.notes===`From RFQ ${inq.id}`)?.stocked_in
+  );
+  return allArrived?"arrived":"ordered";
+};
+
+// How many of this request's items already have a supplier price recorded
+// (manual entry or a real reply), regardless of whether it's been ordered yet.
+const quoteSummary=(items,inquiries)=>{
+  const skus=[...new Set(items.map(i=>(i.sku||i.part_sku||"").toUpperCase()).filter(Boolean))];
+  if(skus.length===0) return {quoted:0,total:0};
+  const quoted=skus.filter(sk=>inquiries.some(inq=>(inq.part_sku||"").toUpperCase()===sk&&inq.reply_price!=null)).length;
+  return {quoted,total:skus.length};
+};
+
 const TYPE_META={
   ws:      {icon:"🏪",label:"Parts Request"},
   transfer:{icon:"🔄",label:"Stock Transfer"},
@@ -27,21 +68,23 @@ const TYPE_META={
   part:    {icon:"📬",label:"Catalog Part Request"},
 };
 
-function normalize(row,type,branches,parts){
+function normalize(row,type,branches,parts,inquiries=[],supplierInvoices=[]){
   const branchName=id=>branches.find(b=>b.id===id)?.name||"Unknown Branch";
-  let title,subtitle,photoUrl="";
+  let title,subtitle,photoUrl="",rfqItems=[];
   if(type==="ws"){
     title=row.workshop_name||row.requester_name||"Workshop";
     const reqItems=(()=>{try{return JSON.parse(row.items||"[]");}catch{return [];}})();
     subtitle=[row.job_car,row.job_complaint].filter(Boolean).join(" · ")||`${reqItems.length} part${reqItems.length!==1?"s":""}`;
     const firstWithPhoto=reqItems.find(i=>i.photo_url);
     photoUrl=firstWithPhoto?.photo_url||"";
+    rfqItems=reqItems;
   }else if(type==="transfer"){
     const items=Array.isArray(row.items)?row.items:[];
     title=row.workshop_name||branchName(row.requesting_branch_id);
     subtitle=`${items.length} item${items.length!==1?"s":""} → ${branchName(row.supplying_branch_id)}`;
     const firstItemPart=items.find(i=>i.partId)?.partId ? parts.find(p=>String(p.id)===String(items.find(i=>i.partId).partId)) : null;
     photoUrl=partPhotoUrl(firstItemPart);
+    rfqItems=items;
   }else if(type==="vehicle"){
     title=`${row.make} ${row.model}`;
     subtitle=branchName(row.branch_id);
@@ -51,7 +94,15 @@ function normalize(row,type,branches,parts){
     subtitle=branchName(row.branch_id);
     photoUrl=row.image_url||"";
   }
-  return {id:`${type}_${row.id}`,rawId:row.id,type,title,subtitle,photoUrl,status:row.status,kanbanColumn:mapToColumn(type,row.status),createdAt:row.created_at,raw:row};
+  let kanbanColumn=mapToColumn(type,row.status);
+  if(kanbanColumn==="new"){
+    const progress=rfqProgress(rfqItems,inquiries,supplierInvoices);
+    if(progress==="partial") kanbanColumn="inprogress";
+    else if(progress==="ordered") kanbanColumn="finishorder";
+    else if(progress==="arrived") kanbanColumn="arrived";
+  }
+  const {quoted,total}=quoteSummary(rfqItems,inquiries);
+  return {id:`${type}_${row.id}`,rawId:row.id,type,title,subtitle,photoUrl,status:row.status,kanbanColumn,createdAt:row.created_at,quotedCount:quoted,totalItems:total,raw:row};
 }
 
 const RequestCard=({card,onClick})=>{
@@ -71,6 +122,11 @@ const RequestCard=({card,onClick})=>{
           </div>
           <div style={{fontWeight:700,fontSize:13,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{card.title}</div>
           {card.subtitle&&<div style={{fontSize:11,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{card.subtitle}</div>}
+          {card.totalItems>0&&(
+            <div style={{fontSize:10,fontWeight:700,marginTop:4,color:card.quotedCount===card.totalItems?"var(--green)":card.quotedCount>0?"var(--orange)":"var(--text3)"}}>
+              💬 {card.quotedCount}/{card.totalItems} quoted
+            </div>
+          )}
         </div>
       </div>
       {lightbox&&<div onClick={e=>e.stopPropagation()}><ImgLightbox url={toImgUrl(card.photoUrl)} onClose={()=>setLightbox(false)}/></div>}
@@ -80,10 +136,10 @@ const RequestCard=({card,onClick})=>{
 
 export function RequestsKanbanPage({
   wsShopRequests=[],branchStockRequests=[],vehicleRequests=[],partRequests=[],
-  branches=[],parts=[],vehicles=[],suppliers=[],partSuppliers=[],settings={},branchStock=[],
+  branches=[],parts=[],vehicles=[],suppliers=[],partSuppliers=[],inquiries=[],supplierInvoices=[],settings={},branchStock=[],
   user,role,currentBranch,t={},
   onReply,onEscalate,onMainReply,onDeleteWsShop,onDeleteTransfer,
-  onApproveVehicle,onGoToVehicles,onSendInquiry,onEditPart,onRefresh,
+  onApproveVehicle,onGoToVehicles,onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,onRefresh,
 }) {
   const [activeTypes,setActiveTypes]=useState(()=>new Set(["ws","transfer","vehicle","part"]));
   const [openCardId,setOpenCardId]=useState(null); // id of the card currently shown in the detail Overlay
@@ -93,11 +149,11 @@ export function RequestsKanbanPage({
   // Unfiltered — so the open detail Overlay always re-derives from live data (not a stale snapshot),
   // and stays resolvable even if the user toggles a filter chip while it's open.
   const allCards=useMemo(()=>[
-    ...wsShopRequests.map(r=>normalize(r,"ws",branches,parts)),
-    ...branchStockRequests.map(r=>normalize(r,"transfer",branches,parts)),
-    ...vehicleRequests.map(r=>normalize(r,"vehicle",branches,parts)),
-    ...partRequests.map(r=>normalize(r,"part",branches,parts)),
-  ],[wsShopRequests,branchStockRequests,vehicleRequests,partRequests,branches,parts]);
+    ...wsShopRequests.map(r=>normalize(r,"ws",branches,parts,inquiries,supplierInvoices)),
+    ...branchStockRequests.map(r=>normalize(r,"transfer",branches,parts,inquiries,supplierInvoices)),
+    ...vehicleRequests.map(r=>normalize(r,"vehicle",branches,parts,inquiries,supplierInvoices)),
+    ...partRequests.map(r=>normalize(r,"part",branches,parts,inquiries,supplierInvoices)),
+  ],[wsShopRequests,branchStockRequests,vehicleRequests,partRequests,branches,parts,inquiries,supplierInvoices]);
 
   const cards=useMemo(()=>
     allCards.filter(c=>activeTypes.has(c.type)).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)),
@@ -125,7 +181,7 @@ export function RequestsKanbanPage({
               🗑️ Delete
             </button>
           )}/>
-        <WsShopRequestDetail req={raw} parts={parts} settings={settings} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t}
+        <WsShopRequestDetail req={raw} parts={parts} settings={settings} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t}
           onReply={async(...a)=>{await onReply(...a);closeDetail();}}
           onEscalate={onEscalate} onMainReply={onMainReply}
           userRole={role} userBranchId={user?.branch_id||null}/>
@@ -135,7 +191,7 @@ export function RequestsKanbanPage({
       <Overlay onClose={closeDetail} wide>
         <MHead title="🔄 Branch Transfer Request" sub={raw.workshop_name||"Request"} onClose={closeDetail}/>
         <TransferRequestCard r={raw} branches={branches} role={role} currentBranch={currentBranch}
-          settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t}
+          settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t}
           onRefresh={onRefresh} onDelete={onDeleteTransfer}/>
       </Overlay>
     );
@@ -149,7 +205,7 @@ export function RequestsKanbanPage({
     return(
       <Overlay onClose={closeDetail}>
         <MHead title="📬 Catalog Part Request" sub={raw.name} onClose={closeDetail}/>
-        <PartRequestCard r={raw} isAdmin={isAdmin} branches={branches} parts={parts} user={user} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={onSendInquiry} onEditPart={onEditPart} t={t} onRefresh={onRefresh}/>
+        <PartRequestCard r={raw} isAdmin={isAdmin} branches={branches} parts={parts} user={user} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t} onRefresh={onRefresh}/>
       </Overlay>
     );
   };

@@ -263,6 +263,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [toast,setToast]=useState(null);
   const [busyMsg,setBusyMsg]=useState(null); // full-screen blocking spinner
   const [lightbox,setLightbox]=useState(null);
+  const [poConfirmRemark,setPoConfirmRemark]=useState("");
   const [drawerOpen,setDrawerOpen]=useState(false);
   const [crossBranchSearch,setCrossBranchSearch]=useState("");
   const [showCrossBranch,setShowCrossBranch]=useState(false);
@@ -723,7 +724,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setPartSuppliers(Array.isArray(data)?data:[]);
   },[]);
   useEffect(()=>{
-    if(tab==="inventory"||tab==="suppliers"||tab==="pos") loadPartSuppliers();
+    // Also load on the request pages that offer "Ask Suppliers" — otherwise the
+    // matched-supplier badge/filter in that modal has nothing to match against.
+    if(["inventory","suppliers","pos","partRequests","transferRequests","wsShopRequests","requestsKanban"].includes(tab)) loadPartSuppliers();
   },[tab,loadPartSuppliers]);
 
   // Scoped load — always runs fresh (bypassing the SWR cache) whenever the Edit Part modal
@@ -2094,59 +2097,108 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     showToast("Merged & deleted!");
   };
 
-  // Inquiries
-  const sendInquiry=async(data)=>{
-    const token=makeToken();
-    // Only save columns that exist in inquiries table — strip unknown fields
-    const {
-      part_id, part_name, part_sku,
-      part_oe_number, part_make, part_model, part_year,
-      supplier_id, supplier_name, supplier_email, supplier_phone,
-      qty_requested, message,
-      // known_supplier_part_no is NOT a DB column — used only for message building
-    } = data;
-    const record = {
-      id:makeId("INQ"),
-      rfq_token:token,
-      created_by:user.name||user.username,
-      status:"pending",
-      ...(_bId?{branch_id:_bId}:{}),
-      part_id, part_name, part_sku,
-      part_oe_number:part_oe_number||"",
-      part_make:part_make||"",
-      part_model:part_model||"",
-      part_year:part_year||"",
-      supplier_id, supplier_name,
-      supplier_email:supplier_email||"",
-      supplier_phone:supplier_phone||"",
-      qty_requested, message,
-    };
-    const res = await api.upsert("inquiries", record);
-    if(!Array.isArray(res) && res?.code) {
-      showToast(`Error: ${res.message||res.code}`, "err");
-      return;
+  // Inquiries — accepts one supplier's data or an array (batch send to multiple
+  // suppliers at once). Creates an inquiries row per supplier, then opens a
+  // one-by-one WhatsApp/email send queue so every selected supplier actually
+  // gets stepped through instead of only the last one in the batch.
+  const sendInquiry=async(dataOrList)=>{
+    const list=Array.isArray(dataOrList)?dataOrList:[dataOrList];
+    const queue=[];
+    for(const data of list){
+      const token=makeToken();
+      // Only save columns that exist in inquiries table — strip unknown fields
+      const {
+        part_id, part_name, part_sku,
+        part_oe_number, part_make, part_model, part_year,
+        supplier_id, supplier_name, supplier_email, supplier_phone,
+        qty_requested, message,
+        // known_supplier_part_no is NOT a DB column — used only for message building
+      } = data;
+      const record = {
+        id:makeId("INQ"),
+        rfq_token:token,
+        created_by:user.name||user.username,
+        status:"pending",
+        ...(_bId?{branch_id:_bId}:{}),
+        part_id, part_name, part_sku,
+        part_oe_number:part_oe_number||"",
+        part_make:part_make||"",
+        part_model:part_model||"",
+        part_year:part_year||"",
+        supplier_id, supplier_name,
+        supplier_email:supplier_email||"",
+        supplier_phone:supplier_phone||"",
+        qty_requested, message,
+      };
+      const res = await api.upsert("inquiries", record);
+      if(!Array.isArray(res) && res?.code) {
+        showToast(`Error sending to ${supplier_name}: ${res.message||res.code}`, "err");
+        continue;
+      }
+      queue.push({...data, token});
     }
-    await refreshTables("inquiries");closeM("inquiry");openM("rfqSend",{...data,token});
+    await refreshTables("inquiries");closeM("inquiry");
+    if(queue.length>0) openM("rfqSend",{queue,index:0});
   };
   const updateInquiry=async(id,data)=>{await api.patch("inquiries","id",id,data);await refreshTables("inquiries");showToast("Updated");};
+
+  // Record a supplier's quote directly (e.g. after a phone call) without going
+  // through the WhatsApp/email RFQ round-trip. Updates the existing inquiry if
+  // one's already open for this supplier+part, otherwise creates one pre-filled
+  // as already replied.
+  const saveManualQuote=async({part,supplier,qty,price,stock,notes,supplierPartNo,existingId})=>{
+    const replyFields={
+      reply_price:price!==""?+price:null,
+      reply_stock:stock!==""?+stock:null,
+      reply_notes:notes||"",
+      supplier_part_no:supplierPartNo||"",
+      status:"replied",
+      replied_at:new Date().toISOString(),
+    };
+    if(existingId){
+      await api.patch("inquiries","id",existingId,replyFields);
+      await refreshTables("inquiries");
+      showToast("Quote updated");
+      return;
+    }
+    const record={
+      id:makeId("INQ"),
+      rfq_token:makeToken(),
+      created_by:user.name||user.username,
+      ...(_bId?{branch_id:_bId}:{}),
+      part_id:part.id, part_name:part.name, part_sku:part.sku,
+      part_oe_number:part.oe_number||"", part_make:part.make||"",
+      part_model:part.model||"", part_year:part.year_range||"",
+      supplier_id:supplier.id, supplier_name:supplier.name,
+      supplier_email:supplier.email||"", supplier_phone:supplier.phone||"",
+      qty_requested:qty||1, message:"(Manually recorded — no RFQ sent)",
+      ...replyFields,
+    };
+    const res=await api.upsert("inquiries",record);
+    if(!Array.isArray(res)&&res?.code){ showToast(`Error: ${res.message||res.code}`,"err"); return; }
+    await refreshTables("inquiries");
+    showToast("Quote saved");
+  };
 
   const acceptInquiry=async(inq)=>{
     if(!inq.reply_price) return;
     const invId=makeId(settings.invoice_prefix||"INV");
     const lineItem={
-      id:makeId("LI"), invoice_id:invId,
-      part_id:inq.part_id||"", part_name:inq.part_name||"",
+      invoice_id:invId,
+      part_id:inq.part_id?+inq.part_id:null, part_name:inq.part_name||"",
       part_sku:inq.part_sku||"", supplier_part_id:inq.supplier_part_no||"",
-      qty:inq.qty_requested||1, unit_cost:+inq.reply_price||0,
-      total:(inq.qty_requested||1)*(+inq.reply_price||0)
+      qty:+inq.qty_requested||1, unit_cost:+inq.reply_price||0,
+      total:(+inq.qty_requested||1)*(+inq.reply_price||0)
     };
     const inv={
       id:invId, supplier_id:+inq.supplier_id||null, supplier_name:inq.supplier_name,
       invoice_date:today(), status:"unpaid",
       total:lineItem.total, notes:`From RFQ ${inq.id}`,...(_bId?{branch_id:_bId}:{})
     };
-    await api.insert("supplier_invoices",inv);
-    await api.insert("supplier_invoice_items",lineItem);
+    const invRes=await api.insert("supplier_invoices",inv);
+    if(!Array.isArray(invRes)&&invRes?.code){ showToast(`Error creating invoice: ${invRes.message||invRes.code}`,"err"); return; }
+    const itemRes=await api.insert("supplier_invoice_items",lineItem);
+    if(!Array.isArray(itemRes)&&itemRes?.code){ showToast(`Error creating invoice line: ${itemRes.message||itemRes.code}`,"err"); return; }
     // Update stock
     const part=parts.find(p=>String(p.id)===String(inq.part_id));
     if(part){
@@ -2157,7 +2209,35 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     await api.patch("inquiries","id",inq.id,{status:"ordered"});
     await refreshTables("inquiries","supplier_invoices","parts","inventory_logs");
     showToast(`✅ PO ${invId} created`);
-    setTab("purchaseInvoices");
+    // Let the user notify the supplier (WhatsApp/email) or just note that they
+    // phoned them — instead of yanking them away to the Purchase Invoices tab.
+    openM("poConfirm",{
+      invoiceId:invId, supplierName:inq.supplier_name,
+      supplierPhone:inq.supplier_phone||"", supplierEmail:inq.supplier_email||"",
+      partName:inq.part_name, partSku:inq.part_sku||"", supplierPartNo:inq.supplier_part_no||"",
+      qty:inq.qty_requested||1, price:inq.reply_price,
+    });
+  };
+
+  // Undo an accepted quote — deletes the PO it created (matched via the "From
+  // RFQ <id>" note acceptInquiry stamps on it), reverses the stock it added,
+  // and drops the inquiry back to "replied" so it's actionable again.
+  const cancelOrder=async(inq)=>{
+    if(!window.confirm(`Cancel the order for ${inq.qty_requested||1} × ${inq.part_name} from ${inq.supplier_name}?\n\nThis deletes the purchase invoice it created and reverses the stock added.`)) return;
+    const invs=await api.fresh("supplier_invoices",`notes=eq.${encodeURIComponent(`From RFQ ${inq.id}`)}&select=id`).catch(()=>[]);
+    for(const inv of (Array.isArray(invs)?invs:[])){
+      await api.delete("supplier_invoice_items","invoice_id",inv.id);
+      await api.delete("supplier_invoices","id",inv.id);
+    }
+    const part=parts.find(p=>String(p.id)===String(inq.part_id));
+    if(part){
+      const ns=Math.max(0,part.stock-(inq.qty_requested||1));
+      await api.patch("parts","id",part.id,{stock:ns});
+      await logInv(part,part.stock,ns,"Stock Out",`Cancelled PO — RFQ ${inq.id}`);
+    }
+    await api.patch("inquiries","id",inq.id,{status:"replied"});
+    await refreshTables("inquiries","supplier_invoices","parts","inventory_logs");
+    showToast("Purchase order cancelled","err");
   };
 
   // Customer Queries
@@ -5746,8 +5826,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             wsShopRequests={wsShopRequests}
             onSaveWsShopRequest={saveWsShopRequest}
             branches={branches}
-            onPlaceShopOrder={async({localItems,mainItems,requestItems,notes,linkedBranchId,mainBranchId})=>{
-              let localOid=null,bsrId=null,linkedBsrId=null;
+            onPlaceShopOrder={async({localItems,mainItems,requestItems,notes,linkedBranchId})=>{
+              let localOid=null,bsrId=null;
               try{
                 if(localItems?.length){
                   localOid=makeId("ORD");
@@ -5755,27 +5835,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                   const total=localItems.reduce((s,i)=>s+i.price*i.qty,0);
                   await api.upsert("orders",{id:localOid,customer_name:workshopProfile.name||"Workshop Order",customer_phone:workshopProfile.phone||"",customer_email:workshopProfile.email||"",date:todayStr,status:"Processing",items:localItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,price:i.price})),total,branch_id:linkedBranchId,workshop_source_id:wsId||null});
                 }
-                if(mainItems?.length){
+                // Head-office-only parts and out-of-stock parts both go to the workshop's
+                // own linked branch — that's who actually deals with this workshop, not
+                // whichever branch happens to be flagged "main". Combined into one request
+                // so a single checkout doesn't create two separate cards for the branch.
+                const stockItems=[...(mainItems||[]),...(requestItems||[])];
+                if(stockItems.length){
                   bsrId=makeId("BSR");
-                  const bsrPayload={id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:mainBranchId||null,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:mainItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:makeToken(),notes:notes||null};
+                  const bsrPayload={id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:linkedBranchId,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:stockItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:makeToken(),notes:notes||null};
                   const bsrRes=await api.upsert("branch_stock_requests",bsrPayload);
                   if(bsrRes?.code||bsrRes?.message) throw new Error(`DB error ${bsrRes.code||""}: ${bsrRes.message||JSON.stringify(bsrRes)}`);
                 }
-                if(requestItems?.length){
-                  // Out-of-stock parts from the linked branch — request goes TO the linked branch (not main)
-                  linkedBsrId=makeId("BSR");
-                  const linkedBsrPayload={id:linkedBsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:linkedBranchId,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:requestItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:makeToken(),notes:notes||null};
-                  const linkedBsrRes=await api.upsert("branch_stock_requests",linkedBsrPayload);
-                  if(linkedBsrRes?.code||linkedBsrRes?.message) throw new Error(`DB error ${linkedBsrRes.code||""}: ${linkedBsrRes.message||JSON.stringify(linkedBsrRes)}`);
-                }
                 await refreshTables("orders","branch_stock_requests");
-                const parts=[localOid&&"✅ Order placed",bsrId&&"📋 Main branch request sent",linkedBsrId&&"📦 Branch stock request sent"].filter(Boolean);
+                const parts=[localOid&&"✅ Order placed",bsrId&&"📦 Branch stock request sent"].filter(Boolean);
                 showToast(parts.join(" · ")||"Nothing to process");
               }catch(err){
                 showToast(`❌ Error: ${err?.message||"save failed"}`, "err");
                 console.error("onPlaceShopOrder error",err);
               }
-              return {localOid,bsrId:bsrId||linkedBsrId};
+              return {localOid,bsrId};
             }}
             wsLocked={role==="workshop"&&!!subStatus?.expired}
             wsDaysLeft={role==="workshop"?(subStatus?.daysLeft??sub?.daysLeft??null):null}
@@ -5819,26 +5897,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {tab==="partRequests"&&(role==="admin"||role==="branch_admin")&&(
-          <PartRequestsPage partRequests={partRequests} branches={branches} parts={parts} user={user} role={role} currentBranch={currentBranch} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={sendInquiry} onEditPart={openPartEditor} onRefresh={()=>refreshTables("part_requests")} t={t}/>
+          <PartRequestsPage partRequests={partRequests} branches={branches} parts={parts} user={user} role={role} currentBranch={currentBranch} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor} onRefresh={()=>refreshTables("part_requests")} t={t}/>
         )}
 
         {tab==="transferRequests"&&(role==="admin"||role==="branch_admin")&&(
-          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={sendInquiry} onEditPart={openPartEditor} t={t} onRefresh={()=>refreshTables("branch_stock_requests")} onDelete={deleteBranchStockRequest}/>
+          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor} t={t} onRefresh={()=>refreshTables("branch_stock_requests")} onDelete={deleteBranchStockRequest}/>
         )}
 
         {tab==="wsShopRequests"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
-          <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} suppliers={suppliers} partSuppliers={partSuppliers} onSendInquiry={sendInquiry} onEditPart={openPartEditor} t={t} onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest} onDelete={deleteWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
+          <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor} t={t} onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest} onDelete={deleteWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
         )}
 
         {tab==="requestsKanban"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
           <RequestsKanbanPage
             wsShopRequests={wsShopRequests} branchStockRequests={branchStockRequests}
             vehicleRequests={vehicleRequests} partRequests={partRequests}
-            branches={branches} parts={parts} vehicles={vehicles} suppliers={suppliers} partSuppliers={partSuppliers}
+            branches={branches} parts={parts} vehicles={vehicles} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} supplierInvoices={supplierInvoices}
             settings={settings} branchStock={branchStock} user={user} role={role} currentBranch={currentBranch} t={t}
             onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest}
             onDeleteWsShop={deleteWsShopRequest} onDeleteTransfer={deleteBranchStockRequest}
-            onApproveVehicle={saveVehicle} onSendInquiry={sendInquiry} onEditPart={openPartEditor}
+            onApproveVehicle={saveVehicle} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor}
             onGoToVehicles={(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}}
             onRefresh={()=>refreshTables("ws_shop_requests","branch_stock_requests","vehicle_requests","part_requests")}/>
         )}
@@ -6115,7 +6193,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         const idx=ep?.id?sortedBySku.findIndex(p=>p.id===ep.id):-1;
         const prevPart=idx>0?sortedBySku[idx-1]:null;
         const nextPart=idx>=0&&idx<sortedBySku.length-1?sortedBySku[idx+1]:null;
-        return isOpen("editPart")&&<PartModal
+        // Edit Part can be opened from inside other modals (Send RFQ, invoice line
+        // items, etc). All modals share the same overlay z-index, so DOM order
+        // decides who's on top — pin this one above the rest so it's never hidden
+        // behind whichever modal launched it.
+        return isOpen("editPart")&&<div style={{position:"fixed",inset:0,zIndex:250}}><PartModal
           part={ep?._initialF ? null : ep}
           initialTab={ep?._tab}
           initialFitSearch={ep?._fitSearch||""}
@@ -6169,7 +6251,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           }:null}
           onGoBack={returnToCatalogue?()=>{const {sup,catalogueState}=returnToCatalogue;setReturnToCatalogue(null);setPendingCatalogueLink(null);setNewPartInitialF(null);closeM("editPart");openM("supplierCatalogue",{...sup,_page:catalogueState?.page,_search:catalogueState?.search});}:null}
           onClose={()=>{const cur=mData("editPart");if(cur?.id)releaseLock("part",cur.id);if(returnToCatalogue){const {sup,catalogueState}=returnToCatalogue;setReturnToCatalogue(null);setPendingCatalogueLink(null);setNewPartInitialF(null);closeM("editPart");openM("supplierCatalogue",{...sup,_page:catalogueState?.page,_search:catalogueState?.search});}else{setReturnToCatalogue(null);closeM("editPart");}}}
-          t={t}/>;
+          t={t}/></div>;
       })()}
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}
       {isOpen("partRequest")&&<PartRequestModal currentBranch={currentBranch} user={user} onClose={()=>closeM("partRequest")} onSave={async()=>{await refreshTables("part_requests");closeM("partRequest");showToast("Part request submitted ✅");}} t={t}/>}
@@ -6196,12 +6278,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         }}
         onClose={()=>closeM("supplierCatalogue")}/>}
       {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} vehicles={vehicles} partFitments={partFitments} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} onEditPart={(p,tab)=>{closeM("partSupplier");openM("editPart",{...p,_tab:tab||"info"});}} onMergePart={mergePart} branches={branches} allParts={parts} onGoToMainPart={(targetPart)=>{closeM("partSupplier");setTimeout(()=>{setTab("inventory");setFilterBranch("__all__");setSearchPart(targetPart.sku||"");},0);}} onAddSupplier={()=>openM("editSupplier")} onEditSupplier={(s)=>openM("editSupplier",s)} t={t}/>}
-      {isOpen("inquiry")&&<InquiryModal part={mData("inquiry")} suppliers={suppliers} partSuppliers={getPartSupps(mData("inquiry")?.id)} onSend={sendInquiry} onClose={()=>closeM("inquiry")} t={t} isAdmin={role==="admin"} onEditPart={openPartEditor}/>}
+      {isOpen("inquiry")&&<InquiryModal part={mData("inquiry")} suppliers={suppliers} partSuppliers={getPartSupps(mData("inquiry")?.id)} inquiries={inquiries} onSend={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onClose={()=>closeM("inquiry")} t={t} isAdmin={role==="admin"} onEditPart={openPartEditor}/>}
       {isOpen("inquiryDetail")&&<InquiryDetailModal inquiry={mData("inquiryDetail")} onUpdate={updateInquiry} onAccept={async(inq)=>{closeM("inquiryDetail");await acceptInquiry(inq);}} onClose={()=>closeM("inquiryDetail")} settings={settings} t={t}/>}
       {isOpen("editCustomer")&&<CustomerModal customer={mData("editCustomer")} onSave={saveCustomer} onClose={()=>closeM("editCustomer")} t={t}/>}
       {isOpen("editUser")&&<UserModal user={mData("editUser")} onSave={saveUser} onClose={()=>closeM("editUser")} t={t}/>}
       {isOpen("custHistory")&&<CustHistoryModal customer={mData("custHistory")} orders={orders.filter(o=>o.customer_phone===mData("custHistory")?.phone)} onClose={()=>closeM("custHistory")}/>}
-      {isOpen("supplierInvoice")&&<SupplierInvoiceModal data={mData("supplierInvoice")} suppliers={suppliers} parts={parts} onSave={saveSupplierInvoice} onDelete={deleteSupplierInvoice} onStockIn={stockInInvoice} onClose={()=>closeM("supplierInvoice")} t={t} settings={invoiceSettings} role={role} branchId={branchId} branchStock={branchStock}/>}
+      {isOpen("supplierInvoice")&&<SupplierInvoiceModal data={mData("supplierInvoice")} suppliers={suppliers} parts={parts} onSave={saveSupplierInvoice} onDelete={deleteSupplierInvoice} onStockIn={stockInInvoice} onEditPart={openPartEditor} onClose={()=>closeM("supplierInvoice")} t={t} settings={invoiceSettings} role={role} branchId={branchId} branchStock={branchStock}/>}
       {isOpen("viewSupplierInvoice")&&<ViewSupplierInvoiceModal inv={mData("viewSupplierInvoice")} onClose={()=>closeM("viewSupplierInvoice")} settings={invoiceSettings}/>}
       {isOpen("printPartLabel")&&<PrintPartLabelModal part={mData("printPartLabel")} settings={{...settings,...(currentBranch||{})}} onClose={()=>closeM("printPartLabel")}/>}
       {isOpen("printShelfLabel")&&<PrintShelfLabelModal settings={{...settings,...(currentBranch||{})}} onClose={()=>closeM("printShelfLabel")}/>}
@@ -6290,16 +6372,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         );
       })()}
 
-      {/* RFQ SEND */}
+      {/* RFQ SEND — steps through the selected suppliers one at a time so each
+          one actually gets a WhatsApp/email send action instead of only the
+          last supplier in a multi-select batch being shown. */}
       {isOpen("rfqSend")&&(()=>{
         const d=mData("rfqSend")||{};
-        const {part_name,part_sku,supplier_name,supplier_email,supplier_phone,qty_requested,token,message}=d;
+        const queue=d.queue||[];
+        const index=d.index||0;
+        const cur=queue[index]||{};
+        const {part_name,part_sku,supplier_name,supplier_email,supplier_phone,qty_requested,token,message}=cur;
         const replyUrl=`${window.location.origin}${window.location.pathname}?rfq=${token}`;
         const waMsg=`${message||`RFQ for ${part_name} (${part_sku}) - Qty: ${qty_requested}`}\n\n📎 Submit quote here (no login needed):\n${replyUrl}`;
+        const isLast=index>=queue.length-1;
+        const advance=()=>{ if(isLast) closeM("rfqSend"); else openM("rfqSend",{queue,index:index+1}); };
         return (
           <div className="overlay" onClick={()=>closeM("rfqSend")}>
             <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:440}}>
-              <MHead title={`📩 Send RFQ to ${supplier_name}`} onClose={()=>closeM("rfqSend")}/>
+              <MHead title={`📩 Send RFQ to ${supplier_name}`}
+                sub={queue.length>1?`Supplier ${index+1} of ${queue.length}`:undefined}
+                onClose={()=>closeM("rfqSend")}/>
               <div style={{background:"var(--surface2)",borderRadius:10,padding:13,marginBottom:15,border:"1px solid var(--border)"}}>
                 <FL label="Supplier Reply Link (no login needed)"/>
                 <div style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--accent)",wordBreak:"break-all",lineHeight:1.6}}>{replyUrl}</div>
@@ -6311,8 +6402,55 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               <div style={{display:"flex",flexDirection:"column",gap:9}}>
                 {supplier_phone?<a href={waLink(supplier_phone,waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-primary" style={{width:"100%",background:"#25D366",padding:13,fontSize:15}}>📲 Send via WhatsApp</button></a>:<p style={{fontSize:12,color:"var(--text3)",textAlign:"center"}}>💡 Add supplier phone to enable WhatsApp</p>}
                 {supplier_email?<a href={mailLink(supplier_email,`RFQ - ${part_name} (${part_sku})`,waMsg)} style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{width:"100%",padding:13}}>✉ Send via Email</button></a>:<p style={{fontSize:12,color:"var(--text3)",textAlign:"center"}}>💡 Add supplier email to enable Email</p>}
-                <button className="btn btn-ghost" style={{fontSize:13}} onClick={()=>closeM("rfqSend")}>Done</button>
+                <button className="btn btn-primary" style={{fontSize:14}} onClick={advance}>
+                  {isLast?"✅ Finish":`Next Supplier (${index+2}/${queue.length}) →`}
+                </button>
               </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* PO CONFIRM — after accepting a quote and creating the Purchase Invoice,
+          let the user notify the supplier (WhatsApp/email) or just log that they
+          phoned them, instead of being yanked straight to the invoices tab. */}
+      {isOpen("poConfirm")&&(()=>{
+        const d=mData("poConfirm")||{};
+        const {invoiceId,supplierName,supplierPhone,supplierEmail,partName,partSku,supplierPartNo,qty,price}=d;
+        const poMsg=`Hi ${supplierName||"there"}, confirming our order:\n\n`
+          +`${partName}${partSku?` (Our SKU: ${partSku})`:""}\n`
+          +`${supplierPartNo?`Supplier code: ${supplierPartNo}\n`:""}`
+          +`PRICE @ ${fmtAmt(price)}\nQTY NEED X ${qty}\n\n`
+          +`PO Ref: ${invoiceId}\n\nThank you!`;
+        const saveRemark=async()=>{
+          await api.patch("supplier_invoices","id",invoiceId,{notes:poConfirmRemark});
+          await refreshTables("supplier_invoices");
+          showToast("Remark saved");
+        };
+        return (
+          <div className="overlay" onClick={()=>{closeM("poConfirm");setPoConfirmRemark("");}}>
+            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:440}}>
+              <MHead title="✅ Purchase Order Created" sub={invoiceId} onClose={()=>{closeM("poConfirm");setPoConfirmRemark("");}}/>
+              <div style={{background:"var(--surface2)",borderRadius:10,padding:13,marginBottom:15,border:"1px solid var(--border)",fontSize:13}}>
+                <strong>{partName}</strong>{partSku&&<span style={{color:"var(--text3)"}}> (Our SKU: {partSku})</span>}
+                {supplierPartNo&&<div style={{marginTop:4,fontFamily:"DM Mono,monospace",color:"var(--green)",fontWeight:700}}>Supplier code: {supplierPartNo}</div>}
+                <div style={{marginTop:4}}>PRICE @ {fmtAmt(price)} &nbsp;·&nbsp; QTY NEED X {qty}</div>
+                <div style={{marginTop:3,color:"var(--text3)"}}>from <strong style={{color:"var(--text)"}}>{supplierName}</strong></div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:15}}>
+                <p style={{fontSize:12,color:"var(--text3)",margin:0,fontWeight:600}}>📬 Let the supplier know:</p>
+                {supplierPhone?<a href={waLink(supplierPhone,poMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-primary" style={{width:"100%",background:"#25D366",padding:12,fontSize:14}}>📲 Send via WhatsApp</button></a>:<p style={{fontSize:12,color:"var(--text3)",textAlign:"center"}}>💡 No phone on file</p>}
+                {supplierEmail?<a href={mailLink(supplierEmail,`Order Confirmation - ${invoiceId}`,poMsg)} style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{width:"100%",padding:12,fontSize:14}}>✉ Send via Email</button></a>:<p style={{fontSize:12,color:"var(--text3)",textAlign:"center"}}>💡 No email on file</p>}
+              </div>
+              <FD>
+                <FL label="Or just note how it was placed — e.g. phoned the supplier"/>
+                <textarea className="inp" value={poConfirmRemark} onChange={e=>setPoConfirmRemark(e.target.value)} placeholder="e.g. Phoned CATO 08:30, confirmed 7 day lead time" style={{minHeight:60}}/>
+              </FD>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{closeM("poConfirm");setPoConfirmRemark("");}}>Done</button>
+                <button className="btn btn-primary" style={{flex:1}} onClick={async()=>{await saveRemark();closeM("poConfirm");setPoConfirmRemark("");}}>💾 Save Remark</button>
+              </div>
+              <button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:8}} onClick={()=>{closeM("poConfirm");setPoConfirmRemark("");setTab("purchaseInvoices");}}>View Purchase Invoices →</button>
             </div>
           </div>
         );

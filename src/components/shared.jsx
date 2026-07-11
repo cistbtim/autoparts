@@ -300,6 +300,39 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
   );
 }
 
+// Module-level pane so its identity is stable across CompareLightbox re-renders —
+// defining it inline made React remount it (and restart the image load, showing an
+// endless spinner) every time the parent re-rendered, e.g. on the 30s auto-refresh.
+function ComparePane({title, src}) {
+  // Drive thumbnails can be slow/rate-limited — fall back to smaller sizes on error
+  const sizes = (() => {
+    const m = (src||"").match(/thumbnail[?]id=([^&]+)/);
+    if(m) return [
+      `https://drive.google.com/thumbnail?id=${m[1]}&sz=w800`,
+      `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`,
+      `https://drive.google.com/thumbnail?id=${m[1]}&sz=w200`,
+    ];
+    return src ? [src] : [];
+  })();
+  const [tryIdx, setTryIdx] = useState(0);
+  const [status, setStatus] = useState(src?"loading":"empty");
+  useEffect(()=>{ setTryIdx(0); setStatus(src?"loading":"empty"); },[src]);
+  const attempt = sizes[Math.min(tryIdx,sizes.length-1)]||"";
+  return (
+    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minWidth:0,padding:"8px 4px"}}>
+      <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8,textAlign:"center"}}>{title}</div>
+      {status==="empty"&&<div style={{color:"rgba(255,255,255,.4)",fontSize:13}}>No photo</div>}
+      {status==="loading"&&<div style={{width:32,height:32,border:"3px solid rgba(255,255,255,.2)",borderTop:"3px solid #fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>}
+      {status==="error"&&<div style={{color:"rgba(255,255,255,.5)",fontSize:12}}>Failed to load</div>}
+      {attempt&&<img key={attempt} src={attempt} alt={title} referrerPolicy="no-referrer"
+        style={{maxWidth:"100%",maxHeight:"58vh",objectFit:"contain",display:status==="ok"?"block":"none",borderRadius:8}}
+        onLoad={()=>setStatus("ok")}
+        onError={()=>{ if(tryIdx<sizes.length-1) setTryIdx(i=>i+1); else setStatus("error"); }}
+        onClick={e=>e.stopPropagation()}/>}
+    </div>
+  );
+}
+
 // Side-by-side two-photo comparison viewer (e.g. job car vs. catalog vehicle),
 // with shared prev/next navigation across a common set of labels (Front/Rear/Side).
 export function CompareLightbox({left, right, labels, startIdx=0, onClose}) {
@@ -323,31 +356,14 @@ export function CompareLightbox({left, right, labels, startIdx=0, onClose}) {
     alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:22,
     zIndex:100000};
 
-  const Pane = ({side}) => {
-    const src = side.photos.find(p=>p.label===labels[idx])?.src || "";
-    const [status, setStatus] = useState(src?"loading":"empty");
-    useEffect(()=>{ setStatus(src?"loading":"empty"); },[src]);
-    return (
-      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minWidth:0,padding:"8px 4px"}}>
-        <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8,textAlign:"center"}}>{side.title}</div>
-        {status==="empty"&&<div style={{color:"rgba(255,255,255,.4)",fontSize:13}}>No photo</div>}
-        {status==="loading"&&<div style={{width:32,height:32,border:"3px solid rgba(255,255,255,.2)",borderTop:"3px solid #fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>}
-        {status==="error"&&<div style={{color:"rgba(255,255,255,.5)",fontSize:12}}>Failed to load</div>}
-        {src&&<img key={src} src={src} alt={side.title} referrerPolicy="no-referrer"
-          style={{maxWidth:"100%",maxHeight:"58vh",objectFit:"contain",display:status==="ok"?"block":"none",borderRadius:8}}
-          onLoad={()=>setStatus("ok")} onError={()=>setStatus("error")} onClick={e=>e.stopPropagation()}/>}
-      </div>
-    );
-  };
-
   return (
     <div onClick={onClose} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
       style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.96)",
         zIndex:99999,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{display:"flex",width:"100%",maxWidth:960,alignItems:"stretch"}} onClick={e=>e.stopPropagation()}>
-        <Pane side={left}/>
+        <ComparePane title={left.title} src={left.photos.find(p=>p.label===labels[idx])?.src||""}/>
         <div style={{width:1,background:"rgba(255,255,255,.2)"}}/>
-        <Pane side={right}/>
+        <ComparePane title={right.title} src={right.photos.find(p=>p.label===labels[idx])?.src||""}/>
       </div>
 
       {n>1&&idx>0&&<div style={{...btnStyle,left:14}} onClick={e=>{e.stopPropagation();setIdx(idx-1);}}>‹</div>}

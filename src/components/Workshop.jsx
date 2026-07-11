@@ -2154,6 +2154,10 @@ const CHECKLIST_ITEMS=[
   {key:"lights_front", label:"Front Lights",          icon:"💡"},
   {key:"lights_rear",  label:"Rear Lights",           icon:"🔴"},
   {key:"tyres",        label:"Tyres Condition",       icon:"⚫"},
+  {key:"brakes_front", label:"Front Brakes",          icon:"🛑"},
+  {key:"brakes_rear",  label:"Rear Brakes",           icon:"🟥"},
+  {key:"engine",       label:"Engine Check",          icon:"⚙️"},
+  {key:"coolant",      label:"Coolant Level",         icon:"💧"},
   {key:"spare_wheel",  label:"Spare Wheel",           icon:"🛞"},
   {key:"fuel_level",   label:"Fuel Level",            icon:"⛽"},
   {key:"interior",     label:"Interior Condition",    icon:"💺"},
@@ -3620,7 +3624,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : "#";
   };
   const [editJob,      setEditJob]      = useState(false);
-  const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
+  const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour' | 'combo'
+  // Privacy mode — hide cost prices & markup while a customer is watching the screen
+  const [hideCosts,    setHideCosts]    = useState(()=>{try{return localStorage.getItem("ws_hide_costs")==="1";}catch{return false;}});
+  const toggleHideCosts=()=>setHideCosts(v=>{const n=!v;try{localStorage.setItem("ws_hide_costs",n?"1":"0");}catch{/* private mode */}return n;});
   const [creatingInv,  setCreatingInv]  = useState(false);
   const [editingInv,   setEditingInv]   = useState(false);
   const [deletingInv,  setDeletingInv]  = useState(false);
@@ -5652,6 +5659,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("part")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtPart}</button>}
               {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("labour")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtLabour}</button>}
               {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("combo")} style={{background:"rgba(251,191,36,.25)",color:"#fff",border:"1px solid rgba(251,191,36,.5)",borderRadius:8,fontWeight:700,fontSize:12}}>⚡ {t.wsqtCombo||"Combo"}</button>}
+              <button className="btn btn-sm" onClick={toggleHideCosts}
+                title={hideCosts?"Costs & markup hidden — click to show":"Hide costs & markup (customer mode)"}
+                style={{background:hideCosts?"rgba(248,113,113,.3)":"rgba(255,255,255,.15)",color:"#fff",border:`1px solid ${hideCosts?"rgba(248,113,113,.6)":"rgba(255,255,255,.3)"}`,borderRadius:8,fontWeight:700,fontSize:12}}>
+                {hideCosts?"🙈":"👁"}
+              </button>
             </div>
           </div>
           {/* Items body */}
@@ -5687,7 +5699,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     </div>
                     <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0,fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
                   </div>
-                  {supCosts.length>0&&(
+                  {!hideCosts&&supCosts.length>0&&(
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
                       {supCosts.map((sc,i)=>{
                         const sellP=+(sc.price*(1+defaultMarkup/100)).toFixed(2);
@@ -5723,7 +5735,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     <span style={{color:accentColor,fontWeight:700,opacity:.6}}>=</span>
                     <span style={{fontWeight:800,fontSize:16,fontFamily:"Rajdhani,sans-serif",color:accentColor,marginLeft:"auto"}}>{fmtAmt(rowTotal)}</span>
                   </div>
-                  {item.type==="part"&&(
+                  {!hideCosts&&item.type==="part"&&(
                     <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(251,191,36,.07)",borderRadius:"0 0 8px 8px",padding:"5px 10px",borderTop:"1px solid rgba(251,191,36,.15)"}}>
                       {+(item.cost_price||0)>0&&<>
                         <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsqtCost}</span>
@@ -5772,7 +5784,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 <td style={{fontWeight:500}}>
                   <span onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{descOverrides[item.id]??item.description}</span>
                   {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
-                  {supCosts.length>0&&(
+                  {!hideCosts&&supCosts.length>0&&(
                     <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:4}}>
                       {supCosts.map((sc,i)=>{
                         const sellP=+(sc.price*(1+defaultMarkup/100)).toFixed(2);
@@ -5820,7 +5832,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     ?<input autoFocus type="number" min="0" step="0.01" value={editPriceVal} onChange={e=>setEditPriceVal(e.target.value)} onBlur={()=>commitPrice(item)} onKeyDown={e=>{if(e.key==="Enter")commitPrice(item);if(e.key==="Escape")setEditPriceId(null);}} style={{width:90,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
                     :<span onClick={()=>{setEditPriceId(item.id);setEditPriceVal(String(item.unit_price||0));setEditMarkupId(null);}} title="Click to edit price" style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>{fmtAmt(item.unit_price)}</span>
                   }
-                  {item.type==="part"&&(
+                  {!hideCosts&&item.type==="part"&&(
                     <div style={{fontSize:10,color:"var(--text3)",marginTop:2,textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end",gap:3}}>
                       {+(item.cost_price||0)>0&&<span style={{color:"var(--text3)"}}>Cost {fmtAmt(item.cost_price)} ·</span>}
                       {editMarkupId===item.id

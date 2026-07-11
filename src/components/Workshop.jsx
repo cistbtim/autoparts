@@ -282,6 +282,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onSaveWsSupplierQuote={onSaveWsSupplierQuote}
         onSaveWsStock={onSaveWsStock}
         onSaveWsService={onSaveWsService}
+        onDeleteWsService={onDeleteWsService}
         onSaveWsSupplier={onSaveWsSupplier}
         onBack={()=>{ setView("list"); setActiveJob(null); setWsTab("jobs"); }}
         onSaveJob={async(d,onProgress)=>{ await onSaveJob(d,onProgress); setActiveJob({...activeJob,...d}); }}
@@ -3418,7 +3419,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onSaveWsSupplier,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -6214,6 +6215,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           wsId={wsId}
           defaultMarkupPct={wsProfile?.default_markup_pct||0}
           onSaveService={onSaveWsService}
+          onDeleteService={onDeleteWsService}
           onAdd={async(comboItemList)=>{ for(const it of comboItemList) await onSaveItem({...it,job_id:job.id}); setAddingItem(null); }}
           onClose={()=>setAddingItem(null)}/>
       )}
@@ -7981,7 +7983,7 @@ function JobPhotoSlot({label, value, onChange, reg}) {
 // ═══════════════ ADD COMBO MODAL ═══════════════
 // Pick a service combo (e.g. Oil Service) → adds the labour line + all bundled
 // parts to the job in one click. Part prices resolve live from workshop stock.
-function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkupPct=0, onSaveService, onAdd, onClose}) {
+function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkupPct=0, onSaveService, onDeleteService, onAdd, onClose}) {
   const combos=wsServices.filter(s=>parseComboItems(s).length>0);
   const [selected,setSelected]=useState(null);   // the chosen service
   const [lines,setLines]=useState([]);           // preview lines
@@ -8076,9 +8078,9 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
       ):!selected?(
         <div>
           <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
-            {combos.length>6&&<input className="inp" autoFocus value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search combos..." style={{flex:1}}/>}
+            <input className="inp" autoFocus value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search combos..." style={{flex:1}}/>
             {onSaveService&&(
-              <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto",flexShrink:0,border:"1px solid rgba(251,191,36,.5)",color:"#f59e0b",fontWeight:700}} onClick={()=>setEditor({item:null})}>+ New Combo</button>
+              <button className="btn btn-ghost btn-sm" style={{flexShrink:0,border:"1px solid rgba(251,191,36,.5)",color:"#f59e0b",fontWeight:700}} onClick={()=>setEditor({item:null})}>+ New Combo</button>
             )}
           </div>
           <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",maxHeight:380,overflowY:"auto"}}>
@@ -8102,6 +8104,18 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
                   {onSaveService&&(
                     <button className="btn btn-ghost btn-xs" title="Edit combo" style={{flexShrink:0,fontSize:14}}
                       onClick={e=>{e.stopPropagation();setEditor({item:s});}}>✏️</button>
+                  )}
+                  {onSaveService&&(
+                    <button className="btn btn-ghost btn-xs" title="Duplicate combo — copy it, then add extra items" style={{flexShrink:0,fontSize:14}}
+                      onClick={e=>{e.stopPropagation();setEditor({item:{...s,id:undefined,name:`${s.name} (Copy)`}});}}>📋</button>
+                  )}
+                  {onDeleteService&&(
+                    <button className="btn btn-ghost btn-xs" title="Delete combo" style={{flexShrink:0,fontSize:14,color:"var(--red)"}}
+                      onClick={async e=>{
+                        e.stopPropagation();
+                        if(!window.confirm(`Delete combo "${s.name}"?\n\nThis removes the service preset completely (it will also disappear from the Services tab).`)) return;
+                        try{ await onDeleteService(s.id); }catch(err){ alert("Delete failed: "+err.message); }
+                      }}>🗑</button>
                   )}
                 </div>
               );

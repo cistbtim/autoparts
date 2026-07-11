@@ -45,6 +45,7 @@ export function WsServicesPage({wsServices=[],wsStock=[],wsId=null,onSave,onDele
                     <td>
                       <div style={{display:"flex",gap:4}}>
                         {!wsLocked&&<button className="btn btn-ghost btn-xs" onClick={()=>setModal({mode:"edit",item:s})}>✏️</button>}
+                        {!wsLocked&&<button className="btn btn-ghost btn-xs" title="Duplicate" onClick={()=>setModal({mode:"add",item:{...s,id:undefined,name:`${s.name} (Copy)`}})}>📋</button>}
                         {!wsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{if(window.confirm("Delete service preset?"))onDelete(s.id);}}>🗑</button>}
                       </div>
                     </td>
@@ -88,7 +89,7 @@ export function WsServiceModal({item,wsStock=[],wsId=null,onSave,onClose}) {
     return ()=>{dead=true;};
   },[wsId]);
   const stockList=liveStock||wsStock;
-  const isEdit=!!item;
+  const isEdit=!!(item&&item.id); // an id-less item is a duplicate/prefill — save as new
 
   const sq=comboSearch.trim().toLowerCase();
   const stockSuggs=sq

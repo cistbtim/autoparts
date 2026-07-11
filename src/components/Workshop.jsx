@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { createWorker } from "tesseract.js";
-import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
+import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
 import { fmtAmt, makeId, today, toImgUrl, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
@@ -5082,10 +5082,21 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                           ref={el=>clCamRefs.current[item.key]=el}
                           onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;const fr=new FileReader();fr.onload=ev=>uploadChecklistPhoto(item.key,ev.target.result);fr.readAsDataURL(file);}}/>
                         {cl.photo_url&&(
-                          <img src={toImgUrl(cl.photo_url)} alt="check" onClick={()=>setViewPhoto(cl.photo_url)}
-                            style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)"}}
-                            referrerPolicy="no-referrer"
-                            onError={e=>{const m=cl.photo_url.match(/thumbnail[?]id=([^&]+)/)||cl.photo_url.match(/[?&]id=([^&]+)/)||cl.photo_url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {e.target.style.display="none";}}}/>
+                          <div style={{position:"relative",flexShrink:0}}>
+                            <img src={toImgUrl(cl.photo_url)} alt="check" onClick={()=>setViewPhoto(cl.photo_url)}
+                              style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)",display:"block"}}
+                              referrerPolicy="no-referrer"
+                              onError={e=>{const m=cl.photo_url.match(/thumbnail[?]id=([^&]+)/)||cl.photo_url.match(/[?&]id=([^&]+)/)||cl.photo_url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {e.target.style.display="none";}}}/>
+                            <button title="Delete photo"
+                              onClick={e=>{
+                                e.stopPropagation();
+                                if(!window.confirm(`Delete the ${item.label} photo? You can take a new one after.`)) return;
+                                const oldUrl=cl.photo_url;
+                                saveChecklistItem(item.key,{photo_url:""});
+                                deleteFromStorage(oldUrl); // best-effort cleanup of the stored file
+                              }}
+                              style={{position:"absolute",top:-6,right:-6,width:16,height:16,borderRadius:"50%",border:"none",cursor:"pointer",background:"var(--red)",color:"#fff",fontSize:10,fontWeight:800,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0,boxShadow:"0 1px 4px rgba(0,0,0,.35)"}}>✕</button>
+                          </div>
                         )}
                       </div>
                       <input className="inp" placeholder="Note (optional)..." value={cl.note}

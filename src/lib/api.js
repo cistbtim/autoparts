@@ -168,3 +168,18 @@ export const uploadToStorage = async (bucket, path, blob, contentType = "image/j
   if (!resp.ok) { const txt = await resp.text(); throw new Error(txt || resp.statusText); }
   return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
 };
+
+// Delete an object from Supabase Storage given its public URL. Best-effort:
+// returns true on success, false otherwise (e.g. Drive URLs, already gone).
+export const deleteFromStorage = async (publicUrl) => {
+  const m = (publicUrl || "").match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+  if (!m) return false;
+  const [, bucket, path] = m;
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
+      method: "DELETE",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    return resp.ok;
+  } catch { return false; }
+};

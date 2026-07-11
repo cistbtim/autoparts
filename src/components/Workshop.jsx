@@ -2519,6 +2519,177 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// PASTE SUPPLIER REPLY (TEXT) — supplier WhatsApp replies often list
+// several variants per part ("132mm - R440 / 138mm - R399"). Paste the
+// message, pick the right variant per requested part, prices fill in.
+// ═══════════════════════════════════════════════════════════════
+function PasteQuoteTextModal({parts=[], onApply, onClose}) {
+  const [text,  setText]  = useState("");
+  const [stage, setStage] = useState("paste"); // paste | review
+  const [groups,setGroups]= useState([]);      // [{header, options:[{label,price}]}]
+  const [matches,setMatches]=useState([]);     // partIdx -> group index (-1 none)
+  const [sel,   setSel]   = useState({});      // partIdx -> {label, price}
+
+  // "Front b.pads" → ["brake","pad","front"]; "Front disc's" → ["front","disc"]
+  const toks=(s)=>(s||"").toLowerCase().replace(/['’`]/g,"").replace(/[^a-z0-9]+/g," ")
+    .split(/\s+/).filter(Boolean)
+    .map(w=>w==="b"?"brake":w)
+    .map(w=>w.length>3?w.replace(/s$/,""):w)
+    .filter(w=>w.length>=2);
+  const POS=new Set(["front","rear","back","left","right"]);
+  const wgt=w=>POS.has(w)?2:1;
+  // Shared-token score minus a small penalty for header tokens the part lacks,
+  // so "Front disc's" beats "Front b.pads" for "Brake Disc Front"
+  const score=(partToks,headToks)=>{
+    const P=new Set(partToks); let s=0,miss=0;
+    for(const w of new Set(headToks)) P.has(w)?s+=wgt(w):miss++;
+    return s>0?s-miss*0.5:0;
+  };
+
+  const parseSupplierText=(raw)=>{
+    const normPrice=(s)=>{
+      let n=s.replace(/\s+/g,"");
+      if(/,\d{2}$/.test(n)) n=n.replace(/\./g,"").replace(",",".");
+      else n=n.replace(/,/g,"");
+      const v=parseFloat(n);
+      return isNaN(v)?null:v;
+    };
+    const lines=raw.split("\n").map(l=>l.trim()).filter(Boolean);
+    const gs=[]; let cur=null;
+    for(const line of lines){
+      if(/^n\/?a\.?$/i.test(line)||/\bnot avail/i.test(line)) continue;
+      // Price token: "R440", "- R533", "RR399" (typo), "R 1,462.00"
+      const ms=[...line.matchAll(/R+\s*(\d[\d\s]*(?:[.,]\d{1,2})?)/gi)];
+      let price=null, label=line;
+      if(ms.length){
+        const m=ms[ms.length-1];
+        price=normPrice(m[1]);
+        label=line.slice(0,m.index).replace(/[-–—:=\s]+$/,"").trim();
+      } else {
+        // "132mm - 440" (no R)
+        const m=line.match(/^(.*?)[-–—:=]\s*(\d[\d\s]*(?:[.,]\d{1,2})?)\s*$/);
+        if(m){ price=normPrice(m[2]); label=m[1].trim(); }
+      }
+      if(price!=null&&price>0){
+        if(!cur){ cur={header:"",options:[]}; gs.push(cur); }
+        cur.options.push({label,price});
+      } else {
+        cur={header:line.replace(/[:\-–—]+$/,"").trim(),options:[]};
+        gs.push(cur);
+      }
+    }
+    return gs.filter(g=>g.options.length>0);
+  };
+
+  const runParse=()=>{
+    const gs=parseSupplierText(text);
+    if(gs.length===0){ alert("No prices found in the pasted text. Expected lines like:\n132mm - R440"); return; }
+    // One-to-one greedy assignment: each supplier group goes to its best-scoring
+    // part, so a part with no real match (e.g. supplier said N/A) stays unmatched
+    // instead of stealing a weaker group.
+    const pairs=[];
+    parts.forEach((p,pi)=>{
+      const pt=toks(p);
+      gs.forEach((g,gi)=>{ const s=score(pt,toks(g.header)); if(s>=1) pairs.push({pi,gi,s}); });
+    });
+    pairs.sort((a,b)=>b.s-a.s);
+    const ms=parts.map(()=>-1); const usedG=new Set();
+    for(const {pi,gi} of pairs){
+      if(ms[pi]!==-1||usedG.has(gi)) continue;
+      ms[pi]=gi; usedG.add(gi);
+    }
+    // Pre-select when the matched group has exactly one option
+    const pre={};
+    ms.forEach((gi,idx)=>{ if(gi>=0&&gs[gi].options.length===1) pre[idx]={...gs[gi].options[0]}; });
+    setGroups(gs); setMatches(ms); setSel(pre); setStage("review");
+  };
+
+  const allOptions=groups.flatMap((g,gi)=>g.options.map(o=>({...o,gi,full:`${g.header?g.header+" · ":""}${o.label?o.label+" — ":""}R${o.price}`})));
+  const chosenCount=Object.keys(sel).length;
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="📋 Paste Supplier Reply" onClose={onClose}/>
+      {stage==="paste"?(
+        <div>
+          <div style={{fontSize:12,color:"var(--text3)",marginBottom:8,lineHeight:1.5}}>
+            Paste the supplier's WhatsApp message below. Lines like <code style={{fontSize:11}}>132mm - R440</code> become
+            price options — you'll pick the right one for each part.
+          </div>
+          <textarea className="inp" autoFocus value={text} onChange={e=>setText(e.target.value)}
+            placeholder={"Front b.pads\n132mm - R440\n138mm - R399\n\nFront discs\n(×2) 282mm - R1462"}
+            style={{width:"100%",minHeight:220,fontSize:13,fontFamily:"DM Mono,monospace",resize:"vertical",marginBottom:12}}/>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" style={{flex:2}} onClick={runParse} disabled={!text.trim()}>🔍 Read Prices</button>
+          </div>
+        </div>
+      ):(
+        <div>
+          <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>
+            Tap the correct option for each part — supplier replies often list several sizes/variants.
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14,maxHeight:380,overflowY:"auto"}}>
+            {parts.map((p,idx)=>{
+              const gi=matches[idx];
+              const g=gi>=0?groups[gi]:null;
+              const chosen=sel[idx];
+              return (
+                <div key={idx} style={{border:"1px solid var(--border)",borderRadius:10,padding:"10px 12px",background:chosen?"rgba(52,211,153,.05)":"var(--surface2)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                    <span style={{fontWeight:700,fontSize:13,flex:1,minWidth:120}}>{p}</span>
+                    {g&&g.header&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",borderRadius:99,padding:"2px 8px"}}>matched: {g.header}</span>}
+                    {chosen&&(
+                      <span style={{display:"flex",alignItems:"center",gap:4}}>
+                        <input className="inp" type="number" min="0" step="0.01" value={chosen.price}
+                          onChange={e=>setSel(prev=>({...prev,[idx]:{...prev[idx],price:e.target.value}}))}
+                          style={{width:90,textAlign:"right",padding:"3px 8px",fontSize:13,fontWeight:700,color:"var(--green)"}}/>
+                        <button onClick={()=>setSel(prev=>{const n={...prev};delete n[idx];return n;})}
+                          style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:15,padding:0}} title="Clear">✕</button>
+                      </span>
+                    )}
+                  </div>
+                  {g&&g.options.length>0&&(
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                      {g.options.map((o,oi)=>{
+                        const active=chosen&&+chosen.price===+o.price&&chosen.label===o.label;
+                        return (
+                          <button key={oi} onClick={()=>setSel(prev=>({...prev,[idx]:{...o}}))}
+                            style={{fontSize:12,fontWeight:700,padding:"5px 12px",borderRadius:99,cursor:"pointer",
+                              border:`1.5px solid ${active?"var(--green)":"var(--border)"}`,
+                              background:active?"rgba(52,211,153,.15)":"var(--surface)",
+                              color:active?"var(--green)":"var(--text)"}}>
+                            {o.label?`${o.label} · `:""}R{(+o.price).toLocaleString()}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {allOptions.length>0&&(
+                    <select className="inp" value="" style={{fontSize:11,padding:"3px 6px",width:"100%",color:"var(--text3)"}}
+                      onChange={e=>{ const o=allOptions[+e.target.value]; if(o) setSel(prev=>({...prev,[idx]:{label:o.label,price:o.price}})); }}>
+                      <option value="">{g?"— or pick a different option —":"— pick an option —"}</option>
+                      {allOptions.map((o,oi)=><option key={oi} value={oi}>{o.full}</option>)}
+                    </select>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setStage("paste")}>↩ Back</button>
+            <button className="btn btn-primary" style={{flex:2}} disabled={chosenCount===0}
+              onClick={()=>onApply(Object.entries(sel).filter(([,o])=>+o.price>0).map(([i,o])=>({partIdx:+i,price:+o.price})))}>
+              ✅ Apply {chosenCount} Price{chosenCount!==1?"s":""}
+            </button>
+          </div>
+        </div>
+      )}
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SUPPLIER QUOTE MODAL — enter prices received from a supplier
 // ═══════════════════════════════════════════════════════════════
 function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=false, onSave, onClose}) {
@@ -2546,6 +2717,7 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
   const [quoteRef,  setQuoteRef]  = useState(existingQuote?.quote_ref||"");
   const [saving,    setSaving]    = useState(false);
   const [showOcr,   setShowOcr]   = useState(false);
+  const [showPaste, setShowPaste] = useState(false);
 
   const onOcrApply = (mapped) => {
     setPrices(prev => {
@@ -2695,12 +2867,15 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
         {!priceOnly&&<FD><FL label="Notes (optional)"/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="ETA, conditions…"/></FD>}
       </div>
 
-      <div style={{display:"flex",gap:10,marginTop:4}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowOcr(true)} title="Read prices from a screenshot">
+      <div style={{display:"flex",gap:10,marginTop:4,flexWrap:"wrap"}}>
+        <button className="btn btn-ghost" style={{flex:1,minWidth:90}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-ghost" style={{flex:1,minWidth:110}} onClick={()=>setShowOcr(true)} title="Read prices from a screenshot">
           📷 Scan Image
         </button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>
+        <button className="btn btn-ghost" style={{flex:1,minWidth:110}} onClick={()=>setShowPaste(true)} title="Paste the supplier's WhatsApp reply and pick prices">
+          📋 Paste Text
+        </button>
+        <button className="btn btn-primary" style={{flex:2,minWidth:160}} onClick={handleSave} disabled={saving}>
           {saving?"Saving...":priceOnly?"↩️ Save Return Quote":"💾 Save Quote"}
         </button>
       </div>
@@ -2710,6 +2885,14 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
           parts={parts}
           onApply={onOcrApply}
           onClose={()=>setShowOcr(false)}
+        />
+      )}
+
+      {showPaste&&(
+        <PasteQuoteTextModal
+          parts={parts}
+          onApply={(mapped)=>{ onOcrApply(mapped); setShowPaste(false); }}
+          onClose={()=>setShowPaste(false)}
         />
       )}
     </Overlay>

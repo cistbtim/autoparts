@@ -1628,12 +1628,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       chkR(await api.patch("workshop_suppliers","id",id,clean),"Update supplier");
       setWorkshopSuppliers(prev=>prev.map(s=>s.id===id?{...s,...clean}:s));
       showToast("Supplier updated");
+      return {...clean,id};
     } else {
       const newId=makeId("WSUP");
       const newSup={...clean,id:newId,workshop_id:wsId||null};
       chkR(await api.insert("workshop_suppliers",newSup),"Add supplier");
       setWorkshopSuppliers(prev=>[...prev,newSup].sort((a,b)=>(a.name||"").localeCompare(b.name||"")));
       showToast("Supplier added");
+      return newSup;
     }
   };
   const deleteWsSupplier=async(id)=>{
@@ -6256,7 +6258,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       {isOpen("adjust")&&<AdjustModal part={mData("adjust")} onApply={applyAdjust} onClose={()=>closeM("adjust")} t={t}/>}
       {isOpen("partRequest")&&<PartRequestModal currentBranch={currentBranch} user={user} onClose={()=>closeM("partRequest")} onSave={async()=>{await refreshTables("part_requests");closeM("partRequest");showToast("Part request submitted ✅");}} t={t}/>}
       {isOpen("branchStock")&&<BranchStockModal part={mData("branchStock")?.part} existing={mData("branchStock")?.existing} branchId={branchId} overrideBranchId={mData("branchStock")?.overrideBranchId} onClose={()=>closeM("branchStock")} onSave={async()=>{api.cacheInvalidate("branch_stock");await refreshTables("branch_stock");closeM("branchStock");showToast("Stock updated ✅");}} suppliers={suppliers} t={t}/>}
-      {isOpen("editSupplier")&&<SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/>}
+      {/* Can be opened from inside the Part modal (zIndex:250) via "+ Supplier" —
+          pin above that so it doesn't render hidden behind it. */}
+      {isOpen("editSupplier")&&<div style={{position:"fixed",inset:0,zIndex:260}}><SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/></div>}
       {isOpen("importSuppliers")&&<SupplierImportModal onImport={async()=>{await refreshTables("suppliers");}} onClose={()=>closeM("importSuppliers")}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}
       {isOpen("supplierCatalogue")&&<SupplierCatalogueModal parts={parts} supplier={mData("supplierCatalogue")}

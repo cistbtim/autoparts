@@ -71,6 +71,10 @@ export const toFullUrl = (url) => {
 
 export const today = () => new Date().toISOString().slice(0, 10);
 export const fmtAmt = (n) => `${C()}${(n || 0).toLocaleString()}`;
+// Combo items bundled into a workshop service preset (workshop_services.combo_items JSON)
+export const parseComboItems = (svc) => {
+  try { const a = JSON.parse(svc?.combo_items || "[]"); return Array.isArray(a) ? a : []; } catch { return []; }
+};
 
 let _idCounter = 0;
 export const makeId = (prefix) => { _idCounter++; return `${prefix}-${Date.now()}-${_idCounter}`; };

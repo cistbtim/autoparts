@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, makeId, today, toImgUrl, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
+import { fmtAmt, makeId, today, toImgUrl, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner } from "../components/shared.jsx";
@@ -75,6 +75,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [kanbanNoteEdit,  setKanbanNoteEdit]  = useState(null);
   const [kanbanDueEdit,   setKanbanDueEdit]   = useState(null);
   const [kanbanAssignEdit,setKanbanAssignEdit]= useState(null);
+  const [kanbanBkDateEdit,setKanbanBkDateEdit]= useState(null);
   const [jobDetailTab,    setJobDetailTab]    = useState("menu");
   const [kanbanInvJob,    setKanbanInvJob]    = useState(null);
   const [kanbanInvOpen,   setKanbanInvOpen]   = useState(false);
@@ -165,6 +166,15 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const C   = curSym(settings.currency||getSettings().currency);
   const fmt = v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
+  // Change the customer's requested date after the job's already been created —
+  // the date only ever lives on the original workshop_bookings row (jobs don't
+  // store their own copy), so this patches that row and the job card/detail
+  // pick it up automatically via booking_id.
+  const rescheduleBooking = async(bk, newDate) => {
+    if(!onPatchWsBooking) return;
+    await onPatchWsBooking(bk.id,{preferred_date:newDate||null});
+  };
+
   const confirmBooking = async(b) => {
     let vehicleId = b.workshop_vehicle_id || null;
     if (!vehicleId) {
@@ -224,6 +234,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
     if(type==="confirm")  msg=`Hi ${n}, your booking for ${reg}${dtStr} is CONFIRMED! We look forward to seeing you. — ${shop}`;
     if(type==="cancel")   msg=`Hi ${n}, unfortunately we need to cancel your booking for ${reg}${dtStr}.${reason?` Reason: ${reason}`:""} Please contact us to reschedule. — ${shop}`;
     if(type==="closure")  msg=`Hi ${n}, we regret to inform you that we will be closed on ${dt||"that date"}${reason?` (${reason})`:""}. Your booking for ${reg} will need to be rescheduled. Please contact us. — ${shop}`;
+    if(type==="reschedule") msg=`Hi ${n}, your booking for ${reg} has been moved${dtStr?` to${dtStr}`:""}. Please let us know if this works for you. — ${shop}`;
+    if(type==="contact")  msg=`Hi ${n}, regarding your ${reg} booking${dtStr} — `;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -269,6 +281,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onDeleteWsSupplierRequest={onDeleteWsSupplierRequest}
         onSaveWsSupplierQuote={onSaveWsSupplierQuote}
         onSaveWsStock={onSaveWsStock}
+        onSaveWsService={onSaveWsService}
+        onSaveWsSupplier={onSaveWsSupplier}
         onBack={()=>{ setView("list"); setActiveJob(null); setWsTab("jobs"); }}
         onSaveJob={async(d,onProgress)=>{ await onSaveJob(d,onProgress); setActiveJob({...activeJob,...d}); }}
         onDeleteJob={async()=>{ await onDeleteJob(activeJob.id); setView("list"); setActiveJob(null); }}
@@ -294,6 +308,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         wsShopRequests={wsShopRequests.filter(r=>r.job_id===activeJob.id)}
         onSaveWsShopRequest={onSaveWsShopRequest}
         sourceBooking={wsBookings.find(bk=>bk.id===activeJob.booking_id)||null}
+        onPatchWsBooking={onPatchWsBooking}
         initialTab={jobDetailTab}
         onRefresh={onRefresh}
         wsLocked={wsLocked}
@@ -740,6 +755,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             const inv = jInv(job.id);
             const fp  = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)?.photo_front||"";
             const srcBk = wsBookings.find(bk=>bk.id===job.booking_id);
+            const isBkDateEditing = kanbanBkDateEdit?.jobId===job.id;
             const canFlag   = col.id!=="paid"&&col.id!=="problem";
             const canUnflag = col.id==="problem";
             const canInvoice= col.id==="done";
@@ -910,11 +926,36 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                     </div>
                   )}
 
+                  {/* booking date — editable, reschedules the source booking row */}
+                  {srcBk&&(
+                    isBkDateEditing ? (
+                      <div style={{marginBottom:5}} onClick={e=>e.stopPropagation()}>
+                        <input type="date" autoFocus defaultValue={srcBk.preferred_date||""}
+                          style={{width:"100%",padding:"3px 6px",border:"1px solid var(--border)",borderRadius:5,background:"var(--surface)",color:"var(--text1)",fontSize:11}}
+                          onBlur={async e=>{
+                            const v=e.target.value;
+                            setKanbanBkDateEdit(null);
+                            if(v===(srcBk.preferred_date||"")) return;
+                            await rescheduleBooking(srcBk,v);
+                            if(srcBk.customer_phone&&window.confirm(`Notify ${srcBk.customer_name||"the customer"} of the new date via WhatsApp?`)){
+                              window.open(bkWaLink({...srcBk,preferred_date:v},"reschedule"),"_blank");
+                            }
+                          }}/>
+                      </div>
+                    ) : (
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,fontSize:10,fontWeight:700,marginBottom:5,padding:"3px 7px",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.25)",borderRadius:5,color:"var(--blue)",cursor:"pointer"}}
+                        onClick={e=>{e.stopPropagation();setKanbanBkDateEdit({jobId:job.id});}}>
+                        <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🌐 {srcBk.preferred_date?`Booked: ${srcBk.preferred_date}`:"No date selected"}</span>
+                        <span>✏️</span>
+                      </div>
+                    )
+                  )}
+
                   {/* booking quick-actions */}
                   {srcBk&&job.customer_phone&&(
                     <div style={{display:"flex",gap:4,marginBottom:5}} onClick={e=>e.stopPropagation()}>
                       <a href={`tel:${job.customer_phone}`} className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"4px 0",textDecoration:"none",textAlign:"center",color:"var(--blue)"}}>📞 Call</a>
-                      <a href={`https://wa.me/${job.customer_phone.replace(/\D/g,"")}?text=${encodeURIComponent(`Hi ${(job.customer_name||"").split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}`}
+                      <a href={bkWaLink(srcBk,"contact")}
                         target="_blank" rel="noreferrer" className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"4px 0",textDecoration:"none",textAlign:"center",color:"#25D366"}}>
                         📱 WA
                       </a>
@@ -1698,7 +1739,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
       {/* ══════════════ WS SERVICES TAB ══════════════ */}
       {wsTab==="wsservices"&&(
-        <WsServicesPage wsServices={wsServices} settings={settings}
+        <WsServicesPage wsServices={wsServices} wsStock={wsStock} wsId={wsId} settings={settings}
           onSave={onSaveWsService} onDelete={onDeleteWsService} wsLocked={wsLocked}/>
       )}
 
@@ -2684,7 +2725,7 @@ const makePartSku = (name) => {
   return `ws-${abbr}-${rand}`;
 };
 
-function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onGenerateLink, onCreatePO, onClose}) {
+function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onSaveWsSupplier, onGenerateLink, onCreatePO, onClose}) {
   const shopName = settings?.shop_name || "Workshop";
 
   // Job items — parts only, pre-ticked (labour items excluded from supplier requests)
@@ -2705,6 +2746,52 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
   const [quoteTarget, setQuoteTarget] = useState(null); // { request, existingQuote }
   const [localReplies,setLocalReplies]= useState(sqReplies);
   const [refreshing,  setRefreshing]  = useState(false);
+  // New supplier inline form + fresh supplier list from DB
+  const [addingSup,   setAddingSup]   = useState(false);
+  const [supName,     setSupName]     = useState("");
+  const [supPhone,    setSupPhone]    = useState("");
+  const [supType,     setSupType]     = useState("");
+  const [supSaving,   setSupSaving]   = useState(false);
+  const [freshSups,   setFreshSups]   = useState(null);
+
+  // Auto-refresh suppliers from DB on open — catches suppliers added on other
+  // devices or moments ago elsewhere in the app
+  useEffect(()=>{
+    let dead=false;
+    api.fresh("workshop_suppliers",`select=*&order=name.asc${job?.workshop_id?`&workshop_id=eq.${job.workshop_id}`:""}`)
+      .then(d=>{ if(!dead&&Array.isArray(d)) setFreshSups(d); })
+      .catch(()=>{});
+    return ()=>{dead=true;};
+  },[job?.workshop_id]);
+
+  // Union of prop list and fresh DB list (prop also grows when a supplier is added here)
+  const supplierList=(()=>{
+    if(!freshSups) return wsSuppliers;
+    const m=new Map();
+    [...freshSups,...wsSuppliers].forEach(s=>m.set(String(s.id),s));
+    return [...m.values()].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  })();
+
+  const handleAddSupplier=async()=>{
+    if(!supName.trim()){alert("Enter supplier name");return;}
+    setSupSaving(true);
+    try{
+      const saved=await onSaveWsSupplier({
+        name:supName.trim(),
+        phone:supPhone.trim()||null,
+        supplier_type:supType?JSON.stringify([supType]):null,
+      });
+      if(saved?.id){
+        setFreshSups(prev=>[...(prev||wsSuppliers),saved]);
+        setSupplierId(String(saved.id));   // auto-select the new supplier
+        setManualPhone("");
+        setTypeFilter("");
+      }
+      setAddingSup(false);
+      setSupName(""); setSupPhone(""); setSupType("");
+    }catch(e){ alert("Add supplier failed: "+e.message); }
+    finally{ setSupSaving(false); }
+  };
 
   useEffect(()=>{
     if(!history.length) return;
@@ -2759,7 +2846,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
   ];
   const selectedItems = allItems.filter(i => selected.includes(i.id));
 
-  const chosenSupplier = wsSuppliers.find(s => String(s.id) === String(supplierId));
+  const chosenSupplier = supplierList.find(s => String(s.id) === String(supplierId));
   const phone = (chosenSupplier?.phone || manualPhone || "").replace(/\D/g, "");
   const jobVehicle = wsVehicles.find(v => v.id === job.workshop_vehicle_id);
 
@@ -2916,12 +3003,41 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
       )}
 
       {/* Supplier selector */}
-      <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",margin:"14px 0 6px"}}>Supplier</div>
-      {wsSuppliers.length > 0 && (()=>{
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",margin:"14px 0 6px"}}>
+        <span style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em"}}>Supplier</span>
+        {onSaveWsSupplier&&!addingSup&&(
+          <button className="btn btn-ghost btn-xs" style={{border:"1px solid var(--border)",fontWeight:700,fontSize:11}}
+            onClick={()=>setAddingSup(true)}>+ New Supplier</button>
+        )}
+      </div>
+      {addingSup&&(
+        <div style={{border:"1px solid var(--accent)",borderRadius:10,padding:"12px 14px",marginBottom:10,background:"rgba(249,115,22,.04)"}}>
+          <div style={{fontWeight:700,fontSize:12,marginBottom:10,color:"var(--accent)"}}>➕ New Supplier</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+            <input className="inp" style={{flex:"2 1 160px"}} value={supName} onChange={e=>setSupName(e.target.value)} placeholder="Supplier name *" autoFocus
+              onKeyDown={e=>{if(e.key==="Enter")handleAddSupplier();}}/>
+            <input className="inp" style={{flex:"2 1 140px"}} value={supPhone} onChange={e=>setSupPhone(e.target.value)} placeholder="Phone: +27 83 123 4567"
+              onKeyDown={e=>{if(e.key==="Enter")handleAddSupplier();}}/>
+            <select className="inp" style={{flex:"1 1 120px"}} value={supType} onChange={e=>setSupType(e.target.value)}>
+              <option value="">— Type —</option>
+              <option value="New Spares">New Spares</option>
+              <option value="Used Parts">Used Parts</option>
+              <option value="Dealer">Dealer</option>
+            </select>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{setAddingSup(false);setSupName("");setSupPhone("");setSupType("");}}>Cancel</button>
+            <button className="btn btn-primary btn-sm" style={{flex:2}} onClick={handleAddSupplier} disabled={supSaving||!supName.trim()}>
+              {supSaving?"Saving...":"✅ Save & Select"}
+            </button>
+          </div>
+        </div>
+      )}
+      {supplierList.length > 0 && (()=>{
         const normMake=(job.vehicle_make||"").toLowerCase().replace(/[-_]/g," ").trim();
         const parseBrands=s=>{if(!s.car_brands)return [];if(Array.isArray(s.car_brands))return s.car_brands;try{return JSON.parse(s.car_brands);}catch{return [];}};
         const matchesMake=s=>parseBrands(s).some(b=>{const nb=b.toLowerCase().replace(/[-_]/g," ").trim();return nb===normMake||nb.includes(normMake)||normMake.includes(nb);});
-        const brandPool=normMake&&wsSuppliers.some(matchesMake)?wsSuppliers.filter(matchesMake):wsSuppliers;
+        const brandPool=normMake&&supplierList.some(matchesMake)?supplierList.filter(matchesMake):supplierList;
         return (
           <div style={{display:"flex",gap:8,marginBottom:8}}>
             <select className="inp" style={{flex:"0 0 auto",width:150}} value={typeFilter}
@@ -2933,20 +3049,29 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
             </select>
             <select className="inp" style={{flex:1}} value={supplierId} onChange={e=>{setSupplierId(e.target.value);setManualPhone("");setGeneratedLink("");}}>
               <option value="">— Select supplier —</option>
-              {brandPool.filter(s=>{
-                if(!typeFilter) return true;
-                const types=s.supplier_type?(Array.isArray(s.supplier_type)?s.supplier_type:(()=>{try{return JSON.parse(s.supplier_type);}catch{return [];}})()):[];
-                return types.includes(typeFilter);
-              }).map(s=>(
-                <option key={s.id} value={s.id}>{s.name}{s.phone?` · ${s.phone}`:""}</option>
-              ))}
+              {(()=>{
+                const pool=brandPool.filter(s=>{
+                  if(!typeFilter) return true;
+                  const types=s.supplier_type?(Array.isArray(s.supplier_type)?s.supplier_type:(()=>{try{return JSON.parse(s.supplier_type);}catch{return [];}})()):[];
+                  return types.includes(typeFilter);
+                });
+                // Keep the selected supplier visible even if brand/type filters exclude it
+                if(supplierId&&!pool.some(s=>String(s.id)===String(supplierId))){
+                  const cs=supplierList.find(s=>String(s.id)===String(supplierId));
+                  if(cs) pool.unshift(cs);
+                }
+                return pool.map(s=>(
+                  <option key={s.id} value={s.id}>{s.name}{s.phone?` · ${s.phone}`:""}</option>
+                ));
+              })()}
             </select>
           </div>
         );
       })()}
-      {wsSuppliers.length === 0 && (
-        <div style={{fontSize:12,color:"var(--text3)",marginBottom:6,padding:"8px 12px",background:"var(--surface2)",borderRadius:8}}>
-          No suppliers saved yet — go to <strong>WS → Suppliers</strong> tab to add them, or type a number below
+      {supplierList.length === 0 && !addingSup && (
+        <div style={{fontSize:12,color:"var(--text3)",marginBottom:6,padding:"8px 12px",background:"var(--surface2)",borderRadius:8,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+          <span style={{flex:1,minWidth:180}}>No suppliers saved yet — add one here, or type a number below</span>
+          {onSaveWsSupplier&&<button className="btn btn-primary btn-sm" style={{flexShrink:0}} onClick={()=>setAddingSup(true)}>+ New Supplier</button>}
         </div>
       )}
       <input className="inp" placeholder="Or enter phone number: +27 83 123 4567"
@@ -3293,12 +3418,23 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onSaveWsSupplier,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
   // Resolve catalog vehicle code to display model name (e.g. "FD57E" → "RANGER S-CAB DRL-H.LAMP")
   const resolvedVehicleModel = vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase())?.model||job.vehicle_model;
+  // Reschedule the customer's requested date — lives only on the source
+  // workshop_bookings row (jobs don't keep their own copy), patched via
+  // onPatchWsBooking so it's picked up next time sourceBooking is derived.
+  const rescheduleSourceBooking = async(newDate) => {
+    if(!sourceBooking||!onPatchWsBooking) return;
+    await onPatchWsBooking(sourceBooking.id,{preferred_date:newDate||null});
+  };
+  const bookingWaLink = (msg) => {
+    const phone=(sourceBooking?.customer_phone||"").replace(/\D/g,"");
+    return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : "#";
+  };
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour'
   const [creatingInv,  setCreatingInv]  = useState(false);
@@ -3345,6 +3481,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [showJobMenu,      setShowJobMenu]      = useState(false);
   const [showPrintMenu,    setShowPrintMenu]    = useState(false);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
+  const [editingBkDate, setEditingBkDate] = useState(false);
   const [addingPastRecord, setAddingPastRecord] = useState(false);
   const [pastRec, setPastRec] = useState({date_in:"",date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});
   const [savingPastRec, setSavingPastRec] = useState(false);
@@ -3902,6 +4039,34 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               📋 {vehicleHistory.length>0?vehicleHistory.length+" visits":"History"}
             </button>
           </div>
+          {/* ── Online booking date — editable, visible without scrolling ── */}
+          {sourceBooking&&(
+            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6,flexWrap:"wrap"}}>
+              {editingBkDate ? (
+                <input type="date" autoFocus defaultValue={sourceBooking.preferred_date||""}
+                  style={{padding:"3px 7px",border:"1px solid var(--border)",borderRadius:6,background:"var(--surface)",color:"var(--text1)",fontSize:12}}
+                  onBlur={async e=>{
+                    const v=e.target.value;
+                    setEditingBkDate(false);
+                    if(v===(sourceBooking.preferred_date||"")) return;
+                    await rescheduleSourceBooking(v);
+                    if(sourceBooking.customer_phone&&window.confirm(`Notify ${sourceBooking.customer_name||"the customer"} of the new date via WhatsApp?`)){
+                      window.open(bookingWaLink(`Hi ${(sourceBooking.customer_name||"").split(" ")[0]||"there"}, your booking for ${sourceBooking.vehicle_reg||job.vehicle_reg||""} has been moved${v?` to ${v}`:""}. Please let us know if this works for you.`),"_blank");
+                    }
+                  }}/>
+              ) : (
+                <span style={{fontSize:12,fontWeight:700,color:"var(--blue)",cursor:"pointer"}}
+                  onClick={()=>setEditingBkDate(true)}>
+                  🌐 {sourceBooking.preferred_date?`Booked: ${sourceBooking.preferred_date}`:"No preferred date selected"} ✏️
+                </span>
+              )}
+              {sourceBooking.customer_phone&&<>
+                <a href={`tel:${sourceBooking.customer_phone}`} style={{fontSize:11,fontWeight:700,color:"var(--blue)",textDecoration:"none"}}>📞 Call</a>
+                <a href={bookingWaLink(`Hi ${(sourceBooking.customer_name||"").split(" ")[0]||"there"}, regarding your ${sourceBooking.vehicle_reg||job.vehicle_reg||""} booking${sourceBooking.preferred_date?` for ${sourceBooking.preferred_date}`:""} — `)}
+                  target="_blank" rel="noreferrer" style={{fontSize:11,fontWeight:700,color:"#25D366",textDecoration:"none"}}>📱 WA</a>
+              </>}
+            </div>
+          )}
         </div>
         {/* ── PAID stamp overlay ── */}
         {invoice?.status==="paid"&&(
@@ -4386,7 +4551,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 <span style={{fontWeight:600,fontSize:12,color:"var(--blue)",flex:1}}>
                   Online Booking
                   {sourceBooking.customer_name&&<span style={{fontWeight:400,color:"var(--text2)",marginLeft:6}}>{sourceBooking.customer_name}</span>}
-                  {sourceBooking.preferred_date&&<span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>· 📅 {sourceBooking.preferred_date}</span>}
+                  <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>· 📅 {sourceBooking.preferred_date||"no date selected"}</span>
                 </span>
                 <span style={{fontSize:11,color:"var(--text3)"}}>{showBookingDetails?"▲":"▼"}</span>
               </button>
@@ -4398,7 +4563,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{sourceBooking.customer_name}</div>
                       {sourceBooking.customer_phone&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:2}}>{sourceBooking.customer_phone}</div>}
                       {sourceBooking.customer_email&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>{sourceBooking.customer_email}</div>}
-                      {sourceBooking.preferred_date&&<div style={{fontSize:12,color:"var(--blue)",marginTop:4}}>📅 Preferred: {sourceBooking.preferred_date}</div>}
+                      <div style={{fontSize:12,color:sourceBooking.preferred_date?"var(--blue)":"var(--text3)",marginTop:4}}>
+                        📅 {sourceBooking.preferred_date?`Preferred: ${sourceBooking.preferred_date}`:"No preferred date selected"}
+                      </div>
                       {sourceBooking.complaint&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>🔧 {sourceBooking.complaint}</div>}
                     </div>
                     <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
@@ -5300,6 +5467,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             <div style={{display:"flex",gap:6}}>
               {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("part")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtPart}</button>}
               {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("labour")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtLabour}</button>}
+              {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("combo")} style={{background:"rgba(251,191,36,.25)",color:"#fff",border:"1px solid rgba(251,191,36,.5)",borderRadius:8,fontWeight:700,fontSize:12}}>⚡ {t.wsqtCombo||"Combo"}</button>}
             </div>
           </div>
           {/* Items body */}
@@ -6038,8 +6206,20 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           onClose={()=>setReturnQuoteTarget(null)}/>
       )}
 
+      {/* Add combo modal — adds service labour + all bundled parts in one click */}
+      {addingItem==="combo"&&(
+        <WorkshopComboModal
+          wsServices={wsServices}
+          wsStock={wsStock}
+          wsId={wsId}
+          defaultMarkupPct={wsProfile?.default_markup_pct||0}
+          onSaveService={onSaveWsService}
+          onAdd={async(comboItemList)=>{ for(const it of comboItemList) await onSaveItem({...it,job_id:job.id}); setAddingItem(null); }}
+          onClose={()=>setAddingItem(null)}/>
+      )}
+
       {/* Add item modal */}
-      {addingItem&&(
+      {addingItem&&addingItem!=="combo"&&(
         <WorkshopItemModal
           type={addingItem}
           wsStock={wsStock}
@@ -6543,6 +6723,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             onSaveQuote={onSaveWsSupplierQuote}
             onSaveItem={onSaveItem}
             onSaveWsStock={onSaveWsStock}
+            onSaveWsSupplier={onSaveWsSupplier}
             onGenerateLink={onGenerateWsQuoteLink}
             onCreatePO={onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);setSupplierModal(false);if(onViewPurchaseOrders)onViewPurchaseOrders();}:undefined}
             onClose={()=>setSupplierModal(false)}/>
@@ -7797,6 +7978,198 @@ function JobPhotoSlot({label, value, onChange, reg}) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP ITEM MODAL — Add Part or Labour (uses workshop stock)
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════ ADD COMBO MODAL ═══════════════
+// Pick a service combo (e.g. Oil Service) → adds the labour line + all bundled
+// parts to the job in one click. Part prices resolve live from workshop stock.
+function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkupPct=0, onSaveService, onAdd, onClose}) {
+  const combos=wsServices.filter(s=>parseComboItems(s).length>0);
+  const [selected,setSelected]=useState(null);   // the chosen service
+  const [lines,setLines]=useState([]);           // preview lines
+  const [saving,setSaving]=useState(false);
+  const [search,setSearch]=useState("");
+  const [editor,setEditor]=useState(null);       // WsServiceModal: {item:null}=new combo, {item:svc}=edit
+  const [pendingPick,setPendingPick]=useState(null); // name of just-saved combo to auto-open
+  // Fresh stock from DB so combo lines price correctly even for parts created moments ago
+  const [liveStock,setLiveStock]=useState(null);
+  useEffect(()=>{
+    let dead=false;
+    api.fresh("workshop_stock",`select=*&order=name.asc${wsId?`&workshop_id=eq.${wsId}`:""}`)
+      .then(d=>{ if(!dead&&Array.isArray(d)) setLiveStock(d); })
+      .catch(()=>{});
+    return ()=>{dead=true;};
+  },[wsId]);
+  const stockList=liveStock||wsStock;
+
+  const priceFor=(c)=>{
+    const st=c.ws_stock_id?stockList.find(s=>String(s.id)===String(c.ws_stock_id)):null;
+    const cost=+(st?.unit_cost||0);
+    const listPrice=+(st?.unit_price||0)||(+c.unit_price||0);
+    if(st&&cost>0&&defaultMarkupPct>0) return {st,cost,markup:defaultMarkupPct,price:+(cost*(1+defaultMarkupPct/100)).toFixed(2)};
+    if(st&&cost>0){const mp=listPrice>0?+((listPrice/cost-1)*100).toFixed(1):0;return {st,cost,markup:mp,price:listPrice||cost};}
+    return {st,cost:0,markup:defaultMarkupPct,price:listPrice};
+  };
+
+  const pickCombo=(svc)=>{
+    const rate=+(svc.default_price||svc.price||svc.rate||0);
+    const partLines=parseComboItems(svc).map((c,i)=>{
+      const {st,cost,markup,price}=priceFor(c);
+      return {key:`p${i}`, checked:true, type:"part", description:c.name,
+        part_sku:c.sku||st?.sku||"", ws_stock_id:st?.id||null,
+        qty:+c.qty||1, unit_price:price, cost_price:cost, markup_pct:markup,
+        stockQty:st?(+st.qty||0):null};
+    });
+    const labourLine={key:"labour", checked:rate>0, type:"labour", description:svc.name,
+      part_sku:"", ws_stock_id:null, qty:1, unit_price:rate, cost_price:0, markup_pct:0, stockQty:null};
+    setLines([labourLine,...partLines]);
+    setSelected(svc);
+  };
+
+  // After creating a combo in the inline service editor, auto-open its preview
+  // once the refreshed wsServices prop arrives.
+  useEffect(()=>{
+    if(!pendingPick) return;
+    const svc=combos.find(s=>(s.name||"").toLowerCase()===pendingPick.toLowerCase());
+    if(svc){ setPendingPick(null); pickCombo(svc); }
+  });
+
+  const setLine=(key,patch)=>setLines(prev=>prev.map(l=>l.key===key?{...l,...patch}:l));
+  const chosen=lines.filter(l=>l.checked&&(+l.unit_price>0||+l.qty>0));
+  const total=chosen.reduce((s,l)=>s+(+l.qty||1)*(+l.unit_price||0),0);
+
+  const handleAdd=async()=>{
+    if(chosen.length===0){alert("Select at least one line");return;}
+    setSaving(true);
+    try{
+      await onAdd(chosen.map(l=>({
+        type:l.type, description:l.description, part_sku:l.part_sku||"",
+        ws_stock_id:l.type==="part"?l.ws_stock_id:null,
+        qty:+l.qty||1, unit_price:+l.unit_price||0,
+        cost_price:l.type==="part"?+l.cost_price||0:0,
+        markup_pct:l.type==="part"?+l.markup_pct||0:0,
+        total:+((+l.qty||1)*(+l.unit_price||0)).toFixed(2),
+      })));
+    }catch(e){ alert("Add failed: "+e.message); setSaving(false); }
+  };
+
+  const sq=search.trim().toLowerCase();
+  const filteredCombos=sq?combos.filter(s=>{
+    const h=`${s.name||""} ${parseComboItems(s).map(c=>c.name).join(" ")}`.toLowerCase();
+    return sq.split(/\s+/).every(w=>h.includes(w));
+  }):combos;
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="⚡ Add Combo" onClose={onClose}/>
+      {combos.length===0?(
+        <div style={{textAlign:"center",padding:"32px 16px",color:"var(--text3)"}}>
+          <div style={{fontSize:32,marginBottom:8}}>⚡</div>
+          <div style={{fontWeight:700,color:"var(--text)",marginBottom:6}}>No combos yet</div>
+          <div style={{fontSize:13,lineHeight:1.6,marginBottom:16}}>
+            A combo is a service with parts bundled in —<br/>
+            e.g. <strong>Oil Service</strong> = labour + oil + oil filter + air filter.<br/>
+            One click adds the whole package to the quote.
+          </div>
+          {onSaveService&&(
+            <button className="btn btn-primary" onClick={()=>setEditor({item:null})}>⚡ Create Combo</button>
+          )}
+        </div>
+      ):!selected?(
+        <div>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
+            {combos.length>6&&<input className="inp" autoFocus value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search combos..." style={{flex:1}}/>}
+            {onSaveService&&(
+              <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto",flexShrink:0,border:"1px solid rgba(251,191,36,.5)",color:"#f59e0b",fontWeight:700}} onClick={()=>setEditor({item:null})}>+ New Combo</button>
+            )}
+          </div>
+          <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",maxHeight:380,overflowY:"auto"}}>
+            {filteredCombos.length===0&&<div style={{padding:"16px",color:"var(--text3)",fontSize:13}}>No combos match "{search}"</div>}
+            {filteredCombos.map(s=>{
+              const ci=parseComboItems(s);
+              const rate=+(s.default_price||s.price||s.rate||0);
+              return (
+                <div key={s.id} onClick={()=>pickCombo(s)} style={{padding:"12px 14px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",gap:10,alignItems:"center"}}>
+                  <span style={{fontSize:18,flexShrink:0}}>⚡</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:14}}>{s.name}</div>
+                    <div style={{fontSize:12,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {ci.map(c=>`${c.name}${+c.qty>1?` ×${c.qty}`:""}`).join(" + ")}
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>{ci.length} part{ci.length>1?"s":""}{rate>0?" + labour":""}</div>
+                    {rate>0&&<div style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",fontSize:13}}>{fmtAmt(rate)} labour</div>}
+                  </div>
+                  {onSaveService&&(
+                    <button className="btn btn-ghost btn-xs" title="Edit combo" style={{flexShrink:0,fontSize:14}}
+                      onClick={e=>{e.stopPropagation();setEditor({item:s});}}>✏️</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ):(
+        <div>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <button className="btn btn-ghost btn-xs" onClick={()=>{setSelected(null);setLines([]);}}>← Back</button>
+            <span style={{fontWeight:800,fontSize:15}}>⚡ {selected.name}</span>
+          </div>
+          <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:12}}>
+            {lines.map(l=>(
+              <div key={l.key} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderBottom:"1px solid var(--border)",background:l.checked?"var(--surface2)":"var(--surface)",opacity:l.checked?1:.5}}>
+                <input type="checkbox" checked={l.checked} onChange={e=>setLine(l.key,{checked:e.target.checked})} style={{width:17,height:17,cursor:"pointer",flexShrink:0,accentColor:l.type==="part"?"var(--blue)":"var(--green)"}}/>
+                <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,flexShrink:0,background:l.type==="part"?"rgba(96,165,250,.15)":"rgba(52,211,153,.15)",color:l.type==="part"?"var(--blue)":"var(--green)"}}>
+                  {l.type==="part"?"🔩":"👷"}
+                </span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.description}</div>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    {l.part_sku&&<code style={{fontSize:10,color:"var(--text3)"}}>{l.part_sku}</code>}
+                    {l.stockQty!==null&&<span style={{fontSize:10,fontWeight:700,color:l.stockQty<=0?"var(--red)":"var(--green)"}}>{l.stockQty<=0?"⛔ Out of stock":`${l.stockQty} in stock`}</span>}
+                    {l.type==="part"&&+l.cost_price>0&&<span style={{fontSize:10,color:"#f59e0b",fontWeight:600}}>cost {fmtAmt(l.cost_price)} +{l.markup_pct}%</span>}
+                  </div>
+                </div>
+                <input type="number" min="1" step="1" value={l.qty} onChange={e=>setLine(l.key,{qty:e.target.value})}
+                  style={{width:48,textAlign:"center",fontSize:13,fontWeight:700,padding:"3px 4px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)",flexShrink:0}}/>
+                <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>×</span>
+                <input type="number" min="0" step="0.01" value={l.unit_price} onChange={e=>setLine(l.key,{unit_price:e.target.value})}
+                  style={{width:80,textAlign:"right",fontSize:13,fontWeight:700,fontFamily:"Rajdhani,sans-serif",padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)",flexShrink:0}}/>
+                <span style={{fontWeight:800,fontSize:13,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",width:70,textAlign:"right",flexShrink:0}}>{fmtAmt((+l.qty||1)*(+l.unit_price||0))}</span>
+              </div>
+            ))}
+            <div style={{display:"flex",justifyContent:"flex-end",gap:10,padding:"9px 12px",background:"rgba(251,191,36,.07)",fontWeight:800}}>
+              <span style={{fontSize:12,color:"var(--text3)",fontWeight:700,alignSelf:"center"}}>Combo total</span>
+              <span style={{fontFamily:"Rajdhani,sans-serif",fontSize:16,color:"#f59e0b"}}>{fmtAmt(total)}</span>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" style={{flex:2}} onClick={handleAdd} disabled={saving||chosen.length===0}>
+              {saving?"Adding...":`⚡ Add ${chosen.length} item${chosen.length!==1?"s":""} to Quote`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Inline combo creator/editor — same editor as the Services tab */}
+      {editor&&onSaveService&&(
+        <WsServiceModal
+          item={editor.item}
+          wsStock={stockList}
+          wsId={wsId}
+          onSave={async(d)=>{
+            if(!editor.item&&!parseComboItems(d).length){alert("Add at least one combo item (part) so this service works as a combo");return;}
+            await onSaveService(d);
+            if(parseComboItems(d).length) setPendingPick(d.name);
+            setEditor(null);
+            setSelected(null); setLines([]);
+          }}
+          onClose={()=>setEditor(null)}/>
+      )}
+    </Overlay>
+  );
+}
+
 function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, wsId=null, t}) {
   const [desc,        setDesc]        = useState("");
   const [qty,         setQty]         = useState(1);
@@ -7809,8 +8182,10 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
   const [justAdded,   setJustAdded]   = useState(false);
   const [addedIds,    setAddedIds]    = useState(new Set());
   const [localExtras, setLocalExtras] = useState([]); // items created this session
-  // Create-new sub-form
+  // Create-new / edit sub-form
   const [creating,    setCreating]    = useState(false);
+  const [editingItem, setEditingItem] = useState(null); // stock/service record being edited
+  const [localEdits,  setLocalEdits]  = useState({});   // id -> patched fields (until parent refreshes)
   const [newName,     setNewName]     = useState("");
   const [newSku,      setNewSku]      = useState("");
   const [newCost,     setNewCost]     = useState("");
@@ -7822,10 +8197,10 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
   const skuSuggs=skuTrim.length>0
     ? wsStock.filter(s=>s.sku&&s.sku.toLowerCase().includes(skuTrim.toLowerCase())).slice(0,8)
     : [];
-  const skuDup=skuTrim?wsStock.find(s=>s.sku&&s.sku.toLowerCase()===skuTrim.toLowerCase()):null;
+  const skuDup=skuTrim?wsStock.find(s=>s.id!==editingItem?.id&&s.sku&&s.sku.toLowerCase()===skuTrim.toLowerCase()):null;
 
   const baseList = type==="part" ? wsStock : wsServices;
-  const list = [...localExtras, ...baseList];
+  const list = [...localExtras, ...baseList].map(p=>localEdits[p.id]?{...p,...localEdits[p.id]}:p);
   const existingSkus = new Set(existingItems.map(i=>i.part_sku).filter(Boolean));
 
   const filtered = list.filter(p=>{
@@ -7864,11 +8239,38 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
   };
 
   const openCreateForm=()=>{
+    setEditingItem(null);
     setNewName(search.trim());
     setNewSku("");
     setNewCost("");
     setNewSell("");
     setCreating(true);
+  };
+
+  const openEditForm=(p)=>{
+    setEditingItem(p);
+    setNewName(p.name||"");
+    setNewSku(p.sku||"");
+    setNewCost(String(p.unit_cost||""));
+    setNewSell(String(type==="part"?(p.unit_price||""):(p.default_price||p.rate||p.price||"")));
+    setCreating(true);
+  };
+
+  const handleEditUpdate=async()=>{
+    if(!newName.trim()){alert("Enter a name");return;}
+    setCreateSaving(true);
+    try{
+      const patch=type==="part"
+        ?{name:newName.trim(),sku:newSku.trim()||null,unit_cost:+newCost||0,unit_price:+newSell||0}
+        :{name:newName.trim(),default_price:+newSell||0,rate:+newSell||0};
+      await api.patch(type==="part"?"workshop_stock":"workshop_services","id",editingItem.id,patch);
+      setLocalEdits(prev=>({...prev,[editingItem.id]:patch}));
+      setLocalExtras(prev=>prev.map(x=>x.id===editingItem.id?{...x,...patch}:x));
+      if(selItem?.id===editingItem.id) selectItem({...editingItem,...patch});
+      setCreating(false);
+      setEditingItem(null);
+    }catch(e){ alert("Update failed: "+e.message); }
+    finally{ setCreateSaving(false); }
   };
 
   const useSearchAsDesc=()=>{
@@ -7992,6 +8394,8 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
                       <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>{fmtAmt(p.unit_price||p.default_price||p.price||p.rate||0)}</div>
                       {type==="part"&&!p.quote_only&&stockBadge(p)}
                     </div>
+                    <button className="btn btn-ghost btn-xs" title={`Edit ${type==="part"?"stock item":"service"}`} style={{flexShrink:0,fontSize:14}}
+                      onClick={e=>{e.stopPropagation();openEditForm(p);}}>✏️</button>
                   </div>
                 ))
             }
@@ -8002,7 +8406,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
         {creating&&(
           <div style={{border:"1px solid var(--accent)",borderRadius:10,padding:"14px 16px",marginBottom:12,background:"rgba(249,115,22,.04)"}}>
             <div style={{fontWeight:700,fontSize:13,marginBottom:12,color:"var(--accent)"}}>
-              ➕ New {type==="part"?"Stock Item":"Service"}
+              {editingItem?`✏️ Edit ${type==="part"?"Stock Item":"Service"}`:`➕ New ${type==="part"?"Stock Item":"Service"}`}
             </div>
             <FD style={{marginBottom:10}}>
               <FL label="Name *"/>
@@ -8054,9 +8458,9 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
               </div>
             </FG>
             <div style={{display:"flex",gap:8}}>
-              <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setCreating(false)}>Cancel</button>
-              <button className="btn btn-primary btn-sm" style={{flex:2}} onClick={handleCreateAndSelect} disabled={createSaving||!!skuDup} title={skuDup?"SKU already exists — change it or clear the SKU field":""}>
-                {createSaving?"Creating...":"✅ Create & Select"}
+              <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{setCreating(false);setEditingItem(null);}}>Cancel</button>
+              <button className="btn btn-primary btn-sm" style={{flex:2}} onClick={editingItem?handleEditUpdate:handleCreateAndSelect} disabled={createSaving||!!skuDup} title={skuDup?"SKU already exists — change it or clear the SKU field":""}>
+                {createSaving?(editingItem?"Saving...":"Creating..."):(editingItem?"✅ Save Changes":"✅ Create & Select")}
               </button>
             </div>
           </div>

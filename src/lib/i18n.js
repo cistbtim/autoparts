@@ -167,6 +167,7 @@ export const T = {
     wsqtType: "Type",
     wsqtPart: "Part",
     wsqtLabour: "Labour",
+    wsqtCombo: "Combo",
     wsqtCost: "Cost",
     wsqtMarkup: "Markup",
     wsqtPrice: "Price",

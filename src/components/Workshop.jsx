@@ -7679,7 +7679,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], wsId=nul
     photo_side: (()=>{ const v=wsVehicles.find(x=>x.id===job.workshop_vehicle_id); return v?.photo_side ||""; })(),
   });
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
-  const [tab,setTab]=useState("customer");
+  const [tab,setTab]=useState("vehicle");
   const [saving,setSaving]=useState(false);
   const [uploadProgress,setUploadProgress]=useState(null); // {current,total,name}
   const [custSearch,setCustSearch]=useState(job.customer_name||"");

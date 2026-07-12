@@ -5864,6 +5864,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             onGoToSpareShopTab={()=>setTab("wsspareshop")}
             onEditPart={async(p)=>{const ok=await acquireLock("part",p.id);if(!ok)return;const fresh=await api.get("parts",`id=eq.${p.id}&select=*`);openM("editPart",Array.isArray(fresh)&&fresh[0]?fresh[0]:p);}}
             onDeletePart={async(p)=>{await deletePart(p.id);}}
+            onAddPart={(init)=>openM("editPart",{_initialF:{},...(init||{})})}
             t={t} lang={lang}/>
         )}
 

@@ -28,7 +28,7 @@ import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -1799,7 +1799,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   <div style={{fontWeight:600,marginBottom:6}}>No spare shop linked</div>
                   <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
                 </div>
-              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab} onEditPart={onEditPart} onDeletePart={onDeletePart}/>
+              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab} onEditPart={onEditPart} onDeletePart={onDeletePart} onAddPart={onAddPart}/>
             }
           </div>
         );
@@ -8820,7 +8820,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
 // Module-level cache so spare shop parts survive WorkshopPage remounts (tab switches)
 const _spCache={data:null,branchId:null,ts:null};
 
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",initialVin="",initialEngineNo="",initialReg="",ads=[],userCtx=null,onClearJobFilter,onEditPart,onDeletePart}) {
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",initialVin="",initialEngineNo="",initialReg="",ads=[],userCtx=null,onClearJobFilter,onEditPart,onDeletePart,onAddPart}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
@@ -9012,12 +9012,42 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const _dispV=initialCode?vehicles.find(v=>v.make===initialMake&&v.code===initialCode):null;
   const _dispYear=_dispV?((_dispV.year_from||"")+(_dispV.year_to&&_dispV.year_to!==_dispV.year_from?`–${_dispV.year_to}`:"")).trim():"";
 
+  // "Search all cars" — server-side catalog search that ignores the vehicle filter,
+  // for parts listed under another model that also fit this car. Needed because in
+  // job mode only this vehicle's fitted parts are downloaded (data-saving).
+  const [allCarsSearch,setAllCarsSearch]=useState(false);
+  const [extraResults,setExtraResults]=useState([]);
+  const [extraLoading,setExtraLoading]=useState(false);
+  useEffect(()=>{
+    if(!jobMode||!allCarsSearch){setExtraResults([]);return;}
+    const term=search.trim();
+    if(term.length<2){setExtraResults([]);return;}
+    let dead=false;
+    setExtraLoading(true);
+    const t=setTimeout(async()=>{
+      const esc=term.replace(/[%,()*]/g," ").replace(/\s+/g," ").trim();
+      const branchIds=[linkedBranchId,...(mainBranchId&&mainBranchId!==linkedBranchId?[mainBranchId]:[])].filter(Boolean);
+      const res=await api.get("parts",`branch_id=in.(${branchIds.join(",")})&or=(name.ilike.*${esc}*,sku.ilike.*${esc}*,oe_number.ilike.*${esc}*,brand.ilike.*${esc}*)&select=id,sku,name,brand,stock,price,image_url,image,bin_location,category,chinese_desc,make,model,year_range,oe_number&order=sku.asc&limit=60`).catch(()=>[]);
+      if(!dead){ setExtraResults(Array.isArray(res)?res:[]); setExtraLoading(false); }
+    },400);
+    return ()=>{dead=true;clearTimeout(t);};
+  },[jobMode,allCarsSearch,search,linkedBranchId,mainBranchId]);
+
   const q=search.trim().toLowerCase();
-  const filtered=(q
+  const baseFiltered=(q
     ?shopParts.filter(p=>(p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q))
     :shopParts
   ).filter(p=>!vehicleFilterIds||vehicleFilterIds.has(String(p.id)))
    .filter(p=>!stockOnly||p.stock>0);
+  // Parts from other cars matching the search, appended with an "Other car" tag
+  const baseIds=new Set(baseFiltered.map(p=>String(p.id)));
+  const extraMatches=(jobMode&&allCarsSearch&&q)
+    ? extraResults
+        .filter(p=>!baseIds.has(String(p.id)))
+        .filter(p=>!stockOnly||p.stock>0)
+        .map(p=>({...p,_otherCar:true}))
+    : [];
+  const filtered=[...baseFiltered,...extraMatches];
 
   const addToCart=(p)=>setCart(prev=>{
     const ex=prev.find(i=>i.id===p.id);
@@ -9229,6 +9259,18 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <button onClick={()=>{setStockOnly(true);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:stockOnly?700:400,background:stockOnly?"var(--accent)":"transparent",color:stockOnly?"#fff":"var(--text2)"}}>In Stock</button>
           </div>
           <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={()=>setShelfModal({})} title="Print shelf/bin label">📋 Shelf Label</button>
+          {onAddPart&&(
+            <button className="btn btn-sm" style={{flexShrink:0,background:"var(--green)",color:"#fff",border:"none",fontWeight:700,borderRadius:8,boxShadow:"0 2px 10px rgba(52,211,153,.35)"}}
+              title={adminUnlocked?"Add a new part to the spare shop catalog":"Add a new part — admin unlock required"}
+              onClick={()=>{
+                if(!adminUnlocked){ setShowUnlock(true); return; }
+                const code=(_dispV?.code||initialCode||"").toUpperCase();
+                onAddPart({
+                  _initialF:{sku:code?`${code}-`:""},
+                  ...(initialMake?{_tab:"fitment",_fitSearch:`${initialMake} ${_dispV?.model||initialModel||""}`.trim()}:{}),
+                });
+              }}>➕ Add Part{adminUnlocked?"":" 🔒"}</button>
+          )}
           <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} disabled={refreshing} title="Reload all inventory and requests from server"
             onClick={()=>{
               api.cacheInvalidate("parts");
@@ -9314,6 +9356,29 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
           user={userCtx?.id?{id:userCtx.id}:null}/>
       )}
 
+      {/* Cross-car search toggle — find parts listed under other models that also fit */}
+      {jobMode&&q&&(
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:12,padding:"8px 12px",borderRadius:10,fontSize:12,
+          background:allCarsSearch?"rgba(249,115,22,.08)":"var(--surface2)",
+          border:`1px solid ${allCarsSearch?"rgba(249,115,22,.35)":"var(--border)"}`}}>
+          {allCarsSearch?(
+            <>
+              <span style={{fontWeight:700,color:"var(--accent)"}}>🌍 Searching all cars</span>
+              <span style={{color:"var(--text3)"}}>
+                {extraLoading?"searching catalog…":`${extraMatches.length} part${extraMatches.length!==1?"s":""} from other cars — tagged 🔀 below, check fitment before ordering`}
+              </span>
+              <button className="btn btn-ghost btn-xs" style={{marginLeft:"auto",flexShrink:0}} onClick={()=>setAllCarsSearch(false)}>↩ This car only</button>
+            </>
+          ):(
+            <>
+              <span style={{color:"var(--text3)"}}>Only searching parts fitted to this car.</span>
+              <button className="btn btn-ghost btn-xs" style={{marginLeft:"auto",flexShrink:0,color:"var(--accent)",border:"1px solid rgba(249,115,22,.35)",fontWeight:700}}
+                onClick={()=>setAllCarsSearch(true)}>🌍 Search all cars for "{search.trim()}"</button>
+            </>
+          )}
+        </div>
+      )}
+
       {!jobMode&&vehicleFilterIds&&<div style={{fontSize:12,color:"var(--blue)",marginBottom:12,fontWeight:600}}>
         🚗 {filtered.length} parts match your vehicle
       </div>}
@@ -9337,7 +9402,14 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             );
           })()
         : filtered.length===0
-        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>{search||vehicleFilterIds?"No parts match your search":"No parts found for this branch"}</div>
+        ? <div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>
+            {search||vehicleFilterIds?"No parts match your search":"No parts found for this branch"}
+            {jobMode&&q&&!allCarsSearch&&(
+              <div style={{marginTop:12}}>
+                <button className="btn btn-primary btn-sm" onClick={()=>setAllCarsSearch(true)}>🌍 Search all cars for "{search.trim()}"</button>
+              </div>
+            )}
+          </div>
         : <>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14}}>
             {paged.map(p=>{
@@ -9363,6 +9435,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                         color:p._source==="local"?"var(--green)":"var(--blue)"}}>
                         {p._source==="local"?"🏬 Local Stock":"🏭 Head Office"}
                       </span>
+                      {p._otherCar&&<span title="Listed under another car — check fitment before ordering" style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(249,115,22,.15)",color:"var(--accent)"}}>🔀 Other car</span>}
                     </div>
                     {showSku&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2,fontFamily:"DM Mono,monospace"}}>{p.sku}{p.brand?` · ${p.brand}`:""}</div>}
                     {!showSku&&p.brand&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{p.brand}</div>}

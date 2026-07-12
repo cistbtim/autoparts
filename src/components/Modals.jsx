@@ -4699,28 +4699,36 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],onSend,o
           <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",flex:1}}>Part Details to Send</div>
           {isAdmin&&onEditPart&&<button className="btn btn-ghost btn-xs" title="Edit this part" onClick={()=>onEditPart(part)}>✏️ Edit Part</button>}
         </div>
-        <div style={{display:"flex",gap:14}}>
-          {partPhoto&&<img src={toImgUrl(partPhoto)} alt="" referrerPolicy="no-referrer" onClick={()=>setShowPhoto(true)}
-            style={{width:144,height:144,objectFit:"contain",background:"#fff",borderRadius:8,border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}
-            onError={e=>e.target.style.display="none"}/>}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"5px 16px",fontSize:13,flex:1}}>
-            {[
-              ["Name",part.name],
-              ["中文",part.chinese_desc||"—"],
-              ["SKU",part.sku],
-              ["OE#",part.oe_number||"—"],
-              ["Make",part.make||"—"],
-              ["Model",part.model||"—"],
-              ["Year",part.year_range||"—"],
-              ["Brand",part.brand||"—"],
-            ].map(([k,v])=>(
-              <div key={k} style={{display:"flex",gap:6}}>
-                <span style={{color:"var(--text3)",minWidth:40,flexShrink:0}}>{k}</span>
-                <span style={{fontWeight:500,fontFamily:k==="SKU"||k==="OE#"?"DM Mono,monospace":"inherit",fontSize:k==="SKU"||k==="OE#"?12:13}}>{v}</span>
+        {(()=>{
+          // Phones: photo on top, single detail column — the 144px photo + 2-column
+          // grid overflows the modal frame and cuts off the right column
+          const narrow=typeof window!=="undefined"&&window.innerWidth<640;
+          const rows=[
+            ["Name",part.name],
+            ["中文",part.chinese_desc||"—"],
+            ["SKU",part.sku],
+            ["OE#",part.oe_number||"—"],
+            ["Make",part.make||"—"],
+            ["Model",part.model||"—"],
+            ["Year",part.year_range||"—"],
+            ["Brand",part.brand||"—"],
+          ].filter(([,v],i)=>!narrow||i<1||v!=="—"); // on phones skip empty fields to save space
+          return (
+            <div style={{display:"flex",gap:narrow?10:14,flexDirection:narrow?"column":"row"}}>
+              {partPhoto&&<img src={toImgUrl(partPhoto)} alt="" referrerPolicy="no-referrer" onClick={()=>setShowPhoto(true)}
+                style={{width:narrow?"100%":144,height:144,objectFit:"contain",background:"#fff",borderRadius:8,border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}
+                onError={e=>e.target.style.display="none"}/>}
+              <div style={{display:"grid",gridTemplateColumns:narrow?"1fr":"1fr 1fr",gap:"5px 16px",fontSize:13,flex:1,minWidth:0}}>
+                {rows.map(([k,v])=>(
+                  <div key={k} style={{display:"flex",gap:6,minWidth:0}}>
+                    <span style={{color:"var(--text3)",minWidth:40,flexShrink:0}}>{k}</span>
+                    <span style={{fontWeight:500,fontFamily:k==="SKU"||k==="OE#"?"DM Mono,monospace":"inherit",fontSize:k==="SKU"||k==="OE#"?12:13,overflowWrap:"anywhere"}}>{v}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          );
+        })()}
       </div>
 
       <FD>
@@ -8500,11 +8508,24 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
             )}
           </div>
         </div>
-        <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,fontWeight:600,alignSelf:"center",
-          background:isSupplier?"rgba(52,211,153,.12)":"rgba(96,165,250,.12)",
-          color:isSupplier?"var(--green)":"var(--blue)"}}>
-          {isSupplier?"📥 Incoming":"📤 Outgoing"}
-        </span>
+        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",alignSelf:"center"}}>
+          {(()=>{
+            const ordered=items.map(i=>orderInfoFor(i.sku)).filter(Boolean);
+            if(!ordered.length) return null;
+            const supps=[...new Set(ordered.map(o=>o.supplier))].join(", ");
+            return (
+              <span title={ordered.map(o=>`${o.qty}× from ${o.supplier}${o.date?` · ${new Date(o.date).toLocaleDateString()}`:""}`).join("\n")}
+                style={{fontSize:11,padding:"2px 8px",borderRadius:99,fontWeight:700,background:"rgba(251,191,36,.15)",color:"#d97706",border:"1px solid rgba(251,191,36,.4)"}}>
+                📦 Ordered{items.length>1?` ${ordered.length}/${items.length}`:""} — {supps}
+              </span>
+            );
+          })()}
+          <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,fontWeight:600,
+            background:isSupplier?"rgba(52,211,153,.12)":"rgba(96,165,250,.12)",
+            color:isSupplier?"var(--green)":"var(--blue)"}}>
+            {isSupplier?"📥 Incoming":"📤 Outgoing"}
+          </span>
+        </div>
       </div>
 
       {/* Progress stepper — one glance tells where this request stands */}

@@ -8477,6 +8477,8 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
 
   const STEPS=[["pending","Requested"],["quoted","Quoted"],["confirmed","Confirmed"],["dispatched","Ready"],["completed","Collected"]];
   const stepIdx={pending:0,quoted:1,confirmed:2,dispatched:3,completed:4}[r.status]??-1;
+  const isNarrow=typeof window!=="undefined"&&window.innerWidth<640;
+  const actBtn=isNarrow?{flex:"1 1 45%",justifyContent:"center",textAlign:"center"}:{};
 
   return (
     <div className="card" style={{padding:18,marginBottom:14,borderLeft:`3px solid ${borderColor}`}}>
@@ -8509,12 +8511,12 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
       {r.status==="cancelled"
         ? <div style={{marginBottom:14}}>{statusBadge("cancelled")}</div>
         : (
-        <div style={{display:"flex",alignItems:"center",gap:2,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:2,marginBottom:14,flexWrap:"nowrap",overflowX:"auto",paddingBottom:3,scrollbarWidth:"none"}}>
           {STEPS.map(([k,l],i)=>{
             const done=i<stepIdx, active=i===stepIdx;
             return (
-              <div key={k} style={{display:"flex",alignItems:"center",gap:2}}>
-                <span style={{fontSize:11,fontWeight:active?800:600,padding:"3px 10px",borderRadius:99,whiteSpace:"nowrap",
+              <div key={k} style={{display:"flex",alignItems:"center",gap:2,flexShrink:0}}>
+                <span style={{fontSize:isNarrow?10:11,fontWeight:active?800:600,padding:isNarrow?"3px 7px":"3px 10px",borderRadius:99,whiteSpace:"nowrap",
                   background:active?"rgba(96,165,250,.18)":done?"rgba(52,211,153,.1)":"var(--surface2)",
                   color:active?"var(--blue)":done?"var(--green)":"var(--text3)",
                   border:`1px solid ${active?"rgba(96,165,250,.45)":done?"rgba(52,211,153,.3)":"var(--border)"}`}}>
@@ -8565,12 +8567,17 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
                   </div>
                 )}
               </div>
-              {q&&(
-                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0,marginLeft:"auto"}}>
-                  {q.price>0&&q.availability!=="not_available"&&<span style={{fontSize:15,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{Cs}{(+q.price).toFixed(2)}</span>}
-                  {availBadge(q.availability)}
-                  {q.notes&&<span style={{fontSize:10,color:"var(--text3)",maxWidth:160,textAlign:"right"}}>{q.notes}</span>}
-                </div>
+              {q&&(isNarrow
+                ? <div style={{flex:"1 1 100%",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:6,paddingTop:8,borderTop:"1px dashed var(--border)"}}>
+                    {q.price>0&&q.availability!=="not_available"&&<span style={{fontSize:16,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{Cs}{(+q.price).toFixed(2)}</span>}
+                    {availBadge(q.availability)}
+                    {q.notes&&<span style={{fontSize:10,color:"var(--text3)",marginLeft:"auto",textAlign:"right"}}>{q.notes}</span>}
+                  </div>
+                : <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0,marginLeft:"auto"}}>
+                    {q.price>0&&q.availability!=="not_available"&&<span style={{fontSize:15,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{Cs}{(+q.price).toFixed(2)}</span>}
+                    {availBadge(q.availability)}
+                    {q.notes&&<span style={{fontSize:10,color:"var(--text3)",maxWidth:160,textAlign:"right"}}>{q.notes}</span>}
+                  </div>
               )}
             </div>
           );
@@ -8689,41 +8696,41 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
       {/* Actions */}
       <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",borderTop:"1px solid var(--border)",paddingTop:12,marginTop:4}}>
         {isSupplier&&!isReplying&&(r.status==="pending"||r.status==="quoted")&&
-          <button className="btn btn-purple btn-sm" onClick={startReply}>
+          <button className="btn btn-purple btn-sm" style={actBtn} onClick={startReply}>
             {r.status==="quoted"?"✏️ Edit Quote":"💬 Reply with Quote"}
           </button>}
         {isSupplier&&r.status==="quoted"&&replyItems.length>0&&r.workshop_phone&&
-          <a href={waLink(r.workshop_phone,waQuoteMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Quote</a>}
+          <a href={waLink(r.workshop_phone,waQuoteMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none",...actBtn}}>💬 WhatsApp Quote</a>}
         {isSupplier&&r.status==="confirmed"&&<>
-          {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Workshop</a>}
-          <button className="btn btn-success btn-sm" disabled={isBusy} onClick={()=>patch({status:"dispatched",dispatched_at:new Date().toISOString()})}>🚚 Mark Ready for Collection</button>
+          {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none",...actBtn}}>💬 WhatsApp Workshop</a>}
+          <button className="btn btn-success btn-sm" style={actBtn} disabled={isBusy} onClick={()=>patch({status:"dispatched",dispatched_at:new Date().toISOString()})}>🚚 Mark Ready{isNarrow?"":" for Collection"}</button>
         </>}
         {isSupplier&&r.status==="dispatched"&&<>
-          {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 Notify Workshop</a>}
-          <button className="btn btn-ghost btn-sm" disabled={isBusy} onClick={()=>patch({status:"completed"})}>✅ Mark Collected</button>
+          {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none",...actBtn}}>💬 Notify Workshop</a>}
+          <button className="btn btn-ghost btn-sm" style={actBtn} disabled={isBusy} onClick={()=>patch({status:"completed"})}>✅ Mark Collected</button>
         </>}
         {isSupplier&&!["completed","cancelled"].includes(r.status)&&
-          <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto",color:"var(--red)",border:"1px solid rgba(248,113,113,.3)"}} disabled={isBusy} title="Cancels this request — the requester will see it as Cancelled"
+          <button className="btn btn-ghost btn-sm" style={{marginLeft:isNarrow?0:"auto",color:"var(--red)",border:"1px solid rgba(248,113,113,.3)",...actBtn}} disabled={isBusy} title="Cancels this request — the requester will see it as Cancelled"
             onClick={()=>{if(!window.confirm("Cancel this transfer request? The requester will be notified it's cancelled."))return;patch({status:"cancelled"});}}>✕ Cancel</button>}
 
         {/* Requester side */}
         {!isSupplier&&r.status==="pending"&&<span style={{fontSize:12,color:"var(--orange)",fontWeight:600}}>⏳ Awaiting quote from {supplyingBranch?.name||"branch"}…</span>}
         {!isSupplier&&r.status==="quoted"&&<>
-          <span style={{fontSize:12,color:"var(--purple)",fontWeight:600}}>💬 Quote received — review above and confirm</span>
-          <button className="btn btn-primary btn-sm" disabled={isBusy} onClick={acceptQuote}>✅ Accept & Update Prices</button>
-          <button className="btn btn-danger btn-sm" disabled={isBusy} title="Declines the quote and cancels this request"
+          <span style={{fontSize:12,color:"var(--purple)",fontWeight:600,flex:isNarrow?"1 1 100%":undefined}}>💬 Quote received — review above and confirm</span>
+          <button className="btn btn-primary btn-sm" style={actBtn} disabled={isBusy} onClick={acceptQuote}>✅ Accept & Update Prices</button>
+          <button className="btn btn-danger btn-sm" style={actBtn} disabled={isBusy} title="Declines the quote and cancels this request"
             onClick={()=>{if(!window.confirm("Decline this quote and cancel the request?"))return;patch({status:"cancelled"});}}>✕ Decline Quote</button>
         </>}
         {!isSupplier&&r.status==="confirmed"&&<span style={{fontSize:12,color:"var(--blue)",fontWeight:600}}>✅ Accepted — {supplyingBranch?.name||"branch"} is preparing your parts</span>}
         {!isSupplier&&r.status==="dispatched"&&<>
-          <span style={{fontSize:12,color:"var(--green)",fontWeight:700}}>📦 Parts ready! Notify your workshop customer.</span>
-          {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none"}}>💬 WhatsApp Workshop</a>}
+          <span style={{fontSize:12,color:"var(--green)",fontWeight:700,flex:isNarrow?"1 1 100%":undefined}}>📦 Parts ready! Notify your workshop customer.</span>
+          {r.workshop_phone&&<a href={waLink(r.workshop_phone,waReadyMsg)} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:"#25D366",color:"#fff",textDecoration:"none",...actBtn}}>💬 WhatsApp Workshop</a>}
         </>}
         {!isSupplier&&r.status==="completed"&&<span style={{fontSize:12,color:"var(--text3)"}}>✅ Completed</span>}
         {!isSupplier&&r.status==="cancelled"&&<span style={{fontSize:12,color:"var(--red)"}}>✕ Cancelled</span>}
         {r.status==="cancelled"&&
           <button className="btn btn-ghost btn-sm" disabled={isBusy} onClick={()=>patch({status:"pending"})}>↩️ Reopen</button>}
-        {onDelete&&<button className="btn btn-ghost btn-sm" style={{marginLeft:isSupplier&&!["completed","cancelled"].includes(r.status)?0:"auto",color:"var(--red)",border:"1px solid rgba(248,113,113,.3)"}} disabled={isBusy}
+        {onDelete&&<button className="btn btn-ghost btn-sm" style={{marginLeft:isNarrow||(isSupplier&&!["completed","cancelled"].includes(r.status))?0:"auto",color:"var(--red)",border:"1px solid rgba(248,113,113,.3)",...actBtn}} disabled={isBusy}
           onClick={async()=>{if(!window.confirm("Delete this transfer request?"))return;await onDelete(r.id);}}>
           🗑️ Delete
         </button>}

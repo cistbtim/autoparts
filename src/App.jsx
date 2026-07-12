@@ -5485,14 +5485,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         <MapBase viewBox={getVB(sc)}>
                           {scd&&Object.entries(scd.provinces).map(([prov,cnt],i)=>{
                             const ll=PROV_LL[prov];if(!ll)return null;
-                            const r=8;
+                            const r=2.4; // 30% of the old size — full-size pins swallowed the zoomed country map
                             const cx=+mX(ll[1]).toFixed(1),cy=+mY(ll[0]).toFixed(1);
                             return(
                               <g key={i} transform={`translate(${cx},${cy})`} onClick={()=>{setSelectedMapProvince(prov);setSelectedMapCity(null);}} style={{cursor:"pointer"}}>
-                                <circle r={r+1} fill="rgba(251,191,36,0.08)"/>
-                                <circle r={r} fill="#d97706" stroke="#fef08a" strokeWidth={1.2} filter="url(#pinGlow)"/>
+                                <circle r={r+0.3} fill="rgba(251,191,36,0.08)"/>
+                                <circle r={r} fill="#d97706" stroke="#fef08a" strokeWidth={0.4} filter="url(#pinGlow)"/>
                                 <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={r*0.85} fontWeight="700" fontFamily="DM Mono,monospace">{cnt}</text>
-                                <text y={r+5} textAnchor="middle" fill="#fbbf24" fontSize={4.5} fontWeight="600">{prov}</text>
+                                <text y={r+1.6} textAnchor="middle" fill="#fbbf24" fontSize={1.4} fontWeight="600">{prov}</text>
                               </g>
                             );
                           })}

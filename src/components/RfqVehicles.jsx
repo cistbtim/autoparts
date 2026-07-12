@@ -1878,13 +1878,18 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
     return prefix + String(num+1).padStart(3,'0') + 'A';
   };
   // When search is active, base the new code on the visible filtered group.
-  // When a model is provided, first try to find the model-group codes (e.g. "121" → MZ11x).
+  // When a model is provided, try each word of it against existing models
+  // (e.g. "G02 X4 LCI" → no G02 group, but "X4" matches the X4 group → BM074D).
   const nextCodeForMake = (make, model) => {
     const pool = search.trim() && filtered.length ? filtered : inMake.length ? inMake : vehicles.filter(v=>v.make===make);
     if (model) {
-      const token = model.split(/[\s\/\(]/)[0].toUpperCase();
-      if (token.length >= 2) {
-        const group = pool.filter(v=>v.model.toUpperCase().startsWith(token) && v.code);
+      const tokens = model.toUpperCase().split(/[\s\/\(\)]+/).filter(tk=>tk.length>=2);
+      for (const token of tokens) {
+        const group = pool.filter(v=>{
+          if (!v.code) return false;
+          const m = (v.model||'').toUpperCase();
+          return m.startsWith(token) || m.split(/[\s\/\(\)]+/).includes(token);
+        });
         if (group.length > 0) return nextCodeFromList(group, make);
       }
     }

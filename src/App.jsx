@@ -1444,17 +1444,53 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     // Check target workshop exists
     const check=await api.get("workshop_profiles",`id=eq.${tid}&select=id`).catch(()=>[]);
     if(!Array.isArray(check)||check.length===0) throw new Error(`Workshop "${tid}" not found`);
-    // Move job and all related records
-    await api.patch("workshop_jobs","id",jobId,{workshop_id:tid});
-    await api.patch("workshop_job_items","job_id",jobId,{workshop_id:tid});
     const job=workshopJobs.find(j=>j.id===jobId);
+    if(!job) throw new Error("Job not found");
+
+    // The customer/vehicle records (incl. car photos) are scoped by workshop_id
+    // just like everything else, so moving the job alone leaves them invisible
+    // to the target workshop. Move them along with it — unless another job is
+    // still using the same customer/vehicle and staying behind in this
+    // workshop, in which case clone instead of stealing them out from under it.
+    let newCustomerId=job.workshop_customer_id;
+    if(job.workshop_customer_id){
+      const sharedElsewhere=workshopJobs.some(j=>j.id!==jobId&&j.workshop_customer_id===job.workshop_customer_id);
+      if(sharedElsewhere){
+        const cust=workshopCustomers.find(c=>c.id===job.workshop_customer_id);
+        if(cust){
+          const {id,...rest}=cust;
+          newCustomerId=makeId("WSC");
+          await api.insert("workshop_customers",{...rest,id:newCustomerId,workshop_id:tid});
+        }
+      } else {
+        await api.patch("workshop_customers","id",job.workshop_customer_id,{workshop_id:tid});
+      }
+    }
+    let newVehicleId=job.workshop_vehicle_id;
+    if(job.workshop_vehicle_id){
+      const sharedElsewhere=workshopJobs.some(j=>j.id!==jobId&&j.workshop_vehicle_id===job.workshop_vehicle_id);
+      if(sharedElsewhere){
+        const veh=workshopVehicles.find(v=>v.id===job.workshop_vehicle_id);
+        if(veh){
+          const {id,...rest}=veh;
+          newVehicleId=makeId("WSV");
+          await api.insert("workshop_vehicles",{...rest,id:newVehicleId,workshop_customer_id:newCustomerId,workshop_id:tid});
+        }
+      } else {
+        await api.patch("workshop_vehicles","id",job.workshop_vehicle_id,{workshop_id:tid,workshop_customer_id:newCustomerId});
+      }
+    }
+
+    // Move job and all related records
+    await api.patch("workshop_jobs","id",jobId,{workshop_id:tid,workshop_customer_id:newCustomerId,workshop_vehicle_id:newVehicleId});
+    await api.patch("workshop_job_items","job_id",jobId,{workshop_id:tid});
     // Move invoice(s) for this job
     const jobInvoices=workshopInvoices.filter(i=>i.job_id===jobId);
     for(const inv of jobInvoices) await api.patch("workshop_invoices","id",inv.id,{workshop_id:tid});
     // Move quote(s) for this job
     const jobQuotes=workshopQuotes.filter(q=>q.job_id===jobId);
     for(const q of jobQuotes) await api.patch("workshop_quotes","id",q.id,{workshop_id:tid});
-    await refreshTables("workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes");
+    await refreshTables("workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes","workshop_customers","workshop_vehicles");
     showToast(`Job moved to workshop ${tid}`);
   };
   const saveJobItem=async(item)=>{

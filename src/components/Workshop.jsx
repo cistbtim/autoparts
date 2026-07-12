@@ -28,7 +28,7 @@ import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart}) {
+export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -305,6 +305,10 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
+        wsProfiles={wsProfiles}
+        wsFriends={wsFriends}
+        onAddWsFriend={onAddWsFriend}
+        onRemoveWsFriend={onRemoveWsFriend}
         mainBranchId={branches.find(b=>b.is_main)?.id||null}
         wsShopRequests={wsShopRequests.filter(r=>r.job_id===activeJob.id)}
         onSaveWsShopRequest={onSaveWsShopRequest}
@@ -3606,7 +3610,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -6914,6 +6918,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       {moveModal&&(
         <MoveJobModal
           job={job}
+          wsId={wsId}
+          wsProfiles={wsProfiles}
+          wsFriends={wsFriends}
+          onAddFriend={onAddWsFriend}
+          onRemoveFriend={onRemoveWsFriend}
           onMove={onMoveJob}
           onClose={()=>setMoveModal(false)}/>
       )}
@@ -7316,19 +7325,45 @@ function JobCardLabelModal({job, settings, onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // MOVE JOB MODAL
 // ═══════════════════════════════════════════════════════════════
-function MoveJobModal({job,onMove,onClose}) {
+function MoveJobModal({job,wsId,wsProfiles=[],wsFriends=[],onAddFriend,onRemoveFriend,onMove,onClose}) {
   const [targetId,setTargetId]=useState("");
+  const [search,setSearch]=useState("");
   const [saving,setSaving]=useState(false);
+  const [addingId,setAddingId]=useState(null);
+
+  const profileMap=Object.fromEntries(wsProfiles.map(p=>[String(p.id),p]));
+  const friends=wsFriends
+    .map(f=>({...f,profile:profileMap[String(f.friend_workshop_id)]}))
+    .filter(f=>f.profile);
+
+  const searchResults=search.trim()
+    ? wsProfiles.filter(p=>
+        String(p.id)!==String(wsId) &&
+        !friends.some(f=>String(f.friend_workshop_id)===String(p.id)) &&
+        `${p.name||""} ${p.city||""} ${p.country||""} ${p.id}`.toLowerCase().includes(search.trim().toLowerCase())
+      ).slice(0,8)
+    : [];
+
+  const targetProfile=profileMap[targetId.trim()];
 
   const handleMove=async()=>{
-    if(!targetId.trim()){alert("Enter the target Workshop ID");return;}
+    if(!targetId.trim()){alert("Select or enter the target Workshop ID");return;}
+    const label=targetProfile?`${targetProfile.name||targetProfile.id} (${targetProfile.id})`:targetId.trim();
     if(!window.confirm(
-      `Move job ${job.id} (${job.customer_name}) to workshop "${targetId.trim()}"?\n\nThis will also move all related quotes and invoices.`
+      `Move job ${job.id} (${job.customer_name}) to workshop "${label}"?\n\nThis will also move all related quotes and invoices.`
     )) return;
     setSaving(true);
     try{
       await onMove(targetId.trim());
     }catch(e){ alert("Move failed: "+e.message); setSaving(false); }
+  };
+
+  const handleAddFriend=async(p)=>{
+    if(!onAddFriend) return;
+    setAddingId(p.id);
+    try{ await onAddFriend(p.id); }
+    catch(e){ alert("Could not add friend: "+e.message); }
+    setAddingId(null);
   };
 
   return (
@@ -7338,13 +7373,65 @@ function MoveJobModal({job,onMove,onClose}) {
         <div style={{fontWeight:700,marginBottom:4}}>{job.customer_name} · <code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{job.id}</code></div>
         <div style={{color:"var(--text3)"}}>🚗 {job.vehicle_reg||"—"} · {job.date_in}</div>
       </div>
+
+      {friends.length>0&&(
+        <div style={{marginBottom:14}}>
+          <FL label="⭐ My Workshop Friends"/>
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:6}}>
+            {friends.map(f=>(
+              <div key={f.id}
+                onClick={()=>setTargetId(String(f.friend_workshop_id))}
+                style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"8px 12px",
+                  borderRadius:8,cursor:"pointer",
+                  border:`1.5px solid ${targetId.trim()===String(f.friend_workshop_id)?"var(--accent)":"var(--border)"}`,
+                  background:targetId.trim()===String(f.friend_workshop_id)?"rgba(249,115,22,.08)":"var(--surface)"}}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.profile.name||f.profile.id}</div>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>{[f.profile.city,f.profile.country].filter(Boolean).join(", ")||"—"}</div>
+                </div>
+                {onRemoveFriend&&<button onClick={e=>{e.stopPropagation();onRemoveFriend(f.id);}}
+                  title="Remove from friends"
+                  style={{flexShrink:0,background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:16,padding:2}}>✕</button>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{marginBottom:14}}>
+        <FL label="Find a Workshop"/>
+        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="Search by name, city or ID..."/>
+        {search.trim()&&(
+          <div style={{marginTop:6,border:"1px solid var(--border)",borderRadius:8,maxHeight:180,overflowY:"auto"}}>
+            {searchResults.length===0
+              ? <div style={{padding:12,fontSize:12,color:"var(--text3)"}}>No match</div>
+              : searchResults.map(p=>(
+                <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"8px 12px",borderBottom:"1px solid var(--border)"}}>
+                  <div onClick={()=>{setTargetId(String(p.id));setSearch("");}} style={{cursor:"pointer",minWidth:0,flex:1}}>
+                    <div style={{fontWeight:600,fontSize:13}}>{p.name||p.id}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{[p.city,p.country].filter(Boolean).join(", ")||"—"} · <code style={{fontFamily:"DM Mono,monospace"}}>{p.id}</code></div>
+                  </div>
+                  {onAddFriend&&<button onClick={()=>handleAddFriend(p)} disabled={addingId===p.id}
+                    className="btn btn-ghost btn-xs" style={{flexShrink:0,whiteSpace:"nowrap"}}>
+                    {addingId===p.id?"...":"+ Friend"}
+                  </button>}
+                </div>
+              ))
+            }
+          </div>
+        )}
+      </div>
+
       <div style={{marginBottom:16}}>
         <FL label="Target Workshop ID"/>
         <input className="inp" value={targetId} onChange={e=>setTargetId(e.target.value)}
           placeholder="e.g. WS-00123"
           style={{fontFamily:"DM Mono,monospace"}}/>
         <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>
-          The job, all job items, quotes and invoices will be reassigned to this workshop.
+          {targetProfile
+            ? `→ ${targetProfile.name||targetProfile.id}${targetProfile.city?` · ${targetProfile.city}`:""}`
+            : "The job, all job items, quotes and invoices will be reassigned to this workshop."}
         </div>
       </div>
       <div style={{display:"flex",gap:10}}>

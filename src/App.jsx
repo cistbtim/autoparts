@@ -232,6 +232,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [workshopStock,setWorkshopStock]=useState([]);
   const [workshopServices,setWorkshopServices]=useState([]);
   const [workshopSuppliers,setWorkshopSuppliers]=useState([]);
+  const [workshopFriends,setWorkshopFriends]=useState([]); // workshops this workshop has added as quick-pick move targets
   const [wsSupplierRequests,setWsSupplierRequests]=useState([]);
   const [wsSupplierQuotes,  setWsSupplierQuotes]  =useState([]);
   const [wsSupplierInvoices,setWsSupplierInvoices]=useState([]);
@@ -570,6 +571,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       needsWs ? api.get("workshop_documents",`select=*&order=uploaded_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_profiles","select=id,name,city,country&order=name.asc").catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("workshop_suppliers",`select=*&order=name.asc${wsF}`).catch(()=>[]) : Promise.resolve([]),
+      needsWs ? api.get("workshop_friends",`select=*&order=created_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("ws_supplier_requests",`select=*&order=sent_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("ws_supplier_quotes",`select=*&order=quoted_at.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
       needsWs ? api.get("ws_supplier_invoices",`select=*&order=invoice_date.desc${wsF}`).catch(()=>[]) : Promise.resolve([]),
@@ -622,21 +624,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setWorkshopDocuments(Array.isArray(rest[14])?rest[14]:[]);
     setAllWsProfiles(Array.isArray(rest[15])?rest[15]:[]);
     setWorkshopSuppliers(Array.isArray(rest[16])?rest[16]:[]);
-    setWsSupplierRequests(Array.isArray(rest[17])?rest[17]:[]);
-    setWsSupplierQuotes(Array.isArray(rest[18])?rest[18]:[]);
-    setWsSupplierInvoices(Array.isArray(rest[19])?rest[19]:[]);
-    setWsSupplierInvItems(Array.isArray(rest[20])?rest[20]:[]);
-    setWsSupplierPayments(Array.isArray(rest[21])?rest[21]:[]);
-    setWsSupplierReturns(Array.isArray(rest[22])?rest[22]:[]);
-    setWsSqReplies(Array.isArray(rest[23])?rest[23]:[]);
-    setWsPurchaseOrders(Array.isArray(rest[24])?rest[24]:[]);
-    setWsPoItems(Array.isArray(rest[25])?rest[25]:[]);
-    setWsLicenceRenewals(Array.isArray(rest[26])?rest[26]:[]);
-    setWsBookings(Array.isArray(rest[27])?rest[27]:[]);
-    setAllScrapVehicles(Array.isArray(rest[28])?rest[28]:[]);
-    setAllScrapParts(Array.isArray(rest[29])?rest[29]:[]);
-    setAllScrapProfiles(Array.isArray(rest[30])?rest[30]:[]);
-    setWorkshopFeedback(Array.isArray(rest[31])?rest[31]:[]);
+    setWorkshopFriends(Array.isArray(rest[17])?rest[17]:[]);
+    setWsSupplierRequests(Array.isArray(rest[18])?rest[18]:[]);
+    setWsSupplierQuotes(Array.isArray(rest[19])?rest[19]:[]);
+    setWsSupplierInvoices(Array.isArray(rest[20])?rest[20]:[]);
+    setWsSupplierInvItems(Array.isArray(rest[21])?rest[21]:[]);
+    setWsSupplierPayments(Array.isArray(rest[22])?rest[22]:[]);
+    setWsSupplierReturns(Array.isArray(rest[23])?rest[23]:[]);
+    setWsSqReplies(Array.isArray(rest[24])?rest[24]:[]);
+    setWsPurchaseOrders(Array.isArray(rest[25])?rest[25]:[]);
+    setWsPoItems(Array.isArray(rest[26])?rest[26]:[]);
+    setWsLicenceRenewals(Array.isArray(rest[27])?rest[27]:[]);
+    setWsBookings(Array.isArray(rest[28])?rest[28]:[]);
+    setAllScrapVehicles(Array.isArray(rest[29])?rest[29]:[]);
+    setAllScrapParts(Array.isArray(rest[30])?rest[30]:[]);
+    setAllScrapProfiles(Array.isArray(rest[31])?rest[31]:[]);
+    setWorkshopFeedback(Array.isArray(rest[32])?rest[32]:[]);
     setBgLoading(0); // all background tables done
     // Ads — load for everyone, fail silently if table doesn't exist yet
     api.get("ads","select=*&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAds(r);});
@@ -1642,6 +1645,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     await api.delete("workshop_suppliers","id",id);
     setWorkshopSuppliers(prev=>prev.filter(s=>s.id!==id));
     showToast("Deleted","err");
+  };
+  const addWorkshopFriend=async(friendWsId)=>{
+    if(!wsId||!friendWsId||String(friendWsId)===String(wsId)) return;
+    if(workshopFriends.some(f=>String(f.friend_workshop_id)===String(friendWsId))) return;
+    const newFriend={id:makeId("WSF"),workshop_id:wsId,friend_workshop_id:String(friendWsId),created_at:new Date().toISOString()};
+    const r=await api.insert("workshop_friends",newFriend);
+    if(r&&!Array.isArray(r)&&(r.code||r.message)) throw new Error(r.message||r.code);
+    setWorkshopFriends(prev=>[newFriend,...prev]);
+    showToast("Added to workshop friends");
+  };
+  const removeWorkshopFriend=async(id)=>{
+    await api.delete("workshop_friends","id",id);
+    setWorkshopFriends(prev=>prev.filter(f=>f.id!==id));
   };
   const saveWsSupplierQuote=async(qt)=>{
     const {id,...rest}=qt;
@@ -5807,6 +5823,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             wsRole={wsRole}
             wsId={wsId}
             wsProfiles={allWsProfiles}
+            wsFriends={workshopFriends}
+            onAddWsFriend={addWorkshopFriend}
+            onRemoveWsFriend={removeWorkshopFriend}
             wsSqReplies={wsSqReplies}
             wsPurchaseOrders={wsPurchaseOrders}
             wsPoItems={wsPoItems}

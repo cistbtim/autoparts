@@ -201,9 +201,9 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
     if(!u) return [u];
     const m = u.match(/thumbnail[?]id=([^&]+)/);
     if(m) return [
+      `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1600`,
       `https://drive.google.com/thumbnail?id=${m[1]}&sz=w800`,
       `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`,
-      `https://drive.google.com/thumbnail?id=${m[1]}&sz=w200`,
     ];
     return [u];
   };
@@ -271,7 +271,7 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
       )}
 
       <img key={src} src={src} alt="photo"
-        style={{maxWidth:"90%",maxHeight:"90%",objectFit:"contain",
+        style={{width:"96vw",height:"92vh",objectFit:"contain",
           display:status==="ok"?"block":"none",borderRadius:8}}
         referrerPolicy="no-referrer"
         onLoad={()=>setStatus("ok")}
@@ -331,7 +331,7 @@ function ComparePane({title, src}) {
       {status==="loading"&&<div style={{width:32,height:32,border:"3px solid rgba(255,255,255,.2)",borderTop:"3px solid #fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>}
       {status==="error"&&<div style={{color:"rgba(255,255,255,.5)",fontSize:12}}>Failed to load</div>}
       {attempt&&<img key={attempt} src={attempt} alt={title} referrerPolicy="no-referrer"
-        style={{maxWidth:"100%",maxHeight:"58vh",objectFit:"contain",display:status==="ok"?"block":"none",borderRadius:8}}
+        style={{width:"100%",height:"70vh",objectFit:"contain",display:status==="ok"?"block":"none",borderRadius:8}}
         onLoad={()=>setStatus("ok")}
         onError={()=>{ if(tryIdx<sizes.length-1) setTryIdx(i=>i+1); else setStatus("error"); }}
         onClick={e=>e.stopPropagation()}/>}

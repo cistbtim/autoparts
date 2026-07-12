@@ -1201,7 +1201,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
         <div onClick={()=>setZoomed(false)}
           style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
           <img src={toFullUrl(imageUrl)||preview} alt="part"
-            style={{maxWidth:"92vw",maxHeight:"88vh",objectFit:"contain",borderRadius:10,boxShadow:"0 8px 48px rgba(0,0,0,.6)"}}
+            style={{width:"96vw",height:"92vh",objectFit:"contain",borderRadius:10,boxShadow:"0 8px 48px rgba(0,0,0,.6)"}}
             onError={e=>{e.target.src=preview;}}
             onClick={e=>e.stopPropagation()}/>
           <button onClick={()=>setZoomed(false)}
@@ -1785,7 +1785,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
           style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
           <div onClick={e=>e.stopPropagation()} style={{position:"relative",maxWidth:"92vw",maxHeight:"90vh",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
             <img src={toImgUrl(lightbox.photos[lightbox.idx].url)} alt={lightbox.photos[lightbox.idx].label}
-              style={{maxWidth:"88vw",maxHeight:"78vh",objectFit:"contain",borderRadius:10,boxShadow:"0 8px 48px rgba(0,0,0,.6)"}}/>
+              style={{width:"92vw",height:"74vh",objectFit:"contain",borderRadius:10,boxShadow:"0 8px 48px rgba(0,0,0,.6)"}}/>
             <div style={{color:"#fff",fontWeight:700,fontSize:15,letterSpacing:".05em"}}>{lightbox.photos[lightbox.idx].label}</div>
             {lightbox.photos.length>1&&(
               <div style={{display:"flex",gap:10}}>

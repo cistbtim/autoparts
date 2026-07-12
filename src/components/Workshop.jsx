@@ -2464,7 +2464,7 @@ function OcrQuoteModal({parts=[], onApply, onClose}) {
           {zoomed&&imgSrc&&(
             <div onClick={()=>setZoomed(false)}
               style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
-              <img src={imgSrc} alt="" style={{maxWidth:"95vw",maxHeight:"95vh",objectFit:"contain",borderRadius:8}}/>
+              <img src={imgSrc} alt="" style={{width:"96vw",height:"94vh",objectFit:"contain",borderRadius:8}}/>
               <button onClick={e=>{e.stopPropagation();setZoomed(false);}}
                 style={{position:"absolute",top:16,right:20,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:28,width:44,height:44,borderRadius:"50%",cursor:"pointer",lineHeight:1}}>×</button>
             </div>
@@ -5024,7 +5024,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               style={{position:"absolute",left:16,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",width:48,height:48,fontSize:24,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>}
             {/* Image */}
             <div onClick={e=>e.stopPropagation()} style={{maxWidth:"90vw",maxHeight:"85vh",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-              <img src={photo.url} alt={photo.label} style={{maxWidth:"90vw",maxHeight:"78vh",objectFit:"contain",borderRadius:8,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
+              <img src={photo.url} alt={photo.label} style={{width:"90vw",height:"74vh",objectFit:"contain",borderRadius:8,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
               <div style={{color:"#fff",fontWeight:700,fontSize:14,letterSpacing:".05em"}}>{photo.label} <span style={{opacity:.5,fontWeight:400,fontSize:12}}>{idx+1} / {visiblePhotos.length}</span></div>
             </div>
             {/* Next arrow */}

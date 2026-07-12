@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Component } from "react";
+import { createPortal } from "react-dom";
 import { toLogoUrl, extractDriveId, detectGeoLocation, fetchWeather, classifyWeather } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { api } from "../lib/api.js";
@@ -241,7 +242,11 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
     if(dx > 0 && idx > 0)             goTo(idx-1);
   };
 
-  return (
+  // Portal to <body> — if this renders inside an ancestor with a CSS transform
+  // (e.g. .kb-card:hover translateY) + overflow:hidden, position:fixed resolves
+  // against that ancestor: the lightbox collapses into the card, hover toggles,
+  // and it flickers in a loop.
+  return createPortal(
     <div onClick={onClose}
       onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
       style={{position:"fixed",top:0,left:0,right:0,bottom:0,
@@ -296,7 +301,8 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
           border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",
           width:38,height:38,display:"flex",alignItems:"center",justifyContent:"center",
           cursor:"pointer",fontSize:18,fontWeight:700,zIndex:100000}}>✕</div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -356,7 +362,9 @@ export function CompareLightbox({left, right, labels, startIdx=0, onClose}) {
     alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:22,
     zIndex:100000};
 
-  return (
+  // Portal to <body> for the same reason as ImgLightbox — position:fixed breaks
+  // inside transformed ancestors.
+  return createPortal(
     <div onClick={onClose} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
       style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.96)",
         zIndex:99999,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -383,7 +391,8 @@ export function CompareLightbox({left, right, labels, startIdx=0, onClose}) {
           border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",
           width:38,height:38,display:"flex",alignItems:"center",justifyContent:"center",
           cursor:"pointer",fontSize:18,fontWeight:700,zIndex:100000}}>✕</div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

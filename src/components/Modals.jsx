@@ -8475,67 +8475,101 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
   const waQuoteMsg=`Hi ${r.workshop_name||"there"}, here is your parts quote from ${supplyingBranch?.name||"the branch"}:\n\n${quotedList}${r.reply_notes?`\n\nNotes: ${r.reply_notes}`:""}\n\nPlease confirm if you'd like to proceed.`;
   const waReadyMsg=`Hi ${r.workshop_name||"there"}, your parts are ready for collection at ${supplyingBranch?.name||"the branch"}. Thank you!`;
 
+  const STEPS=[["pending","Requested"],["quoted","Quoted"],["confirmed","Confirmed"],["dispatched","Ready"],["completed","Collected"]];
+  const stepIdx={pending:0,quoted:1,confirmed:2,dispatched:3,completed:4}[r.status]??-1;
+
   return (
     <div className="card" style={{padding:18,marginBottom:14,borderLeft:`3px solid ${borderColor}`}}>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:10}}>
         <div>
           <div style={{fontWeight:700,fontSize:15}}>{r.workshop_name||"Workshop"}</div>
-          <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
-            {isSupplier&&reqBranch&&<span>From: <strong>{reqBranch.name}</strong> · </span>}
-            {!isSupplier&&supplyingBranch&&<span>To: <strong>{supplyingBranch.name}</strong> · </span>}
-            {r.created_at&&new Date(r.created_at).toLocaleDateString()}
-            {r.workshop_phone&&<span> · 📱 {r.workshop_phone}</span>}
-            {r.workshop_email&&<span> · ✉️ {r.workshop_email}</span>}
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:2,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+            {isSupplier&&reqBranch&&<span>From: <strong>{reqBranch.name}</strong> ·</span>}
+            {!isSupplier&&supplyingBranch&&<span>To: <strong>{supplyingBranch.name}</strong> ·</span>}
+            {r.created_at&&<span>{new Date(r.created_at).toLocaleDateString()}</span>}
+            {r.workshop_phone&&(
+              <a href={waLink(r.workshop_phone,"")} target="_blank" rel="noreferrer" title={r.workshop_phone}
+                style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:24,height:24,borderRadius:6,background:"var(--surface2)",border:"1px solid var(--border)",textDecoration:"none",fontSize:12}}>📱</a>
+            )}
+            {r.workshop_email&&(
+              <a href={`mailto:${r.workshop_email}`} title={r.workshop_email}
+                style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:24,height:24,borderRadius:6,background:"var(--surface2)",border:"1px solid var(--border)",textDecoration:"none",fontSize:12}}>✉️</a>
+            )}
           </div>
         </div>
-        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-          <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,fontWeight:600,
-            background:isSupplier?"rgba(52,211,153,.12)":"rgba(96,165,250,.12)",
-            color:isSupplier?"var(--green)":"var(--blue)"}}>
-            {isSupplier?"📥 Incoming":"📤 Outgoing"}
-          </span>
-          {statusBadge(r.status)}
-        </div>
+        <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,fontWeight:600,alignSelf:"center",
+          background:isSupplier?"rgba(52,211,153,.12)":"rgba(96,165,250,.12)",
+          color:isSupplier?"var(--green)":"var(--blue)"}}>
+          {isSupplier?"📥 Incoming":"📤 Outgoing"}
+        </span>
       </div>
 
-      {/* Requested items */}
-      <div style={{marginBottom:10}}>
-        <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:5}}>Requested Items</div>
+      {/* Progress stepper — one glance tells where this request stands */}
+      {r.status==="cancelled"
+        ? <div style={{marginBottom:14}}>{statusBadge("cancelled")}</div>
+        : (
+        <div style={{display:"flex",alignItems:"center",gap:2,marginBottom:14,flexWrap:"wrap"}}>
+          {STEPS.map(([k,l],i)=>{
+            const done=i<stepIdx, active=i===stepIdx;
+            return (
+              <div key={k} style={{display:"flex",alignItems:"center",gap:2}}>
+                <span style={{fontSize:11,fontWeight:active?800:600,padding:"3px 10px",borderRadius:99,whiteSpace:"nowrap",
+                  background:active?"rgba(96,165,250,.18)":done?"rgba(52,211,153,.1)":"var(--surface2)",
+                  color:active?"var(--blue)":done?"var(--green)":"var(--text3)",
+                  border:`1px solid ${active?"rgba(96,165,250,.45)":done?"rgba(52,211,153,.3)":"var(--border)"}`}}>
+                  {done?"✓ ":""}{l}
+                </span>
+                {i<STEPS.length-1&&<span style={{fontSize:10,color:"var(--text3)",padding:"0 2px"}}>→</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Items — request + stock + quote merged into one row per part */}
+      <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:10}}>
         {items.map((i,idx)=>{
           const stock=getItemStock(i,r.supplying_branch_id);
           const stockColor=stock==null?"var(--text3)":stock>0?"var(--green)":"var(--orange)";
-          const stockLabel=stock==null?"—":stock>0?`${stock} in stock`:"0 — need to order";
+          const stockLabel=stock==null?"stock —":stock>0?`${stock} in stock`:"0 in stock";
           const itemPart=i.partId?parts.find(p=>String(p.id)===String(i.partId)):null;
           const itemPhoto=itemPart?.image_url||"";
           const orderInfo=orderInfoFor(i.sku);
+          const q=!isReplying?(replyItems.find(x=>x.sku&&i.sku&&x.sku===i.sku)||replyItems[idx]||null):null;
           return(
-            <div key={idx} style={{padding:"8px 10px",background:"var(--surface2)",borderRadius:8,marginBottom:6}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                {itemPhoto&&<img src={toImgUrl(itemPhoto)} alt="" referrerPolicy="no-referrer" onClick={()=>setLightbox(itemPhoto)}
-                  style={{width:32,height:32,objectFit:"cover",borderRadius:6,border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}
-                  onError={e=>e.target.style.display="none"}/>}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.name}</div>
-                  {i.sku&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{i.sku}</div>}
+            <div key={idx} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:idx%2?"var(--surface)":"var(--surface2)",borderBottom:idx<items.length-1?"1px solid var(--border)":"none",flexWrap:"wrap"}}>
+              {itemPhoto
+                ? <img src={toImgUrl(itemPhoto)} alt="" referrerPolicy="no-referrer" onClick={()=>setLightbox(itemPhoto)}
+                    style={{width:40,height:40,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}
+                    onError={e=>e.target.style.visibility="hidden"}/>
+                : <div style={{width:40,height:40,borderRadius:8,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>🔩</div>}
+              <div style={{flex:"1 1 180px",minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:700,lineHeight:1.3}}>
+                  {i.name} {+i.qty>1&&<span style={{color:"var(--text3)",fontWeight:600}}>×{i.qty}</span>}
                 </div>
-                <span style={{fontSize:13,color:"var(--text2)",fontWeight:600,flexShrink:0}}>×{i.qty}</span>
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-                <span style={{fontSize:11,fontWeight:600,color:stockColor}}>📦 {stockLabel}</span>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <div style={{fontSize:11,color:"var(--text3)",display:"flex",gap:8,flexWrap:"wrap",marginTop:2,alignItems:"center"}}>
+                  {i.sku&&<code style={{fontFamily:"DM Mono,monospace"}}>{i.sku}</code>}
+                  <span style={{color:stockColor,fontWeight:600}}>📦 {stockLabel}</span>
                   {itemPart&&onSendInquiry&&(
-                    <button className="btn btn-ghost btn-xs" style={{whiteSpace:"nowrap"}} title="Request price/stock from suppliers" onClick={()=>setRfqPart(itemPart)}>📩 Ask Suppliers</button>
+                    <button className="btn btn-ghost btn-xs" style={{padding:"0 6px",fontSize:10,whiteSpace:"nowrap"}} title="Request price/stock from suppliers" onClick={()=>setRfqPart(itemPart)}>📩 Ask Suppliers</button>
                   )}
                   {itemPart&&role==="admin"&&onEditPart&&(
-                    <button className="btn btn-ghost btn-xs" style={{whiteSpace:"nowrap"}} title="Edit this part" onClick={()=>onEditPart(itemPart)}>✏️ Edit Part</button>
+                    <button className="btn btn-ghost btn-xs" style={{padding:"0 6px",fontSize:10,whiteSpace:"nowrap"}} title="Edit this part" onClick={()=>onEditPart(itemPart)}>✏️ Edit</button>
                   )}
                 </div>
+                {orderInfo&&(
+                  <div style={{fontSize:11,fontWeight:600,color:"var(--blue)",marginTop:3}}>
+                    📦 Ordered {orderInfo.qty}× from {orderInfo.supplier}{orderInfo.date?` · ${new Date(orderInfo.date).toLocaleDateString()}`:""}
+                    {orderInfo.note&&<span style={{fontWeight:400,color:"var(--text3)"}}> — {orderInfo.note}</span>}
+                  </div>
+                )}
               </div>
-              {orderInfo&&(
-                <div style={{fontSize:11,fontWeight:600,color:"var(--blue)",marginTop:6}}>
-                  📦 Ordered {orderInfo.qty}× from {orderInfo.supplier}{orderInfo.date?` · ${new Date(orderInfo.date).toLocaleDateString()}`:""}
-                  {orderInfo.note&&<div style={{fontSize:11,fontWeight:400,color:"var(--text3)",marginTop:2}}>📝 {orderInfo.note}</div>}
+              {q&&(
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0,marginLeft:"auto"}}>
+                  {q.price>0&&q.availability!=="not_available"&&<span style={{fontSize:15,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{Cs}{(+q.price).toFixed(2)}</span>}
+                  {availBadge(q.availability)}
+                  {q.notes&&<span style={{fontSize:10,color:"var(--text3)",maxWidth:160,textAlign:"right"}}>{q.notes}</span>}
                 </div>
               )}
             </div>
@@ -8543,23 +8577,8 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
         })}
       </div>
 
-      {r.notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:10,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>📝 {r.notes}</div>}
-
-      {/* Quote — shown after supplier replies */}
-      {replyItems.length>0&&!isReplying&&<div style={{marginBottom:12,padding:"10px 12px",background:"rgba(167,139,250,.06)",border:"1px solid rgba(167,139,250,.2)",borderRadius:8}}>
-        <div style={{fontSize:11,fontWeight:700,color:"var(--purple)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>💬 Quote from {supplyingBranch?.name||"Supplier"}</div>
-        {replyItems.map((i,idx)=>(
-          <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 10px",background:"var(--surface)",borderRadius:6,marginBottom:3,gap:8,flexWrap:"wrap"}}>
-            <span style={{fontSize:13,fontWeight:600}}>{i.name}</span>
-            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-              {availBadge(i.availability)}
-              {i.price>0&&i.availability!=="not_available"&&<span style={{fontSize:13,fontWeight:700,color:"var(--accent)"}}>{Cs}{(+i.price).toFixed(2)}</span>}
-              {i.notes&&<span style={{fontSize:11,color:"var(--text3)"}}>({i.notes})</span>}
-            </div>
-          </div>
-        ))}
-        {r.reply_notes&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6}}>📝 {r.reply_notes}</div>}
-      </div>}
+      {r.notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:10,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>📝 Request note: {r.notes}</div>}
+      {r.reply_notes&&!isReplying&&replyItems.length>0&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:10,padding:"6px 10px",background:"rgba(167,139,250,.07)",border:"1px solid rgba(167,139,250,.2)",borderRadius:6}}>💬 Quote note from {supplyingBranch?.name||"supplier"}: {r.reply_notes}</div>}
 
       {/* Inline reply form — supplier fills in price + availability per item */}
       {isReplying&&<div style={{marginBottom:12,padding:"12px 14px",background:"rgba(167,139,250,.07)",border:"1.5px solid rgba(167,139,250,.3)",borderRadius:10}}>
@@ -8668,7 +8687,7 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
       )}
 
       {/* Actions */}
-      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",borderTop:"1px solid var(--border)",paddingTop:12,marginTop:4}}>
         {isSupplier&&!isReplying&&(r.status==="pending"||r.status==="quoted")&&
           <button className="btn btn-purple btn-sm" onClick={startReply}>
             {r.status==="quoted"?"✏️ Edit Quote":"💬 Reply with Quote"}
@@ -8684,8 +8703,8 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
           <button className="btn btn-ghost btn-sm" disabled={isBusy} onClick={()=>patch({status:"completed"})}>✅ Mark Collected</button>
         </>}
         {isSupplier&&!["completed","cancelled"].includes(r.status)&&
-          <button className="btn btn-danger btn-sm" disabled={isBusy} title="Cancels this request — the requester will see it as Cancelled"
-            onClick={()=>{if(!window.confirm("Cancel this transfer request? The requester will be notified it's cancelled."))return;patch({status:"cancelled"});}}>✕ Cancel Request</button>}
+          <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto",color:"var(--red)",border:"1px solid rgba(248,113,113,.3)"}} disabled={isBusy} title="Cancels this request — the requester will see it as Cancelled"
+            onClick={()=>{if(!window.confirm("Cancel this transfer request? The requester will be notified it's cancelled."))return;patch({status:"cancelled"});}}>✕ Cancel</button>}
 
         {/* Requester side */}
         {!isSupplier&&r.status==="pending"&&<span style={{fontSize:12,color:"var(--orange)",fontWeight:600}}>⏳ Awaiting quote from {supplyingBranch?.name||"branch"}…</span>}
@@ -8704,7 +8723,7 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
         {!isSupplier&&r.status==="cancelled"&&<span style={{fontSize:12,color:"var(--red)"}}>✕ Cancelled</span>}
         {r.status==="cancelled"&&
           <button className="btn btn-ghost btn-sm" disabled={isBusy} onClick={()=>patch({status:"pending"})}>↩️ Reopen</button>}
-        {onDelete&&<button className="btn btn-danger btn-sm" style={{marginLeft:"auto"}} disabled={isBusy}
+        {onDelete&&<button className="btn btn-ghost btn-sm" style={{marginLeft:isSupplier&&!["completed","cancelled"].includes(r.status)?0:"auto",color:"var(--red)",border:"1px solid rgba(248,113,113,.3)"}} disabled={isBusy}
           onClick={async()=>{if(!window.confirm("Delete this transfer request?"))return;await onDelete(r.id);}}>
           🗑️ Delete
         </button>}

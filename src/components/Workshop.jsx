@@ -393,6 +393,14 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
           })()}
           {wsTab==="jobs"&&(
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {!wsId&&wsProfiles.length>0&&(
+              <select className="inp" value={filterWs} onChange={e=>{setFilterWs(e.target.value);setFilterCity("__all__");setFilterCountry("__all__");}} style={{flex:"0 0 auto",width:"auto",minWidth:160}}>
+                <option value="__all__">🏪 All Workshops</option>
+                {wsProfiles.map(p=>(
+                  <option key={p.id} value={p.id}>{p.name||p.id}</option>
+                ))}
+              </select>
+            )}
             <button className="btn btn-primary" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
             {!wsLocked&&<button className="btn btn-ghost" onClick={()=>setEditJob({
               customer_name:"",customer_phone:"",vehicle_reg:"",vehicle_make:"",
@@ -505,12 +513,6 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
             <option value="make">Make / Model</option>
           </select>
           {!wsId&&wsProfiles.length>0&&(<>
-            <select className="inp" value={filterWs} onChange={e=>{setFilterWs(e.target.value);setFilterCity("__all__");setFilterCountry("__all__");}} style={{flex:"0 0 auto",width:"auto",minWidth:180}}>
-              <option value="__all__">🏪 All Workshops</option>
-              {wsProfiles.map(p=>(
-                <option key={p.id} value={p.id}>{p.name||p.id}</option>
-              ))}
-            </select>
             {wsCities.length>0&&(
               <select className="inp" value={filterCity} onChange={e=>{setFilterCity(e.target.value);setFilterWs("__all__");}} style={{flex:"0 0 auto",width:"auto",minWidth:140}}>
                 <option value="__all__">🏙️ All Cities</option>
@@ -603,7 +605,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
           // ── helpers ──────────────────────────────────────────
           const kq = kanbanSearch.trim().toLowerCase();
-          const matchesSearch = j => !kq || [j.customer_name,j.vehicle_reg,j.vehicle_make,j.vehicle_model,j.complaint,j.notes,j.assigned_to].some(f=>(f||"").toLowerCase().includes(kq));
+          const matchesWs = j => wsId || filterWs==="__all__" || j.workshop_id===filterWs;
+          const matchesSearch = j => matchesWs(j) && (!kq || [j.customer_name,j.vehicle_reg,j.vehicle_make,j.vehicle_model,j.complaint,j.notes,j.assigned_to].some(f=>(f||"").toLowerCase().includes(kq)));
 
           const highlight = (text) => {
             if(!kq||!text) return text;
@@ -839,6 +842,15 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 )}
 
                 <div style={{padding:"8px 10px"}}>
+                  {/* workshop badge — admin viewing all workshops */}
+                  {!wsId&&job.workshop_id&&(
+                    <div style={{textAlign:"center",marginBottom:5}}>
+                      <span style={{display:"inline-block",fontSize:9,fontWeight:700,color:"#f97316",background:"rgba(251,146,60,.12)",border:"1px solid rgba(251,146,60,.25)",borderRadius:99,padding:"1px 9px",letterSpacing:".03em",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        🏪 {wsProfileMap[job.workshop_id]||job.workshop_id}
+                      </span>
+                    </div>
+                  )}
+
                   {/* vehicle + time badges when photos hidden */}
                   {!showKanbanPhotos&&(
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
@@ -4211,6 +4223,13 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               {job.customer_name&&(
                 <div style={{fontSize:15,fontWeight:800,color:"var(--text)",lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                   👤 {job.customer_name}
+                </div>
+              )}
+              {!wsId&&job.workshop_id&&(
+                <div style={{marginTop:2}}>
+                  <span style={{display:"inline-block",fontSize:10,fontWeight:700,color:"#f97316",background:"rgba(251,146,60,.12)",border:"1px solid rgba(251,146,60,.25)",borderRadius:99,padding:"1px 8px",letterSpacing:".02em"}}>
+                    🏪 {wsProfiles.find(p=>p.id===job.workshop_id)?.name||job.workshop_id}
+                  </span>
                 </div>
               )}
             </div>

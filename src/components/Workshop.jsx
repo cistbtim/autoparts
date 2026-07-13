@@ -829,19 +829,16 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                       <button title="More actions" style={{padding:"2px 5px",border:"1px solid rgba(255,255,255,.25)",background:"rgba(0,0,0,.55)",color:"#fff",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
                         onClick={e=>{e.stopPropagation();setExpandedActions(x=>x===job.id?null:job.id);}}>⋯</button>
                     </div>
-                    {/* ── time-in-column + stuck badge ── */}
+                    {/* ── date opened badge ── */}
                     <div style={{position:"absolute",top:6,left:7,display:"flex",gap:3}}>
-                      {elapsed&&<span style={{padding:"1px 5px",background:"rgba(0,0,0,.55)",backdropFilter:"blur(4px)",borderRadius:4,fontSize:9,fontWeight:700,color:stuck?"#f87171":"#fff"}}>
-                        {stuck?"⏰":""}{elapsed}
+                      {job.date_in&&<span style={{padding:"1px 5px",background:"rgba(0,0,0,.55)",backdropFilter:"blur(4px)",borderRadius:4,fontSize:9,fontWeight:700,color:stuck?"#f87171":"#fff"}}>
+                        {stuck?"⏰":""}{job.date_in}
                       </span>}
                     </div>
                   </div>
                 )}
 
                 <div style={{padding:"8px 10px"}}>
-                  {/* date opened — always visible */}
-                  {job.date_in&&<div style={{fontSize:10,color:"var(--text3)",fontWeight:600,marginBottom:5,textAlign:"center"}}>🗓️ Opened {job.date_in}</div>}
-
                   {/* vehicle + time badges when photos hidden */}
                   {!showKanbanPhotos&&(
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>

@@ -4333,6 +4333,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             🔍 VIN
           </button>
         )}
+        {wsRole==="main"&&onMoveJob&&wsProfile?.move_pin&&(
+          <button onClick={()=>{setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}}
+            style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",
+              background:"rgba(251,191,36,.12)",border:"1px solid rgba(251,191,36,.4)",
+              borderRadius:8,cursor:"pointer",color:"var(--yellow)",fontSize:11,fontWeight:700}}>
+            🔀 {t.wsMove}
+          </button>
+        )}
         <div style={{flex:1}}/>
       </div>
       {/* ── Inspect shortcut ── */}
@@ -6581,12 +6589,13 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 </>
               );
             })()}
-            <div style={{marginBottom:10,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,fontSize:13,display:"flex",gap:12,flexWrap:"wrap"}}>
+            <div style={{marginBottom:10,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,fontSize:13,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
               <span>🚗 {job.vehicle_reg}</span>
               {job.vehicle_make&&<span>Make: <strong>{job.vehicle_make}</strong></span>}
               {job.vehicle_model&&<span>Current model: <strong>{job.vehicle_model}</strong></span>}
               {job.vehicle_year&&<span>Year: <strong>{job.vehicle_year}</strong></span>}
               {job.vin&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11}}>VIN: {job.vin}</span>}
+              {!wsLocked&&<button className="btn btn-ghost btn-sm" style={{marginLeft:"auto",fontSize:11,padding:"4px 10px"}} onClick={()=>setEditJob(true)}>✏️ Edit</button>}
             </div>
             {/* VIN decoded info — collapsed by default to leave room for photo comparison */}
             {job.vin&&(()=>{

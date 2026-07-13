@@ -76,6 +76,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [kanbanDueEdit,   setKanbanDueEdit]   = useState(null);
   const [kanbanAssignEdit,setKanbanAssignEdit]= useState(null);
   const [kanbanBkDateEdit,setKanbanBkDateEdit]= useState(null);
+  const [expandedActions, setExpandedActions] = useState(null);
   const [jobDetailTab,    setJobDetailTab]    = useState("menu");
   const [kanbanInvJob,    setKanbanInvJob]    = useState(null);
   const [kanbanInvOpen,   setKanbanInvOpen]   = useState(false);
@@ -825,6 +826,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         <button title="Return to previous stage" style={{padding:"2px 5px",border:"1px solid rgba(52,211,153,.35)",background:"rgba(0,0,0,.55)",color:"#34d399",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
                           onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>
                       )}
+                      <button title="More actions" style={{padding:"2px 5px",border:"1px solid rgba(255,255,255,.25)",background:"rgba(0,0,0,.55)",color:"#fff",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
+                        onClick={e=>{e.stopPropagation();setExpandedActions(x=>x===job.id?null:job.id);}}>⋯</button>
                     </div>
                     {/* ── time-in-column + stuck badge ── */}
                     <div style={{position:"absolute",top:6,left:7,display:"flex",gap:3}}>
@@ -836,6 +839,9 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 )}
 
                 <div style={{padding:"8px 10px"}}>
+                  {/* date opened — always visible */}
+                  {job.date_in&&<div style={{fontSize:10,color:"var(--text3)",fontWeight:600,marginBottom:5,textAlign:"center"}}>🗓️ Opened {job.date_in}</div>}
+
                   {/* vehicle + time badges when photos hidden */}
                   {!showKanbanPhotos&&(
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
@@ -844,6 +850,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         {elapsed&&<span style={{padding:"1px 5px",background:stuck?"rgba(248,113,113,.2)":"var(--surface3)",borderRadius:4,fontSize:9,fontWeight:700,color:stuck?"#f87171":"var(--text3)"}}>{stuck?"⏰":""}{elapsed}</span>}
                         {canFlag&&<button title="Flag as Problem" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#f87171",cursor:"pointer",fontSize:10,lineHeight:1}} onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>}
                         {canUnflag&&<button title="Unflag" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#34d399",cursor:"pointer",fontSize:10,lineHeight:1}} onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>}
+                        <button title="More actions" style={{padding:"2px 5px",border:"none",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:10,lineHeight:1}}
+                          onClick={e=>{e.stopPropagation();setExpandedActions(x=>x===job.id?null:job.id);}}>⋯</button>
                       </div>
                     </div>
                   )}
@@ -975,19 +983,23 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                     </div>
                   )}
 
-                  {/* quick-action icon row */}
-                  <div style={{display:"flex",gap:3,marginBottom:4,marginTop:2}} onClick={e=>e.stopPropagation()}>
-                    <button title="Quick note" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:job.notes?"rgba(251,191,36,.15)":"transparent",cursor:"pointer",fontSize:11}}
-                      onClick={()=>setKanbanNoteEdit({jobId:job.id,draft:job.notes||""})}>📝</button>
-                    <button title="Set due date" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:job.due_date?"rgba(96,165,250,.15)":"transparent",cursor:"pointer",fontSize:11}}
-                      onClick={()=>setKanbanDueEdit({jobId:job.id})}>📅</button>
-                    <button title="Assign mechanic" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:job.assigned_to?"rgba(52,211,153,.15)":"transparent",cursor:"pointer",fontSize:11}}
-                      onClick={()=>setKanbanAssignEdit({jobId:job.id,draft:job.assigned_to||""})}>👤</button>
-                    <button title="Print job sheet" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11}}
-                      onClick={()=>printJobSheet(job)}>🖨️</button>
-                    {wsRole==="main"&&!wsLocked&&<button title="Delete job" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--red)"}}
-                      onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob(job.id);}}>🗑</button>}
-                  </div>
+                  {/* quick-action icon row — opened via the ⋯ button in the card header */}
+                  {expandedActions===job.id&&(
+                    <div style={{display:"flex",gap:3,marginBottom:4,marginTop:2}} onClick={e=>e.stopPropagation()}>
+                      <button title="Quick note" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:job.notes?"rgba(251,191,36,.15)":"transparent",cursor:"pointer",fontSize:11}}
+                        onClick={()=>setKanbanNoteEdit({jobId:job.id,draft:job.notes||""})}>📝</button>
+                      <button title="Set due date" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:job.due_date?"rgba(96,165,250,.15)":"transparent",cursor:"pointer",fontSize:11}}
+                        onClick={()=>setKanbanDueEdit({jobId:job.id})}>📅</button>
+                      <button title="Assign mechanic" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:job.assigned_to?"rgba(52,211,153,.15)":"transparent",cursor:"pointer",fontSize:11}}
+                        onClick={()=>setKanbanAssignEdit({jobId:job.id,draft:job.assigned_to||""})}>👤</button>
+                      <button title="Print job sheet" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11}}
+                        onClick={()=>printJobSheet(job)}>🖨️</button>
+                      {wsRole==="main"&&!wsLocked&&<button title="Delete job" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--red)"}}
+                        onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob(job.id);}}>🗑</button>}
+                      <button title="Hide actions" style={{flex:"0 0 auto",padding:"3px 7px",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--text3)"}}
+                        onClick={()=>setExpandedActions(null)}>✕</button>
+                    </div>
+                  )}
 
                   {/* status action buttons */}
                   {!wsLocked&&(col.nextStatus||canInvoice||col.id==="wip"||col.id==="invoiced")&&(

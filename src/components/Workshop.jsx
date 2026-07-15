@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
@@ -3691,6 +3691,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [movePinErr,       setMovePinErr]        = useState("");
   const [photoLightbox,    setPhotoLightbox]    = useState(null); // null | index into visible photos
   const [wsShopPartPhotoLightbox, setWsShopPartPhotoLightbox] = useState(null);
+  const [linePartImgLightbox, setLinePartImgLightbox] = useState(null); // main-inventory photo enlarge for a parts/labour row
   const [renewalModal,  setRenewalModal]  = useState(false);
   const [serviceHistModal, setServiceHistModal] = useState(false);
   const [showMoreActions,  setShowMoreActions]  = useState(false);
@@ -5074,6 +5075,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         );
       })()}
 
+      {linePartImgLightbox&&<ImgLightbox url={linePartImgLightbox} onClose={()=>setLinePartImgLightbox(null)}/>}
+
       {/* ══ INSPECTION popup ══ */}
       {inspectPopup&&(
         <Overlay onClose={()=>setInspectPopup(false)}>
@@ -5360,6 +5363,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         {/* Parts & Labour */}
         {(()=>{
           const defaultMarkup = +(wsProfile?.default_markup_pct||0);
+          // Resolve a job item back to its main-inventory part (by SKU) so the TYPE
+          // badge can show the real product photo instead of the generic wrench icon.
+          const mainPartFor = (item) => item.type==="part" && item.part_sku
+            ? parts.find(p=>p.sku && p.sku.toLowerCase()===item.part_sku.toLowerCase())
+            : null;
           const commitDesc = async (item) => {
             const v = editDescVal.trim();
             setEditDescId(null);
@@ -5741,9 +5749,21 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     <input type="checkbox" checked={!quoteExcluded.has(item.id)}
                       onChange={()=>setQuoteExcluded(prev=>{const n=new Set(prev);n.has(item.id)?n.delete(item.id):n.add(item.id);return n;})}
                       style={{marginTop:4,flexShrink:0,accentColor:accentColor,width:18,height:18,cursor:"pointer"}}/>
-                    <span style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:99,background:item.type==="part"?"rgba(96,165,250,.15)":"rgba(52,211,153,.15)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>
-                      {item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}
-                    </span>
+                    {(()=>{
+                      const mp=mainPartFor(item);
+                      const thumb=mp?toImgUrl(mp.image_url):null;
+                      return (
+                        <span style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:99,background:item.type==="part"?"rgba(96,165,250,.15)":"rgba(52,211,153,.15)",color:item.type==="part"?"var(--blue)":"var(--green)",display:"inline-flex",alignItems:"center",gap:5}}>
+                          {thumb
+                            ? <img src={thumb} alt="" loading="lazy" referrerPolicy="no-referrer"
+                                onClick={e=>{e.stopPropagation();setLinePartImgLightbox(mp.image_url);}}
+                                onError={e=>{e.target.style.display="none";}}
+                                style={{width:15,height:15,objectFit:"contain",borderRadius:3,cursor:"zoom-in",background:"#fff",flexShrink:0}}/>
+                            : <span>{item.type==="part"?"🔩":"👷"}</span>}
+                          {item.type==="part"?t.wsqtPart:t.wsqtLabour}
+                        </span>
+                      );
+                    })()}
                     <div style={{flex:1,minWidth:0}}>
                       <div onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)"}}>{descOverrides[item.id]??item.description}</div>
                       {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2,display:"block"}}>{item.part_sku}</code>}
@@ -5831,7 +5851,21 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     onChange={()=>setQuoteExcluded(prev=>{const n=new Set(prev);n.has(item.id)?n.delete(item.id):n.add(item.id);return n;})}
                     style={{cursor:"pointer",accentColor:item.type==="part"?"var(--blue)":"var(--green)"}}/>
                 </td>
-                <td><span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)"}}>{item.type==="part"?`🔩 ${t.wsqtPart}`:`👷 ${t.wsqtLabour}`}</span></td>
+                <td>{(()=>{
+                  const mp=mainPartFor(item);
+                  const thumb=mp?toImgUrl(mp.image_url):null;
+                  return (
+                    <span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)",display:"inline-flex",alignItems:"center",gap:5}}>
+                      {thumb
+                        ? <img src={thumb} alt="" loading="lazy" referrerPolicy="no-referrer"
+                            onClick={e=>{e.stopPropagation();setLinePartImgLightbox(mp.image_url);}}
+                            onError={e=>{e.target.style.display="none";}}
+                            style={{width:15,height:15,objectFit:"contain",borderRadius:3,cursor:"zoom-in",background:"#fff",flexShrink:0}}/>
+                        : <span>{item.type==="part"?"🔩":"👷"}</span>}
+                      {item.type==="part"?t.wsqtPart:t.wsqtLabour}
+                    </span>
+                  );
+                })()}</td>
                 <td style={{fontWeight:500}}>
                   <span onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{descOverrides[item.id]??item.description}</span>
                   {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
@@ -6478,6 +6512,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           onClose={()=>setAddingItem(null)}
           onGoToStock={onGoToStock}
           wsId={wsId}
+          parts={parts}
+          partFitments={partFitments}
+          vehicles={vehicles}
+          vehicleMake={job.vehicle_make}
+          vehicleModel={job.vehicle_model}
+          vehicleLabel={[job.vehicle_make,resolvedVehicleModel].filter(Boolean).join(" ")}
           t={t}/>
       )}
 
@@ -8514,13 +8554,16 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
   );
 }
 
-function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, wsId=null, t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", t}) {
   const [desc,        setDesc]        = useState("");
   const [qty,         setQty]         = useState(1);
   const [price,       setPrice]       = useState("");
   const [costPrice,   setCostPrice]   = useState(0);
   const [markupPct,   setMarkupPct]   = useState(defaultMarkupPct);
   const [selItem,     setSelItem]     = useState(null);
+  const [selSource,   setSelSource]   = useState(null); // "stock" | "main"
+  const [skipMainSearch, setSkipMainSearch] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
   const [search,      setSearch]      = useState("");
   const [saving,      setSaving]      = useState(false);
   const [justAdded,   setJustAdded]   = useState(false);
@@ -8555,12 +8598,78 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
     return search.trim().toLowerCase().split(/\s+/).every(w=>hay.includes(w));
   }).slice(0,30);
 
+  // Main inventory (head office parts DB), filtered to this job's vehicle via
+  // part_fitments. Kept fitment-only (no code/text fallback) to avoid pulling
+  // in parts that don't actually fit — same precision trade-off used for the
+  // Spare Shop "parts for this vehicle" count.
+  const hasVehicle = type==="part" && !!vehicleMake;
+  const vehicleMatchedPartIds = useMemo(()=>{
+    if(!hasVehicle) return new Set();
+    const jMake=vehicleMake.toLowerCase();
+    const byCode=vehicleModel?vehicles.filter(v=>v.make?.toLowerCase()===jMake&&v.code===vehicleModel):[];
+    const matchV=byCode.length>0?byCode
+      :!vehicleModel?vehicles.filter(v=>v.make?.toLowerCase()===jMake)
+      :vehicles.filter(v=>v.make?.toLowerCase()===jMake&&(v.model||"").toLowerCase()===vehicleModel.toLowerCase());
+    const vIds=new Set(matchV.map(v=>String(v.id)));
+    return new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)));
+  },[hasVehicle,vehicleMake,vehicleModel,vehicles,partFitments]);
+
+  const mainPartsPool = useMemo(()=>
+    vehicleMatchedPartIds.size===0 ? [] : parts.filter(p=>vehicleMatchedPartIds.has(String(p.id))),
+  [parts,vehicleMatchedPartIds]);
+
+  const showMainPanel = hasVehicle && !skipMainSearch;
+
+  const mainFiltered = !showMainPanel ? [] : (()=>{
+    const pool = mainPartsPool.filter(p=>!(p.sku&&existingSkus.has(p.sku)));
+    const sq=search.trim().toLowerCase();
+    const list = sq
+      ? pool.filter(p=>{
+          const hay=`${p.name||""} ${p.sku||""} ${p.oe_number||""} ${p.brand||""}`.toLowerCase();
+          return sq.split(/\s+/).every(w=>hay.includes(w));
+        })
+      : pool;
+    return list.slice(0,30);
+  })();
+
+  const mainStockBadge=(p)=>{
+    const q=+p.stock||0;
+    const low=+p.min_stock||0;
+    const color=q<=0?"var(--red)":q<=low?"var(--yellow)":"var(--green)";
+    return <span style={{fontSize:11,fontWeight:700,color,fontFamily:"Rajdhani,sans-serif",flexShrink:0}}>{q<=0?"⛔ Out":q<=low?`⚠️ ${q}`:q}</span>;
+  };
+
   const total = (+qty||0)*(+price||0);
 
-  const resetForm=()=>{ setDesc(""); setQty(1); setPrice(""); setCostPrice(0); setMarkupPct(defaultMarkupPct); setSelItem(null); setSearch(""); };
+  const resetForm=()=>{ setDesc(""); setQty(1); setPrice(""); setCostPrice(0); setMarkupPct(defaultMarkupPct); setSelItem(null); setSelSource(null); setSearch(""); };
+
+  const selectMainPart=(p)=>{
+    setSelItem(p);
+    setSelSource("main");
+    setDesc(p.name);
+    const cost=+(p.cost_price||0);
+    const listPrice=+(p.price||0);
+    if(cost>0&&defaultMarkupPct>0){
+      setCostPrice(cost);
+      setMarkupPct(defaultMarkupPct);
+      setPrice(String(+(cost*(1+defaultMarkupPct/100)).toFixed(2)));
+    } else if(cost>0){
+      setCostPrice(cost);
+      const mp=listPrice>0?+((listPrice/cost-1)*100).toFixed(1):0;
+      setMarkupPct(mp);
+      setPrice(String(listPrice||cost));
+    } else {
+      setCostPrice(0);
+      setMarkupPct(defaultMarkupPct);
+      setPrice(String(listPrice||""));
+    }
+    setSearch("");
+    setCreating(false);
+  };
 
   const selectItem=(p)=>{
     setSelItem(p);
+    setSelSource("stock");
     setDesc(p.name);
     const cost=+(p.unit_cost||0);
     const listPrice=+(p.unit_price||p.default_price||p.price||p.rate||0);
@@ -8655,8 +8764,8 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       await onSave({
         type,
         description:desc,
-        part_sku:selItem?selItem.sku||"":"",
-        ws_stock_id:type==="part"&&selItem?selItem.id:null,
+        part_sku:selItem?selItem.sku||selItem.oe_number||"":"",
+        ws_stock_id:type==="part"&&selItem&&selSource==="stock"?selItem.id:null,
         qty:+qty,
         unit_price:+price,
         cost_price:type==="part"?+costPrice:0,
@@ -8688,12 +8797,23 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       <div style={{marginBottom:14}}>
         <FL label={type==="part"?"Search Workshop Stock":"Search Service Preset"}/>
         <div style={{marginBottom:8}}>
-          <input className="inp" value={search} onChange={e=>{setSearch(e.target.value);setSelItem(null);setCreating(false);}}
+          <input className="inp" value={search} onChange={e=>{setSearch(e.target.value);setSelItem(null);setSelSource(null);setCreating(false);}}
             placeholder={type==="part"?"Search part name, SKU...":"Search service name..."}
             onKeyDown={e=>{ if(e.key==="Enter"&&search.trim()&&filtered.length===0) useSearchAsDesc(); }}/>
         </div>
 
-        {(search||list.length<=10)&&!selItem&&(
+        {hasVehicle&&(
+          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--text3)",marginBottom:8,cursor:"pointer"}}>
+            <input type="checkbox" checked={skipMainSearch} onChange={e=>setSkipMainSearch(e.target.checked)} style={{width:14,height:14,cursor:"pointer"}}/>
+            Don't search main parts database for this vehicle
+          </label>
+        )}
+
+        {!selItem&&(
+        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+        <div style={{flex:"1 1 260px",minWidth:0}}>
+          {showMainPanel&&<div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:4,textTransform:"uppercase",letterSpacing:".04em"}}>🔧 Workshop Stock</div>}
+        {(search||list.length<=10)&&(
           <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:creating?180:300,overflowY:"auto",marginBottom:8}}>
             {(search?filtered:list.slice(0,20)).length===0
               ? <div style={{padding:"14px 16px"}}>
@@ -8744,6 +8864,50 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
                 ))
             }
           </div>
+        )}
+        </div>
+
+        {showMainPanel&&(
+          <div style={{flex:"1 1 260px",minWidth:0}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--blue)",marginBottom:4,textTransform:"uppercase",letterSpacing:".04em"}}>
+              🏭 Main Inventory{vehicleLabel?` — fits ${vehicleLabel}`:""}
+            </div>
+            <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:300,overflowY:"auto",marginBottom:8}}>
+              {mainFiltered.length===0
+                ? <div style={{padding:"14px 16px",color:"var(--text3)",fontSize:13}}>
+                    {mainPartsPool.length===0
+                      ? "No main-inventory fitments recorded for this vehicle yet"
+                      : `"${search}" not found in main inventory`}
+                  </div>
+                : mainFiltered.map(p=>{
+                    const thumb=toImgUrl(p.image_url);
+                    return (
+                    <div key={p.id} onClick={()=>selectMainPart(p)}
+                      style={{padding:"10px 12px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",gap:10,alignItems:"center"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
+                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                      {thumb
+                        ? <img src={thumb} alt="" loading="lazy" referrerPolicy="no-referrer"
+                            onClick={e=>{e.stopPropagation();setLightboxUrl(p.image_url);}}
+                            onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}
+                            style={{width:36,height:36,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in",flexShrink:0}}/>
+                        : null}
+                      <div style={{fontSize:22,flexShrink:0,display:thumb?"none":"flex"}}>🏭</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
+                        {(p.sku||p.oe_number)&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{p.sku||p.oe_number}</code>}
+                      </div>
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>{fmtAmt(p.price||0)}</div>
+                        {mainStockBadge(p)}
+                      </div>
+                    </div>
+                  );})
+              }
+            </div>
+          </div>
+        )}
+        </div>
         )}
 
         {/* Create-new mini form */}
@@ -8812,14 +8976,23 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 
         {selItem&&(
           <div style={{padding:"10px 12px",background:"rgba(96,165,250,.08)",borderRadius:8,border:"1px solid rgba(96,165,250,.2)",marginBottom:8,display:"flex",gap:10,alignItems:"center"}}>
-            <div style={{fontSize:22,flexShrink:0}}>{type==="part"?"🔩":"🔧"}</div>
+            {selSource==="main"&&toImgUrl(selItem.image_url)
+              ? <img src={toImgUrl(selItem.image_url)} alt="" referrerPolicy="no-referrer"
+                  onClick={()=>setLightboxUrl(selItem.image_url)}
+                  onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}
+                  style={{width:36,height:36,objectFit:"contain",borderRadius:6,background:"#f5f5f5",border:"1px solid var(--border)",cursor:"zoom-in",flexShrink:0}}/>
+              : null}
+            <div style={{fontSize:22,flexShrink:0,display:selSource==="main"&&toImgUrl(selItem.image_url)?"none":"flex"}}>{selSource==="main"?"🏭":type==="part"?"🔩":"🔧"}</div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:600}}>{selItem.name}</div>
-              {selItem.sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{selItem.sku}</code>}
-              {type==="part"&&stockBadge(selItem)}
+              <div style={{fontWeight:600}}>
+                {selItem.name}
+                {selSource==="main"&&<span style={{marginLeft:6,fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",borderRadius:4,padding:"1px 5px"}}>🏭 Main Inventory</span>}
+              </div>
+              {(selItem.sku||selItem.oe_number)&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)"}}>{selItem.sku||selItem.oe_number}</code>}
+              {type==="part"&&(selSource==="main"?mainStockBadge(selItem):stockBadge(selItem))}
             </div>
             <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}}
-              onClick={()=>{ setSelItem(null); setDesc(""); setPrice(""); }}>✕</button>
+              onClick={()=>{ setSelItem(null); setSelSource(null); setDesc(""); setPrice(""); }}>✕</button>
           </div>
         )}
       </div>
@@ -8841,6 +9014,8 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
           {saving?"Saving...":("✅ Add "+(type==="part"?"Part":"Labour"))}
         </button>
       </div>
+
+      {lightboxUrl&&<ImgLightbox url={lightboxUrl} onClose={()=>setLightboxUrl(null)}/>}
     </Overlay>
   );
 }

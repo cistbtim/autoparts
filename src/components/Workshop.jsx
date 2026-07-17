@@ -138,6 +138,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
   const kanbanSt = (job) => {
     if (job.is_problem)                          return {label:"⚠️ Problem Job",       color:"#f87171", bg:"rgba(248,113,113,.15)"};
+    if (job.is_cancelled)                        return {label:"🚫 Cancelled",         color:"#64748b", bg:"rgba(100,116,139,.15)"};
     const inv = jobInvoice(job.id);
     if (inv?.status==="paid")                    return {label:"💚 Payment Received",   color:"#10b981", bg:"rgba(16,185,129,.15)"};
     if (inv)                                     return {label:"🧾 Invoiced",           color:"#f97316", bg:"rgba(249,115,22,.15)"};
@@ -276,6 +277,12 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   };
   const unflagProblem = async(job) => {
     await onSaveJob({...job, is_problem:false, status:job.problem_prev_status||"Pending"});
+  };
+  const cancelJob = async(job) => {
+    await onSaveJob({...job, is_cancelled:true, cancelled_prev_status:job.status});
+  };
+  const uncancelJob = async(job) => {
+    await onSaveJob({...job, is_cancelled:false, status:job.cancelled_prev_status||"Pending"});
   };
   const moveJobStatus = async(job, newStatus) => {
     await onSaveJob({...job, status:newStatus});
@@ -695,15 +702,16 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
           // ── filter columns by search ──────────────────────────
           const bkCol   = wsBookings.filter(b=>b.status==="pending"||b.status==="confirmed");
-          const pendCol = jobs.filter(j=>!j.is_problem&&j.status==="Pending"&&matchesSearch(j));
-          const checkupCol = jobs.filter(j=>!j.is_problem&&j.status==="Checkup"&&matchesSearch(j));
-          const wipCol  = jobs.filter(j=>!j.is_problem&&j.status==="In Progress"&&matchesSearch(j));
-          const quotingCol = jobs.filter(j=>!j.is_problem&&j.status==="Quoting"&&matchesSearch(j));
-          const orderedCol = jobs.filter(j=>!j.is_problem&&j.status==="Ordered"&&matchesSearch(j));
-          const doneCol = jobs.filter(j=>!j.is_problem&&j.status==="Done"&&!jInv(j.id)&&matchesSearch(j));
-          const invCol  = jobs.filter(j=>!j.is_problem&&jInv(j.id)&&jInv(j.id)?.status!=="paid"&&matchesSearch(j));
-          const paidCol = jobs.filter(j=>!j.is_problem&&jInv(j.id)?.status==="paid"&&matchesSearch(j));
-          const probCol = jobs.filter(j=>j.is_problem&&matchesSearch(j));
+          const pendCol = jobs.filter(j=>!j.is_problem&&!j.is_cancelled&&j.status==="Pending"&&matchesSearch(j));
+          const checkupCol = jobs.filter(j=>!j.is_problem&&!j.is_cancelled&&j.status==="Checkup"&&matchesSearch(j));
+          const wipCol  = jobs.filter(j=>!j.is_problem&&!j.is_cancelled&&j.status==="In Progress"&&matchesSearch(j));
+          const quotingCol = jobs.filter(j=>!j.is_problem&&!j.is_cancelled&&j.status==="Quoting"&&matchesSearch(j));
+          const orderedCol = jobs.filter(j=>!j.is_problem&&!j.is_cancelled&&j.status==="Ordered"&&matchesSearch(j));
+          const doneCol = jobs.filter(j=>!j.is_problem&&!j.is_cancelled&&j.status==="Done"&&!jInv(j.id)&&matchesSearch(j));
+          const invCol  = jobs.filter(j=>!j.is_problem&&!j.is_cancelled&&jInv(j.id)&&jInv(j.id)?.status!=="paid"&&matchesSearch(j));
+          const paidCol = jobs.filter(j=>!j.is_problem&&!j.is_cancelled&&jInv(j.id)?.status==="paid"&&matchesSearch(j));
+          const probCol = jobs.filter(j=>j.is_problem&&!j.is_cancelled&&matchesSearch(j));
+          const cancelCol = jobs.filter(j=>j.is_cancelled&&matchesSearch(j));
 
           const COLS = [
             {id:"booking",  label:"Booking",          hint:"Confirm & create job",   color:"#60a5fa", items:bkCol,   type:"booking"},
@@ -716,6 +724,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             {id:"invoiced", label:"Invoiced",          hint:"Collect payment",         color:"#f97316", items:invCol,  type:"job"},
             {id:"paid",     label:"Payment Received",  hint:"Job complete ✓",          color:"#10b981", items:paidCol, type:"job"},
             {id:"problem",  label:"Problem Job",       hint:"Needs attention",         color:"#f87171", items:probCol, type:"job"},
+            {id:"cancelled",label:"Cancelled",         hint:"Customer didn't proceed", color:"#64748b", items:cancelCol, type:"job"},
           ];
 
           const BkCard = ({b}) => (
@@ -789,8 +798,10 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             const fp  = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)?.photo_front||"";
             const srcBk = wsBookings.find(bk=>bk.id===job.booking_id);
             const isBkDateEditing = kanbanBkDateEdit?.jobId===job.id;
-            const canFlag   = col.id!=="paid"&&col.id!=="problem";
+            const canFlag   = col.id!=="paid"&&col.id!=="problem"&&col.id!=="cancelled";
             const canUnflag = col.id==="problem";
+            const canCancel   = col.id!=="paid"&&col.id!=="problem"&&col.id!=="cancelled";
+            const canUncancel = col.id==="cancelled";
             const canInvoice= col.id==="done";
             const isDraggable = !wsLocked && DRAGGABLE_COLS.includes(col.id);
             const stuck = isStuck(job);
@@ -1027,6 +1038,10 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         onClick={()=>setKanbanAssignEdit({jobId:job.id,draft:job.assigned_to||""})}>👤</button>
                       <button title="Print job sheet" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11}}
                         onClick={()=>printJobSheet(job)}>🖨️</button>
+                      {canCancel&&!wsLocked&&<button title="Cancel job — customer didn't proceed" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--text3)"}}
+                        onClick={()=>{if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`))cancelJob(job);}}>🚫</button>}
+                      {canUncancel&&!wsLocked&&<button title="Reopen — return to previous stage" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--green)"}}
+                        onClick={()=>uncancelJob(job)}>↩</button>}
                       {wsRole==="main"&&!wsLocked&&<button title="Delete job" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--red)"}}
                         onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob(job.id);}}>🗑</button>}
                       <button title="Hide actions" style={{flex:"0 0 auto",padding:"3px 7px",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--text3)"}}
@@ -4500,6 +4515,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         const isPaid = invoice?.status==="paid";
         const isInvoiced = !!invoice;
         const isProblem = !!job.is_problem;
+        const isCancelled = !!job.is_cancelled;
         const STAGES = [
           {key:"Pending",         label:"⏳ "+(t.wsStPending||"Pending"),          color:"#a78bfa", bg:"rgba(167,139,250,.18)", mechanic:true},
           {key:"Checkup",         label:"🔎 "+(t.checkup||"Checkup"),              color:"#38bdf8", bg:"rgba(56,189,248,.18)",  mechanic:true},
@@ -4568,6 +4584,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       <text x="15" y="20" textAnchor="middle" fontSize="11" fontWeight="bold"
                         fill={isProblem?"#fff":"var(--text3)"}>!</text>
                     </svg>
+                  </button>
+                )}
+                {wsRole!=="mechanic"&&(
+                  <button
+                    onClick={()=>{
+                      if(isCancelled) return onSaveJob({...job,is_cancelled:false,status:job.cancelled_prev_status||"Pending"});
+                      if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`)) onSaveJob({...job,is_cancelled:true,cancelled_prev_status:job.status});
+                    }}
+                    title={isCancelled?"Reopen — return to previous stage":"Cancel job — customer didn't proceed"}
+                    style={{background:isCancelled?"rgba(100,116,139,.15)":"none",border:`1px solid ${isCancelled?"#64748b":"var(--border2)"}`,borderRadius:8,cursor:"pointer",padding:"3px 7px",flexShrink:0,fontSize:11,fontWeight:700,color:isCancelled?"#64748b":"var(--text3)"}}>
+                    🚫
                   </button>
                 )}
                 {showWa&&(()=>{

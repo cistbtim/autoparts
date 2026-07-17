@@ -68,8 +68,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [bkCancelReason,  setBkCancelReason]  = useState("");
   const [kanbanView,      setKanbanView]      = useState(true);
   const [kanbanZoom,      setKanbanZoom]      = useState(()=>{try{return Number(localStorage.getItem("ws_kanban_zoom")||1);}catch{return 1;}});
-  const KANBAN_WIDTHS=[200,270,340,420];
-  const kanbanColW=KANBAN_WIDTHS[Math.max(0,Math.min(3,kanbanZoom))];
+  const KANBAN_WIDTHS=[150,200,270,340,420];
+  const kanbanColW=KANBAN_WIDTHS[Math.max(0,Math.min(4,kanbanZoom))];
   const [collapsedCols,   setCollapsedCols]   = useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("ws_kanban_collapsed")||"[]"));}catch{return new Set();}});
   const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
   const [kanbanSearch,    setKanbanSearch]    = useState("");
@@ -442,12 +442,12 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
                     style={{padding:"7px 11px",border:"none",cursor:kanbanZoom<=0?"not-allowed":"pointer",background:"transparent",color:kanbanZoom<=0?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom<=0?.4:1}}
                     onClick={()=>{const z=Math.max(0,kanbanZoom-1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>−</button>
                   <div style={{padding:"7px 8px",fontSize:11,fontWeight:700,color:"var(--text1)",display:"flex",alignItems:"center",gap:4,borderLeft:"1px solid var(--border)",borderRight:"1px solid var(--border)"}}>
-                    {["S","M","L","XL"][kanbanZoom]}
+                    {["XS","S","M","L","XL"][kanbanZoom]}
                     <span style={{color:"var(--text3)",fontWeight:400}}>{kanbanColW}px</span>
                   </div>
-                  <button title="Zoom in" disabled={kanbanZoom>=3}
-                    style={{padding:"7px 11px",border:"none",cursor:kanbanZoom>=3?"not-allowed":"pointer",background:"transparent",color:kanbanZoom>=3?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom>=3?.4:1}}
-                    onClick={()=>{const z=Math.min(3,kanbanZoom+1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>＋</button>
+                  <button title="Zoom in" disabled={kanbanZoom>=4}
+                    style={{padding:"7px 11px",border:"none",cursor:kanbanZoom>=4?"not-allowed":"pointer",background:"transparent",color:kanbanZoom>=4?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom>=4?.4:1}}
+                    onClick={()=>{const z=Math.min(4,kanbanZoom+1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>＋</button>
                 </div>
                 <button title={showKanbanPhotos?"Hide car photos":"Show car photos"}
                   style={{padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:showKanbanPhotos?"var(--surface2)":"transparent",cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:4}}

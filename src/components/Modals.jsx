@@ -1026,7 +1026,7 @@ function TranslationEditor({row, onClose, onSaved}) {
   };
 
   const STATUS_KEYS = ["Pending","Replied","Closed","Paid","Unpaid","Partial","Approved",
-    "Processing","Ready to Ship","Completed","Cancelled","In Progress","Done","Delivered"];
+    "Processing","Ready to Ship","Completed","Cancelled","In Progress","Quoting","Ordered","Done","Delivered"];
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center"}}>

@@ -133,8 +133,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
   const JOB_PAGE_SIZE = typeof window!=="undefined"&&window.innerWidth<=767 ? 5 : 20;
 
-  const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
-  const ST_BG    = {"Pending":"rgba(96,165,250,.12)","In Progress":"rgba(251,191,36,.12)","Done":"rgba(52,211,153,.12)","Delivered":"rgba(100,116,139,.12)"};
+  const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Quoting":"var(--purple)","Ordered":"#818cf8","Done":"var(--green)","Delivered":"var(--text3)"};
+  const ST_BG    = {"Pending":"rgba(96,165,250,.12)","In Progress":"rgba(251,191,36,.12)","Quoting":"rgba(167,139,250,.12)","Ordered":"rgba(129,140,248,.12)","Done":"rgba(52,211,153,.12)","Delivered":"rgba(100,116,139,.12)"};
 
   const kanbanSt = (job) => {
     if (job.is_problem)                          return {label:"⚠️ Problem Job",       color:"#f87171", bg:"rgba(248,113,113,.15)"};
@@ -513,7 +513,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       {wsTab==="jobs"&&(<>
         {!kanbanView&&(<>
         <div className="tabs" style={{marginBottom:14,width:"fit-content",maxWidth:"100%",flexWrap:"wrap"}}>
-          {[["__all__","All"],["Pending","🔵 Pending"],["In Progress","🟡 In Progress"],["Done","🟢 Done"],["Delivered","⚫ Delivered"]].map(([v,l])=>{
+          {[["__all__","All"],["Pending","🔵 Pending"],["In Progress","🟡 In Progress"],["Quoting","🟣 Quoting"],["Ordered","🔷 Ordered"],["Done","🟢 Done"],["Delivered","⚫ Delivered"]].map(([v,l])=>{
             const cnt=v==="__all__"?jobs.length:jobs.filter(j=>j.status===v).length;
             return <button key={v} className={`tab ${filterSt===v?"on":""}`} onClick={()=>setFilterSt(v)}>{l} <span style={{opacity:.6,fontSize:11}}>{cnt}</span></button>;
           })}
@@ -697,6 +697,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           const bkCol   = wsBookings.filter(b=>b.status==="pending"||b.status==="confirmed");
           const pendCol = jobs.filter(j=>!j.is_problem&&j.status==="Pending"&&matchesSearch(j));
           const wipCol  = jobs.filter(j=>!j.is_problem&&j.status==="In Progress"&&matchesSearch(j));
+          const quotingCol = jobs.filter(j=>!j.is_problem&&j.status==="Quoting"&&matchesSearch(j));
+          const orderedCol = jobs.filter(j=>!j.is_problem&&j.status==="Ordered"&&matchesSearch(j));
           const doneCol = jobs.filter(j=>!j.is_problem&&j.status==="Done"&&!jInv(j.id)&&matchesSearch(j));
           const invCol  = jobs.filter(j=>!j.is_problem&&jInv(j.id)&&jInv(j.id)?.status!=="paid"&&matchesSearch(j));
           const paidCol = jobs.filter(j=>!j.is_problem&&jInv(j.id)?.status==="paid"&&matchesSearch(j));
@@ -706,6 +708,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             {id:"booking",  label:"Booking",          hint:"Confirm & create job",   color:"#60a5fa", items:bkCol,   type:"booking"},
             {id:"pending",  label:"Pending",           hint:"Waiting to start",       color:"#a78bfa", items:pendCol, type:"job", nextStatus:"In Progress", nextLabel:"▶ Start"},
             {id:"wip",      label:"In Progress",       hint:"Add quote + do the work",color:"#fbbf24", items:wipCol,  type:"job", nextStatus:"Done",        nextLabel:"✓ Mark Done"},
+            {id:"quoting",  label:"Quoting",           hint:"Waiting on supplier prices", color:"#a78bfa", items:quotingCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
+            {id:"ordered",  label:"Ordered",           hint:"Parts on order",         color:"#818cf8", items:orderedCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
             {id:"done",     label:"Done",              hint:"Create invoice",          color:"#34d399", items:doneCol, type:"job"},
             {id:"invoiced", label:"Invoiced",          hint:"Collect payment",         color:"#f97316", items:invCol,  type:"job"},
             {id:"paid",     label:"Payment Received",  hint:"Job complete ✓",          color:"#10b981", items:paidCol, type:"job"},
@@ -1990,7 +1994,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         const invThisMonth=invoices.filter(i=>(i.invoice_date||"").startsWith(thisMonth));
         const revThisMonth=invThisMonth.reduce((s,i)=>s+(+i.total||0),0);
         // Status breakdown
-        const byStatus=["Pending","In Progress","Done","Delivered"].map(s=>([s,jobs.filter(j=>j.status===s).length]));
+        const byStatus=["Pending","In Progress","Quoting","Ordered","Done","Delivered"].map(s=>([s,jobs.filter(j=>j.status===s).length]));
         // Top customers by revenue
         const custRev={};
         invoices.forEach(inv=>{ const k=inv.invoice_customer||"Unknown"; custRev[k]=(custRev[k]||0)+(+inv.total||0); });
@@ -3705,6 +3709,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
+  // Auto-advance job.status as a side effect of a real action (sending a
+  // supplier price request / shop request → Quoting; placing a supplier
+  // order → Ordered) — forward-only, so it never regresses a job that's
+  // already further along (e.g. Done, or Ordered when a follow-up quote
+  // request goes out).
+  const JOB_STATUS_ORDER=["Pending","In Progress","Quoting","Ordered","Done","Delivered"];
+  const advanceJobStatus = (targetStatus) => {
+    const curIdx=JOB_STATUS_ORDER.indexOf(job.status);
+    const targetIdx=JOB_STATUS_ORDER.indexOf(targetStatus);
+    if(targetIdx>curIdx) onSaveJob({...job, status:targetStatus});
+  };
   // Resolve catalog vehicle code to display model name (e.g. "FD57E" → "RANGER S-CAB DRL-H.LAMP")
   const resolvedVehicleModel = vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase())?.model||job.vehicle_model;
   // Reschedule the customer's requested date — lives only on the source
@@ -4234,8 +4249,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const quoteTax      = settings.vat_number ? quoteSubtotal*(settings.tax_rate||0)/100 : 0;
   const quoteTotal    = quoteSubtotal+quoteTax;
 
-  const JOB_STATUSES = ["Pending","In Progress","Done","Delivered"];
-  const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Done":"var(--green)","Delivered":"var(--text3)"};
+  const JOB_STATUSES = ["Pending","In Progress","Quoting","Ordered","Done","Delivered"];
+  const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Quoting":"var(--purple)","Ordered":"#818cf8","Done":"var(--green)","Delivered":"var(--text3)"};
 
   // VIN search lookup helper
   const catcarSlug=(make)=>{
@@ -4478,6 +4493,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         const STAGES = [
           {key:"Pending",         label:"⏳ "+(t.wsStPending||"Pending"),          color:"#a78bfa", bg:"rgba(167,139,250,.18)", mechanic:true},
           {key:"In Progress",     label:"⚙️ "+(t.inProgress||"In Progress"),       color:"#fbbf24", bg:"rgba(251,191,36,.18)",  mechanic:true},
+          {key:"Quoting",         label:"💬 "+(t.quoting||"Quoting"),              color:"#a78bfa", bg:"rgba(167,139,250,.18)", mechanic:false},
+          {key:"Ordered",         label:"📦 "+(t.ordered||"Ordered"),              color:"#818cf8", bg:"rgba(129,140,248,.18)", mechanic:false},
           {key:"Done",            label:"✅ "+(t.done||"Done"),                    color:"#34d399", bg:"rgba(52,211,153,.18)",  mechanic:false},
           {key:"Invoiced",        label:"🧾 "+(t.wsStInvoiced||"Invoiced"),         color:"#f97316", bg:"rgba(249,115,22,.18)",  mechanic:false, derived:true},
           {key:"Payment Received",label:"💚 "+(t.wsStPaid||"Paid"),                color:"#10b981", bg:"rgba(16,185,129,.18)",  mechanic:false, derived:true},
@@ -6598,7 +6615,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           existingRequests={localShopRequests}
           parts={parts}
           settings={settings}
-          onSend={async(data)=>{ await onSaveWsShopRequest(data); await refreshLocalShopRequests(); setWsShopReqModal(false); }}
+          onSend={async(data)=>{ await onSaveWsShopRequest(data); advanceJobStatus("Quoting"); await refreshLocalShopRequests(); setWsShopReqModal(false); }}
           onRefresh={async()=>{ if(onRefresh) await onRefresh(); await refreshLocalShopRequests(); }}
           onClose={()=>setWsShopReqModal(false)}/>
       )}
@@ -7082,14 +7099,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             history={wsSupplierRequests.filter(r=>r.job_id===job.id)}
             quotes={wsSupplierQuotes.filter(q=>q.job_id===job.id)}
             sqReplies={sqReplies}
-            onLogSend={onSaveWsSupplierRequest}
+            onLogSend={onSaveWsSupplierRequest?(data)=>{onSaveWsSupplierRequest(data);advanceJobStatus("Quoting");}:undefined}
             onDeleteSend={onDeleteWsSupplierRequest}
             onSaveQuote={onSaveWsSupplierQuote}
             onSaveItem={onSaveItem}
             onSaveWsStock={onSaveWsStock}
             onSaveWsSupplier={onSaveWsSupplier}
             onGenerateLink={onGenerateWsQuoteLink}
-            onCreatePO={onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);setSupplierModal(false);if(onViewPurchaseOrders)onViewPurchaseOrders();}:undefined}
+            onCreatePO={onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);advanceJobStatus("Ordered");setSupplierModal(false);if(onViewPurchaseOrders)onViewPurchaseOrders();}:undefined}
             onClose={()=>setSupplierModal(false)}/>
         </Overlay>
       )}
@@ -7101,7 +7118,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           wsSupplierRequests={wsSupplierRequests}
           sqReplies={sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id))}
           wsSuppliers={wsSuppliers} settings={settings}
-          onSave={onSaveWsPurchaseOrder}
+          onSave={async(...args)=>{const res=await onSaveWsPurchaseOrder(...args);advanceJobStatus("Ordered");return res;}}
           onViewPOs={onViewPurchaseOrders}
           onClose={()=>setCreatePoOpen(false)}/>
       )}
@@ -8211,7 +8228,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], wsId=nul
             <div><FL label={t.mechanic||"Mechanic"}/><input className="inp" value={f.mechanic} onChange={e=>s("mechanic",e.target.value)} placeholder="Assign mechanic..."/></div>
             <div><FL label="Status"/>
               <select className="inp" value={f.status} onChange={e=>s("status",e.target.value)}>
-                {["Pending","In Progress","Done","Delivered"].map(st=><option key={st}>{st}</option>)}
+                {["Pending","In Progress","Quoting","Ordered","Done","Delivered"].map(st=><option key={st}>{st}</option>)}
               </select>
             </div>
           </FG>

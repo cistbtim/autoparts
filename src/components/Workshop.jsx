@@ -1040,8 +1040,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         onClick={()=>setKanbanAssignEdit({jobId:job.id,draft:job.assigned_to||""})}>👤</button>
                       <button title="Print job sheet" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11}}
                         onClick={()=>printJobSheet(job)}>🖨️</button>
-                      {canCancel&&!wsLocked&&<button title="Cancel job — customer didn't proceed" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--text3)"}}
-                        onClick={()=>{if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`))cancelJob(job);}}>🚫</button>}
+                      {canCancel&&!wsLocked&&<button title="Cancel job — customer didn't proceed" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:13,fontWeight:700,color:"#64748b"}}
+                        onClick={()=>{if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`))cancelJob(job);}}>✕</button>}
                       {canUncancel&&!wsLocked&&<button title="Reopen — return to previous stage" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--green)"}}
                         onClick={()=>uncancelJob(job)}>↩</button>}
                       {wsRole==="main"&&!wsLocked&&<button title="Delete job" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--red)"}}
@@ -4595,8 +4595,15 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`)) onSaveJob({...job,is_cancelled:true,cancelled_prev_status:job.status});
                     }}
                     title={isCancelled?"Reopen — return to previous stage":"Cancel job — customer didn't proceed"}
-                    style={{background:isCancelled?"rgba(100,116,139,.15)":"none",border:`1px solid ${isCancelled?"#64748b":"var(--border2)"}`,borderRadius:8,cursor:"pointer",padding:"3px 7px",flexShrink:0,fontSize:11,fontWeight:700,color:isCancelled?"#64748b":"var(--text3)"}}>
-                    🚫
+                    style={{background:"none",border:"none",cursor:"pointer",padding:"2px",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+                    <svg width="30" height="26" viewBox="0 0 30 26">
+                      <circle cx="15" cy="13" r="12"
+                        fill={isCancelled?"#64748b":"transparent"}
+                        stroke={isCancelled?"#64748b":"var(--border2)"}
+                        strokeWidth="2"/>
+                      <text x="15" y="18" textAnchor="middle" fontSize="14" fontWeight="bold"
+                        fill={isCancelled?"#fff":"var(--text3)"}>✕</text>
+                    </svg>
                   </button>
                 )}
                 {showWa&&(()=>{

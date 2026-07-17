@@ -133,8 +133,8 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
   const JOB_PAGE_SIZE = typeof window!=="undefined"&&window.innerWidth<=767 ? 5 : 20;
 
-  const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Quoting":"var(--purple)","Ordered":"#818cf8","Done":"var(--green)","Delivered":"var(--text3)"};
-  const ST_BG    = {"Pending":"rgba(96,165,250,.12)","In Progress":"rgba(251,191,36,.12)","Quoting":"rgba(167,139,250,.12)","Ordered":"rgba(129,140,248,.12)","Done":"rgba(52,211,153,.12)","Delivered":"rgba(100,116,139,.12)"};
+  const ST_COLOR = {"Pending":"var(--blue)","Checkup":"#38bdf8","In Progress":"var(--yellow)","Quoting":"var(--purple)","Ordered":"#818cf8","Done":"var(--green)","Delivered":"var(--text3)"};
+  const ST_BG    = {"Pending":"rgba(96,165,250,.12)","Checkup":"rgba(56,189,248,.12)","In Progress":"rgba(251,191,36,.12)","Quoting":"rgba(167,139,250,.12)","Ordered":"rgba(129,140,248,.12)","Done":"rgba(52,211,153,.12)","Delivered":"rgba(100,116,139,.12)"};
 
   const kanbanSt = (job) => {
     if (job.is_problem)                          return {label:"⚠️ Problem Job",       color:"#f87171", bg:"rgba(248,113,113,.15)"};
@@ -513,7 +513,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       {wsTab==="jobs"&&(<>
         {!kanbanView&&(<>
         <div className="tabs" style={{marginBottom:14,width:"fit-content",maxWidth:"100%",flexWrap:"wrap"}}>
-          {[["__all__","All"],["Pending","🔵 Pending"],["In Progress","🟡 In Progress"],["Quoting","🟣 Quoting"],["Ordered","🔷 Ordered"],["Done","🟢 Done"],["Delivered","⚫ Delivered"]].map(([v,l])=>{
+          {[["__all__","All"],["Pending","🔵 Pending"],["Checkup","🔎 Checkup"],["In Progress","🟡 In Progress"],["Quoting","🟣 Quoting"],["Ordered","🔷 Ordered"],["Done","🟢 Done"],["Delivered","⚫ Delivered"]].map(([v,l])=>{
             const cnt=v==="__all__"?jobs.length:jobs.filter(j=>j.status===v).length;
             return <button key={v} className={`tab ${filterSt===v?"on":""}`} onClick={()=>setFilterSt(v)}>{l} <span style={{opacity:.6,fontSize:11}}>{cnt}</span></button>;
           })}
@@ -696,6 +696,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           // ── filter columns by search ──────────────────────────
           const bkCol   = wsBookings.filter(b=>b.status==="pending"||b.status==="confirmed");
           const pendCol = jobs.filter(j=>!j.is_problem&&j.status==="Pending"&&matchesSearch(j));
+          const checkupCol = jobs.filter(j=>!j.is_problem&&j.status==="Checkup"&&matchesSearch(j));
           const wipCol  = jobs.filter(j=>!j.is_problem&&j.status==="In Progress"&&matchesSearch(j));
           const quotingCol = jobs.filter(j=>!j.is_problem&&j.status==="Quoting"&&matchesSearch(j));
           const orderedCol = jobs.filter(j=>!j.is_problem&&j.status==="Ordered"&&matchesSearch(j));
@@ -707,6 +708,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           const COLS = [
             {id:"booking",  label:"Booking",          hint:"Confirm & create job",   color:"#60a5fa", items:bkCol,   type:"booking"},
             {id:"pending",  label:"Pending",           hint:"Waiting to start",       color:"#a78bfa", items:pendCol, type:"job", nextStatus:"In Progress", nextLabel:"▶ Start"},
+            {id:"checkup",  label:"Checkup",           hint:"Inspection only — no repair", color:"#38bdf8", items:checkupCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
             {id:"wip",      label:"In Progress",       hint:"Add quote + do the work",color:"#fbbf24", items:wipCol,  type:"job", nextStatus:"Done",        nextLabel:"✓ Mark Done"},
             {id:"quoting",  label:"Quoting",           hint:"Waiting on supplier prices", color:"#a78bfa", items:quotingCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
             {id:"ordered",  label:"Ordered",           hint:"Parts on order",         color:"#818cf8", items:orderedCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
@@ -1048,6 +1050,14 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                           {!hasQuote&&<div style={{fontSize:9,color:"var(--yellow)",textAlign:"center",marginTop:2}}>⚠ Quote required</div>}
                         </>);
                       })()}
+                      {col.id==="pending"&&(
+                        <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:10,padding:"5px 0",marginTop:3,color:"#38bdf8"}}
+                          onClick={()=>moveJobStatus(job,"Checkup")}>🔍 Checkup Only</button>
+                      )}
+                      {col.id==="checkup"&&(
+                        <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:10,padding:"5px 0",marginTop:3}}
+                          onClick={()=>moveJobStatus(job,"In Progress")}>🔧 Start Repair</button>
+                      )}
                       {canInvoice&&(
                         <button className="btn btn-xs btn-primary" style={{width:"100%",fontSize:10,padding:"5px 0"}}
                           onClick={()=>{ setKanbanInvJob(job); setTimeout(()=>kanbanInvPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),80); }}>🧾 Invoice</button>
@@ -1994,7 +2004,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         const invThisMonth=invoices.filter(i=>(i.invoice_date||"").startsWith(thisMonth));
         const revThisMonth=invThisMonth.reduce((s,i)=>s+(+i.total||0),0);
         // Status breakdown
-        const byStatus=["Pending","In Progress","Quoting","Ordered","Done","Delivered"].map(s=>([s,jobs.filter(j=>j.status===s).length]));
+        const byStatus=["Pending","Checkup","In Progress","Quoting","Ordered","Done","Delivered"].map(s=>([s,jobs.filter(j=>j.status===s).length]));
         // Top customers by revenue
         const custRev={};
         invoices.forEach(inv=>{ const k=inv.invoice_customer||"Unknown"; custRev[k]=(custRev[k]||0)+(+inv.total||0); });
@@ -3714,7 +3724,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   // order → Ordered) — forward-only, so it never regresses a job that's
   // already further along (e.g. Done, or Ordered when a follow-up quote
   // request goes out).
-  const JOB_STATUS_ORDER=["Pending","In Progress","Quoting","Ordered","Done","Delivered"];
+  const JOB_STATUS_ORDER=["Pending","Checkup","In Progress","Quoting","Ordered","Done","Delivered"];
   const advanceJobStatus = (targetStatus) => {
     const curIdx=JOB_STATUS_ORDER.indexOf(job.status);
     const targetIdx=JOB_STATUS_ORDER.indexOf(targetStatus);
@@ -4249,8 +4259,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const quoteTax      = settings.vat_number ? quoteSubtotal*(settings.tax_rate||0)/100 : 0;
   const quoteTotal    = quoteSubtotal+quoteTax;
 
-  const JOB_STATUSES = ["Pending","In Progress","Quoting","Ordered","Done","Delivered"];
-  const ST_COLOR = {"Pending":"var(--blue)","In Progress":"var(--yellow)","Quoting":"var(--purple)","Ordered":"#818cf8","Done":"var(--green)","Delivered":"var(--text3)"};
+  const JOB_STATUSES = ["Pending","Checkup","In Progress","Quoting","Ordered","Done","Delivered"];
+  const ST_COLOR = {"Pending":"var(--blue)","Checkup":"#38bdf8","In Progress":"var(--yellow)","Quoting":"var(--purple)","Ordered":"#818cf8","Done":"var(--green)","Delivered":"var(--text3)"};
 
   // VIN search lookup helper
   const catcarSlug=(make)=>{
@@ -4492,6 +4502,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         const isProblem = !!job.is_problem;
         const STAGES = [
           {key:"Pending",         label:"⏳ "+(t.wsStPending||"Pending"),          color:"#a78bfa", bg:"rgba(167,139,250,.18)", mechanic:true},
+          {key:"Checkup",         label:"🔎 "+(t.checkup||"Checkup"),              color:"#38bdf8", bg:"rgba(56,189,248,.18)",  mechanic:true},
           {key:"In Progress",     label:"⚙️ "+(t.inProgress||"In Progress"),       color:"#fbbf24", bg:"rgba(251,191,36,.18)",  mechanic:true},
           {key:"Quoting",         label:"💬 "+(t.quoting||"Quoting"),              color:"#a78bfa", bg:"rgba(167,139,250,.18)", mechanic:false},
           {key:"Ordered",         label:"📦 "+(t.ordered||"Ordered"),              color:"#818cf8", bg:"rgba(129,140,248,.18)", mechanic:false},
@@ -8228,7 +8239,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], wsId=nul
             <div><FL label={t.mechanic||"Mechanic"}/><input className="inp" value={f.mechanic} onChange={e=>s("mechanic",e.target.value)} placeholder="Assign mechanic..."/></div>
             <div><FL label="Status"/>
               <select className="inp" value={f.status} onChange={e=>s("status",e.target.value)}>
-                {["Pending","In Progress","Quoting","Ordered","Done","Delivered"].map(st=><option key={st}>{st}</option>)}
+                {["Pending","Checkup","In Progress","Quoting","Ordered","Done","Delivered"].map(st=><option key={st}>{st}</option>)}
               </select>
             </div>
           </FG>

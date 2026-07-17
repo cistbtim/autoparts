@@ -1378,6 +1378,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         parent_job_id:d.parent_job_id||null,
         is_problem:d.is_problem||false,
         problem_prev_status:str(d.problem_prev_status),
+        is_cancelled:d.is_cancelled||false,
+        cancelled_prev_status:str(d.cancelled_prev_status),
         notes:str(d.notes),
       };
       let savedId=d.id;

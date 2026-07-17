@@ -255,7 +255,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const saveAvailability = async () => {
     const baselineNum = bkPaperBaseline===""?null:+bkPaperBaseline;
     if(baselineNum!==null&&(!Number.isFinite(baselineNum)||baselineNum<1)){
-      alert("紙本作業平均天數必須是大於 0 的數字");
+      alert("Average Days on Paper must be a number greater than 0");
       return;
     }
     setBkAvailSaving(true);
@@ -1489,10 +1489,10 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
                 {/* Paper baseline (time-saved dashboard) */}
                 <div>
-                  <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".04em",marginBottom:8}}>紙本作業平均天數</div>
-                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>以前用紙本/電話管理一張工單,從進廠到出廠平均要幾天?</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".04em",marginBottom:8}}>Average Days on Paper</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>Before switching to this system, how many days did a job typically take from drop-off to collection using paper/phone tracking?</div>
                   <input className="inp" type="number" min="1" step="1" style={{maxWidth:140}}
-                    value={bkPaperBaseline} onChange={e=>setBkPaperBaseline(e.target.value)} placeholder="例如 5"/>
+                    value={bkPaperBaseline} onChange={e=>setBkPaperBaseline(e.target.value)} placeholder="e.g. 5"/>
                 </div>
 
                 <button className="btn btn-primary btn-sm" style={{alignSelf:"flex-end"}} onClick={saveAvailability} disabled={bkAvailSaving}>
@@ -2013,29 +2013,29 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         return (<>
           {/* KPI cards */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:12,marginBottom:20}}>
-            {/* 省下時間 — always first (see /office-hours design doc 20260717) */}
+            {/* Time Saved — always first (see /office-hours design doc 20260717) */}
             <div className="card" style={{padding:"12px 14px"}}>
               <div style={{fontSize:18,marginBottom:4}}>⏱</div>
-              <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>省下時間</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>Time Saved</div>
               {cycleN===0?(
                 <>
-                  <div style={{fontWeight:700,fontSize:15,color:"var(--text2)"}}>尚無數據</div>
-                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{paperBaseline>0?"紙本基準已設定,等待第一張工單完成":"完成第一張工單後開始追蹤"}</div>
+                  <div style={{fontWeight:700,fontSize:15,color:"var(--text2)"}}>No data yet</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{paperBaseline>0?"Baseline set — waiting for first completed job":"Tracking starts after your first completed job"}</div>
                 </>
               ):cycleN<10?(
                 <>
-                  <div style={{fontWeight:700,fontSize:15,color:"var(--text2)"}}>仍在累積數據</div>
-                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>已追蹤 {cycleN} / 10 張工單</div>
+                  <div style={{fontWeight:700,fontSize:15,color:"var(--text2)"}}>Still collecting data</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{cycleN} / 10 jobs tracked</div>
                 </>
               ):cycleDelta!==null&&cycleDelta>0?(
                 <>
-                  <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:"var(--green)"}}>+{cycleDelta.toFixed(1)} 天</div>
-                  <div style={{fontSize:11,color:"var(--text2)",marginTop:2}}>較紙本作業快</div>
+                  <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:"var(--green)"}}>+{cycleDelta.toFixed(1)} days</div>
+                  <div style={{fontSize:11,color:"var(--text2)",marginTop:2}}>faster than paper</div>
                 </>
               ):(
                 <>
-                  <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)"}}>{cycleMedian.toFixed(1)} 天</div>
-                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>已追蹤 {cycleN} 張工單{paperBaseline>0?"":" · 尚未設定紙本基準"}</div>
+                  <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)"}}>{cycleMedian.toFixed(1)} days</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{cycleN} jobs tracked{paperBaseline>0?"":" · no paper baseline set"}</div>
                 </>
               )}
             </div>

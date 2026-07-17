@@ -118,7 +118,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
     setBkWorkDays(wsProfile?.working_days||[1,2,3,4,5]);
     setBkHolidays(wsProfile?.public_holidays||[]);
     setBkClosedDates(wsProfile?.closed_dates||[]);
-    setBkPaperBaseline(wsProfile?.paper_baseline_days||"");
+    setBkPaperBaseline(wsProfile?.paper_baseline_hours||"");
   },[wsProfile]);
 
   // Migration-drift self-check: if the time-tracking columns weren't added to
@@ -255,7 +255,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const saveAvailability = async () => {
     const baselineNum = bkPaperBaseline===""?null:+bkPaperBaseline;
     if(baselineNum!==null&&(!Number.isFinite(baselineNum)||baselineNum<1)){
-      alert("Average Days on Paper must be a number greater than 0");
+      alert("Average Hours on Paper must be a number greater than 0");
       return;
     }
     setBkAvailSaving(true);
@@ -263,10 +263,10 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
       working_days: bkWorkDays,
       public_holidays: bkHolidays,
       closed_dates: bkClosedDates,
-      paper_baseline_days: baselineNum,
+      paper_baseline_hours: baselineNum,
     }).catch(e=>({message:e.message}));
     if(res&&!Array.isArray(res)&&res.message){
-      alert("❌ Save failed: "+res.message+"\n\nYou need to run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles\n  ADD COLUMN IF NOT EXISTS working_days jsonb DEFAULT '[1,2,3,4,5]'::jsonb,\n  ADD COLUMN IF NOT EXISTS public_holidays jsonb DEFAULT '[]'::jsonb,\n  ADD COLUMN IF NOT EXISTS closed_dates jsonb DEFAULT '[]'::jsonb,\n  ADD COLUMN IF NOT EXISTS paper_baseline_days integer CHECK (paper_baseline_days > 0);");
+      alert("❌ Save failed: "+res.message+"\n\nYou need to run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles\n  ADD COLUMN IF NOT EXISTS working_days jsonb DEFAULT '[1,2,3,4,5]'::jsonb,\n  ADD COLUMN IF NOT EXISTS public_holidays jsonb DEFAULT '[]'::jsonb,\n  ADD COLUMN IF NOT EXISTS closed_dates jsonb DEFAULT '[]'::jsonb,\n  ADD COLUMN IF NOT EXISTS paper_baseline_hours numeric CHECK (paper_baseline_hours > 0);");
     }
     setBkAvailSaving(false);
   };
@@ -1489,10 +1489,10 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
                 {/* Paper baseline (time-saved dashboard) */}
                 <div>
-                  <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".04em",marginBottom:8}}>Average Days on Paper</div>
-                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>Before switching to this system, how many days did a job typically take from drop-off to collection using paper/phone tracking?</div>
-                  <input className="inp" type="number" min="1" step="1" style={{maxWidth:140}}
-                    value={bkPaperBaseline} onChange={e=>setBkPaperBaseline(e.target.value)} placeholder="e.g. 5"/>
+                  <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".04em",marginBottom:8}}>Average Hours on Paper</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>Before switching to this system, how many hours did a job typically take from drop-off to collection using paper/phone tracking? (e.g. 2 hours for same-day work, 48 for a 2-day job)</div>
+                  <input className="inp" type="number" min="1" step="0.5" style={{maxWidth:140}}
+                    value={bkPaperBaseline} onChange={e=>setBkPaperBaseline(e.target.value)} placeholder="e.g. 2"/>
                 </div>
 
                 <button className="btn btn-primary btn-sm" style={{alignSelf:"flex-end"}} onClick={saveAvailability} disabled={bkAvailSaving}>
@@ -1996,18 +1996,21 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         invoices.forEach(inv=>{ const k=inv.invoice_customer||"Unknown"; custRev[k]=(custRev[k]||0)+(+inv.total||0); });
         const topCust=Object.entries(custRev).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
-        // Time-saved stat card — mirrors the workshop_job_cycle_days DB view's
+        // Time-saved stat card — mirrors the workshop_job_cycle_hours DB view's
         // filter/median logic client-side (reopen_count=0, closed_at set, not backfilled).
         // Keep this the single source of truth for the exclusion rule; don't
         // reimplement it elsewhere (see /plan-eng-review DRY finding).
-        const cycleDays=jobs
+        // Base unit is hours, not days — most jobs here are same-day 1-2 hour
+        // turnarounds, so "days" rounds everything to 0/1 and hides the signal.
+        const fmtDuration=(h)=>h<48?`${h.toFixed(1)} hours`:`${(h/24).toFixed(1)} days`;
+        const cycleHours=jobs
           .filter(j=>j.closed_at&&!(+j.reopen_count>0)&&!j.is_backfilled)
-          .map(j=>(new Date(j.closed_at)-new Date(j.created_at))/86400000)
-          .filter(d=>Number.isFinite(d)&&d>=0)
+          .map(j=>(new Date(j.closed_at)-new Date(j.created_at))/3600000)
+          .filter(h=>Number.isFinite(h)&&h>=0)
           .sort((a,b)=>a-b);
-        const cycleN=cycleDays.length;
-        const cycleMedian=cycleN===0?null:cycleN%2===1?cycleDays[(cycleN-1)/2]:(cycleDays[cycleN/2-1]+cycleDays[cycleN/2])/2;
-        const paperBaseline=+wsProfile?.paper_baseline_days||0;
+        const cycleN=cycleHours.length;
+        const cycleMedian=cycleN===0?null:cycleN%2===1?cycleHours[(cycleN-1)/2]:(cycleHours[cycleN/2-1]+cycleHours[cycleN/2])/2;
+        const paperBaseline=+wsProfile?.paper_baseline_hours||0;
         const cycleDelta=(paperBaseline>0&&cycleMedian!==null)?paperBaseline-cycleMedian:null;
 
         return (<>
@@ -2029,12 +2032,12 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 </>
               ):cycleDelta!==null&&cycleDelta>0?(
                 <>
-                  <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:"var(--green)"}}>+{cycleDelta.toFixed(1)} days</div>
+                  <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:"var(--green)"}}>+{fmtDuration(cycleDelta)}</div>
                   <div style={{fontSize:11,color:"var(--text2)",marginTop:2}}>faster than paper</div>
                 </>
               ):(
                 <>
-                  <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)"}}>{cycleMedian.toFixed(1)} days</div>
+                  <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)"}}>{fmtDuration(cycleMedian)}</div>
                   <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{cycleN} jobs tracked{paperBaseline>0?"":" · no paper baseline set"}</div>
                 </>
               )}

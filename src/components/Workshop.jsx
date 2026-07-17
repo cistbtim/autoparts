@@ -7105,7 +7105,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             onSaveItem={onSaveItem}
             onSaveWsStock={onSaveWsStock}
             onSaveWsSupplier={onSaveWsSupplier}
-            onGenerateLink={onGenerateWsQuoteLink}
+            onGenerateLink={onGenerateWsQuoteLink?(info,linkItems)=>onGenerateWsQuoteLink(info,linkItems).then(url=>{advanceJobStatus("Quoting");return url;}):undefined}
             onCreatePO={onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);advanceJobStatus("Ordered");setSupplierModal(false);if(onViewPurchaseOrders)onViewPurchaseOrders();}:undefined}
             onClose={()=>setSupplierModal(false)}/>
         </Overlay>

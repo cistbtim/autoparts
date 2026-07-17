@@ -8691,16 +8691,36 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
   // in parts that don't actually fit — same precision trade-off used for the
   // Spare Shop "parts for this vehicle" count.
   const hasVehicle = type==="part" && !!vehicleMake;
-  const vehicleMatchedPartIds = useMemo(()=>{
+  const matchVIds = useMemo(()=>{
     if(!hasVehicle) return new Set();
     const jMake=vehicleMake.toLowerCase();
     const byCode=vehicleModel?vehicles.filter(v=>v.make?.toLowerCase()===jMake&&v.code===vehicleModel):[];
     const matchV=byCode.length>0?byCode
       :!vehicleModel?vehicles.filter(v=>v.make?.toLowerCase()===jMake)
       :vehicles.filter(v=>v.make?.toLowerCase()===jMake&&(v.model||"").toLowerCase()===vehicleModel.toLowerCase());
-    const vIds=new Set(matchV.map(v=>String(v.id)));
-    return new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)));
-  },[hasVehicle,vehicleMake,vehicleModel,vehicles,partFitments]);
+    return new Set(matchV.map(v=>String(v.id)));
+  },[hasVehicle,vehicleMake,vehicleModel,vehicles]);
+
+  // The global partFitments prop is loaded once at app start and cached —
+  // fitments added/linked since then (e.g. from the vehicle-fitment search
+  // page) won't be in it yet. Re-fetch fresh, scoped to just the matched
+  // vehicle(s), so newly-linked parts show up without a full app reload —
+  // same fix already applied to the Spare Shop "parts for this vehicle" search.
+  const [freshFitments,setFreshFitments]=useState([]);
+  useEffect(()=>{
+    if(matchVIds.size===0){ setFreshFitments([]); return; }
+    let cancelled=false;
+    api.fresh("part_fitments",`vehicle_id=in.(${[...matchVIds].join(",")})&select=part_id,vehicle_id`)
+      .then(d=>{ if(!cancelled) setFreshFitments(Array.isArray(d)?d:[]); })
+      .catch(()=>{});
+    return ()=>{cancelled=true;};
+  },[matchVIds]);
+
+  const vehicleMatchedPartIds = useMemo(()=>{
+    if(matchVIds.size===0) return new Set();
+    const combined=[...partFitments,...freshFitments];
+    return new Set(combined.filter(f=>matchVIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)));
+  },[matchVIds,partFitments,freshFitments]);
 
   const mainPartsPool = useMemo(()=>
     vehicleMatchedPartIds.size===0 ? [] : parts.filter(p=>vehicleMatchedPartIds.has(String(p.id))),

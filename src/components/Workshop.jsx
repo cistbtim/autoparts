@@ -58,6 +58,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   const [bkWorkDays,      setBkWorkDays]      = useState([1,2,3,4,5]);
   const [bkHolidays,      setBkHolidays]      = useState([]);
   const [bkClosedDates,   setBkClosedDates]   = useState([]);
+  const [bkPaperBaseline, setBkPaperBaseline] = useState("");
   const [bkAvailSaving,   setBkAvailSaving]   = useState(false);
   const [bkNewHolDate,    setBkNewHolDate]    = useState("");
   const [bkNewHolName,    setBkNewHolName]    = useState("");
@@ -117,7 +118,18 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
     setBkWorkDays(wsProfile?.working_days||[1,2,3,4,5]);
     setBkHolidays(wsProfile?.public_holidays||[]);
     setBkClosedDates(wsProfile?.closed_dates||[]);
+    setBkPaperBaseline(wsProfile?.paper_baseline_days||"");
   },[wsProfile]);
+
+  // Migration-drift self-check: if the time-tracking columns weren't added to
+  // this Supabase instance yet, the dashboard would silently show empty
+  // states forever with no error. Warn once per session instead.
+  useEffect(()=>{
+    if(!jobs?.length) return;
+    if(!("closed_at" in jobs[0])){
+      console.warn("[workshop time-tracking] workshop_jobs.closed_at column not found — has the schema migration been run on this Supabase instance?");
+    }
+  },[jobs]);
 
   const JOB_PAGE_SIZE = typeof window!=="undefined"&&window.innerWidth<=767 ? 5 : 20;
 
@@ -241,14 +253,20 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
   };
 
   const saveAvailability = async () => {
+    const baselineNum = bkPaperBaseline===""?null:+bkPaperBaseline;
+    if(baselineNum!==null&&(!Number.isFinite(baselineNum)||baselineNum<1)){
+      alert("紙本作業平均天數必須是大於 0 的數字");
+      return;
+    }
     setBkAvailSaving(true);
     const res = await api.patch("workshop_profiles","id",wsId,{
       working_days: bkWorkDays,
       public_holidays: bkHolidays,
       closed_dates: bkClosedDates,
+      paper_baseline_days: baselineNum,
     }).catch(e=>({message:e.message}));
     if(res&&!Array.isArray(res)&&res.message){
-      alert("❌ Save failed: "+res.message+"\n\nYou need to run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles\n  ADD COLUMN IF NOT EXISTS working_days jsonb DEFAULT '[1,2,3,4,5]'::jsonb,\n  ADD COLUMN IF NOT EXISTS public_holidays jsonb DEFAULT '[]'::jsonb,\n  ADD COLUMN IF NOT EXISTS closed_dates jsonb DEFAULT '[]'::jsonb;");
+      alert("❌ Save failed: "+res.message+"\n\nYou need to run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles\n  ADD COLUMN IF NOT EXISTS working_days jsonb DEFAULT '[1,2,3,4,5]'::jsonb,\n  ADD COLUMN IF NOT EXISTS public_holidays jsonb DEFAULT '[]'::jsonb,\n  ADD COLUMN IF NOT EXISTS closed_dates jsonb DEFAULT '[]'::jsonb,\n  ADD COLUMN IF NOT EXISTS paper_baseline_days integer CHECK (paper_baseline_days > 0);");
     }
     setBkAvailSaving(false);
   };
@@ -1469,6 +1487,14 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   </div>
                 </div>
 
+                {/* Paper baseline (time-saved dashboard) */}
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".04em",marginBottom:8}}>紙本作業平均天數</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>以前用紙本/電話管理一張工單,從進廠到出廠平均要幾天?</div>
+                  <input className="inp" type="number" min="1" step="1" style={{maxWidth:140}}
+                    value={bkPaperBaseline} onChange={e=>setBkPaperBaseline(e.target.value)} placeholder="例如 5"/>
+                </div>
+
                 <button className="btn btn-primary btn-sm" style={{alignSelf:"flex-end"}} onClick={saveAvailability} disabled={bkAvailSaving}>
                   {bkAvailSaving?"⏳ Saving…":"💾 Save Availability"}
                 </button>
@@ -1969,9 +1995,50 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         const custRev={};
         invoices.forEach(inv=>{ const k=inv.invoice_customer||"Unknown"; custRev[k]=(custRev[k]||0)+(+inv.total||0); });
         const topCust=Object.entries(custRev).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+        // Time-saved stat card — mirrors the workshop_job_cycle_days DB view's
+        // filter/median logic client-side (reopen_count=0, closed_at set, not backfilled).
+        // Keep this the single source of truth for the exclusion rule; don't
+        // reimplement it elsewhere (see /plan-eng-review DRY finding).
+        const cycleDays=jobs
+          .filter(j=>j.closed_at&&!(+j.reopen_count>0)&&!j.is_backfilled)
+          .map(j=>(new Date(j.closed_at)-new Date(j.created_at))/86400000)
+          .filter(d=>Number.isFinite(d)&&d>=0)
+          .sort((a,b)=>a-b);
+        const cycleN=cycleDays.length;
+        const cycleMedian=cycleN===0?null:cycleN%2===1?cycleDays[(cycleN-1)/2]:(cycleDays[cycleN/2-1]+cycleDays[cycleN/2])/2;
+        const paperBaseline=+wsProfile?.paper_baseline_days||0;
+        const cycleDelta=(paperBaseline>0&&cycleMedian!==null)?paperBaseline-cycleMedian:null;
+
         return (<>
           {/* KPI cards */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:12,marginBottom:20}}>
+            {/* 省下時間 — always first (see /office-hours design doc 20260717) */}
+            <div className="card" style={{padding:"12px 14px"}}>
+              <div style={{fontSize:18,marginBottom:4}}>⏱</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>省下時間</div>
+              {cycleN===0?(
+                <>
+                  <div style={{fontWeight:700,fontSize:15,color:"var(--text2)"}}>尚無數據</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{paperBaseline>0?"紙本基準已設定,等待第一張工單完成":"完成第一張工單後開始追蹤"}</div>
+                </>
+              ):cycleN<10?(
+                <>
+                  <div style={{fontWeight:700,fontSize:15,color:"var(--text2)"}}>仍在累積數據</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>已追蹤 {cycleN} / 10 張工單</div>
+                </>
+              ):cycleDelta!==null&&cycleDelta>0?(
+                <>
+                  <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:"var(--green)"}}>+{cycleDelta.toFixed(1)} 天</div>
+                  <div style={{fontSize:11,color:"var(--text2)",marginTop:2}}>較紙本作業快</div>
+                </>
+              ):(
+                <>
+                  <div style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)"}}>{cycleMedian.toFixed(1)} 天</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>已追蹤 {cycleN} 張工單{paperBaseline>0?"":" · 尚未設定紙本基準"}</div>
+                </>
+              )}
+            </div>
             {[
               ["Total Jobs",jobs.length,"var(--blue)","🔧"],
               ["This Month Jobs",jobsThisMonth.length,"var(--blue)","📅"],
@@ -7123,6 +7190,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       mechanic:pastRec.mechanic||"",
                       notes:pastRec.notes||"",
                       status:"Delivered",
+                      is_backfilled:true,
                     });
                     setAddingPastRecord(false);
                     setPastRec({date_in:"",date_out:"",mileage:"",complaint:"",diagnosis:"",mechanic:"",notes:""});

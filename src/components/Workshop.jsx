@@ -753,8 +753,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             </div>
           );
 
-          const DRAGGABLE_COLS = ["pending","wip","done","problem"];
-          const DROP_TARGET_COLS = ["pending","wip","done","problem"];
+          const DRAGGABLE_COLS = ["pending","wip","done","problem","cancelled"];
+          const DROP_TARGET_COLS = ["pending","wip","done","problem","cancelled"];
 
           const handleDragStart = (job, col) => {
             dragJobRef.current = {job, srcColId: col.id};
@@ -783,13 +783,15 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
             if (col.id === "problem") {
               flagProblem(job);
+            } else if (col.id === "cancelled") {
+              cancelJob(job);
             } else if (col.id === "pending") {
-              await onSaveJob({...job, is_problem:false, status:"Pending"});
+              await onSaveJob({...job, is_problem:false, is_cancelled:false, status:"Pending"});
             } else if (col.id === "wip") {
-              await onSaveJob({...job, is_problem:false, status:"In Progress"});
+              await onSaveJob({...job, is_problem:false, is_cancelled:false, status:"In Progress"});
             } else if (col.id === "done") {
               if (!job.is_problem && srcColId === "wip" && !jobQuote(job.id)) return;
-              await onSaveJob({...job, is_problem:false, status:"Done"});
+              await onSaveJob({...job, is_problem:false, is_cancelled:false, status:"Done"});
             }
           };
 

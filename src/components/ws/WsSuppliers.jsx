@@ -27,7 +27,26 @@ function parseTypes(v){
   try{ return JSON.parse(v); }catch{ return []; }
 }
 
-export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete,wsLocked=false}) {
+// Median hours from request sent_at to quote quoted_at, per supplier — only
+// counts requests that actually got a reply ("只有有回來就行": no reply = no data point).
+function fmtReplyDuration(h){ return h<48?`${h.toFixed(1)}h`:`${(h/24).toFixed(1)}d`; }
+function supplierReplyStats(supplierId, requests, quotes){
+  const reqIds=new Set(requests.filter(r=>r.supplier_id===supplierId).map(r=>r.id));
+  if(!reqIds.size) return null;
+  const reqById={};
+  requests.forEach(r=>{ if(reqIds.has(r.id)) reqById[r.id]=r; });
+  const hours=quotes
+    .filter(q=>reqIds.has(q.request_id)&&reqById[q.request_id]?.sent_at&&q.quoted_at)
+    .map(q=>(new Date(q.quoted_at)-new Date(reqById[q.request_id].sent_at))/3600000)
+    .filter(h=>Number.isFinite(h)&&h>=0)
+    .sort((a,b)=>a-b);
+  if(!hours.length) return null;
+  const n=hours.length;
+  const median=n%2===1?hours[(n-1)/2]:(hours[n/2-1]+hours[n/2])/2;
+  return {n, median};
+}
+
+export function WsSuppliersPage({wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSave,onDelete,wsLocked=false}) {
   const [modal,setModal]=useState(null);
   const [search,setSearch]=useState("");
   const [typeFilter,setTypeFilter]=useState("");
@@ -64,6 +83,7 @@ export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete,wsLocked=false})
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {filtered.map(s=>{
               const brands=parseTypes(s.car_brands);
+              const replyStats=supplierReplyStats(s.id, wsSupplierRequests, wsSupplierQuotes);
               return (
               <div key={s.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                 <div style={{width:38,height:38,borderRadius:10,background:"rgba(37,211,102,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🏪</div>
@@ -81,6 +101,7 @@ export function WsSuppliersPage({wsSuppliers=[],onSave,onDelete,wsLocked=false})
                     {s.phone&&<span>📲 {s.phone}</span>}
                     {s.group_link&&<span style={{color:"#25D366"}}>👥 Group</span>}
                     {s.email&&<span>✉️ {s.email}</span>}
+                    {replyStats&&<span title={`Median reply time across ${replyStats.n} price request${replyStats.n!==1?"s":""}`}>⏱ replies in ~{fmtReplyDuration(replyStats.median)}</span>}
                     {s.notes&&<span style={{fontStyle:"italic"}}>{s.notes}</span>}
                   </div>
                   {brands.length>0&&(

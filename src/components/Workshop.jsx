@@ -1810,7 +1810,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
       {/* ══════════════ WS SUPPLIERS TAB ══════════════ */}
       {wsTab==="wssuppliers"&&(
-        <WsSuppliersPage wsSuppliers={wsSuppliers}
+        <WsSuppliersPage wsSuppliers={wsSuppliers} wsSupplierRequests={wsSupplierRequests} wsSupplierQuotes={wsSupplierQuotes}
           onSave={onSaveWsSupplier} onDelete={onDeleteWsSupplier} wsLocked={wsLocked}/>
       )}
 

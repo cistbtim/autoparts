@@ -866,6 +866,14 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         <button title="Return to previous stage" style={{padding:"2px 5px",border:"1px solid rgba(52,211,153,.35)",background:"rgba(0,0,0,.55)",color:"#34d399",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
                           onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>
                       )}
+                      {canCancel&&(
+                        <button title="Cancel job — customer didn't proceed" style={{padding:"2px 5px",border:"1px solid rgba(100,116,139,.4)",background:"rgba(0,0,0,.55)",color:"#94a3b8",borderRadius:4,cursor:"pointer",fontSize:10,fontWeight:700,lineHeight:1,backdropFilter:"blur(4px)"}}
+                          onClick={e=>{e.stopPropagation();if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`))cancelJob(job);}}>✕</button>
+                      )}
+                      {canUncancel&&(
+                        <button title="Reopen — return to previous stage" style={{padding:"2px 5px",border:"1px solid rgba(52,211,153,.35)",background:"rgba(0,0,0,.55)",color:"#34d399",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
+                          onClick={e=>{e.stopPropagation();uncancelJob(job);}}>↩</button>
+                      )}
                       <button title="More actions" style={{padding:"2px 5px",border:"1px solid rgba(255,255,255,.25)",background:"rgba(0,0,0,.55)",color:"#fff",borderRadius:4,cursor:"pointer",fontSize:10,lineHeight:1,backdropFilter:"blur(4px)"}}
                         onClick={e=>{e.stopPropagation();setExpandedActions(x=>x===job.id?null:job.id);}}>⋯</button>
                     </div>
@@ -896,6 +904,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         {elapsed&&<span style={{padding:"1px 5px",background:stuck?"rgba(248,113,113,.2)":"var(--surface3)",borderRadius:4,fontSize:9,fontWeight:700,color:stuck?"#f87171":"var(--text3)"}}>{stuck?"⏰":""}{elapsed}</span>}
                         {canFlag&&<button title="Flag as Problem" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#f87171",cursor:"pointer",fontSize:10,lineHeight:1}} onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>}
                         {canUnflag&&<button title="Unflag" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#34d399",cursor:"pointer",fontSize:10,lineHeight:1}} onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>}
+                        {canCancel&&<button title="Cancel job — customer didn't proceed" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#64748b",cursor:"pointer",fontSize:10,fontWeight:700,lineHeight:1}} onClick={e=>{e.stopPropagation();if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`))cancelJob(job);}}>✕</button>}
+                        {canUncancel&&<button title="Reopen — return to previous stage" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#34d399",cursor:"pointer",fontSize:10,lineHeight:1}} onClick={e=>{e.stopPropagation();uncancelJob(job);}}>↩</button>}
                         <button title="More actions" style={{padding:"2px 5px",border:"none",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:10,lineHeight:1}}
                           onClick={e=>{e.stopPropagation();setExpandedActions(x=>x===job.id?null:job.id);}}>⋯</button>
                       </div>
@@ -914,6 +924,9 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                     </div>
                     );
                   })()}
+
+                  {/* cancelled banner */}
+                  {job.is_cancelled&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#64748b",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textAlign:"center"}}>✕ CANCELLED</div>}
 
                   {/* complaint */}
                   {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#ef4444",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {highlight(job.complaint)}</div>}
@@ -1040,10 +1053,6 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         onClick={()=>setKanbanAssignEdit({jobId:job.id,draft:job.assigned_to||""})}>👤</button>
                       <button title="Print job sheet" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11}}
                         onClick={()=>printJobSheet(job)}>🖨️</button>
-                      {canCancel&&!wsLocked&&<button title="Cancel job — customer didn't proceed" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:13,fontWeight:700,color:"#64748b"}}
-                        onClick={()=>{if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`))cancelJob(job);}}>✕</button>}
-                      {canUncancel&&!wsLocked&&<button title="Reopen — return to previous stage" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--green)"}}
-                        onClick={()=>uncancelJob(job)}>↩</button>}
                       {wsRole==="main"&&!wsLocked&&<button title="Delete job" style={{flex:1,padding:"3px 0",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--red)"}}
                         onClick={()=>{if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob(job.id);}}>🗑</button>}
                       <button title="Hide actions" style={{flex:"0 0 auto",padding:"3px 7px",border:"1px solid var(--border)",borderRadius:5,background:"transparent",cursor:"pointer",fontSize:11,color:"var(--text3)"}}

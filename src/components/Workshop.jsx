@@ -138,7 +138,7 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
 
   const kanbanSt = (job) => {
     if (job.is_problem)                          return {label:"⚠️ Problem Job",       color:"#f87171", bg:"rgba(248,113,113,.15)"};
-    if (job.is_cancelled)                        return {label:"🚫 Cancelled",         color:"#64748b", bg:"rgba(100,116,139,.15)"};
+    if (job.is_cancelled)                        return {label:"🚫 Cancelled",         color:"#ef4444", bg:"rgba(239,68,68,.15)"};
     const inv = jobInvoice(job.id);
     if (inv?.status==="paid")                    return {label:"💚 Payment Received",   color:"#10b981", bg:"rgba(16,185,129,.15)"};
     if (inv)                                     return {label:"🧾 Invoiced",           color:"#f97316", bg:"rgba(249,115,22,.15)"};
@@ -724,7 +724,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             {id:"invoiced", label:"Invoiced",          hint:"Collect payment",         color:"#f97316", items:invCol,  type:"job"},
             {id:"paid",     label:"Payment Received",  hint:"Job complete ✓",          color:"#10b981", items:paidCol, type:"job"},
             {id:"problem",  label:"Problem Job",       hint:"Needs attention",         color:"#f87171", items:probCol, type:"job"},
-            {id:"cancelled",label:"Cancelled",         hint:"Customer didn't proceed", color:"#64748b", items:cancelCol, type:"job"},
+            {id:"cancelled",label:"Cancelled",         hint:"Customer didn't proceed", color:"#ef4444", items:cancelCol, type:"job"},
           ];
 
           const BkCard = ({b}) => (
@@ -867,7 +867,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                           onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>
                       )}
                       {canCancel&&(
-                        <button title="Cancel job — customer didn't proceed" style={{padding:"2px 5px",border:"1px solid rgba(100,116,139,.4)",background:"rgba(0,0,0,.55)",color:"#94a3b8",borderRadius:4,cursor:"pointer",fontSize:10,fontWeight:700,lineHeight:1,backdropFilter:"blur(4px)"}}
+                        <button title="Cancel job — customer didn't proceed" style={{padding:"2px 5px",border:"1px solid rgba(239,68,68,.4)",background:"rgba(0,0,0,.55)",color:"#ef4444",borderRadius:4,cursor:"pointer",fontSize:10,fontWeight:700,lineHeight:1,backdropFilter:"blur(4px)"}}
                           onClick={e=>{e.stopPropagation();if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`))cancelJob(job);}}>✕</button>
                       )}
                       {canUncancel&&(
@@ -904,7 +904,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         {elapsed&&<span style={{padding:"1px 5px",background:stuck?"rgba(248,113,113,.2)":"var(--surface3)",borderRadius:4,fontSize:9,fontWeight:700,color:stuck?"#f87171":"var(--text3)"}}>{stuck?"⏰":""}{elapsed}</span>}
                         {canFlag&&<button title="Flag as Problem" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#f87171",cursor:"pointer",fontSize:10,lineHeight:1}} onClick={e=>{e.stopPropagation();flagProblem(job);}}>⚠️</button>}
                         {canUnflag&&<button title="Unflag" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#34d399",cursor:"pointer",fontSize:10,lineHeight:1}} onClick={e=>{e.stopPropagation();unflagProblem(job);}}>↩</button>}
-                        {canCancel&&<button title="Cancel job — customer didn't proceed" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#64748b",cursor:"pointer",fontSize:10,fontWeight:700,lineHeight:1}} onClick={e=>{e.stopPropagation();if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`))cancelJob(job);}}>✕</button>}
+                        {canCancel&&<button title="Cancel job — customer didn't proceed" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#ef4444",cursor:"pointer",fontSize:10,fontWeight:700,lineHeight:1}} onClick={e=>{e.stopPropagation();if(window.confirm(`Cancel job ${job.id} for ${job.customer_name}? Customer didn't proceed.`))cancelJob(job);}}>✕</button>}
                         {canUncancel&&<button title="Reopen — return to previous stage" style={{padding:"2px 5px",border:"none",background:"transparent",color:"#34d399",cursor:"pointer",fontSize:10,lineHeight:1}} onClick={e=>{e.stopPropagation();uncancelJob(job);}}>↩</button>}
                         <button title="More actions" style={{padding:"2px 5px",border:"none",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:10,lineHeight:1}}
                           onClick={e=>{e.stopPropagation();setExpandedActions(x=>x===job.id?null:job.id);}}>⋯</button>
@@ -926,7 +926,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   })()}
 
                   {/* cancelled banner */}
-                  {job.is_cancelled&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#64748b",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textAlign:"center"}}>✕ CANCELLED</div>}
+                  {job.is_cancelled&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#ef4444",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textAlign:"center"}}>✕ CANCELLED</div>}
 
                   {/* complaint */}
                   {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#ef4444",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {highlight(job.complaint)}</div>}
@@ -4607,8 +4607,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     style={{background:"none",border:"none",cursor:"pointer",padding:"2px",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
                     <svg width="30" height="26" viewBox="0 0 30 26">
                       <circle cx="15" cy="13" r="12"
-                        fill={isCancelled?"#64748b":"transparent"}
-                        stroke={isCancelled?"#64748b":"var(--border2)"}
+                        fill={isCancelled?"#ef4444":"transparent"}
+                        stroke={isCancelled?"#ef4444":"var(--border2)"}
                         strokeWidth="2"/>
                       <text x="15" y="18" textAnchor="middle" fontSize="14" fontWeight="bold"
                         fill={isCancelled?"#fff":"var(--text3)"}>✕</text>

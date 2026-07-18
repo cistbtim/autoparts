@@ -1685,6 +1685,35 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     setWorkshopSuppliers(prev=>prev.filter(s=>s.id!==id));
     showToast("Deleted","err");
   };
+  const importWsSuppliers=async(list)=>{
+    if(!Array.isArray(list)||!list.length){showToast("Nothing to import","err");return;}
+    const existingNames=new Set(workshopSuppliers.map(s=>(s.name||"").trim().toLowerCase()));
+    const seen=new Set();
+    const rows=[];
+    let skipped=0;
+    for(const item of list){
+      const name=(item?.name||"").trim();
+      const key=name.toLowerCase();
+      if(!name||!key||existingNames.has(key)||seen.has(key)){ skipped++; continue; }
+      seen.add(key);
+      rows.push({
+        id:makeId("WSUP"), workshop_id:wsId||null,
+        name,
+        phone:item.phone||null,
+        group_link:item.group_link||null,
+        email:item.email||null,
+        notes:item.notes||null,
+        vat_inclusive:!!item.vat_inclusive,
+        supplier_type:item.supplier_type?(typeof item.supplier_type==="string"?item.supplier_type:JSON.stringify(item.supplier_type)):null,
+        car_brands:item.car_brands?(typeof item.car_brands==="string"?item.car_brands:JSON.stringify(item.car_brands)):null,
+      });
+    }
+    if(!rows.length){showToast(`Nothing new to import (${skipped} skipped, already exist)`,"err");return;}
+    const r=await api.insert("workshop_suppliers",rows);
+    if(r&&!Array.isArray(r)&&(r.code||r.message)){showToast(`Import failed: ${r.message||r.code}`,"err");return;}
+    setWorkshopSuppliers(prev=>[...prev,...rows].sort((a,b)=>(a.name||"").localeCompare(b.name||"")));
+    showToast(`Imported ${rows.length} supplier${rows.length!==1?"s":""}${skipped?` (${skipped} skipped, already exist)`:""}`);
+  };
   const addWorkshopFriend=async(friendWsId)=>{
     if(!wsId||!friendWsId||String(friendWsId)===String(wsId)) return;
     if(workshopFriends.some(f=>String(f.friend_workshop_id)===String(friendWsId))) return;
@@ -5840,6 +5869,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             wsSupplierReturns={wsSupplierReturns}
             onSaveWsSupplier={saveWsSupplier}
             onDeleteWsSupplier={deleteWsSupplier}
+            onImportWsSuppliers={importWsSuppliers}
             onSaveWsSupplierRequest={saveWsSupplierRequest}
             onDeleteWsSupplierRequest={deleteWsSupplierRequest}
             onSaveWsSupplierQuote={saveWsSupplierQuote}

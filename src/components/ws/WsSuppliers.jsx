@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 
 const SUPPLIER_TYPES=["New Spares","Used Parts","Dealer"];
@@ -46,10 +46,40 @@ function supplierReplyStats(supplierId, requests, quotes){
   return {n, median};
 }
 
-export function WsSuppliersPage({wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSave,onDelete,wsLocked=false}) {
+export function WsSuppliersPage({wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],onSave,onDelete,onImport,wsLocked=false}) {
   const [modal,setModal]=useState(null);
   const [search,setSearch]=useState("");
   const [typeFilter,setTypeFilter]=useState("");
+  const [importing,setImporting]=useState(false);
+  const fileInputRef=useRef(null);
+
+  const exportSuppliers=()=>{
+    const data=wsSuppliers.map(s=>({
+      name:s.name, phone:s.phone||null, group_link:s.group_link||null, email:s.email||null,
+      notes:s.notes||null, vat_inclusive:!!s.vat_inclusive,
+      supplier_type:parseTypes(s.supplier_type), car_brands:parseTypes(s.car_brands),
+    }));
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download=`suppliers-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile=async(e)=>{
+    const file=e.target.files?.[0];
+    e.target.value="";
+    if(!file||!onImport) return;
+    setImporting(true);
+    try{
+      const text=await file.text();
+      const list=JSON.parse(text);
+      if(!Array.isArray(list)) throw new Error("File must contain a JSON array of suppliers");
+      await onImport(list);
+    }catch(err){ alert("Import failed: "+err.message); }
+    finally{ setImporting(false); }
+  };
 
   const filtered=wsSuppliers.filter(s=>{
     if(typeFilter){
@@ -70,6 +100,13 @@ export function WsSuppliersPage({wsSuppliers=[],wsSupplierRequests=[],wsSupplier
           <option value="">All Types</option>
           {SUPPLIER_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
         </select>
+        {wsSuppliers.length>0&&<button className="btn btn-ghost btn-sm" onClick={exportSuppliers}>⬇️ Export</button>}
+        {!wsLocked&&onImport&&(
+          <>
+            <input ref={fileInputRef} type="file" accept="application/json" style={{display:"none"}} onChange={handleImportFile}/>
+            <button className="btn btn-ghost btn-sm" disabled={importing} onClick={()=>fileInputRef.current?.click()}>{importing?"Importing...":"⬆️ Import"}</button>
+          </>
+        )}
         {!wsLocked&&<button className="btn btn-primary btn-sm" onClick={()=>setModal({mode:"add"})}>+ Add Supplier</button>}
       </div>
 

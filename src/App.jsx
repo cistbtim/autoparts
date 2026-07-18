@@ -260,6 +260,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [subStatus,setSubStatus]=useState(null); // null | {status,daysLeft,expiresAt}
   const [completedDays,setCompletedDays]=useState(7); // filter completed orders to last N days
   const [searchCust,setSearchCust]=useState("");
+  const [searchUser,setSearchUser]=useState("");
   const [inqFilter,setInqFilter]=useState("all");
   const [toast,setToast]=useState(null);
   const [busyMsg,setBusyMsg]=useState(null); // full-screen blocking spinner
@@ -2984,6 +2985,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(branchId&&c.branch_id!==branchId)return false;
     return c.name?.includes(searchCust)||c.phone?.includes(searchCust);
   });
+  const filteredUsers=users.filter(u=>{
+    const q=searchUser.trim().toLowerCase();
+    if(!q)return true;
+    return [u.name,u.username,u.phone,u.email,u.role].some(v=>v?.toLowerCase().includes(q));
+  });
   const pendingPartsReview=(role==="admin"||role==="manager")?parts.filter(p=>p.review_status==="pending").length:0;
   const lowStock=displayParts.filter(p=>{
     if(role==="branch_admin"){const isMain=!p.branch_id||p.branch_id===mainBranchId;const isOwn=p.branch_id===branchId;return (isMain||isOwn)&&p.stock<=p.min_stock;}
@@ -5287,14 +5293,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               )}
             </div>
 
-            <PH title={t.users} subtitle={`${users.length} users`}
+            <PH title={t.users} subtitle={`${filteredUsers.length} of ${users.length} users`}
               action={<div style={{display:"flex",gap:8}}><button className="btn btn-ghost" onClick={()=>openM("editUser",{role:"workshop",username:"",password:"",name:"",phone:"",email:""})}>🔧 Add Workshop</button><button className="btn btn-primary" onClick={()=>openM("editUser")}>+ Add User</button></div>}/>
+            <div style={{marginBottom:16}}><input className="inp" type="text" placeholder="Search name, username, phone, email, role..." value={searchUser} onChange={e=>setSearchUser(e.target.value)} style={{maxWidth:320}}/></div>
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
                   <thead><tr>{["User",t.role,"Subscription",t.phone,t.email,"Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {users.map(u=>{const sub2=getSubInfo(u);const isPicking=activePicker?.userId===u.id;
+                    {filteredUsers.map(u=>{const sub2=getSubInfo(u);const isPicking=activePicker?.userId===u.id;
                     // default expiry = today + 1 month (always future, regardless of old expiry)
                     const nextMonthDefault=(()=>{const base=new Date();base.setMonth(base.getMonth()+1);return base.toISOString().slice(0,10);})();
                     return(

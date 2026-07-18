@@ -1727,6 +1727,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     await api.delete("workshop_friends","id",id);
     setWorkshopFriends(prev=>prev.filter(f=>f.id!==id));
   };
+  // Apply a chosen supplier price to a job item: cost_price + markup -> unit_price/total.
+  // Shared by the auto-apply-on-save-quote path and the interactive picker in the customer quote screen.
+  const applySupplierPriceToItem=async(itemId,price)=>{
+    const match=workshopJobItems.find(i=>i.id===itemId);
+    if(!match||!(price>0)) return;
+    const mu=+(match.markup_pct||workshopProfile?.default_markup_pct||0);
+    const newPrice=+(price*(1+mu/100)).toFixed(2);
+    const patch={cost_price:price,unit_price:newPrice,total:+(newPrice*(+match.qty||1)).toFixed(2),markup_pct:mu};
+    await api.patch("workshop_job_items","id",itemId,patch).catch(()=>{});
+    setWorkshopJobItems(prev=>prev.map(i=>i.id===itemId?{...i,...patch}:i));
+  };
   const saveWsSupplierQuote=async(qt)=>{
     const {id,...rest}=qt;
     const chkR=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${label}: ${r.message||r.code}`); return r; };
@@ -1734,7 +1745,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     else { chkR(await api.insert("ws_supplier_quotes",{...rest,id:makeId("WSQT"),workshop_id:wsId||null,quoted_at:new Date().toISOString()}),"Save quote"); }
     // Apply supplier prices as cost_price + recalculate unit_price on matching job items
     if(qt.job_id && qt.line_items){
-      const defaultMarkup=+(workshopProfile?.default_markup_pct||0);
       const jobItems=workshopJobItems.filter(i=>i.job_id===qt.job_id);
       let lineItems=[]; try{ lineItems=JSON.parse(qt.line_items||"[]"); }catch{}
       for(const li of lineItems){
@@ -1743,9 +1753,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         const sku=(li.sku||"").trim();
         const match=jobItems.find(i=>sku?(i.part_sku||"").trim()===sku:(i.description||"").toLowerCase().trim()===(li.name||"").toLowerCase().trim());
         if(!match) continue;
-        const mu=+(match.markup_pct||defaultMarkup);
-        const newPrice=+(price*(1+mu/100)).toFixed(2);
-        await api.patch("workshop_job_items","id",match.id,{cost_price:price,unit_price:newPrice,total:+(newPrice*(+match.qty||1)).toFixed(2),markup_pct:mu}).catch(()=>{});
+        await applySupplierPriceToItem(match.id,price);
       }
     }
     await refreshTables("ws_supplier_quotes","workshop_job_items");
@@ -5870,6 +5878,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             onSaveWsSupplier={saveWsSupplier}
             onDeleteWsSupplier={deleteWsSupplier}
             onImportWsSuppliers={importWsSuppliers}
+            onApplySupplierPrice={applySupplierPriceToItem}
             onSaveWsSupplierRequest={saveWsSupplierRequest}
             onDeleteWsSupplierRequest={deleteWsSupplierRequest}
             onSaveWsSupplierQuote={saveWsSupplierQuote}

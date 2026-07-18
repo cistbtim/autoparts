@@ -4,7 +4,52 @@ import { fmtAmt } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD } from "../shared.jsx";
 import { printWorkshopQuote } from "./Print.jsx";
 
-export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplierQuotes=[],onSave,onClose}) {
+function safeParse(s,fallback){ try{ return JSON.parse(s||"[]"); }catch{ return fallback; } }
+
+// Builds job_item_id -> [{key,label,price,source}] by matching supplier-quoted
+// lines (formally returned quotes + pending digital replies) back to job items
+// by sku (preferred) or description text — same matching rule used when a
+// supplier quote is saved and auto-applies its price to a job item.
+function buildCandidatesByItem(items,jobSupQuotes,wsSupplierRequests,sqReplies){
+  const byItem={};
+  const add=(jobItem,entry)=>{ (byItem[jobItem.id]||=[]).push(entry); };
+  const matchItem=(sku,name)=>items.find(i=>
+    sku?(i.part_sku||"").trim()===sku:(i.description||"").toLowerCase().trim()===name.toLowerCase().trim());
+
+  jobSupQuotes.forEach(sq=>{
+    const req=wsSupplierRequests.find(r=>r.id===sq.request_id);
+    const reqItems=safeParse(req?.items_json,[]);
+    const skuByName={};
+    reqItems.forEach(it=>{ const k=(it.label||it.description||"").toLowerCase().trim(); if(k) skuByName[k]=it.sku||""; });
+    safeParse(sq.line_items,[]).forEach(l=>{
+      const price=+(l.vat_incl_price||l.price)||0;
+      if(!(price>0)||!l.name) return;
+      const sku=(l.sku||skuByName[(l.name||"").toLowerCase().trim()]||"").trim();
+      const jobItem=matchItem(sku,l.name);
+      if(jobItem) add(jobItem,{key:`sq-${sq.id}-${l.name}`,label:sq.supplier_name||"Supplier",price,source:"quote"});
+    });
+  });
+
+  sqReplies.forEach(rep=>{
+    const req=wsSupplierRequests.find(r=>r.id===rep.request_id);
+    safeParse(rep.items,[]).filter(ri=>ri.condition!=="no_stock"&&+ri.price>0&&ri.description).forEach(ri=>{
+      const jobItem=matchItem((ri.sku||"").trim(),ri.description);
+      if(jobItem) add(jobItem,{key:`rep-${rep.id}-${ri.description}`,label:req?.supplier_name||"Supplier",price:+ri.price,source:"reply"});
+    });
+  });
+
+  Object.keys(byItem).forEach(id=>{
+    const seen=new Set();
+    byItem[id]=byItem[id].filter(c=>{
+      const k=`${c.label}|${c.price}`;
+      if(seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+  });
+  return byItem;
+}
+
+export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplierQuotes=[],wsSupplierRequests=[],sqReplies=[],onApplySupplierPrice,onSave,onClose}) {
   const C=curSym(settings.currency||getSettings().currency);
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [selectedIds,setSelectedIds]=useState(()=>{
@@ -28,64 +73,31 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplier
     quote_phone:existing?.quote_phone||job.customer_phone||"",
     quote_email:existing?.quote_email||job.customer_email||"",
     quote_date:existing?.quote_date||job.date_in||new Date().toISOString().slice(0,10),
-    valid_until:existing?.valid_until||"",
+    valid_until:existing?.valid_until||new Date(Date.now()+86400000).toISOString().slice(0,10),
     notes:existing?.notes||"",
     status:existing?.status||"draft",
   });
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const [saving,setSaving]=useState(false);
-  const [showSupRef,setShowSupRef]=useState(true);
+  const [applyingId,setApplyingId]=useState(null);
+  const [noLabourConfirmed,setNoLabourConfirmed]=useState(false);
 
-  // Supplier quotes for this job
   const jobSupQuotes = wsSupplierQuotes.filter(q=>q.job_id===job.id);
+  const candidatesByItem = buildCandidatesByItem(items,jobSupQuotes,wsSupplierRequests,sqReplies);
+  const hasLabour = selItems.some(i=>i.type==="labour");
+  const blockedNoLabour = !hasLabour && selItems.length>0 && !noLabourConfirmed;
+
+  const applyPrice=async(itemId,price)=>{
+    if(!onApplySupplierPrice) return;
+    setApplyingId(itemId);
+    try{ await onApplySupplierPrice(itemId,price); }
+    catch(e){ alert("Failed to apply price: "+e.message); }
+    finally{ setApplyingId(null); }
+  };
 
   return (
     <Overlay onClose={onClose} wide>
       <MHead title={existing?"✏️ Edit Quotation":"📝 Create Quotation"} onClose={onClose}/>
-
-      {/* Supplier price reference panel */}
-      {jobSupQuotes.length>0&&(
-        <div style={{marginBottom:14,border:"1px solid rgba(251,191,36,.35)",borderRadius:10,overflow:"hidden"}}>
-          <button
-            onClick={()=>setShowSupRef(p=>!p)}
-            style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 14px",background:"rgba(251,191,36,.08)",border:"none",cursor:"pointer",textAlign:"left"}}>
-            <span style={{fontWeight:700,fontSize:12,color:"#f59e0b"}}>💰 Supplier Prices ({jobSupQuotes.length} quote{jobSupQuotes.length!==1?"s":""})</span>
-            <span style={{fontSize:11,color:"var(--text3)"}}>{showSupRef?"▲ hide":"▼ show"}</span>
-          </button>
-          {showSupRef&&(
-            <div style={{padding:"10px 14px 12px",display:"flex",flexDirection:"column",gap:10}}>
-              {jobSupQuotes.map((sq,si)=>{
-                const lines=(() => { try { return JSON.parse(sq.line_items||"[]"); } catch { return []; } })();
-                return (
-                  <div key={sq.id||si} style={{background:"var(--surface2)",borderRadius:8,padding:"8px 12px"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                      <span style={{fontWeight:700,fontSize:12,color:"#25D366"}}>{sq.supplier_name||"Unknown supplier"}</span>
-                      {sq.total>0&&<span style={{fontWeight:800,fontSize:13,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmt(sq.total)}</span>}
-                    </div>
-                    {lines.length>0&&(
-                      <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                        {lines.map((l,li)=>(
-                          <div key={li} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,gap:8}}>
-                            <span style={{color:"var(--text2)",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.name}</span>
-                            <span style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-                              {l.available&&<span style={{fontSize:10,color:"var(--text3)"}}>{l.available}</span>}
-                              <span style={{fontWeight:700,color:(+l.price>0)?"var(--text1)":"var(--text3)",fontFamily:"Rajdhani,sans-serif",fontSize:13}}>
-                                {+(l.vat_incl_price||l.price)>0?fmt(+(l.vat_incl_price||l.price)):"—"}
-                              </span>
-                              {l.vat_incl_price&&+l.vat_incl_price!==+l.price&&<span style={{fontSize:10,color:"#f59e0b",fontWeight:600}}>incl.VAT</span>}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {sq.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:5,fontStyle:"italic"}}>{sq.notes}</div>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Customer */}
       <div className="card" style={{padding:14,marginBottom:14,background:"var(--surface2)"}}>
@@ -112,13 +124,33 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplier
           <tbody>
             {items.map(i=>{
               const checked=selectedIds.has(i.id);
+              const candidates=candidatesByItem[i.id]||[];
               return (
                 <tr key={i.id} style={{opacity:checked?1:0.4,cursor:"pointer"}} onClick={()=>toggleItem(i.id)}>
                   <td><input type="checkbox" checked={checked} onChange={()=>toggleItem(i.id)} onClick={e=>e.stopPropagation()} style={{cursor:"pointer"}}/></td>
                   <td><span className="badge" style={{background:i.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:i.type==="part"?"var(--blue)":"var(--green)",fontSize:10}}>{i.type==="part"?"🔩":"👷"}</span></td>
                   <td style={{textDecoration:checked?"none":"line-through"}}>{i.description}</td>
                   <td style={{textAlign:"right"}}>{i.qty}</td>
-                  <td style={{textAlign:"right"}}>{fmt(i.unit_price)}</td>
+                  <td style={{textAlign:"right"}}>
+                    {fmt(i.unit_price)}
+                    {candidates.length>0&&(
+                      <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:5,alignItems:"flex-end"}} onClick={e=>e.stopPropagation()}>
+                        {candidates.map(c=>{
+                          const active=Math.abs((+i.cost_price||0)-c.price)<0.005;
+                          return (
+                            <button key={c.key} type="button" disabled={applyingId===i.id}
+                              onClick={()=>applyPrice(i.id,c.price)}
+                              style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:6,
+                                border:`1px solid ${active?"var(--accent)":"var(--border)"}`,
+                                background:active?"rgba(251,146,60,.12)":"var(--surface2)",
+                                color:active?"var(--accent)":"var(--text3)",cursor:"pointer",whiteSpace:"nowrap"}}>
+                              {c.source==="reply"?"💬":"🏪"} {c.label} · {fmt(c.price)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </td>
                   <td style={{textAlign:"right",fontWeight:700}}>{fmt(i.total)}</td>
                 </tr>
               );
@@ -132,6 +164,17 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplier
         </div>
       </div>
 
+      {!hasLabour&&selItems.length>0&&(
+        <div style={{background:noLabourConfirmed?"var(--surface2)":"rgba(251,191,36,.15)",border:`1px solid ${noLabourConfirmed?"var(--border)":"rgba(251,191,36,.5)"}`,borderRadius:6,padding:"7px 12px",marginBottom:14,fontSize:12,display:"flex",alignItems:"center",gap:8}}>
+          <span>{noLabourConfirmed?"✅":"⚠️"}</span>
+          <span style={{flex:1,color:noLabourConfirmed?"var(--text3)":"inherit"}}>No labour or service fee included in this quote — did you forget to add one?</span>
+          <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontWeight:600,whiteSpace:"nowrap"}}>
+            <input type="checkbox" checked={noLabourConfirmed} onChange={e=>setNoLabourConfirmed(e.target.checked)} style={{cursor:"pointer"}}/>
+            Don't need labour
+          </label>
+        </div>
+      )}
+
       <FG>
         <div><FL label="Quote Date"/><input className="inp" type="date" value={f.quote_date} onChange={e=>s("quote_date",e.target.value)}/></div>
         <div><FL label="Valid Until"/><input className="inp" type="date" value={f.valid_until} onChange={e=>s("valid_until",e.target.value)}/></div>
@@ -140,19 +183,20 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplier
 
       <div style={{display:"flex",gap:10,marginTop:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-        <button className="btn btn-ghost" style={{flex:1}} disabled={saving||selItems.length===0} onClick={async()=>{
+        <button className="btn btn-ghost" style={{flex:1}} disabled={saving||selItems.length===0||blockedNoLabour} onClick={async()=>{
           setSaving(true);
           const q={...f,subtotal:selSubtotal,tax:selTax,total:selTotal,selected_item_ids:JSON.stringify([...selectedIds])};
           try{ await onSave(q); printWorkshopQuote(job,selItems,q,settings,{},false,vehicles); }catch(e){alert(e.message);}
           finally{setSaving(false);}
         }}>💾 Save &amp; Print</button>
-        <button className="btn btn-primary" style={{flex:1}} disabled={saving||selItems.length===0} onClick={async()=>{
+        <button className="btn btn-primary" style={{flex:1}} disabled={saving||selItems.length===0||blockedNoLabour} onClick={async()=>{
           setSaving(true);
           try{ await onSave({...f,subtotal:selSubtotal,tax:selTax,total:selTotal,selected_item_ids:JSON.stringify([...selectedIds])}); }catch(e){alert(e.message);}
           finally{setSaving(false);}
         }}>{saving?"Saving...":(existing?"💾 Save":"📝 Create Quote")}</button>
       </div>
       {selItems.length===0&&<p style={{color:"var(--red)",fontSize:12,marginTop:8,textAlign:"center"}}>{items.length===0?"Add parts or labour items before creating a quote.":"Select at least one item to include in the quote."}</p>}
+      {blockedNoLabour&&<p style={{color:"var(--red)",fontSize:12,marginTop:8,textAlign:"center"}}>Tick "Don't need labour" above to confirm before saving, or add a labour/service fee item.</p>}
     </Overlay>
   );
 }

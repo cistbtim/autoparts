@@ -132,7 +132,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       const u={...userRes[0],_branchName:branch.name};
       const accErr=checkAccess(u);
       if(accErr){setErr(accErr);setExpiredInfo({name:u.name,username:u.username,company:u._branchName});setLoading(false);return;}
-      await logLogin(userRes[0]);
+      logLogin(userRes[0]);
       onLogin(u);
     } else {
       setErr("Invalid username or password");
@@ -147,7 +147,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(Array.isArray(res)&&res.length>0){
       const accErr=checkAccess(res[0]);
       if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username});setLoading(false);return;}
-      await logLogin(res[0]);onLogin(res[0]);
+      logLogin(res[0]);onLogin(res[0]);
     } else setErr(t.wrongPass);
     setLoading(false);
   };
@@ -164,7 +164,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       const accErr=checkAccess(res[0]);
       if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username,company:res[0].name});setLoading(false);return;}
       const userObj = applyPendingSpareShop(res[0]);
-      await logLogin(userObj);onLogin(userObj);setLoading(false);return;
+      logLogin(userObj);onLogin(userObj);setLoading(false);return;
     }
     // Check workshop sub-users
     let suQ = `username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&is_active=eq.true&select=*`;
@@ -180,7 +180,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
         const userObj={...mainRes[0],wsRole:wu.ws_role,wsUsername:wu.username,name:wu.name||mainRes[0].name};
         const accErr=checkAccess(userObj);
         if(accErr){setErr(accErr);setExpiredInfo({name:wu.name||mainRes[0].name,username:wu.username,company:mainRes[0].name});setLoading(false);return;}
-        await logLogin({...userObj,username:wu.username});
+        logLogin({...userObj,username:wu.username});
         onLogin(userObj);
         setLoading(false);return;
       }
@@ -199,7 +199,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(Array.isArray(res)&&res.length>0){
       const accErr=checkAccess(res[0]);
       if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username,company:res[0].name});setLoading(false);return;}
-      await logLogin(res[0]);onLogin(res[0]);
+      logLogin(res[0]);onLogin(res[0]);
     } else setErr(t.wrongPass);
     setLoading(false);
   };
@@ -218,7 +218,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(!newUser){setLoading(false);return;}
     await api.upsert("workshop_profiles",{id:wsId,name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>{});
     const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
-    if(loginUser){await logLogin({...loginUser});onLogin({...loginUser});}
+    if(loginUser){logLogin({...loginUser});onLogin({...loginUser});}
     else setErr("Account created — please log in");
     setLoading(false);
   };
@@ -238,7 +238,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(!loginUser||loginUser.code){setErr("Signup failed");setLoading(false);return;}
     const profRes=await api.upsert("scrapyard_profiles",{id:loginUser.id,name:scrapRegName,phone:scrapRegPhone||"",email:scrapRegEmail||"",city:scrapRegCity,country:scrapRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>null);
     if(profRes?.code) setErr("Account created but profile save failed — "+(profRes.message||"check DB"));
-    if(!profRes?.code){await logLogin({...loginUser});onLogin({...loginUser});}
+    if(!profRes?.code){logLogin({...loginUser});onLogin({...loginUser});}
     else setErr("Account created — please log in");
     setLoading(false);
   };
@@ -247,7 +247,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(!cPhone||!cPass){setErr("Fill phone & password");return;}
     setLoading(true);setErr("");
     const res = await api.get("customers",`phone=eq.${encodeURIComponent(cPhone)}&password=eq.${encodeURIComponent(cPass)}&select=*`);
-    if(Array.isArray(res)&&res.length>0){const c=res[0];await logLogin({...c,username:c.phone,role:"customer"});onLogin({...c,username:c.phone,role:"customer",_isCustomer:true});}
+    if(Array.isArray(res)&&res.length>0){const c=res[0];logLogin({...c,username:c.phone,role:"customer"});onLogin({...c,username:c.phone,role:"customer",_isCustomer:true});}
     else setErr("Phone or password incorrect");
     setLoading(false);
   };
@@ -262,7 +262,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(Array.isArray(ex)&&ex.length>0){setErr("Phone already registered — login instead");setLoading(false);return;}
     const res = await api.upsert("customers",{name:cName,phone:cPhone,email:cEmail,password:cPass,address:"",orders:0,total_spent:0});
     const c=Array.isArray(res)?res[0]:null;
-    if(c){await logLogin({username:cPhone,role:"customer"});onLogin({...c,username:c.phone,role:"customer",_isCustomer:true});}
+    if(c){logLogin({username:cPhone,role:"customer"});onLogin({...c,username:c.phone,role:"customer",_isCustomer:true});}
     else setErr("Registration failed");
     setLoading(false);
   };

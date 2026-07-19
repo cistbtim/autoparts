@@ -4863,17 +4863,19 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           const tileSize = isMobile ? {iconSize:28,labelSize:9,padding:"14px 4px",gap:4,borderRadius:12} : {iconSize:36,labelSize:12,padding:"20px 10px",gap:6,borderRadius:14};
           const row1 = CHAPTERS.filter(ch=>["ch_car","ch_docs"].includes(ch.id));
           const row2 = CHAPTERS.filter(ch=>!["ch_car","ch_docs"].includes(ch.id));
+          // Calm tiles: neutral surface with the chapter colour on the icon chip and
+          // label only — five full-saturation blocks competed and nothing read primary.
           const renderTile = ch=>(
             <button key={ch.id} onClick={ch.onClick} style={{
               display:"flex",flexDirection:"column",alignItems:"center",gap:tileSize.gap,
-              padding:tileSize.padding,border:"none",borderRadius:tileSize.borderRadius,cursor:"pointer",
-              background:ch.color,color:"#fff",
-              boxShadow:"0 4px 14px rgba(0,0,0,.22)",
-              transition:"transform .12s,box-shadow .12s",
+              padding:tileSize.padding,border:`1.5px solid ${ch.color}38`,borderRadius:tileSize.borderRadius,cursor:"pointer",
+              background:"var(--surface)",color:"var(--text)",
+              boxShadow:"0 2px 10px rgba(0,0,0,.10)",
+              transition:"transform .12s,box-shadow .12s,border-color .12s",
               WebkitTapHighlightColor:"transparent",flex:1,
             }}>
-              <span style={{fontSize:tileSize.iconSize,lineHeight:1}}>{ch.icon}</span>
-              <span style={{fontSize:tileSize.labelSize,fontWeight:700,lineHeight:1.2,textAlign:"center",letterSpacing:".01em"}}>{ch.label}</span>
+              <span style={{fontSize:tileSize.iconSize,lineHeight:1,background:`${ch.color}16`,borderRadius:10,padding:"7px 16px"}}>{ch.icon}</span>
+              <span style={{fontSize:tileSize.labelSize,fontWeight:700,lineHeight:1.2,textAlign:"center",letterSpacing:".01em",color:ch.color}}>{ch.label}</span>
             </button>
           );
           const hasSpareShop = !!wsProfile?.linked_branch_id && !!onGoToSpareShop;

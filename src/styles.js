@@ -3,6 +3,7 @@ export const CSS = `
 [data-theme="light"]{--bg:#f0ede8;--surface:#ffffff;--surface2:#f5f2ee;--surface3:#e8e4de;--border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);--text:#1c1c1e;--text2:#48484a;--text3:#8e8e93;--green:#16a34a;--red:#dc2626;--blue:#2563eb;--yellow:#d97706;--purple:#7c3aed;--shadow:0 2px 16px rgba(0,0,0,0.07);--shadow-lg:0 8px 40px rgba(0,0,0,0.12);--glow:0 0 20px rgba(249,115,22,0.1)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+button{font-family:inherit}svg text{font-family:'DM Sans',sans-serif}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:99px}
 .ws-tabs{scrollbar-width:thin}.ws-tabs::-webkit-scrollbar{height:6px}.ws-tabs::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:99px}
 .kanban-scroll::-webkit-scrollbar{height:10px}.kanban-scroll::-webkit-scrollbar-track{background:var(--surface2);border-radius:99px;margin:0 4px}.kanban-scroll::-webkit-scrollbar-thumb{background:rgba(249,115,22,.45);border-radius:99px}.kanban-scroll::-webkit-scrollbar-thumb:hover{background:rgba(249,115,22,.85)}

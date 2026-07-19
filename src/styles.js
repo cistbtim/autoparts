@@ -67,6 +67,15 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .ws-feedback-btn{bottom:82px!important;left:18px!important;right:auto!important}
   .modal{border-radius:var(--radius) var(--radius) 0 0;max-height:88vh}
   .tbl th,.tbl td{padding:9px 10px;font-size:13px}
+  /* Workshop header: tighter, single-column, full-width toolbar on phones */
+  .ws-head{margin-bottom:8px!important;gap:6px!important}
+  .ws-head h1{font-size:17px!important}
+  .ws-head p{font-size:11px!important;margin-top:1px!important}
+  .ws-head-side{width:100%;align-items:stretch!important;gap:6px!important}
+  .ws-toolbar{width:100%;flex-wrap:wrap}
+  .ws-toolbar>button.btn-primary{flex:1 1 auto;min-height:40px;padding:8px 10px!important}
+  .ws-subnav-m{margin-bottom:10px!important}
+  .ws-subnav-m select{padding:9px 12px;font-size:14px}
 }
 .mob-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;border-radius:8px;transition:all .18s;position:relative}
 .mob-nav-btn.on{color:var(--accent)}.mob-nav-btn .mi{font-size:18px;line-height:1}

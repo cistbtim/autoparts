@@ -14,7 +14,7 @@ const VIEW_INFO = {
 };
 const REQUIRED_VIEWS = ["Front","Rear","Side"];
 
-export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],onSaveJob,onReopenJob,onClose,userCtx=null}) {
+export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],onSaveJob,onReopenJob,onClose,onManual=null,userCtx=null}) {
   const [step,setStep]=useState("scan");
   const [plate,setPlate]=useState("");
   const [scanLoading,setScanLoading]=useState(false);
@@ -632,7 +632,8 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
   if(step==="scan"){
     return (
       <Overlay onClose={onClose} wide>
-        <MHead title="📷 Book In Car" onClose={onClose}/>
+        <MHead title="📷 Book In Car" onClose={onClose}
+          actions={onManual&&<button className="btn btn-ghost btn-sm" title="Type the job in by hand — no photo/scan" onClick={onManual}>📝 Manual</button>}/>
 
         {/* Camera or file capture — native file inputs, no getUserMedia, works on HTTP/mobile */}
         {!capturedImg&&(

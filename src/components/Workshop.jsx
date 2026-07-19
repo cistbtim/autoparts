@@ -88,6 +88,8 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const kanbanScrollRef = useRef(null);
   const kDrag = useRef({on:false, x:0, sl:0, moved:false});
   const [jobsRefreshing,  setJobsRefreshing]  = useState(false);
+  const [manualBk,        setManualBk]        = useState(null);  // manual booking form draft, null = closed
+  const [manualBkSaving,  setManualBkSaving]  = useState(false);
 
   // Auto-refresh the Jobs kanban board so edits made on other devices (job details, quote/
   // invoice items, payments) show up without a manual refresh. Only polls while the board
@@ -404,7 +406,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         );
       })()}
       {/* ── Page header ── */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
+      <div className="ws-head" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div>
           <h1 style={{fontSize:20,fontWeight:700}}>🔧 {t.workshop||"Workshop"}</h1>
           <p style={{color:"var(--text3)",fontSize:13,marginTop:2}}>
@@ -413,14 +415,14 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               : <>{jobs.length} jobs · {jobs.filter(j=>j.status==="In Progress").length} in progress · {invoices.filter(i=>i.status!=="paid").length} unpaid invoices</>}
           </p>
         </div>
-        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
+        <div className="ws-head-side" style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
           {wsDaysLeft!==null&&!wsExpiresAt&&!wsLocked&&(()=>{
             const col=wsDaysLeft<=3?"#ef4444":wsDaysLeft<=7?"#f97316":"#22c55e";
             const label=wsDaysLeft<=0?"⚠️ Today":`✅ ${wsDaysLeft}d left`;
             return <span className={wsDaysLeft<=7?"wsFlash":undefined} style={{background:col+"22",border:`1px solid ${col}66`,borderRadius:99,padding:"3px 12px",fontSize:12,color:col,fontWeight:700,whiteSpace:"nowrap"}}>{label}</span>;
           })()}
           {wsTab==="jobs"&&(
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <div className="ws-toolbar" style={{display:"flex",gap:8,alignItems:"center"}}>
             {!wsId&&wsProfiles.length>0&&(
               <select className="inp" value={filterWs} onChange={e=>{setFilterWs(e.target.value);setFilterCity("__all__");setFilterCountry("__all__");}} style={{flex:"0 0 auto",width:"auto",minWidth:160}}>
                 <option value="__all__">🏪 All Workshops</option>
@@ -430,12 +432,6 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               </select>
             )}
             <button className="btn btn-primary" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
-            {!wsLocked&&<button className="btn btn-ghost" onClick={()=>setEditJob({
-              customer_name:"",customer_phone:"",vehicle_reg:"",vehicle_make:"",
-              vehicle_model:"",vehicle_year:"",vehicle_color:"",vin:"",engine_no:"",mileage:"",
-              complaint:"",diagnosis:"",mechanic:"",date_in:new Date().toISOString().slice(0,10),
-              date_out:"",notes:"",status:"Pending"
-            })}>+ Manual</button>}
             <button className="btn btn-ghost" title="Refresh jobs" disabled={jobsRefreshing}
               onClick={async()=>{if(!onRefresh)return;setJobsRefreshing(true);try{await onRefresh();}finally{setJobsRefreshing(false);}}}
               style={{opacity:jobsRefreshing?.6:1}}>
@@ -491,7 +487,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         ))}
       </div>
       {/* ── Sub-navigation (mobile dropdown) ── */}
-      <div className="show-mobile" style={{marginBottom:14}}>
+      <div className="show-mobile ws-subnav-m" style={{marginBottom:14}}>
         <select className="inp" value={wsTab} onChange={e=>{ const v=e.target.value; setWsTab(v); if(v==="spareshop") setSpareShopFilter({make:"",model:""}); }} style={{width:"100%",fontWeight:600}}>
           {WS_TABS.map(([v,label,cnt])=>(
             <option key={v} value={v}>{label}{cnt!=null?` (${cnt})`:""}</option>
@@ -1102,10 +1098,14 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             );
           };
 
-          const toggleCollapse = (colId) => {
+          // currentlyCollapsed = what the user sees, which includes auto-collapse of
+          // empty columns — keying off displayed state stops a click on an auto-collapsed
+          // column from adding it to the manual set (it would then stay hidden even after
+          // items arrive).
+          const toggleCollapse = (colId, currentlyCollapsed) => {
             setCollapsedCols(prev=>{
               const next=new Set(prev);
-              next.has(colId)?next.delete(colId):next.add(colId);
+              if(currentlyCollapsed) next.delete(colId); else next.add(colId);
               try{localStorage.setItem("ws_kanban_collapsed",JSON.stringify([...next]));}catch{}
               return next;
             });
@@ -1150,11 +1150,17 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
               }}
             >
               {COLS.map(col=>{
-                const isCollapsed=collapsedCols.has(col.id)||(col.id==="booking"&&col.items.length===0);
+                // Empty columns auto-collapse to a slim strip (except while the initial
+                // load skeletons are showing — collapsing then would hide the loading UI).
+                const showSkeletons=jobsLoading&&jobs.length===0;
+                const isCollapsed=!showSkeletons&&(collapsedCols.has(col.id)||col.items.length===0);
                 if(isCollapsed) return (
-                  <div key={col.id} style={{minWidth:34,maxWidth:34,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",paddingTop:6,gap:8}}
+                  <div key={col.id} style={{minWidth:34,maxWidth:34,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",paddingTop:6,gap:8,borderRadius:8,background:dragOverColId===col.id?`${col.color}30`:"transparent",outline:dragOverColId===col.id?`2px dashed ${col.color}`:"none",transition:"background .15s"}}
                     title={`Expand ${col.label}`}
-                    onClick={()=>toggleCollapse(col.id)}>
+                    onDragOver={e=>handleDragOver(e,col.id)}
+                    onDragLeave={()=>handleDragLeave(col.id)}
+                    onDrop={e=>handleDrop(e,col)}
+                    onClick={()=>toggleCollapse(col.id,true)}>
                     <div style={{width:10,height:10,borderRadius:"50%",background:col.color,boxShadow:`0 0 8px ${col.color}`}}/>
                     <span style={{background:`${col.color}22`,color:col.color,borderRadius:99,padding:"3px 7px",fontSize:11,fontWeight:700}}>{col.items.length}</span>
                     <div style={{writingMode:"vertical-rl",transform:"rotate(180deg)",fontSize:11,fontWeight:700,color:"var(--text2)",letterSpacing:".05em",marginTop:4}}>{col.label}</div>
@@ -1163,7 +1169,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 return (
                   <div key={col.id} style={{minWidth:kanbanColW,maxWidth:kanbanColW,flexShrink:0,display:"flex",flexDirection:"column"}}>
                     <div style={{borderRadius:"12px 12px 0 0",padding:"10px 14px",background:`linear-gradient(135deg,${col.color}1a 0%,${col.color}0a 100%)`,border:`1px solid ${col.color}35`,borderBottom:"none",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",userSelect:"none"}}
-                      onClick={()=>toggleCollapse(col.id)} title="Click to collapse">
+                      onClick={()=>toggleCollapse(col.id,false)} title="Click to collapse">
                       <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
                         <div style={{width:8,height:8,borderRadius:"50%",background:col.color,boxShadow:`0 0 8px ${col.color}`,flexShrink:0}}/>
                         <div style={{minWidth:0}}>
@@ -1428,6 +1434,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             <div style={{fontWeight:700,fontSize:15}}>🗓️ Bookings ({activeBookings.length})</div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               {bookingsLastAt&&<span style={{fontSize:11,color:"var(--text3)"}}>Updated {bookingsLastAt.toLocaleTimeString()}</span>}
+              {!wsLocked&&<button className="btn btn-ghost btn-sm" title="Add a phone/walk-in booking"
+                onClick={()=>setManualBk({customer_name:"",customer_phone:"",vehicle_reg:"",vehicle_make:"",vehicle_model:"",preferred_date:"",complaint:""})}>🗓️ + Booking</button>}
               <button className="btn btn-ghost btn-sm" disabled={bookingsRefreshing}
                 onClick={async()=>{ if(!onRefreshBookings)return; setBookingsRefreshing(true); await onRefreshBookings(); setBookingsRefreshing(false); setBookingsLastAt(new Date()); }}>
                 {bookingsRefreshing?"⏳":"🔄"} Refresh
@@ -2183,10 +2191,62 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
       })()}
 
       {/* ── Modals ── */}
+      {manualBk&&(()=>{
+        const set=(k)=>(e)=>setManualBk(p=>({...p,[k]:e.target.value}));
+        const save=async()=>{
+          const bkWsId=wsId||(filterWs!=="__all__"?filterWs:null);
+          if(!bkWsId){alert("Select a workshop first (top-left workshop filter)");return;}
+          if(!manualBk.customer_name.trim()||!manualBk.customer_phone.trim()){alert("Customer name and phone are required");return;}
+          setManualBkSaving(true);
+          try{
+            await api.insert("workshop_bookings",{
+              id:"WB-"+Date.now()+"-"+Math.floor(Math.random()*9000+1000),
+              workshop_id:bkWsId,
+              customer_name:manualBk.customer_name.trim(),
+              customer_phone:manualBk.customer_phone.trim(),
+              vehicle_reg:manualBk.vehicle_reg.trim().toUpperCase(),
+              vehicle_make:manualBk.vehicle_make.trim(),
+              vehicle_model:manualBk.vehicle_model.trim(),
+              complaint:manualBk.complaint.trim(),
+              preferred_date:manualBk.preferred_date||null,
+              status:"pending",
+            });
+            if(onRefreshBookings) await onRefreshBookings();
+            setManualBk(null);
+          }catch(e){alert("Failed to save booking: "+(e?.message||e));}
+          finally{setManualBkSaving(false);}
+        };
+        return (
+          <Overlay onClose={()=>setManualBk(null)}>
+            <MHead title="🗓️ Add Booking" onClose={()=>setManualBk(null)}/>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>For phone or walk-in bookings — the card lands in the Booking column, ready to confirm into a job.</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <input className="inp" placeholder="Customer name *" value={manualBk.customer_name} onChange={set("customer_name")}/>
+              <input className="inp" placeholder="Phone *" value={manualBk.customer_phone} onChange={set("customer_phone")}/>
+              <div style={{display:"flex",gap:8}}>
+                <input className="inp" placeholder="Vehicle reg" style={{flex:1,textTransform:"uppercase"}} value={manualBk.vehicle_reg} onChange={set("vehicle_reg")}/>
+                <input className="inp" type="date" title="Preferred date" style={{flex:1}} value={manualBk.preferred_date} onChange={set("preferred_date")}/>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <input className="inp" placeholder="Make" style={{flex:1}} value={manualBk.vehicle_make} onChange={set("vehicle_make")}/>
+                <input className="inp" placeholder="Model" style={{flex:1}} value={manualBk.vehicle_model} onChange={set("vehicle_model")}/>
+              </div>
+              <textarea className="inp" rows={2} placeholder="Complaint / reason for visit" value={manualBk.complaint} onChange={set("complaint")}/>
+              <button className="btn btn-primary" disabled={manualBkSaving} onClick={save}>{manualBkSaving?"Saving…":"💾 Save Booking"}</button>
+            </div>
+          </Overlay>
+        );
+      })()}
       {bookIn&&(
         <BookInModal wsCustomers={wsCustomers} wsVehicles={wsVehicles} vehicles={vehicles} jobs={jobs} settings={settings} userCtx={userCtx}
           onSaveJob={async(d)=>{ await onSaveJob(d); setBookIn(false); }}
           onReopenJob={async(d)=>{ await onSaveJob(d); setBookIn(false); setActiveJob(d); setView("job"); }}
+          onManual={wsLocked?null:()=>{ setBookIn(false); setEditJob({
+            customer_name:"",customer_phone:"",vehicle_reg:"",vehicle_make:"",
+            vehicle_model:"",vehicle_year:"",vehicle_color:"",vin:"",engine_no:"",mileage:"",
+            complaint:"",diagnosis:"",mechanic:"",date_in:new Date().toISOString().slice(0,10),
+            date_out:"",notes:"",status:"Pending"
+          }); }}
           onClose={()=>setBookIn(false)} t={t}/>
       )}
       {editJob&&(

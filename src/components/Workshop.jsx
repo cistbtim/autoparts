@@ -715,7 +715,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           const COLS = [
             {id:"booking",  label:"Booking",          hint:"Confirm & create job",   color:"#60a5fa", items:bkCol,   type:"booking"},
             {id:"pending",  label:"Pending",           hint:"Waiting to start",       color:"#a78bfa", items:pendCol, type:"job", nextStatus:"In Progress", nextLabel:"▶ Start"},
-            {id:"checkup",  label:"Checkup",           hint:"Inspection only — no repair", color:"#38bdf8", items:checkupCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
+            {id:"checkup",  label:"Checkup",           hint:"Inspection only — no repair", color:"#38bdf8", items:checkupCol, type:"job"},
             {id:"wip",      label:"In Progress",       hint:"Add quote + do the work",color:"#fbbf24", items:wipCol,  type:"job", nextStatus:"Done",        nextLabel:"✓ Mark Done"},
             {id:"quoting",  label:"Quoting",           hint:"Waiting on supplier prices", color:"#a78bfa", items:quotingCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
             {id:"ordered",  label:"Ordered",           hint:"Parts on order",         color:"#818cf8", items:orderedCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
@@ -882,6 +882,17 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         {stuck?"⏰":""}{job.date_in}
                       </span>}
                     </div>
+                    {/* ── cancelled stamp over the car photo ── */}
+                    {job.is_cancelled&&(
+                      <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+                        <div style={{transform:"rotate(-12deg)",border:"3px solid #ef4444",borderRadius:7,padding:"5px 14px",
+                          color:"#ef4444",fontWeight:900,fontSize:16,letterSpacing:".16em",
+                          fontFamily:"DM Mono,monospace",textTransform:"uppercase",lineHeight:1,
+                          background:"rgba(255,255,255,.78)",userSelect:"none"}}>
+                          Cancelled
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -924,8 +935,17 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                     );
                   })()}
 
-                  {/* cancelled banner */}
-                  {job.is_cancelled&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#ef4444",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textAlign:"center"}}>✕ CANCELLED</div>}
+                  {/* cancelled stamp in card body — only when photos are hidden (otherwise it sits on the photo) */}
+                  {job.is_cancelled&&!showKanbanPhotos&&(
+                    <div style={{display:"flex",justifyContent:"center",marginBottom:5,marginTop:2}}>
+                      <div style={{transform:"rotate(-8deg)",border:"2.5px solid #ef4444",borderRadius:7,padding:"4px 12px",
+                        color:"#ef4444",fontWeight:900,fontSize:13,letterSpacing:".14em",opacity:.8,
+                        fontFamily:"DM Mono,monospace",textTransform:"uppercase",lineHeight:1,
+                        background:"rgba(239,68,68,.05)",userSelect:"none",pointerEvents:"none"}}>
+                        Cancelled
+                      </div>
+                    </div>
+                  )}
 
                   {/* complaint */}
                   {job.complaint&&<div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4,background:"#ef4444",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>⚠️ {highlight(job.complaint)}</div>}
@@ -1022,19 +1042,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                     )
                   )}
 
-                  {/* booking quick-actions */}
-                  {srcBk&&job.customer_phone&&(
-                    <div style={{display:"flex",gap:4,marginBottom:5}} onClick={e=>e.stopPropagation()}>
-                      <a href={`tel:${job.customer_phone}`} className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"4px 0",textDecoration:"none",textAlign:"center",color:"var(--blue)"}}>📞 Call</a>
-                      <a href={bkWaLink(srcBk,"contact")}
-                        target="_blank" rel="noreferrer" className="btn btn-xs btn-ghost" style={{flex:1,fontSize:10,padding:"4px 0",textDecoration:"none",textAlign:"center",color:"#25D366"}}>
-                        📱 WA
-                      </a>
-                    </div>
-                  )}
-
-                  {/* invoice total */}
-                  {inv&&wsRole!=="mechanic"&&(
+                  {/* invoice total — hidden in Payment Received column (PAID stamp already says it) */}
+                  {inv&&wsRole!=="mechanic"&&col.id!=="paid"&&(
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,marginBottom:5,padding:"4px 8px",background:"var(--surface2)",borderRadius:6,border:"1px solid var(--border)"}}>
                       <span style={{color:"var(--text3)",fontWeight:500}}>Invoice</span>
                       <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
@@ -4493,8 +4502,18 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             </div>
           )}
         </div>
+        {/* ── CANCELLED stamp overlay — same spot/style as PAID; wins over payment stamps ── */}
+        {job.is_cancelled&&(
+          <div style={{position:"absolute",top:16,right:16,transform:"rotate(-10deg)",
+            border:"3px solid #ef4444",borderRadius:7,padding:"7px 16px",
+            color:"#ef4444",fontWeight:900,fontSize:20,letterSpacing:".18em",
+            opacity:.8,fontFamily:"DM Mono,monospace",textTransform:"uppercase",
+            lineHeight:1,background:"rgba(239,68,68,.05)",pointerEvents:"none",userSelect:"none"}}>
+            Cancelled
+          </div>
+        )}
         {/* ── PAID stamp overlay ── */}
-        {invoice?.status==="paid"&&(
+        {!job.is_cancelled&&invoice?.status==="paid"&&(
           <div style={{position:"absolute",top:16,right:16,transform:"rotate(-10deg)",
             border:"3px solid #dc2626",borderRadius:7,padding:"7px 16px",
             color:"#dc2626",fontWeight:900,fontSize:20,letterSpacing:".18em",
@@ -4503,7 +4522,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             PAID
           </div>
         )}
-        {invoice?.status==="partial"&&(
+        {!job.is_cancelled&&invoice?.status==="partial"&&(
           <div style={{position:"absolute",top:16,right:16,transform:"rotate(-10deg)",
             border:"3px solid #f97316",borderRadius:7,padding:"7px 16px",
             color:"#f97316",fontWeight:900,fontSize:20,letterSpacing:".18em",

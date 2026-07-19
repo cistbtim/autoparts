@@ -162,7 +162,20 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Tim\" -Recurse -Filter \"*.pdf\" -ErrorAction SilentlyContinue)",
       "Bash(Select-Object FullName)",
       "Read(//c/Users/Tim/**)",
-      "Bash(python -c \"import fitz; print\\('pymupdf ok', fitz.__version__\\)\")"
+      "Bash(python -c \"import fitz; print\\('pymupdf ok', fitz.__version__\\)\")",
+      "Bash(powershell -Command \"winget list --id Gyan.FFmpeg\")",
+      "Bash(powershell -Command \"winget install --id=Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements\")",
+      "Bash(where ffmpeg *)",
+      "Bash(ffmpeg -version)",
+      "Bash(\"/c/Users/Tim/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-8.1.2-full_build/bin/ffmpeg.exe\" -version)",
+      "Bash(.venv/Scripts/python.exe -c \"import playwright; print\\(playwright.__version__ if hasattr\\(playwright,'__version__'\\) else 'n/a'\\)\")",
+      "Bash(.venv/Scripts/python.exe -m pip show playwright)",
+      "Bash(grep -o \"enableRecorder[^;]\\\\{0,400\\\\}\" \"C:/Users/Tim/car-parts-app/python/tutorial_recorder/.venv/Lib/site-packages/playwright/driver/package/lib/coreBundle.js\")",
+      "Bash(grep -o \"enableRecorder: tObject\\({[^\\)]\\\\{0,600\\\\}\" \"C:/Users/Tim/car-parts-app/python/tutorial_recorder/.venv/Lib/site-packages/playwright/driver/package/lib/coreBundle.js\")",
+      "Bash(grep -o \"scheme\\\\.BrowserContextEnableRecorderParams = tObject\\({[^;]\\\\{0,900\\\\}\" \"C:/Users/Tim/car-parts-app/python/tutorial_recorder/.venv/Lib/site-packages/playwright/driver/package/lib/coreBundle.js\")",
+      "Bash(grep -o \"scheme\\\\.BrowserContextEnableRecorderParams = tObject\\({.\\\\{0,1200\\\\}\" \"C:/Users/Tim/car-parts-app/python/tutorial_recorder/.venv/Lib/site-packages/playwright/driver/package/lib/coreBundle.js\")",
+      "Bash(.venv/Scripts/python.exe \"C:/Users/Tim/AppData/Local/Temp/claude/c--Users-Tim-car-parts-app/151094a9-06a4-4200-b7a6-3c59af55f8f6/scratchpad/test_recorder.py\")",
+      "Bash(.venv/Scripts/python.exe \"C:/Users/Tim/AppData/Local/Temp/claude/c--Users-Tim-car-parts-app/151094a9-06a4-4200-b7a6-3c59af55f8f6/scratchpad/test_partsouq.py\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\Tim\\.claude\\projects\\c--Users-Tim-car-parts-app\\memory",

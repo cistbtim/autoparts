@@ -4,6 +4,7 @@ export const CSS = `
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:99px}
+.ws-tabs{scrollbar-width:thin}.ws-tabs::-webkit-scrollbar{height:6px}.ws-tabs::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:99px}
 .kanban-scroll::-webkit-scrollbar{height:10px}.kanban-scroll::-webkit-scrollbar-track{background:var(--surface2);border-radius:99px;margin:0 4px}.kanban-scroll::-webkit-scrollbar-thumb{background:rgba(249,115,22,.45);border-radius:99px}.kanban-scroll::-webkit-scrollbar-thumb:hover{background:rgba(249,115,22,.85)}
 input,select,textarea{outline:none;font-family:'DM Sans',sans-serif}input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .btn{cursor:pointer;border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;transition:all .18s;display:inline-flex;align-items:center;gap:6px;justify-content:center}

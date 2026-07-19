@@ -472,8 +472,8 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         </div>
       </div>
 
-      {/* ── Sub-navigation (desktop) ── */}
-      <div className="hide-mobile" style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
+      {/* ── Sub-navigation (desktop) — single scrollable row, never wraps ── */}
+      <div className="hide-mobile ws-tabs" style={{display:"flex",gap:4,flexWrap:"nowrap",overflowX:"auto",marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
         {WS_TABS.map(([v,label,cnt])=>(
           <button key={v} onClick={()=>{ setWsTab(v); if(v==="spareshop") setSpareShopFilter({make:"",model:""}); }} style={{
             padding:"8px 14px",border:"none",background:"none",cursor:"pointer",

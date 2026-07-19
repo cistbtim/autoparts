@@ -5844,6 +5844,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             ads={liveAds}
             userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}
             jobs={workshopJobs}
+            jobsLoading={bgLoading>0}
             jobItems={workshopJobItems}
             invoices={workshopInvoices}
             quotes={workshopQuotes}

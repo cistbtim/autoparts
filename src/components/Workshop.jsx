@@ -28,7 +28,7 @@ import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart}) {
+export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -408,7 +408,9 @@ export function WorkshopPage({jobs,jobItems,invoices,quotes=[],parts=[],partFitm
         <div>
           <h1 style={{fontSize:20,fontWeight:700}}>🔧 {t.workshop||"Workshop"}</h1>
           <p style={{color:"var(--text3)",fontSize:13,marginTop:2}}>
-            {jobs.length} jobs · {jobs.filter(j=>j.status==="In Progress").length} in progress · {invoices.filter(i=>i.status!=="paid").length} unpaid invoices
+            {jobsLoading&&jobs.length===0
+              ? <span style={{color:"var(--accent)",fontWeight:600}}><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span> Loading jobs…</span>
+              : <>{jobs.length} jobs · {jobs.filter(j=>j.status==="In Progress").length} in progress · {invoices.filter(i=>i.status!=="paid").length} unpaid invoices</>}
           </p>
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
@@ -1109,7 +1111,15 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             });
           };
 
-          return (
+          return (<>
+            {jobsLoading&&(
+              <div style={{marginBottom:10}}>
+                <div style={{height:4,borderRadius:99,background:"var(--surface2)",overflow:"hidden",position:"relative"}}>
+                  <div style={{position:"absolute",top:0,bottom:0,width:"30%",borderRadius:99,background:"var(--accent)",animation:"kanbanBar 1.1s ease-in-out infinite"}}/>
+                </div>
+                {jobs.length===0&&<div style={{fontSize:11,color:"var(--text3)",marginTop:5,textAlign:"center"}}>Loading job cards — please wait before booking in or opening a car…</div>}
+              </div>
+            )}
             <div
               ref={kanbanScrollRef}
               className="kanban-scroll"
@@ -1168,11 +1178,20 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                       onDragLeave={()=>handleDragLeave(col.id)}
                       onDrop={e=>handleDrop(e,col)}
                       style={{background: dragOverColId===col.id ? `${col.color}20` : `${col.color}07`, border:`1px solid ${dragOverColId===col.id ? col.color : `${col.color}25`}`,borderTop:"none",borderRadius:"0 0 12px 12px",padding:"8px 7px",minHeight:160,maxHeight:"calc(100vh - 240px)",overflowY:"auto",transition:"background .15s,border-color .15s"}}>
-                      {col.items.length===0&&(
-                        <div style={{textAlign:"center",padding:"32px 10px",border:`1.5px dashed ${dragOverColId===col.id ? col.color : "var(--border2)"}`,borderRadius:10,margin:"2px 0",transition:"border-color .15s"}}>
-                          <div style={{fontSize:24,marginBottom:6,opacity:.25}}>{col.id==="booking"?"🗓️":col.id==="paid"?"💳":col.id==="problem"?"⚠️":"📋"}</div>
-                          <div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic"}}>No items</div>
-                        </div>
+                      {col.items.length===0&&(jobsLoading&&jobs.length===0
+                        ? <div style={{margin:"2px 0",display:"flex",flexDirection:"column",gap:6}}>
+                            {[0,1].map(i=>(
+                              <div key={i} style={{borderRadius:10,border:"1px solid var(--border)",padding:"10px 12px",animation:"skelPulse 1.4s ease-in-out infinite",animationDelay:`${i*0.2}s`}}>
+                                <div style={{height:10,width:"60%",borderRadius:5,background:"var(--surface2)",marginBottom:7}}/>
+                                <div style={{height:8,width:"85%",borderRadius:5,background:"var(--surface2)",marginBottom:5}}/>
+                                <div style={{height:8,width:"45%",borderRadius:5,background:"var(--surface2)"}}/>
+                              </div>
+                            ))}
+                          </div>
+                        : <div style={{textAlign:"center",padding:"32px 10px",border:`1.5px dashed ${dragOverColId===col.id ? col.color : "var(--border2)"}`,borderRadius:10,margin:"2px 0",transition:"border-color .15s"}}>
+                            <div style={{fontSize:24,marginBottom:6,opacity:.25}}>{col.id==="booking"?"🗓️":col.id==="paid"?"💳":col.id==="problem"?"⚠️":"📋"}</div>
+                            <div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic"}}>No items</div>
+                          </div>
                       )}
                       {col.type==="booking"&&col.items.map(b=><BkCard key={b.id} b={b}/>)}
                       {col.type==="job"&&col.items.map(j=><JobCard key={j.id} job={j} col={col}/>)}
@@ -1181,7 +1200,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 );
               })}
             </div>
-          );
+          </>);
         })()}
 
         {/* ── Kanban: invoice preview panel (scrolls into view) ── */}

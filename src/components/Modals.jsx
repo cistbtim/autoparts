@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { C, curSym, getSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
-import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
+import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
 import { CAR_MAKES, getCategories, DEFAULT_CATS, OC } from "../lib/constants.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
@@ -4860,6 +4860,162 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],onSend,o
   );
 }
 
+// Request quotes for several parts from ONE supplier in a single action — pick the
+// supplier once instead of reopening InquiryModal per line item. Creates a proper
+// rfq_sessions/rfq_items/rfq_quotes batch (the same mechanism the RFQ page uses) so
+// the supplier gets ONE link covering every part instead of one link per part.
+export function BulkInquiryModal({items=[],suppliers=[],partSuppliers=[],rfqQuotes=[],settings={},sessionName="RFQ",onCreateRfqSession,onClose,t={}}) {
+  const [checked,setChecked]=useState(()=>new Set(items.map((_,i)=>i)));
+  const [qtyMap,setQtyMap]=useState(()=>Object.fromEntries(items.map((it,i)=>[i,it.qty||1])));
+  const [selectedSupplierId,setSelectedSupplierId]=useState(null);
+  const [supplierSearch,setSupplierSearch]=useState("");
+  const [matchedOnly,setMatchedOnly]=useState(false);
+  const [creating,setCreating]=useState(false);
+  const [createdInfo,setCreatedInfo]=useState(null); // {sid,itemsList,supplier}
+  const [waMsgEdit,setWaMsgEdit]=useState(null); // user override of the outgoing message, once created
+
+  const toggleItem=(i)=>setChecked(prev=>{const n=new Set(prev);n.has(i)?n.delete(i):n.add(i);return n;});
+  const linkedPsFor=(supplierId,partId)=>partSuppliers.find(ps=>ps.supplier_id===supplierId&&ps.part_id===partId);
+  const matchCount=(s)=>items.filter((it,i)=>checked.has(i)&&it.part&&linkedPsFor(s.id,it.part.id)).length;
+
+  const filteredSupps=suppliers.filter(s=>{
+    if(matchedOnly&&matchCount(s)===0)return false;
+    if(supplierSearch.trim()){
+      const q=supplierSearch.toLowerCase();
+      const hay=`${s.name||""} ${s.country||""} ${s.phone||""} ${s.email||""}`.toLowerCase();
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  });
+  const sortedSupps=[...filteredSupps].sort((a,b)=>matchCount(b)-matchCount(a));
+  const selectedSupplier=suppliers.find(s=>s.id===selectedSupplierId)||null;
+  const selectedCount=checked.size;
+
+  const handleCreate=async()=>{
+    if(!selectedSupplier||selectedCount===0||creating||!onCreateRfqSession)return;
+    setCreating(true);
+    try{
+      const picked=items
+        .map((it,i)=>({it,i}))
+        .filter(({i,it})=>checked.has(i)&&it.part);
+      if(picked.length===0)return;
+      const itemsList=picked.map(({it,i})=>({name:it.part.name,sku:it.part.sku,qty:+qtyMap[i]||it.qty||1}));
+      const selectedParts=picked.map(({it,i})=>({...it.part,qty_needed:+qtyMap[i]||it.qty||1}));
+      const sid=await onCreateRfqSession(sessionName,"",selectedParts,[selectedSupplier]);
+      if(sid) setCreatedInfo({sid,itemsList,supplier:selectedSupplier});
+    }finally{setCreating(false);}
+  };
+
+  // ── Step 2: batch created — surface the ONE link covering every item ──
+  if(createdInfo){
+    const {sid,itemsList,supplier}=createdInfo;
+    const quotes=rfqQuotes.filter(q=>String(q.rfq_id)===String(sid)&&String(q.supplier_id)===String(supplier.id));
+    const batchToken=quotes[0]?.token;
+    const batchUrl=batchToken?`${window.location.origin}${window.location.pathname}?rfq_batch=${batchToken}`:"";
+    const itemsText=itemsList.map((it,i)=>`${i+1}. ${it.name} (${it.sku||"—"}) × ${it.qty}`).join("\n");
+    const defaultMsg=`Hi ${supplier.name},\n\nWe have an RFQ for ${itemsList.length} part${itemsList.length!==1?"s":""}. Please click the link below to view the list and submit all quotes at once:\n\n${batchUrl}\n\nParts:\n${itemsText}\n\nThank you,\n${settings?.shop_name||"MotorDesk"}`;
+    const waMsg=waMsgEdit??defaultMsg;
+    return (
+      <Overlay onClose={onClose} wide>
+        <MHead title="✅ RFQ Sent" sub={`${itemsList.length} item${itemsList.length!==1?"s":""} · ${supplier.name}`} onClose={onClose}/>
+        {!batchToken
+          ? <div style={{textAlign:"center",padding:20,color:"var(--text3)"}}>⏳ Preparing quote link…</div>
+          : <>
+              <div style={{background:"var(--surface2)",borderRadius:10,padding:13,marginBottom:15,border:"1px solid var(--border)"}}>
+                <FL label="One link — every item"/>
+                <div style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--accent)",wordBreak:"break-all",lineHeight:1.6}}>{batchUrl}</div>
+                <div style={{display:"flex",gap:6,marginTop:7}}>
+                  <button className="btn btn-ghost btn-xs" onClick={()=>navigator.clipboard.writeText(batchUrl)}>📋 Copy Link</button>
+                  <a href={batchUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}>↗ Open</button></a>
+                </div>
+              </div>
+              <FD>
+                <FL label="Message preview — link + all items are sent together (editable)"/>
+                <textarea className="inp" rows={9} value={waMsg} onChange={e=>setWaMsgEdit(e.target.value)}
+                  style={{fontSize:12,fontFamily:"DM Mono,monospace",resize:"vertical",lineHeight:1.5}}/>
+              </FD>
+              <div style={{display:"flex",flexDirection:"column",gap:9}}>
+                {supplier.phone?<a href={waLink(supplier.phone,waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-primary" style={{width:"100%",background:"#25D366",padding:13,fontSize:15}}>📲 Send via WhatsApp</button></a>:<p style={{fontSize:12,color:"var(--text3)",textAlign:"center"}}>💡 Add supplier phone to enable WhatsApp</p>}
+                {supplier.email?<a href={mailLink(supplier.email,`RFQ - ${itemsList.length} items`,waMsg)} style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{width:"100%",padding:13}}>✉ Send via Email</button></a>:<p style={{fontSize:12,color:"var(--text3)",textAlign:"center"}}>💡 Add supplier email to enable Email</p>}
+                <button className="btn btn-ghost" onClick={onClose}>Done</button>
+              </div>
+            </>}
+      </Overlay>
+    );
+  }
+
+  // ── Step 1: pick items + one supplier ──
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="📩 Send RFQ — Multiple Items" sub={`${items.length} item${items.length!==1?"s":""} in this request`} onClose={onClose}/>
+
+      <FD>
+        <FL label={`Items to Request (${selectedCount}/${items.length} selected) *`}/>
+        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:200,overflowY:"auto",background:"var(--surface2)",borderRadius:10,padding:11,border:"1px solid var(--border)"}}>
+          {items.map((it,i)=>{
+            const isChecked=checked.has(i);
+            return (
+              <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 8px",borderRadius:8,opacity:it.part?1:.5}}>
+                <input type="checkbox" className="chk" checked={isChecked} disabled={!it.part} onChange={()=>toggleItem(i)}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600}}>{it.name||it.part?.name}</div>
+                  <div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{it.sku||it.part?.sku||"—"}{!it.part&&<span style={{color:"var(--yellow)",fontFamily:"inherit",marginLeft:6}}>⚠ not in catalog — can't RFQ</span>}</div>
+                </div>
+                {it.part&&<input type="number" min="1" className="inp" value={qtyMap[i]??1}
+                  onChange={e=>setQtyMap(m=>({...m,[i]:Math.max(1,+e.target.value||1)}))}
+                  style={{width:70,fontSize:12,flexShrink:0}}/>}
+              </div>
+            );
+          })}
+        </div>
+      </FD>
+
+      <FD>
+        <FL label="Select Supplier (one) *"/>
+        <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+          <input className="inp" placeholder="🔍 Search suppliers…" value={supplierSearch} onChange={e=>setSupplierSearch(e.target.value)} style={{flex:1,fontSize:12}}/>
+          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--text2)",whiteSpace:"nowrap",cursor:"pointer"}}>
+            <input type="checkbox" className="chk" checked={matchedOnly} onChange={e=>setMatchedOnly(e.target.checked)}/>
+            ✓ Matches a selected item
+          </label>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:220,overflowY:"auto",background:"var(--surface2)",borderRadius:10,padding:11,border:"1px solid var(--border)"}}>
+          {sortedSupps.map(s=>{
+            const isSelected=selectedSupplierId===s.id;
+            const mc=matchCount(s);
+            return (
+              <div key={s.id} onClick={()=>setSelectedSupplierId(s.id)}
+                style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 10px",borderRadius:8,
+                  background:isSelected?"rgba(249,115,22,.1)":"transparent",border:isSelected?"1px solid rgba(249,115,22,.3)":"1px solid transparent"}}>
+                <input type="radio" className="chk" checked={isSelected} readOnly/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <span style={{fontSize:13,fontWeight:700}}>{s.name}</span>
+                    {mc>0&&<span style={{fontSize:10,color:"var(--green)",background:"rgba(52,211,153,.12)",borderRadius:4,padding:"1px 6px"}}>✓ {mc}/{selectedCount} matched</span>}
+                  </div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:3,display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {s.country&&<span>📍 {s.country}</span>}
+                    {s.phone?<span style={{color:"var(--green)"}}>📞 {s.phone}</span>:<span style={{color:"var(--red)"}}>⚠ no phone</span>}
+                    {s.email?<span style={{color:"var(--blue)"}}>✉ {s.email}</span>:<span style={{color:"var(--text3)"}}>no email</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {sortedSupps.length===0&&<div style={{fontSize:12,color:"var(--text3)",textAlign:"center",padding:10}}>No suppliers match</div>}
+        </div>
+      </FD>
+
+      <div style={{display:"flex",gap:10,marginTop:18}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={!selectedSupplier||selectedCount===0||creating} onClick={handleCreate}>
+          {creating?"Creating…":`📩 Request Quote for ${selectedCount} Item${selectedCount!==1?"s":""}${selectedSupplier?` from ${selectedSupplier.name}`:""}`}
+        </button>
+      </div>
+    </Overlay>
+  );
+}
+
 export function InquiryDetailModal({inquiry,onUpdate,onAccept,onClose}) {
   const [rp,setRp]=useState(inquiry?.reply_price||"");
   const [rs,setRs]=useState(inquiry?.reply_stock||"");
@@ -8342,7 +8498,7 @@ export function BranchUsersPage({branchId, branchName, user}) {
 // ═══════════════════════════════════════════════════════════════
 // BRANCH TRANSFER REQUESTS PAGE
 // ═══════════════════════════════════════════════════════════════
-export function TransferRequestCard({r,branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],inquiries=[],supplierInvoices=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh,onDelete}) {
+export function TransferRequestCard({r,branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],inquiries=[],supplierInvoices=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh,onDelete,rfqQuotes=[],onCreateRfqSession}) {
   const Cs=curSym(settings?.currency||"ZAR R");
   const [acting,setActing]=useState(false);
   const [isReplying,setIsReplying]=useState(false);
@@ -8350,6 +8506,7 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
   const [replyNotes,setReplyNotes]=useState("");
   const [patchErr,setPatchErr]=useState(null);
   const [rfqPart,setRfqPart]=useState(null);
+  const [bulkRfq,setBulkRfq]=useState(false);
   const [lightbox,setLightbox]=useState(null);
 
   const isSupplier=role==="admin"||String(r.supplying_branch_id)===String(currentBranch?.id);
@@ -8547,6 +8704,14 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
               </div>
             );
           })}
+        </div>
+      )}
+
+      {onCreateRfqSession&&items.length>1&&items.some(i=>i.partId&&parts.find(p=>String(p.id)===String(i.partId)))&&(
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
+          <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}}
+            title="Pick one supplier and request quotes for all items in this list at once"
+            onClick={()=>setBulkRfq(true)}>📩 Ask Suppliers — All Items</button>
         </div>
       )}
 
@@ -8759,12 +8924,18 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
 
       {rfqPart&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)} inquiries={inquiries}
         onSend={async(data)=>{await onSendInquiry(data);}} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onClose={()=>setRfqPart(null)} t={t} isAdmin={role==="admin"} onEditPart={onEditPart}/>}
+      {bulkRfq&&<BulkInquiryModal
+        items={items.map(i=>({...i,part:i.partId?parts.find(p=>String(p.id)===String(i.partId)):null}))}
+        suppliers={suppliers} partSuppliers={partSuppliers} rfqQuotes={rfqQuotes} settings={settings}
+        sessionName={`Branch Transfer — ${r.workshop_name||supplyingBranch?.name||reqBranch?.name||r.id}`}
+        onCreateRfqSession={onCreateRfqSession}
+        onClose={()=>setBulkRfq(false)} t={t}/>}
       {lightbox&&<ImgLightbox url={toImgUrl(lightbox)} onClose={()=>setLightbox(null)}/>}
     </div>
   );
 }
 
-export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],inquiries=[],supplierInvoices=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh,onDelete}) {
+export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],role,currentBranch,settings,branchStock=[],parts=[],suppliers=[],partSuppliers=[],inquiries=[],supplierInvoices=[],onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,t={},onRefresh,onDelete,rfqQuotes=[],onCreateRfqSession}) {
   const [refreshing,setRefreshing]=useState(false);
   const onRefreshRef=useRef(onRefresh);
   useEffect(()=>{onRefreshRef.current=onRefresh;},[onRefresh]);
@@ -8808,7 +8979,7 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
       {sorted.length===0&&<div style={{textAlign:"center",padding:48,color:"var(--text3)"}}>No transfer requests yet</div>}
 
       {sorted.map(r=>(
-        <TransferRequestCard key={r.id} r={r} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} supplierInvoices={supplierInvoices} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t} onRefresh={onRefresh} onDelete={onDelete}/>
+        <TransferRequestCard key={r.id} r={r} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} supplierInvoices={supplierInvoices} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t} onRefresh={onRefresh} onDelete={onDelete} rfqQuotes={rfqQuotes} onCreateRfqSession={onCreateRfqSession}/>
       ))}
     </div>
   );

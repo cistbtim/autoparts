@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, makeId, today, toImgUrl, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems } from "../lib/helpers.js";
+import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner } from "../components/shared.jsx";
@@ -6723,7 +6723,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     <span style={{fontSize:22,flexShrink:0}}>📲</span>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:14}}>{r.supplier_name||r.supplier_phone||"Unknown supplier"}</div>
-                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{new Date(r.sent_at||r.created_at).toLocaleString()}</div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{fmtDT(r.sent_at||r.created_at)}</div>
                     </div>
                     {existing
                       ? <span style={{fontSize:11,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.12)",borderRadius:6,padding:"3px 8px",flexShrink:0}}>✅ Quoted</span>
@@ -9718,7 +9718,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:replyItems.length>0||items.length>0?10:0}}>
                 <div>
                   <div style={{fontWeight:700,fontSize:13}}>{items.map(i=>i.name).join(", ")}</div>
-                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{new Date(r.created_at).toLocaleDateString()}{r.reply_at&&<span> · Quoted {new Date(r.reply_at).toLocaleDateString()}</span>}</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{fmtD(r.created_at)}{r.reply_at&&<span> · Quoted {fmtD(r.reply_at)}</span>}</div>
                 </div>
                 <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
                   <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${sm.c}20`,color:sm.c}}>{sm.l}</span>

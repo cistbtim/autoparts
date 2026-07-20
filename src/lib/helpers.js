@@ -71,6 +71,20 @@ export const toFullUrl = (url) => {
 
 export const today = () => new Date().toISOString().slice(0, 10);
 export const fmtAmt = (n) => `${C()}${(n || 0).toLocaleString()}`;
+
+// Postgres `timestamp without time zone` columns come back from PostgREST with no
+// Z/offset suffix (e.g. "2026-07-20T19:58:27"). JS treats such strings as already
+// local time, so they display un-converted instead of shifting from UTC — parse
+// them as UTC explicitly so toLocaleString()/toLocaleDateString() convert correctly.
+const parseUTC = (s) => {
+  if (!s) return null;
+  const str = String(s);
+  const hasTZ = /[Zz]|[+-]\d{2}:?\d{2}$/.test(str);
+  const d = new Date(hasTZ ? str : `${str}Z`);
+  return isNaN(d) ? null : d;
+};
+export const fmtDT = (s, fallback = "") => { const d = parseUTC(s); return d ? d.toLocaleString() : fallback; };
+export const fmtD  = (s, fallback = "") => { const d = parseUTC(s); return d ? d.toLocaleDateString() : fallback; };
 // Combo items bundled into a workshop service preset (workshop_services.combo_items JSON)
 export const parseComboItems = (svc) => {
   try { const a = JSON.parse(svc?.combo_items || "[]"); return Array.isArray(a) ? a : []; } catch { return []; }

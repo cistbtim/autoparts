@@ -118,7 +118,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       const device=`${br}${bv?" "+bv:""} · ${os}${mob?" (mobile)":""}`;
       const device_type=/Android/i.test(ua)?"Android":/iPhone|iPad|iPod/i.test(ua)?"Apple iOS":mob?"Other Mobile":"Desktop";
       await api.upsert("login_logs",{username:u.username||u.phone,user_role:u.role||"customer",ip_address:g.ip||"?",country:g.countryFull||"?",province:g.province||"",city:g.city||"",lat:g.lat||null,lon:g.lon||null,weather:wx.label||null,device,device_type,status:"success"});
-    } catch {}
+    } catch (e) { console.error("login_logs insert failed:", e); }
   };
 
   const doBranchLogin = async () => {

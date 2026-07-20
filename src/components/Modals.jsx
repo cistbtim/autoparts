@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
 import { C, curSym, getSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
-import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
+import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
 import { CAR_MAKES, getCategories, DEFAULT_CATS, OC } from "../lib/constants.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
@@ -1853,7 +1853,7 @@ function LinkedWorkshopsList({shopName}) {
                 </div>
               </div>
               <div style={{fontSize:10,color:"var(--text3)",flexShrink:0,textAlign:"right"}}>
-                {w.created_at ? new Date(w.created_at).toLocaleDateString() : ""}
+                {fmtD(w.created_at)}
               </div>
             </div>
           ))}
@@ -8654,7 +8654,7 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
           <div style={{fontSize:12,color:"var(--text3)",marginTop:2,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
             {isSupplier&&reqBranch&&<span>From: <strong>{reqBranch.name}</strong> ·</span>}
             {!isSupplier&&supplyingBranch&&<span>To: <strong>{supplyingBranch.name}</strong> ·</span>}
-            {r.created_at&&<span>{new Date(r.created_at).toLocaleDateString()}</span>}
+            {r.created_at&&<span>{fmtD(r.created_at)}</span>}
             {r.workshop_phone&&(
               <a href={waLink(r.workshop_phone,"")} target="_blank" rel="noreferrer" title={r.workshop_phone}
                 style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:24,height:24,borderRadius:6,background:"var(--surface2)",border:"1px solid var(--border)",textDecoration:"none",fontSize:12}}>📱</a>
@@ -9125,7 +9125,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},sup
                     <div style={{flex:1,minWidth:200}}>
                       <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>🔧 {req.workshop_name||"Workshop"}{req.requester_name?` · ${req.requester_name}`:""}</div>
                       <div style={{fontSize:12,color:"var(--text3)"}}>{req.job_car||"—"}{req.job_complaint?` · ${req.job_complaint}`:""}</div>
-                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{items.length} part{items.length!==1?"s":""} · {req.created_at?new Date(req.created_at).toLocaleString():"—"}</div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{items.length} part{items.length!==1?"s":""} · {fmtDT(req.created_at,"—")}</div>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                       {(()=>{const m=statusMeta[req.status]||{icon:"•",label:req.status,bg:"var(--surface2)",color:"var(--text3)"};return(
@@ -9327,7 +9327,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
             {req.requester_name&&<div style={{fontSize:13,color:"var(--text3)"}}>👤 Requested by: <strong style={{color:"var(--text)"}}>{req.requester_name}</strong></div>}
             {req.job_car&&<div style={{fontSize:13,color:"var(--text3)"}}>🚗 Vehicle: <strong style={{color:"var(--text)"}}>{req.job_car}</strong></div>}
             {req.job_complaint&&<div style={{fontSize:13,color:"var(--text3)"}}>⚠️ Issue: <em>{req.job_complaint}</em></div>}
-            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Received: {req.created_at?new Date(req.created_at).toLocaleString():"—"}</div>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Received: {fmtDT(req.created_at,"—")}</div>
           </div>
           <div style={{display:"flex",gap:6,flexShrink:0}}>
             {workshopPhone&&<a href={`https://wa.me/${workshopPhone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer"

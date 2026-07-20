@@ -2,7 +2,7 @@
 import { api, setDemoMode } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
-import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, today, fmtAmt, makeId, makeToken, detectGeoLocation, waLink, mailLink } from "./lib/helpers.js";
+import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink } from "./lib/helpers.js";
 import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess, CITY_PROVINCE } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
 import { CSS } from "./styles.js";
@@ -5249,7 +5249,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                     {filteredLogs.map(l=>{const d=l.qty_after-l.qty_before;return(
                       <tr key={l.id} style={{cursor:"pointer"}}
                         onDoubleClick={()=>{setSearchPart(l.part_sku||l.part_name||"");setTab("inventory");}}>
-                        <td style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{new Date(l.created_at).toLocaleString()}</td>
+                        <td style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{fmtDT(l.created_at)}</td>
                         <td><div style={{fontWeight:600}}>{l.part_name}</div><div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{l.part_sku}</div></td>
                         <td><span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:11}}>{l.action}</span></td>
                         <td style={{textAlign:"center",color:"var(--text3)"}}>{l.qty_before}</td>
@@ -5300,7 +5300,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                           <td style={{fontSize:13}}>{r.contact_name||"—"}</td>
                           <td style={{fontSize:13,fontFamily:"DM Mono,monospace"}}>{r.phone||"—"}</td>
                           <td style={{fontSize:12,color:"var(--text3)"}}>{r.city||"—"}</td>
-                          <td style={{fontSize:11,color:"var(--text3)"}}>{r.created_at?new Date(r.created_at).toLocaleDateString():""}</td>
+                          <td style={{fontSize:11,color:"var(--text3)"}}>{fmtD(r.created_at)}</td>
                           <td>
                             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                               {r.status!=="handled"&&(
@@ -5681,7 +5681,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                                     {l.username}
                                     <span style={{fontSize:9,padding:"1px 5px",borderRadius:3,background:isNew?"rgba(74,222,128,.15)":"rgba(96,165,250,.1)",color:isNew?"#4ade80":"#60a5fa"}}>{isNew?"NEW":"returning"}</span>
                                   </div>
-                                  <div style={{fontSize:11,color:"#475569",marginTop:2}}>{new Date(l.created_at).toLocaleDateString()} · {l.ip_address||"—"}</div>
+                                  <div style={{fontSize:11,color:"#475569",marginTop:2}}>{fmtD(l.created_at)} · {l.ip_address||"—"}</div>
                                 </div>
                                 <div style={{fontSize:14,color:dc.color,flexShrink:0}}>{dc.icon}</div>
                               </div>
@@ -5787,7 +5787,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                                         {l.username}
                                         <span style={{fontSize:9,padding:"1px 5px",borderRadius:3,background:isNew?"rgba(74,222,128,.15)":"rgba(96,165,250,.1)",color:isNew?"#4ade80":"#60a5fa"}}>{isNew?"NEW":"returning"}</span>
                                       </div>
-                                      <div style={{fontSize:10,color:"#475569",marginTop:1}}>{l.province||CITY_PROVINCE[l.city]||l.city||"—"} · {new Date(l.created_at).toLocaleDateString()}</div>
+                                      <div style={{fontSize:10,color:"#475569",marginTop:1}}>{l.province||CITY_PROVINCE[l.city]||l.city||"—"} · {fmtD(l.created_at)}</div>
                                     </div>
                                     <div style={{fontSize:10,color:dc.color,flexShrink:0}}>{dc.icon}</div>
                                   </div>
@@ -5846,7 +5846,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                   <tbody>
                     {loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").map(l=>(
                       <tr key={l.id}>
-                        <td style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{new Date(l.created_at).toLocaleString()}</td>
+                        <td style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{fmtDT(l.created_at)}</td>
                         <td style={{fontWeight:600}}>{l.username}</td>
                         <td>{l.user_role&&<span className="badge" style={{background:ROLES[l.user_role]?.bg||"var(--surface3)",color:ROLES[l.user_role]?.color||"var(--text2)",fontSize:11}}>{ROLES[l.user_role]?.icon} {l.user_role}</span>}</td>
                         <td style={{fontSize:13}}>{l.country||"—"}</td>

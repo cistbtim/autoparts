@@ -18,6 +18,19 @@ export const ROLES = {
 
 export const BRANCH_ROLES = ["branch_admin","branch_manager","branch_warehouse","branch_picker","branch_salesman"];
 
+// Display-only fallback: fills in a province/state when the geo lookup at login time
+// returned a city but no region (common with free-tier IP geolocation outside SA).
+export const CITY_PROVINCE = {
+  "Pattaya City": "Chonburi", "Pattaya": "Chonburi", "Bangkok": "Bangkok",
+  "Chiang Mai": "Chiang Mai", "Phuket": "Phuket", "Nonthaburi": "Nonthaburi",
+  "Udon Thani": "Udon Thani", "Hat Yai": "Songkhla", "Nakhon Ratchasima": "Nakhon Ratchasima",
+  "Khon Kaen": "Khon Kaen", "Rayong": "Rayong", "Chonburi": "Chonburi",
+  "Luanda": "Luanda", "Huambo": "Huambo", "Lobito": "Benguela", "Benguela": "Benguela",
+  "Kaohsiung": "Kaohsiung", "Kaohsiung City": "Kaohsiung", "Taipei": "Taipei", "Taipei City": "Taipei",
+  "New Taipei": "New Taipei", "New Taipei City": "New Taipei", "Taichung": "Taichung", "Taichung City": "Taichung",
+  "Tainan": "Tainan", "Tainan City": "Tainan", "Taoyuan": "Taoyuan", "Taoyuan City": "Taoyuan",
+};
+
 export const OC = { "Completed": "#34d399", "Ready to Ship": "#fbbf24", "Processing": "#60a5fa", "Cancelled": "#f87171", "Quoted": "#a855f7", "Invoiced": "#f97316", "Paid": "#10b981", "已完成": "#34d399", "待出貨": "#fbbf24", "處理中": "#60a5fa", "已取消": "#f87171" };
 
 export const CATS_EN = ["All", "Engine", "Brake", "Filter", "Electrical", "Suspension"];

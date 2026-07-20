@@ -115,9 +115,22 @@ export const detectGeoLocation = async () => {
     // User denied permission or browser geo failed — fall back to IP-based lookup
     try {
       const g = await (await fetch("https://ipapi.co/json/")).json();
+      let province = g.region || "";
+      // ipapi.co's free tier often has no region for IPs outside a handful of countries.
+      // Its lat/lon is usually still present, so reverse-geocode those via Nominatim —
+      // same lookup the GPS path uses — to backfill the province for any country.
+      if (!province && g.latitude && g.longitude) {
+        try {
+          const r = await (await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${g.latitude}&lon=${g.longitude}`,
+            { headers: { "Accept-Language": "en" } }
+          )).json();
+          province = r.address?.state || r.address?.state_district || "";
+        } catch {}
+      }
       return {
         city: g.city || "",
-        province: g.region || "",
+        province,
         country: g.country_name || "",
         countryFull: `${g.country_name||""}${g.country_flag_emoji?" "+g.country_flag_emoji:""}`.trim(),
         lat: g.latitude || null,

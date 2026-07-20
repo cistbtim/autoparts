@@ -37,25 +37,49 @@ const APP_UPDATE_DATE = __BUILD_DATE__;
 export default function App() {
   const [lang,setLang] = useState(localStorage.getItem("ap_lang")||"en");
   const _today = ()=>new Date().toISOString().slice(0,10);
+  const IDLE_LIMIT = 60*60*1000; // auto-logout after 1hr with no clicks/keys/scroll/touch
+  const _touchActivity = ()=>{ try{localStorage.setItem("ap_last_activity",String(Date.now()));}catch{} };
   const _sessionValid = ()=>{
-    try{return localStorage.getItem("ap_login_date")===_today();}catch{return false;}
+    try{
+      if(localStorage.getItem("ap_login_date")!==_today()) return false;
+      const last=Number(localStorage.getItem("ap_last_activity")||0);
+      if(last && Date.now()-last>IDLE_LIMIT) return false;
+      return true;
+    }catch{return false;}
   };
   const [user,setUser] = useState(()=>{
     try{
-      if(!_sessionValid()){localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");return null;}
+      if(!_sessionValid()){localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");localStorage.removeItem("ap_last_activity");return null;}
       const s=localStorage.getItem("ap_user");return s?JSON.parse(s):null;
     }catch{return null;}
   });
-  const handleLogin=(u)=>{api.cacheClearAll();setUser(u);try{localStorage.setItem("ap_user",JSON.stringify(u));localStorage.setItem("ap_login_date",_today());}catch{}};
-  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");db.parts.clear().catch(()=>{});db.workshopJobs.clear().catch(()=>{});db.workshopJobItems.clear().catch(()=>{});};
+  const [sessionExpiredMsg,setSessionExpiredMsg] = useState("");
+  const handleLogin=(u)=>{api.cacheClearAll();setUser(u);setSessionExpiredMsg("");try{localStorage.setItem("ap_user",JSON.stringify(u));localStorage.setItem("ap_login_date",_today());_touchActivity();}catch{}};
+  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");localStorage.removeItem("ap_last_activity");db.parts.clear().catch(()=>{});db.workshopJobs.clear().catch(()=>{});db.workshopJobItems.clear().catch(()=>{});};
   const [settingsLoaded,setSettingsLoaded] = useState(false);
   const [availLangs,setAvailLangs] = useState(getLangs());
   useEffect(()=>{ document.documentElement.setAttribute("data-theme","light"); localStorage.removeItem("ap_theme"); },[]);
-  // Force re-login if the calendar day changes while the app is open (e.g. left open overnight)
+  // Force re-login if the calendar day changes, or the user is idle for 1hr+, while the app is open
   useEffect(()=>{
-    const check=()=>{if(user&&!_sessionValid()){setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");}};
+    if(!user) return;
+    _touchActivity();
+    const expire=()=>{
+      setUser(null);
+      localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");localStorage.removeItem("ap_last_activity");
+      setSessionExpiredMsg("Session expired after 1 hour of inactivity — please log in again.");
+    };
+    const check=()=>{ if(!_sessionValid()) expire(); };
+    let lastTouch=0;
+    const touch=()=>{ const now=Date.now(); if(now-lastTouch>5000){ lastTouch=now; _touchActivity(); } };
+    const events=["mousedown","keydown","touchstart","scroll"];
+    events.forEach(e=>window.addEventListener(e,touch,{passive:true}));
     document.addEventListener("visibilitychange",check);
-    return()=>document.removeEventListener("visibilitychange",check);
+    const iv=setInterval(check,30000);
+    return()=>{
+      events.forEach(e=>window.removeEventListener(e,touch));
+      document.removeEventListener("visibilitychange",check);
+      clearInterval(iv);
+    };
   },[user]);
   const changeLang = (l)=>{setLang(l);localStorage.setItem("ap_lang",l);api.patch("settings","id",1,{default_lang:l}).catch(()=>{});};
   const t = T[lang] || T.en;
@@ -104,7 +128,7 @@ export default function App() {
   );
   if(!settingsLoaded) return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{CSS}</style><div style={{color:"var(--accent)",fontSize:15,fontWeight:600}}>⚙ Loading...</div></div>;
   const wsLoginOnly = !!new URLSearchParams(window.location.search).get("ws_login");
-  if(!user) return <LoginPage onLogin={handleLogin} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs} wsLoginOnly={wsLoginOnly}/>;
+  if(!user) return <LoginPage onLogin={handleLogin} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs} wsLoginOnly={wsLoginOnly} initialError={sessionExpiredMsg}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={handleLogout} lang={lang}/>;
   return <MainApp user={user} onLogout={handleLogout} t={t} lang={lang} setLang={changeLang} langs={availLangs}/>;
 }

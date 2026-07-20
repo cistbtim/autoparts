@@ -9842,18 +9842,17 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <button onClick={()=>{setStockOnly(false);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:!stockOnly?700:400,background:!stockOnly?"var(--accent)":"transparent",color:!stockOnly?"#fff":"var(--text2)"}}>All</button>
             <button onClick={()=>{setStockOnly(true);setPage(0);}} style={{padding:"7px 12px",border:"none",cursor:"pointer",fontSize:12,fontWeight:stockOnly?700:400,background:stockOnly?"var(--accent)":"transparent",color:stockOnly?"#fff":"var(--text2)"}}>In Stock</button>
           </div>
-          <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={()=>setShelfModal({})} title="Print shelf/bin label">📋 Shelf Label</button>
-          {onAddPart&&(
+          {adminUnlocked&&<button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={()=>setShelfModal({})} title="Print shelf/bin label">📋 Shelf Label</button>}
+          {onAddPart&&adminUnlocked&&(
             <button className="btn btn-sm" style={{flexShrink:0,background:"var(--green)",color:"#fff",border:"none",fontWeight:700,borderRadius:8,boxShadow:"0 2px 10px rgba(52,211,153,.35)"}}
-              title={adminUnlocked?"Add a new part to the spare shop catalog":"Add a new part — admin unlock required"}
+              title="Add a new part to the spare shop catalog"
               onClick={()=>{
-                if(!adminUnlocked){ setShowUnlock(true); return; }
                 const code=(_dispV?.code||initialCode||"").toUpperCase();
                 onAddPart({
                   _initialF:{sku:code?`${code}-`:""},
                   ...(initialMake?{_tab:"fitment",_fitSearch:`${initialMake} ${_dispV?.model||initialModel||""}`.trim()}:{}),
                 });
-              }}>➕ Add Part{adminUnlocked?"":" 🔒"}</button>
+              }}>➕ Add Part</button>
           )}
           <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} disabled={refreshing} title="Reload all inventory and requests from server"
             onClick={()=>{

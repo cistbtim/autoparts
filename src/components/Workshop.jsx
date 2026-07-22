@@ -1475,6 +1475,29 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             )}
           </div>
 
+          {/* ── Referral Link (main workshop account only) ── */}
+          {wsRole==="main"&&(()=>{
+            const refUrl=`${window.location.origin}${window.location.pathname}?ref=${wsId}`;
+            return(
+              <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🤝 Invite Another Workshop</div>
+                <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>
+                  Know another workshop owner? Share this link — when they sign up with it, we'll know it came from you.
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                  <code style={{fontSize:11,background:"var(--surface2)",padding:"6px 10px",borderRadius:6,flex:1,wordBreak:"break-all",color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{refUrl}</code>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>navigator.clipboard?.writeText(refUrl).then(()=>alert("Link copied!"))}>📋 Copy</button>
+                  {navigator.share&&(
+                    <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}}
+                      onClick={()=>navigator.share({title:"Try MotorDesk for your workshop",text:"I've been using this to run my workshop — worth a look.",url:refUrl}).catch(()=>{})}>
+                      📤 Share
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── Availability Settings ── */}
           <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
             <button style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"none",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"var(--text)",padding:0}}

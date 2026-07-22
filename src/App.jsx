@@ -172,6 +172,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [selectedMapCity,setSelectedMapCity]=useState(null);
   const [llCountryFilter,setLlCountryFilter]=useState(null);
   const [adContracts,setAdContracts]=useState([]);
+  const [wsGrowthProfiles,setWsGrowthProfiles]=useState([]); // workshop_profiles + trial/referral fields, admin-only, for Workshop Growth dashboard
+  const [wsGrowthLoginLogs,setWsGrowthLoginLogs]=useState([]); // full (unlimited) login_logs, workshop role only, for the same dashboard
   const [suppliers,setSuppliers]=useState([]);
   const [supplierSearch,setSupplierSearch]=useState("");
   const [supplierOriginFilter,setSupplierOriginFilter]=useState("all");
@@ -672,6 +674,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     // Ad clicks — admin only
     if(needsAdmin) api.get("ad_clicks","select=*&order=clicked_at.desc&limit=500").catch(()=>[]).then(r=>{if(Array.isArray(r))setAdClicks(r);});
     if(needsAdmin) api.get("ad_contracts","select=*&order=created_at.desc").catch(()=>[]).then(r=>{if(Array.isArray(r))setAdContracts(r);});
+    // Workshop Growth dashboard — separate from allWsProfiles (which other features depend on) so a
+    // missing referral_source/referred_by_user_id column (until the SQL below is run) can't break them.
+    if(needsAdmin){
+      api.get("workshop_profiles","select=id,name,city,country,trial_start,subscription_status,referral_source,referred_by_user_id&order=trial_start.asc").catch(()=>[]).then(r=>{if(Array.isArray(r))setWsGrowthProfiles(r);});
+      // No &limit= — api.get paginates automatically, unlike the capped Login Logs page query.
+      // All roles (not just workshop) — also powers the "Last Login" column on the Users table.
+      api.get("login_logs","select=username,created_at,user_role&order=created_at.asc").catch(()=>[]).then(r=>{if(Array.isArray(r))setWsGrowthLoginLogs(r);});
+    }
 
     // Check for overdue auto-RFQs on every app load (runs after state is set)
     if(!isSalesman) setTimeout(()=>checkStaleRfqs(),2000);
@@ -3172,6 +3182,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         {id:"dashboard",icon:"📊",label:t.dashboard,roles:["admin"]},
         {id:"systemMap",icon:"🗺️",label:"System Map",roles:["admin"]},
         {id:"loginlogs",icon:"🌍",label:t.loginLogs,roles:["admin"]},
+        {id:"wsgrowth",icon:"🤝",label:"Workshop Growth",roles:["admin"]},
         {id:"adclicks",icon:"📢",label:"Ad Clicks",roles:["admin"]},
         {id:"adcontracts",icon:"📑",label:"Ad Contracts",roles:["admin"]},
       ]
@@ -3334,7 +3345,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       if(isMobileDevice&&c.id==="systemMap") return false;
       if(isBranchUser){
         // branch users see admin tabs scoped to their role
-        const BA_HIDE=new Set(["dashboard","loginlogs","adclicks","adcontracts","branches","settings","users","wssubscriptions","vehicles","systemMap","workshopfeedback"]);
+        const BA_HIDE=new Set(["dashboard","loginlogs","wsgrowth","adclicks","adcontracts","branches","settings","users","wssubscriptions","vehicles","systemMap","workshopfeedback"]);
         if(!c.roles.includes("admin")||BA_HIDE.has(c.id)) return false;
         // branchAdminOnly items only visible to branch_admin
         if(c.branchAdminOnly && role!=="branch_admin") return false;
@@ -5355,13 +5366,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               )}
             </div>
 
+            {(()=>{
+              const lastLoginByUsername={};
+              wsGrowthLoginLogs.forEach(l=>{ if(l.username&&l.created_at) lastLoginByUsername[l.username]=l.created_at; }); // asc order — last write wins = most recent
+              const jobCountByWorkshopId={};
+              workshopJobs.forEach(j=>{ if(j.workshop_id) jobCountByWorkshopId[j.workshop_id]=(jobCountByWorkshopId[j.workshop_id]||0)+1; });
+              return(
+            <>
             <PH title={t.users} subtitle={`${filteredUsers.length} of ${users.length} users`}
               action={<div style={{display:"flex",gap:8}}><button className="btn btn-ghost" onClick={()=>openM("editUser",{role:"workshop",username:"",password:"",name:"",phone:"",email:""})}>🔧 Add Workshop</button><button className="btn btn-primary" onClick={()=>openM("editUser")}>+ Add User</button></div>}/>
             <div style={{marginBottom:16}}><input className="inp" type="text" placeholder="Search name, username, phone, email, role..." value={searchUser} onChange={e=>setSearchUser(e.target.value)} style={{maxWidth:320}}/></div>
             <div className="card" style={{overflow:"hidden"}}>
               <div className="tbl-wrap">
                 <table className="tbl">
-                  <thead><tr>{["User",t.role,"Subscription",t.phone,t.email,"Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{["User",t.role,"Subscription","Last Login","Job Cards",t.phone,t.email,"Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {filteredUsers.map(u=>{const sub2=getSubInfo(u);const isPicking=activePicker?.userId===u.id;
                     // default expiry = today + 1 month (always future, regardless of old expiry)
@@ -5392,6 +5410,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                             </div>
                           )}
                         </td>
+                        <td style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{lastLoginByUsername[u.username]?fmtDT(lastLoginByUsername[u.username]):"Never"}</td>
+                        <td style={{fontSize:13,color:"var(--text2)"}}>{u.role==="workshop"?(jobCountByWorkshopId[u.id]||0):"—"}</td>
                         <td style={{color:"var(--text2)",fontSize:13}}>{u.phone||"—"}</td>
                         <td style={{color:"var(--text2)",fontSize:13}}>{u.email||"—"}</td>
                         <td><div style={{display:"flex",gap:6}}><button className="btn btn-ghost btn-sm" onClick={()=>openM("editUser",u)}>{t.edit}</button><button className="btn btn-danger btn-sm" onClick={()=>deleteUser(u.id)} disabled={u.id===user.id}>{t.delete}</button></div></td>
@@ -5401,6 +5421,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 </table>
               </div>
             </div>
+            </>
+              );
+            })()}
           </div>
         )}
 
@@ -5921,6 +5944,145 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             </div>
           </div>
         )}
+
+        {/* ── WORKSHOP GROWTH ── */}
+        {tab==="wsgrowth"&&role==="admin"&&(()=>{
+          const profiles=wsGrowthProfiles;
+          const idToUsername={};
+          users.forEach(u=>{ if(u.role==="workshop") idToUsername[u.id]=u.username; });
+          const idToName={};
+          profiles.forEach(p=>{ idToName[p.id]=p.name; });
+
+          // Monday-start ISO week bucket key
+          const weekKey=(dateStr)=>{
+            if(!dateStr) return null;
+            const d=new Date(dateStr.slice(0,10)+"T00:00:00");
+            if(isNaN(d)) return null;
+            const day=(d.getDay()+6)%7; // 0=Mon
+            d.setDate(d.getDate()-day);
+            return d.toISOString().slice(0,10);
+          };
+
+          const regByWeek={};
+          profiles.forEach(p=>{
+            const wk=weekKey(p.trial_start);
+            if(!wk) return;
+            if(!regByWeek[wk]) regByWeek[wk]={organic:0,referral:0};
+            regByWeek[wk][p.referral_source==="referral"?"referral":"organic"]++;
+          });
+
+          const wsLoginLogs=wsGrowthLoginLogs.filter(l=>l.user_role==="workshop");
+          const firstSeenWeek={};
+          const loginByWeek={};
+          wsLoginLogs.forEach(l=>{
+            const wk=weekKey(l.created_at);
+            if(!wk||!l.username) return;
+            if(!loginByWeek[wk]) loginByWeek[wk]={new:0,returning:0};
+            if(!firstSeenWeek[l.username]){ firstSeenWeek[l.username]=wk; loginByWeek[wk].new++; }
+            else loginByWeek[wk].returning++;
+          });
+
+          const allWeeks=Array.from(new Set([...Object.keys(regByWeek),...Object.keys(loginByWeek)])).sort();
+          const weeks=allWeeks.slice(-12); // last 12 weeks
+
+          const now=Date.now(), THIRTY=30*24*60*60*1000, cutoff=now-THIRTY;
+          const eligible=profiles.filter(p=>p.trial_start&&(now-new Date(p.trial_start).getTime())>=THIRTY);
+          const activeUsernames=new Set();
+          wsLoginLogs.forEach(l=>{ if(l.username&&l.created_at&&new Date(l.created_at).getTime()>=cutoff) activeUsernames.add(l.username); });
+          const activeCount=eligible.filter(p=>{ const un=idToUsername[p.id]; return un&&activeUsernames.has(un); }).length;
+          const activePct=eligible.length?Math.round(activeCount/eligible.length*100):null;
+
+          const referrals=profiles.filter(p=>p.referral_source==="referral").sort((a,b)=>(b.trial_start||"").localeCompare(a.trial_start||""));
+
+          const maxReg=Math.max(1,...weeks.map(w=>(regByWeek[w]?.organic||0)+(regByWeek[w]?.referral||0)));
+          const maxLogin=Math.max(1,...weeks.map(w=>(loginByWeek[w]?.new||0)+(loginByWeek[w]?.returning||0)));
+          const CW=800,CH=160,padL=30,padB=20;
+          const lx=(i)=>weeks.length>1?padL+(i/(weeks.length-1))*(CW-padL-10):CW/2;
+          const ly=(v)=>CH-padB-(v/maxLogin)*(CH-padB-10);
+          const newPts=weeks.map((w,i)=>`${lx(i).toFixed(1)},${ly(loginByWeek[w]?.new||0).toFixed(1)}`).join(" ");
+          const retPts=weeks.map((w,i)=>`${lx(i).toFixed(1)},${ly(loginByWeek[w]?.returning||0).toFixed(1)}`).join(" ");
+          const wkLabel=(w)=>{ const d=new Date(w+"T00:00:00"); return `${d.getMonth()+1}/${d.getDate()}`; };
+
+          return(
+            <div className="fu">
+              <PH title="🤝 Workshop Growth" subtitle={`${profiles.length} workshop${profiles.length!==1?"s":""} registered`}/>
+
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:20}}>
+                <SC label="Total Workshops" value={profiles.length} icon="🔧" color="var(--accent)"/>
+                <SC label="Via Referral" value={referrals.length} icon="🤝" color="var(--blue)"/>
+                <SC label="Active 30d After Signup" value={activePct===null?"—":`${activePct}%`} icon="📈" color="var(--green)"/>
+              </div>
+
+              {profiles.length===0?(
+                <div className="card" style={{padding:24,textAlign:"center",color:"var(--text3)",fontSize:13}}>
+                  No workshop registrations yet — or `referral_source`/`referred_by_user_id` columns haven't been added to <code>workshop_profiles</code> yet (see SQL below).
+                </div>
+              ):(<>
+                <div className="card" style={{padding:"14px 16px",marginBottom:16}}>
+                  <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>📊 New Registrations per Week (last 12 weeks)</div>
+                  <div style={{display:"flex",alignItems:"flex-end",gap:6,height:140}}>
+                    {weeks.length===0?<div style={{color:"var(--text3)",fontSize:12}}>No data yet</div>:weeks.map(w=>{
+                      const o=regByWeek[w]?.organic||0, r=regByWeek[w]?.referral||0;
+                      return(
+                        <div key={w} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                          <div style={{width:"100%",display:"flex",flexDirection:"column-reverse",height:110}}>
+                            <div style={{width:"100%",height:`${(o/maxReg)*100}%`,background:"var(--surface3)",borderRadius:o?"3px 3px 0 0":0}} title={`${o} organic`}/>
+                            <div style={{width:"100%",height:`${(r/maxReg)*100}%`,background:"var(--blue)",borderRadius:"3px 3px 0 0"}} title={`${r} referral`}/>
+                          </div>
+                          <span style={{fontSize:10,color:"var(--text3)"}}>{wkLabel(w)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{display:"flex",gap:14,marginTop:10,fontSize:11,color:"var(--text3)"}}>
+                    <span><span style={{display:"inline-block",width:9,height:9,background:"var(--blue)",borderRadius:2,marginRight:5}}/>Referral</span>
+                    <span><span style={{display:"inline-block",width:9,height:9,background:"var(--surface3)",borderRadius:2,marginRight:5}}/>Organic</span>
+                  </div>
+                </div>
+
+                <div className="card" style={{padding:"14px 16px",marginBottom:16}}>
+                  <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>📈 New vs Returning Logins per Week</div>
+                  {weeks.length<2?(
+                    <div style={{color:"var(--text3)",fontSize:12}}>Not enough weeks of login data yet</div>
+                  ):(
+                    <svg viewBox={`0 0 ${CW} ${CH}`} style={{width:"100%",height:"auto",display:"block"}}>
+                      {[0,0.5,1].map(f=>(<line key={f} x1={padL} y1={ly(maxLogin*f)} x2={CW-10} y2={ly(maxLogin*f)} stroke="var(--border)" strokeWidth={0.5}/>))}
+                      <polyline points={retPts} fill="none" stroke="var(--surface3)" strokeWidth={2}/>
+                      <polyline points={newPts} fill="none" stroke="var(--blue)" strokeWidth={2}/>
+                      {weeks.map((w,i)=>(<text key={w} x={lx(i)} y={CH-4} fontSize={9} fill="var(--text3)" textAnchor="middle">{wkLabel(w)}</text>))}
+                    </svg>
+                  )}
+                  <div style={{display:"flex",gap:14,marginTop:10,fontSize:11,color:"var(--text3)"}}>
+                    <span><span style={{display:"inline-block",width:9,height:9,background:"var(--blue)",borderRadius:2,marginRight:5}}/>New</span>
+                    <span><span style={{display:"inline-block",width:9,height:9,background:"var(--surface3)",borderRadius:2,marginRight:5}}/>Returning</span>
+                  </div>
+                </div>
+
+                <div className="card" style={{overflow:"hidden"}}>
+                  <div style={{padding:"12px 16px",fontWeight:700,fontSize:13,borderBottom:"1px solid var(--border)"}}>🤝 Referral Attributions ({referrals.length})</div>
+                  {referrals.length===0?(
+                    <div style={{padding:24,textAlign:"center",color:"var(--text3)",fontSize:13}}>No referral-attributed signups yet</div>
+                  ):(
+                    <div className="tbl-wrap">
+                      <table className="tbl">
+                        <thead><tr><th>Workshop</th><th>Referred By</th><th>Signed Up</th></tr></thead>
+                        <tbody>
+                          {referrals.map(p=>(
+                            <tr key={p.id}>
+                              <td style={{fontWeight:600}}>{p.name||p.id}</td>
+                              <td>{idToName[p.referred_by_user_id]||p.referred_by_user_id||"—"}</td>
+                              <td style={{fontSize:13,color:"var(--text3)"}}>{p.trial_start||"—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>)}
+            </div>
+          );
+        })()}
 
         {/* ── AD CLICKS ── */}
         {tab==="adclicks"&&role==="admin"&&(()=>{

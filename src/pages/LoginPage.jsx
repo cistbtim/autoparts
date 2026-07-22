@@ -68,7 +68,9 @@ const IcLock   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="non
 const IcGrid   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
 
 export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLoginOnly=false,initialError=""}) {
-  const [authTab,setAuthTab] = useState(wsLoginOnly?"workshop":"branch");
+  // Referral: ?ref=<workshop id> jumps straight to workshop signup and gets stamped on the new account
+  const [wsReferrerId] = useState(()=>new URLSearchParams(window.location.search).get("ref")||"");
+  const [authTab,setAuthTab] = useState(wsLoginOnly?"workshop":(wsReferrerId?"workshop":"branch"));
   // branch
   const [branchName,setBranchName] = useState("");
   const [branchUser,setBranchUser] = useState(""); const [branchPass,setBranchPass] = useState("");
@@ -77,7 +79,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   // workshop
   const [wsCompany,setWsCompany] = useState("");
   const [wsUser,setWsUser] = useState(""); const [wsPass,setWsPass] = useState("");
-  const [wsTab,setWsTab] = useState("login");
+  const [wsTab,setWsTab] = useState(wsReferrerId?"signup":"login");
   const [wsRegName,setWsRegName] = useState(""); const [wsRegUser,setWsRegUser] = useState("");
   const [wsRegPass,setWsRegPass] = useState(""); const [wsRegPass2,setWsRegPass2] = useState("");
   const [wsRegEmail,setWsRegEmail] = useState(""); const [wsRegPhone,setWsRegPhone] = useState("");
@@ -216,7 +218,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
     const newUser=await api.insert("users",{id:wsId,username:wsRegUser,password:wsRegPass,name:wsRegName,role:"workshop",phone:wsRegPhone||"",email:wsRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
     if(!newUser){setLoading(false);return;}
-    await api.upsert("workshop_profiles",{id:wsId,name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>{});
+    await api.upsert("workshop_profiles",{id:wsId,name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd,referral_source:wsReferrerId?"referral":"organic",referred_by_user_id:wsReferrerId||null}).catch(()=>{});
     const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
     if(loginUser){logLogin({...loginUser});onLogin({...loginUser});}
     else setErr("Account created — please log in");

@@ -4093,7 +4093,16 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   useEffect(()=>{ setNoteVal(job.notes||""); },[job.notes]);
   const [pendingPayModal, setPendingPayModal] = useState(false);
   const [showLabelModal,  setShowLabelModal]  = useState(false);
-  const [quoteExcluded,   setQuoteExcluded]   = useState(()=>new Set());
+  // Derive which items are excluded from a fresh quote build from the job's existing quote
+  // selection (if any) — so the checklist matches what was actually saved/sent, not "everything".
+  const excludedFromQuote=(q)=>{
+    if(!q?.selected_item_ids) return new Set();
+    try{ const selected=new Set(JSON.parse(q.selected_item_ids)); return new Set(items.filter(i=>!selected.has(i.id)).map(i=>i.id)); }
+    catch{ return new Set(); }
+  };
+  const [quoteExcluded,   setQuoteExcluded]   = useState(()=>excludedFromQuote(quote));
+  // Re-sync on reload, job switch, or after the quote is saved (component instance is reused, no remount)
+  useEffect(()=>{ setQuoteExcluded(excludedFromQuote(quote)); },[job.id,quote?.selected_item_ids]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{ if(pendingPayModal&&invoice){ setPendingPayModal(false); setPaymentModal(true); } },[invoice,pendingPayModal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;

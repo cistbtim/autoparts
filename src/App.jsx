@@ -2,7 +2,7 @@
 import { api, setDemoMode } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
-import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink } from "./lib/helpers.js";
+import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag } from "./lib/helpers.js";
 import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess, CITY_PROVINCE } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
 import { CSS } from "./styles.js";
@@ -170,6 +170,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [selectedMapCountry,setSelectedMapCountry]=useState(null);
   const [selectedMapProvince,setSelectedMapProvince]=useState(null);
   const [selectedMapCity,setSelectedMapCity]=useState(null);
+  const [llCountryFilter,setLlCountryFilter]=useState(null);
   const [adContracts,setAdContracts]=useState([]);
   const [suppliers,setSuppliers]=useState([]);
   const [supplierSearch,setSupplierSearch]=useState("");
@@ -5426,10 +5427,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 </div>
               </div>
             )}
-            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
-              {Object.entries(loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").reduce((a,l)=>{const c=l.country||"?";a[c]=(a[c]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>(
-                <span key={c} className="badge" style={{background:"var(--surface2)",color:"var(--text2)",padding:"5px 13px",fontSize:13}}>{c} · {n}</span>
+            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16,alignItems:"center"}}>
+              {Object.entries(loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").reduce((a,l)=>{const c=stripFlag(l.country)||"?";a[c]=(a[c]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>(
+                <span key={c} className="badge" onClick={()=>{setLlCountryFilter(v=>v===c?null:c);document.getElementById("ll-table")?.scrollIntoView({behavior:"smooth",block:"start"});}}
+                  style={{background:llCountryFilter===c?"var(--accent)":"var(--surface2)",color:llCountryFilter===c?"#fff":"var(--text2)",padding:"5px 13px",fontSize:13,cursor:"pointer"}}>{c} · {n}</span>
               ))}
+              {llCountryFilter&&<button className="btn btn-ghost btn-sm" style={{fontSize:12,padding:"4px 10px"}} onClick={()=>setLlCountryFilter(null)}>✕ Clear filter</button>}
             </div>
             {(()=>{
               /* ── World Map (2-level: country → province drill-down) ── */
@@ -5437,7 +5440,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               const mX=lon=>((lon+180)/360*MW);
               const mY=lat=>((90-lat)/180*MH);
               const poly=pts=>pts.map(([la,lo])=>`${mX(lo).toFixed(1)},${mY(la).toFixed(1)}`).join(" ");
-              const stripFlag=s=>(s||"").replace(/[\u{1F1E0}-\u{1F1FF}]{2}/gu,"").trim();
               const PROV_LL={"Gauteng":[-26.0,28.0],"Western Cape":[-33.9,18.4],"KwaZulu-Natal":[-29.8,31.0],"Eastern Cape":[-32.8,27.0],"Free State":[-29.0,26.0],"Limpopo":[-23.9,29.5],"Mpumalanga":[-25.5,30.5],"North West":[-25.8,25.5],"Northern Cape":[-28.7,24.8],"Harare":[-17.8,31.0],"Bulawayo":[-20.1,28.6],"Lusaka":[-15.4,28.3]};
               const CTY_LL={"South Africa":[-29.0,25.0],"Zimbabwe":[-20.0,30.0],"Zambia":[-15.0,28.0],"Mozambique":[-18.0,35.0],"Botswana":[-22.0,24.0],"Namibia":[-22.0,17.0],"Lesotho":[-29.5,28.2],"Eswatini":[-26.5,31.5],"Tanzania":[-6.0,35.0],"Kenya":[1.0,38.0],"Uganda":[1.0,32.0],"Nigeria":[9.0,8.0],"Ghana":[8.0,-1.0],"Ethiopia":[9.0,40.0],"Egypt":[26.0,30.0],"Morocco":[32.0,-6.0],"Angola":[-12.5,18.5],"United Kingdom":[51.5,-0.1],"Ireland":[53.3,-8.0],"United States":[38.0,-97.0],"Canada":[56.0,-96.0],"Australia":[-25.0,133.0],"New Zealand":[-41.0,174.0],"Germany":[51.0,10.0],"France":[46.0,2.0],"Netherlands":[52.0,5.0],"China":[35.0,105.0],"India":[20.0,77.0],"Japan":[36.0,138.0],"Thailand":[15.0,101.0],"Brazil":[-10.0,-55.0],"Argentina":[-34.0,-64.0]};
               const BBOX={"South Africa":[-35,-22,15,34],"Zimbabwe":[-23,-15,25,34],"Zambia":[-19,-8,21,34],"Mozambique":[-27,-10,32,41],"Botswana":[-27,-17,19,30],"Namibia":[-29,-17,10,26],"Tanzania":[-12,-1,29,41],"Kenya":[-5,5,33,42],"Nigeria":[4,14,2,15],"Ghana":[5,11,-4,2],"Egypt":[22,32,24,37],"Angola":[-18,-4,11,24],"United Kingdom":[49,59,-9,3],"United States":[24,50,-126,-65],"Australia":[-44,-10,112,155],"Germany":[47,55,5,16],"France":[42,52,-6,9],"China":[18,54,72,136],"India":[6,37,67,98],"Thailand":[5,21,97,106],"Brazil":[-35,6,-74,-33],"Argentina":[-56,-21,-74,-52]};
@@ -5580,11 +5582,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               // the centroid of its users' actual stored lat/lon — so a brand-new country "just
               // works" on first login, with no code changes needed.
               const seenU=new Set();
+              const seenUC=new Set();
               const ctData={};
               loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").forEach(l=>{
-                if(seenU.has(l.username))return;
                 seenU.add(l.username);
                 const cn=stripFlag(l.country)||"Unknown";
+                const ucKey=`${l.username}|${cn}`;
+                if(seenUC.has(ucKey))return;
+                seenUC.add(ucKey);
                 if(!ctData[cn])ctData[cn]={count:0,users:[],provinces:{},newCount:0,oldCount:0,latSum:0,lonSum:0,llCount:0,latMin:null,latMax:null,lonMin:null,lonMax:null};
                 const d=ctData[cn];
                 d.count++;
@@ -5863,17 +5868,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 </div>
               );
             })()}
-            <div className="card" style={{overflow:"hidden"}}>
+            <div className="card" id="ll-table" style={{overflow:"hidden"}}>
+              {llCountryFilter&&<div style={{padding:"10px 16px",fontSize:13,color:"var(--text2)",borderBottom:"1px solid var(--border)"}}>Filtered to <strong>{llCountryFilter}</strong> — {loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo"&&(stripFlag(l.country)||"?")===llCountryFilter).length} event{loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo"&&(stripFlag(l.country)||"?")===llCountryFilter).length!==1?"s":""}</div>}
               <div className="tbl-wrap">
                 <table className="tbl">
-                  <thead><tr>{[t.time,t.user,t.role,t.country,"Province",t.city,"IP","Device","Weather",t.status].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{[t.time,t.user,t.role,t.country,"Province",t.city,"IP","Device","Weather",t.status,""].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").map(l=>(
+                    {loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo").filter(l=>!llCountryFilter||(stripFlag(l.country)||"?")===llCountryFilter).map(l=>(
                       <tr key={l.id}>
                         <td style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{fmtDT(l.created_at)}</td>
                         <td style={{fontWeight:600}}>{l.username}</td>
                         <td>{l.user_role&&<span className="badge" style={{background:ROLES[l.user_role]?.bg||"var(--surface3)",color:ROLES[l.user_role]?.color||"var(--text2)",fontSize:11}}>{ROLES[l.user_role]?.icon} {l.user_role}</span>}</td>
-                        <td style={{fontSize:13}}>{l.country||"—"}</td>
+                        <td style={{fontSize:13}}>{stripFlag(l.country)||"—"}</td>
                         <td style={{fontSize:13,color:"var(--text2)"}}>{l.province||CITY_PROVINCE[l.city]||"—"}</td>
                         <td style={{fontSize:13,color:"var(--text3)"}}>{l.city||"—"}</td>
                         <td style={{fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{l.ip_address||"—"}</td>
@@ -5899,6 +5905,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                         })()}</td>
                         <td style={{fontSize:13,whiteSpace:"nowrap"}}>{l.weather||"—"}</td>
                         <td><span className="badge" style={{background:l.status==="success"?"rgba(52,211,153,.12)":"rgba(248,113,113,.12)",color:l.status==="success"?"var(--green)":"var(--red)"}}>{l.status}</span></td>
+                        <td>
+                          <button className="btn btn-ghost btn-sm" title="Delete this log entry" style={{color:"var(--red)",padding:"3px 8px"}}
+                            onClick={async()=>{
+                              if(!window.confirm(`Delete this login log entry?\n\n${l.username} · ${fmtDT(l.created_at)}`))return;
+                              await api.delete("login_logs","id",l.id);
+                              setLoginLogs(prev=>prev.filter(x=>x.id!==l.id));
+                            }}>🗑</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -5914,7 +5928,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           const byPage=adClicks.reduce((a,c)=>{const p=c.page||"?";a[p]=(a[p]||0)+1;return a;},{});
           const byAd=adClicks.reduce((a,c)=>{const k=c.ad_title||"?";a[k]=(a[k]||0)+1;return a;},{});
           const topAd=Object.entries(byAd).sort((a,b)=>b[1]-a[1])[0];
-          const byCountry=adClicks.reduce((a,c)=>{const k=c.country||"?";a[k]=(a[k]||0)+1;return a;},{});
+          const byCountry=adClicks.reduce((a,c)=>{const k=stripFlag(c.country)||"?";a[k]=(a[k]||0)+1;return a;},{});
           const topCountry=Object.entries(byCountry).sort((a,b)=>b[1]-a[1])[0];
           return (
             <div className="fu">
@@ -5950,7 +5964,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                             <td style={{fontSize:13}}>{c.user_name||"—"}</td>
                             <td>{c.user_role&&<span className="badge" style={{background:ROLES[c.user_role]?.bg||"var(--surface3)",color:ROLES[c.user_role]?.color||"var(--text2)",fontSize:11}}>{ROLES[c.user_role]?.icon} {c.user_role}</span>}</td>
                             <td style={{fontSize:13,color:"var(--text3)"}}>{c.city||"—"}</td>
-                            <td style={{fontSize:13}}>{c.country||"—"}</td>
+                            <td style={{fontSize:13}}>{stripFlag(c.country)||"—"}</td>
                             <td style={{fontSize:13}}>{c.weather||"—"}</td>
                           </tr>
                         ))

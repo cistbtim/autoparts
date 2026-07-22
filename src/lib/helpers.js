@@ -93,6 +93,8 @@ export const parseComboItems = (svc) => {
 let _idCounter = 0;
 export const makeId = (prefix) => { _idCounter++; return `${prefix}-${Date.now()}-${_idCounter}`; };
 export const makeToken = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+// Strips regional-indicator flag emoji (legacy rows stored "Country 🇿🇦"; Windows renders those as literal "ZA")
+export const stripFlag = (s) => (s || "").replace(/[\u{1F1E0}-\u{1F1FF}]{2}/gu, "").trim();
 export const detectGeoLocation = async () => {
   // Try browser GPS/WiFi positioning first — gives the real physical city.
   // IP-based lookup is unreliable in SA: mobile carriers route through Johannesburg
@@ -117,14 +119,10 @@ export const detectGeoLocation = async () => {
     const city = a.city || a.town || a.village || a.suburb || a.county || "";
     const province = a.state || a.state_district || "";
     const countryName = a.country || "";
-    const cc = (a.country_code || "").toUpperCase();
-    const flag = cc.length === 2
-      ? String.fromCodePoint(...[...cc].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)))
-      : "";
     // Still fetch IP for the ip_address field
     let ip = "";
     try { ip = (await (await fetch("https://ipapi.co/json/")).json()).ip || ""; } catch {}
-    return { city, province, country: countryName, countryFull: flag ? `${countryName} ${flag}` : countryName, lat, lon, ip };
+    return { city, province, country: countryName, countryFull: countryName, lat, lon, ip };
   } catch {
     // User denied permission or browser geo failed — fall back to IP-based lookup
     try {
@@ -146,7 +144,7 @@ export const detectGeoLocation = async () => {
         city: g.city || "",
         province,
         country: g.country_name || "",
-        countryFull: `${g.country_name||""}${g.country_flag_emoji?" "+g.country_flag_emoji:""}`.trim(),
+        countryFull: g.country_name || "",
         lat: g.latitude || null,
         lon: g.longitude || null,
         ip: g.ip || ""

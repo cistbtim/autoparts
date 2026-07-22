@@ -765,7 +765,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   useEffect(()=>{
     // Also load on the request pages that offer "Ask Suppliers" — otherwise the
     // matched-supplier badge/filter in that modal has nothing to match against.
-    if(["inventory","suppliers","pos","partRequests","transferRequests","wsShopRequests","requestsKanban"].includes(tab)) loadPartSuppliers();
+    // transferRequests is excluded here on purpose: TransferRequestCard fetches only
+    // the part_suppliers rows it actually needs (its own request's items) instead of
+    // the full 69k+ row table — that full fetch was the slow part on mobile data.
+    if(["inventory","suppliers","pos","partRequests","wsShopRequests","requestsKanban"].includes(tab)) loadPartSuppliers();
   },[tab,loadPartSuppliers]);
 
   // Scoped load — always runs fresh (bypassing the SWR cache) whenever the Edit Part modal
@@ -3602,8 +3605,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
                 if(e.target.value==="__all__") setCurrentBranch(null);
                 else setCurrentBranch(branches.find(b=>b.id===e.target.value)||null);
               }} style={{width:"100%",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 8px",fontSize:12,color:"var(--text)",cursor:"pointer",fontFamily:"inherit"}}>
-                <option value="__all__">{t.branchAllBranches}</option>
-                {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+                {/* Options get an explicit dark color — the native dropdown popup always
+                    renders on a light background regardless of the select's own (dark
+                    sidebar) styling, so inheriting var(--text) here made the list unreadable. */}
+                <option value="__all__" style={{color:"#1c1c1e",background:"#fff"}}>{t.branchAllBranches}</option>
+                {branches.map(b=><option key={b.id} value={b.id} style={{color:"#1c1c1e",background:"#fff"}}>{b.name}</option>)}
               </select>
             ):(
               <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 8px",fontSize:12,color:"var(--text3)",textAlign:"center"}}>

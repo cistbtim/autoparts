@@ -4896,25 +4896,49 @@ export function BulkInquiryModal({items=[],suppliers=[],partSuppliers=[],rfqQuot
   const [qtyMap,setQtyMap]=useState(()=>Object.fromEntries(items.map((it,i)=>[i,it.qty||1])));
   const [selectedSupplierId,setSelectedSupplierId]=useState(null);
   const [supplierSearch,setSupplierSearch]=useState("");
-  const [matchedOnly,setMatchedOnly]=useState(false);
+  const [matchedOnly,setMatchedOnly]=useState(true); // default on — jump straight to suppliers who can actually fill this request
   const [creating,setCreating]=useState(false);
   const [createdInfo,setCreatedInfo]=useState(null); // {sid,itemsList,supplier}
   const [waMsgEdit,setWaMsgEdit]=useState(null); // user override of the outgoing message, once created
 
   const toggleItem=(i)=>setChecked(prev=>{const n=new Set(prev);n.has(i)?n.delete(i):n.add(i);return n;});
-  const linkedPsFor=(supplierId,partId)=>partSuppliers.find(ps=>ps.supplier_id===supplierId&&ps.part_id===partId);
-  const matchCount=(s)=>items.filter((it,i)=>checked.has(i)&&it.part&&linkedPsFor(s.id,it.part.id)).length;
 
-  const filteredSupps=suppliers.filter(s=>{
-    if(matchedOnly&&matchCount(s)===0)return false;
-    if(supplierSearch.trim()){
-      const q=supplierSearch.toLowerCase();
-      const hay=`${s.name||""} ${s.country||""} ${s.phone||""} ${s.email||""}`.toLowerCase();
-      if(!hay.includes(q))return false;
-    }
-    return true;
-  });
-  const sortedSupps=[...filteredSupps].sort((a,b)=>matchCount(b)-matchCount(a));
+  // Index partSuppliers once (Map<supplierId, Set<partId>>) instead of a linear .find() scan
+  // per supplier per item — that was O(suppliers × items × partSuppliers) on every render,
+  // slow to interact with on low-power mobile devices when either list is large.
+  const psBySupplier=useMemo(()=>{
+    const m=new Map();
+    partSuppliers.forEach(ps=>{
+      if(!m.has(ps.supplier_id)) m.set(ps.supplier_id,new Set());
+      m.get(ps.supplier_id).add(ps.part_id);
+    });
+    return m;
+  },[partSuppliers]);
+
+  // Match counts computed once per (items/checked/index) change, not on every render/keystroke
+  const matchCounts=useMemo(()=>{
+    const m=new Map();
+    const checkedParts=items.filter((it,i)=>checked.has(i)&&it.part).map(it=>it.part.id);
+    suppliers.forEach(s=>{
+      const partIds=psBySupplier.get(s.id);
+      m.set(s.id,partIds?checkedParts.filter(pid=>partIds.has(pid)).length:0);
+    });
+    return m;
+  },[suppliers,items,checked,psBySupplier]);
+  const matchCount=(s)=>matchCounts.get(s.id)||0;
+
+  const sortedSupps=useMemo(()=>{
+    const q=supplierSearch.trim().toLowerCase();
+    const filtered=suppliers.filter(s=>{
+      if(matchedOnly&&(matchCounts.get(s.id)||0)===0)return false;
+      if(q){
+        const hay=`${s.name||""} ${s.country||""} ${s.phone||""} ${s.email||""}`.toLowerCase();
+        if(!hay.includes(q))return false;
+      }
+      return true;
+    });
+    return [...filtered].sort((a,b)=>(matchCounts.get(b.id)||0)-(matchCounts.get(a.id)||0));
+  },[suppliers,supplierSearch,matchedOnly,matchCounts]);
   const selectedSupplier=suppliers.find(s=>s.id===selectedSupplierId)||null;
   const selectedCount=checked.size;
 
@@ -8535,6 +8559,23 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
   const [rfqPart,setRfqPart]=useState(null);
   const [bulkRfq,setBulkRfq]=useState(false);
   const [lightbox,setLightbox]=useState(null);
+  // part_suppliers is 69k+ rows table-wide — fetching it in full just to open "Ask
+  // Suppliers" on a mobile connection was the slow part. Fetch only the rows for this
+  // request's own items instead, and fall back to that if the full table isn't
+  // already loaded elsewhere in the app (Inventory/Suppliers tabs still load it fully).
+  const [scopedPs,setScopedPs]=useState([]);
+  useEffect(()=>{
+    if(partSuppliers.length>0||(!rfqPart&&!bulkRfq)) return;
+    const items=Array.isArray(r.items)?r.items:[];
+    const partIds=[...new Set(items.map(i=>i.partId).filter(Boolean))];
+    if(!partIds.length) return;
+    let cancelled=false;
+    api.get("part_suppliers",`part_id=in.(${partIds.join(",")})&select=*`).then(d=>{
+      if(!cancelled&&Array.isArray(d)) setScopedPs(d);
+    }).catch(()=>{});
+    return ()=>{cancelled=true;};
+  },[rfqPart,bulkRfq,partSuppliers.length,r.items]);
+  const effectivePartSuppliers=partSuppliers.length>0?partSuppliers:scopedPs;
 
   const isSupplier=role==="admin"||String(r.supplying_branch_id)===String(currentBranch?.id);
   const supplyingBranch=branches.find(b=>String(b.id)===String(r.supplying_branch_id));
@@ -8949,11 +8990,11 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
         </button>}
       </div>
 
-      {rfqPart&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={partSuppliers.filter(ps=>ps.part_id===rfqPart.id)} inquiries={inquiries}
+      {rfqPart&&<InquiryModal part={rfqPart} suppliers={suppliers} partSuppliers={effectivePartSuppliers.filter(ps=>ps.part_id===rfqPart.id)} inquiries={inquiries}
         onSend={async(data)=>{await onSendInquiry(data);}} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onClose={()=>setRfqPart(null)} t={t} isAdmin={role==="admin"} onEditPart={onEditPart}/>}
       {bulkRfq&&<BulkInquiryModal
         items={items.map(i=>({...i,part:i.partId?parts.find(p=>String(p.id)===String(i.partId)):null}))}
-        suppliers={suppliers} partSuppliers={partSuppliers} rfqQuotes={rfqQuotes} settings={settings}
+        suppliers={suppliers} partSuppliers={effectivePartSuppliers} rfqQuotes={rfqQuotes} settings={settings}
         sessionName={`Branch Transfer — ${r.workshop_name||supplyingBranch?.name||reqBranch?.name||r.id}`}
         onCreateRfqSession={onCreateRfqSession}
         onClose={()=>setBulkRfq(false)} t={t}/>}

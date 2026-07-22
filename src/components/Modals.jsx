@@ -3803,15 +3803,28 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
         </div>
       )}
 
-      {/* Opposite-side confirmation dialog */}
+      {/* Opposite-side / similar-part confirmation dialog (shared) */}
       {oppConfirm&&(
         <div style={{marginTop:14,background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.3)",borderRadius:10,padding:"12px 14px"}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:"var(--purple)"}}>🔄 建立對應零件確認</div>
-          <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"4px 10px",fontSize:12,marginBottom:10}}>
-            <span style={{color:"var(--text3)"}}>新 SKU</span><span style={{fontWeight:600,fontFamily:"monospace"}}>{oppConfirm.sku}</span>
-            <span style={{color:"var(--text3)"}}>新名稱</span><span>{oppConfirm.name}</span>
-            {oppConfirm.chineseDesc&&<><span style={{color:"var(--text3)"}}>中文說明</span><span>{oppConfirm.chineseDesc}</span></>}
-          </div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:"var(--purple)"}}>{oppConfirm.editableSku?"🔗 建立相似零件確認":"🔄 建立對應零件確認"}</div>
+          {oppConfirm.editableSku ? (
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>
+              <div>
+                <FL label="新 SKU *"/>
+                <input className="inp" autoFocus value={oppConfirm.sku} onChange={e=>setOppConfirm(p=>({...p,sku:e.target.value}))} placeholder="Enter the new part number"/>
+              </div>
+              <div>
+                <FL label="新名稱"/>
+                <input className="inp" value={oppConfirm.name} onChange={e=>setOppConfirm(p=>({...p,name:e.target.value}))}/>
+              </div>
+            </div>
+          ) : (
+            <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"4px 10px",fontSize:12,marginBottom:10}}>
+              <span style={{color:"var(--text3)"}}>新 SKU</span><span style={{fontWeight:600,fontFamily:"monospace"}}>{oppConfirm.sku}</span>
+              <span style={{color:"var(--text3)"}}>新名稱</span><span>{oppConfirm.name}</span>
+              {oppConfirm.chineseDesc&&<><span style={{color:"var(--text3)"}}>中文說明</span><span>{oppConfirm.chineseDesc}</span></>}
+            </div>
+          )}
           <div style={{marginBottom:10,padding:"10px 12px",background:"rgba(139,92,246,.06)",borderRadius:8,border:"1px solid rgba(139,92,246,.2)"}}>
             <div style={{fontSize:11,fontWeight:700,color:"var(--purple)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Copy from original part?</div>
             <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,cursor:"pointer",marginBottom:6}}>
@@ -3839,17 +3852,22 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                 style={{width:48,height:48,objectFit:"cover",borderRadius:5,border:"1px solid var(--border)",
                   transform:oppConfirm.flipPhoto?"scaleX(-1)":"none",transition:"transform .2s",flexShrink:0}}
                 onError={e=>e.target.style.display="none"}/>
-              <label style={{display:"flex",alignItems:"center",gap:7,fontSize:12,cursor:"pointer",userSelect:"none"}}>
-                <input type="checkbox" checked={oppConfirm.flipPhoto||false}
-                  onChange={e=>setOppConfirm(p=>({...p,flipPhoto:e.target.checked}))}
-                  style={{width:14,height:14,accentColor:"var(--purple)",cursor:"pointer"}}/>
-                <span>鏡像翻轉照片 <span style={{color:"var(--text3)"}}>(水平)</span></span>
-              </label>
+              {oppConfirm.editableSku ? (
+                <span style={{fontSize:12,color:"var(--text3)"}}>Photo copied to the new part</span>
+              ) : (
+                <label style={{display:"flex",alignItems:"center",gap:7,fontSize:12,cursor:"pointer",userSelect:"none"}}>
+                  <input type="checkbox" checked={oppConfirm.flipPhoto||false}
+                    onChange={e=>setOppConfirm(p=>({...p,flipPhoto:e.target.checked}))}
+                    style={{width:14,height:14,accentColor:"var(--purple)",cursor:"pointer"}}/>
+                  <span>鏡像翻轉照片 <span style={{color:"var(--text3)"}}>(水平)</span></span>
+                </label>
+              )}
             </div>
           )}
           <div style={{display:"flex",gap:8}}>
             <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setOppConfirm(null)}>取消</button>
             <button className="btn btn-sm" style={{flex:2,background:"var(--purple)",color:"#fff",border:"none"}}
+              disabled={oppConfirm.editableSku&&!oppConfirm.sku.trim()}
               onClick={()=>{ onCreateOpposite(oppConfirm); setOppConfirm(null); }}>
               ✅ 確認建立
             </button>
@@ -3937,6 +3955,15 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                   setOppConfirm({sku:newSku,name:newName,chineseDesc:newCd,fitCount:myFitments.length,originalPart:part,originalF:f,flipPhoto:!!f.image_url,copyFits:myFitments.length>0,copyVehicleInfo:!!(f.make||f.model||f.year_range)});
                 }}>
                 🔄 對應零件
+              </button>
+            )}
+            {part&&onCreateOpposite&&!oppConfirm&&(
+              <button className="btn btn-ghost" style={{flexShrink:0,borderColor:"rgba(139,92,246,.5)",color:"var(--purple)"}}
+                title="用一個新號碼建立同一個零件的相似版本（複製名稱/價格/圖片等，SKU 自己輸入）"
+                onClick={()=>{
+                  setOppConfirm({sku:"",name:f.name,chineseDesc:f.chinese_desc,editableSku:true,fitCount:myFitments.length,originalPart:part,originalF:f,flipPhoto:false,copyFits:myFitments.length>0,copyVehicleInfo:!!(f.make||f.model||f.year_range)});
+                }}>
+                🔗 相似零件
               </button>
             )}
             <button className="btn btn-primary" style={{flex:2,position:"relative",

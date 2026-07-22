@@ -3188,6 +3188,9 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
   const [supType,     setSupType]     = useState("");
   const [supSaving,   setSupSaving]   = useState(false);
   const [freshSups,   setFreshSups]   = useState(null);
+  // After a quick-add, open the full Supplier edit page so brands/other details get set properly
+  // instead of duplicating that picker in this compact form.
+  const [editingNewSupplier, setEditingNewSupplier] = useState(null);
 
   // Auto-refresh suppliers from DB on open — catches suppliers added on other
   // devices or moments ago elsewhere in the app
@@ -3211,9 +3214,10 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
     if(!supName.trim()){alert("Enter supplier name");return;}
     setSupSaving(true);
     try{
-      // Auto-tag with this job's vehicle make so the supplier isn't invisible next time the
-      // brand filter runs (car_brands used to be left blank here — that was the bug). Full
-      // brand list is edited on the Suppliers page, not duplicated in this quick-add form.
+      // Auto-tag with this job's vehicle make as a sensible starting point so the supplier
+      // isn't invisible next time the brand filter runs (car_brands used to be left blank
+      // here — that was the bug). Then hand off to the full Supplier edit page so brands
+      // and other details get set properly, instead of duplicating that picker here.
       const jm=(job.vehicle_make||"").toLowerCase().replace(/[-_]/g," ").trim();
       const matchedBrand=CAR_BRANDS.find(b=>b.toLowerCase()===jm);
       const saved=await onSaveWsSupplier({
@@ -3227,6 +3231,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
         setSupplierId(String(saved.id));   // auto-select the new supplier
         setManualPhone("");
         setTypeFilter("");
+        setEditingNewSupplier(saved);      // open full edit page to confirm/expand brands
       }
       setAddingSup(false);
       setSupName(""); setSupPhone(""); setSupType("");
@@ -3466,7 +3471,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
               <option value="Dealer">Dealer</option>
             </select>
           </div>
-          <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>Tagged for {job.vehicle_make||"this vehicle's make"} automatically — visit the Suppliers page to add other makes they cover.</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>Tagged for {job.vehicle_make||"this vehicle's make"} automatically — you'll get the full edit page next to add any other makes they cover.</div>
           <div style={{display:"flex",gap:8}}>
             <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{setAddingSup(false);setSupName("");setSupPhone("");setSupType("");}}>Cancel</button>
             <button className="btn btn-primary btn-sm" style={{flex:2}} onClick={handleAddSupplier} disabled={supSaving||!supName.trim()}>
@@ -3474,6 +3479,16 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
             </button>
           </div>
         </div>
+      )}
+      {editingNewSupplier&&(
+        <WsSupplierModal
+          item={editingNewSupplier}
+          onSave={async(payload)=>{
+            const updated=await onSaveWsSupplier(payload);
+            setFreshSups(prev=>(prev||wsSuppliers).map(s=>String(s.id)===String(editingNewSupplier.id)?{...s,...updated}:s));
+            setEditingNewSupplier(null);
+          }}
+          onClose={()=>setEditingNewSupplier(null)}/>
       )}
       {supplierList.length > 0 && (()=>{
         const normMake=(job.vehicle_make||"").toLowerCase().replace(/[-_]/g," ").trim();
@@ -9545,7 +9560,11 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     // without requiring a logout. On initial load (refreshKey===0) the prop is fine.
     const getFitments=async()=>{
       if(!initialMake||vehicles.length===0||refreshKey===0) return partFitments;
-      const matchV=(!initialModel?vehicles.filter(v=>v.make===initialMake):initialCode?vehicles.filter(v=>v.make===initialMake&&v.code===initialCode):((bc=vehicles.filter(v=>v.make===initialMake&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make===initialMake&&v.model===initialModel))());
+      // Case-insensitive make match — job.vehicle_make (scanned/typed) doesn't always match
+      // the vehicles table's stored casing exactly, unlike the badge count which already
+      // accounts for this (was causing the "N parts" badge to disagree with 0 results here).
+      const _im=initialMake.toLowerCase();
+      const matchV=(!initialModel?vehicles.filter(v=>v.make?.toLowerCase()===_im):initialCode?vehicles.filter(v=>v.make?.toLowerCase()===_im&&v.code===initialCode):((bc=vehicles.filter(v=>v.make?.toLowerCase()===_im&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make?.toLowerCase()===_im&&v.model===initialModel))());
       if(!matchV.length) return partFitments;
       const vIds=matchV.map(v=>String(v.id));
       const FC=50;const fchunks=[];for(let i=0;i<vIds.length;i+=FC)fchunks.push(vIds.slice(i,i+FC));
@@ -9556,7 +9575,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     let idFilter=null;
     let jobModeMatchV=[];
     if(initialMake&&vehicles.length>0){
-      jobModeMatchV=(!initialModel?vehicles.filter(v=>v.make===initialMake):initialCode?vehicles.filter(v=>v.make===initialMake&&v.code===initialCode):((bc=vehicles.filter(v=>v.make===initialMake&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make===initialMake&&v.model===initialModel))());
+      const _im2=initialMake.toLowerCase();
+      jobModeMatchV=(!initialModel?vehicles.filter(v=>v.make?.toLowerCase()===_im2):initialCode?vehicles.filter(v=>v.make?.toLowerCase()===_im2&&v.code===initialCode):((bc=vehicles.filter(v=>v.make?.toLowerCase()===_im2&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make?.toLowerCase()===_im2&&v.model===initialModel))());
       if(currentFitments.length>0&&jobModeMatchV.length>0){
         const vIds=new Set(jobModeMatchV.map(v=>String(v.id)));
         const fitIds=[...new Set(currentFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
@@ -9629,8 +9649,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   // No text/model matching — that risks showing parts for the wrong variant.
   useEffect(()=>{
     if(!jobMode||!initialMake) return;
+    const _imLower=initialMake.toLowerCase();
     const matchV=vehicles.filter(v=>
-      v.make===initialMake&&(!initialModel||(initialCode?v.code===initialCode:(v.code===initialModel||v.model===initialModel)))
+      v.make?.toLowerCase()===_imLower&&(!initialModel||(initialCode?v.code===initialCode:(v.code===initialModel||v.model===initialModel)))
     );
     const vIds=new Set(matchV.map(v=>String(v.id)));
     const fitIds=new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)));
@@ -9639,7 +9660,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     setVehicleFilterIds(fitIds.size>0?fitIds:new Set(["__none__"]));
   },[jobMode,initialMake,initialModel,initialCode,vehicles,partFitments]);
 
-  const _dispV=initialCode?vehicles.find(v=>v.make===initialMake&&v.code===initialCode):null;
+  const _dispV=initialCode?vehicles.find(v=>v.make?.toLowerCase()===initialMake?.toLowerCase()&&v.code===initialCode):null;
   const _dispYear=_dispV?((_dispV.year_from||"")+(_dispV.year_to&&_dispV.year_to!==_dispV.year_from?`–${_dispV.year_to}`:"")).trim():"";
 
   // "Search all cars" — server-side catalog search that ignores the vehicle filter,
@@ -9933,7 +9954,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       {/* Vehicle filter */}
       {jobMode&&initialMake?(()=>{
         const matchV=vehicles.filter(v=>
-          v.make===initialMake&&(!initialModel||v.code===initialModel||v.model===initialModel)
+          v.make?.toLowerCase()===initialMake?.toLowerCase()&&(!initialModel||v.code===initialModel||v.model===initialModel)
         );
         const photos=matchV.find(v=>v.photo_front||v.photo_rear||v.photo_side)||matchV[0];
         const photoList=[

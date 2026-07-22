@@ -9,7 +9,7 @@ import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg,
 import { VehiclePhotoUploader, VehicleSearchBar } from "./RfqVehicles.jsx";
 import { WsStockPage, WsStockModal, WsStockAdjustModal } from "./ws/Stock.jsx";
 import { WsServicesPage, WsServiceModal } from "./ws/Services.jsx";
-import { WsSuppliersPage, WsSupplierModal } from "./ws/WsSuppliers.jsx";
+import { WsSuppliersPage, WsSupplierModal, CAR_BRANDS } from "./ws/WsSuppliers.jsx";
 import { WsTransferPage } from "./ws/Transfer.jsx";
 import { WsDocumentsPage } from "./ws/Documents.jsx";
 import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote } from "./ws/Print.jsx";
@@ -3211,10 +3211,16 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
     if(!supName.trim()){alert("Enter supplier name");return;}
     setSupSaving(true);
     try{
+      // Auto-tag with this job's vehicle make so the supplier isn't invisible next time the
+      // brand filter runs (car_brands used to be left blank here — that was the bug). Full
+      // brand list is edited on the Suppliers page, not duplicated in this quick-add form.
+      const jm=(job.vehicle_make||"").toLowerCase().replace(/[-_]/g," ").trim();
+      const matchedBrand=CAR_BRANDS.find(b=>b.toLowerCase()===jm);
       const saved=await onSaveWsSupplier({
         name:supName.trim(),
         phone:supPhone.trim()||null,
         supplier_type:supType?JSON.stringify([supType]):null,
+        car_brands:matchedBrand?JSON.stringify([matchedBrand]):null,
       });
       if(saved?.id){
         setFreshSups(prev=>[...(prev||wsSuppliers),saved]);
@@ -3460,6 +3466,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
               <option value="Dealer">Dealer</option>
             </select>
           </div>
+          <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>Tagged for {job.vehicle_make||"this vehicle's make"} automatically — visit the Suppliers page to add other makes they cover.</div>
           <div style={{display:"flex",gap:8}}>
             <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{setAddingSup(false);setSupName("");setSupPhone("");setSupType("");}}>Cancel</button>
             <button className="btn btn-primary btn-sm" style={{flex:2}} onClick={handleAddSupplier} disabled={supSaving||!supName.trim()}>

@@ -6367,7 +6367,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           </>);
         })()}
         {/* Quote */}
-        {quote ? (
+        {quote ? (()=>{
+          // Only send/print the items actually selected for this quote, not every item on the job.
+          const quoteSendItems = quote.selected_item_ids
+            ? (()=>{ try{ const ids=new Set(JSON.parse(quote.selected_item_ids)); const f=items.filter(i=>ids.has(i.id)); return f.length>0?f:items; }catch{ return items; } })()
+            : items;
+          return (
         <div className="card" style={{padding:14,marginBottom:14,borderLeft:`3px solid ${
           quote.status==="accepted"?"var(--green)":quote.status==="declined"?"var(--red)":quote.status==="converted"?"var(--text3)":"var(--blue)"}`}}>
           {/* Header */}
@@ -6427,7 +6432,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   const name=quote.quote_customer||job.customer_name||"";
                   const C=curSym(settings.currency||getSettings().currency);
                   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-                  const lines=items.map(i=>`  • ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
+                  const lines=quoteSendItems.map(i=>`  • ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                   if(phone){
                     const msg=`📋 *Parts Quotation ${quote.id}*\n──────────────────\n`+
                       `👤 ${name}\n🚗 ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n`+
@@ -6456,7 +6461,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 const name=quote.quote_customer||job.customer_name||"";
                 const C=curSym(settings.currency||getSettings().currency);
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-                const lines=items.map(i=>`  • ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
+                const lines=quoteSendItems.map(i=>`  • ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                 const msg=`📝 *Workshop Quotation ${quote.id}*\n──────────────────\n`+
                   `👤 ${name}\n🚗 ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n`+
                   `📅 Date: ${quote.quote_date}${quote.valid_until?`\n⏳ Valid Until: ${quote.valid_until}`:""}\n\n`+
@@ -6471,7 +6476,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 const name=quote.quote_customer||job.customer_name||"";
                 const C=curSym(settings.currency||getSettings().currency);
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-                const lines=items.map(i=>`  - ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
+                const lines=quoteSendItems.map(i=>`  - ${i.description} x${i.qty} = ${fmt(i.total)}`).join("\n");
                 const subj=`Workshop Quotation ${quote.id} — ${name}`;
                 const body=`Dear ${name},\n\nPlease find your workshop quotation below.\n\n`+
                   `Quotation: ${quote.id}\nDate: ${quote.quote_date}${quote.valid_until?`\nValid Until: ${quote.valid_until}`:""}\n`+
@@ -6497,7 +6502,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               onClick={()=>setDeletingQuote(true)}>🗑️</button>}
           </div>
         </div>
-      ) : (
+          );})() : (
         !wsLocked&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
           {quoteItems.length>0&&!quoteItems.some(i=>i.type==="labour")&&(
             <div style={{background:"rgba(251,191,36,.15)",border:"1px solid rgba(251,191,36,.5)",borderRadius:6,padding:"7px 12px",fontSize:12,display:"flex",alignItems:"center",gap:6}}>
@@ -7244,7 +7249,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       {/* Send for Approval modal */}
       {approvalModal&&quote&&(
         <QuoteApprovalModal
-          quote={quote} job={job} items={items} settings={settings}
+          quote={quote} job={job} items={quote.selected_item_ids
+            ? (()=>{ try{ const ids=new Set(JSON.parse(quote.selected_item_ids)); const f=items.filter(i=>ids.has(i.id)); return f.length>0?f:items; }catch{ return items; } })()
+            : items} settings={settings}
           vehiclePhotos={vehiclePhotos}
           onSend={async()=>{
             const token = await onSendQuoteForApproval(quote.id);

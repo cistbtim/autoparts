@@ -476,7 +476,11 @@ export function printWorkshopInvoice(job, items, invoice, settings, photos={}, v
   setTimeout(()=>w.print(),400);
 }
 
-export function printWorkshopQuote(job, items, quote, settings, photos={}, shareMode=false, vehicles=[]) {
+export function printWorkshopQuote(job, allItems, quote, settings, photos={}, shareMode=false, vehicles=[]) {
+  // Only print the items actually selected for this quote (quote.selected_item_ids), not every item on the job.
+  const items = quote.selected_item_ids
+    ? (()=>{ try{ const ids=new Set(JSON.parse(quote.selected_item_ids)); const f=allItems.filter(i=>ids.has(i.id)); return f.length>0?f:allItems; }catch{ return allItems; } })()
+    : allItems;
   const dispModel = resolveVehicleModel(job, vehicles);
   const C = curSym(settings.currency||getSettings().currency);
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;

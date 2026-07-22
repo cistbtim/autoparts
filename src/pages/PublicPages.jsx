@@ -573,7 +573,12 @@ export function QuoteConfirmPage({token}) {
           // Try to fetch workshop profile for logo — may be blocked by RLS, that's fine
           q.workshop_id?api.get("workshop_profiles",`id=eq.${q.workshop_id}&select=name,phone,whatsapp,email,address,logo_url,logo_data,vat_number`).catch(()=>[]):Promise.resolve([]),
         ]);
-        setItems(Array.isArray(ji)?ji:[]);
+        const allItems=Array.isArray(ji)?ji:[];
+        // Only show the items actually selected for this quote, not every item on the job.
+        const shownItems=q.selected_item_ids
+          ? (()=>{ try{ const ids=new Set(JSON.parse(q.selected_item_ids)); const f=allItems.filter(i=>ids.has(i.id)); return f.length>0?f:allItems; }catch{ return allItems; } })()
+          : allItems;
+        setItems(shownItems);
         if(Array.isArray(jj)&&jj[0]) setJob(jj[0]);
         // Build workshop info: denormalized quote fields for text, profile fetch for logo
         const prof=Array.isArray(wp)&&wp[0]?wp[0]:null;

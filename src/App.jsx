@@ -130,13 +130,14 @@ export default function App() {
   const wsLoginOnly = !!new URLSearchParams(window.location.search).get("ws_login");
   if(!user) return <LoginPage onLogin={handleLogin} t={t} lang={lang} setLang={changeLang} loadedSettings={getSettings()} langs={availLangs} wsLoginOnly={wsLoginOnly} initialError={sessionExpiredMsg}/>;
   if(!canAccess(user)) return <PaywallPage user={user} onLogout={handleLogout} lang={lang}/>;
-  return <MainApp user={user} onLogout={handleLogout} t={t} lang={lang} setLang={changeLang} langs={availLangs}/>;
+  const vehiclesMakeParam = new URLSearchParams(window.location.search).get("vehiclesMake");
+  return <MainApp user={user} onLogout={handleLogout} t={t} lang={lang} setLang={changeLang} langs={availLangs} initialVehiclesMake={vehiclesMakeParam}/>;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════
-function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
+function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null}) {
   setCurrentLang(lang); // sync for tSt
   const role = user.role;
   const wsRole = user.wsRole || "main"; // workshop sub-role: "main" | "manager" | "mechanic"
@@ -157,7 +158,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const isBranchUser = BRANCH_ROLES.includes(role);
   const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth<768;
-  const initTab = role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"requestsKanban":role==="branch_manager"?"requestsKanban":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"requestsKanban":"dashboard";
+  const initTab = initialVehiclesMake&&role==="admin"?"vehicles":role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"requestsKanban":role==="branch_manager"?"requestsKanban":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"requestsKanban":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
@@ -259,7 +260,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [shopVehicleFilter,setShopVehicleFilter]=useState({make:"",model:""});
-  const [vehiclesJumpMake,setVehiclesJumpMake]=useState(null);
+  const [vehiclesJumpMake,setVehiclesJumpMake]=useState(initialVehiclesMake||null);
   const [vehiclesJumpModel,setVehiclesJumpModel]=useState(null);
   const [workshopJobs,setWorkshopJobs]=useState([]);
   const [workshopJobItems,setWorkshopJobItems]=useState([]);
@@ -6714,7 +6715,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart}
           onDelete={ep&&canEditPart(ep)?async(p)=>{ if(p.id)releaseLock("part",p.id); await deletePart(p.id); closeM("editPart"); }:null}
           onCreateOpposite={createOpposite}
-          onGoVehicles={()=>{closeM("editPart");setTab("vehicles");}}
+          onGoVehicles={()=>{
+            const mk=(ep?.make||"").toUpperCase();
+            window.open(`${window.location.origin}${window.location.pathname}?vehiclesMake=${encodeURIComponent(mk)}`,"_blank","noopener,noreferrer");
+          }}
           onGoSupplier={async(p)=>{closeM("editPart");await reloadPartSuppliers();openM("partSupplier",p);}}
           onGoToPart={(sku)=>{
             const target=parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase());

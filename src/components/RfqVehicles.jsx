@@ -1303,9 +1303,27 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             {part.make
               ? <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",fontSize:13,fontWeight:700}}>🚗 {part.make}</span>
               : <span style={{fontSize:12,color:"var(--text3)"}}>No make set</span>}
-            {part.model && part.model.split(";").map(m=>m.trim()).filter(Boolean).map((m,i)=>(
-              <span key={i} className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:12}}>{m}</span>
-            ))}
+            {part.model && part.model.split(";").map(m=>m.trim()).filter(Boolean).map((m,i)=>{
+              const gq=encodeURIComponent(`${part.make||""} ${m}`.trim());
+              // WeBuyCars' own search wants a short model keyword (e.g. "GLE", "S-CLASS"),
+              // not the full chassis-code/year text — strip tokens that look like a chassis
+              // code (a letter + 2-3 digits, e.g. W253, C292/W166, G05) but keep real model
+              // designators that share the same shape (BMW X3/X4/X5 — only 1 digit).
+              const shortModel=m.replace(/\([^)]*\)/g,"")
+                .split(/\s+/).filter(Boolean)
+                .filter(tok=>!/^[a-z]\d{2,3}(\/[a-z]\d{2,3})?$/i.test(tok))
+                .join(" ").trim()||m;
+              const wq=new URLSearchParams({q:`${part.make||""} ${shortModel}`.trim()}).toString();
+              return (
+                <span key={i} className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:12,display:"inline-flex",alignItems:"center",gap:5}}>
+                  {m}
+                  <a href={`https://www.google.com/search?q=${gq}`} target="_blank" rel="noreferrer" title="Search on Google"
+                    style={{color:"var(--blue)",textDecoration:"none",fontSize:11}} onClick={e=>e.stopPropagation()}>🔍</a>
+                  <a href={`https://www.webuycars.co.za/buy-a-car?${wq}`} target="_blank" rel="noreferrer" title="Search on WeBuyCars"
+                    style={{color:"var(--green)",textDecoration:"none",fontSize:11}} onClick={e=>e.stopPropagation()}>🚗</a>
+                </span>
+              );
+            })}
             {part.year_range && <span className="badge" style={{background:"var(--surface3)",color:"var(--text3)",fontSize:11}}>{part.year_range}</span>}
           </div>
           <div style={{fontSize:11,color:"var(--text3)",marginTop:5}}>
@@ -1998,21 +2016,26 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
         {/* Model list with thumbnails */}
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {filtered.map(v=>{
-            const thumb = v.photo_front||v.photo_rear||v.photo_side;
-            const thumbUrl = thumb ? toImgUrl(thumb) : null;
-            const hasPhotos = !!(v.photo_front||v.photo_rear||v.photo_side);
             const needsEdit = highlightModel && v.model.toUpperCase()===highlightModel.toUpperCase();
             return (
             <div key={v.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",
               ...(needsEdit?{border:"2px solid var(--accent)",background:"rgba(249,115,22,.04)"}:{})}}>
-              {/* Photo thumbnail */}
-              <div style={{flexShrink:0,width:160,height:160,borderRadius:10,overflow:"hidden",
-                background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",
-                cursor:hasPhotos?"zoom-in":"default"}}
-                onClick={()=>hasPhotos&&openVehicleLightbox(v,"photo_front")}>
-                {thumbUrl
-                  ? <img src={thumbUrl} alt="vehicle" style={{width:"100%",height:"100%",objectFit:"contain"}}/>
-                  : <span style={{fontSize:24,opacity:.3}}>🚗</span>}
+              {/* Photo thumbnails — front/rear/side all at once */}
+              <div style={{flexShrink:0,display:"flex",gap:4}}>
+                {[["photo_front","Front"],["photo_rear","Rear"],["photo_side","Side"]].map(([field,label])=>{
+                  const url = v[field] ? toImgUrl(v[field]) : null;
+                  return (
+                    <div key={field} style={{width:52,height:52,borderRadius:8,overflow:"hidden",position:"relative",
+                      background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",
+                      cursor:url?"zoom-in":"default"}}
+                      title={label}
+                      onClick={()=>url&&openVehicleLightbox(v,field)}>
+                      {url
+                        ? <img src={url} alt={label} style={{width:"100%",height:"100%",objectFit:"contain"}}/>
+                        : <span style={{fontSize:14,opacity:.3}}>🚗</span>}
+                    </div>
+                  );
+                })}
               </div>
               {/* Main info */}
               <div style={{flex:1,minWidth:140}}>

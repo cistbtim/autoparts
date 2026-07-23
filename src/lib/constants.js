@@ -91,7 +91,7 @@ export const CAR_MAKES = {
   "Suzuki": ["Alto", "Swift", "Baleno", "Vitara", "Jimny", "Ertiga", "S-Cross", "Celerio", "Ignis", "Fronx"],
   "Tata": ["Xenon", "Safari", "Indica", "Bolt", "Hexa", "Nexon"],
   "Tesla": ["Model 3", "Model S", "Model X", "Model Y", "Cybertruck"],
-  "Toyota": ["Corolla", "Camry", "RAV4", "Hilux", "Land Cruiser", "Prius", "Fortuner", "Yaris", "HiAce", "Prado", "Avanza", "Rumion", "Urban Cruiser", "Quantum"],
+  "Toyota": ["Corolla", "Camry", "RAV4", "Hilux", "Land Cruiser", "Prius", "Fortuner", "Yaris", "Vitz", "HiAce", "Prado", "Avanza", "Rumion", "Urban Cruiser", "Quantum"],
   "Volkswagen": ["Golf", "Polo", "Passat", "Tiguan", "Touareg", "Amarok", "Caddy", "T-Roc", "Arteon", "T-Cross", "Taigo"],
   "Volvo": ["S60", "S90", "V40", "V60", "V90", "XC40", "XC60", "XC90"],
   "Other": ["Other / Unknown"],

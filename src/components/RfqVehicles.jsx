@@ -1811,7 +1811,8 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, onAddPart, t, jumpMake=null, jumpModel=null}) {
+export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, onAddPart, onRefreshVehicles, t, jumpMake=null, jumpModel=null}) {
+  const [refreshing, setRefreshing] = useState(false);
   const [selMake, setSelMake] = useState(jumpMake);  // null = makes level
   const [search,  setSearch]  = useState("");
   const [searchD, setSearchD] = useState("");
@@ -1938,9 +1939,17 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
             </p>
           </div>
         </div>
-        <button className="btn btn-primary" onClick={()=>setEditV(newVehicleDefaults)}>
-          + {t.addVehicle||"Add Vehicle"}
-        </button>
+        <div style={{display:"flex",gap:8}}>
+          {onRefreshVehicles&&(
+            <button className="btn btn-ghost" title="Refresh — pull in vehicles added directly in Supabase" disabled={refreshing}
+              onClick={async()=>{setRefreshing(true);try{await onRefreshVehicles();}finally{setRefreshing(false);}}}>
+              <span style={{display:"inline-block",animation:refreshing?"spin 0.8s linear infinite":"none"}}>🔄</span> Refresh
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={()=>setEditV(newVehicleDefaults)}>
+            + {t.addVehicle||"Add Vehicle"}
+          </button>
+        </div>
       </div>
 
       {/* ── Level 1: Makes grid ── */}

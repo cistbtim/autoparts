@@ -140,8 +140,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
   setCurrentLang(lang); // sync for tSt
   const role = user.role;
   const wsRole = user.wsRole || "main"; // workshop sub-role: "main" | "manager" | "mechanic"
+  // Admin "acting as" a workshop — lets admin assist a workshop (fix data, create jobs, etc.)
+  // as that workshop's main user, without a separate login. Persisted so a page refresh
+  // doesn't drop back to the aggregate all-workshops view mid-task.
+  const [adminActingAsWsId, setAdminActingAsWsId] = useState(()=>{
+    if(role!=="admin") return "";
+    try{ return localStorage.getItem("admin_acting_as_ws")||""; }catch{ return ""; }
+  });
+  const switchActingAsWorkshop=useCallback((id)=>{
+    try{ if(id) localStorage.setItem("admin_acting_as_ws",id); else localStorage.removeItem("admin_acting_as_ws"); }catch{}
+    setAdminActingAsWsId(id||"");
+  },[]);
   // workshop_id scopes all workshop data to this user's own records
-  const wsId  = role==="workshop"  ? String(user.id) : null;
+  const wsId  = role==="workshop" ? String(user.id) : (role==="admin"&&adminActingAsWsId) ? adminActingAsWsId : null;
   const scrapId = (role==="scrapyard"||role==="scrapyard_admin") ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const isBranchUser = BRANCH_ROLES.includes(role);
@@ -905,8 +916,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     if(wsId){
       const prof=await api.fresh("workshop_profiles",`id=eq.${wsId}&select=*`).catch(()=>[]);
       setWorkshopProfile(Array.isArray(prof)&&prof[0]?prof[0]:{});
+    } else {
+      setWorkshopProfile({});
     }
-  },[]);
+  },[wsF]); // wsF must be current — this is re-run live when admin switches "acting as" workshop
+
+  // Re-pull all workshop-scoped tables whenever admin switches which workshop they're
+  // "acting as" (see adminActingAsWsId above). Skipped on mount — loadAll() already used
+  // the correct wsF there since adminActingAsWsId is read from localStorage synchronously.
+  const actingAsMountRef = useRef(true);
+  useEffect(()=>{
+    if(role!=="admin") return;
+    if(actingAsMountRef.current){ actingAsMountRef.current=false; return; }
+    refreshWorkshopData();
+  },[adminActingAsWsId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lean refresh for the Jobs board poll — only the 4 tables that drive what a job card shows
   // (status, item/quote/invoice badges). Deliberately skips the other ~18 workshop tables that
@@ -6247,6 +6270,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             parts={parts}
             wsRole={wsRole}
             wsId={wsId}
+            role={role}
+            actingAsWsId={adminActingAsWsId}
+            onSwitchActingAsWorkshop={switchActingAsWorkshop}
             wsProfiles={allWsProfiles}
             wsFriends={workshopFriends}
             onAddWsFriend={addWorkshopFriend}
@@ -6316,6 +6342,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
           <VehiclesPage vehicles={vehicles} partFitments={partFitments} onSave={saveVehicle} onDelete={deleteVehicle}
             onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
             onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
+            onRefreshVehicles={()=>refreshTables("vehicles")}
             jumpMake={vehiclesJumpMake} jumpModel={vehiclesJumpModel} t={t}/>
         )}
 

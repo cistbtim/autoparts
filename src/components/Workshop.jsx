@@ -28,7 +28,7 @@ import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop}) {
+export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[]}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -74,6 +74,13 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [kanbanZoom,      setKanbanZoom]      = useState(()=>{try{return Number(localStorage.getItem("ws_kanban_zoom")||1);}catch{return 1;}});
   const KANBAN_WIDTHS=[150,200,270,340,420];
   const kanbanColW=KANBAN_WIDTHS[Math.max(0,Math.min(4,kanbanZoom))];
+  const wsOptionLabel=p=>{
+    const uname=users.find(u=>String(u.id)===String(p.id))?.username;
+    return `${p.name||p.id}${uname?` (@${uname})`:""}`;
+  };
+  const [deleteWsOpen,   setDeleteWsOpen]   = useState(false);
+  const [deleteWsTyped,  setDeleteWsTyped]  = useState("");
+  const [deleteWsBusy,   setDeleteWsBusy]   = useState(false);
   const [collapsedCols,   setCollapsedCols]   = useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("ws_kanban_collapsed")||"[]"));}catch{return new Set();}});
   const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
   const [kanbanSearch,    setKanbanSearch]    = useState("");
@@ -438,12 +445,17 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                   fontWeight:actingAsWsId?700:400}}>
                 <option value="__all__">🏪 All Workshops (aggregate view)</option>
                 {wsProfiles.map(p=>(
-                  <option key={p.id} value={p.id}>{p.name||p.id}</option>
+                  <option key={p.id} value={p.id}>{wsOptionLabel(p)}</option>
                 ))}
               </select>
               {actingAsWsId&&(
                 <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}}
                   onClick={()=>onSwitchActingAsWorkshop&&onSwitchActingAsWorkshop("")}>✕ Exit</button>
+              )}
+              {actingAsWsId&&onDeleteWorkshopAccount&&(
+                <button className="btn btn-ghost btn-sm" style={{color:"var(--red)",borderColor:"rgba(248,113,113,.4)"}}
+                  title="Permanently delete this workshop account and all its data"
+                  onClick={()=>{setDeleteWsTyped("");setDeleteWsOpen(true);}}>🗑 Delete Workshop</button>
               )}
             </div>
           )}
@@ -453,7 +465,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               <select className="inp" value={filterWs} onChange={e=>{setFilterWs(e.target.value);setFilterCity("__all__");setFilterCountry("__all__");}} style={{flex:"0 0 auto",width:"auto",minWidth:160}}>
                 <option value="__all__">🏪 All Workshops</option>
                 {wsProfiles.map(p=>(
-                  <option key={p.id} value={p.id}>{p.name||p.id}</option>
+                  <option key={p.id} value={p.id}>{wsOptionLabel(p)}</option>
                 ))}
               </select>
             )}
@@ -2434,6 +2446,64 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
               </div>
               <textarea className="inp" rows={2} placeholder="Complaint / reason for visit" value={manualBk.complaint} onChange={set("complaint")}/>
               <button className="btn btn-primary" disabled={manualBkSaving} onClick={save}>{manualBkSaving?"Saving…":"💾 Save Booking"}</button>
+            </div>
+          </Overlay>
+        );
+      })()}
+      {deleteWsOpen&&(()=>{
+        const wsName=wsProfiles.find(p=>String(p.id)===String(actingAsWsId))?.name||actingAsWsId;
+        const counts=[
+          ["Jobs",jobs.length],["Customers",wsCustomers.length],["Vehicles",wsVehicles.length],
+          ["Invoices",invoices.length],["Quotes",quotes.length],["Bookings",wsBookings.length],
+          ["WS Stock items",wsStock.length],["Services",wsServices.length],["Suppliers",wsSuppliers.length],
+          ["Purchase Orders",wsPurchaseOrders.length],["Licence Renewals",wsLicenceRenewals.length],
+          ["Documents",wsDocs.length],
+        ];
+        const nonZero=counts.filter(([,n])=>n>0);
+        const isEmpty=nonZero.length===0;
+        const canDelete=isEmpty||deleteWsTyped.trim().toLowerCase()===wsName.trim().toLowerCase();
+        return (
+          <Overlay onClose={()=>!deleteWsBusy&&setDeleteWsOpen(false)}>
+            <MHead title={`🗑 Delete Workshop — ${wsName}`} onClose={()=>!deleteWsBusy&&setDeleteWsOpen(false)}/>
+            {isEmpty ? (
+              <div style={{fontSize:13,color:"var(--text2)",marginBottom:16}}>
+                This workshop has no jobs, customers, vehicles, invoices, quotes, bookings, stock, services, suppliers,
+                purchase orders, licence renewals, or documents. Deleting it will remove the account and its login permanently.
+              </div>
+            ) : (
+              <>
+                <div style={{fontSize:13,color:"var(--red)",fontWeight:700,marginBottom:8}}>
+                  ⚠ This workshop still has data — deleting it removes all of the following permanently, with no undo:
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:14,background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 12px"}}>
+                  {nonZero.map(([label,n])=>(
+                    <div key={label} style={{display:"flex",justifyContent:"space-between",fontSize:12.5}}>
+                      <span style={{color:"var(--text2)"}}>{label}</span>
+                      <span style={{fontWeight:700,color:"var(--text)"}}>{n}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{fontSize:12.5,color:"var(--text3)",marginBottom:6}}>
+                  Type the workshop name (<b style={{color:"var(--text2)"}}>{wsName}</b>) below to confirm:
+                </div>
+                <input className="inp" value={deleteWsTyped} onChange={e=>setDeleteWsTyped(e.target.value)}
+                  placeholder={wsName} style={{marginBottom:14}}/>
+              </>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} disabled={deleteWsBusy} onClick={()=>setDeleteWsOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" style={{flex:2,background:canDelete?"var(--red)":undefined,opacity:canDelete?1:.5}}
+                disabled={!canDelete||deleteWsBusy}
+                onClick={async()=>{
+                  setDeleteWsBusy(true);
+                  try{
+                    await onDeleteWorkshopAccount(actingAsWsId);
+                    setDeleteWsOpen(false);
+                  }catch(e){ alert(`❌ Failed to delete workshop: ${e.message||e}`); }
+                  finally{ setDeleteWsBusy(false); }
+                }}>
+                {deleteWsBusy?"⏳ Deleting…":"🗑 Delete Permanently"}
+              </button>
             </div>
           </Overlay>
         );
@@ -9321,11 +9391,30 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
     if(!desc.trim()||!price){alert("Fill description and price");return;}
     setSaving(true);
     try{
+      let stockId=type==="part"&&selItem&&selSource==="stock"?selItem.id:null;
+      // Typed directly into the form with nothing picked from Workshop Stock or Main
+      // Inventory — this is a brand-new part/labour entry. Persist it to the
+      // workshop's own WS Stock / Services list too (qty:0 — a catalog/price entry,
+      // not a stock count) so it's searchable and reusable on future jobs instead of
+      // only ever existing as this one job's line item.
+      if(!selItem){
+        const newId=`${type==="part"?"WSK":"WSS"}-${Date.now()}`;
+        if(type==="part"){
+          const payload={id:newId,workshop_id:wsId||null,name:desc.trim(),sku:"",unit_cost:+costPrice||0,unit_price:+price||0,qty:0,min_qty:0};
+          await api.insert("workshop_stock",payload);
+          setLocalExtras(prev=>[payload,...prev]);
+          stockId=newId;
+        } else {
+          const payload={id:newId,workshop_id:wsId||null,name:desc.trim(),description:"",default_price:+price||0,rate:+price||0};
+          await api.insert("workshop_services",payload);
+          setLocalExtras(prev=>[payload,...prev]);
+        }
+      }
       await onSave({
         type,
         description:desc,
         part_sku:selItem?selItem.sku||selItem.oe_number||"":"",
-        ws_stock_id:type==="part"&&selItem&&selSource==="stock"?selItem.id:null,
+        ws_stock_id:stockId,
         qty:+qty,
         unit_price:+price,
         cost_price:type==="part"?+costPrice:0,

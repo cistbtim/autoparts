@@ -1303,7 +1303,9 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             {part.make
               ? <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",fontSize:13,fontWeight:700}}>🚗 {part.make}</span>
               : <span style={{fontSize:12,color:"var(--text3)"}}>No make set</span>}
-            {part.model && <span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:12}}>{part.model}</span>}
+            {part.model && part.model.split(";").map(m=>m.trim()).filter(Boolean).map((m,i)=>(
+              <span key={i} className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:12}}>{m}</span>
+            ))}
             {part.year_range && <span className="badge" style={{background:"var(--surface3)",color:"var(--text3)",fontSize:11}}>{part.year_range}</span>}
           </div>
           <div style={{fontSize:11,color:"var(--text3)",marginTop:5}}>

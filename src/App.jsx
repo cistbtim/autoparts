@@ -857,7 +857,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       const data=await api.get(name,def[0]).catch(()=>[]);
       def[1](data);
     }));
-  },[]);
+  },[wsF]); // wsF must be current — stale here meant refreshes after admin "acting as" a workshop used the wrong/frozen scope
 
   // Silent workshop-only refresh — does NOT set loading=true so WorkshopPage stays mounted.
   // Always hits the network (api.fresh, never api.get's cache) — the manual refresh button
@@ -1417,7 +1417,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       const str=v=>v?.toString().trim()||null;
       const int=v=>v?parseInt(v,10)||null:null;
       const jobRow={
-        workshop_id:wsId||null,
+        // Only tag ownership on create. On update, omitting the key (JSON.stringify
+        // drops `undefined`) leaves the job's existing workshop_id untouched — any
+        // admin editing a job while wsId is null/different (aggregate view, or acting
+        // as a different workshop) must never overwrite/orphan its real owner.
+        workshop_id:d.id?undefined:(wsId||null),
         workshop_customer_id:d.workshop_customer_id||null,
         workshop_vehicle_id:d.workshop_vehicle_id||null,
         customer_name:str(d.customer_name),
@@ -2138,6 +2142,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
     await api.delete("part_fitments","id",id);
     setPartFitments(prev=>prev.filter(f=>String(f.id)!==String(id)));
     showToast("Removed","err");
+  };
+
+  // Every table scoped by workshop_id — used to fully wipe a workshop account.
+  // workshop_stock_moves is deliberately excluded: it has no workshop_id column
+  // (only stock_id), so a handful of orphaned log rows may remain — harmless clutter,
+  // not linked data that could resurface under a different workshop.
+  const WORKSHOP_SCOPED_TABLES=["workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes",
+    "workshop_customers","workshop_vehicles","workshop_stock","workshop_services","workshop_suppliers",
+    "workshop_documents","workshop_users","workshop_bookings","ws_supplier_requests","ws_supplier_quotes",
+    "ws_supplier_invoices","ws_supplier_invoice_items","ws_supplier_payments","ws_supplier_returns",
+    "ws_purchase_orders","ws_po_items","ws_licence_renewals","ws_sq_replies","ws_shop_requests",
+    "branch_stock_requests"];
+  const deleteWorkshopAccount=async(targetWsId)=>{
+    await Promise.all(WORKSHOP_SCOPED_TABLES.map(t=>api.delete(t,"workshop_id",targetWsId).catch(()=>{})));
+    await api.delete("workshop_profiles","id",targetWsId).catch(()=>{});
+    await api.delete("users","id",targetWsId).catch(()=>{});
+    if(String(adminActingAsWsId)===String(targetWsId)) switchActingAsWorkshop("");
+    setAllWsProfiles(prev=>prev.filter(p=>String(p.id)!==String(targetWsId)));
+    setUsers(prev=>prev.filter(u=>String(u.id)!==String(targetWsId)));
+    showToast("Workshop account deleted","err");
   };
   const saveVehicle=async(v)=>{
     const {id, ...data} = v;
@@ -6278,7 +6302,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
             role={role}
             actingAsWsId={adminActingAsWsId}
             onSwitchActingAsWorkshop={switchActingAsWorkshop}
+            onDeleteWorkshopAccount={deleteWorkshopAccount}
             wsProfiles={allWsProfiles}
+            users={users}
             wsFriends={workshopFriends}
             onAddWsFriend={addWorkshopFriend}
             onRemoveWsFriend={removeWorkshopFriend}

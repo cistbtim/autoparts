@@ -1267,17 +1267,22 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 
   const saveAll = async () => {
     setSaving(true);
-    // Save new links
-    for(const vid of pending) {
-      await onAdd(part.id, vid);
+    try{
+      // Save new links
+      for(const vid of pending) {
+        await onAdd(part.id, vid);
+      }
+      // Delete removed links
+      for(const fid of toDelete) {
+        await onDelete(fid);
+      }
+      setPending(new Set());
+      setToDelete(new Set());
+    }catch(e){
+      alert(`❌ Failed to save vehicle links: ${e.message||e}`);
+    }finally{
+      setSaving(false);
     }
-    // Delete removed links
-    for(const fid of toDelete) {
-      await onDelete(fid);
-    }
-    setPending(new Set());
-    setToDelete(new Set());
-    setSaving(false);
   };
 
   const hasChanges = pending.size > 0 || toDelete.size > 0;
@@ -2094,6 +2099,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
                   onClick={async()=>{
                     setLinkingId(p.id);
                     try{ await onLinkPart(p.id, linkPartFor.id); }
+                    catch(e){ alert(`❌ Failed to link part: ${e.message||e}`); }
                     finally{ setLinkingId(null); }
                   }}>
                   {linkingId===p.id?"⏳":"🔗 Link"}

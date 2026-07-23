@@ -2126,6 +2126,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
 
   const saveFitment=async(partId,vehicleId,notes="")=>{
     const r=await api.upsert("part_fitments",{part_id:partId,vehicle_id:vehicleId,notes});
+    if(r&&!Array.isArray(r)&&(r.code||r.message)) throw new Error(r.message||r.code);
     const row=Array.isArray(r)&&r[0]?r[0]:{part_id:partId,vehicle_id:vehicleId,notes};
     setPartFitments(prev=>{
       const exists=prev.find(f=>String(f.part_id)===String(partId)&&String(f.vehicle_id)===String(vehicleId));

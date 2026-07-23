@@ -343,6 +343,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         onAddWsFriend={onAddWsFriend}
         onRemoveWsFriend={onRemoveWsFriend}
         mainBranchId={branches.find(b=>b.is_main)?.id||null}
+        branches={branches}
         wsShopRequests={wsShopRequests.filter(r=>r.job_id===activeJob.id)}
         onSaveWsShopRequest={onSaveWsShopRequest}
         sourceBooking={wsBookings.find(bk=>bk.id===activeJob.booking_id)||null}
@@ -4043,7 +4044,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -4228,12 +4229,17 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     const linkedBranchId=wsProfile?.linked_branch_id;
     if(!linkedBranchId||!onGoToSpareShop||!job.vehicle_make){setSpareShopPartsCount(null);return;}
     const _jMake=job.vehicle_make?.toLowerCase();
-    const _jModel=job.vehicle_model;
-    const _byCode=!_jModel?[]:vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&v.code===_jModel);
-    const _foundByCode=_byCode.length>0;
-    const matchV=!_jModel
-      ?vehicles.filter(v=>v.make?.toLowerCase()===_jMake)
-      :_foundByCode?_byCode:vehicles.filter(v=>v.make?.toLowerCase()===_jMake&&v.model?.toLowerCase()===_jModel.toLowerCase());
+    const _jModel=(job.vehicle_model||"").toLowerCase();
+    const _byMake=vehicles.filter(v=>(v.make||"").toLowerCase()===_jMake);
+    let matchV=_byMake;
+    if(_jModel){
+      matchV=_byMake.filter(v=>(v.code||"").toLowerCase()===_jModel);
+      if(matchV.length===0) matchV=_byMake.filter(v=>(v.model||"").toLowerCase()===_jModel);
+      if(matchV.length===0) matchV=_byMake.filter(v=>{
+        const vm=(v.model||"").toLowerCase();
+        return vm && (vm.includes(_jModel)||_jModel.includes(vm));
+      });
+    }
     const vIds=new Set(matchV.map(v=>String(v.id)));
     const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
     // Fall back to the job's own vehicle_model text when no vehicles-table row
@@ -7008,6 +7014,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           vehicleMake={job.vehicle_make}
           vehicleModel={job.vehicle_model}
           vehicleLabel={[job.vehicle_make,resolvedVehicleModel].filter(Boolean).join(" ")}
+          linkedBranchId={wsProfile?.linked_branch_id||null}
+          linkedBranchName={branches.find(b=>b.id===wsProfile?.linked_branch_id)?.name||""}
+          mainBranchId={mainBranchId}
           t={t}/>
       )}
 
@@ -9048,7 +9057,7 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
   );
 }
 
-function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
   const [desc,        setDesc]        = useState("");
   const [qty,         setQty]         = useState(1);
   const [price,       setPrice]       = useState("");
@@ -9096,14 +9105,25 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
   // part_fitments. Kept fitment-only (no code/text fallback) to avoid pulling
   // in parts that don't actually fit — same precision trade-off used for the
   // Spare Shop "parts for this vehicle" count.
+  // Matching is case-insensitive and falls back to a loose substring match on
+  // model text (e.g. job vehicle_model "Vitz" vs vehicle record model
+  // "VITZ AFRICA (2023-2026)") — the job's free-text make/model rarely matches
+  // the vehicles-table code/model exactly by case or by full string.
   const hasVehicle = type==="part" && !!vehicleMake;
   const matchVIds = useMemo(()=>{
     if(!hasVehicle) return new Set();
     const jMake=vehicleMake.toLowerCase();
-    const byCode=vehicleModel?vehicles.filter(v=>v.make?.toLowerCase()===jMake&&v.code===vehicleModel):[];
-    const matchV=byCode.length>0?byCode
-      :!vehicleModel?vehicles.filter(v=>v.make?.toLowerCase()===jMake)
-      :vehicles.filter(v=>v.make?.toLowerCase()===jMake&&(v.model||"").toLowerCase()===vehicleModel.toLowerCase());
+    const jModel=(vehicleModel||"").toLowerCase();
+    const byMake=vehicles.filter(v=>(v.make||"").toLowerCase()===jMake);
+    let matchV=byMake;
+    if(jModel){
+      matchV=byMake.filter(v=>(v.code||"").toLowerCase()===jModel);
+      if(matchV.length===0) matchV=byMake.filter(v=>(v.model||"").toLowerCase()===jModel);
+      if(matchV.length===0) matchV=byMake.filter(v=>{
+        const vm=(v.model||"").toLowerCase();
+        return vm && (vm.includes(jModel)||jModel.includes(vm));
+      });
+    }
     return new Set(matchV.map(v=>String(v.id)));
   },[hasVehicle,vehicleMake,vehicleModel,vehicles]);
 
@@ -9128,9 +9148,35 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
     return new Set(combined.filter(f=>matchVIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)));
   },[matchVIds,partFitments,freshFitments]);
 
-  const mainPartsPool = useMemo(()=>
-    vehicleMatchedPartIds.size===0 ? [] : parts.filter(p=>vehicleMatchedPartIds.has(String(p.id))),
-  [parts,vehicleMatchedPartIds]);
+  // Overlay the workshop's linked-branch stock/price onto the matched parts —
+  // the raw `parts` row is unscoped (could belong to any branch), so without this
+  // the modal can show the wrong stock/price for a franchise workshop's actual
+  // linked shop. Same branch_stock-preferred-over-main pattern as Spare Shop.
+  const [branchStockMap,setBranchStockMap]=useState({});
+  useEffect(()=>{
+    if(!linkedBranchId||vehicleMatchedPartIds.size===0){ setBranchStockMap({}); return; }
+    let cancelled=false;
+    const bsIds=[linkedBranchId,...(mainBranchId&&mainBranchId!==linkedBranchId?[mainBranchId]:[])];
+    api.get("branch_stock",`branch_id=in.(${bsIds.join(",")})&part_id=in.(${[...vehicleMatchedPartIds].join(",")})&select=part_id,stock,price,branch_id`)
+      .then(d=>{
+        if(cancelled||!Array.isArray(d)) return;
+        const map={};
+        d.forEach(bs=>{
+          const k=String(bs.part_id);
+          if(!map[k]||String(bs.branch_id)===String(linkedBranchId)) map[k]=bs;
+        });
+        setBranchStockMap(map);
+      }).catch(()=>{});
+    return ()=>{cancelled=true;};
+  },[linkedBranchId,mainBranchId,vehicleMatchedPartIds]);
+
+  const mainPartsPool = useMemo(()=>{
+    if(vehicleMatchedPartIds.size===0) return [];
+    return parts.filter(p=>vehicleMatchedPartIds.has(String(p.id))).map(p=>{
+      const bs=branchStockMap[String(p.id)];
+      return bs?{...p,stock:bs.stock??0,price:bs.price??p.price}:p;
+    });
+  },[parts,vehicleMatchedPartIds,branchStockMap]);
 
   const showMainPanel = hasVehicle && !skipMainSearch;
 
@@ -9386,6 +9432,11 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
             <div style={{fontSize:11,fontWeight:700,color:"var(--blue)",marginBottom:4,textTransform:"uppercase",letterSpacing:".04em"}}>
               🏭 Main Inventory{vehicleLabel?` — fits ${vehicleLabel}`:""}
             </div>
+            {linkedBranchId&&(
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>
+                🏪 Stock/price shown from linked shop: <span style={{color:"var(--text2)",fontWeight:600}}>{linkedBranchName||linkedBranchId}</span>
+              </div>
+            )}
             <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:300,overflowY:"auto",marginBottom:8}}>
               {mainFiltered.length===0
                 ? <div style={{padding:"14px 16px",color:"var(--text3)",fontSize:13}}>

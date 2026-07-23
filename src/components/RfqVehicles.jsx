@@ -1811,8 +1811,11 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewInShop, onAddPart, onRefreshVehicles, t, jumpMake=null, jumpModel=null}) {
+export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete, onViewInShop, onAddPart, onLinkPart, onRefreshVehicles, t, jumpMake=null, jumpModel=null}) {
   const [refreshing, setRefreshing] = useState(false);
+  const [linkPartFor, setLinkPartFor] = useState(null); // vehicle being linked to an existing part
+  const [linkSearch,  setLinkSearch]  = useState("");
+  const [linkingId,   setLinkingId]   = useState(null); // part id currently being linked (spinner)
   const [selMake, setSelMake] = useState(jumpMake);  // null = makes level
   const [search,  setSearch]  = useState("");
   const [searchD, setSearchD] = useState("");
@@ -2030,6 +2033,8 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
                   onClick={()=>onViewInShop(v.make,v.model)}>🛒 Shop</button>}
                 {onAddPart&&<button className="btn btn-ghost btn-xs" style={{color:"var(--accent)",borderColor:"var(--accent)"}}
                   onClick={()=>onAddPart(v)} title={`Add new part with SKU ${v.code}-`}>+ Part</button>}
+                {onLinkPart&&<button className="btn btn-ghost btn-xs" style={{color:"var(--blue)",borderColor:"var(--blue)"}}
+                  onClick={()=>{setLinkPartFor(v);setLinkSearch("");}} title="Link an existing part to this vehicle">🔗 Link Part</button>}
                 <button className="btn btn-ghost btn-xs" onClick={()=>{setEditV({...v});setHighlightModel(null);}}>✏️ Edit</button>
                 <button className="btn btn-danger btn-xs"
                   onClick={()=>{if(window.confirm(`Delete ${v.make} ${v.model}?`))onDelete(v.id);}}>🗑</button>
@@ -2055,6 +2060,49 @@ export function VehiclesPage({vehicles, partFitments, onSave, onDelete, onViewIn
         <VehicleModal vehicle={editV} onSave={async(data)=>{ await onSave(data); setEditV(null); }}
           onClose={()=>setEditV(null)} t={t} nextCodeForMake={nextCodeForMake}/>
       </ErrorBoundary>
+    )}
+
+    {linkPartFor&&(
+      <Overlay onClose={()=>setLinkPartFor(null)}>
+        <MHead title={`🔗 Link Part — ${linkPartFor.make} ${linkPartFor.model}${linkPartFor.code?` (${linkPartFor.code})`:""}`} onClose={()=>setLinkPartFor(null)}/>
+        <input className="inp" autoFocus placeholder="Search part name or SKU… e.g. windscreen"
+          value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} style={{marginBottom:12}}/>
+        <div style={{maxHeight:420,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
+          {(() => {
+            const linkedIds = new Set(partFitments.filter(f=>String(f.vehicle_id)===String(linkPartFor.id)).map(f=>String(f.part_id)));
+            const words = linkSearch.trim().toLowerCase().split(" ").filter(Boolean);
+            if(!words.length) return <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>Start typing to search parts… e.g. "vitz windscreen"</div>;
+            const results = parts.filter(p=>{
+              if(linkedIds.has(String(p.id))) return false;
+              const fields=[p.name,p.chinese_desc,p.sku,p.brand,p.make,p.model,p.year_range,p.oe_number,p.category]
+                .map(v=>(v||"").toLowerCase()).join(" ");
+              return words.every(w=>fields.includes(w));
+            }).slice(0,40);
+            if(!results.length) return <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>No matching parts</div>;
+            return results.map(p=>(
+              <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                  {p.chinese_desc&&<div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.chinese_desc}</div>}
+                  <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:2}}>
+                    <span style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{p.sku}</span>
+                    {(p.make||p.model)&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"var(--surface3)",color:"var(--text2)"}}>{[p.make,p.model].filter(Boolean).join(" ")}</span>}
+                    {p.year_range&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"var(--surface3)",color:"var(--text3)"}}>{p.year_range}</span>}
+                  </div>
+                </div>
+                <button className="btn btn-primary btn-xs" disabled={linkingId===p.id}
+                  onClick={async()=>{
+                    setLinkingId(p.id);
+                    try{ await onLinkPart(p.id, linkPartFor.id); }
+                    finally{ setLinkingId(null); }
+                  }}>
+                  {linkingId===p.id?"⏳":"🔗 Link"}
+                </button>
+              </div>
+            ));
+          })()}
+        </div>
+      </Overlay>
     )}
   </>
   );

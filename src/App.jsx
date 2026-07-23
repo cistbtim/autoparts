@@ -4071,6 +4071,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
               partFitments={partFitments}
               parts={parts}
               onVehicleChange={(partIds)=>{setInvVehicleFilterIds(partIds||null);setInvPage(0);}}
+              onAddPart={(ids)=>{
+                const v=vehicles.find(x=>ids.includes(x.id));
+                openM("editPart",{_initialF:{sku:(v?.code||"")+(v?.code?"-":"")},_tab:"fitment",_fitSearch:(v?.make||"")+" "+(v?.model||"")});
+              }}
               t={t} user={user} currentBranch={currentBranch}/>
             <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
               <div style={{position:"relative",flex:"1 1 220px",maxWidth:340}}>
@@ -6339,9 +6343,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
         )}
 
         {tab==="vehicles"&&role==="admin"&&(
-          <VehiclesPage vehicles={vehicles} partFitments={partFitments} onSave={saveVehicle} onDelete={deleteVehicle}
+          <VehiclesPage vehicles={vehicles} partFitments={partFitments} parts={parts} onSave={saveVehicle} onDelete={deleteVehicle}
             onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
             onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
+            onLinkPart={saveFitment}
             onRefreshVehicles={()=>refreshTables("vehicles")}
             jumpMake={vehiclesJumpMake} jumpModel={vehiclesJumpModel} t={t}/>
         )}

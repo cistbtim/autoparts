@@ -480,7 +480,10 @@ export function WsPurchaseOrderModal({po,wsSuppliers=[],settings,wsSupplierQuote
   const [sqRef,setSqRef]=useState(po?.supplier_quote_ref||"");
   const [items,setItems]=useState(()=>{
     if(prefill) return prefill;
-    if(po){const stored=JSON.parse(po._items||"[]");return stored.length?stored:[{id:"i1",description:"",sku:"",supplier_part_no:"",qty:1,unit_price:0,condition:"in_stock"}];}
+    if(po){
+      const stored=JSON.parse(po._items||"[]").map(it=>({...it,unit_price:Math.round((+it.unit_price||0)*100)/100}));
+      return stored.length?stored:[{id:"i1",description:"",sku:"",supplier_part_no:"",qty:1,unit_price:0,condition:"in_stock"}];
+    }
     return [{id:"i1",description:"",sku:"",supplier_part_no:"",qty:1,unit_price:0,condition:"in_stock"}];
   });
   const [saving,setSaving]=useState(false);
@@ -677,7 +680,7 @@ export function WsReceiveGoodsModal({po,poItems=[],wsStock=[],settings,onReceive
     po_item_id:i.id,description:i.description,sku:i.sku||"",
     qty:+i.qty||0,received_qty:+i.received_qty||0,
     receive_qty:Math.max(0,(+i.qty||0)-(+i.received_qty||0)),
-    unit_price:+i.unit_price||0,stock_id:"",
+    unit_price:Math.round((+i.unit_price||0)*100)/100,stock_id:"",
   })));
   const [saving,setSaving]=useState(false);
 
@@ -731,7 +734,16 @@ export function WsReceiveGoodsModal({po,poItems=[],wsStock=[],settings,onReceive
       <div style={{display:"flex",gap:8}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2,background:"rgba(52,211,153,.8)"}} disabled={saving}
-          onClick={async()=>{setSaving(true);await onReceive(rows);setSaving(false);}}>
+          onClick={async()=>{
+            setSaving(true);
+            try{
+              await onReceive(rows);
+            }catch(e){
+              alert(`❌ Failed to receive goods: ${e.message||e}`);
+            }finally{
+              setSaving(false);
+            }
+          }}>
           {saving?"Processing…":"📥 Confirm Receipt & Create Invoice"}
         </button>
       </div>

@@ -58,6 +58,10 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [bkWorkDays,      setBkWorkDays]      = useState([1,2,3,4,5]);
   const [bkHolidays,      setBkHolidays]      = useState([]);
   const [bkClosedDates,   setBkClosedDates]   = useState([]);
+  const [bkView,          setBkView]          = useState("list"); // list|month|week
+  const [bkSelDate,       setBkSelDate]       = useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");});
+  const [bkViewMonth,     setBkViewMonth]     = useState(()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1);});
+  const [bkViewWeekStart, setBkViewWeekStart] = useState(()=>{const d=new Date();const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);return d;});
   const [bkPaperBaseline, setBkPaperBaseline] = useState("");
   const [bkAvailSaving,   setBkAvailSaving]   = useState(false);
   const [bkNewHolDate,    setBkNewHolDate]    = useState("");
@@ -1437,6 +1441,76 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
         const activeBookings = wsBookings.filter(b=>b.status!=="deleted");
 
+        const ymd=(d)=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+        const todayStr=ymd(new Date());
+        const bookingsOnDate=(ds)=>activeBookings.filter(b=>b.preferred_date===ds);
+        const holidayOnDate=(ds)=>bkHolidays.find(h=>h.date===ds);
+        const closureOnDate=(ds)=>bkClosedDates.find(c=>c.date===ds);
+        const renderBookingCard=(b)=>(
+          <div key={b.id} className="card" style={{marginBottom:12,padding:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:15}}>{b.customer_name}</div>
+                <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{b.customer_phone}{b.customer_email?` · ${b.customer_email}`:""}</div>
+              </div>
+              <span className="badge" style={{background:statusColor(b.status),color:statusTextColor(b.status),fontSize:11,flexShrink:0,fontWeight:600}}>
+                {statusLabel(b.status)}
+              </span>
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8,fontSize:12}}>
+              <span style={{fontFamily:"DM Mono,monospace",fontWeight:700,color:"var(--accent)"}}>{b.vehicle_reg}</span>
+              {(b.vehicle_make||b.vehicle_model)&&<span style={{color:"var(--text2)"}}>{[b.vehicle_make,b.vehicle_model].filter(Boolean).join(" ")}</span>}
+              {b.preferred_date&&<span style={{color:"var(--blue)"}}>📅 {b.preferred_date}</span>}
+              <span style={{color:"var(--text3)",marginLeft:"auto"}}>{b.created_at?.slice(0,10)}</span>
+            </div>
+            {b.complaint&&<div style={{fontSize:13,color:"var(--text2)",padding:"8px 10px",background:"var(--surface2)",borderRadius:8,marginBottom:8}}>🔧 {b.complaint}</div>}
+            {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).length>0&&(
+              <div style={{display:"flex",gap:6,marginBottom:8}}>
+                {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).map((url,i)=>(
+                  <a key={i} href={url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
+                    <img src={url} alt={`photo ${i+1}`} style={{width:60,height:60,objectFit:"cover",borderRadius:6,border:"1px solid var(--border)",cursor:"zoom-in"}}
+                      onError={e=>{e.target.style.display="none";}}/>
+                  </a>
+                ))}
+              </div>
+            )}
+            {b.status==="pending"&&(
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button className="btn btn-success btn-sm" onClick={()=>confirmBooking(b)}>
+                  ✅ Confirm{!b.workshop_vehicle_id?" & Add to System":""}
+                </button>
+                <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}}
+                  onClick={()=>{ setBkCancelModal({booking:b}); setBkCancelReason(""); }}>❌ Cancel</button>
+                {b.customer_phone&&(
+                  <a href={bkWaLink(b,"received")} target="_blank" rel="noreferrer"
+                    className="btn btn-ghost btn-sm" style={{color:"#25D366",textDecoration:"none"}}>📱 WhatsApp</a>
+                )}
+              </div>
+            )}
+            {b.status==="confirmed"&&(
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button className="btn btn-ghost btn-sm" style={{color:"var(--text3)"}}
+                  onClick={()=>onPatchWsBooking&&onPatchWsBooking(b.id,{status:"pending"})}>↩ Unconfirm</button>
+                {b.customer_phone&&(
+                  <a href={bkWaLink(b,"confirm")} target="_blank" rel="noreferrer"
+                    className="btn btn-ghost btn-sm" style={{color:"#25D366",textDecoration:"none"}}>📱 Confirm via WhatsApp</a>
+                )}
+              </div>
+            )}
+            <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",marginLeft:"auto",display:"block",marginTop:6}}
+              onClick={()=>{ setBkDeleteModal({booking:b}); setBkDeleteReason(""); setBkDeleteBy(""); }}>🗑️ Delete</button>
+          </div>
+        );
+        const monthGridDays = (()=>{
+          const first = new Date(bkViewMonth.getFullYear(), bkViewMonth.getMonth(), 1);
+          const startOffset = (first.getDay()+6)%7;
+          const daysInMonth = new Date(bkViewMonth.getFullYear(), bkViewMonth.getMonth()+1, 0).getDate();
+          const cells = [];
+          for(let i=0;i<startOffset;i++) cells.push(null);
+          for(let day=1; day<=daysInMonth; day++) cells.push(new Date(bkViewMonth.getFullYear(), bkViewMonth.getMonth(), day));
+          return cells;
+        })();
+
         return(<>
           {/* Toolbar: title + refresh */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,gap:8}}>
@@ -1602,67 +1676,140 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             )}
           </div>
 
+          {/* ── View Switcher ── */}
+          <div style={{display:"flex",alignItems:"center",gap:2,background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:9,padding:3,marginBottom:14,width:"fit-content"}}>
+            {[["list","List"],["month","Month"],["week","Week"]].map(([k,l])=>(
+              <button key={k}
+                style={{border:"none",background:bkView===k?"var(--accent)":"none",color:bkView===k?"#fff":"var(--text3)",fontSize:12.5,fontWeight:600,padding:"6px 13px",borderRadius:6,cursor:"pointer",fontFamily:"inherit"}}
+                onClick={()=>setBkView(k)}>{l}</button>
+            ))}
+          </div>
+
+          {bkView!=="list"&&(
+            <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:11,color:"var(--text3)",marginBottom:10}}>
+              <span><span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:"var(--yellow)",marginRight:4}}/>Pending</span>
+              <span><span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:"var(--green)",marginRight:4}}/>Confirmed</span>
+              <span><span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:"var(--red)",marginRight:4}}/>Closed / holiday</span>
+              <span style={{color:"var(--accent)"}}>◻ Today</span>
+            </div>
+          )}
+
+          {bkView==="month"&&(<>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <button className="btn btn-ghost btn-xs" onClick={()=>setBkViewMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))}>‹</button>
+                <div style={{fontWeight:700,fontSize:14,minWidth:130,textAlign:"center"}}>{bkViewMonth.toLocaleDateString("en-GB",{month:"long",year:"numeric"})}</div>
+                <button className="btn btn-ghost btn-xs" onClick={()=>setBkViewMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))}>›</button>
+              </div>
+              <button className="btn btn-ghost btn-xs" style={{color:"var(--accent)"}}
+                onClick={()=>{const d=new Date();setBkViewMonth(new Date(d.getFullYear(),d.getMonth(),1));setBkSelDate(ymd(d));}}>Today</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:5,marginBottom:5}}>
+              {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(l=>(
+                <div key={l} style={{fontSize:10,fontWeight:700,letterSpacing:".04em",textTransform:"uppercase",color:"var(--text3)",textAlign:"center"}}>{l}</div>
+              ))}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:5}}>
+              {monthGridDays.map((d,i)=>{
+                if(!d) return <div key={"blank"+i}/>;
+                const ds=ymd(d);
+                const dow=d.getDay()===0?7:d.getDay();
+                const isOff=!bkWorkDays.includes(dow);
+                const isToday=ds===todayStr;
+                const isSel=ds===bkSelDate;
+                const dayB=bookingsOnDate(ds);
+                const pending=dayB.filter(b=>b.status==="pending").length;
+                const confirmed=dayB.filter(b=>b.status==="confirmed").length;
+                const hol=holidayOnDate(ds);
+                const clo=closureOnDate(ds);
+                return (
+                  <div key={ds} onClick={()=>setBkSelDate(ds)}
+                    style={{minHeight:64,padding:"5px 6px",borderRadius:8,cursor:"pointer",
+                      background:isSel?"var(--surface3)":"var(--surface2)",
+                      border:`1px solid ${isToday?"var(--accent)":"var(--border)"}`,
+                      opacity:isOff?0.5:1}}>
+                    <div style={{fontSize:12,fontWeight:700,color:isToday?"var(--accent)":"var(--text2)"}}>{d.getDate()}</div>
+                    {(pending>0||confirmed>0)&&(
+                      <div style={{display:"flex",gap:3,marginTop:5,flexWrap:"wrap"}}>
+                        {pending>0&&<span style={{fontSize:9,fontWeight:700,borderRadius:5,padding:"1px 5px",background:"rgba(251,191,36,.15)",color:"var(--yellow)"}}>{pending}</span>}
+                        {confirmed>0&&<span style={{fontSize:9,fontWeight:700,borderRadius:5,padding:"1px 5px",background:"rgba(52,211,153,.15)",color:"var(--green)"}}>{confirmed}</span>}
+                      </div>
+                    )}
+                    {(hol||clo)&&<div style={{fontSize:8.5,color:"var(--red)",fontWeight:600,marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⚠ {clo?clo.reason:hol.name}</div>}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",margin:"18px 0 8px"}}>
+              <div style={{fontWeight:700,fontSize:13,color:"var(--text2)"}}>Agenda — {new Date(bkSelDate+"T00:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"2-digit",month:"short"})}</div>
+              <div style={{fontSize:11,color:"var(--text3)"}}>{bookingsOnDate(bkSelDate).length} booking{bookingsOnDate(bkSelDate).length!==1?"s":""}</div>
+            </div>
+            {closureOnDate(bkSelDate)&&(
+              <div style={{fontSize:12,color:"var(--red)",padding:"8px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,marginBottom:8}}>
+                ⚠ Closed — {closureOnDate(bkSelDate).reason}
+              </div>
+            )}
+            {holidayOnDate(bkSelDate)&&(
+              <div style={{fontSize:12,color:"var(--red)",padding:"8px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,marginBottom:8}}>
+                ⚠ Public Holiday — {holidayOnDate(bkSelDate).name}
+              </div>
+            )}
+            {bookingsOnDate(bkSelDate).length===0
+              ? <div className="card" style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>No bookings this day</div>
+              : bookingsOnDate(bkSelDate).map(renderBookingCard)}
+          </>)}
+
+          {bkView==="week"&&(<>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <button className="btn btn-ghost btn-xs" onClick={()=>setBkViewWeekStart(w=>{const d=new Date(w);d.setDate(d.getDate()-7);return d;})}>‹</button>
+                <div style={{fontWeight:700,fontSize:14}}>
+                  {bkViewWeekStart.toLocaleDateString("en-GB",{day:"2-digit",month:"short"})} – {(()=>{const e=new Date(bkViewWeekStart);e.setDate(e.getDate()+6);return e.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});})()}
+                </div>
+                <button className="btn btn-ghost btn-xs" onClick={()=>setBkViewWeekStart(w=>{const d=new Date(w);d.setDate(d.getDate()+7);return d;})}>›</button>
+              </div>
+              <button className="btn btn-ghost btn-xs" style={{color:"var(--accent)"}}
+                onClick={()=>{const d=new Date();const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);setBkViewWeekStart(d);}}>This Week</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(100px,1fr))",gap:6,overflowX:"auto"}}>
+              {Array.from({length:7}).map((_,i)=>{
+                const d=new Date(bkViewWeekStart); d.setDate(d.getDate()+i);
+                const ds=ymd(d);
+                const dow=i+1;
+                const isOff=!bkWorkDays.includes(dow);
+                const isToday=ds===todayStr;
+                const dayB=bookingsOnDate(ds);
+                const clo=closureOnDate(ds); const hol=holidayOnDate(ds);
+                return (
+                  <div key={ds} style={{background:"var(--surface2)",border:`1px solid ${isToday?"var(--accent)":"var(--border)"}`,borderRadius:8,padding:8,opacity:isOff?0.55:1}}>
+                    <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i]}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:isToday?"var(--accent)":"var(--text)",marginBottom:6}}>{d.getDate()}</div>
+                    {(clo||hol)&&<div style={{fontSize:9.5,color:"var(--red)",fontWeight:600,marginBottom:4}}>⚠ {clo?clo.reason:hol.name}</div>}
+                    {dayB.length===0
+                      ? <div style={{fontSize:10,color:"var(--text3)"}}>—</div>
+                      : dayB.map(b=>(
+                          <div key={b.id} onClick={()=>{setBkView("month");setBkViewMonth(new Date(d.getFullYear(),d.getMonth(),1));setBkSelDate(ds);}}
+                            style={{borderLeft:`3px solid ${b.status==="confirmed"?"var(--green)":"var(--yellow)"}`,background:"var(--surface3)",borderRadius:5,padding:"4px 6px",marginBottom:5,cursor:"pointer"}}>
+                            <div style={{fontSize:10.5,fontWeight:700,color:"var(--text)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.customer_name}</div>
+                            <div style={{fontSize:9.5,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{b.vehicle_reg}</div>
+                          </div>
+                        ))}
+                  </div>
+                );
+              })}
+            </div>
+          </>)}
+
+          {bkView==="list"&&(<>
           {activeBookings.length===0&&(
             <div className="card" style={{textAlign:"center",padding:36,color:"var(--text3)"}}>
               <div style={{marginBottom:12}}>No bookings yet — share the link above with customers</div>
               <button className="btn btn-primary" onClick={()=>setWsTab("jobs")}>🔧 Go to Jobs →</button>
             </div>
           )}
-          {activeBookings.map(b=>(
-              <div key={b.id} className="card" style={{marginBottom:12,padding:14}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
-                  <div>
-                    <div style={{fontWeight:700,fontSize:15}}>{b.customer_name}</div>
-                    <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{b.customer_phone}{b.customer_email?` · ${b.customer_email}`:""}</div>
-                  </div>
-                  <span className="badge" style={{background:statusColor(b.status),color:statusTextColor(b.status),fontSize:11,flexShrink:0,fontWeight:600}}>
-                    {statusLabel(b.status)}
-                  </span>
-                </div>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8,fontSize:12}}>
-                  <span style={{fontFamily:"DM Mono,monospace",fontWeight:700,color:"var(--accent)"}}>{b.vehicle_reg}</span>
-                  {(b.vehicle_make||b.vehicle_model)&&<span style={{color:"var(--text2)"}}>{[b.vehicle_make,b.vehicle_model].filter(Boolean).join(" ")}</span>}
-                  {b.preferred_date&&<span style={{color:"var(--blue)"}}>📅 {b.preferred_date}</span>}
-                  <span style={{color:"var(--text3)",marginLeft:"auto"}}>{b.created_at?.slice(0,10)}</span>
-                </div>
-                {b.complaint&&<div style={{fontSize:13,color:"var(--text2)",padding:"8px 10px",background:"var(--surface2)",borderRadius:8,marginBottom:8}}>🔧 {b.complaint}</div>}
-                {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).length>0&&(
-                  <div style={{display:"flex",gap:6,marginBottom:8}}>
-                    {[b.photo_1,b.photo_2,b.photo_3].filter(Boolean).map((url,i)=>(
-                      <a key={i} href={url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>
-                        <img src={url} alt={`photo ${i+1}`} style={{width:60,height:60,objectFit:"cover",borderRadius:6,border:"1px solid var(--border)",cursor:"zoom-in"}}
-                          onError={e=>{e.target.style.display="none";}}/>
-                      </a>
-                    ))}
-                  </div>
-                )}
-                {b.status==="pending"&&(
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                    <button className="btn btn-success btn-sm" onClick={()=>confirmBooking(b)}>
-                      ✅ Confirm{!b.workshop_vehicle_id?" & Add to System":""}
-                    </button>
-                    <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}}
-                      onClick={()=>{ setBkCancelModal({booking:b}); setBkCancelReason(""); }}>❌ Cancel</button>
-                    {b.customer_phone&&(
-                      <a href={bkWaLink(b,"received")} target="_blank" rel="noreferrer"
-                        className="btn btn-ghost btn-sm" style={{color:"#25D366",textDecoration:"none"}}>📱 WhatsApp</a>
-                    )}
-                  </div>
-                )}
-                {b.status==="confirmed"&&(
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                    <button className="btn btn-ghost btn-sm" style={{color:"var(--text3)"}}
-                      onClick={()=>onPatchWsBooking&&onPatchWsBooking(b.id,{status:"pending"})}>↩ Unconfirm</button>
-                    {b.customer_phone&&(
-                      <a href={bkWaLink(b,"confirm")} target="_blank" rel="noreferrer"
-                        className="btn btn-ghost btn-sm" style={{color:"#25D366",textDecoration:"none"}}>📱 Confirm via WhatsApp</a>
-                    )}
-                  </div>
-                )}
-                <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",marginLeft:"auto",display:"block",marginTop:6}}
-                  onClick={()=>{ setBkDeleteModal({booking:b}); setBkDeleteReason(""); setBkDeleteBy(""); }}>🗑️ Delete</button>
-              </div>
-            ))}
+          {activeBookings.map(renderBookingCard)}
+          </>)}
 
           {/* ── Deleted bookings section ── */}
           {(()=>{

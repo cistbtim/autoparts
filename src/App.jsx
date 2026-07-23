@@ -1871,7 +1871,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[]}) {
       total,paid_amount:0,status:"pending"}),"Create invoice");
     for(const it of toReceive){
       chk(await api.insert("ws_supplier_invoice_items",{id:makeId("WSII"),invoice_id:invId,workshop_id:wsId||null,
-        description:it.description,sku:it.sku||"",qty:+it.receive_qty,
+        part_name:it.description,part_sku:it.sku||"",qty:+it.receive_qty,
         unit_cost:+it.unit_price||0,total:(+it.receive_qty)*(+it.unit_price||0),stock_id:it.stock_id||null}),"Add item");
       if(it.stock_id){
         const wsi=workshopStock.find(w=>w.id===it.stock_id);

@@ -119,22 +119,51 @@ export function VehicleAiLookupModal({initialMake, vehicles, onBulkSave, onClose
       )}
 
       {rows && rows.length > 0 && (
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
-          {rows.map(r => {
-            const dupe = r.code && existingCodes.has(r.code.toUpperCase());
-            return (
-              <div key={r.key} className="card" style={{padding:"10px 12px",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                <input type="checkbox" checked={r.checked} onChange={e => updateRow(r.key, "checked", e.target.checked)} />
-                <input className="inp" style={{width:90}} value={r.code} onChange={e => updateRow(r.key, "code", e.target.value)} placeholder="Code" />
-                <input className="inp" style={{width:100}} value={r.chassis_code} onChange={e => updateRow(r.key, "chassis_code", e.target.value)} placeholder="Chassis" />
-                <input className="inp" style={{flex:1,minWidth:100}} value={r.variant} onChange={e => updateRow(r.key, "variant", e.target.value)} placeholder="Variant" />
-                <input className="inp" style={{width:70}} value={r.year_from} onChange={e => updateRow(r.key, "year_from", e.target.value)} placeholder="From" />
-                <input className="inp" style={{width:70}} value={r.year_to} onChange={e => updateRow(r.key, "year_to", e.target.value)} placeholder="To" />
-                <input className="inp" style={{flex:1,minWidth:100}} value={r.body_note} onChange={e => updateRow(r.key, "body_note", e.target.value)} placeholder="Body note" />
-                {dupe && <span className="badge" style={{background:"rgba(249,115,22,.15)",color:"var(--accent)"}}>code exists</span>}
-              </div>
-            );
-          })}
+        <div style={{overflowX:"auto",marginBottom:16}}>
+          <table className="inv-table">
+            <thead>
+              <tr>
+                <th style={{width:30}}></th>
+                <th>Model</th>
+                <th>Years</th>
+                <th>Chassis Code</th>
+                <th>Notes</th>
+                <th>Our Code</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => {
+                const dupe = r.code && existingCodes.has(r.code.toUpperCase());
+                const cellInp = {border:"none",background:"transparent",padding:"3px 4px",width:"100%",font:"inherit",color:"inherit"};
+                return (
+                  <tr key={r.key} style={{opacity:r.checked?1:.45}}>
+                    <td><input type="checkbox" checked={r.checked} onChange={e => updateRow(r.key, "checked", e.target.checked)} /></td>
+                    <td style={{fontWeight:600}}>
+                      {make.trim()} {model.trim()}
+                      <input style={{...cellInp,fontWeight:400,fontSize:12,color:"var(--text3)"}} value={r.variant}
+                        onChange={e => updateRow(r.key, "variant", e.target.value)} placeholder="variant" />
+                    </td>
+                    <td style={{whiteSpace:"nowrap"}}>
+                      <input style={{...cellInp,width:52,display:"inline-block"}} value={r.year_from}
+                        onChange={e => updateRow(r.key, "year_from", e.target.value)} placeholder="from" />
+                      –
+                      <input style={{...cellInp,width:52,display:"inline-block"}} value={r.year_to}
+                        onChange={e => updateRow(r.key, "year_to", e.target.value)} placeholder="present" />
+                    </td>
+                    <td><input className="inp" style={cellInp} value={r.chassis_code}
+                      onChange={e => updateRow(r.key, "chassis_code", e.target.value)} placeholder="—" /></td>
+                    <td><input className="inp" style={cellInp} value={r.body_note}
+                      onChange={e => updateRow(r.key, "body_note", e.target.value)} placeholder="—" /></td>
+                    <td>
+                      <input className="inp" style={{...cellInp,width:80,fontFamily:"DM Mono,monospace",color:"var(--accent)"}} value={r.code}
+                        onChange={e => updateRow(r.key, "code", e.target.value)} placeholder="code" />
+                      {dupe && <span className="badge" style={{background:"rgba(249,115,22,.15)",color:"var(--accent)",marginLeft:6,fontSize:10}}>exists</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 

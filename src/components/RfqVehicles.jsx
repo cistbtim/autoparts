@@ -2237,7 +2237,20 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
         </div>
       </FG>
       {/* Photos — drag & drop upload */}
-      <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",margin:"14px 0 8px",paddingBottom:6,borderBottom:"1px solid var(--border)"}}>📸 Vehicle Photos</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,margin:"14px 0 8px",paddingBottom:6,borderBottom:"1px solid var(--border)"}}>
+        <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em"}}>📸 Vehicle Photos</div>
+        {(f.make||f.model)&&(()=>{
+          const q=`${f.make||""} ${f.model||""}`.trim();
+          return (
+            <div style={{display:"flex",gap:8,fontSize:11}}>
+              <a href={`https://www.google.com/search?q=${encodeURIComponent(q)}&tbm=isch`} target="_blank" rel="noreferrer"
+                style={{color:"var(--blue)",textDecoration:"none",fontWeight:600}}>🔍 Search Google</a>
+              <a href={`https://www.webuycars.co.za/buy-a-car?${new URLSearchParams({q}).toString()}`} target="_blank" rel="noreferrer"
+                style={{color:"var(--green)",textDecoration:"none",fontWeight:600}}>🚗 Search WeBuyCars</a>
+            </div>
+          );
+        })()}
+      </div>
       {f.id
         ? <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
             {[

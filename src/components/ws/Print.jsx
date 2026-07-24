@@ -10,7 +10,11 @@ function resolveVehicleModel(job, vehicles=[]) {
   return match?.model || job.vehicle_model;
 }
 
-const CHECKLIST_ITEMS=[
+// Single source of truth for the check-in inspection checklist — Workshop.jsx
+// imports this instead of keeping its own copy, so the live checklist UI and
+// the printed report can never drift apart again (they previously did: this
+// list was missing brakes/engine/coolant that the UI already had).
+export const CHECKLIST_ITEMS=[
   {key:"body_front",    label:"Front Bumper / Body",   icon:"🚗"},
   {key:"body_rear",     label:"Rear Bumper / Body",    icon:"🚙"},
   {key:"body_left",     label:"Left Side Body",        icon:"◀️"},
@@ -20,6 +24,10 @@ const CHECKLIST_ITEMS=[
   {key:"lights_front", label:"Front Lights",          icon:"💡"},
   {key:"lights_rear",  label:"Rear Lights",           icon:"🔴"},
   {key:"tyres",        label:"Tyres Condition",       icon:"⚫"},
+  {key:"brakes_front", label:"Front Brakes",          icon:"🛑"},
+  {key:"brakes_rear",  label:"Rear Brakes",           icon:"🟥"},
+  {key:"engine",       label:"Engine Check",          icon:"⚙️"},
+  {key:"coolant",      label:"Coolant Level",         icon:"💧"},
   {key:"spare_wheel",  label:"Spare Wheel",           icon:"🛞"},
   {key:"fuel_level",   label:"Fuel Level",            icon:"⛽"},
   {key:"interior",     label:"Interior Condition",    icon:"💺"},

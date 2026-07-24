@@ -12,7 +12,7 @@ import { WsServicesPage, WsServiceModal } from "./ws/Services.jsx";
 import { WsSuppliersPage, WsSupplierModal, CAR_BRANDS } from "./ws/WsSuppliers.jsx";
 import { WsTransferPage } from "./ws/Transfer.jsx";
 import { WsDocumentsPage } from "./ws/Documents.jsx";
-import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote } from "./ws/Print.jsx";
+import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote, CHECKLIST_ITEMS } from "./ws/Print.jsx";
 import { BookInModal } from "./ws/BookIn.jsx";
 import { WsCustomersPage, WsCustomerForm, WsVehicleForm, LicenceRenewalModal, WsLicenceRenewalsPage } from "./ws/Customers.jsx";
 import { WsSupplierInvoicesPage, WsSupInvoiceModal, WsSupInvoiceViewModal, WsSupPaymentModal, WsSupReturnModal } from "./ws/SupplierInvoices.jsx";
@@ -2630,27 +2630,6 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 // ═══════════════════════════════════════════════════════════════
 // VEHICLE CHECK-IN CHECKLIST ITEMS
 // ═══════════════════════════════════════════════════════════════
-const CHECKLIST_ITEMS=[
-  {key:"body_front",    label:"Front Bumper / Body",   icon:"🚗"},
-  {key:"body_rear",     label:"Rear Bumper / Body",    icon:"🚙"},
-  {key:"body_left",     label:"Left Side Body",        icon:"◀️"},
-  {key:"body_right",   label:"Right Side Body",       icon:"▶️"},
-  {key:"windscreen",   label:"Windscreen",            icon:"🔲"},
-  {key:"wipers",       label:"Wipers",                icon:"🌧️"},
-  {key:"lights_front", label:"Front Lights",          icon:"💡"},
-  {key:"lights_rear",  label:"Rear Lights",           icon:"🔴"},
-  {key:"tyres",        label:"Tyres Condition",       icon:"⚫"},
-  {key:"brakes_front", label:"Front Brakes",          icon:"🛑"},
-  {key:"brakes_rear",  label:"Rear Brakes",           icon:"🟥"},
-  {key:"engine",       label:"Engine Check",          icon:"⚙️"},
-  {key:"coolant",      label:"Coolant Level",         icon:"💧"},
-  {key:"spare_wheel",  label:"Spare Wheel",           icon:"🛞"},
-  {key:"fuel_level",   label:"Fuel Level",            icon:"⛽"},
-  {key:"interior",     label:"Interior Condition",    icon:"💺"},
-  {key:"dash_lights",  label:"Dashboard Warning Lights",icon:"⚠️"},
-  {key:"boot",         label:"Boot / Trunk",          icon:"📦"},
-  {key:"radio",        label:"Radio / Electronics",   icon:"📻"},
-];
 
 // ═══════════════════════════════════════════════════════════════
 // OCR QUOTE MODAL — scan supplier screenshot → extract prices

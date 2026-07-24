@@ -6,6 +6,7 @@ import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, extractDriveId }
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
+import { VehicleAiLookupModal } from "./VehicleAiLookup.jsx";
 
 export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpdateStatus,onSelectQuote,onUnselectQuote,onUnselectAll,onRefresh,onCreatePO,onResendStale,onEditPart,t,user,settings}) {
   const [view,setView]=useState("list"); // list | create | detail
@@ -1836,8 +1837,9 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete, onViewInShop, onAddPart, onLinkPart, onRefreshVehicles, t, jumpMake=null, jumpModel=null}) {
+export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete, onViewInShop, onAddPart, onLinkPart, onRefreshVehicles, onBulkSaveVehicles, t, jumpMake=null, jumpModel=null}) {
   const [refreshing, setRefreshing] = useState(false);
+  const [aiLookup, setAiLookup] = useState(null); // {make} | null
   const [linkPartFor, setLinkPartFor] = useState(null); // vehicle being linked to an existing part
   const [linkSearch,  setLinkSearch]  = useState("");
   const [linkingId,   setLinkingId]   = useState(null); // part id currently being linked (spinner)
@@ -1974,6 +1976,9 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
               <span style={{display:"inline-block",animation:refreshing?"spin 0.8s linear infinite":"none"}}>🔄</span> Refresh
             </button>
           )}
+          <button className="btn btn-ghost" onClick={()=>setAiLookup({make:selMake!==null?selMake:""})}>
+            ✨ AI Lookup
+          </button>
           <button className="btn btn-primary" onClick={()=>setEditV(newVehicleDefaults)}>
             + {t.addVehicle||"Add Vehicle"}
           </button>
@@ -2076,7 +2081,10 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
       </>)}
 
       {selMake!==null&&(
-        <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
+        <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:16}}>
+          <button className="btn btn-ghost" onClick={()=>setAiLookup({make:selMake})}>
+            ✨ AI Lookup
+          </button>
           <button className="btn btn-primary" onClick={()=>setEditV(newVehicleDefaults)}>
             + {t.addVehicle||"Add Vehicle"}
           </button>
@@ -2084,6 +2092,13 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
       )}
 
     </div>
+
+    {aiLookup&&onBulkSaveVehicles&&(
+      <ErrorBoundary name="VehicleAiLookupModal">
+        <VehicleAiLookupModal initialMake={aiLookup.make} vehicles={vehicles} onBulkSave={onBulkSaveVehicles}
+          onClose={()=>setAiLookup(null)} nextCodeForMake={nextCodeForMake}/>
+      </ErrorBoundary>
+    )}
 
     {editV&&(
       <ErrorBoundary name="VehicleModal">

@@ -2177,14 +2177,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await api.delete("vehicles","id",id);
     await refreshTables("vehicles"); showToast("Deleted","err");
   };
-  const saveVehiclesBulk=async(rows)=>{
-    if(!rows?.length) return;
-    const res = await api.insert("vehicles",rows);
-    if(res?.code||res?.message){
-      showToast("Unable to save vehicles","err");throw new Error("bulk save failed");
-    }
-    await refreshTables("vehicles"); showToast(`${rows.length} vehicle${rows.length!==1?"s":""} added`);
-  };
   const deletePart=async(id)=>{const p=parts.find(pt=>pt.id===id);setBusyMsg(`Deleting ${p?.sku||""}${p?.name?" · "+p.name:""}`);const t0=Date.now();try{if(p)await logInv(p,p.stock,0,"Delete Part","Deleted");await Promise.all([api.delete("part_suppliers","part_id",id),api.delete("part_fitments","part_id",id),api.delete("parts","id",id)]);setParts(prev=>prev.filter(pt=>String(pt.id)!==String(id)));db.parts.delete(id).catch(()=>{});setPartSuppliers(prev=>prev.filter(ps=>String(ps.part_id)!==String(id)));setPartFitments(prev=>prev.filter(f=>String(f.part_id)!==String(id)));const ms=Date.now()-t0;showToast(`Deleted in ${ms<1000?(ms+"ms"):((ms/1000).toFixed(1)+"s")}`,"err");}finally{setBusyMsg(null);}};
   const approvePart=async(id)=>{await api.patch("parts","id",id,{review_status:null,created_by_branch_id:null});await refreshTables("parts");showToast("✅ Part approved");};
   const applyAdjust=async(part,nq,reason)=>{
@@ -6384,7 +6376,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
             onLinkPart={saveFitment}
             onRefreshVehicles={()=>refreshTables("vehicles")}
-            onBulkSaveVehicles={saveVehiclesBulk}
             jumpMake={vehiclesJumpMake} jumpModel={vehiclesJumpModel} t={t}/>
         )}
 

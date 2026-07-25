@@ -1836,8 +1836,9 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete, onViewInShop, onAddPart, onLinkPart, onRefreshVehicles, t, jumpMake=null, jumpModel=null}) {
+export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete, onViewInShop, onAddPart, onLinkPart, onRefreshVehicles, onShiftCodes, t, jumpMake=null, jumpModel=null}) {
   const [refreshing, setRefreshing] = useState(false);
+  const [inserting, setInserting] = useState(null); // vehicle id currently being shifted for insert
   const [linkPartFor, setLinkPartFor] = useState(null); // vehicle being linked to an existing part
   const [linkSearch,  setLinkSearch]  = useState("");
   const [linkingId,   setLinkingId]   = useState(null); // part id currently being linked (spinner)
@@ -1926,6 +1927,33 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
   };
 
   const newVehicleDefaults = { make: selMake!==null?selMake:"GWM", model:"", code: nextCodeForMake(selMake!==null?selMake:"GWM"), year_from:"", year_to:"", engine:"", variant:"" };
+
+  // Increment a code's trailing letter (A→B…Y→Z), wrapping to the next number + "A" past Z.
+  const incrementCode = (code) => {
+    if (!code) return code;
+    const lastChar = code.slice(-1);
+    if (lastChar >= 'A' && lastChar < 'Z') return code.slice(0,-1) + String.fromCharCode(lastChar.charCodeAt(0)+1);
+    const prefix = code.slice(0,2);
+    const num = parseInt(code.slice(2,-1),10)||1;
+    return prefix + String(num+1).padStart(3,'0') + 'A';
+  };
+
+  // Insert a new vehicle before `target` in the code-sorted list: shift target and every
+  // later-coded vehicle in this make up one letter (highest code first, to avoid collisions),
+  // then open the Add Vehicle form pre-filled with the code that was just freed up.
+  const insertBefore = async (target) => {
+    if (!onShiftCodes || !target.code) return;
+    const toShift = inMake
+      .filter(v=>v.code && v.code >= target.code)
+      .sort((a,b)=>(b.code||"").localeCompare(a.code||"")); // highest code shifts first
+    setInserting(target.id);
+    try {
+      await onShiftCodes(toShift.map(v=>({id:v.id, code:incrementCode(v.code)})));
+      setEditV({...newVehicleDefaults, make: target.make, code: target.code});
+    } finally {
+      setInserting(null);
+    }
+  };
 
   const openVehicleLightbox = (v, startKey) => {
     const entries = [
@@ -2065,6 +2093,9 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
                   onClick={()=>onAddPart(v)} title={`Add new part with SKU ${v.code}-`}>+ Part</button>}
                 {onLinkPart&&<button className="btn btn-ghost btn-xs" style={{color:"var(--blue)",borderColor:"var(--blue)"}}
                   onClick={()=>{setLinkPartFor(v);setLinkSearch("");}} title="Link an existing part to this vehicle">🔗 Link Part</button>}
+                {onShiftCodes&&v.code&&<button className="btn btn-ghost btn-xs" disabled={inserting===v.id}
+                  onClick={()=>insertBefore(v)} title={`Insert a new vehicle before this one — shifts ${v.code} and later codes up one letter`}>
+                  {inserting===v.id?"⏳":"⬆️➕"} Insert</button>}
                 <button className="btn btn-ghost btn-xs" onClick={()=>{setEditV({...v});setHighlightModel(null);}}>✏️ Edit</button>
                 <button className="btn btn-danger btn-xs"
                   onClick={()=>{if(window.confirm(`Delete ${v.make} ${v.model}?`))onDelete(v.id);}}>🗑</button>

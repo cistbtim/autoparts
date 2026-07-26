@@ -913,7 +913,11 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
           if (total > 0) setUploadStatus(`Removing background… ${Math.round(current/total*100)}%`);
         },
       });
-    } catch { processedBlob = file; }
+    } catch (e) {
+      console.error("Background removal failed — saved photo without removing background:", e);
+      setError(`⚠ Background removal failed (${e?.message||"AI model couldn't load"}) — saved photo without removing the background`);
+      processedBlob = file;
+    }
     // Step 2: Draw on white canvas, resize to 1200px → Blob
     setUploadStatus("Processing…");
     const MAX = 1200;
@@ -1040,6 +1044,104 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
     setUploading(false); setUploadStatus("");
   };
 
+  // Shared helpers for the Remove BG / Watermark / Add Text tools below —
+  // all three fetch the current photo, run it through a canvas, then re-upload.
+  const _fetchCurrentAsImage = async () => {
+    const srcUrl = toImgUrl(imageUrl) || imageUrl;
+    const r = await fetch(srcUrl, {credentials:"omit"});
+    if (!r.ok) throw new Error("fetch failed");
+    const blob = await r.blob();
+    if (!blob.type.startsWith("image/")) throw new Error("not an image");
+    return new Promise((res, rej) => {
+      const objUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload  = () => { URL.revokeObjectURL(objUrl); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(objUrl); rej(new Error("img load failed")); };
+      img.src = objUrl;
+    });
+  };
+
+  const _canvasBlob = (img, drawExtra) => new Promise((res, rej) => {
+    const cv = document.createElement("canvas");
+    cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(img, 0, 0);
+    if (drawExtra) drawExtra(ctx, cv.width, cv.height);
+    cv.toBlob(b => b ? res(b) : rej(new Error("toBlob failed")), "image/jpeg", 0.92);
+  });
+
+  const _saveDerivedBlob = async (blob, suffix) => {
+    if (bucket) {
+      const _sku = String(sku||"part").replace(/[^a-zA-Z0-9_-]/g,"_");
+      const path = `parts/${_sku}/${Date.now()}_${suffix}.jpg`;
+      const url = await uploadToStorage(bucket, path, blob);
+      onChange(url);
+    } else {
+      await uploadToGDrive(new File([blob], `${sku||"part"}_${suffix}.jpg`, {type:"image/jpeg"}));
+    }
+  };
+
+  const removeBgFromCurrent = async () => {
+    if (!imageUrl) return;
+    setUploading(true); setError(null); setUploadStatus("Removing background…");
+    try {
+      const srcUrl = toImgUrl(imageUrl) || imageUrl;
+      const r = await fetch(srcUrl, {credentials:"omit"});
+      if (!r.ok) throw new Error("fetch failed");
+      const blob = await r.blob();
+      const processed = await _processImage(blob);
+      await _saveDerivedBlob(processed, "nobg");
+    } catch (e) { setError("Could not remove background — " + (e.message||e)); }
+    setUploading(false); setUploadStatus("");
+  };
+
+  const addWatermark = async () => {
+    if (!imageUrl) return;
+    setUploading(true); setError(null); setUploadStatus("Adding watermark…");
+    try {
+      const img = await _fetchCurrentAsImage();
+      const text = getSettings().shop_name || "MotorDesk";
+      const stamped = await _canvasBlob(img, (ctx, w, h) => {
+        const fontSize = Math.max(14, Math.round(w*0.045));
+        ctx.font = `700 ${fontSize}px DM Sans, sans-serif`;
+        ctx.textBaseline = "bottom";
+        const pad = Math.round(w*0.02);
+        const tw = ctx.measureText(text).width;
+        ctx.fillStyle = "rgba(0,0,0,.35)";
+        ctx.fillRect(w-tw-pad*2, h-fontSize-pad*1.6, tw+pad*2, fontSize+pad*1.2);
+        ctx.fillStyle = "rgba(255,255,255,.92)";
+        ctx.fillText(text, w-tw-pad, h-pad*0.7);
+      });
+      await _saveDerivedBlob(stamped, "wm");
+    } catch (e) { setError("Could not add watermark — " + (e.message||e)); }
+    setUploading(false); setUploadStatus("");
+  };
+
+  const addCaption = async () => {
+    if (!imageUrl) return;
+    const text = window.prompt("Caption text to stamp on this photo:", "");
+    if (!text || !text.trim()) return;
+    setUploading(true); setError(null); setUploadStatus("Adding text…");
+    try {
+      const img = await _fetchCurrentAsImage();
+      const stamped = await _canvasBlob(img, (ctx, w, h) => {
+        const label = text.trim();
+        const fontSize = Math.max(16, Math.round(w*0.05));
+        ctx.font = `700 ${fontSize}px DM Sans, sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+        const pad = Math.round(w*0.02);
+        const tw = ctx.measureText(label).width;
+        ctx.fillStyle = "rgba(0,0,0,.4)";
+        ctx.fillRect(w/2-tw/2-pad, h-fontSize-pad*1.8, tw+pad*2, fontSize+pad*1.4);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(label, w/2, h-pad*0.8);
+      });
+      await _saveDerivedBlob(stamped, "txt");
+    } catch (e) { setError("Could not add text — " + (e.message||e)); }
+    setUploading(false); setUploadStatus("");
+  };
+
   const preview = imageUrl ? toImgUrl(imageUrl) : null;
 
   return (
@@ -1106,6 +1208,24 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
       {copied&&(
         <div style={{fontSize:11,color:"var(--green)",background:"rgba(34,197,94,.1)",border:"1px solid rgba(34,197,94,.3)",borderRadius:7,padding:"6px 10px",marginBottom:6,textAlign:"center",fontWeight:600}}>
           ✓ Saved! Open the other part and click Paste Photo
+        </div>
+      )}
+
+      {/* Photo edit tools — operate on whatever photo is currently showing */}
+      {imageUrl&&(bucket||SCRIPT_URL)&&(
+        <div style={{display:"flex",gap:5,marginBottom:7,flexWrap:"wrap"}}>
+          <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={uploading}
+            onClick={removeBgFromCurrent} title="Re-run background removal on this photo">
+            🪄 Remove BG
+          </button>
+          <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={uploading}
+            onClick={addWatermark} title="Stamp your shop name onto this photo">
+            💧 Watermark
+          </button>
+          <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={uploading}
+            onClick={addCaption} title="Add a text caption to this photo">
+            🔤 Add Text
+          </button>
         </div>
       )}
 
@@ -1215,25 +1335,60 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
 // ═══════════════════════════════════════════════════════════════
 // VEHICLE FITMENT TAB — inside PartModal
 // ═══════════════════════════════════════════════════════════════
-export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, initialSearch="", t}) {
+export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, onRefreshVehicles, initialSearch="", t, imageUrl="", onPhotoChange}) {
   const [search,  setSearch]  = useState(initialSearch);
   const [pending, setPending] = useState(new Set()); // selected but not yet saved
   const [saving,  setSaving]  = useState(false);
   const [toDelete,setToDelete]= useState(new Set()); // marked for removal
   const [lightbox, setLightbox] = useState(null); // {urls,labels,idx}
+  const [expanded, setExpanded] = useState(true); // full-screen popup view — auto-opens when the Fits tab is selected
+  const [photoOpen, setPhotoOpen] = useState(false); // expand full uploader in full-screen header
+  const [compareVehicle, setCompareVehicle] = useState(null); // vehicle to show side-by-side with part photo
+  const [compareIdx, setCompareIdx] = useState(0); // which vehicle angle (front/side/rear) is shown in compare view
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshVehicles = async () => {
+    if(!onRefreshVehicles||refreshing) return;
+    setRefreshing(true);
+    try{ await onRefreshVehicles(); }finally{ setRefreshing(false); }
+  };
+
+  const vehiclePhotoEntries = (v) => [
+    {key:"photo_front", label:"Front"},
+    {key:"photo_side",  label:"Side"},
+    {key:"photo_rear",  label:"Rear"},
+  ].filter(e=>v[e.key]);
 
   const openVehicleLightbox = (v) => {
-    const entries = [
-      {key:"photo_front", label:"Front"},
-      {key:"photo_rear",  label:"Rear"},
-      {key:"photo_side",  label:"Side"},
-    ].filter(e=>v[e.key]);
+    const entries = vehiclePhotoEntries(v);
     if(!entries.length) return;
     setLightbox({ urls: entries.map(e=>toFullUrl(v[e.key])), labels: entries.map(e=>e.label), idx: 0 });
   };
 
+  const openCompare = (v) => { setCompareVehicle(v); setCompareIdx(0); };
+
   const linked    = partFitments; // already filtered by part_id
   const linkedIds = new Set(linked.map(f => String(f.vehicle_id)));
+  const vehiclePhoto = (v) => v.photo_front||v.photo_side||v.photo_rear||"";
+  const VehicleThumb = ({v}) => {
+    const photo = vehiclePhoto(v);
+    const compareMode = photoOpen && !!imageUrl;
+    return (
+      <div onClick={e=>{
+          if(!photo) return;
+          e.stopPropagation();
+          compareMode ? openCompare(v) : openVehicleLightbox(v);
+        }}
+        title={photo?(compareMode?"Click to compare with part photo":"Click to enlarge"):"No photo"}
+        style={{width:48,height:36,borderRadius:6,flexShrink:0,overflow:"hidden",
+          background:"var(--surface3)",border:`1px solid ${compareMode&&photo?"var(--accent)":"var(--border)"}`,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          cursor:photo?"zoom-in":"default"}}>
+        {photo
+          ? <img src={toImgUrl(photo)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+          : <span style={{fontSize:15,opacity:.4}}>🚗</span>}
+      </div>
+    );
+  };
 
   // Derive vehicle code from SKU prefix (e.g. "BM01C" from "BM01C-054GL")
   const skuCode = (part.sku||"").split(/[-\s]/)[0].toUpperCase();
@@ -1245,8 +1400,9 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
     if(linkedIds.has(String(v.id))) return false; // already linked
     if(pending.has(String(v.id))) return false;    // already selected
     if(!search.trim()) return true;
-    const s = search.toLowerCase();
-    return `${v.make} ${v.model} ${v.variant||""} ${v.engine||""} ${v.year_from} ${v.year_to||""} ${v.code||""}`.toLowerCase().includes(s);
+    const hay = `${v.make} ${v.model} ${v.variant||""} ${v.engine||""} ${v.year_from} ${v.year_to||""} ${v.code||""}`.toLowerCase();
+    const tokens = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    return tokens.every(tok=>hay.includes(tok)); // every keyword must appear, in any order
   });
 
   const toggle = (vid) => {
@@ -1287,10 +1443,121 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 
   const hasChanges = pending.size > 0 || toDelete.size > 0;
 
-  return (
-    <div>
+  const body = (
+    <>
       {lightbox&&<ImgLightbox urls={lightbox.urls} labels={lightbox.labels} startIdx={lightbox.idx}
         onClose={()=>setLightbox(null)}/>}
+
+      {/* ── Compare view — part photo (left) vs vehicle photo (right, cycle front/side/rear) ── */}
+      {compareVehicle&&(()=>{
+        const angles = vehiclePhotoEntries(compareVehicle);
+        const cur = angles[compareIdx] || angles[0];
+        const vehicleUrl = cur ? compareVehicle[cur.key] : vehiclePhoto(compareVehicle);
+        const navBtn = {position:"absolute",top:"50%",transform:"translateY(-50%)",
+          background:"rgba(0,0,0,.55)",border:"1px solid rgba(255,255,255,.3)",borderRadius:"50%",
+          width:38,height:38,fontSize:20,color:"#fff",cursor:"pointer",
+          display:"flex",alignItems:"center",justifyContent:"center",zIndex:1};
+        return (
+          <div onClick={()=>setCompareVehicle(null)}
+            style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.92)",
+              display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out",padding:20}}>
+            <div onClick={e=>e.stopPropagation()}
+              style={{display:"flex",flexWrap:"wrap",gap:20,maxWidth:"96vw",maxHeight:"88vh",justifyContent:"center"}}>
+              <div style={{flex:"1 1 320px",maxWidth:460,display:"flex",flexDirection:"column",alignItems:"center",minWidth:0}}>
+                <div style={{color:"#fff",fontSize:13,fontWeight:700,marginBottom:8,opacity:.85}}>📦 {part.name||part.sku||"Part"}</div>
+                <img src={toFullUrl(imageUrl)||toImgUrl(imageUrl)} alt="part"
+                  style={{maxWidth:"100%",maxHeight:"76vh",objectFit:"contain",borderRadius:10,background:"#fff",boxShadow:"0 8px 48px rgba(0,0,0,.6)"}}/>
+              </div>
+              <div style={{flex:"1 1 320px",maxWidth:460,display:"flex",flexDirection:"column",alignItems:"center",minWidth:0}}>
+                <div style={{color:"#fff",fontSize:13,fontWeight:700,marginBottom:8,opacity:.85}}>🚗 {compareVehicle.make} {compareVehicle.model}</div>
+                <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",maxWidth:"100%"}}>
+                  {angles.length>1&&(
+                    <button onClick={()=>setCompareIdx(i=>(i-1+angles.length)%angles.length)}
+                      style={{...navBtn,left:6}} title="Previous angle">‹</button>
+                  )}
+                  <img src={toFullUrl(vehicleUrl)} alt="vehicle"
+                    style={{maxWidth:"100%",maxHeight:"76vh",objectFit:"contain",borderRadius:10,boxShadow:"0 8px 48px rgba(0,0,0,.6)"}}/>
+                  {angles.length>1&&(
+                    <button onClick={()=>setCompareIdx(i=>(i+1)%angles.length)}
+                      style={{...navBtn,right:6}} title="Next angle">›</button>
+                  )}
+                </div>
+                {angles.length>1&&(
+                  <div style={{marginTop:8,fontSize:12,color:"#fff",opacity:.75}}>{cur.label} · {compareIdx+1}/{angles.length}</div>
+                )}
+              </div>
+            </div>
+            <button onClick={()=>setCompareVehicle(null)}
+              style={{position:"absolute",top:18,right:22,background:"rgba(255,255,255,.12)",border:"none",borderRadius:"50%",width:38,height:38,fontSize:20,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          </div>
+        );
+      })()}
+
+      {/* ── Full-screen only: photo + description + OE number combined ── */}
+      {expanded&&(
+        <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",
+          marginBottom:14,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,
+          border:"1px solid var(--border)"}}>
+          {onPhotoChange&&(
+            <div style={{position:"relative",flexShrink:0}}>
+              <div onClick={()=>setPhotoOpen(p=>!p)} title="Change photo"
+                style={{width:52,height:52,borderRadius:8,overflow:"hidden",cursor:"pointer",
+                  border:`1px solid ${photoOpen?"var(--accent)":"var(--border)"}`,background:"var(--surface3)",
+                  display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {imageUrl
+                  ? <img src={toImgUrl(imageUrl)} alt="part" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                  : <span style={{fontSize:18,color:"var(--text3)"}}>📷</span>}
+              </div>
+              <button onClick={()=>setPhotoOpen(p=>!p)} title="Change photo"
+                style={{position:"absolute",bottom:-4,right:-4,width:18,height:18,borderRadius:"50%",
+                  background:"var(--accent)",border:"2px solid var(--surface2)",fontSize:9,color:"#fff",
+                  cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✎</button>
+            </div>
+          )}
+          <div style={{flex:"1 1 200px",minWidth:0}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>
+              Description
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+              <span style={{fontWeight:700,fontSize:14}}>{part.name||"—"}</span>
+              {part.name&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(part.name)}>📋</button>}
+              {part.sku&&<span style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{part.sku}</span>}
+            </div>
+          </div>
+          <div style={{flex:"1 1 220px",minWidth:0}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>
+              OE Number
+            </div>
+            {part.oe_number ? (
+              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                <span style={{fontWeight:700,fontSize:13,fontFamily:"DM Mono,monospace"}}>{part.oe_number}</span>
+                <button className="cp-btn" onClick={()=>navigator.clipboard.writeText(part.oe_number)}>📋</button>
+                <button className="cp-btn" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)"}}
+                  onClick={()=>window.open(`https://www.google.com/search?q=${encodeURIComponent(part.oe_number)}`,"_blank","noopener,noreferrer")}>🔍</button>
+                <select className="inp" style={{fontSize:11,color:"#e65c00",width:"auto",padding:"3px 6px"}}
+                  value="" onChange={e=>{if(e.target.value)window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+                  <option value="">🔍 SpareTO…</option>
+                  {part.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
+                    <option key={i} value={tok}>{tok}</option>
+                  ))}
+                </select>
+              </div>
+            ) : <span style={{fontSize:12,color:"var(--text3)"}}>No OE number set</span>}
+          </div>
+        </div>
+      )}
+
+      {/* ── Collapsed-by-default photo uploader — only shown when the thumbnail is clicked ── */}
+      {expanded&&photoOpen&&onPhotoChange&&(
+        <div style={{marginBottom:14,padding:12,background:"var(--surface2)",borderRadius:10,border:"1px solid var(--accent)",maxWidth:300}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em"}}>📷 Change Photo</div>
+            <button className="btn btn-ghost btn-xs" onClick={()=>setPhotoOpen(false)}>✕ Close</button>
+          </div>
+          <PartPhotoUploader imageUrl={imageUrl} onChange={onPhotoChange} sku={part.sku} t={t} bucket="cars_parts"/>
+        </div>
+      )}
+
       {/* ── Part vehicle info + Go to Vehicles button ── */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
         marginBottom:14,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,
@@ -1330,18 +1597,26 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             Use the search below to link vehicles — or go to Vehicle Management to add new models
           </div>
         </div>
-        <button className="btn btn-ghost btn-sm" style={{flexShrink:0,color:"var(--blue)",borderColor:"rgba(96,165,250,.3)",whiteSpace:"nowrap"}}
-          onClick={()=>onGoVehicles&&onGoVehicles()}>
-          🚗 Manage Vehicles →
-        </button>
+        <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+          {!expanded&&(
+            <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(251,146,60,.35)",whiteSpace:"nowrap"}}
+              onClick={()=>setExpanded(true)} title="Open in full screen">
+              ⛶ Full Screen
+            </button>
+          )}
+          <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)",whiteSpace:"nowrap"}}
+            onClick={()=>onGoVehicles&&onGoVehicles()}>
+            🚗 Manage Vehicles →
+          </button>
+        </div>
       </div>
 
       {/* ── Currently linked ── */}
       <div style={{marginBottom:8}}>
-        <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:part?.oe_number?5:0}}>
+        <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:(part?.oe_number&&!expanded)?5:0}}>
           ✅ Linked Vehicles ({linked.length})
         </div>
-        {part?.oe_number&&(
+        {part?.oe_number&&!expanded&&(
           <select className="inp" style={{fontSize:12,color:"#e65c00"}}
             value="" onChange={e=>{if(e.target.value)window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
             <option value="">🔍 Search on SpareTO…</option>
@@ -1356,37 +1631,34 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
           🚗 No vehicles linked yet — select below to add
         </div>
       )}
-      <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:14}}>
+      <div style={expanded
+        ? {display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:8,marginBottom:14}
+        : {display:"flex",flexDirection:"column",gap:5,marginBottom:14}}>
         {linked.map(f => {
           const v = vehicles.find(vv => String(vv.id) === String(f.vehicle_id));
           if(!v) return null;
           const marked = toDelete.has(f.id);
           return (
-            <div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              padding:"8px 12px",borderRadius:8,transition:"all .15s",
+            <div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
+              padding:"8px 12px",borderRadius:expanded?10:8,transition:"all .15s",
               background: marked ? "rgba(248,113,113,.08)" : "rgba(52,211,153,.08)",
               border: `1px solid ${marked ? "rgba(248,113,113,.3)" : "rgba(52,211,153,.2)"}`,
+              boxShadow: expanded?"0 1px 3px rgba(0,0,0,.12)":"none",
               opacity: marked ? 0.6 : 1}}>
-              <div>
-                {v.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",marginRight:6}}>{v.code}</span>}
-                <span style={{fontWeight:600,fontSize:13,textDecoration:marked?"line-through":"none"}}>{v.make} {v.model}</span>
-                <span style={{fontSize:12,color:"var(--text3)",marginLeft:8}}>{v.year_from}–{v.year_to||"now"}</span>
-                {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
-                {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
+              <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
+                <VehicleThumb v={v}/>
+                <div style={{minWidth:0}}>
+                  {v.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",marginRight:6}}>{v.code}</span>}
+                  <span style={{fontWeight:600,fontSize:13,textDecoration:marked?"line-through":"none"}}>{v.make} {v.model}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.14)",padding:"2px 7px",borderRadius:6,marginLeft:8,whiteSpace:"nowrap"}}>{v.year_from}–{v.year_to||"now"}</span>
+                  {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
+                  {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
+                </div>
               </div>
-              <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-                {(v.photo_front||v.photo_rear||v.photo_side)&&(
-                  <button className="btn btn-ghost btn-xs" title="Enlarge vehicle photos"
-                    onClick={()=>openVehicleLightbox(v)}>
-                    🔍 Photos
-                  </button>
-                )}
-                <button className="btn btn-ghost btn-xs"
-                  style={{color:marked?"var(--green)":"var(--red)"}}
-                  onClick={()=>toggleDelete(f.id)}>
-                  {marked ? "↩ Undo" : "✕"}
-                </button>
-              </div>
+              <button className="btn btn-ghost btn-xs" style={{flexShrink:0,color:marked?"var(--green)":"var(--red)"}}
+                onClick={()=>toggleDelete(f.id)}>
+                {marked ? "↩ Undo" : "✕"}
+              </button>
             </div>
           );
         })}
@@ -1396,15 +1668,19 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
           const v = vehicles.find(vv => String(vv.id) === vid);
           if(!v) return null;
           return (
-            <div key={`p-${vid}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              padding:"8px 12px",borderRadius:8,
+            <div key={`p-${vid}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
+              padding:"8px 12px",borderRadius:expanded?10:8,
+              boxShadow: expanded?"0 1px 3px rgba(0,0,0,.12)":"none",
               background:"rgba(251,146,60,.08)",border:"1px solid rgba(251,146,60,.3)"}}>
-              <div>
-                <span style={{fontSize:11,color:"var(--accent)",fontWeight:700,marginRight:6}}>+ NEW</span>
-                <span style={{fontWeight:600,fontSize:13}}>{v.make} {v.model}</span>
-                <span style={{fontSize:12,color:"var(--text3)",marginLeft:8}}>{v.year_from}–{v.year_to||"now"}</span>
-                {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
-                {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
+              <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
+                <VehicleThumb v={v}/>
+                <div style={{minWidth:0}}>
+                  <span style={{fontSize:11,color:"var(--accent)",fontWeight:700,marginRight:6}}>+ NEW</span>
+                  <span style={{fontWeight:600,fontSize:13}}>{v.make} {v.model}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.14)",padding:"2px 7px",borderRadius:6,marginLeft:8,whiteSpace:"nowrap"}}>{v.year_from}–{v.year_to||"now"}</span>
+                  {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
+                  {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
+                </div>
               </div>
               <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}}
                 onClick={()=>toggle(vid)}>✕</button>
@@ -1419,16 +1695,23 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
           <div style={{fontSize:11,fontWeight:700,color:"var(--green)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
             🎯 SKU prefix "{skuCode}" matches {skuMatches.length} vehicle{skuMatches.length!==1?"s":""}
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          <div style={expanded
+            ? {display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:6}
+            : {display:"flex",flexDirection:"column",gap:5}}>
             {skuMatches.map(v => (
-              <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                padding:"7px 10px",borderRadius:7,background:"rgba(52,211,153,.06)",border:"1px solid rgba(52,211,153,.15)"}}>
-                <div style={{fontSize:13}}>
-                  <span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",marginRight:6}}>{v.code}</span>
-                  <span style={{fontWeight:600}}>{v.make} {v.model}</span>
-                  {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
-                  <span style={{fontSize:12,color:"var(--text3)",marginLeft:8}}>{v.year_from}–{v.year_to||"now"}</span>
-                  {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
+              <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
+                padding:"7px 10px",borderRadius:expanded?9:7,
+                boxShadow: expanded?"0 1px 3px rgba(0,0,0,.1)":"none",
+                background:"rgba(52,211,153,.06)",border:"1px solid rgba(52,211,153,.15)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
+                  <VehicleThumb v={v}/>
+                  <div style={{fontSize:13,minWidth:0}}>
+                    <span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",marginRight:6}}>{v.code}</span>
+                    <span style={{fontWeight:600}}>{v.make} {v.model}</span>
+                    {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
+                    <span style={{fontSize:11,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.14)",padding:"2px 7px",borderRadius:6,marginLeft:8,whiteSpace:"nowrap"}}>{v.year_from}–{v.year_to||"now"}</span>
+                    {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
+                  </div>
                 </div>
                 <button className="btn btn-ghost btn-xs" style={{color:"var(--green)",borderColor:"rgba(52,211,153,.4)",flexShrink:0}}
                   onClick={()=>toggle(String(v.id))}>+ Add</button>
@@ -1445,8 +1728,16 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
       )}
 
       {/* ── Search & select ── */}
-      <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>
-        ➕ Select Vehicles to Link
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em"}}>
+          ➕ Select Vehicles to Link
+        </div>
+        {onRefreshVehicles&&(
+          <button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} disabled={refreshing}
+            onClick={refreshVehicles} title="Reload vehicle list from the database">
+            {refreshing ? "⏳ Refreshing…" : "🔄 Refresh"}
+          </button>
+        )}
       </div>
       <div style={{position:"relative",marginBottom:10}}>
         <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
@@ -1456,22 +1747,28 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:16}}>✕</button>}
       </div>
 
-      <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:220,overflowY:"auto",marginBottom:14}}>
+      <div style={expanded
+        ? {display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:8,maxHeight:420,overflowY:"auto",marginBottom:14}
+        : {display:"flex",flexDirection:"column",gap:5,maxHeight:220,overflowY:"auto",marginBottom:14}}>
         {filtered.slice(0,50).map(v => (
           <div key={v.id}
             onClick={()=>toggle(String(v.id))}
-            style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              padding:"8px 12px",background:"var(--surface2)",borderRadius:8,
+            style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
+              padding:"8px 12px",background:"var(--surface2)",borderRadius:expanded?10:8,
               border:"1px solid var(--border)",cursor:"pointer",
+              boxShadow: expanded?"0 1px 3px rgba(0,0,0,.1)":"none",
               transition:"all .1s"}}
             onMouseEnter={e=>e.currentTarget.style.borderColor="var(--accent)"}
             onMouseLeave={e=>e.currentTarget.style.borderColor="var(--border)"}>
-            <div>
-              {v.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",marginRight:6}}>{v.code}</span>}
-              <span style={{fontWeight:600,fontSize:13}}>{v.make} {v.model}</span>
-              <span style={{fontSize:12,color:"var(--text3)",marginLeft:8}}>{v.year_from}–{v.year_to||"now"}</span>
-              {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
-              {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
+            <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
+              <VehicleThumb v={v}/>
+              <div style={{minWidth:0}}>
+                {v.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",marginRight:6}}>{v.code}</span>}
+                <span style={{fontWeight:600,fontSize:13}}>{v.make} {v.model}</span>
+                <span style={{fontSize:11,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.14)",padding:"2px 7px",borderRadius:6,marginLeft:8,whiteSpace:"nowrap"}}>{v.year_from}–{v.year_to||"now"}</span>
+                {v.variant&&<span style={{fontSize:11,color:"var(--text3)",marginLeft:6}}>{v.variant}</span>}
+                {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
+              </div>
             </div>
             <span style={{fontSize:18,color:"var(--accent)",flexShrink:0}}>+</span>
           </div>
@@ -1493,8 +1790,17 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             : `💾 Save Changes (${pending.size > 0 ? `+${pending.size}` : ""}${toDelete.size > 0 ? ` −${toDelete.size}` : ""})`}
         </button>
       )}
-    </div>
+    </>
   );
+
+  if(expanded) return (
+    <Overlay onClose={()=>setExpanded(false)} maxWidth="1100px">
+      <MHead title={`🔗 Vehicle Fits — ${part.sku||""}`} sub={part.name} onClose={()=>setExpanded(false)}/>
+      {body}
+    </Overlay>
+  );
+
+  return <div>{body}</div>;
 }
 
 // ═══════════════════════════════════════════════════════════════

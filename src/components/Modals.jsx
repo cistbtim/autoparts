@@ -3055,7 +3055,7 @@ function GrabImageOverlay({supplierUrl,partSku,onSave,onClose}) {
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onEditSupplier,onGoBack=null}) {
+export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onRefreshVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onEditSupplier,onGoBack=null}) {
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
@@ -3496,8 +3496,11 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
           onAdd={onSaveFitment}
           onDelete={onDeleteFitment}
           onGoVehicles={onGoVehicles}
+          onRefreshVehicles={onRefreshVehicles}
           initialSearch={initialFitSearch}
-          t={t}/>
+          t={t}
+          imageUrl={f.image_url}
+          onPhotoChange={handlePhotoChange}/>
       )}
       {ptab==="fitment"&&!part&&(
         <div style={{textAlign:"center",padding:32,color:"var(--text3)"}}>

@@ -907,8 +907,11 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
     // Step 1: AI background removal
     let processedBlob;
     try {
+      // No publicPath override — the library's built-in default points to its own
+      // model CDN (staticimgly.com) and auto-matches the installed package version.
+      // A previous hardcoded jsdelivr npm-mirror path 404'd because that mirror
+      // only hosts the JS source, not the AI model binaries.
       processedBlob = await removeBackground(file, {
-        publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/",
         progress: (_key, current, total) => {
           if (total > 0) setUploadStatus(`Removing background… ${Math.round(current/total*100)}%`);
         },

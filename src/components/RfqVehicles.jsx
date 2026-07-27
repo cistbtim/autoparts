@@ -903,23 +903,26 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
   if(!SCRIPT_URL) console.warn("No vehicle script URL configured");
   else console.log("Vehicle upload URL:", SCRIPT_URL.slice(0,60)+"...");
 
-  const _processImage = async (file) => {
+  const _processImage = async (file, skipBgRemoval=false) => {
     // Step 1: AI background removal
-    let processedBlob;
-    try {
-      // No publicPath override — the library's built-in default points to its own
-      // model CDN (staticimgly.com) and auto-matches the installed package version.
-      // A previous hardcoded jsdelivr npm-mirror path 404'd because that mirror
-      // only hosts the JS source, not the AI model binaries.
-      processedBlob = await removeBackground(file, {
-        progress: (_key, current, total) => {
-          if (total > 0) setUploadStatus(`Removing background… ${Math.round(current/total*100)}%`);
-        },
-      });
-    } catch (e) {
-      console.error("Background removal failed — saved photo without removing background:", e);
-      setError(`⚠ Background removal failed (${e?.message||"AI model couldn't load"}) — saved photo without removing the background`);
-      processedBlob = file;
+    let processedBlob = file;
+    if (!skipBgRemoval) {
+      try {
+        // No publicPath override — the library's built-in default points to its own
+        // model CDN (staticimgly.com) and auto-matches the installed package version.
+        // A previous hardcoded jsdelivr npm-mirror path 404'd because that mirror
+        // only hosts the JS source, not the AI model binaries.
+        processedBlob = await removeBackground(file, {
+          model: "large", // full-precision isnet — the "medium" default (isnet_fp16) misses busy/watermarked backgrounds like supplier stock photos
+          progress: (_key, current, total) => {
+            if (total > 0) setUploadStatus(`Removing background… ${Math.round(current/total*100)}%`);
+          },
+        });
+      } catch (e) {
+        console.error("Background removal failed — saved photo without removing background:", e);
+        setError(`⚠ Background removal failed (${e?.message||"AI model couldn't load"}) — saved photo without removing the background`);
+        processedBlob = file;
+      }
     }
     // Step 2: Draw on white canvas, resize to 1200px → Blob
     setUploadStatus("Processing…");
@@ -942,14 +945,14 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
     });
   };
 
-  const uploadToGDrive = async (file) => {
+  const uploadToGDrive = async (file, {skipBgRemoval=false}={}) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) { setError("Please select an image file"); return; }
 
     setUploading(true); setError(null);
-    setUploadStatus("Removing background…");
+    setUploadStatus(skipBgRemoval ? "Processing…" : "Removing background…");
     try {
-      const blob = await _processImage(file);
+      const blob = await _processImage(file, skipBgRemoval);
       setUploadStatus("Uploading…");
 
       if (bucket) {
@@ -1255,7 +1258,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
                   const imgType = item.types.find(t=>t.startsWith("image/"));
                   if(imgType){
                     const blob = await item.getType(imgType);
-                    uploadToGDrive(new File([blob],`${sku||"part"}.png`,{type:"image/png"}));
+                    uploadToGDrive(new File([blob],`${sku||"part"}.png`,{type:"image/png"}), {skipBgRemoval:true});
                     return;
                   }
                 }
@@ -2496,15 +2499,21 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
     photo_side:  vehicle.photo_side||"",
   });
   const codeUserEdited = useRef(false);
+  const [dirty, setDirty] = useState(false);
   const s = (k,v) => {
     if (k==="code") codeUserEdited.current = true;
     if (k==="make" && isNew && !codeUserEdited.current && nextCodeForMake)
       setF(p=>({...p, make:v, code: nextCodeForMake(v, p.model)}));
     else
       setF(p=>({...p,[k]:v}));
+    setDirty(true);
   };
   const [err, setErr] = useState({});
   const [codeErr, setCodeErr] = useState("");
+  const handleClose = () => {
+    if (dirty && !window.confirm("You have unsaved changes. Close without saving?")) return;
+    onClose();
+  };
 
   const validate = () => {
     const e={};
@@ -2516,8 +2525,8 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
   };
 
   return (
-    <Overlay onClose={onClose}>
-      <MHead title={f.id?"✏️ Edit Vehicle":"🚗 Add Vehicle"} onClose={onClose}/>
+    <Overlay onClose={handleClose}>
+      <MHead title={f.id?"✏️ Edit Vehicle":"🚗 Add Vehicle"} onClose={handleClose}/>
       <FG>
         <div>
           <FL label="Make *"/>
@@ -2610,10 +2619,10 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
       }
 
       <div style={{display:"flex",gap:10,marginTop:18}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{t.cancel}</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={async()=>{
           if(!validate()) return;
-          try{ await onSave(f); }
+          try{ await onSave(f); setDirty(false); }
           catch(e){ if(e.message==="code_exists") setCodeErr("Code already exists in database"); }
         }}>
           💾 {t.save}

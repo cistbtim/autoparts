@@ -3500,7 +3500,9 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
           initialSearch={initialFitSearch}
           t={t}
           imageUrl={f.image_url}
-          onPhotoChange={handlePhotoChange}/>
+          onPhotoChange={handlePhotoChange}
+          allParts={allParts}
+          allFitments={partFitments}/>
       )}
       {ptab==="fitment"&&!part&&(
         <div style={{textAlign:"center",padding:32,color:"var(--text3)"}}>

@@ -891,7 +891,13 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
   const [showFlipPopup, setShowFlipPopup] = useState(false);
   const [copied, setCopied]       = useState(false);
   const [hasClip, setHasClip]     = useState(!!_appPhotoClip);
+  const [showTouchUp, setShowTouchUp] = useState(false);
+  const [brushSize, setBrushSize] = useState(28);
   const fileRef = useRef(null);
+  const touchUpCanvasRef = useRef(null);
+  const touchUpHistoryRef = useRef([]); // stack of ImageData snapshots for undo
+  const touchUpOrigRef = useRef(null);  // original loaded <img>, for Reset
+  const touchUpDrawingRef = useRef(false);
 
   // ⚙️ Paste your Apps Script Web App URL here after deploying
   // Settings → System → paste your Apps Script URL
@@ -1148,6 +1154,110 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
     setUploading(false); setUploadStatus("");
   };
 
+  // Manual touch-up — brush away leftover watermark/background pixels the AI missed
+  // (needed because a semi-transparent watermark overlapping the product reads as
+  // foreground to the background-removal model, so it survives auto-processing).
+  const openTouchUp = async () => {
+    if (!imageUrl) return;
+    setError(null);
+    try {
+      const img = await _fetchCurrentAsImage();
+      // Rasterize into a data URL right away — the source <img> is backed by a
+      // blob URL we revoke on load, so holding onto it across a render/tick gap
+      // (canvas isn't mounted until showTouchUp flips) risks drawImage silently
+      // failing on a since-invalidated image. A data URL has no such lifetime.
+      const off = document.createElement("canvas");
+      off.width = img.naturalWidth; off.height = img.naturalHeight;
+      const octx = off.getContext("2d");
+      octx.fillStyle = "#ffffff"; octx.fillRect(0, 0, off.width, off.height);
+      octx.drawImage(img, 0, 0);
+      touchUpOrigRef.current = { dataUrl: off.toDataURL("image/png"), w: off.width, h: off.height };
+      touchUpHistoryRef.current = [];
+      setShowTouchUp(true);
+    } catch (e) { setError("Could not open touch-up — " + (e.message||e)); }
+  };
+
+  // Draw the captured photo onto the on-screen canvas once it's mounted
+  useEffect(() => {
+    if (!showTouchUp) return;
+    const data = touchUpOrigRef.current;
+    const cv = touchUpCanvasRef.current;
+    if (!data || !cv) return;
+    cv.width = data.w; cv.height = data.h;
+    const ctx = cv.getContext("2d");
+    const im = new Image();
+    im.onload = () => ctx.drawImage(im, 0, 0);
+    im.src = data.dataUrl;
+  }, [showTouchUp]);
+
+  const _touchUpPos = (e) => {
+    const cv = touchUpCanvasRef.current;
+    const r = cv.getBoundingClientRect();
+    const sx = cv.width / r.width, sy = cv.height / r.height;
+    return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
+  };
+
+  const touchUpPointerDown = (e) => {
+    const cv = touchUpCanvasRef.current;
+    if (!cv) return;
+    e.preventDefault();
+    // setPointerCapture/getImageData can throw in some embedded webviews — neither
+    // is essential to painting, so a failure there must not block the brush itself.
+    try { cv.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    const ctx = cv.getContext("2d");
+    try {
+      touchUpHistoryRef.current.push(ctx.getImageData(0, 0, cv.width, cv.height));
+      if (touchUpHistoryRef.current.length > 15) touchUpHistoryRef.current.shift();
+    } catch (err) { console.error("Touch-up: could not snapshot for undo:", err); }
+    touchUpDrawingRef.current = true;
+    const { x, y } = _touchUpPos(e);
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(x, y, brushSize/2, 0, Math.PI*2); ctx.fill();
+    ctx.lineWidth = brushSize; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#ffffff";
+    ctx.beginPath(); ctx.moveTo(x, y);
+  };
+
+  const touchUpPointerMove = (e) => {
+    if (!touchUpDrawingRef.current) return;
+    e.preventDefault();
+    const cv = touchUpCanvasRef.current;
+    const ctx = cv.getContext("2d");
+    const { x, y } = _touchUpPos(e);
+    ctx.lineTo(x, y); ctx.stroke();
+  };
+
+  const touchUpPointerUp = () => { touchUpDrawingRef.current = false; };
+
+  const touchUpUndo = () => {
+    const cv = touchUpCanvasRef.current;
+    const last = touchUpHistoryRef.current.pop();
+    if (!cv || !last) return;
+    cv.getContext("2d").putImageData(last, 0, 0);
+  };
+
+  const touchUpReset = () => {
+    const cv = touchUpCanvasRef.current;
+    const data = touchUpOrigRef.current;
+    if (!cv || !data) return;
+    const ctx = cv.getContext("2d");
+    const im = new Image();
+    im.onload = () => ctx.drawImage(im, 0, 0);
+    im.src = data.dataUrl;
+    touchUpHistoryRef.current = [];
+  };
+
+  const touchUpSave = async () => {
+    const cv = touchUpCanvasRef.current;
+    if (!cv) return;
+    setShowTouchUp(false);
+    setUploading(true); setError(null); setUploadStatus("Saving touch-up…");
+    try {
+      const blob = await new Promise((res, rej) => cv.toBlob(b => b ? res(b) : rej(new Error("toBlob failed")), "image/jpeg", 0.92));
+      await _saveDerivedBlob(blob, "touchup");
+    } catch (e) { setError("Could not save touch-up — " + (e.message||e)); }
+    setUploading(false); setUploadStatus("");
+  };
+
   const preview = imageUrl ? toImgUrl(imageUrl) : null;
 
   return (
@@ -1223,6 +1333,10 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
           <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={uploading}
             onClick={removeBgFromCurrent} title="Re-run background removal on this photo">
             🪄 Remove BG
+          </button>
+          <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={uploading}
+            onClick={openTouchUp} title="Manually brush away leftover watermark or background bits">
+            ✏️ Touch Up
           </button>
           <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={uploading}
             onClick={addWatermark} title="Stamp your shop name onto this photo">
@@ -1322,6 +1436,34 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
         </div>
       )}
 
+      {/* Manual touch-up editor — brush white over leftover watermark/background */}
+      {showTouchUp&&(
+        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.88)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:14}}>
+          <div style={{fontWeight:700,fontSize:14,color:"#fff",marginBottom:8}}>✏️ Touch Up — brush over what to erase</div>
+          <div style={{background:"#fff",borderRadius:8,padding:4,maxWidth:"94vw",maxHeight:"64vh",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+            <canvas ref={touchUpCanvasRef}
+              style={{maxWidth:"92vw",maxHeight:"60vh",cursor:"crosshair",touchAction:"none",display:"block"}}
+              onPointerDown={touchUpPointerDown}
+              onPointerMove={touchUpPointerMove}
+              onPointerUp={touchUpPointerUp}
+              onPointerLeave={touchUpPointerUp}/>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginTop:14,color:"#fff",fontSize:12}}>
+            <span>Brush size</span>
+            <input type="range" min="8" max="90" value={brushSize} onChange={e=>setBrushSize(+e.target.value)} style={{width:120}}/>
+            <span style={{width:24,textAlign:"right"}}>{brushSize}</span>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14,justifyContent:"center"}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setShowTouchUp(false);setError(null);}}>✕ Cancel</button>
+            <button className="btn btn-ghost btn-sm" onClick={touchUpUndo}>↩ Undo</button>
+            <button className="btn btn-ghost btn-sm" onClick={touchUpReset}>⟲ Reset</button>
+            <button className="btn btn-primary btn-sm" style={{background:"var(--accent)",border:"none"}} onClick={touchUpSave}>
+              💾 Save Touch-Up
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Fullscreen lightbox */}
       {zoomed&&preview&&(
         <div onClick={()=>setZoomed(false)}
@@ -1341,7 +1483,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
 // ═══════════════════════════════════════════════════════════════
 // VEHICLE FITMENT TAB — inside PartModal
 // ═══════════════════════════════════════════════════════════════
-export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, onRefreshVehicles, initialSearch="", t, imageUrl="", onPhotoChange}) {
+export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, onRefreshVehicles, initialSearch="", t, imageUrl="", onPhotoChange, allParts=[], allFitments=[]}) {
   const [search,  setSearch]  = useState(initialSearch);
   const [pending, setPending] = useState(new Set()); // selected but not yet saved
   const [saving,  setSaving]  = useState(false);
@@ -1352,6 +1494,12 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
   const [compareVehicle, setCompareVehicle] = useState(null); // vehicle to show side-by-side with part photo
   const [compareIdx, setCompareIdx] = useState(0); // which vehicle angle (front/side/rear) is shown in compare view
   const [refreshing, setRefreshing] = useState(false);
+  const [copyOpen,     setCopyOpen]     = useState(false); // "Copy Fits to Other Parts" overlay
+  const [copySearch,   setCopySearch]   = useState("");
+  const [copySelected, setCopySelected] = useState(new Set()); // target part ids
+  const [copying,      setCopying]      = useState(false);
+  const [copyProgress, setCopyProgress] = useState(null); // {done,total}
+  const [copyDone,      setCopyDone]    = useState(null); // {parts,vehicles}
   const refreshVehicles = async () => {
     if(!onRefreshVehicles||refreshing) return;
     setRefreshing(true);
@@ -1449,10 +1597,134 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 
   const hasChanges = pending.size > 0 || toDelete.size > 0;
 
+  // ── Copy Fits to Other Parts — apply every vehicle currently linked to this
+  // part onto other selected parts too. onAdd() has no on_conflict target set,
+  // so re-linking an already-fitted vehicle throws a 23505 duplicate-key error
+  // instead of silently upserting — skip pairs we already know about, and treat
+  // a duplicate-key error on the rest as "already there" rather than a failure.
+  const existingPairs = new Set(allFitments.map(f => `${f.part_id}:${f.vehicle_id}`));
+  const isDuplicateKeyError = (e) => /duplicate key|23505/i.test(e?.message||"");
+
+  const copyCandidates = allParts.filter(p => {
+    if (String(p.id) === String(part.id)) return false;
+    if (!copySearch.trim()) return true;
+    const words = copySearch.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const hay = [p.name,p.chinese_desc,p.sku,p.brand,p.make,p.model,p.year_range,p.oe_number,p.category]
+      .map(v=>(v||"").toLowerCase()).join(" ");
+    return words.every(w=>hay.includes(w));
+  });
+
+  const toggleCopyTarget = (pid) => {
+    setCopySelected(prev => {
+      const n = new Set(prev);
+      n.has(pid) ? n.delete(pid) : n.add(pid);
+      return n;
+    });
+  };
+
+  const applyCopyFits = async () => {
+    const targets = [...copySelected];
+    if (!targets.length || !linked.length) return;
+    setCopying(true);
+    setCopyProgress({done:0, total:targets.length});
+    let added = 0, skipped = 0;
+    try {
+      let i = 0;
+      for (const pid of targets) {
+        for (const f of linked) {
+          if (existingPairs.has(`${pid}:${f.vehicle_id}`)) { skipped++; continue; }
+          try {
+            await onAdd(pid, f.vehicle_id);
+            added++;
+          } catch(e) {
+            if (isDuplicateKeyError(e)) skipped++;
+            else throw e;
+          }
+        }
+        i++;
+        setCopyProgress({done:i, total:targets.length});
+      }
+      setCopyDone({parts: targets.length, added, skipped});
+      setCopySelected(new Set());
+      setCopySearch("");
+    } catch(e) {
+      alert(`❌ Failed to copy fitments: ${e.message||e}`);
+    } finally {
+      setCopying(false);
+      setCopyProgress(null);
+    }
+  };
+
   const body = (
     <>
       {lightbox&&<ImgLightbox urls={lightbox.urls} labels={lightbox.labels} startIdx={lightbox.idx}
         onClose={()=>setLightbox(null)}/>}
+
+      {/* ── Copy Fits to Other Parts ── */}
+      {copyOpen&&(
+        <Overlay onClose={()=>!copying&&setCopyOpen(false)}>
+          <MHead title="📋 Copy Fits to Other Parts"
+            sub={copyDone?undefined:`Applies all ${linked.length} vehicle${linked.length!==1?"s":""} linked to ${part.sku||part.name||"this part"} onto the parts you pick below`}
+            onClose={()=>!copying&&setCopyOpen(false)}/>
+          {copyDone ? (
+            <div style={{textAlign:"center",padding:"20px 10px"}}>
+              <div style={{fontSize:32,marginBottom:8}}>✅</div>
+              <div style={{fontWeight:700,marginBottom:4}}>
+                Added {copyDone.added} new fitment{copyDone.added!==1?"s":""} across {copyDone.parts} part{copyDone.parts!==1?"s":""}
+              </div>
+              {copyDone.skipped>0&&(
+                <div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>
+                  {copyDone.skipped} were already linked and left as-is.
+                </div>
+              )}
+              <button className="btn btn-primary" onClick={()=>setCopyOpen(false)}>Done</button>
+            </div>
+          ) : (<>
+            <input className="inp" autoFocus placeholder="Search part name or SKU… e.g. hiace"
+              value={copySearch} onChange={e=>setCopySearch(e.target.value)} style={{marginBottom:10}}/>
+            {copyCandidates.length>0&&(
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,fontSize:12,color:"var(--text3)"}}>
+                <span>{copySelected.size} selected</span>
+                <button className="btn btn-ghost btn-xs" onClick={()=>setCopySelected(new Set(copyCandidates.slice(0,200).map(p=>p.id)))}>
+                  Select all {Math.min(copyCandidates.length,200)} shown
+                </button>
+              </div>
+            )}
+            <div style={{maxHeight:380,overflowY:"auto",display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+              {!copySearch.trim() && (
+                <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>Start typing to search parts…</div>
+              )}
+              {copySearch.trim() && copyCandidates.length===0 && (
+                <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>No matching parts</div>
+              )}
+              {copySearch.trim() && copyCandidates.slice(0,200).map(p=>{
+                const checked = copySelected.has(p.id);
+                return (
+                  <div key={p.id} onClick={()=>toggleCopyTarget(p.id)}
+                    style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",cursor:"pointer",
+                      background:checked?"rgba(52,211,153,.08)":"var(--surface2)",
+                      borderRadius:8,border:`1px solid ${checked?"rgba(52,211,153,.4)":"var(--border)"}`}}>
+                    <input type="checkbox" checked={checked} readOnly/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:2}}>
+                        <span style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{p.sku}</span>
+                        {(p.make||p.model)&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"var(--surface3)",color:"var(--text2)"}}>{[p.make,p.model].filter(Boolean).join(" ")}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button className="btn btn-primary" style={{width:"100%"}} disabled={copying||copySelected.size===0}
+              onClick={applyCopyFits}>
+              {copying
+                ? `⏳ Applying… (${copyProgress?.done||0}/${copyProgress?.total||copySelected.size})`
+                : `Apply to ${copySelected.size} Part${copySelected.size!==1?"s":""}`}
+            </button>
+          </>)}
+        </Overlay>
+      )}
 
       {/* ── Compare view — part photo (left) vs vehicle photo (right, cycle front/side/rear) ── */}
       {compareVehicle&&(()=>{
@@ -1614,6 +1886,13 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             onClick={()=>onGoVehicles&&onGoVehicles()}>
             🚗 Manage Vehicles →
           </button>
+          {linked.length>0&&(
+            <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(251,146,60,.35)",whiteSpace:"nowrap"}}
+              disabled={hasChanges} title={hasChanges?"Save pending changes to this part's fitments first":"Copy this part's linked vehicles onto other parts"}
+              onClick={()=>{setCopyOpen(true);setCopyDone(null);}}>
+              📋 Copy Fits to Parts
+            </button>
+          )}
         </div>
       </div>
 
@@ -2158,6 +2437,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
   const [search,  setSearch]  = useState("");
   const [searchD, setSearchD] = useState("");
   const [highlightModel, setHighlightModel] = useState(jumpModel);
+  const [wikiOpenId, setWikiOpenId] = useState(null); // vehicle id whose wiki summary is expanded inline
 
   useEffect(()=>{ if(jumpMake) setSelMake(jumpMake); },[jumpMake]);
   useEffect(()=>{ setHighlightModel(jumpModel); },[jumpModel]);
@@ -2239,6 +2519,19 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
   };
 
   const newVehicleDefaults = { make: selMake!==null?selMake:"GWM", model:"", code: nextCodeForMake(selMake!==null?selMake:"GWM"), year_from:"", year_to:"", engine:"", variant:"" };
+
+  // Vehicle Wiki — a free-text reference note (generation history, chassis codes,
+  // engine options, known issues) shared across every code/generation of the same
+  // make+model, so it only has to be written once and then carries forward.
+  const wikiForModel = (make, model) => {
+    if (!make || !model) return "";
+    const match = vehicles.find(v =>
+      (v.make||"").toUpperCase()===make.toUpperCase() &&
+      (v.model||"").toUpperCase()===model.toUpperCase() &&
+      v.wiki_summary
+    );
+    return match ? match.wiki_summary : "";
+  };
 
   // Increment a code's trailing letter (A→B…Y→Z), wrapping to the next number + "A" past Z.
   const incrementCode = (code) => {
@@ -2357,8 +2650,10 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {filtered.map(v=>{
             const needsEdit = highlightModel && v.model.toUpperCase()===highlightModel.toUpperCase();
+            const wikiOpen = wikiOpenId===v.id;
             return (
-            <div key={v.id} className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",
+            <div key={v.id} style={{display:"flex",flexDirection:"column"}}>
+            <div className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",
               ...(needsEdit?{border:"2px solid var(--accent)",background:"rgba(249,115,22,.04)"}:{})}}>
               {/* Photo thumbnails — front/rear/side all at once */}
               <div style={{flexShrink:0,display:"flex",gap:4}}>
@@ -2408,10 +2703,26 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
                 {onShiftCodes&&v.code&&<button className="btn btn-ghost btn-xs" disabled={inserting===v.id}
                   onClick={()=>insertBefore(v)} title={`Insert a new vehicle before this one — shifts ${v.code} and later codes up one letter`}>
                   {inserting===v.id?"⏳":"⬆️➕"} Insert</button>}
+                <button className={v.wiki_summary?"btn btn-ghost btn-xs":"btn btn-ghost btn-xs"}
+                  style={v.wiki_summary?{color:"var(--accent)",borderColor:"var(--accent)"}:{opacity:.5}}
+                  onClick={()=>setWikiOpenId(wikiOpen?null:v.id)}
+                  title={v.wiki_summary?"View vehicle wiki notes":"No wiki notes yet — add via Edit"}>
+                  📖{wikiOpen?" ▲":""}
+                </button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>{setEditV({...v});setHighlightModel(null);}}>✏️ Edit</button>
                 <button className="btn btn-danger btn-xs"
                   onClick={()=>{if(window.confirm(`Delete ${v.make} ${v.model}?`))onDelete(v.id);}}>🗑</button>
               </div>
+            </div>
+            {wikiOpen&&(
+              <div className="card" style={{margin:"4px 0 0",padding:"10px 14px",background:"var(--surface2)",
+                borderTop:"2px solid var(--accent)",fontSize:12.5,color:"var(--text2)",whiteSpace:"pre-wrap",lineHeight:1.5}}>
+                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>
+                  📖 {v.make} {v.model} — Wiki
+                </div>
+                {v.wiki_summary || <span style={{color:"var(--text3)",fontStyle:"italic"}}>No notes yet. Click ✏️ Edit to add generation history, chassis codes, engine options, known issues…</span>}
+              </div>
+            )}
             </div>
           );
           })}
@@ -2431,7 +2742,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
     {editV&&(
       <ErrorBoundary name="VehicleModal">
         <VehicleModal vehicle={editV} onSave={async(data)=>{ await onSave(data); setEditV(null); }}
-          onClose={()=>setEditV(null)} t={t} nextCodeForMake={nextCodeForMake}/>
+          onClose={()=>setEditV(null)} t={t} nextCodeForMake={nextCodeForMake} wikiForModel={wikiForModel}/>
       </ErrorBoundary>
     )}
 
@@ -2483,7 +2794,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
 }
 
 // ── Vehicle Add/Edit Modal ──
-function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
+function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake, wikiForModel}) {
   const isNew = !vehicle.id;
   const [f, setF] = useState({
     id:          vehicle.id||null,
@@ -2497,13 +2808,18 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
     photo_front: vehicle.photo_front||"",
     photo_rear:  vehicle.photo_rear||"",
     photo_side:  vehicle.photo_side||"",
+    wiki_summary: vehicle.wiki_summary || (isNew && wikiForModel ? wikiForModel(vehicle.make, vehicle.model) : ""),
   });
   const codeUserEdited = useRef(false);
+  const wikiUserEdited = useRef(!isNew && !!vehicle.wiki_summary);
   const [dirty, setDirty] = useState(false);
   const s = (k,v) => {
     if (k==="code") codeUserEdited.current = true;
+    if (k==="wiki_summary") wikiUserEdited.current = true;
     if (k==="make" && isNew && !codeUserEdited.current && nextCodeForMake)
       setF(p=>({...p, make:v, code: nextCodeForMake(v, p.model)}));
+    else if (k==="model" && isNew && !wikiUserEdited.current && wikiForModel)
+      setF(p=>({...p, model:v, wiki_summary: wikiForModel(p.make, v) || p.wiki_summary}));
     else
       setF(p=>({...p,[k]:v}));
     setDirty(true);
@@ -2585,6 +2901,27 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake}) {
             placeholder="2.0TD, 1.5T, 2.8GD6..." style={{textTransform:"uppercase"}}/>
         </div>
       </FG>
+
+      {/* Vehicle Wiki — free-text reference notes, shared across every code/generation
+          of this make+model so it only needs to be written once. */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,margin:"4px 0 8px"}}>
+        <FL label="📖 Vehicle Wiki"/>
+        {(f.make||f.model)&&(()=>{
+          const q=`${f.make||""} ${f.model||""}`.trim();
+          return (
+            <div style={{display:"flex",gap:8,fontSize:11}}>
+              <a href={`https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(q)}`} target="_blank" rel="noreferrer"
+                style={{color:"var(--blue)",textDecoration:"none",fontWeight:600}}>📚 Wikipedia</a>
+              <a href={`https://www.google.com/search?q=${encodeURIComponent(q+" generations chassis code specs")}`} target="_blank" rel="noreferrer"
+                style={{color:"var(--green)",textDecoration:"none",fontWeight:600}}>🔍 Search</a>
+            </div>
+          );
+        })()}
+      </div>
+      <textarea className="inp" rows={4} value={f.wiki_summary} onChange={e=>s("wiki_summary",e.target.value)}
+        placeholder="Generation history, chassis codes, engine options, known issues, parts-interchange notes… shared across all codes for this model."
+        style={{resize:"vertical",marginBottom:14}}/>
+
       {/* Photos — drag & drop upload */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,margin:"14px 0 8px",paddingBottom:6,borderBottom:"1px solid var(--border)"}}>
         <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em"}}>📸 Vehicle Photos</div>

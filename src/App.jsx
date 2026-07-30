@@ -574,8 +574,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // same-device 5-min cache would otherwise mask those changes on reload.
     if(needsWs){
       const [idbJobs,idbJobItems]=await Promise.all([db.workshopJobs.toArray().catch(()=>[]),db.workshopJobItems.toArray().catch(()=>[])]);
-      if(idbJobs.length) setWorkshopJobs(idbJobs);
-      if(idbJobItems.length) setWorkshopJobItems(idbJobItems);
+      // db.workshopJobs is one shared IndexedDB store for the whole browser/device — it can still
+      // hold another workshop's rows from a prior login (or an admin's "acting as" session) here.
+      // Filter to this workshop before painting so that stale cache is never shown, even briefly.
+      const scopedJobs  = wsId ? idbJobs.filter(j=>String(j.workshop_id)===String(wsId))     : idbJobs;
+      const scopedItems = wsId ? idbJobItems.filter(i=>String(i.workshop_id)===String(wsId)) : idbJobItems;
+      if(scopedJobs.length) setWorkshopJobs(scopedJobs);
+      if(scopedItems.length) setWorkshopJobItems(scopedItems);
       api.cacheInvalidate("workshop_jobs");
       api.cacheInvalidate("workshop_job_items");
     }

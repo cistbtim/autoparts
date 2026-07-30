@@ -1481,6 +1481,74 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SPARETO FITMENT MATCHER — matches scraped Spareto vehicle data (see
+// scripts/scrape-spareto.mjs) against this app's own Vehicles table, so a
+// pasted product's fitment list can be turned into part_fitments links
+// without retyping every make/model/year by hand.
+// ═══════════════════════════════════════════════════════════════
+const _sqYear = (y) => { if (!y) return null; const m = String(y).match(/\d{4}/); return m ? parseInt(m[0], 10) : null; };
+const _sqSquash = (s) => (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const _sqChunks = (s) => (s || "").toUpperCase().match(/[A-Z]+|[0-9]+/g) || [];
+const _sqYearsOverlap = (a1, a2, b1, b2) => {
+  const A1 = a1 || 0, A2 = a2 || 9999, B1 = b1 || 0, B2 = b2 || 9999;
+  return A1 <= B2 && B1 <= A2;
+};
+
+// One row per generation when the scrape was run with --deep, else one row per base model.
+function flattenSparetoData(data) {
+  const rows = [];
+  for (const mk of data?.vehicles || []) {
+    for (const model of mk.models || []) {
+      if (model.generations?.length) {
+        for (const g of model.generations) {
+          rows.push({
+            key: `${mk.make}|${model.model}|${g.name}|${g.year_from}`,
+            make: mk.make, label: g.name,
+            year_from: _sqYear(g.year_from), year_to: _sqYear(g.year_to),
+          });
+        }
+      } else {
+        rows.push({
+          key: `${mk.make}|${model.model}|${model.year_from}`,
+          make: mk.make, label: model.model,
+          year_from: _sqYear(model.year_from), year_to: _sqYear(model.year_to),
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+// Scores how well an internal vehicle (make/model/variant/years) matches a scraped
+// entry — chunk-based (letter-runs and digit-runs, so "300D"/"300 d"/"300-D" all
+// compare equal) rather than exact string matching, since the two data sources
+// format the same chassis code differently.
+function scoreVehicleMatch(internalV, entry) {
+  if (_sqSquash(internalV.make) !== _sqSquash(entry.make)) return 0;
+  const ivChunks = _sqChunks(`${internalV.model} ${internalV.variant || ""}`);
+  if (!ivChunks.length) return 0;
+  const spChunkSet = new Set(_sqChunks(entry.label));
+  const hits = ivChunks.filter(c => spChunkSet.has(c)).length;
+  const tokenScore = hits / ivChunks.length;
+  const overlap = _sqYearsOverlap(internalV.year_from, internalV.year_to, entry.year_from, entry.year_to);
+  return tokenScore + (overlap ? 0.25 : 0);
+}
+
+// CONFIDENT_MATCH: auto-checked by default. Below that but >0, still surfaced as the
+// suggested candidate (with alternates) but left unchecked for manual review.
+const SPARETO_CONFIDENT_MATCH = 0.75;
+
+export function matchSparetoToVehicles(data, internalVehicles) {
+  return flattenSparetoData(data).map(entry => {
+    const scored = internalVehicles
+      .map(v => ({ v, score: scoreVehicleMatch(v, entry) }))
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score);
+    return { ...entry, best: scored[0]?.v || null, bestScore: scored[0]?.score || 0, alternates: scored.slice(0, 6).map(x => x.v) };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
 // VEHICLE FITMENT TAB — inside PartModal
 // ═══════════════════════════════════════════════════════════════
 export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, onRefreshVehicles, initialSearch="", t, imageUrl="", onPhotoChange, allParts=[], allFitments=[]}) {
@@ -1500,6 +1568,13 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
   const [copying,      setCopying]      = useState(false);
   const [copyProgress, setCopyProgress] = useState(null); // {done,total}
   const [copyDone,      setCopyDone]    = useState(null); // {parts,vehicles}
+  const [matchOpen,     setMatchOpen]     = useState(false); // "Match from Spareto" overlay
+  const [matchPaste,    setMatchPaste]    = useState("");
+  const [matchError,    setMatchError]    = useState("");
+  const [matchRows,     setMatchRows]     = useState(null); // null = not yet run
+  const [matchChecked,  setMatchChecked]  = useState(new Set()); // row keys to add
+  const [matchOverride, setMatchOverride] = useState({}); // row key -> vehicle id (manual pick)
+  const [matchSearchFor,setMatchSearchFor]= useState(null); // row key currently showing manual search
   const refreshVehicles = async () => {
     if(!onRefreshVehicles||refreshing) return;
     setRefreshing(true);
@@ -1597,6 +1672,47 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 
   const hasChanges = pending.size > 0 || toDelete.size > 0;
 
+  // ── Match from Spareto — paste the JSON from `node scripts/scrape-spareto.mjs
+  // <url> --deep` and match its vehicle list against this app's own Vehicles
+  // table, so confident matches can be added to `pending` in one click instead
+  // of searching + clicking + for every generation by hand.
+  const runSparetoMatch = () => {
+    setMatchError("");
+    let data;
+    try { data = JSON.parse(matchPaste); }
+    catch { setMatchError("That doesn't look like valid JSON — paste the full output of scrape-spareto.mjs."); return; }
+    if (!Array.isArray(data?.vehicles)) { setMatchError("No \"vehicles\" array found in the pasted data."); return; }
+    const rows = matchSparetoToVehicles(data, vehicles);
+    if (!rows.length) { setMatchError("No vehicles found in that data."); return; }
+    setMatchRows(rows);
+    setMatchOverride({});
+    setMatchChecked(new Set(rows.filter(r => r.best && r.bestScore >= SPARETO_CONFIDENT_MATCH).map(r => r.key)));
+  };
+
+  const resolvedVehicleFor = (row) => {
+    const overrideId = matchOverride[row.key];
+    if (overrideId === "") return null; // explicitly cleared by user
+    if (overrideId != null) return vehicles.find(v => String(v.id) === String(overrideId)) || null;
+    return row.best;
+  };
+
+  const toggleMatchChecked = (key) => {
+    setMatchChecked(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  };
+
+  const applySparetoMatches = () => {
+    for (const row of matchRows || []) {
+      if (!matchChecked.has(row.key)) continue;
+      const v = resolvedVehicleFor(row);
+      if (!v) continue;
+      const vid = String(v.id);
+      if (linkedIds.has(vid) || pending.has(vid)) continue; // already there
+      toggle(vid);
+    }
+    setMatchOpen(false);
+    setMatchPaste(""); setMatchRows(null); setMatchChecked(new Set()); setMatchOverride({}); setMatchSearchFor(null);
+  };
+
   // ── Copy Fits to Other Parts — apply every vehicle currently linked to this
   // part onto other selected parts too. onAdd() has no on_conflict target set,
   // so re-linking an already-fitted vehicle throws a 23505 duplicate-key error
@@ -1659,6 +1775,92 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
     <>
       {lightbox&&<ImgLightbox urls={lightbox.urls} labels={lightbox.labels} startIdx={lightbox.idx}
         onClose={()=>setLightbox(null)}/>}
+
+      {/* ── Match from Spareto ── */}
+      {matchOpen&&(
+        <Overlay onClose={()=>setMatchOpen(false)} wide>
+          <MHead title="🔗 Match from Spareto"
+            sub={matchRows ? undefined : "Paste the JSON from running scripts/scrape-spareto.mjs <url> --deep, or an equivalent {vehicles:[...]} object"}
+            onClose={()=>setMatchOpen(false)}/>
+
+          {!matchRows && (<>
+            <textarea className="inp" rows={10} value={matchPaste} onChange={e=>setMatchPaste(e.target.value)}
+              placeholder='{"vehicles":[{"make":"MERCEDES-BENZ","models":[{"model":"GLE","generations":[...]}]}]}'
+              style={{resize:"vertical",fontFamily:"DM Mono,monospace",fontSize:12,marginBottom:10}}/>
+            {matchError&&<div style={{fontSize:12,color:"var(--red)",marginBottom:10}}>⚠ {matchError}</div>}
+            <button className="btn btn-primary" style={{width:"100%"}} disabled={!matchPaste.trim()} onClick={runSparetoMatch}>
+              Match Against My Vehicles
+            </button>
+          </>)}
+
+          {matchRows && (<>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,fontSize:12,color:"var(--text3)"}}>
+              <span>{matchChecked.size} of {matchRows.length} selected — confident matches are pre-checked, review the rest</span>
+              <button className="btn btn-ghost btn-xs" onClick={()=>{setMatchRows(null);setMatchPaste("");setMatchOverride({});setMatchChecked(new Set());}}>
+                ↩ Paste different data
+              </button>
+            </div>
+            <div style={{maxHeight:440,overflowY:"auto",display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+              {matchRows.map(row => {
+                const resolved = resolvedVehicleFor(row);
+                const alreadyLinked = resolved && (linkedIds.has(String(resolved.id)) || pending.has(String(resolved.id)));
+                const checked = matchChecked.has(row.key);
+                const searching = matchSearchFor === row.key;
+                return (
+                  <div key={row.key} style={{padding:"8px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--surface2)"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <input type="checkbox" checked={checked} disabled={!resolved||alreadyLinked}
+                        onChange={()=>toggleMatchChecked(row.key)}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                          {row.make} — {row.label}
+                        </div>
+                        <div style={{fontSize:11,color:"var(--text3)"}}>{row.year_from}{row.year_to?`–${row.year_to}`:"–now"}</div>
+                      </div>
+                      <div style={{flexShrink:0,textAlign:"right"}}>
+                        {resolved ? (
+                          <div style={{fontSize:12}}>
+                            <span style={{fontFamily:"DM Mono,monospace",fontWeight:700,color:"var(--accent)",marginRight:5}}>{resolved.code}</span>
+                            <span>{resolved.model}</span>
+                            {alreadyLinked&&<span style={{marginLeft:6,color:"var(--green)"}}>✓ already linked</span>}
+                          </div>
+                        ) : (
+                          <span style={{fontSize:12,color:"var(--text3)"}}>No match in your system</span>
+                        )}
+                        <button className="btn btn-ghost btn-xs" style={{marginLeft:8,fontSize:11}}
+                          onClick={()=>setMatchSearchFor(searching?null:row.key)}>
+                          {resolved?"change":"search"}
+                        </button>
+                      </div>
+                    </div>
+                    {searching&&(
+                      <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid var(--border)"}}>
+                        {row.alternates.length>0&&(
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>
+                            {row.alternates.map(alt=>(
+                              <button key={alt.id} className="btn btn-ghost btn-xs"
+                                onClick={()=>{setMatchOverride(p=>({...p,[row.key]:alt.id}));setMatchChecked(p=>new Set(p).add(row.key));setMatchSearchFor(null);}}>
+                                {alt.code} {alt.model} ({alt.year_from}–{alt.year_to||"now"})
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
+                          onClick={()=>{setMatchOverride(p=>({...p,[row.key]:""}));setMatchChecked(p=>{const n=new Set(p);n.delete(row.key);return n;});setMatchSearchFor(null);}}>
+                          ✕ No match — leave unlinked
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <button className="btn btn-primary" style={{width:"100%"}} disabled={matchChecked.size===0} onClick={applySparetoMatches}>
+              Add {matchChecked.size} to Fits (review + Save Changes after)
+            </button>
+          </>)}
+        </Overlay>
+      )}
 
       {/* ── Copy Fits to Other Parts ── */}
       {copyOpen&&(
@@ -1893,6 +2095,11 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
               📋 Copy Fits to Parts
             </button>
           )}
+          <button className="btn btn-ghost btn-sm" style={{color:"var(--green)",borderColor:"rgba(52,211,153,.35)",whiteSpace:"nowrap"}}
+            title="Paste scraped Spareto fitment data and match it against your Vehicles table"
+            onClick={()=>{setMatchOpen(true);setMatchError("");}}>
+            🔗 Match from Spareto
+          </button>
         </div>
       </div>
 

@@ -44,14 +44,39 @@ const _cClearAll = () => {
 
 const fetchAll = async (table, query = "") => {
   const PAGE = 1000;
-  let all = [], offset = 0;
+  const sep = query ? "&" : "";
+  const urlFor = (offset) => `${SUPABASE_URL}/rest/v1/${table}?${query}${sep}limit=${PAGE}&offset=${offset}`;
+  const parse = async (resp) => { try { return JSON.parse(await resp.text()); } catch { return null; } };
+
+  // Page 1 also asks for the exact total row count (Supabase returns it in the
+  // Content-Range header) so we know up front how many more pages are left —
+  // then fetch the rest in parallel instead of one-at-a-time. On a 26k-row table
+  // this cuts 27 sequential round-trips (~11s) down to one parallel batch (~1s).
+  const firstResp = await fetch(urlFor(0), { headers: H({ Prefer: "count=exact" }) });
+  const firstBatch = await parse(firstResp);
+  if (!Array.isArray(firstBatch) || firstBatch.length === 0) return [];
+  let all = firstBatch;
+  if (firstBatch.length < PAGE) return all; // only one page — done
+
+  const range = firstResp.headers.get("content-range") || ""; // "0-999/26654"
+  const total = range.includes("/") ? parseInt(range.split("/")[1], 10) : NaN;
+
+  if (Number.isFinite(total)) {
+    const offsets = [];
+    for (let o = PAGE; o < total; o += PAGE) offsets.push(o);
+    const pages = await Promise.all(offsets.map(async o => {
+      const batch = await parse(await fetch(urlFor(o), { headers: H() }));
+      return Array.isArray(batch) ? batch : [];
+    }));
+    for (const p of pages) all = all.concat(p);
+    return all;
+  }
+
+  // Total count unavailable (count=exact disabled/unsupported) — fall back to
+  // the original sequential loop so correctness never depends on the header.
+  let offset = PAGE;
   while (true) {
-    const sep = query ? "&" : "";
-    const url = `${SUPABASE_URL}/rest/v1/${table}?${query}${sep}limit=${PAGE}&offset=${offset}`;
-    const resp = await fetch(url, { headers: H() });
-    const text = await resp.text();
-    let batch;
-    try { batch = JSON.parse(text); } catch { break; }
+    const batch = await parse(await fetch(urlFor(offset), { headers: H() }));
     if (!Array.isArray(batch) || batch.length === 0) break;
     all = all.concat(batch);
     if (batch.length < PAGE) break;

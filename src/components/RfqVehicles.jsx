@@ -1701,14 +1701,20 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
   };
 
   const applySparetoMatches = () => {
+    // Multiple Spareto rows (different engine variants) often resolve to the same
+    // internal generation-level vehicle — collect into a Set first rather than
+    // calling the single-click toggle() per row, which would flip membership back
+    // off on the 2nd occurrence of the same vehicle (add, remove, add, remove...).
+    const idsToAdd = new Set();
     for (const row of matchRows || []) {
       if (!matchChecked.has(row.key)) continue;
       const v = resolvedVehicleFor(row);
       if (!v) continue;
       const vid = String(v.id);
-      if (linkedIds.has(vid) || pending.has(vid)) continue; // already there
-      toggle(vid);
+      if (linkedIds.has(vid)) continue; // already saved to this part
+      idsToAdd.add(vid);
     }
+    if (idsToAdd.size) setPending(prev => new Set([...prev, ...idsToAdd]));
     setMatchOpen(false);
     setMatchPaste(""); setMatchRows(null); setMatchChecked(new Set()); setMatchOverride({}); setMatchSearchFor(null);
   };

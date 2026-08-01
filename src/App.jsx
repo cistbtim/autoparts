@@ -263,6 +263,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [workshopJobFilter,setWorkshopJobFilter]=useState(null); // {label,jobIds} — one-shot nav from Vehicle Management's job-card badge
   const [vehiclesJumpMake,setVehiclesJumpMake]=useState(initialVehiclesMake||null);
   const [vehiclesJumpModel,setVehiclesJumpModel]=useState(null);
+  const [vehiclesJumpSearch,setVehiclesJumpSearch]=useState("");
   const [workshopJobs,setWorkshopJobs]=useState([]);
   const [workshopJobItems,setWorkshopJobItems]=useState([]);
   const [workshopInvoices,setWorkshopInvoices]=useState([]);
@@ -6252,7 +6253,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":"report"}
             initialJobFilter={tab==="workshop"?workshopJobFilter:null}
             onConsumeInitialJobFilter={()=>setWorkshopJobFilter(null)}
-            onReturnToVehicle={role==="admin"?(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}:null}
+            onReturnToVehicle={role==="admin"?(make,model,searchKw)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setVehiclesJumpSearch(searchKw||"");setTab("vehicles");}:null}
             ads={liveAds}
             userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}
             jobs={workshopJobs}
@@ -6392,12 +6393,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {tab==="vehicles"&&role==="admin"&&(
           <VehiclesPage vehicles={vehicles} partFitments={partFitments} parts={parts} workshopJobs={workshopJobs} onSave={saveVehicle} onDelete={deleteVehicle}
             onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
-            onViewJobs={(label,jobIds,make,model)=>{setWorkshopJobFilter({label,jobIds,returnMake:make,returnModel:model});setTab("workshop");}}
+            onViewJobs={(label,jobIds,make,model,searchKw)=>{setWorkshopJobFilter({label,jobIds,returnMake:make,returnModel:model,returnSearch:searchKw});setTab("workshop");}}
             onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
             onLinkPart={saveFitment}
             onRefreshVehicles={()=>refreshTables("vehicles")}
             onShiftCodes={shiftVehicleCodes}
-            jumpMake={vehiclesJumpMake} jumpModel={vehiclesJumpModel} t={t}/>
+            jumpMake={vehiclesJumpMake} jumpModel={vehiclesJumpModel} jumpSearch={vehiclesJumpSearch} t={t}/>
         )}
 
         {tab==="vehicleRequests"&&(role==="admin"||role==="branch_admin")&&(

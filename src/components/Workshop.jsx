@@ -570,7 +570,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
             </div>
             {onReturnToVehicle&&jobIdFilter.returnMake&&(
               <button className="btn btn-ghost btn-xs" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)"}}
-                onClick={()=>onReturnToVehicle(jobIdFilter.returnMake,jobIdFilter.returnModel)}>
+                onClick={()=>onReturnToVehicle(jobIdFilter.returnMake,jobIdFilter.returnModel,jobIdFilter.returnSearch)}>
                 🚗 Return to Vehicle
               </button>
             )}

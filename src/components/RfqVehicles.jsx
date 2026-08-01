@@ -2645,20 +2645,21 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[], onSave, onDelete, onViewInShop, onViewJobs, onAddPart, onLinkPart, onRefreshVehicles, onShiftCodes, t, jumpMake=null, jumpModel=null}) {
+export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[], onSave, onDelete, onViewInShop, onViewJobs, onAddPart, onLinkPart, onRefreshVehicles, onShiftCodes, t, jumpMake=null, jumpModel=null, jumpSearch=""}) {
   const [refreshing, setRefreshing] = useState(false);
   const [inserting, setInserting] = useState(null); // vehicle id currently being shifted for insert
   const [linkPartFor, setLinkPartFor] = useState(null); // vehicle being linked to an existing part
   const [linkSearch,  setLinkSearch]  = useState("");
   const [linkingId,   setLinkingId]   = useState(null); // part id currently being linked (spinner)
   const [selMake, setSelMake] = useState(jumpMake);  // null = makes level
-  const [search,  setSearch]  = useState("");
-  const [searchD, setSearchD] = useState("");
+  const [search,  setSearch]  = useState(jumpSearch);
+  const [searchD, setSearchD] = useState(jumpSearch);
   const [highlightModel, setHighlightModel] = useState(jumpModel);
   const [wikiOpenId, setWikiOpenId] = useState(null); // vehicle id whose wiki summary is expanded inline
 
   useEffect(()=>{ if(jumpMake) setSelMake(jumpMake); },[jumpMake]);
   useEffect(()=>{ setHighlightModel(jumpModel); },[jumpModel]);
+  useEffect(()=>{ if(jumpSearch) setSearch(jumpSearch); },[jumpSearch]);
   const [editV,   setEditV]   = useState(null);
 
   useEffect(()=>{
@@ -2945,7 +2946,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
               {/* Job-card count — how many workshop jobs were logged against this model */}
               <span className="badge" style={{background:"rgba(167,139,250,.12)",color:"var(--purple)",flexShrink:0,
                 cursor:(onViewJobs&&jobCount(v.id)>0)?"pointer":"default"}}
-                onClick={()=>onViewJobs&&jobCount(v.id)>0&&onViewJobs(`${v.code?v.code+" — ":""}${v.make} ${v.model}`, jobIdsByVehicleId[v.id]||[], v.make, v.model)}
+                onClick={()=>onViewJobs&&jobCount(v.id)>0&&onViewJobs(`${v.code?v.code+" — ":""}${v.make} ${v.model}`, jobIdsByVehicleId[v.id]||[], v.make, v.model, search)}
                 title="Workshop job cards matched to this model (by make/model text or code) — click to view">
                 🔧 {jobCount(v.id)} job cards
               </span>

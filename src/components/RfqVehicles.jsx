@@ -1523,28 +1523,33 @@ function flattenSparetoData(data) {
 // entry — chunk-based (letter-runs and digit-runs, so "300D"/"300 d"/"300-D" all
 // compare equal) rather than exact string matching, since the two data sources
 // format the same chassis code differently.
+//
+// `full` (every one of the internal model's chunks found in the entry text) is the
+// confidence gate — a bare fractional score is NOT safe on its own: a short internal
+// model like "I3" is just 2 chunks ["I","3"], and "3" alone appears in tons of unrelated
+// names ("X3", "3 SERIES", "F30"...), so a partial-match fraction can clear a percentage
+// threshold on pure coincidence. Requiring full coverage of the internal model's own
+// chunks avoids that false-positive class; `score` (with a year-overlap bonus) is only
+// used to rank candidates against each other, not to decide confidence.
 function scoreVehicleMatch(internalV, entry) {
-  if (_sqSquash(internalV.make) !== _sqSquash(entry.make)) return 0;
+  if (_sqSquash(internalV.make) !== _sqSquash(entry.make)) return { score: 0, full: false };
   const ivChunks = _sqChunks(`${internalV.model} ${internalV.variant || ""}`);
-  if (!ivChunks.length) return 0;
+  if (!ivChunks.length) return { score: 0, full: false };
   const spChunkSet = new Set(_sqChunks(entry.label));
   const hits = ivChunks.filter(c => spChunkSet.has(c)).length;
   const tokenScore = hits / ivChunks.length;
   const overlap = _sqYearsOverlap(internalV.year_from, internalV.year_to, entry.year_from, entry.year_to);
-  return tokenScore + (overlap ? 0.25 : 0);
+  return { score: tokenScore + (overlap ? 0.25 : 0), full: tokenScore === 1 };
 }
-
-// CONFIDENT_MATCH: auto-checked by default. Below that but >0, still surfaced as the
-// suggested candidate (with alternates) but left unchecked for manual review.
-const SPARETO_CONFIDENT_MATCH = 0.75;
 
 export function matchSparetoToVehicles(data, internalVehicles) {
   return flattenSparetoData(data).map(entry => {
     const scored = internalVehicles
-      .map(v => ({ v, score: scoreVehicleMatch(v, entry) }))
+      .map(v => ({ v, ...scoreVehicleMatch(v, entry) }))
       .filter(x => x.score > 0)
       .sort((a, b) => b.score - a.score);
-    return { ...entry, best: scored[0]?.v || null, bestScore: scored[0]?.score || 0, alternates: scored.slice(0, 6).map(x => x.v) };
+    const top = scored[0];
+    return { ...entry, best: top?.v || null, bestScore: top?.score || 0, bestFull: top?.full || false, alternates: scored.slice(0, 6).map(x => x.v) };
   });
 }
 
@@ -1686,7 +1691,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
     if (!rows.length) { setMatchError("No vehicles found in that data."); return; }
     setMatchRows(rows);
     setMatchOverride({});
-    setMatchChecked(new Set(rows.filter(r => r.best && r.bestScore >= SPARETO_CONFIDENT_MATCH).map(r => r.key)));
+    setMatchChecked(new Set(rows.filter(r => r.best && r.bestFull).map(r => r.key)));
   };
 
   const resolvedVehicleFor = (row) => {
@@ -2640,7 +2645,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete, onViewInShop, onAddPart, onLinkPart, onRefreshVehicles, onShiftCodes, t, jumpMake=null, jumpModel=null}) {
+export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[], onSave, onDelete, onViewInShop, onAddPart, onLinkPart, onRefreshVehicles, onShiftCodes, t, jumpMake=null, jumpModel=null}) {
   const [refreshing, setRefreshing] = useState(false);
   const [inserting, setInserting] = useState(null); // vehicle id currently being shifted for insert
   const [linkPartFor, setLinkPartFor] = useState(null); // vehicle being linked to an existing part
@@ -2672,6 +2677,33 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
   },[search]);
 
   const fitCount = (vid) => partFitments.filter(f=>String(f.vehicle_id)===String(vid)).length;
+
+  // ── Job-card count per vehicle — workshop_jobs stores make/model as free text
+  // typed by mechanics (or, sometimes, the catalog code itself), not a vehicle_id
+  // foreign key, so match it against this Vehicles table the same way the
+  // Spareto matcher does: exact code match first, then chunk-based fuzzy text
+  // match (so "320i f30" / "F30 320I" / "F30" all resolve to the same row).
+  const jobCountByVehicleId = useMemo(()=>{
+    const counts = {};
+    for (const j of workshopJobs) {
+      const jm = (j.vehicle_make||"").trim();
+      if (!jm) continue;
+      const candidates = vehicles.filter(v => _sqSquash(v.make) === _sqSquash(jm));
+      if (!candidates.length) continue;
+      let best = candidates.find(v => v.code && _sqSquash(v.code) === _sqSquash(j.vehicle_model));
+      if (!best) {
+        const entry = { make: jm, label: j.vehicle_model, year_from: j.vehicle_year, year_to: j.vehicle_year };
+        const scored = candidates
+          .map(v => ({ v, ...scoreVehicleMatch(v, entry) }))
+          .filter(x => x.score > 0)
+          .sort((a, b) => b.score - a.score);
+        if (scored[0]?.full) best = scored[0].v;
+      }
+      if (best) counts[best.id] = (counts[best.id] || 0) + 1;
+    }
+    return counts;
+  }, [vehicles, workshopJobs]);
+  const jobCount = (vid) => jobCountByVehicleId[vid] || 0;
 
   // ── Level 1: makes summary ── only computed when at top level or data changes
   const makeStats = useMemo(()=>{
@@ -2904,6 +2936,11 @@ export function VehiclesPage({vehicles, partFitments, parts=[], onSave, onDelete
                 onClick={()=>onViewInShop&&onViewInShop(v.make,v.model)}
                 title="View linked parts in shop">
                 🔗 {fitCount(v.id)} parts
+              </span>
+              {/* Job-card count — how many workshop jobs were logged against this model */}
+              <span className="badge" style={{background:"rgba(167,139,250,.12)",color:"var(--purple)",flexShrink:0}}
+                title="Workshop job cards matched to this model (by make/model text or code)">
+                🔧 {jobCount(v.id)} job cards
               </span>
               {/* Actions */}
               <div style={{display:"flex",gap:6,flexShrink:0}}>

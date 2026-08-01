@@ -6386,7 +6386,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         )}
 
         {tab==="vehicles"&&role==="admin"&&(
-          <VehiclesPage vehicles={vehicles} partFitments={partFitments} parts={parts} onSave={saveVehicle} onDelete={deleteVehicle}
+          <VehiclesPage vehicles={vehicles} partFitments={partFitments} parts={parts} workshopJobs={workshopJobs} onSave={saveVehicle} onDelete={deleteVehicle}
             onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
             onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
             onLinkPart={saveFitment}

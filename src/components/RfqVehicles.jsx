@@ -2645,7 +2645,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[], onSave, onDelete, onViewInShop, onAddPart, onLinkPart, onRefreshVehicles, onShiftCodes, t, jumpMake=null, jumpModel=null}) {
+export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[], onSave, onDelete, onViewInShop, onViewJobs, onAddPart, onLinkPart, onRefreshVehicles, onShiftCodes, t, jumpMake=null, jumpModel=null}) {
   const [refreshing, setRefreshing] = useState(false);
   const [inserting, setInserting] = useState(null); // vehicle id currently being shifted for insert
   const [linkPartFor, setLinkPartFor] = useState(null); // vehicle being linked to an existing part
@@ -2683,8 +2683,8 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
   // foreign key, so match it against this Vehicles table the same way the
   // Spareto matcher does: exact code match first, then chunk-based fuzzy text
   // match (so "320i f30" / "F30 320I" / "F30" all resolve to the same row).
-  const jobCountByVehicleId = useMemo(()=>{
-    const counts = {};
+  const jobIdsByVehicleId = useMemo(()=>{
+    const map = {};
     for (const j of workshopJobs) {
       const jm = (j.vehicle_make||"").trim();
       if (!jm) continue;
@@ -2699,10 +2699,15 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
           .sort((a, b) => b.score - a.score);
         if (scored[0]?.full) best = scored[0].v;
       }
-      if (best) counts[best.id] = (counts[best.id] || 0) + 1;
+      if (best) (map[best.id] ||= []).push(j.id);
     }
+    return map;
+  },[vehicles, workshopJobs]);
+  const jobCountByVehicleId = useMemo(()=>{
+    const counts = {};
+    for (const [vid, ids] of Object.entries(jobIdsByVehicleId)) counts[vid] = ids.length;
     return counts;
-  }, [vehicles, workshopJobs]);
+  }, [jobIdsByVehicleId]);
   const jobCount = (vid) => jobCountByVehicleId[vid] || 0;
 
   // ── Level 1: makes summary ── only computed when at top level or data changes
@@ -2938,8 +2943,10 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
                 🔗 {fitCount(v.id)} parts
               </span>
               {/* Job-card count — how many workshop jobs were logged against this model */}
-              <span className="badge" style={{background:"rgba(167,139,250,.12)",color:"var(--purple)",flexShrink:0}}
-                title="Workshop job cards matched to this model (by make/model text or code)">
+              <span className="badge" style={{background:"rgba(167,139,250,.12)",color:"var(--purple)",flexShrink:0,
+                cursor:(onViewJobs&&jobCount(v.id)>0)?"pointer":"default"}}
+                onClick={()=>onViewJobs&&jobCount(v.id)>0&&onViewJobs(`${v.code?v.code+" — ":""}${v.make} ${v.model}`, jobIdsByVehicleId[v.id]||[])}
+                title="Workshop job cards matched to this model (by make/model text or code) — click to view">
                 🔧 {jobCount(v.id)} job cards
               </span>
               {/* Actions */}

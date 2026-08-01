@@ -28,12 +28,18 @@ import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[]}) {
+export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
   const [filterSt,       setFilterSt]       = useState("__all__");
   const [search,         setSearch]         = useState("");
+  // Seeded once from a "🔧 N job cards" click in Vehicle Management — a one-shot
+  // navigation filter, not a persistent search. Consumed (cleared at the App level)
+  // on mount so revisiting this tab later doesn't silently reapply a stale filter.
+  const [jobIdFilter,    setJobIdFilter]    = useState(initialJobFilter);
+  useEffect(()=>{ if(initialJobFilter) onConsumeInitialJobFilter?.(); },[]); // eslint-disable-line react-hooks/exhaustive-deps
+  const jobIdFilterSet = useMemo(()=> jobIdFilter ? new Set(jobIdFilter.jobIds) : null, [jobIdFilter]);
   const [bookIn,         setBookIn]         = useState(false);
   const [wsTab,          setWsTab]          = useState(initialTab||"jobs");
   const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:"", code:"", vin:"", engineNo:"", reg:""});
@@ -168,6 +174,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const wsCountries   = [...new Set(wsProfiles.map(p=>p.country).filter(Boolean))].sort();
 
   const filtered = jobs.filter(j=>{
+    if(jobIdFilterSet&&!jobIdFilterSet.has(j.id)) return false;
     if(filterSt!=="__all__"&&j.status!==filterSt) return false;
     if(filterWs!=="__all__"&&j.workshop_id!==filterWs) return false;
     if(filterCity!=="__all__"){const p=wsProfileMap2[j.workshop_id];if(!p||p.city!==filterCity) return false;}
@@ -185,7 +192,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     return 0;
   });
 
-  useEffect(()=>{ setJobPage(0); },[filterSt,search,sortBy,filterWs,filterCity,filterCountry]);
+  useEffect(()=>{ setJobPage(0); },[filterSt,search,sortBy,filterWs,filterCity,filterCountry,jobIdFilterSet]);
 
   const jobInvoice = (jobId) => invoices.find(i=>i.job_id===jobId);
   const jobQuote   = (jobId) => quotes.find(q=>q.job_id===jobId);
@@ -555,6 +562,15 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
 
       {/* ══════════════ JOBS TAB ══════════════ */}
       {wsTab==="jobs"&&(<>
+        {jobIdFilter&&(
+          <div style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",marginBottom:14,background:"rgba(167,139,250,.1)",border:"1px solid rgba(167,139,250,.35)",borderRadius:10}}>
+            <span style={{fontSize:16,flexShrink:0}}>🔧</span>
+            <div style={{flex:1,fontSize:13}}>
+              Showing only job cards matched to <strong>{jobIdFilter.label}</strong> — {jobIdFilterSet.size} job{jobIdFilterSet.size!==1?"s":""}
+            </div>
+            <button className="btn btn-ghost btn-xs" onClick={()=>setJobIdFilter(null)}>✕ Clear filter</button>
+          </div>
+        )}
         {!kanbanView&&(<>
         <div className="tabs" style={{marginBottom:14,width:"fit-content",maxWidth:"100%",flexWrap:"wrap"}}>
           {[["__all__","All"],["Pending","🔵 Pending"],["Checkup","🔎 Checkup"],["In Progress","🟡 In Progress"],["Quoting","🟣 Quoting"],["Ordered","🔷 Ordered"],["Done","🟢 Done"],["Delivered","⚫ Delivered"]].map(([v,l])=>{
@@ -667,7 +683,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
 
           // ── helpers ──────────────────────────────────────────
           const kq = kanbanSearch.trim().toLowerCase();
-          const matchesWs = j => wsId || filterWs==="__all__" || j.workshop_id===filterWs;
+          const matchesWs = j => (wsId || filterWs==="__all__" || j.workshop_id===filterWs) && (!jobIdFilterSet || jobIdFilterSet.has(j.id));
           const matchesSearch = j => matchesWs(j) && (!kq || [j.customer_name,j.vehicle_reg,j.vehicle_make,j.vehicle_model,j.complaint,j.notes,j.assigned_to].some(f=>(f||"").toLowerCase().includes(kq)));
 
           const highlight = (text) => {

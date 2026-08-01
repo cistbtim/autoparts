@@ -6252,6 +6252,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":"report"}
             initialJobFilter={tab==="workshop"?workshopJobFilter:null}
             onConsumeInitialJobFilter={()=>setWorkshopJobFilter(null)}
+            onReturnToVehicle={role==="admin"?(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}:null}
             ads={liveAds}
             userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}
             jobs={workshopJobs}
@@ -6391,7 +6392,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {tab==="vehicles"&&role==="admin"&&(
           <VehiclesPage vehicles={vehicles} partFitments={partFitments} parts={parts} workshopJobs={workshopJobs} onSave={saveVehicle} onDelete={deleteVehicle}
             onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
-            onViewJobs={(label,jobIds)=>{setWorkshopJobFilter({label,jobIds});setTab("workshop");}}
+            onViewJobs={(label,jobIds,make,model)=>{setWorkshopJobFilter({label,jobIds,returnMake:make,returnModel:model});setTab("workshop");}}
             onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
             onLinkPart={saveFitment}
             onRefreshVehicles={()=>refreshTables("vehicles")}

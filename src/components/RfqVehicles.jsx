@@ -2945,7 +2945,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
               {/* Job-card count — how many workshop jobs were logged against this model */}
               <span className="badge" style={{background:"rgba(167,139,250,.12)",color:"var(--purple)",flexShrink:0,
                 cursor:(onViewJobs&&jobCount(v.id)>0)?"pointer":"default"}}
-                onClick={()=>onViewJobs&&jobCount(v.id)>0&&onViewJobs(`${v.code?v.code+" — ":""}${v.make} ${v.model}`, jobIdsByVehicleId[v.id]||[])}
+                onClick={()=>onViewJobs&&jobCount(v.id)>0&&onViewJobs(`${v.code?v.code+" — ":""}${v.make} ${v.model}`, jobIdsByVehicleId[v.id]||[], v.make, v.model)}
                 title="Workshop job cards matched to this model (by make/model text or code) — click to view">
                 🔧 {jobCount(v.id)} job cards
               </span>

@@ -892,6 +892,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
   const [copied, setCopied]       = useState(false);
   const [hasClip, setHasClip]     = useState(!!_appPhotoClip);
   const [showTouchUp, setShowTouchUp] = useState(false);
+  const [pasteCompare, setPasteCompare] = useState(null); // {blob, previewUrl} — shown instead of an instant overwrite when a photo already exists
   const [brushSize, setBrushSize] = useState(28);
   const fileRef = useRef(null);
   const touchUpCanvasRef = useRef(null);
@@ -1372,7 +1373,13 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
                   const imgType = item.types.find(t=>t.startsWith("image/"));
                   if(imgType){
                     const blob = await item.getType(imgType);
-                    uploadToGDrive(new File([blob],`${sku||"part"}.png`,{type:"image/png"}), {skipBgRemoval:true});
+                    if(imageUrl){
+                      // A photo already exists — show a side-by-side compare
+                      // instead of silently overwriting it.
+                      setPasteCompare({blob, previewUrl: URL.createObjectURL(blob)});
+                    } else {
+                      uploadToGDrive(new File([blob],`${sku||"part"}.png`,{type:"image/png"}), {skipBgRemoval:true});
+                    }
                     return;
                   }
                 }
@@ -1430,6 +1437,46 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
               <button className="btn btn-primary btn-sm" style={{flex:"2 1 120px",background:"var(--green)",border:"none"}}
                 onClick={copyFlippedToClipboard}>
                 📋 Copy to Other Part
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Paste-over-existing-photo compare — side by side, no silent overwrite */}
+      {pasteCompare&&(
+        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"var(--surface)",borderRadius:16,padding:24,maxWidth:520,width:"92vw",boxShadow:"0 16px 48px rgba(0,0,0,.5)"}}>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:3,textAlign:"center"}}>📋 Replace Photo?</div>
+            <div style={{fontSize:11,color:"var(--text3)",textAlign:"center",marginBottom:12}}>
+              This part already has a photo — compare before replacing it
+            </div>
+            <div style={{display:"flex",gap:10,marginBottom:14}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",textAlign:"center",marginBottom:5}}>Current</div>
+                <div style={{background:"var(--surface2)",borderRadius:10,padding:8,display:"flex",alignItems:"center",justifyContent:"center",minHeight:150}}>
+                  <img src={preview} alt="current" style={{maxWidth:"100%",maxHeight:150,objectFit:"contain",display:"block"}}/>
+                </div>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:10,color:"var(--accent)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",textAlign:"center",marginBottom:5}}>New (pasted)</div>
+                <div style={{background:"var(--surface2)",borderRadius:10,padding:8,display:"flex",alignItems:"center",justifyContent:"center",minHeight:150,border:"1px solid rgba(249,115,22,.35)"}}>
+                  <img src={pasteCompare.previewUrl} alt="new" style={{maxWidth:"100%",maxHeight:150,objectFit:"contain",display:"block"}}/>
+                </div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-ghost btn-sm" style={{flex:1}}
+                onClick={()=>{URL.revokeObjectURL(pasteCompare.previewUrl);setPasteCompare(null);}}>
+                ✕ Cancel
+              </button>
+              <button className="btn btn-primary btn-sm" style={{flex:1,background:"var(--accent)",border:"none"}}
+                onClick={()=>{
+                  uploadToGDrive(new File([pasteCompare.blob],`${sku||"part"}.png`,{type:"image/png"}), {skipBgRemoval:true});
+                  URL.revokeObjectURL(pasteCompare.previewUrl);
+                  setPasteCompare(null);
+                }}>
+                🔄 Replace
               </button>
             </div>
           </div>

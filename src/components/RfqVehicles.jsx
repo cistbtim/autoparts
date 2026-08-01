@@ -1445,32 +1445,32 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
 
       {/* Paste-over-existing-photo compare — side by side, no silent overwrite */}
       {pasteCompare&&(
-        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-          <div style={{background:"var(--surface)",borderRadius:16,padding:24,maxWidth:520,width:"92vw",boxShadow:"0 16px 48px rgba(0,0,0,.5)"}}>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:3,textAlign:"center"}}>📋 Replace Photo?</div>
-            <div style={{fontSize:11,color:"var(--text3)",textAlign:"center",marginBottom:12}}>
+        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.86)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"var(--surface)",borderRadius:16,padding:"20px 24px 24px",maxWidth:1100,width:"96vw",boxShadow:"0 16px 48px rgba(0,0,0,.5)"}}>
+            <div style={{fontWeight:700,fontSize:16,marginBottom:3,textAlign:"center"}}>📋 Replace Photo?</div>
+            <div style={{fontSize:12,color:"var(--text3)",textAlign:"center",marginBottom:14}}>
               This part already has a photo — compare before replacing it
             </div>
-            <div style={{display:"flex",gap:10,marginBottom:14}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",textAlign:"center",marginBottom:5}}>Current</div>
-                <div style={{background:"var(--surface2)",borderRadius:10,padding:8,display:"flex",alignItems:"center",justifyContent:"center",minHeight:150}}>
-                  <img src={preview} alt="current" style={{maxWidth:"100%",maxHeight:150,objectFit:"contain",display:"block"}}/>
+            <div style={{display:"flex",gap:14,marginBottom:16,flexWrap:"wrap"}}>
+              <div style={{flex:"1 1 320px",minWidth:0}}>
+                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",textAlign:"center",marginBottom:6}}>Current</div>
+                <div style={{background:"var(--surface2)",borderRadius:10,padding:10,display:"flex",alignItems:"center",justifyContent:"center",height:"56vh",minHeight:280}}>
+                  <img src={preview} alt="current" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",display:"block"}}/>
                 </div>
               </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:10,color:"var(--accent)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",textAlign:"center",marginBottom:5}}>New (pasted)</div>
-                <div style={{background:"var(--surface2)",borderRadius:10,padding:8,display:"flex",alignItems:"center",justifyContent:"center",minHeight:150,border:"1px solid rgba(249,115,22,.35)"}}>
-                  <img src={pasteCompare.previewUrl} alt="new" style={{maxWidth:"100%",maxHeight:150,objectFit:"contain",display:"block"}}/>
+              <div style={{flex:"1 1 320px",minWidth:0}}>
+                <div style={{fontSize:11,color:"var(--accent)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",textAlign:"center",marginBottom:6}}>New (pasted)</div>
+                <div style={{background:"var(--surface2)",borderRadius:10,padding:10,display:"flex",alignItems:"center",justifyContent:"center",height:"56vh",minHeight:280,border:"1px solid rgba(249,115,22,.35)"}}>
+                  <img src={pasteCompare.previewUrl} alt="new" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",display:"block"}}/>
                 </div>
               </div>
             </div>
-            <div style={{display:"flex",gap:8}}>
-              <button className="btn btn-ghost btn-sm" style={{flex:1}}
+            <div style={{display:"flex",gap:8,maxWidth:420,margin:"0 auto"}}>
+              <button className="btn btn-ghost" style={{flex:1}}
                 onClick={()=>{URL.revokeObjectURL(pasteCompare.previewUrl);setPasteCompare(null);}}>
                 ✕ Cancel
               </button>
-              <button className="btn btn-primary btn-sm" style={{flex:1,background:"var(--accent)",border:"none"}}
+              <button className="btn btn-primary" style={{flex:1,background:"var(--accent)",border:"none"}}
                 onClick={()=>{
                   uploadToGDrive(new File([pasteCompare.blob],`${sku||"part"}.png`,{type:"image/png"}), {skipBgRemoval:true});
                   URL.revokeObjectURL(pasteCompare.previewUrl);

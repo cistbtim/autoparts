@@ -2703,6 +2703,13 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
   const [searchD, setSearchD] = useState(jumpSearch);
   const [highlightModel, setHighlightModel] = useState(jumpModel);
   const [wikiOpenId, setWikiOpenId] = useState(null); // vehicle id whose wiki summary is expanded inline
+  const [bulkOpen,    setBulkOpen]    = useState(false); // "Bulk Add from Research" overlay
+  const [bulkPaste,   setBulkPaste]   = useState("");
+  const [bulkError,   setBulkError]   = useState("");
+  const [bulkRows,    setBulkRows]    = useState(null); // parsed+editable review rows, null = not yet parsed
+  const [bulkChecked, setBulkChecked] = useState(new Set());
+  const [bulkSaving,  setBulkSaving]  = useState(false);
+  const [bulkDone,    setBulkDone]    = useState(null); // {count}
 
   useEffect(()=>{ if(jumpMake) setSelMake(jumpMake); },[jumpMake]);
   useEffect(()=>{ setHighlightModel(jumpModel); },[jumpModel]);
@@ -2725,6 +2732,23 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
   },[search]);
 
   const fitCount = (vid) => partFitments.filter(f=>String(f.vehicle_id)===String(vid)).length;
+
+  // ── Bulk Add from Research — the code system this catalog actually uses (learned
+  // the hard way this session): code = [make's short prefix][real chassis number][letter],
+  // e.g. BZ167=W167/C167 GLE, BZ206=W206 C-Class, BZ172=R172 SLK/SLC. Letters are assigned
+  // sequentially within one chassis number and NEVER auto-overflow into a new number —
+  // that collided with an unrelated model (BZ028 was already W208 CLK) earlier this session.
+  const existingCodesSet = useMemo(()=> new Set(vehicles.map(v=>(v.code||"").toUpperCase()).filter(Boolean)), [vehicles]);
+  const makeCodePrefix = useMemo(()=>{
+    if(!selMake) return "";
+    const counts = {};
+    for(const v of vehicles){
+      if(v.make!==selMake || !v.code) continue;
+      const m = v.code.toUpperCase().match(/^[A-Z]+/);
+      if(m) counts[m[0]] = (counts[m[0]]||0)+1;
+    }
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0] || "";
+  },[vehicles, selMake]);
 
   // ── Job-card count per vehicle — workshop_jobs stores make/model as free text
   // typed by mechanics (or, sometimes, the catalog code itself), not a vehicle_id
@@ -2858,6 +2882,78 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
     }
   };
 
+  // Paste schema: [{model, chassis, year_from, year_to, variant?}, ...]
+  // "chassis" is the real designation (e.g. "R172", "W206", "F30") — the row's model
+  // text becomes "{chassis} {model}" and its code becomes prefix+numericChassis+letter,
+  // matching how every hand-built row in this catalog is already named.
+  const runBulkParse = () => {
+    setBulkError("");
+    let data;
+    try { data = JSON.parse(bulkPaste); }
+    catch { setBulkError("That doesn't look like valid JSON."); return; }
+    if (!Array.isArray(data) || !data.length) { setBulkError("Expected a JSON array of {model, chassis, year_from, year_to} rows."); return; }
+
+    const reserved = new Set(existingCodesSet);
+    const rows = data.map((d, i) => {
+      const chassis = String(d.chassis||"").toUpperCase().trim();
+      const numeric = (chassis.match(/\d+/)||[""])[0];
+      let code = "";
+      if (numeric) {
+        const base = `${makeCodePrefix}${numeric}`;
+        for (let c=0;c<26;c++){
+          const cand = base + String.fromCharCode(65+c);
+          if (!reserved.has(cand)) { code = cand; break; }
+        }
+      }
+      if (code) reserved.add(code);
+      return {
+        key: i,
+        model: [chassis, d.model].filter(Boolean).join(" "),
+        code,
+        variant: d.variant || "",
+        year_from: d.year_from ?? "",
+        year_to: d.year_to ?? "",
+        codeManual: false,
+      };
+    });
+    setBulkRows(rows);
+    setBulkChecked(new Set(rows.filter(r=>r.code).map(r=>r.key)));
+  };
+
+  const updateBulkRow = (key, field, value) => {
+    setBulkRows(prev => prev.map(r => r.key===key ? {...r, [field]:value, ...(field==="code"?{codeManual:true}:{})} : r));
+  };
+
+  const bulkCodeIssue = (row) => {
+    if (!row.code) return "no chassis number — enter a code manually";
+    const dupInBatch = bulkRows.filter(r=>r.code===row.code).length > 1;
+    if (dupInBatch) return "duplicate code in this batch";
+    if (existingCodesSet.has(row.code.toUpperCase())) return "code already exists";
+    return null;
+  };
+
+  const applyBulkInsert = async () => {
+    const rows = (bulkRows||[]).filter(r => bulkChecked.has(r.key) && !bulkCodeIssue(r));
+    if (!rows.length) return;
+    setBulkSaving(true);
+    try {
+      for (const r of rows) {
+        await api.insert("vehicles", {
+          make: selMake, model: r.model, code: r.code, variant: r.variant||"",
+          year_from: r.year_from?+r.year_from:null, year_to: r.year_to?+r.year_to:null,
+          engine: "", photo_front:"", photo_rear:"", photo_side:"",
+        });
+      }
+      await onRefreshVehicles?.();
+      setBulkDone({count: rows.length});
+    } catch(e) {
+      alert(`❌ Bulk insert failed partway through: ${e.message||e}`);
+      await onRefreshVehicles?.();
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const openVehicleLightbox = (v, startKey) => {
     const entries = [
       {key:"photo_front", label:"Front"},
@@ -2903,6 +2999,13 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
             <button className="btn btn-ghost" title="Refresh — pull in vehicles added directly in Supabase" disabled={refreshing}
               onClick={async()=>{setRefreshing(true);try{await onRefreshVehicles();}finally{setRefreshing(false);}}}>
               <span style={{display:"inline-block",animation:refreshing?"spin 0.8s linear infinite":"none"}}>🔄</span> Refresh
+            </button>
+          )}
+          {selMake!==null&&(
+            <button className="btn btn-ghost" style={{color:"var(--green)",borderColor:"rgba(52,211,153,.35)"}}
+              title="Paste researched generation/chassis history and bulk-add models"
+              onClick={()=>{setBulkOpen(true);setBulkError("");setBulkDone(null);}}>
+              🌐 Bulk Add from Research
             </button>
           )}
           <button className="btn btn-primary" onClick={()=>setEditV(newVehicleDefaults)}>
@@ -3092,6 +3195,64 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
             ));
           })()}
         </div>
+      </Overlay>
+    )}
+
+    {bulkOpen&&(
+      <Overlay onClose={()=>!bulkSaving&&setBulkOpen(false)} wide>
+        <MHead title={`🌐 Bulk Add — ${selMake}`}
+          sub={bulkDone?undefined:`Code system: ${makeCodePrefix||"??"} + real chassis number + letter, e.g. ${makeCodePrefix||"BZ"}172A — paste a JSON array of {model, chassis, year_from, year_to}`}
+          onClose={()=>!bulkSaving&&setBulkOpen(false)}/>
+
+        {bulkDone ? (
+          <div style={{textAlign:"center",padding:"20px 10px"}}>
+            <div style={{fontSize:32,marginBottom:8}}>✅</div>
+            <div style={{fontWeight:700,marginBottom:16}}>Added {bulkDone.count} vehicle{bulkDone.count!==1?"s":""} to {selMake}</div>
+            <button className="btn btn-primary" onClick={()=>{setBulkOpen(false);setBulkPaste("");setBulkRows(null);}}>Done</button>
+          </div>
+        ) : !bulkRows ? (<>
+          <textarea className="inp" rows={10} value={bulkPaste} onChange={e=>setBulkPaste(e.target.value)}
+            placeholder={`[\n  {"model":"SLK","chassis":"R172","year_from":2011,"year_to":2015},\n  {"model":"SLC","chassis":"R172","year_from":2016,"year_to":2020}\n]`}
+            style={{resize:"vertical",fontFamily:"DM Mono,monospace",fontSize:12,marginBottom:10}}/>
+          {bulkError&&<div style={{fontSize:12,color:"var(--red)",marginBottom:10}}>⚠ {bulkError}</div>}
+          <div style={{fontSize:11,color:"var(--text3)",marginBottom:12}}>
+            One row per real generation/body split — not per engine size. Only split on things that actually change body parts (facelift, generation, AMG/M/AMG-Line-style bodykits), same chassis number across a rename (e.g. R172 covers both SLK and SLC).
+          </div>
+          <button className="btn btn-primary" style={{width:"100%"}} disabled={!bulkPaste.trim()} onClick={runBulkParse}>
+            Parse
+          </button>
+        </>) : (<>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,fontSize:12,color:"var(--text3)"}}>
+            <span>{bulkChecked.size} of {bulkRows.length} selected</span>
+            <button className="btn btn-ghost btn-xs" onClick={()=>{setBulkRows(null);setBulkPaste("");}}>↩ Paste different data</button>
+          </div>
+          <div style={{maxHeight:420,overflowY:"auto",display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+            {bulkRows.map(row=>{
+              const issue = bulkCodeIssue(row);
+              const checked = bulkChecked.has(row.key);
+              return (
+                <div key={row.key} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,
+                  border:`1px solid ${issue?"var(--red)":"var(--border)"}`,background:"var(--surface2)",flexWrap:"wrap"}}>
+                  <input type="checkbox" checked={checked} disabled={!!issue}
+                    onChange={()=>setBulkChecked(p=>{const n=new Set(p);n.has(row.key)?n.delete(row.key):n.add(row.key);return n;})}/>
+                  <input className="inp" style={{flex:"2 1 200px",fontSize:12}} value={row.model}
+                    onChange={e=>updateBulkRow(row.key,"model",e.target.value.toUpperCase())}/>
+                  <input className="inp" style={{width:90,fontSize:12,fontFamily:"DM Mono,monospace",fontWeight:700,
+                    color:issue?"var(--red)":"var(--accent)"}} value={row.code}
+                    onChange={e=>updateBulkRow(row.key,"code",e.target.value.toUpperCase())}/>
+                  <input className="inp" type="number" style={{width:75,fontSize:12}} value={row.year_from} placeholder="from"
+                    onChange={e=>updateBulkRow(row.key,"year_from",e.target.value)}/>
+                  <input className="inp" type="number" style={{width:75,fontSize:12}} value={row.year_to} placeholder="to"
+                    onChange={e=>updateBulkRow(row.key,"year_to",e.target.value)}/>
+                  {issue&&<div style={{width:"100%",fontSize:11,color:"var(--red)"}}>⚠ {issue}</div>}
+                </div>
+              );
+            })}
+          </div>
+          <button className="btn btn-primary" style={{width:"100%"}} disabled={bulkSaving||bulkChecked.size===0} onClick={applyBulkInsert}>
+            {bulkSaving?"⏳ Adding…":`Add ${bulkChecked.size} to ${selMake}`}
+          </button>
+        </>)}
       </Overlay>
     )}
   </>

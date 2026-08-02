@@ -9971,12 +9971,23 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     const matchV=vehicles.filter(v=>
       v.make?.toLowerCase()===_imLower&&(!initialModel||(initialCode?v.code===initialCode:(v.code===initialModel||v.model===initialModel)))
     );
-    const vIds=new Set(matchV.map(v=>String(v.id)));
-    const fitIds=new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)));
-    // Zero matches means "no fitment data for this vehicle", not "no filter active" —
-    // use a sentinel so it doesn't fall through to showing the whole catalog
-    setVehicleFilterIds(fitIds.size>0?fitIds:new Set(["__none__"]));
-  },[jobMode,initialMake,initialModel,initialCode,vehicles,partFitments]);
+    const vIds=[...new Set(matchV.map(v=>String(v.id)))];
+    if(!vIds.length){ setVehicleFilterIds(new Set(["__none__"])); return; }
+    let cancelled=false;
+    // Fetch fresh — this is a separate filter from the shopParts fetch above (it drives
+    // the final display filter at render time) and was silently relying on the stale
+    // partFitments prop, so a part fitment-linked after this session's initial load
+    // still showed up in shopParts but then got filtered back out here.
+    (async()=>{
+      const FC=50;const fchunks=[];for(let i=0;i<vIds.length;i+=FC)fchunks.push(vIds.slice(i,i+FC));
+      const pages=await Promise.all(fchunks.map(c=>api.fresh("part_fitments",`vehicle_id=in.(${c.join(",")})&select=part_id`).catch(()=>[])));
+      const fitIds=new Set(pages.flat().map(f=>String(f.part_id)));
+      // Zero matches means "no fitment data for this vehicle", not "no filter active" —
+      // use a sentinel so it doesn't fall through to showing the whole catalog
+      if(!cancelled) setVehicleFilterIds(fitIds.size>0?fitIds:new Set(["__none__"]));
+    })();
+    return()=>{cancelled=true;};
+  },[jobMode,initialMake,initialModel,initialCode,vehicles]);
 
   const _dispV=initialCode?vehicles.find(v=>v.make?.toLowerCase()===initialMake?.toLowerCase()&&v.code===initialCode):null;
   const _dispYear=_dispV?((_dispV.year_from||"")+(_dispV.year_to&&_dispV.year_to!==_dispV.year_from?`–${_dispV.year_to}`:"")).trim():"";

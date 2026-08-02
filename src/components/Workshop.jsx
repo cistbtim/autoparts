@@ -4311,12 +4311,18 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         return vm && (vm.includes(_jModel)||_jModel.includes(vm));
       });
     }
-    const vIds=new Set(matchV.map(v=>String(v.id)));
-    const fitIds=[...new Set(partFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
-    // Fall back to the job's own vehicle_model text when no vehicles-table row
-    // matches, so parts tagged with make/model directly still count
+    const vIds=[...new Set(matchV.map(v=>String(v.id)))];
     let cancelled=false;
     (async()=>{
+      if(!vIds.length){ if(!cancelled)setSpareShopPartsCount(null); return; }
+      // Fetch part_fitments fresh from the DB rather than trusting the in-memory
+      // partFitments prop — this badge is usually viewed from a different login
+      // than whoever last edited fitments in Inventory, so the local cache is
+      // frequently stale (this was the actual bug: badge/count not reflecting
+      // fitments added or removed elsewhere).
+      const FC=50;const fchunks=[];for(let i=0;i<vIds.length;i+=FC)fchunks.push(vIds.slice(i,i+FC));
+      const fitRows=await Promise.all(fchunks.map(c=>api.fresh("part_fitments",`vehicle_id=in.(${c.join(",")})&select=part_id`).catch(()=>[])));
+      const fitIds=[...new Set(fitRows.flat().map(f=>String(f.part_id)))];
       const ids=new Set();
       // Only count fitment-linked parts — text/model matching is excluded here
       // to prevent showing parts that don't actually fit this specific vehicle.
@@ -4330,7 +4336,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       if(!cancelled)setSpareShopPartsCount(ids.size||null);
     })();
     return()=>{cancelled=true;};
-  },[job.vehicle_make,job.vehicle_model,wsProfile?.linked_branch_id,mainBranchId,partFitments,vehicles]);
+  },[job.vehicle_make,job.vehicle_model,wsProfile?.linked_branch_id,mainBranchId,vehicles]);
   // When spare shop part popup opens with a part_id but no photo,
   // fetch the latest part row directly so a recently-added photo shows immediately.
   useEffect(()=>{
@@ -9865,10 +9871,13 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         api.get("parts",`${extra}id=in.(${c.join(",")})&select=${COLS}&order=sku.asc`).catch(()=>[])
       )).then(pages=>pages.flat());
     };
-    // On explicit refresh in job mode, re-fetch part_fitments from DB so newly added parts/fitments appear
-    // without requiring a logout. On initial load (refreshKey===0) the prop is fine.
+    // Always re-fetch part_fitments fresh from DB in job mode — the in-memory
+    // partFitments prop reflects whatever was last loaded in THIS session, so a
+    // fitment added/removed from another login (the common case: whoever edits
+    // Inventory is rarely the same session as whoever's viewing this job) would
+    // otherwise stay invisible here until a full app reload.
     const getFitments=async()=>{
-      if(!initialMake||vehicles.length===0||refreshKey===0) return partFitments;
+      if(!initialMake||vehicles.length===0) return partFitments;
       // Case-insensitive make match — job.vehicle_make (scanned/typed) doesn't always match
       // the vehicles table's stored casing exactly, unlike the badge count which already
       // accounts for this (was causing the "N parts" badge to disagree with 0 results here).
@@ -9877,7 +9886,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       if(!matchV.length) return partFitments;
       const vIds=matchV.map(v=>String(v.id));
       const FC=50;const fchunks=[];for(let i=0;i<vIds.length;i+=FC)fchunks.push(vIds.slice(i,i+FC));
-      const pages=await Promise.all(fchunks.map(c=>api.get("part_fitments",`vehicle_id=in.(${c.join(",")})&select=part_id,vehicle_id`).catch(()=>[])));
+      const pages=await Promise.all(fchunks.map(c=>api.fresh("part_fitments",`vehicle_id=in.(${c.join(",")})&select=part_id,vehicle_id`).catch(()=>[])));
       return pages.flat();
     };
     getFitments().then(currentFitments=>{

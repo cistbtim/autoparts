@@ -9987,7 +9987,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       if(!cancelled) setVehicleFilterIds(fitIds.size>0?fitIds:new Set(["__none__"]));
     })();
     return()=>{cancelled=true;};
-  },[jobMode,initialMake,initialModel,initialCode,vehicles]);
+  },[jobMode,initialMake,initialModel,initialCode,vehicles,refreshKey]);
 
   const _dispV=initialCode?vehicles.find(v=>v.make?.toLowerCase()===initialMake?.toLowerCase()&&v.code===initialCode):null;
   const _dispYear=_dispV?((_dispV.year_from||"")+(_dispV.year_to&&_dispV.year_to!==_dispV.year_from?`–${_dispV.year_to}`:"")).trim():"";

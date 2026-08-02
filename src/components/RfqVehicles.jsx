@@ -1677,14 +1677,18 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
     ? vehicles.filter(v => v.code && v.code.toUpperCase() === skuCode && !linkedIds.has(String(v.id)) && !pending.has(String(v.id)))
     : [];
 
-  const filtered = vehicles.filter(v => {
+  // Matches the current search, regardless of pending state — used by Select All /
+  // Unselect, which need to see vehicles that are ALREADY pending too (unlike
+  // `filtered` below, which hides pending rows since they're shown in their own
+  // "pending" section instead).
+  const searchMatched = vehicles.filter(v => {
     if(linkedIds.has(String(v.id))) return false; // already linked
-    if(pending.has(String(v.id))) return false;    // already selected
     if(!search.trim()) return true;
     const hay = `${v.make} ${v.model} ${v.variant||""} ${v.engine||""} ${v.year_from} ${v.year_to||""} ${v.code||""}`.toLowerCase();
     const tokens = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
     return tokens.every(tok=>hay.includes(tok)); // every keyword must appear, in any order
   });
+  const filtered = searchMatched.filter(v => !pending.has(String(v.id)));
 
   const toggle = (vid) => {
     setPending(p => {
@@ -2282,12 +2286,26 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
         <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em"}}>
           ➕ Select Vehicles to Link
         </div>
-        {onRefreshVehicles&&(
-          <button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} disabled={refreshing}
-            onClick={refreshVehicles} title="Reload vehicle list from the database">
-            {refreshing ? "⏳ Refreshing…" : "🔄 Refresh"}
-          </button>
-        )}
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          {searchMatched.length>0&&(<>
+            <button className="btn btn-ghost btn-xs" style={{color:"var(--green)"}}
+              onClick={()=>setPending(prev=>{const n=new Set(prev);searchMatched.slice(0,50).forEach(v=>n.add(String(v.id)));return n;})}
+              title="Select every vehicle matching the current search">
+              ☑ Select All
+            </button>
+            <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
+              onClick={()=>setPending(prev=>{const n=new Set(prev);searchMatched.slice(0,50).forEach(v=>n.delete(String(v.id)));return n;})}
+              title="Unselect every vehicle matching the current search">
+              ☐ Unselect
+            </button>
+          </>)}
+          {onRefreshVehicles&&(
+            <button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} disabled={refreshing}
+              onClick={refreshVehicles} title="Reload vehicle list from the database">
+              {refreshing ? "⏳ Refreshing…" : "🔄 Refresh"}
+            </button>
+          )}
+        </div>
       </div>
       <div style={{position:"relative",marginBottom:10}}>
         <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}

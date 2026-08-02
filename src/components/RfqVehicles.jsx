@@ -1535,7 +1535,20 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
 // ═══════════════════════════════════════════════════════════════
 const _sqYear = (y) => { if (!y) return null; const m = String(y).match(/\d{4}/); return m ? parseInt(m[0], 10) : null; };
 const _sqSquash = (s) => (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-const _sqChunks = (s) => (s || "").toUpperCase().match(/[A-Z]+|[0-9]+/g) || [];
+// Different data sources name the same body style differently (Spareto says "T-Model"
+// or "Touring", this catalog says "Estate"). Collapse known synonyms to one canonical
+// word BEFORE chunking, so a full match isn't blocked by pure vocabulary mismatch.
+const _sqBodyStyleSynonyms = [
+  [/\bT-MODEL\b|\bT MODEL\b|\bTOURING\b|\bSTATION WAGON\b|\bAVANT\b|\bVARIANT\b|\bKOMBI\b|\bWAGON\b/g, "ESTATE"],
+  [/\bCABRIO\b|\bCONVERTIBLE\b/g, "CABRIOLET"],
+  [/\bSALOON\b|\bBERLINA\b/g, "SEDAN"],
+];
+const _sqNormalize = (s) => {
+  let out = (s || "").toUpperCase();
+  for (const [re, canon] of _sqBodyStyleSynonyms) out = out.replace(re, canon);
+  return out;
+};
+const _sqChunks = (s) => _sqNormalize(s).match(/[A-Z]+|[0-9]+/g) || [];
 const _sqYearsOverlap = (a1, a2, b1, b2) => {
   const A1 = a1 || 0, A2 = a2 || 9999, B1 = b1 || 0, B2 = b2 || 9999;
   return A1 <= B2 && B1 <= A2;

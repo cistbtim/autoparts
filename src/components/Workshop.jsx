@@ -42,7 +42,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const jobIdFilterSet = useMemo(()=> jobIdFilter ? new Set(jobIdFilter.jobIds) : null, [jobIdFilter]);
   const [bookIn,         setBookIn]         = useState(false);
   const [wsTab,          setWsTab]          = useState(initialTab||"jobs");
-  const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:"", code:"", vin:"", engineNo:"", reg:""});
+  const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:"", code:"", vin:"", engineNo:"", reg:"", nonce:0});
   const [stmtCust,       setStmtCust]       = useState("");
   const [qInvModal,      setQInvModal]      = useState(null);
   const [sortBy,         setSortBy]         = useState("date_desc");
@@ -348,7 +348,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         onViewPurchaseOrders={()=>{ setView("list"); setWsTab("wssuporders"); }}
         onViewPO={(poId)=>{ setPendingViewPoId(poId); setView("list"); setWsTab("wssuporders"); }}
         onGoToStock={()=>{ setView("list"); setWsTab("wsstock"); }}
-        onGoToSpareShop={(make,model,code,vin,engineNo,reg)=>{ setSpareShopFilter({make:make||"",model:model||"",code:code||"",vin:vin||"",engineNo:engineNo||"",reg:reg||""}); setView("list"); setWsTab("spareshop"); }}
+        onGoToSpareShop={(make,model,code,vin,engineNo,reg)=>{ setSpareShopFilter(p=>({make:make||"",model:model||"",code:code||"",vin:vin||"",engineNo:engineNo||"",reg:reg||"",nonce:p.nonce+1})); setView("list"); setWsTab("spareshop"); }}
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
@@ -2153,7 +2153,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   <div style={{fontWeight:600,marginBottom:6}}>No spare shop linked</div>
                   <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
                 </div>
-              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab} onEditPart={onEditPart} onDeletePart={onDeletePart} onAddPart={onAddPart}/>
+              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}|${spareShopFilter.nonce}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab} onEditPart={onEditPart} onDeletePart={onDeletePart} onAddPart={onAddPart}/>
             }
           </div>
         );

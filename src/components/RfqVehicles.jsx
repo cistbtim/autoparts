@@ -7,9 +7,19 @@ import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
 
-export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpdateStatus,onSelectQuote,onUnselectQuote,onUnselectAll,onRefresh,onCreatePO,onResendStale,onEditPart,t,user,settings}) {
+export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpdateStatus,onSelectQuote,onUnselectQuote,onUnselectAll,onRefresh,onCreatePO,onResendStale,onDeleteSession,onEditPart,t,user,settings,initialSessionId=null,onConsumeInitialSession}) {
   const [view,setView]=useState("list"); // list | create | detail
   const [activeSession,setActiveSession]=useState(null);
+
+  // One-shot deep link — e.g. from a Branch Transfer Request card's "View & Order via
+  // RFQ" button — jumps straight to that session's quotes instead of the list view.
+  useEffect(()=>{
+    if(!initialSessionId) return;
+    const s=rfqSessions.find(x=>String(x.id)===String(initialSessionId));
+    if(s){setActiveSession(s);setView("detail");}
+    onConsumeInitialSession?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[initialSessionId]);
   const [lq,setLq]=useState([]); // local quote state for detail view (no auto-refresh)
   const needSync=useRef(false);
   const [isMobile,setIsMobile]=useState(()=>window.innerWidth<=700);
@@ -515,7 +525,8 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
             {rfqSessions.map(s=>{
               const sItems=rfqItems.filter(i=>i.rfq_id===s.id);
               const sQuotes=rfqQuotes.filter(q=>q.rfq_id===s.id);
-              const sSupps=[...new Set(sQuotes.map(q=>q.supplier_id))];
+              const sSuppIds=[...new Set(sQuotes.map(q=>q.supplier_id))];
+              const sSuppNames=sSuppIds.map(id=>sQuotes.find(q=>q.supplier_id===id)?.supplier_name||suppliers.find(sp=>String(sp.id)===String(id))?.name).filter(Boolean);
               const quotedCnt=sQuotes.filter(q=>q.status==="quoted").length;
               const statusColor={draft:"var(--text3)",sent:"var(--blue)",comparing:"var(--yellow)",ordered:"var(--green)"}[s.status]||"var(--text3)";
               const isOverdue=s.is_auto&&s.status==="pending"&&s.reply_deadline&&new Date(s.reply_deadline)<new Date();
@@ -532,7 +543,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                     }
                   </td>
                   <td style={{textAlign:"center"}}>{sItems.length}</td>
-                  <td style={{textAlign:"center"}}>{sSupps.length}</td>
+                  <td style={{textAlign:"center"}} title={sSuppNames.join(", ")}>{sSuppNames.length>0?sSuppNames.join(", "):sSuppIds.length}</td>
                   <td style={{textAlign:"center"}}>
                     <span style={{color:quotedCnt===sQuotes.length&&sQuotes.length>0?"var(--green)":"var(--text2)"}}>{quotedCnt}/{sQuotes.length}</span>
                   </td>
@@ -540,6 +551,12 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                   <td style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                     <button className="btn btn-info btn-xs" onClick={()=>openSession(s)}>{t.rfqView}</button>
                     {isOverdue&&onResendStale&&<button className="btn btn-xs" style={{background:"#f97316",color:"#fff",border:"none"}} onClick={async()=>{await onResendStale();onRefresh();}}>Resend</button>}
+                    {onDeleteSession&&(
+                      <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
+                        onClick={()=>{if(window.confirm(`Delete RFQ session "${s.name}" and its ${sItems.length} item${sItems.length!==1?"s":""}/${sQuotes.length} quote${sQuotes.length!==1?"s":""}? This can't be undone.`)) onDeleteSession(s.id);}}>
+                        🗑️
+                      </button>
+                    )}
                   </td>
                 </tr>
               );

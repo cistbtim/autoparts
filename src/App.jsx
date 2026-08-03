@@ -261,6 +261,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [shopVehicleFilter,setShopVehicleFilter]=useState({make:"",model:""});
   const [workshopJobFilter,setWorkshopJobFilter]=useState(null); // {label,jobIds} — one-shot nav from Vehicle Management's job-card badge
+  const [rfqJumpSessionId,setRfqJumpSessionId]=useState(null); // one-shot nav — jump straight into an RFQ session's quotes from a Branch Transfer Request card
   const [vehiclesJumpMake,setVehiclesJumpMake]=useState(initialVehiclesMake||null);
   const [vehiclesJumpModel,setVehiclesJumpModel]=useState(null);
   const [vehiclesJumpSearch,setVehiclesJumpSearch]=useState("");
@@ -2738,6 +2739,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await refreshTables("rfq_sessions");
   };
 
+  const deleteRfqSession=async(sid)=>{
+    await api.delete("rfq_quotes","rfq_id",sid);
+    await api.delete("rfq_items","rfq_id",sid);
+    await api.delete("rfq_sessions","id",sid);
+    setRfqQuotes(prev=>prev.filter(q=>q.rfq_id!==sid));
+    setRfqItems(prev=>prev.filter(i=>i.rfq_id!==sid));
+    setRfqSessions(prev=>prev.filter(s=>s.id!==sid));
+    showToast("🗑️ RFQ session deleted");
+  };
+
   // ── Auto-reorder: create RFQ for one part → one supplier ─────────────────
   const REORDER_DEADLINE_HOURS=24;
 
@@ -2846,18 +2857,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     for(const q of itemQuotes){
       await api.patch("rfq_quotes","id",q.id,{status:q.id===quoteId?"selected":"pending"});
     }
-    // no loadAll — RfqPage uses optimistic lq state; user clicks Refresh to sync
+    // Keep app-level rfqQuotes in sync immediately — createPOFromRfq (and anything
+    // else reading rfqQuotes) needs the real status right away, not just RfqPage's
+    // own optimistic local view, otherwise "Create PO" sees stale statuses and finds
+    // nothing selected until the user happens to click Refresh first.
+    setRfqQuotes(prev=>prev.map(q=>q.rfq_item_id===rfqItemId?{...q,status:q.id===quoteId?"selected":"pending"}:q));
   };
 
   const unselectRfqQuote=async(quoteId)=>{
     await api.patch("rfq_quotes","id",quoteId,{status:"quoted"});
-    // no loadAll
+    setRfqQuotes(prev=>prev.map(q=>q.id===quoteId?{...q,status:"quoted"}:q));
   };
 
   const unselectAllRfq=async(sid)=>{
     const toUnselect=rfqQuotes.filter(q=>q.rfq_id===sid&&q.status==="selected");
     for(const q of toUnselect) await api.patch("rfq_quotes","id",q.id,{status:"quoted"});
-    // no loadAll
+    setRfqQuotes(prev=>prev.map(q=>q.rfq_id===sid&&q.status==="selected"?{...q,status:"quoted"}:q));
   };
 
   const createPOFromRfq=async(sid)=>{
@@ -2874,11 +2889,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // Create one PO per supplier
     for(const [sid2,data] of Object.entries(bySupplier)){
       const invId=makeId(settings.invoice_prefix||"INV");
+      // No client-supplied id — supplier_invoice_items.id is a GENERATED ALWAYS
+      // identity column; sending one made every insert fail with 428C9, silently
+      // (the result was never checked), leaving the PO header created but empty.
       const lineItems=data.quotes.map(q=>{
         const item=sessionItems.find(i=>i.id===q.rfq_item_id);
         return {
-          id:makeId("LI"), invoice_id:invId,
-          part_id:item?.part_id||"", part_name:item?.part_name||"",
+          invoice_id:invId,
+          part_id:item?.part_id?+item.part_id:null, part_name:item?.part_name||"",
           part_sku:item?.part_sku||"", supplier_part_id:q.supplier_part_no||"",
           qty:item?.qty_needed||1, unit_cost:q.unit_price||0,
           total:(item?.qty_needed||1)*(q.unit_price||0)
@@ -2890,8 +2908,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         invoice_date:new Date().toISOString().slice(0,10),
         status:"unpaid", total, notes:`From RFQ ${sid}`,...(_bId?{branch_id:_bId}:{})
       };
-      await api.insert("supplier_invoices",inv);
-      for(const li of lineItems) await api.insert("supplier_invoice_items",li);
+      const invRes=await api.insert("supplier_invoices",inv);
+      if(!Array.isArray(invRes)&&invRes?.code){showToast(`❌ Error creating invoice: ${invRes.message||invRes.code}`,"err");continue;}
+      for(const li of lineItems){
+        const liRes=await api.insert("supplier_invoice_items",li);
+        if(!Array.isArray(liRes)&&liRes?.code){showToast(`❌ Error adding ${li.part_name||"line item"}: ${liRes.message||liRes.code}`,"err");}
+      }
       // Update stock
       for(const li of lineItems){
         const p=parts.find(x=>String(x.id)===String(li.part_id));
@@ -4644,8 +4666,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onCreate={createRfqSession} onUpdateStatus={updateRfqStatus}
             onSelectQuote={selectRfqQuote} onUnselectQuote={unselectRfqQuote}
             onUnselectAll={unselectAllRfq} onRefresh={loadAll}
-            onCreatePO={createPOFromRfq} onResendStale={checkStaleRfqs}
+            onCreatePO={createPOFromRfq} onResendStale={checkStaleRfqs} onDeleteSession={deleteRfqSession}
             onEditPart={(p)=>{if(p)openM("editPart",p);}}
+            initialSessionId={rfqJumpSessionId} onConsumeInitialSession={()=>setRfqJumpSessionId(null)}
             t={t} user={user} settings={settings}/>
         )}
 
@@ -6350,7 +6373,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             wsShopRequests={wsShopRequests}
             onSaveWsShopRequest={saveWsShopRequest}
             branches={branches}
-            onPlaceShopOrder={async({localItems,mainItems,requestItems,notes,linkedBranchId})=>{
+            onPlaceShopOrder={async({localItems,mainItems,requestItems,notes,linkedBranchId,jobId,jobLabel,jobCustomer})=>{
               let localOid=null,bsrId=null;
               try{
                 if(localItems?.length){
@@ -6366,7 +6389,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 const stockItems=[...(mainItems||[]),...(requestItems||[])];
                 if(stockItems.length){
                   bsrId=makeId("BSR");
-                  const bsrPayload={id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:linkedBranchId,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:stockItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:makeToken(),notes:notes||null};
+                  const bsrPayload={id:bsrId,requesting_branch_id:linkedBranchId,supplying_branch_id:linkedBranchId,workshop_id:wsId||null,workshop_name:workshopProfile.name||"",workshop_phone:workshopProfile.phone||workshopProfile.whatsapp||"",workshop_email:workshopProfile.email||"",items:stockItems.map(i=>({partId:i.id,qty:i.qty,name:i.name,sku:i.sku||""})),status:"pending",confirm_token:makeToken(),notes:notes||null,job_id:jobId||null,job_label:jobLabel||"",job_customer:jobCustomer||""};
                   const bsrRes=await api.upsert("branch_stock_requests",bsrPayload);
                   if(bsrRes?.code||bsrRes?.message) throw new Error(`DB error ${bsrRes.code||""}: ${bsrRes.message||JSON.stringify(bsrRes)}`);
                 }
@@ -6430,7 +6453,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         )}
 
         {tab==="transferRequests"&&(role==="admin"||role==="branch_admin")&&(
-          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} supplierInvoices={supplierInvoices} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor} t={t} onRefresh={()=>refreshTables("branch_stock_requests")} onDelete={deleteBranchStockRequest} rfqQuotes={rfqQuotes} onCreateRfqSession={createRfqSession}/>
+          <BranchTransferRequestsPage branchStockRequests={branchStockRequests} branches={branches} role={role} currentBranch={currentBranch} settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} supplierInvoices={supplierInvoices} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor} t={t} onRefresh={()=>refreshTables("branch_stock_requests","rfq_quotes","rfq_items")} onDelete={deleteBranchStockRequest} rfqQuotes={rfqQuotes} rfqItems={rfqItems} onCreateRfqSession={createRfqSession} onGoToRfqSession={(sid)=>{setRfqJumpSessionId(sid);setTab("rfq");}}/>
         )}
 
         {tab==="wsShopRequests"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
@@ -6447,8 +6470,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onDeleteWsShop={deleteWsShopRequest} onDeleteTransfer={deleteBranchStockRequest}
             onApproveVehicle={saveVehicle} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor}
             onGoToVehicles={(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}}
-            rfqQuotes={rfqQuotes} onCreateRfqSession={createRfqSession}
-            onRefresh={()=>refreshTables("ws_shop_requests","branch_stock_requests","vehicle_requests","part_requests")}/>
+            rfqQuotes={rfqQuotes} rfqItems={rfqItems} onCreateRfqSession={createRfqSession}
+            onGoToRfqSession={(sid)=>{setRfqJumpSessionId(sid);setTab("rfq");}}
+            onRefresh={()=>refreshTables("ws_shop_requests","branch_stock_requests","vehicle_requests","part_requests","rfq_quotes","rfq_items")}/>
         )}
 
         {tab==="settings"&&role==="admin"&&(

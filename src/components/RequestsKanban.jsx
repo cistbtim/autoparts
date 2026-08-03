@@ -167,7 +167,7 @@ export function RequestsKanbanPage({
   user,role,currentBranch,t={},
   onReply,onEscalate,onMainReply,onDeleteWsShop,onDeleteTransfer,
   onApproveVehicle,onGoToVehicles,onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,onRefresh,
-  rfqQuotes=[],onCreateRfqSession,
+  rfqQuotes=[],rfqItems=[],onCreateRfqSession,onGoToRfqSession,
 }) {
   const [activeTypes,setActiveTypes]=useState(()=>new Set(["ws","transfer","vehicle","part"]));
   const [openCardId,setOpenCardId]=useState(null); // id of the card currently shown in the detail Overlay
@@ -220,7 +220,7 @@ export function RequestsKanbanPage({
         <MHead title="🔄 Branch Transfer Request" sub={raw.workshop_name||"Request"} onClose={closeDetail}/>
         <TransferRequestCard r={raw} branches={branches} role={role} currentBranch={currentBranch}
           settings={settings} branchStock={branchStock} parts={parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} supplierInvoices={supplierInvoices} onSendInquiry={onSendInquiry} onManualQuote={onManualQuote} onAcceptQuote={onAcceptQuote} onCancelOrder={onCancelOrder} onEditPart={onEditPart} t={t}
-          rfqQuotes={rfqQuotes} onCreateRfqSession={onCreateRfqSession}
+          rfqQuotes={rfqQuotes} rfqItems={rfqItems} onCreateRfqSession={onCreateRfqSession} onGoToRfqSession={onGoToRfqSession}
           onRefresh={onRefresh} onDelete={onDeleteTransfer}/>
       </Overlay>
     );

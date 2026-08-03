@@ -42,7 +42,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const jobIdFilterSet = useMemo(()=> jobIdFilter ? new Set(jobIdFilter.jobIds) : null, [jobIdFilter]);
   const [bookIn,         setBookIn]         = useState(false);
   const [wsTab,          setWsTab]          = useState(initialTab||"jobs");
-  const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:"", code:"", vin:"", engineNo:"", reg:"", nonce:0});
+  const [spareShopFilter, setSpareShopFilter] = useState({make:"", model:"", code:"", vin:"", engineNo:"", reg:"", jobId:"", jobLabel:"", jobCustomer:"", nonce:0});
   const [stmtCust,       setStmtCust]       = useState("");
   const [qInvModal,      setQInvModal]      = useState(null);
   const [sortBy,         setSortBy]         = useState("date_desc");
@@ -77,6 +77,24 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [bkCancelModal,   setBkCancelModal]   = useState(null);
   const [bkCancelReason,  setBkCancelReason]  = useState("");
   const [kanbanView,      setKanbanView]      = useState(true);
+
+  // Spare Shop "quoted, awaiting your decision" count — polled here at the page level
+  // (not just inside WsSpareShopTab) so the 🔔 shows up on the nav tab itself even
+  // while the workshop user is sitting on Jobs/Bookings/etc, instead of only being
+  // visible after they happen to click into Spare Shop.
+  const [spareShopQuotedCount,setSpareShopQuotedCount]=useState(0);
+  useEffect(()=>{
+    if(!wsId||!wsProfile?.linked_branch_id) return;
+    let cancelled=false;
+    const poll=()=>{
+      api.get("branch_stock_requests",`workshop_id=eq.${wsId}&status=eq.quoted&select=id`).then(rows=>{
+        if(!cancelled&&Array.isArray(rows)) setSpareShopQuotedCount(rows.length);
+      }).catch(()=>{});
+    };
+    poll();
+    const timer=setInterval(poll,30000);
+    return()=>{cancelled=true;clearInterval(timer);};
+  },[wsId,wsProfile?.linked_branch_id]);
   const [kanbanZoom,      setKanbanZoom]      = useState(()=>{try{return Number(localStorage.getItem("ws_kanban_zoom")||1);}catch{return 1;}});
   const KANBAN_WIDTHS=[150,200,270,340,420];
   const kanbanColW=KANBAN_WIDTHS[Math.max(0,Math.min(4,kanbanZoom))];
@@ -348,7 +366,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         onViewPurchaseOrders={()=>{ setView("list"); setWsTab("wssuporders"); }}
         onViewPO={(poId)=>{ setPendingViewPoId(poId); setView("list"); setWsTab("wssuporders"); }}
         onGoToStock={()=>{ setView("list"); setWsTab("wsstock"); }}
-        onGoToSpareShop={(make,model,code,vin,engineNo,reg)=>{ setSpareShopFilter(p=>({make:make||"",model:model||"",code:code||"",vin:vin||"",engineNo:engineNo||"",reg:reg||"",nonce:p.nonce+1})); setView("list"); setWsTab("spareshop"); }}
+        onGoToSpareShop={(make,model,code,vin,engineNo,reg,jobId,jobLabel,jobCustomer)=>{ setSpareShopFilter(p=>({make:make||"",model:model||"",code:code||"",vin:vin||"",engineNo:engineNo||"",reg:reg||"",jobId:jobId||"",jobLabel:jobLabel||"",jobCustomer:jobCustomer||"",nonce:p.nonce+1})); setView("list"); setWsTab("spareshop"); }}
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
         wsId={wsId}
         wsProfile={wsProfile}
@@ -389,7 +407,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     ["wssuporders",  "📋 Purchase Orders", wsPurchaseOrders.length],
     ["wssupinv",     "🧾 Supplier Inv",wsSupplierInvoices.length],
     ["wstransfer",   "🔄 Transfer",    null],
-    ...(wsProfile?.linked_branch_id?[["spareshop","🏪 Spare Shop",null]]:[]),
+    ...(wsProfile?.linked_branch_id?[["spareshop",spareShopQuotedCount>0?`🏪 Spare Shop 🔔`:"🏪 Spare Shop",spareShopQuotedCount||null]]:[]),
     ["wsdocs",     "📎 Documents",   wsDocs.length],
     ["wslicencerenewal", "🪪 Licence Renewals", wsLicenceRenewals.length||null],
     ["statement",  "📋 Statement",   null],
@@ -2153,7 +2171,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   <div style={{fontWeight:600,marginBottom:6}}>No spare shop linked</div>
                   <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
                 </div>
-              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}|${spareShopFilter.nonce}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab} onEditPart={onEditPart} onDeletePart={onDeletePart} onAddPart={onAddPart}/>
+              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}|${spareShopFilter.nonce}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} initialJobId={spareShopFilter.jobId||""} initialJobLabel={spareShopFilter.jobLabel||""} initialJobCustomer={spareShopFilter.jobCustomer||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab} onEditPart={onEditPart} onDeletePart={onDeletePart} onAddPart={onAddPart}/>
             }
           </div>
         );
@@ -5213,7 +5231,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               {row2.length>0&&<div style={{display:"flex",gap:isMobile?8:12}}>{row2.map(renderTile)}</div>}
               {hasSpareShop&&(
                 isCodeLinked
-                  ? <button onClick={()=>onGoToSpareShop(job.vehicle_make||"",_linkedV.model||"",_linkedV.code||"",job.vin||"",job.engine_no||"",job.vehicle_reg||"")}
+                  ? <button onClick={()=>onGoToSpareShop(job.vehicle_make||"",_linkedV.model||"",_linkedV.code||"",job.vin||"",job.engine_no||"",job.vehicle_reg||"",job.id,`${[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}${job.vehicle_reg?` · ${job.vehicle_reg}`:""}`.trim()||job.id,job.customer_name||"")}
                       style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"none",cursor:"pointer",
                         background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",color:"#fff",
                         boxShadow:"0 4px 14px rgba(29,78,216,.35)",textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
@@ -6610,7 +6628,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 const shopMake=job.vehicle_make;
                 const shopModel=mv?.model||job.vehicle_model||"";
                 return(
-                  <button onClick={()=>onGoToSpareShop(shopMake,shopModel,mv?.code||"",job.vin||"",job.engine_no||"",job.vehicle_reg||"")} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(96,165,250,.3)",background:"rgba(96,165,250,.08)",color:"var(--blue)",fontWeight:700,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
+                  <button onClick={()=>onGoToSpareShop(shopMake,shopModel,mv?.code||"",job.vin||"",job.engine_no||"",job.vehicle_reg||"",job.id,`${[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}${job.vehicle_reg?` · ${job.vehicle_reg}`:""}`.trim()||job.id,job.customer_name||"")} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(96,165,250,.3)",background:"rgba(96,165,250,.08)",color:"var(--blue)",fontWeight:700,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
                     🏪 {job.vehicle_make}{displayCode?` · ${displayCode}`:""}
                   </button>
                 );
@@ -9780,7 +9798,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
 // Module-level cache so spare shop parts survive WorkshopPage remounts (tab switches)
 const _spCache={data:null,branchId:null,ts:null};
 
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",initialVin="",initialEngineNo="",initialReg="",ads=[],userCtx=null,onClearJobFilter,onEditPart,onDeletePart,onAddPart}) {
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",initialVin="",initialEngineNo="",initialReg="",initialJobId="",initialJobLabel="",initialJobCustomer="",ads=[],userCtx=null,onClearJobFilter,onEditPart,onDeletePart,onAddPart}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
@@ -9788,6 +9806,10 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const cachedMatch=_spCache.branchId===linkedBranchId&&_spCache.data;
   const [loading,setLoading]=useState(!cachedMatch);
   const [myRequests,setMyRequests]=useState([]);
+  // Per-request set of quote-line indices the workshop wants to actually order —
+  // {[requestId]: number[]} — undefined means "not touched yet, treat as all selected"
+  // so the default behaviour (accept everything) is unchanged until someone unchecks a line.
+  const [acceptSel,setAcceptSel]=useState({});
   const [printLabelPart,setPrintLabelPart]=useState(null);
   const [shelfModal,setShelfModal]=useState(false);
   const [adminUnlocked,setAdminUnlocked]=useState(false);
@@ -10083,7 +10105,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         localCart={localCart} mainCart={mainCart} requestCart={requestCart}
         wsProfile={wsProfile} Cs={Cs}
         onConfirm={async({localItems,mainItems,requestItems,notes})=>{
-          const res=await onPlaceShopOrder?.({localItems,mainItems,requestItems,notes,linkedBranchId,mainBranchId});
+          const res=await onPlaceShopOrder?.({localItems,mainItems,requestItems,notes,linkedBranchId,mainBranchId,jobId:initialJobId||null,jobLabel:initialJobLabel||"",jobCustomer:initialJobCustomer||""});
           if(res&&(res.localOid||res.bsrId)) setCart([]);
           return res||{};
         }}
@@ -10108,13 +10130,39 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             const fresh=await api.get("branch_stock_requests",`workshop_id=eq.${wsProfile?.id}&status=not.in.(completed,cancelled)&select=*&order=created_at.desc`).catch(()=>[]);
             if(Array.isArray(fresh))setMyRequests(fresh);
           };
+          const selIdxs=acceptSel[r.id]!==undefined?acceptSel[r.id]:replyItems.map((_,i)=>i);
+          const toggleSel=(idx)=>setAcceptSel(prev=>{
+            const cur=prev[r.id]!==undefined?prev[r.id]:replyItems.map((_,i)=>i);
+            const next=cur.includes(idx)?cur.filter(x=>x!==idx):[...cur,idx].sort((a,b)=>a-b);
+            return {...prev,[r.id]:next};
+          });
+          const acceptSelected=()=>{
+            if(selIdxs.length===0)return;
+            const newItems=items.filter((_,i)=>selIdxs.includes(i));
+            const newReplyItems=replyItems.filter((_,i)=>selIdxs.includes(i));
+            const declined=replyItems.filter((_,i)=>!selIdxs.includes(i)).map(it=>it.name);
+            patchReq({
+              status:"confirmed",confirmed_at:new Date().toISOString(),
+              items:newItems,reply_items:newReplyItems,
+              ...(declined.length?{reply_notes:`${r.reply_notes?r.reply_notes+" | ":""}Not ordered: ${declined.join(", ")}`}:{}),
+            });
+          };
           return (
             <div key={r.id} className="card" style={{marginBottom:10,padding:14,borderLeft:`3px solid ${borderColor}`}}>
               {/* Header row */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:replyItems.length>0||items.length>0?10:0}}>
                 <div>
                   <div style={{fontWeight:700,fontSize:13}}>{items.map(i=>i.name).join(", ")}</div>
-                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{fmtD(r.created_at)}{r.reply_at&&<span> · Quoted {fmtD(r.reply_at)}</span>}</div>
+                  {(r.job_label||r.job_customer||r.job_id)&&(
+                    <div style={{fontSize:11,color:"var(--blue)",fontWeight:600,marginTop:3,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      {r.job_id&&<code style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--text3)",fontWeight:400}}>{r.job_id}</code>}
+                      {r.job_label&&<span>🚗 {r.job_label}</span>}
+                      {r.job_customer&&<span>👤 {r.job_customer}</span>}
+                    </div>
+                  )}
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>
+                    {fmtD(r.created_at)}{r.reply_at&&<span> · Quoted {fmtD(r.reply_at)}</span>}
+                  </div>
                 </div>
                 <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
                   <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${sm.c}20`,color:sm.c}}>{sm.l}</span>
@@ -10128,9 +10176,13 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                 {replyItems.map((it,i)=>{
                   const avColor={in_stock:"var(--green)",can_source:"var(--yellow)",not_available:"var(--red)"}[it.availability]||"var(--text3)";
                   const avLabel={in_stock:"✅ In Stock",can_source:"🔍 Can Source",not_available:"❌ Not Available"}[it.availability]||it.availability;
+                  const checked=selIdxs.includes(i);
                   return(
-                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderBottom:i<replyItems.length-1?"1px solid var(--border)":"none",gap:8,flexWrap:"wrap"}}>
-                      <div style={{fontSize:13,fontWeight:600}}>{it.name}</div>
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderBottom:i<replyItems.length-1?"1px solid var(--border)":"none",gap:8,flexWrap:"wrap",opacity:isQuoted&&!checked?.5:1}}>
+                      <div style={{fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:7}}>
+                        {isQuoted&&<input type="checkbox" className="chk" checked={checked} onChange={()=>toggleSel(i)}/>}
+                        {it.name}{it.sku&&<span style={{fontSize:11,color:"var(--text3)",fontWeight:400,marginLeft:2,fontFamily:"DM Mono,monospace"}}>{it.sku}</span>}
+                      </div>
                       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                         <span style={{fontSize:11,fontWeight:600,padding:"1px 6px",borderRadius:99,background:`${avColor}18`,color:avColor}}>{avLabel}</span>
                         {it.availability!=="not_available"&&+it.price>0&&<span style={{fontSize:14,fontWeight:800,color:"var(--accent)"}}>{Cs}{(+it.price).toFixed(2)}</span>}
@@ -10145,8 +10197,10 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
               {/* Actions */}
               <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
                 {isQuoted&&<>
-                  <button className="btn btn-primary btn-sm" onClick={()=>patchReq({status:"confirmed",confirmed_at:new Date().toISOString()})}>✅ Accept Order</button>
-                  <button className="btn btn-danger btn-sm" onClick={()=>patchReq({status:"cancelled"})}>✕ Decline</button>
+                  <button className="btn btn-primary btn-sm" disabled={selIdxs.length===0} onClick={acceptSelected}>
+                    ✅ Accept {selIdxs.length}/{replyItems.length} Item{replyItems.length!==1?"s":""}
+                  </button>
+                  <button className="btn btn-danger btn-sm" onClick={()=>patchReq({status:"cancelled"})}>✕ Decline All</button>
                 </>}
                 {r.status==="confirmed"&&<span style={{fontSize:12,color:"var(--blue)",fontWeight:600}}>✅ Confirmed — branch is preparing your parts</span>}
                 {r.status==="dispatched"&&<span style={{fontSize:12,color:"var(--green)",fontWeight:700}}>📦 Parts are ready for collection!</span>}

@@ -3092,14 +3092,14 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
                 {[["photo_front","Front"],["photo_rear","Rear"],["photo_side","Side"]].map(([field,label])=>{
                   const url = v[field] ? toImgUrl(v[field]) : null;
                   return (
-                    <div key={field} style={{width:52,height:52,borderRadius:8,overflow:"hidden",position:"relative",
+                    <div key={field} style={{width:96,height:72,borderRadius:8,overflow:"hidden",position:"relative",
                       background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",
                       cursor:url?"zoom-in":"default"}}
                       title={label}
                       onClick={()=>url&&openVehicleLightbox(v,field)}>
                       {url
                         ? <img src={url} alt={label} style={{width:"100%",height:"100%",objectFit:"contain"}}/>
-                        : <span style={{fontSize:14,opacity:.3}}>🚗</span>}
+                        : <span style={{fontSize:24,opacity:.3}}>🚗</span>}
                     </div>
                   );
                 })}

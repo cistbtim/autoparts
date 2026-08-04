@@ -28,7 +28,7 @@ import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle}) {
+export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -368,6 +368,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         onGoToStock={()=>{ setView("list"); setWsTab("wsstock"); }}
         onGoToSpareShop={(make,model,code,vin,engineNo,reg,jobId,jobLabel,jobCustomer)=>{ setSpareShopFilter(p=>({make:make||"",model:model||"",code:code||"",vin:vin||"",engineNo:engineNo||"",reg:reg||"",jobId:jobId||"",jobLabel:jobLabel||"",jobCustomer:jobCustomer||"",nonce:p.nonce+1})); setView("list"); setWsTab("spareshop"); }}
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
+        onSaveWsBooking={onSaveWsBooking}
         wsId={wsId}
         wsProfile={wsProfile}
         wsProfiles={wsProfiles}
@@ -4133,7 +4134,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -4161,6 +4162,25 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     const phone=(sourceBooking?.customer_phone||"").replace(/\D/g,"");
     return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : "#";
   };
+  // "New Booking for this Vehicle" — vehicle/customer are already known from the job,
+  // so unlike the public booking link (which requires scanning a licence disc to
+  // identify the vehicle) this just needs the complaint + a preferred date.
+  const submitNewBooking = async () => {
+    if(!onSaveWsBooking||!newBooking||savingBooking) return;
+    if(!newBooking.complaint?.trim()) return;
+    setSavingBooking(true);
+    try{
+      await onSaveWsBooking({
+        vehicle_reg:job.vehicle_reg||"", vehicle_make:job.vehicle_make||"", vehicle_model:job.vehicle_model||"",
+        vehicle_year:job.vehicle_year||"", vehicle_color:job.vehicle_color||"",
+        vin:job.vin||"", engine_no:job.engine_no||"",
+        customer_name:job.customer_name||"", customer_phone:job.customer_phone||"", customer_email:job.customer_email||"",
+        complaint:newBooking.complaint.trim(), preferred_date:newBooking.preferred_date||null,
+        workshop_vehicle_id:job.workshop_vehicle_id||null,
+      });
+      setNewBooking(null);
+    }finally{setSavingBooking(false);}
+  };
   const [editJob,      setEditJob]      = useState(false);
   const [addingItem,   setAddingItem]   = useState(null); // null | 'part' | 'labour' | 'combo'
   // Privacy mode — hide cost prices & markup while a customer is watching the screen
@@ -4179,6 +4199,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [moveModal,     setMoveModal]     = useState(false);
   const [supplierModal, setSupplierModal] = useState(false);
   const [createPoOpen,  setCreatePoOpen]  = useState(false);
+  const [newBooking,    setNewBooking]    = useState(null); // {complaint,preferred_date} while the modal is open
+  const [savingBooking, setSavingBooking] = useState(false);
   const [jobTab,        setJobTab]        = useState(initialTab||"menu");
   const [oeSearch,      setOeSearch]      = useState("");
   const [editPriceId,   setEditPriceId]   = useState(null);
@@ -4904,6 +4926,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             🔀 {t.wsMove}
           </button>
         )}
+        {onSaveWsBooking&&(
+          <button onClick={()=>setNewBooking({complaint:"",preferred_date:""})}
+            style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",
+              background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.4)",
+              borderRadius:8,cursor:"pointer",color:"var(--blue)",fontSize:11,fontWeight:700}}>
+            🗓️ New Booking
+          </button>
+        )}
         <div style={{flex:1}}/>
       </div>
       {/* ── Inspect shortcut ── */}
@@ -5333,6 +5363,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 <div style={{position:"absolute",top:"110%",right:0,zIndex:200,background:"var(--surface2)",border:"1px solid var(--border2)",borderRadius:14,padding:"6px 4px",display:"flex",flexDirection:"column",gap:2,minWidth:200,boxShadow:"var(--shadow-lg)"}}>
                   <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);setServiceHistModal(true);}}>📋 {t.wsHistory||"History"}{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
                   <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);setDeliveryModal(true);}}>🚗 {t.wsCollect}</button>
+                  {onSaveWsBooking&&<button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--blue)"}} onClick={()=>{setShowJobMenu(false);setNewBooking({complaint:"",preferred_date:""});}}>🗓️ New Booking for this Vehicle</button>}
                   {wsRole==="main"&&onMoveJob&&wsProfile?.move_pin&&<button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--yellow)"}} onClick={()=>{setShowJobMenu(false);setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}}>🔀 {t.wsMove}</button>}
                   <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);const lines=["============================","  VEHICLE INFO","============================",`Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,`Model    : ${job.vehicle_model||"—"}`,`Year     : ${job.vehicle_year||"—"}`,`Color    : ${job.vehicle_color||"—"}`,`Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,job.vin?`VIN      : ${job.vin}`:"",job.engine_no?`Engine No: ${job.engine_no}`:"","============================"].filter(Boolean).join("\r\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`;a.click();}}>⬇️ {t.wsInfoBtn}</button>
                   {wsRole==="main"&&onDeleteJob&&!wsLocked&&<><div style={{height:1,background:"var(--border)",margin:"4px 8px"}}/><button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--red)"}} onClick={()=>{setShowJobMenu(false);if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button></>}
@@ -7102,6 +7133,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           onSave={async(item)=>{ await onSaveItem({...item,job_id:job.id}); }}
           onClose={()=>setAddingItem(null)}
           onGoToStock={onGoToStock}
+          onRefresh={onRefresh}
           wsId={wsId}
           parts={parts}
           partFitments={partFitments}
@@ -7568,6 +7600,33 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         <DeliveryLabelModal
           job={job} settings={settings}
           onClose={()=>setDeliveryModal(false)}/>
+      )}
+
+      {newBooking&&(
+        <Overlay onClose={()=>setNewBooking(null)}>
+          <MHead title="🗓️ New Booking for this Vehicle" sub={`${job.vehicle_reg||job.id} · ${job.customer_name||"Customer"}`} onClose={()=>setNewBooking(null)}/>
+          <div style={{background:"var(--surface2)",borderRadius:10,padding:12,marginBottom:14,border:"1px solid var(--border)",fontSize:13}}>
+            <div style={{color:"var(--text3)",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>Vehicle &amp; customer — from this job, no disc scan needed</div>
+            <div>{[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")||"—"} {job.vehicle_reg&&<code style={{fontFamily:"DM Mono,monospace",marginLeft:6}}>{job.vehicle_reg}</code>}</div>
+            <div style={{color:"var(--text2)",marginTop:2}}>{job.customer_name||"—"}{job.customer_phone?` · ${job.customer_phone}`:""}</div>
+          </div>
+          <FD>
+            <FL label="What's this booking for? *"/>
+            <textarea className="inp" rows={3} autoFocus placeholder="e.g. 30 000km service, brake noise, aircon check…"
+              value={newBooking.complaint} onChange={e=>setNewBooking(b=>({...b,complaint:e.target.value}))} style={{resize:"vertical"}}/>
+          </FD>
+          <FD>
+            <FL label="Preferred Date (optional)"/>
+            <input className="inp" type="date" value={newBooking.preferred_date}
+              onChange={e=>setNewBooking(b=>({...b,preferred_date:e.target.value}))}/>
+          </FD>
+          <div style={{display:"flex",gap:10,marginTop:18}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setNewBooking(null)}>Cancel</button>
+            <button className="btn btn-primary" style={{flex:2}} disabled={!newBooking.complaint.trim()||savingBooking} onClick={submitNewBooking}>
+              {savingBooking?"Saving…":"🗓️ Create Booking"}
+            </button>
+          </div>
+        </Overlay>
       )}
 
       {/* Move PIN prompt */}
@@ -9152,7 +9211,7 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
   );
 }
 
-function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, onRefresh, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
   const [desc,        setDesc]        = useState("");
   const [qty,         setQty]         = useState(1);
   const [price,       setPrice]       = useState("");
@@ -9175,6 +9234,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
   const [newSku,      setNewSku]      = useState("");
   const [newCost,     setNewCost]     = useState("");
   const [newSell,     setNewSell]     = useState("");
+  const [newPerCyl,   setNewPerCyl]   = useState(false); // qty should match the vehicle's cylinder count (spark plugs, injectors, coils…)
   const [createSaving,setCreateSaving]= useState(false);
   const [showSkuDrop, setShowSkuDrop] = useState(false);
   const descRef = useRef(null);
@@ -9318,6 +9378,10 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       setMarkupPct(defaultMarkupPct);
       setPrice(String(listPrice||""));
     }
+    // Per-cylinder parts (spark plugs, injectors, coils…) vary by vehicle — leave qty
+    // blank so the cylinder-count picker below forces a real choice, instead of
+    // silently carrying over whatever qty was last used or defaulting to 1.
+    setQty(p.qty_per_cylinder?"":(+p.default_qty>0?+p.default_qty:1));
     setSearch("");
     setCreating(false);
   };
@@ -9342,6 +9406,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       setMarkupPct(defaultMarkupPct);
       setPrice(String(listPrice||""));
     }
+    setQty(p.qty_per_cylinder?"":(+p.default_qty>0?+p.default_qty:1));
     setSearch("");
     setCreating(false);
   };
@@ -9352,6 +9417,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
     setNewSku("");
     setNewCost("");
     setNewSell("");
+    setNewPerCyl(false);
     setCreating(true);
   };
 
@@ -9361,6 +9427,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
     setNewSku(p.sku||"");
     setNewCost(String(p.unit_cost||""));
     setNewSell(String(type==="part"?(p.unit_price||""):(p.default_price||p.rate||p.price||"")));
+    setNewPerCyl(!!p.qty_per_cylinder);
     setCreating(true);
   };
 
@@ -9369,12 +9436,17 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
     setCreateSaving(true);
     try{
       const patch=type==="part"
-        ?{name:newName.trim(),sku:newSku.trim()||null,unit_cost:+newCost||0,unit_price:+newSell||0}
+        ?{name:newName.trim(),sku:newSku.trim()||null,unit_cost:+newCost||0,unit_price:+newSell||0,qty_per_cylinder:newPerCyl}
         :{name:newName.trim(),default_price:+newSell||0,rate:+newSell||0};
-      await api.patch(type==="part"?"workshop_stock":"workshop_services","id",editingItem.id,patch);
+      const res=await api.patch(type==="part"?"workshop_stock":"workshop_services","id",editingItem.id,patch);
+      if(!Array.isArray(res)&&res?.code){ alert(`Update failed: ${res.message||res.code}`); return; }
       setLocalEdits(prev=>({...prev,[editingItem.id]:patch}));
       setLocalExtras(prev=>prev.map(x=>x.id===editingItem.id?{...x,...patch}:x));
       if(selItem?.id===editingItem.id) selectItem({...editingItem,...patch});
+      // Local edits above only cover this modal instance — without this, closing and
+      // reopening "Add Part" re-reads the parent's still-stale wsStock/wsServices prop
+      // and the edit silently appears to have "not saved" even though the DB is correct.
+      onRefresh?.();
       setCreating(false);
       setEditingItem(null);
     }catch(e){ alert("Update failed: "+e.message); }
@@ -9395,7 +9467,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       const id=`${type==="part"?"WSK":"WSS"}-${Date.now()}`;
       let newItem;
       if(type==="part"){
-        const payload={id,workshop_id:wsId||null,name:newName.trim(),sku:newSku.trim()||null,unit_cost:+newCost||0,unit_price:+newSell||0,qty:0,min_qty:0};
+        const payload={id,workshop_id:wsId||null,name:newName.trim(),sku:newSku.trim()||null,unit_cost:+newCost||0,unit_price:+newSell||0,qty:0,min_qty:0,qty_per_cylinder:newPerCyl};
         await api.insert("workshop_stock",payload);
         newItem={...payload};
       } else {
@@ -9408,12 +9480,14 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       setCreating(false);
       // auto-select after a tick so filtered list updates
       setTimeout(()=>selectItem(newItem),30);
+      onRefresh?.();
     }catch(e){ alert("Create failed: "+e.message); }
     finally{ setCreateSaving(false); }
   };
 
   const handleSave=async()=>{
     if(!desc.trim()||!price){alert("Fill description and price");return;}
+    if(selItem?.qty_per_cylinder&&!(+qty>0)){alert("Please select how many cylinders this vehicle has");return;}
     setSaving(true);
     try{
       let stockId=type==="part"&&selItem&&selSource==="stock"?selItem.id:null;
@@ -9446,6 +9520,15 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
         markup_pct:type==="part"?+markupPct:0,
         total:(+qty)*(+price),
       });
+      // Some parts always go on in twos/pairs etc. — quietly remember whatever qty was
+      // actually used so the next quote for this same part starts prefilled with it,
+      // instead of everyone having to retype it every single time. Skip per-cylinder
+      // parts — their qty legitimately varies by vehicle, so there's no single
+      // "default" worth learning (that's what the cylinder picker above is for).
+      if(type==="part"&&selItem&&!selItem.qty_per_cylinder&&+qty!==(+selItem.default_qty||1)){
+        if(selSource==="stock") api.patch("workshop_stock","id",selItem.id,{default_qty:+qty}).catch(()=>{});
+        else if(selSource==="main") api.patch("parts","id",selItem.id,{default_qty:+qty}).catch(()=>{});
+      }
       if(selItem?.id) setAddedIds(prev=>new Set([...prev,selItem.id]));
       resetForm();
       setJustAdded(true);
@@ -9644,6 +9727,12 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
                 <input className="inp" type="number" value={newSell} onChange={e=>setNewSell(e.target.value)} placeholder="0.00"/>
               </div>
             </FG>
+            {type==="part"&&(
+              <label style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,padding:"8px 10px",borderRadius:8,background:"var(--surface2)",cursor:"pointer",fontSize:12}}>
+                <input type="checkbox" className="chk" checked={newPerCyl} onChange={e=>setNewPerCyl(e.target.checked)}/>
+                <span>🔧 Qty = number of cylinders <span style={{color:"var(--text3)"}}>(spark plugs, injectors, coils…) — asks per job instead of defaulting to 1</span></span>
+              </label>
+            )}
             <div style={{display:"flex",gap:8}}>
               <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{setCreating(false);setEditingItem(null);}}>Cancel</button>
               <button className="btn btn-primary btn-sm" style={{flex:2}} onClick={editingItem?handleEditUpdate:handleCreateAndSelect} disabled={createSaving||!!skuDup} title={skuDup?"SKU already exists — change it or clear the SKU field":""}>
@@ -9680,8 +9769,22 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
         <input ref={descRef} className="inp" value={desc} onChange={e=>setDesc(e.target.value)}
           placeholder={type==="part"?"Part name...":"Labour e.g. Oil change, brake pad replacement..."}/>
       </FD>
+      {selItem?.qty_per_cylinder&&(
+        <div style={{marginBottom:12,padding:"10px 12px",borderRadius:8,background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.35)"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"var(--yellow)",marginBottom:8}}>🔧 How many cylinders does this vehicle have?</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {[3,4,5,6,8,10,12].map(n=>(
+              <button key={n} type="button" onClick={()=>setQty(n)}
+                style={{padding:"6px 14px",borderRadius:8,border:+qty===n?"1px solid var(--yellow)":"1px solid var(--border)",
+                  background:+qty===n?"var(--yellow)":"var(--surface2)",color:+qty===n?"#000":"var(--text2)",
+                  fontWeight:700,fontSize:13,cursor:"pointer"}}>{n}</button>
+            ))}
+          </div>
+        </div>
+      )}
       <FG>
-        <div><FL label="Qty"/><input className="inp" type="number" value={qty} onChange={e=>setQty(e.target.value)} min="0.5" step="0.5"/></div>
+        <div><FL label="Qty"/><input className="inp" type="number" value={qty} onChange={e=>setQty(e.target.value)} min="0.5" step="0.5"
+          style={selItem?.qty_per_cylinder&&!(+qty>0)?{borderColor:"var(--yellow)"}:{}}/></div>
         <div><FL label={`Unit ${type==="part"?"Price":"Rate"}`}/><input className="inp" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0.00"/></div>
         <div><FL label="Total"/><input className="inp" value={fmtAmt(total)} readOnly style={{color:"var(--accent)",fontWeight:700,fontFamily:"Rajdhani,sans-serif"}}/></div>
       </FG>

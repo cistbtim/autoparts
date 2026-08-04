@@ -1952,6 +1952,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setWsBookings(p=>p.map(b=>b.id===id?{...b,...patch}:b));
   };
 
+  // Staff-side booking, e.g. from a job card's "New Booking for this Vehicle" button —
+  // vehicle/customer details come from the job already on file, so unlike the public
+  // booking link (which requires a licence-disc scan to identify the vehicle) this
+  // skips straight to complaint + preferred date.
+  const createWsBooking=async(data)=>{
+    const id="WB-"+Date.now()+"-"+Math.floor(Math.random()*9000+1000);
+    const record={id,workshop_id:wsId||null,status:"pending",created_at:new Date().toISOString(),...data};
+    const res=await api.insert("workshop_bookings",record);
+    if(!Array.isArray(res)&&res?.code){showToast(`❌ Error creating booking: ${res.message||res.code}`,"err");return null;}
+    setWsBookings(p=>[record,...p]);
+    showToast("✅ Booking created");
+    return id;
+  };
+
   const deleteWsBooking=async(id,meta={})=>{
     const patch={
       status:"deleted",
@@ -6364,6 +6378,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onUpdateWsLicenceRenewal={updateWsLicenceRenewal}
             wsBookings={wsBookings}
             onPatchWsBooking={patchWsBooking}
+            onSaveWsBooking={createWsBooking}
             onDeleteWsBooking={deleteWsBooking}
             onRefreshBookings={refreshWsBookings}
             onRefresh={refreshWorkshopData}

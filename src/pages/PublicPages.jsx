@@ -634,7 +634,11 @@ export function QuoteConfirmPage({token}) {
     const total=subtotal+taxAmt;
     const logoSrc=bizLogo;
     const logoHtml=logoSrc?`<img src="${logoSrc}" style="max-height:60px;max-width:180px;object-fit:contain;display:block;margin-bottom:8px"/>`:"";
-    const rowsHtml=items.map((it,i)=>`
+    const partItems=items.filter(i=>i.type==="part");
+    const labourItems=items.filter(i=>i.type!=="part");
+    const partsSubtotal=partItems.reduce((s,i)=>s+(+i.total||0),0);
+    const labourSubtotal=labourItems.reduce((s,i)=>s+(+i.total||0),0);
+    const itemRow=(it,i)=>`
       <tr style="background:${i%2===0?"#fff":"#f9f9f9"}">
         <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5">
           <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;
@@ -645,7 +649,17 @@ export function QuoteConfirmPage({token}) {
         <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${it.qty}</td>
         <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${fmt(it.unit_price)}</td>
         <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:700">${fmt(it.total)}</td>
-      </tr>`).join("");
+      </tr>`;
+    const subtotalRowHtml=(label,amt)=>`
+      <tr style="background:#dbeafe">
+        <td colspan="3" style="padding:10px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:800;font-size:13px;color:#1d4ed8;text-transform:uppercase;letter-spacing:.03em">${label}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:800;font-size:15px;color:#1d4ed8">${fmt(amt)}</td>
+      </tr>`;
+    const rowsHtml=
+      partItems.map(itemRow).join("")+
+      (partItems.length>0?subtotalRowHtml(t.wsqPartsSubtotal,partsSubtotal):"")+
+      labourItems.map(itemRow).join("")+
+      (labourItems.length>0?subtotalRowHtml(t.wsqLabourSubtotal,labourSubtotal):"");
     const html=`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Quotation ${quote.id}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -668,7 +682,7 @@ export function QuoteConfirmPage({token}) {
   thead th:nth-child(n+2){text-align:right}
   .totals{margin-left:auto;width:260px;margin-bottom:24px}
   .t-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #eee}
-  .t-total{display:flex;justify-content:space-between;padding:10px 0;font-size:17px;font-weight:800;color:#2563eb;border-top:2px solid #2563eb;margin-top:4px}
+  .t-total{display:flex;justify-content:space-between;align-items:center;padding:14px 12px;font-size:22px;font-weight:900;color:#f97316;background:#fff7ed;border-top:3px solid #f97316;border-radius:0 0 6px 6px;margin-top:4px}
   .notes-box{background:#fff8ed;border:1px solid #fcd34d;border-radius:8px;padding:12px;font-size:12px;margin-bottom:20px}
   .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
   @media print{body{padding:18px}}
@@ -809,21 +823,41 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
               <div style={{padding:"10px 16px",fontWeight:700,fontSize:13,borderBottom:"1px solid var(--border)",background:"var(--surface2)"}}>📋 {t.wsqWorkItems}</div>
               {items.length===0
                 ? <div style={{padding:16,color:"var(--text3)",fontSize:13,textAlign:"center"}}>{t.wsqNoItems}</div>
-                : items.map((it,i)=>(
-                  <div key={it.id||i} style={{padding:"10px 16px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",gap:8,alignItems:"center"}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontWeight:600,fontSize:13}}>{it.description}</div>
-                      <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
-                        {it.type==="part"?`🔩 ${t.wsqPart}`:`👷 ${t.wsqLabour}`} · {t.wsqPdfQty}: {it.qty} × {fmt(it.unit_price)}
+                : (()=>{
+                    const partItems=items.filter(i=>i.type==="part");
+                    const labourItems=items.filter(i=>i.type!=="part");
+                    const partsSubtotal=partItems.reduce((s,i)=>s+(+i.total||0),0);
+                    const labourSubtotal=labourItems.reduce((s,i)=>s+(+i.total||0),0);
+                    const row=(it,i)=>(
+                      <div key={it.id||i} style={{padding:"10px 16px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",gap:8,alignItems:"center"}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontWeight:600,fontSize:13}}>{it.description}</div>
+                          <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
+                            {it.type==="part"?`🔩 ${t.wsqPart}`:`👷 ${t.wsqLabour}`} · {t.wsqPdfQty}: {it.qty} × {fmt(it.unit_price)}
+                          </div>
+                        </div>
+                        <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)",flexShrink:0}}>{fmt(it.total)}</div>
                       </div>
-                    </div>
-                    <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--accent)",flexShrink:0}}>{fmt(it.total)}</div>
-                  </div>
-                ))
+                    );
+                    const subtotalRow=(label,amt)=>(
+                      <div style={{padding:"11px 16px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",background:"rgba(96,165,250,.1)"}}>
+                        <span style={{fontSize:14,fontWeight:800,color:"var(--blue)",textTransform:"uppercase",letterSpacing:".03em"}}>{label}</span>
+                        <span style={{fontFamily:"Rajdhani,sans-serif",fontSize:17,fontWeight:800,color:"var(--blue)"}}>{fmt(amt)}</span>
+                      </div>
+                    );
+                    return (
+                      <>
+                        {partItems.map(row)}
+                        {partItems.length>0&&subtotalRow(t.wsqPartsSubtotal,partsSubtotal)}
+                        {labourItems.map(row)}
+                        {labourItems.length>0&&subtotalRow(t.wsqLabourSubtotal,labourSubtotal)}
+                      </>
+                    );
+                  })()
               }
-              <div style={{padding:"10px 16px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",background:"var(--surface2)"}}>
-                <span style={{fontWeight:700,fontSize:13}}>Total</span>
-                <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:18,color:"var(--accent)"}}>{fmt(quote.total)}</span>
+              <div style={{padding:"16px 18px",borderTop:"3px solid var(--accent)",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(249,115,22,.1)"}}>
+                <span style={{fontWeight:800,fontSize:16,textTransform:"uppercase",letterSpacing:".05em"}}>Total</span>
+                <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:28,color:"var(--accent)"}}>{fmt(quote.total)}</span>
               </div>
             </div>
 

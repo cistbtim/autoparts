@@ -206,6 +206,8 @@ export const T = {
     wsqDownloadPdf: "Download PDF",
     wsqPart: "PART",
     wsqLabour: "LABOUR",
+    wsqPartsSubtotal: "Parts Subtotal",
+    wsqLabourSubtotal: "Labour Subtotal",
     // PDF strings (quote approval PDF)
     wsqPdfQuotation: "QUOTATION",
     wsqPdfDate: "Date",

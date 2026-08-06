@@ -5225,7 +5225,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo & Doc", color:"#7c3aed", tabs:["photos","docs"],onClick:()=>{setDocsPopup(true);setDocsPopupTab("photos");}},
           ...(wsRole!=="mechanic"?[
             {id:"ch_partsq",icon:"📋", label:"Parts Quotation",         color:"#0f766e", tabs:[],              onClick:()=>{ setQuotePopupQuoteOnly(true);  setQuotePopup(true); setQuotePopupTab("quote"); }},
-            {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote & Invoice",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{ setQuotePopupQuoteOnly(false); setQuotePopup(true); setQuotePopupTab("quote"); }},
+            {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote & Invoice",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{ setQuotePopupQuoteOnly(false); setQuotePopup(true); setQuotePopupTab(invoice?"invoice":"quote"); }},
             {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"],      onClick:()=>setPayPopup(true)},
           ]:[]),
         ];
@@ -5963,6 +5963,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         {/* Parts & Labour */}
         {(()=>{
           const defaultMarkup = +(wsProfile?.default_markup_pct||0);
+          // Once an invoice exists the line items are locked — editing/adding/removing
+          // parts or labour after billing would silently desync the invoice total from
+          // what's shown here. Delete the invoice (and its payment) to unlock.
+          const itemsLocked = wsLocked || !!invoice;
           // Resolve a job item back to its main-inventory part (by SKU) so the TYPE
           // badge can show the real product photo instead of the generic wrench icon.
           const mainPartFor = (item) => item.type==="part" && item.part_sku
@@ -6315,9 +6319,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               )}
             </div>
             <div style={{display:"flex",gap:6}}>
-              {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("part")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtPart}</button>}
-              {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("labour")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtLabour}</button>}
-              {!wsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("combo")} style={{background:"rgba(251,191,36,.25)",color:"#fff",border:"1px solid rgba(251,191,36,.5)",borderRadius:8,fontWeight:700,fontSize:12}}>⚡ {t.wsqtCombo||"Combo"}</button>}
+              {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("part")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtPart}</button>}
+              {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("labour")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtLabour}</button>}
+              {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("combo")} style={{background:"rgba(251,191,36,.25)",color:"#fff",border:"1px solid rgba(251,191,36,.5)",borderRadius:8,fontWeight:700,fontSize:12}}>⚡ {t.wsqtCombo||"Combo"}</button>}
+              {itemsLocked&&!!invoice&&<span title="Delete the invoice to edit these items" style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.85)",background:"rgba(0,0,0,.2)",borderRadius:8,padding:"6px 10px",display:"flex",alignItems:"center",gap:5}}>🔒 Invoiced</span>}
               <button className="btn btn-sm" onClick={toggleHideCosts}
                 title={hideCosts?"Costs & markup hidden — click to show":"Hide costs & markup (customer mode)"}
                 style={{background:hideCosts?"rgba(248,113,113,.3)":"rgba(255,255,255,.15)",color:"#fff",border:`1px solid ${hideCosts?"rgba(248,113,113,.6)":"rgba(255,255,255,.3)"}`,borderRadius:8,fontWeight:700,fontSize:12}}>
@@ -6365,10 +6370,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       );
                     })()}
                     <div style={{flex:1,minWidth:0}}>
-                      <div onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)"}}>{descOverrides[item.id]??item.description}</div>
+                      <div onClick={()=>{if(!itemsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":"1px dashed var(--text3)"}}>{descOverrides[item.id]??item.description}</div>
                       {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2,display:"block"}}>{item.part_sku}</code>}
                     </div>
-                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0,fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
+                    {!itemsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0,fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>}
                   </div>
                   {!hideCosts&&supCosts.length>0&&(
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
@@ -6392,7 +6397,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.qty}</span>
                       {isEditingQty
                         ?<input autoFocus type="number" min="1" step="1" value={editQtyVal} onChange={e=>setEditQtyVal(e.target.value)} onBlur={()=>commitQty(item)} onKeyDown={e=>{if(e.key==="Enter")commitQty(item);if(e.key==="Escape")setEditQtyId(null);}} style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:`1px solid ${accentColor}`,background:"var(--surface2)",color:"var(--text1)"}}/>
-                        :<span onClick={()=>{setEditQtyId(item.id);setEditQtyVal(String(item.qty||1));setEditPriceId(null);}} style={{fontWeight:700,fontSize:15,cursor:"pointer",borderBottom:`1px dashed ${accentColor}`,color:"var(--text)"}}>{item.qty}</span>
+                        :<span onClick={()=>{if(!itemsLocked){setEditQtyId(item.id);setEditQtyVal(String(item.qty||1));setEditPriceId(null);}}} style={{fontWeight:700,fontSize:15,cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":`1px dashed ${accentColor}`,color:"var(--text)"}}>{item.qty}</span>
                       }
                     </div>
                     <span style={{color:accentColor,fontWeight:700,opacity:.6}}>×</span>
@@ -6400,7 +6405,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.wsqtPrice}</span>
                       {isEditingPrice
                         ?<input autoFocus type="number" min="0" step="0.01" value={editPriceVal} onChange={e=>setEditPriceVal(e.target.value)} onBlur={()=>commitPrice(item)} onKeyDown={e=>{if(e.key==="Enter")commitPrice(item);if(e.key==="Escape")setEditPriceId(null);}} style={{width:80,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:`1px solid ${accentColor}`,background:"var(--surface2)",color:"var(--text1)"}}/>
-                        :<span onClick={()=>{setEditPriceId(item.id);setEditPriceVal(String(item.unit_price||0));setEditQtyId(null);setEditMarkupId(null);}} style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:"pointer",borderBottom:`1px dashed ${accentColor}`,color:"var(--text)"}}>{fmtAmt(item.unit_price)}</span>
+                        :<span onClick={()=>{if(!itemsLocked){setEditPriceId(item.id);setEditPriceVal(String(item.unit_price||0));setEditQtyId(null);setEditMarkupId(null);}}} style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":`1px dashed ${accentColor}`,color:"var(--text)"}}>{fmtAmt(item.unit_price)}</span>
                       }
                     </div>
                     <span style={{color:accentColor,fontWeight:700,opacity:.6}}>=</span>
@@ -6416,12 +6421,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsqtMarkup}</span>
                       {editMarkupId===item.id
                         ?<input autoFocus type="number" min="0" step="0.1" value={editMarkupVal} onChange={e=>setEditMarkupVal(e.target.value)} onBlur={()=>commitMarkup(item)} onKeyDown={e=>{if(e.key==="Enter")commitMarkup(item);if(e.key==="Escape")setEditMarkupId(null);}} style={{width:56,fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 5px",borderRadius:5,border:"1px solid #f59e0b",background:"var(--surface2)",color:"var(--text1)"}}/>
-                        :<span onClick={()=>{setEditMarkupId(item.id);setEditMarkupVal(String(item.markup_pct||0));setEditPriceId(null);setEditQtyId(null);}} style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",color:"#f59e0b",borderBottom:"1px dashed rgba(251,191,36,.4)"}}>{item.markup_pct||0}%</span>
+                        :<span onClick={()=>{if(!itemsLocked){setEditMarkupId(item.id);setEditMarkupVal(String(item.markup_pct||0));setEditPriceId(null);setEditQtyId(null);}}} style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,cursor:itemsLocked?"default":"pointer",color:"#f59e0b",borderBottom:itemsLocked?"none":"1px dashed rgba(251,191,36,.4)"}}>{item.markup_pct||0}%</span>
                       }
                     </div>
                   )}
                   <div style={{display:"flex",gap:8,alignItems:"center",marginTop:6,flexWrap:"wrap"}}>
-                    <select value={partTypeOverrides[item.id]??item.part_type??""} onChange={e=>commitPartType(item,e.target.value)}
+                    <select disabled={itemsLocked} value={partTypeOverrides[item.id]??item.part_type??""} onChange={e=>commitPartType(item,e.target.value)}
                       style={{fontSize:11,padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text)",flex:"0 0 auto"}}>
                       <option value="">— Part Type —</option>
                       <option value="New-Replacement">New-Replacement</option>
@@ -6432,8 +6437,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       ?<input autoFocus type="text" value={editRemarkVal} onChange={e=>setEditRemarkVal(e.target.value)}
                           onBlur={()=>commitRemark(item)} onKeyDown={e=>{if(e.key==="Enter")commitRemark(item);if(e.key==="Escape")setEditRemarkId(null);}}
                           placeholder="Remark" style={{flex:1,minWidth:100,fontSize:12,padding:"3px 8px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text)"}}/>
-                      :<span onClick={()=>{setEditRemarkId(item.id);setEditRemarkVal(remarkOverrides[item.id]??item.remark??"");}}
-                          style={{flex:1,fontSize:12,color:(remarkOverrides[item.id]??item.remark)?"var(--text)":"var(--text3)",cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>
+                      :<span onClick={()=>{if(!itemsLocked){setEditRemarkId(item.id);setEditRemarkVal(remarkOverrides[item.id]??item.remark??"");}}}
+                          style={{flex:1,fontSize:12,color:(remarkOverrides[item.id]??item.remark)?"var(--text)":"var(--text3)",cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>
                           {(remarkOverrides[item.id]??item.remark)||"Remark..."}
                         </span>
                     }
@@ -6467,7 +6472,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   );
                 })()}</td>
                 <td style={{fontWeight:500}}>
-                  <span onClick={()=>{if(!wsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{cursor:wsLocked?"default":"pointer",borderBottom:wsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{descOverrides[item.id]??item.description}</span>
+                  <span onClick={()=>{if(!itemsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{descOverrides[item.id]??item.description}</span>
                   {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
                   {!hideCosts&&supCosts.length>0&&(
                     <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:4}}>
@@ -6487,8 +6492,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   )}
                 </td>
                 <td style={{width:120,verticalAlign:"middle"}}>
-                  <select value={partTypeOverrides[item.id]??item.part_type??""} onChange={e=>commitPartType(item,e.target.value)}
-                    style={{width:"100%",fontSize:11,padding:"3px 5px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text)",cursor:"pointer"}}>
+                  <select disabled={itemsLocked} value={partTypeOverrides[item.id]??item.part_type??""} onChange={e=>commitPartType(item,e.target.value)}
+                    style={{width:"100%",fontSize:11,padding:"3px 5px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text)",cursor:itemsLocked?"default":"pointer"}}>
                     <option value=""></option>
                     <option value="New-Replacement">New-Replacement</option>
                     <option value="Original Parts">Original Parts</option>
@@ -6500,8 +6505,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     ?<input autoFocus type="text" value={editRemarkVal} onChange={e=>setEditRemarkVal(e.target.value)}
                         onBlur={()=>commitRemark(item)} onKeyDown={e=>{if(e.key==="Enter")commitRemark(item);if(e.key==="Escape")setEditRemarkId(null);}}
                         style={{width:"100%",fontSize:12,padding:"3px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)",color:"var(--text)"}}/>
-                    :<span onClick={()=>{setEditRemarkId(item.id);setEditRemarkVal(remarkOverrides[item.id]??item.remark??"");}}
-                        style={{fontSize:12,color:(remarkOverrides[item.id]??item.remark)?"var(--text)":"var(--text3)",cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1,display:"block",minHeight:18}}>
+                    :<span onClick={()=>{if(!itemsLocked){setEditRemarkId(item.id);setEditRemarkVal(remarkOverrides[item.id]??item.remark??"");}}}
+                        style={{fontSize:12,color:(remarkOverrides[item.id]??item.remark)?"var(--text)":"var(--text3)",cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":"1px dashed var(--text3)",paddingBottom:1,display:"block",minHeight:18}}>
                         {(remarkOverrides[item.id]??item.remark)||"—"}
                       </span>
                   }
@@ -6509,27 +6514,27 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 <td style={{textAlign:"right"}}>
                   {editQtyId===item.id
                     ?<input autoFocus type="number" min="1" step="1" value={editQtyVal} onChange={e=>setEditQtyVal(e.target.value)} onBlur={()=>commitQty(item)} onKeyDown={e=>{if(e.key==="Enter")commitQty(item);if(e.key==="Escape")setEditQtyId(null);}} style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
-                    :<span onClick={()=>{setEditQtyId(item.id);setEditQtyVal(String(item.qty||1));setEditPriceId(null);}} title="Click to edit qty" style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>{item.qty}</span>
+                    :<span onClick={()=>{if(!itemsLocked){setEditQtyId(item.id);setEditQtyVal(String(item.qty||1));setEditPriceId(null);}}} title={itemsLocked?"":"Click to edit qty"} style={{cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{item.qty}</span>
                   }
                 </td>
                 <td style={{textAlign:"right",fontFamily:"Rajdhani,sans-serif",minWidth:110}}>
                   {isEditing
                     ?<input autoFocus type="number" min="0" step="0.01" value={editPriceVal} onChange={e=>setEditPriceVal(e.target.value)} onBlur={()=>commitPrice(item)} onKeyDown={e=>{if(e.key==="Enter")commitPrice(item);if(e.key==="Escape")setEditPriceId(null);}} style={{width:90,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 6px",borderRadius:6,border:"1px solid var(--accent)",background:"var(--surface2)"}}/>
-                    :<span onClick={()=>{setEditPriceId(item.id);setEditPriceVal(String(item.unit_price||0));setEditMarkupId(null);}} title="Click to edit price" style={{cursor:"pointer",borderBottom:"1px dashed var(--text3)",paddingBottom:1}}>{fmtAmt(item.unit_price)}</span>
+                    :<span onClick={()=>{if(!itemsLocked){setEditPriceId(item.id);setEditPriceVal(String(item.unit_price||0));setEditMarkupId(null);}}} title={itemsLocked?"":"Click to edit price"} style={{cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{fmtAmt(item.unit_price)}</span>
                   }
                   {!hideCosts&&item.type==="part"&&(
                     <div style={{fontSize:10,color:"var(--text3)",marginTop:2,textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end",gap:3}}>
                       {+(item.cost_price||0)>0&&<span style={{color:"var(--text3)"}}>Cost {fmtAmt(item.cost_price)} ·</span>}
                       {editMarkupId===item.id
                         ?<input autoFocus type="number" min="0" step="0.1" value={editMarkupVal} onChange={e=>setEditMarkupVal(e.target.value)} onBlur={()=>commitMarkup(item)} onKeyDown={e=>{if(e.key==="Enter")commitMarkup(item);if(e.key==="Escape")setEditMarkupId(null);}} style={{width:50,textAlign:"right",fontFamily:"Rajdhani,sans-serif",fontSize:11,padding:"1px 4px",borderRadius:4,border:"1px solid #f59e0b",background:"var(--surface2)",color:"#f59e0b"}}/>
-                        :<span onClick={()=>{setEditMarkupId(item.id);setEditMarkupVal(String(item.markup_pct||0));setEditPriceId(null);}} title="Click to edit markup %" style={{cursor:"pointer",color:"#f59e0b",fontWeight:600,borderBottom:"1px dashed rgba(251,191,36,.4)"}}>+{item.markup_pct||0}%</span>
+                        :<span onClick={()=>{if(!itemsLocked){setEditMarkupId(item.id);setEditMarkupVal(String(item.markup_pct||0));setEditPriceId(null);}}} title={itemsLocked?"":"Click to edit markup %"} style={{cursor:itemsLocked?"default":"pointer",color:"#f59e0b",fontWeight:600,borderBottom:itemsLocked?"none":"1px dashed rgba(251,191,36,.4)"}}>+{item.markup_pct||0}%</span>
                       }
                       <span>markup</span>
                     </div>
                   )}
                 </td>
                 <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(isEditing?(+editPriceVal||0)*(editQtyId===item.id?+editQtyVal||1:+item.qty||1):editQtyId===item.id?(+item.unit_price||0)*(+editQtyVal||1):item.total)}</td>
-                <td><button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button></td>
+                <td>{!itemsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button>}</td>
               </tr>
               );
             };
@@ -6837,6 +6842,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         </div>
           );})() : (
         !wsLocked&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+          {quoteItems.length>0&&(
+            <div style={{background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.35)",borderRadius:6,padding:"9px 12px",fontSize:12,display:"flex",gap:8}}>
+              <span style={{flexShrink:0}}>👓</span>
+              <span>Before creating the quote, double-check <strong>quantities</strong> and that nothing's missing — commonly forgotten: <strong>brake pads</strong>, <strong>spark plugs</strong>, <strong>headlamp bulb/globe</strong>.</span>
+            </div>
+          )}
           {quoteItems.length>0&&!quoteItems.some(i=>i.type==="labour")&&(
             <div style={{background:"rgba(251,191,36,.15)",border:"1px solid rgba(251,191,36,.5)",borderRadius:6,padding:"7px 12px",fontSize:12,display:"flex",alignItems:"center",gap:6}}>
               <span>⚠️</span>
@@ -6913,6 +6924,30 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               </span>
             </div>
           </div>
+
+          {/* Itemized preview — what's actually on this invoice, read-only */}
+          {items.length>0&&(()=>{
+            const invPartItems=items.filter(i=>i.type!=="labour");
+            const invLabourItems=items.filter(i=>i.type==="labour");
+            const invPartTotal=invPartItems.reduce((s,i)=>s+(+i.total||0),0);
+            const invLabourTotal=invLabourItems.reduce((s,i)=>s+(+i.total||0),0);
+            const row=(i)=>(
+              <div key={i.id} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"6px 12px",fontSize:12.5,borderBottom:"1px solid var(--border2)"}}>
+                <span style={{flex:1,color:"var(--text2)"}}>{descOverrides[i.id]??i.description} <span style={{color:"var(--text3)"}}>×{i.qty}</span></span>
+                <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,color:"var(--text)",flexShrink:0}}>{fmtAmt(i.total)}</span>
+              </div>
+            );
+            return (
+              <div style={{marginBottom:12,borderRadius:8,overflow:"hidden",border:"1px solid var(--border)"}}>
+                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",padding:"6px 12px",background:"var(--surface2)"}}>Invoice Preview</div>
+                {invPartItems.map(row)}
+                {invPartItems.length>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 12px",background:"rgba(96,165,250,.06)",fontSize:11,fontWeight:700,color:"var(--blue)"}}><span>Parts subtotal</span><span style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(invPartTotal)}</span></div>}
+                {invLabourItems.map(row)}
+                {invLabourItems.length>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 12px",background:"rgba(52,211,153,.06)",fontSize:11,fontWeight:700,color:"var(--green)"}}><span>Labour subtotal</span><span style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(invLabourTotal)}</span></div>}
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 12px",background:"var(--surface2)",fontSize:13,fontWeight:800}}><span>Total</span><span style={{fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(invoice.total)}</span></div>
+              </div>
+            );
+          })()}
 
           {/* Action buttons */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>

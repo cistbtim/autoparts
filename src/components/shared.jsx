@@ -309,7 +309,7 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
 // Module-level pane so its identity is stable across CompareLightbox re-renders —
 // defining it inline made React remount it (and restart the image load, showing an
 // endless spinner) every time the parent re-rendered, e.g. on the 30s auto-refresh.
-function ComparePane({title, src}) {
+function ComparePane({title, src, stacked=false}) {
   // Drive thumbnails can be slow/rate-limited — fall back to smaller sizes on error
   const sizes = (() => {
     const m = (src||"").match(/thumbnail[?]id=([^&]+)/);
@@ -331,7 +331,7 @@ function ComparePane({title, src}) {
       {status==="loading"&&<div style={{width:32,height:32,border:"3px solid rgba(255,255,255,.2)",borderTop:"3px solid #fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>}
       {status==="error"&&<div style={{color:"rgba(255,255,255,.5)",fontSize:12}}>Failed to load</div>}
       {attempt&&<img key={attempt} src={attempt} alt={title} referrerPolicy="no-referrer"
-        style={{width:"100%",height:"70vh",objectFit:"contain",display:status==="ok"?"block":"none",borderRadius:8}}
+        style={{width:"100%",height:stacked?"36vh":"70vh",objectFit:"contain",display:status==="ok"?"block":"none",borderRadius:8}}
         onLoad={()=>setStatus("ok")}
         onError={()=>{ if(tryIdx<sizes.length-1) setTryIdx(i=>i+1); else setStatus("error"); }}
         onClick={e=>e.stopPropagation()}/>}
@@ -345,6 +345,12 @@ export function CompareLightbox({left, right, labels, startIdx=0, onClose}) {
   const n = labels.length;
   const [idx, setIdx] = useState(Math.min(startIdx, Math.max(n-1,0)));
   const touchX = useRef(null);
+  const [isMobile, setIsMobile] = useState(()=>typeof window!=="undefined"&&window.innerWidth<=700);
+  useEffect(()=>{
+    const fn=()=>setIsMobile(window.innerWidth<=700);
+    window.addEventListener("resize",fn);
+    return ()=>window.removeEventListener("resize",fn);
+  },[]);
 
   const onTouchStart = (e) => { touchX.current = e.touches[0].clientX; };
   const onTouchEnd = (e) => {
@@ -368,10 +374,10 @@ export function CompareLightbox({left, right, labels, startIdx=0, onClose}) {
     <div onClick={onClose} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
       style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.96)",
         zIndex:99999,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{display:"flex",width:"100%",maxWidth:960,alignItems:"stretch"}} onClick={e=>e.stopPropagation()}>
-        <ComparePane title={left.title} src={left.photos.find(p=>p.label===labels[idx])?.src||""}/>
-        <div style={{width:1,background:"rgba(255,255,255,.2)"}}/>
-        <ComparePane title={right.title} src={right.photos.find(p=>p.label===labels[idx])?.src||""}/>
+      <div style={{display:"flex",flexDirection:isMobile?"column":"row",width:"100%",maxWidth:960,alignItems:"stretch"}} onClick={e=>e.stopPropagation()}>
+        <ComparePane title={left.title} src={left.photos.find(p=>p.label===labels[idx])?.src||""} stacked={isMobile}/>
+        <div style={isMobile?{height:1,width:"100%",background:"rgba(255,255,255,.2)"}:{width:1,background:"rgba(255,255,255,.2)"}}/>
+        <ComparePane title={right.title} src={right.photos.find(p=>p.label===labels[idx])?.src||""} stacked={isMobile}/>
       </div>
 
       {n>1&&idx>0&&<div style={{...btnStyle,left:14}} onClick={e=>{e.stopPropagation();setIdx(idx-1);}}>‹</div>}

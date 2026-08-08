@@ -4020,6 +4020,10 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
   );
 }
 
+// Bookmarklet: run on the 7zap.com tab (after copying a VIN) to auto-paste + search,
+// since 7zap is a client-side app with no VIN-in-URL deep link.
+const SEVENZAP_BOOKMARKLET = `javascript:(async function(){try{const v=(await navigator.clipboard.readText()).trim();if(!v){alert('Copy a VIN first');return}let i=document.querySelector('.ant-input[placeholder="VIN search"]');if(!i){const o=document.querySelector('.vin-input');if(o)o.click();await new Promise(r=>setTimeout(r,400));i=document.querySelector('.ant-input[placeholder="VIN search"]')}if(!i){alert('Open the VIN search box on 7zap first, then click this bookmark again.');return}i.focus();const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(i,v);i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,150));const b=i.closest('.ant-input-group')?.querySelector('.ant-input-search-button');if(b)b.click();else i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))}catch(e){alert('Bookmarklet error: '+e.message)}})();`;
+
 // ═══════════════════════════════════════════════════════════════
 // VIN DECODER
 // ═══════════════════════════════════════════════════════════════
@@ -5229,6 +5233,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 color:"#f97316",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
               <span style={{fontSize:22}}>🛢️</span><span>WolfOil</span>
             </button>
+          </div>
+          {/* 7zap bookmarklet — one-time drag, then auto-fills+searches the VIN on 7zap's tab */}
+          <div style={{marginTop:10,padding:"8px 10px",background:"var(--surface2)",border:"1px dashed var(--border2)",borderRadius:8,fontSize:11,color:"var(--text3)",lineHeight:1.5}}>
+            🔖 <a href={SEVENZAP_BOOKMARKLET} draggable="true"
+              onClick={e=>{e.preventDefault();alert("Drag this link up to your bookmarks bar (don't click it).\n\nThen: open 7zap, and once — click your new bookmark. It'll auto-paste the copied VIN and run the search.");}}
+              style={{color:"var(--blue)",fontWeight:700,textDecoration:"none",padding:"2px 6px",background:"rgba(96,165,250,.12)",borderRadius:5,border:"1px solid rgba(96,165,250,.3)"}}>
+              7zap Auto-fill
+            </a> — drag to your bookmarks bar once, then click it on the 7zap tab to skip the manual paste.
           </div>
         </Overlay>
       )}

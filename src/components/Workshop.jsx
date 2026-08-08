@@ -4404,6 +4404,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const [noteVal,       setNoteVal]       = useState(job.notes||"");
   const [savingNote,    setSavingNote]    = useState(false);
   useEffect(()=>{ setNoteVal(job.notes||""); },[job.notes]);
+  const [complaintEdit,  setComplaintEdit]  = useState(false);
+  const [complaintVal,   setComplaintVal]   = useState(job.complaint||"");
+  const [savingComplaint,setSavingComplaint]= useState(false);
+  useEffect(()=>{ setComplaintVal(job.complaint||""); },[job.complaint]);
   const [pendingPayModal, setPendingPayModal] = useState(false);
   const [showLabelModal,  setShowLabelModal]  = useState(false);
   // Derive which items are excluded from a fresh quote build from the job's existing quote
@@ -5088,10 +5092,32 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
 
       {/* ══ Job context card — compact unified design ══ */}
       <div style={{marginBottom:10,borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface)"}}>
-        {job.complaint&&(
-          <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 14px",borderBottom:"1px solid var(--border)",borderLeft:"3px solid #ef4444"}}>
-            <span style={{fontSize:13,fontWeight:700,color:"#ef4444",whiteSpace:"nowrap",minWidth:86,paddingTop:1}}>⚠️ Complaint</span>
-            <span style={{fontSize:15,fontWeight:600,color:"var(--text)",lineHeight:1.4}}>{job.complaint}</span>
+        {(job.complaint||complaintEdit)&&(
+          <div style={{borderBottom:"1px solid var(--border)",borderLeft:"3px solid #ef4444"}}>
+            {complaintEdit?(
+              <div style={{padding:"10px 14px"}}>
+                <textarea value={complaintVal} onChange={e=>setComplaintVal(e.target.value)}
+                  placeholder="Customer complaint..."
+                  style={{width:"100%",fontSize:14,padding:"7px 9px",borderRadius:7,border:"1px solid rgba(239,68,68,.5)",background:"var(--surface)",color:"var(--text)",resize:"vertical",minHeight:60,fontFamily:"DM Sans,sans-serif",outline:"none",boxSizing:"border-box"}}
+                  autoFocus/>
+                <div style={{display:"flex",gap:8,marginTop:6}}>
+                  <button className="btn btn-sm" style={{flex:1,background:"#ef4444",color:"#fff",border:"none"}} disabled={savingComplaint}
+                    onClick={async()=>{setSavingComplaint(true);await onSaveJob({...job,complaint:complaintVal.trim()||null});setSavingComplaint(false);setComplaintEdit(false);}}>
+                    {savingComplaint?"Saving...":"💾 Save"}
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>{setComplaintVal(job.complaint||"");setComplaintEdit(false);}}>Cancel</button>
+                </div>
+              </div>
+            ):(
+              <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 14px"}}>
+                <span style={{fontSize:13,fontWeight:700,color:"#ef4444",whiteSpace:"nowrap",minWidth:86,paddingTop:1}}>⚠️ Complaint</span>
+                <span style={{fontSize:15,fontWeight:600,color:"var(--text)",lineHeight:1.4,flex:1}}>{job.complaint}</span>
+                <button onClick={()=>setComplaintEdit(true)}
+                  style={{fontSize:12,padding:"3px 10px",background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",borderRadius:6,cursor:"pointer",color:"#ef4444",fontWeight:700,flexShrink:0}}>
+                  Edit
+                </button>
+              </div>
+            )}
           </div>
         )}
         {job.diagnosis&&(
@@ -5190,7 +5216,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
               <span style={{fontSize:22}}>🔴</span><span>AutoZone</span>
             </button>
-            <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
+            <button onClick={()=>window.open(`https://www.amayama.com/search/?q=${encodeURIComponent(job.vin)}`,"_blank")}
               style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 4px",
                 background:"rgba(14,165,233,.1)",border:"1px solid rgba(14,165,233,.3)",borderRadius:10,
                 color:"#0ea5e9",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
@@ -5612,12 +5638,12 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                     <span style={{fontSize:20}}>🔴</span>
                     <span>AutoZone</span>
                   </button>
-                  <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
+                  <button onClick={()=>window.open(`https://www.amayama.com/search/?q=${encodeURIComponent(job.vin)}`,"_blank")}
                     style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
                       background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:10,
                       color:"#0ea5e9",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
                     <span style={{fontSize:20}}>🔧</span>
-                    <span>Amayama 📋</span>
+                    <span>Amayama</span>
                   </button>
                   <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied!\n\nPaste it into WolfOil's VIN field.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
                     style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
@@ -5951,7 +5977,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   ))}
                   <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open(`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`,"_blank");}}
                     style={{fontSize:10,fontWeight:600,color:"#dc2626",background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🔴 AutoZone</button>
-                  <button onClick={()=>{navigator.clipboard.writeText(job.vin);window.open("https://www.amayama.com","_blank");}}
+                  <button onClick={()=>window.open(`https://www.amayama.com/search/?q=${encodeURIComponent(job.vin)}`,"_blank")}
                     style={{fontSize:10,fontWeight:600,color:"#0ea5e9",background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🔧 Amayama</button>
                   <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert("VIN copied!\n\nPaste it into WolfOil's VIN field.");window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
                     style={{fontSize:10,fontWeight:600,color:"#f97316",background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🛢️ WolfOil</button>
@@ -7351,7 +7377,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                         {[...vinSearchLinks,
                           {label:"AutoZone",  icon:"🔴", color:"#dc2626", bg:"rgba(220,38,38,.12)",  href:`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`},
-                          {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)", href:"https://www.amayama.com"},
+                          {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)", href:`https://www.amayama.com/search/?q=${encodeURIComponent(job.vin)}`},
                           {label:"WolfOil",   icon:"🛢️", color:"#f97316", bg:"rgba(249,115,22,.12)", href:"https://za.wolfoil.com/en-us/oil-finder"},
                         ].map(lk=>(
                           <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"

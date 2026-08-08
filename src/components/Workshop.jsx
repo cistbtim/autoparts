@@ -4740,7 +4740,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
     : null;
   const vinSearchLinks = job.vin ? [
     ...(catcarHref?[{label:"CatCar",    icon:"🐱", color:"#f97316",       bg:"rgba(249,115,22,.13)",  href:catcarHref}]:[]),
-    {label:"PartsOuq",  icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:`https://partsouq.com/en/search/all?q=${encodeURIComponent(job.vin)}`},
+    {label:"7zap",      icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/", copyVin:true},
     {label:"RealOEM",   icon:"🚗", color:"var(--green)",  bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`},
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},
     {label:"17VIN",     icon:"🆔", color:"var(--text2)",  bg:"rgba(148,163,184,.13)", href:`https://en.17vin.com/vin/${encodeURIComponent(job.vin)}`},
@@ -5203,6 +5203,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
             {vinSearchLinks.map(lk=>(
               <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                onClick={lk.copyVin?()=>navigator.clipboard.writeText(job.vin):undefined}
                 style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 4px",
                   background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:10,
                   color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
@@ -5624,6 +5625,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                   {vinSearchLinks.map(lk=>(
                     <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                      onClick={lk.copyVin?()=>navigator.clipboard.writeText(job.vin):undefined}
                       style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
                         background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:10,
                         color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
@@ -5971,6 +5973,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                   {vinSearchLinks.map(lk=>(
                     <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                      onClick={lk.copyVin?()=>navigator.clipboard.writeText(job.vin):undefined}
                       style={{fontSize:10,fontWeight:600,color:lk.color,background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:99,padding:"2px 9px",textDecoration:"none",whiteSpace:"nowrap"}}>
                       {lk.icon} {lk.label}
                     </a>
@@ -7381,6 +7384,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                           {label:"WolfOil",   icon:"🛢️", color:"#f97316", bg:"rgba(249,115,22,.12)", href:"https://za.wolfoil.com/en-us/oil-finder"},
                         ].map(lk=>(
                           <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                            onClick={lk.copyVin?()=>navigator.clipboard.writeText(job.vin):undefined}
                             style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",
                               background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:8,
                               color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>
@@ -8798,9 +8802,10 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], wsId=nul
               </div>
               {f.vin&&(
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:5}}>
-                  <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent(f.vin)}`} target="_blank" rel="noopener noreferrer"
+                  <a href="https://7zap.com/en/vin-decoder/" target="_blank" rel="noopener noreferrer"
+                    onClick={()=>navigator.clipboard.writeText(f.vin)}
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
-                    PartsOuq
+                    7zap
                   </a>
                   <a href={`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(f.vin)}`} target="_blank" rel="noopener noreferrer"
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(52,211,153,.12)",color:"var(--green)",border:"1px solid rgba(52,211,153,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>

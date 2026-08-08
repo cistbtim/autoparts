@@ -9614,7 +9614,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                 {[
                   {label:"CatCar",    icon:"🐱", color:"#f97316", bg:"rgba(249,115,22,.13)", href:`https://catcar.info/?lang=en&vin=${encodeURIComponent(req.vin)}`},
-                  {label:"PartsOuq",  icon:"🔩", color:"#60a5fa", bg:"rgba(96,165,250,.13)",  href:`https://partsouq.com/en/search/all?q=${encodeURIComponent(req.vin)}`},
+                  {label:"7zap",      icon:"🔩", color:"#60a5fa", bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/", copyVin:true},
                   {label:"RealOEM",   icon:"🚗", color:"#34d399", bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(req.vin)}`},
                   {label:"VIN Decode",icon:"🔎", color:"#fbbf24", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(req.vin)}`},
                   {label:"17VIN",     icon:"🆔", color:"#94a3b8", bg:"rgba(148,163,184,.13)", href:`https://en.17vin.com/vin/${encodeURIComponent(req.vin)}`},
@@ -9622,10 +9622,11 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
                   {label:"VARTA",     icon:"⚡", color:"#6366f1", bg:"rgba(99,102,241,.11)",  href:"https://www.varta-automotive.com/battery-finder"},
                   {label:"Safeline",  icon:"🛑", color:"#dc2626", bg:"rgba(220,38,38,.09)",   href:"https://safelinebrakes.co.za/"},
                   {label:"AutoZone",  icon:"🔴", color:"#dc2626", bg:"rgba(220,38,38,.12)",   href:`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(req.vin)}`},
-                  {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)",  href:"https://www.amayama.com"},
+                  {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)",  href:`https://www.amayama.com/search/?q=${encodeURIComponent(req.vin)}`},
                   {label:"WolfOil",   icon:"🛢️", color:"#f97316", bg:"rgba(249,115,22,.12)",  href:"https://za.wolfoil.com/en-us/oil-finder"},
                 ].map(lk=>(
                   <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                    onClick={lk.copyVin?()=>navigator.clipboard.writeText(req.vin):undefined}
                     style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
                       background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:10,
                       color:lk.color,textDecoration:"none",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>

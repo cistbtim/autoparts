@@ -739,8 +739,9 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
         )}
         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
           {vehicle.vin&&<>
-            <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent(vehicle.vin)}`} target="_blank" rel="noopener noreferrer"
-              style={{fontSize:11,fontWeight:600,color:"var(--blue)",background:"rgba(96,165,250,.13)",border:"1px solid rgba(96,165,250,.35)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🔩 PartsOuq</a>
+            <a href="https://7zap.com/en/vin-decoder/" target="_blank" rel="noopener noreferrer"
+              onClick={()=>navigator.clipboard.writeText(vehicle.vin)}
+              style={{fontSize:11,fontWeight:600,color:"var(--blue)",background:"rgba(96,165,250,.13)",border:"1px solid rgba(96,165,250,.35)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🔩 7zap</a>
             <a href={`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(vehicle.vin)}`} target="_blank" rel="noopener noreferrer"
               style={{fontSize:11,fontWeight:600,color:"var(--yellow)",background:"rgba(251,191,36,.13)",border:"1px solid rgba(251,191,36,.35)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🔎 VIN Decode</a>
             <a href={`https://en.17vin.com/vin/${encodeURIComponent(vehicle.vin)}`} target="_blank" rel="noopener noreferrer"
@@ -749,12 +750,12 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
               style={{fontSize:11,fontWeight:600,color:"#dc2626",background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.3)",borderRadius:99,padding:"3px 10px",cursor:"pointer",whiteSpace:"nowrap"}}>🔴 AutoZone</button>
           </>}
           {vehicle.make&&(
-            <a href={`https://partsouq.com/en/search/all?q=${encodeURIComponent([vehicle.make,vehicle.model].filter(Boolean).join(" "))}`} target="_blank" rel="noopener noreferrer"
-              style={{fontSize:11,fontWeight:600,color:"var(--blue)",background:"rgba(96,165,250,.10)",border:"1px solid rgba(96,165,250,.25)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🔩 POuq (model)</a>
+            <a href="https://7zap.com/en/catalog/cars/" target="_blank" rel="noopener noreferrer"
+              style={{fontSize:11,fontWeight:600,color:"var(--blue)",background:"rgba(96,165,250,.10)",border:"1px solid rgba(96,165,250,.25)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🔩 7zap (browse)</a>
           )}
           <a href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent([vehicle.year,vehicle.make,vehicle.model,"parts"].filter(Boolean).join(" "))}`} target="_blank" rel="noopener noreferrer"
             style={{fontSize:11,fontWeight:600,color:"#34d399",background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🌐 Google</a>
-          <button onClick={()=>{if(vehicle.vin)navigator.clipboard.writeText(vehicle.vin);window.open("https://www.amayama.com","_blank");}}
+          <button onClick={()=>window.open(`https://www.amayama.com/search/?q=${encodeURIComponent(vehicle.vin||[vehicle.make,vehicle.model].filter(Boolean).join(" "))}`,"_blank")}
             style={{fontSize:11,fontWeight:600,color:"#0ea5e9",background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:99,padding:"3px 10px",cursor:"pointer",whiteSpace:"nowrap"}}>🔧 Amayama</button>
         </div>
       </div>

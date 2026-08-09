@@ -3060,38 +3060,71 @@ function GrabImageOverlay({supplierUrl,partSku,onSave,onClose}) {
 function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox}) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const fileRef = useRef(null);
+  const menuRef = useRef(null);
 
-  const addFiles = async (files) => {
-    const imgFiles = Array.from(files||[]).filter(f=>f.type.startsWith("image/"));
-    if(!imgFiles.length) return;
+  useEffect(()=>{
+    if(!menuOpen) return;
+    const onDocClick = e => { if(menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  },[menuOpen]);
+
+  const resizeToBlob = (file) => new Promise((resolve,reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1200;
+      let w=img.width, h=img.height;
+      if(w>MAX||h>MAX){ const r=Math.min(MAX/w,MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+      const canvas=document.createElement("canvas");
+      canvas.width=w; canvas.height=h;
+      canvas.getContext("2d").drawImage(img,0,0,w,h);
+      canvas.toBlob(b=>b?resolve(b):reject(new Error("toBlob failed")),"image/jpeg",0.9);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+
+  const uploadBlobs = async (blobs) => {
+    if(!blobs.length) return;
     setUploading(true);
     try{
       const newUrls = [];
-      for(const file of imgFiles){
-        const blob = await new Promise((resolve,reject)=>{
-          const url = URL.createObjectURL(file);
-          const img = new Image();
-          img.onload = () => {
-            URL.revokeObjectURL(url);
-            const MAX = 1200;
-            let w=img.width, h=img.height;
-            if(w>MAX||h>MAX){ const r=Math.min(MAX/w,MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
-            const canvas=document.createElement("canvas");
-            canvas.width=w; canvas.height=h;
-            canvas.getContext("2d").drawImage(img,0,0,w,h);
-            canvas.toBlob(b=>b?resolve(b):reject(new Error("toBlob failed")),"image/jpeg",0.9);
-          };
-          img.onerror = reject;
-          img.src = url;
-        });
+      for(const blob of blobs){
         const path = `parts/${String(sku||"part").replace(/[^a-zA-Z0-9_-]/g,"_")}/extra-${Date.now()}-${newUrls.length}.jpg`;
-        const url = await uploadToStorage("cars_parts", path, blob);
-        newUrls.push(url);
+        newUrls.push(await uploadToStorage("cars_parts", path, blob));
       }
       onChange([...(photos||[]), ...newUrls]);
     }catch(e){ alert("Upload failed: "+e.message); }
     setUploading(false);
+  };
+
+  const addFiles = async (files) => {
+    const imgFiles = Array.from(files||[]).filter(f=>f.type.startsWith("image/"));
+    if(!imgFiles.length) return;
+    uploadBlobs(await Promise.all(imgFiles.map(resizeToBlob)));
+  };
+
+  const pasteFromClipboard = async () => {
+    setMenuOpen(false);
+    try{
+      const items = await navigator.clipboard.read();
+      for(const item of items){
+        const imgType = item.types.find(ty=>ty.startsWith("image/"));
+        if(imgType){
+          const blob = await item.getType(imgType);
+          const file = new File([blob], "pasted.png", {type:imgType});
+          uploadBlobs([await resizeToBlob(file)]);
+          return;
+        }
+      }
+      alert("No image found in clipboard — copy an image first.");
+    }catch{
+      alert("Couldn't read clipboard. Choose Files instead, or grant clipboard permission.");
+    }
   };
 
   const removeAt = (idx) => onChange((photos||[]).filter((_,i)=>i!==idx));
@@ -3110,14 +3143,28 @@ function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox}) {
               style={{position:"absolute",top:-1,right:-1,width:17,height:17,borderRadius:"50%",background:"rgba(0,0,0,.65)",color:"#fff",border:"none",fontSize:10,lineHeight:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
           </div>
         ))}
-        <div onClick={()=>fileRef.current?.click()}
-          onDragOver={e=>{e.preventDefault();setDragOver(true);}}
-          onDragLeave={()=>setDragOver(false)}
-          onDrop={e=>{e.preventDefault();setDragOver(false);addFiles(e.dataTransfer.files);}}
-          style={{width:52,height:52,borderRadius:6,border:`1.5px dashed ${dragOver?"var(--accent)":"var(--border2)"}`,
-            display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,
-            background:dragOver?"rgba(99,102,241,.08)":"transparent",fontSize:18,color:"var(--text3)"}}>
-          {uploading?"⏳":"+"}
+        <div ref={menuRef} style={{position:"relative"}}>
+          <div onClick={()=>setMenuOpen(o=>!o)}
+            onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+            onDragLeave={()=>setDragOver(false)}
+            onDrop={e=>{e.preventDefault();setDragOver(false);addFiles(e.dataTransfer.files);}}
+            style={{width:52,height:52,borderRadius:6,border:`1.5px dashed ${dragOver?"var(--accent)":"var(--border2)"}`,
+              display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,
+              background:dragOver?"rgba(99,102,241,.08)":"transparent",fontSize:18,color:"var(--text3)"}}>
+            {uploading?"⏳":"+"}
+          </div>
+          {menuOpen&&(
+            <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:20,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 6px 20px rgba(0,0,0,.25)",overflow:"hidden",minWidth:150}}>
+              <button onClick={()=>{setMenuOpen(false);fileRef.current?.click();}}
+                style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"9px 12px",background:"none",border:"none",cursor:"pointer",fontSize:12,fontWeight:600,color:"var(--text)",textAlign:"left"}}>
+                📁 Choose File(s)
+              </button>
+              <button onClick={pasteFromClipboard}
+                style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"9px 12px",background:"none",border:"none",borderTop:"1px solid var(--border)",cursor:"pointer",fontSize:12,fontWeight:600,color:"var(--text)",textAlign:"left"}}>
+                📋 Paste from Clipboard
+              </button>
+            </div>
+          )}
         </div>
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}}
           onChange={e=>{addFiles(e.target.files); e.target.value="";}}/>

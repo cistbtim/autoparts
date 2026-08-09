@@ -30,6 +30,13 @@ window.addEventListener("popstate",()=>{
   window.history.pushState({appLoaded:true},"");
 },{capture:true});
 
+// Primary photo + any extra photos for a part, in lightbox order (upgraded to full-res)
+const partPhotoUrls = (p) => {
+  let extra = p?.photos;
+  if(!Array.isArray(extra)){ try{ extra = JSON.parse(extra||"[]"); }catch{ extra = []; } }
+  return [p?.image_url, ...(extra||[])].filter(Boolean).map(toFullUrl);
+};
+
 const APP_VERSION = "2.0.0.1";
 const APP_UPDATE_DATE = __BUILD_DATE__;
 
@@ -4302,7 +4309,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                       {/* Photo */}
                       {img
-                        ? <img src={img} alt={p.name} loading="lazy" onClick={()=>setLightbox({url:toFullUrl(p.image_url),name:p.name})}
+                        ? <img src={img} alt={p.name} loading="lazy" onClick={()=>setLightbox({urls:partPhotoUrls(p),name:p.name})}
                             style={{width:56,height:56,objectFit:"contain",borderRadius:8,background:"var(--surface2)",border:"1px solid var(--border)",flexShrink:0,cursor:"zoom-in"}}/>
                         : <div style={{width:56,height:56,borderRadius:8,background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🔩</div>}
                       {/* Info */}
@@ -4410,7 +4417,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                           <td style={{width:52,padding:"10px 8px"}}>
                             {img
                               ? <img className="part-img" src={img} alt={p.name} loading="lazy"
-                                  onClick={()=>setLightbox({url:toFullUrl(p.image_url),name:p.name})}
+                                  onClick={()=>setLightbox({urls:partPhotoUrls(p),name:p.name})}
                                   onError={e=>{e.target.style.display="none";e.target.nextSibling&&(e.target.nextSibling.style.display="flex");}}/>
                               : <div className="part-emoji">{p.image||"🔩"}</div>}
                           </td>
@@ -4866,7 +4873,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                       ? <div style={{position:"relative",marginBottom:12,flexShrink:0}}>
                           <img src={img} alt={p.name}
                             style={{width:"100%",height:120,objectFit:"contain",background:"#fff",borderRadius:9,cursor:role==="admin"?"pointer":"zoom-in",display:"block"}}
-                            onClick={()=>role==="admin"?openM("editPart",p):setLightbox({url:toFullUrl(p.image_url),name:p.name})}
+                            onClick={()=>role==="admin"?openM("editPart",p):setLightbox({urls:partPhotoUrls(p),name:p.name})}
                             onError={e=>e.target.parentNode.style.display="none"}/>
                           {role==="admin"&&<div style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.55)",color:"#fff",fontSize:11,borderRadius:5,padding:"2px 7px",pointerEvents:"none"}}>✏️ Edit</div>}
                         </div>
@@ -7032,7 +7039,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       })()}
 
       {/* LIGHTBOX */}
-      {lightbox&&<ImgLightbox url={lightbox.url} onClose={()=>setLightbox(null)}/>}
+      {lightbox&&<ImgLightbox url={lightbox.url} urls={lightbox.urls} onClose={()=>setLightbox(null)}/>}
 
       {/* INVENTORY STOCK VALUE REPORT */}
       {invReport&&(()=>{

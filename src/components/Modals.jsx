@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
+import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
 import { C, curSym, getSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
 import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
@@ -3054,12 +3054,85 @@ function GrabImageOverlay({supplierUrl,partSku,onSave,onClose}) {
   );
 }
 
+// Unlimited extra photos for a part — thumbnail strip + add/remove. Uploads go
+// straight to Supabase Storage (no AI background removal — these are quick
+// reference shots, unlike the primary catalog photo).
+function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox}) {
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef(null);
+
+  const addFiles = async (files) => {
+    const imgFiles = Array.from(files||[]).filter(f=>f.type.startsWith("image/"));
+    if(!imgFiles.length) return;
+    setUploading(true);
+    try{
+      const newUrls = [];
+      for(const file of imgFiles){
+        const blob = await new Promise((resolve,reject)=>{
+          const url = URL.createObjectURL(file);
+          const img = new Image();
+          img.onload = () => {
+            URL.revokeObjectURL(url);
+            const MAX = 1200;
+            let w=img.width, h=img.height;
+            if(w>MAX||h>MAX){ const r=Math.min(MAX/w,MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+            const canvas=document.createElement("canvas");
+            canvas.width=w; canvas.height=h;
+            canvas.getContext("2d").drawImage(img,0,0,w,h);
+            canvas.toBlob(b=>b?resolve(b):reject(new Error("toBlob failed")),"image/jpeg",0.9);
+          };
+          img.onerror = reject;
+          img.src = url;
+        });
+        const path = `parts/${String(sku||"part").replace(/[^a-zA-Z0-9_-]/g,"_")}/extra-${Date.now()}-${newUrls.length}.jpg`;
+        const url = await uploadToStorage("cars_parts", path, blob);
+        newUrls.push(url);
+      }
+      onChange([...(photos||[]), ...newUrls]);
+    }catch(e){ alert("Upload failed: "+e.message); }
+    setUploading(false);
+  };
+
+  const removeAt = (idx) => onChange((photos||[]).filter((_,i)=>i!==idx));
+
+  return (
+    <div style={{marginTop:10}}>
+      <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>
+        📸 Extra Photos{photos?.length>0?` (${photos.length})`:""}
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {(photos||[]).map((url,i)=>(
+          <div key={url+i} style={{position:"relative",width:52,height:52,borderRadius:6,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer",flexShrink:0}}
+            onClick={()=>onOpenLightbox(i)}>
+            <img src={toImgUrl(url)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} referrerPolicy="no-referrer"/>
+            <button onClick={e=>{e.stopPropagation();removeAt(i);}} title="Remove"
+              style={{position:"absolute",top:-1,right:-1,width:17,height:17,borderRadius:"50%",background:"rgba(0,0,0,.65)",color:"#fff",border:"none",fontSize:10,lineHeight:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          </div>
+        ))}
+        <div onClick={()=>fileRef.current?.click()}
+          onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+          onDragLeave={()=>setDragOver(false)}
+          onDrop={e=>{e.preventDefault();setDragOver(false);addFiles(e.dataTransfer.files);}}
+          style={{width:52,height:52,borderRadius:6,border:`1.5px dashed ${dragOver?"var(--accent)":"var(--border2)"}`,
+            display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,
+            background:dragOver?"rgba(99,102,241,.08)":"transparent",fontSize:18,color:"var(--text3)"}}>
+          {uploading?"⏳":"+"}
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}}
+          onChange={e=>{addFiles(e.target.files); e.target.value="";}}/>
+      </div>
+    </div>
+  );
+}
+
 // Smart image preview with clear status feedback
 export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onRefreshVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onEditSupplier,onGoBack=null}) {
+  const parsePhotos = (v) => { if(Array.isArray(v)) return v; try{ const a=JSON.parse(v||"[]"); return Array.isArray(a)?a:[]; }catch{ return []; } };
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
     brand:p.brand||"", price:p.price??"", cost_price:p.cost_price??"", stock:p.stock??0, minStock:p.min_stock??0,
-    image_url:p.image_url||"", chinese_desc:p.chinese_desc||"",
+    image_url:p.image_url||"", photos:parsePhotos(p.photos), chinese_desc:p.chinese_desc||"",
     make:p.make||"", model:p.model||"", year_range:p.year_range||"", oe_number:p.oe_number||"",
     reference_url:p.reference_url||"",
     bin_location:p.bin_location||"", is_quantum:p.is_quantum||false, is_hiace:p.is_hiace||false,
@@ -3067,7 +3140,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
     preferred_supplier_id:p.preferred_supplier_id||"",
   }:{
     sku:branchSkuPrefix?branchSkuPrefix+"-":"", name:"", category:"Engine", brand:"", price:0, cost_price:0, stock:"", minStock:"",
-    image_url:"", chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", reference_url:"", bin_location:"", is_quantum:false, is_hiace:false,
+    image_url:"", photos:[], chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", reference_url:"", bin_location:"", is_quantum:false, is_hiace:false,
     auto_reorder:false, reorder_point:0, reorder_qty:1, preferred_supplier_id:"",
   };
   const [f,setF]=useState(()=>initialF?{...makeF(part),...initialF}:makeF(part));
@@ -3109,7 +3182,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
   const buildPayload=(fv)=>({
     sku:fv.sku.trim(), name:fv.name.trim(), category:fv.category, brand:fv.brand,
     price:+fv.price, cost_price:+fv.cost_price||0, stock:+fv.stock, min_stock:+fv.minStock,
-    image_url:fv.image_url, chinese_desc:fv.chinese_desc,
+    image_url:fv.image_url, photos:fv.photos||[], chinese_desc:fv.chinese_desc,
     make:fv.make, model:fv.model, year_range:fv.year_range, oe_number:fv.oe_number,
     reference_url:fv.reference_url||"",
     bin_location:fv.bin_location||"", is_quantum:!!fv.is_quantum, is_hiace:!!fv.is_hiace,
@@ -3124,6 +3197,13 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
     if (part) { onSave(buildPayload(updated), true); setDirty(false); setSaved(true); }
     else setDirty(true);
   };
+  const handlePhotosChange = (newPhotos) => {
+    const updated = {...f, photos: newPhotos};
+    setF(updated);
+    if (part) { onSave(buildPayload(updated), true); setDirty(false); setSaved(true); }
+    else setDirty(true);
+  };
+  const [extraLightbox, setExtraLightbox] = useState(null); // {idx} — urls built from f.image_url + f.photos
 
   const handleClose = () => {
     if (dirty && !window.confirm("You have unsaved changes. Close without saving?")) return;
@@ -3369,6 +3449,11 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
         <div style={{flexShrink:0,width:210}}>
           {part&&<div style={{fontSize:11,color:"var(--green)",marginBottom:8,background:"rgba(34,197,94,.08)",borderRadius:7,padding:"5px 9px"}}>✅ {t.phuAutoSave}</div>}
           <PartPhotoUploader imageUrl={f.image_url} onChange={handlePhotoChange} sku={f.sku} t={t} bucket="cars_parts"/>
+          <ExtraPhotosStrip photos={f.photos} onChange={handlePhotosChange} sku={f.sku}
+            onOpenLightbox={i=>setExtraLightbox({idx:f.image_url?i+1:i})}/>
+          {extraLightbox&&(
+            <ImgLightbox urls={[f.image_url,...(f.photos||[])].filter(Boolean)} startIdx={extraLightbox.idx} onClose={()=>setExtraLightbox(null)}/>
+          )}
           {part&&onSavePartSupplier&&partSuppliers.length===0&&(
             <div style={{marginTop:10,background:"rgba(96,165,250,.07)",border:"1px dashed rgba(96,165,250,.35)",borderRadius:9,padding:"10px 12px",textAlign:"center"}}>
               <div style={{fontSize:12,fontWeight:600,color:"var(--blue)",marginBottom:5}}>🏭 No supplier linked</div>

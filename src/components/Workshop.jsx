@@ -4398,7 +4398,8 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       if(!p) return;
       const ph = (()=>{if(Array.isArray(p.photos)) return p.photos; try{return JSON.parse(p.photos||"[]");}catch{return[];}})();
       const photo = ph[0]||p.image_url||p.photo_url||"";
-      if(photo) setWsShopPartView(prev=>prev?{...prev,part_photo:photo,sku:prev.sku||p.sku||p.oe_number||""}:prev);
+      const gallery = ph.length?ph:[p.image_url,p.photo_url].filter(Boolean);
+      if(photo) setWsShopPartView(prev=>prev?{...prev,part_photo:photo,part_photos:gallery,sku:prev.sku||p.sku||p.oe_number||""}:prev);
     }).catch(()=>{});
   },[wsShopPartView?.part_id, wsShopPartView?.sku, wsShopPartView?.part_photo]);
   const [refreshing,    setRefreshing]    = useState(false);
@@ -5713,7 +5714,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         );
       })()}
 
-      {linePartImgLightbox&&<ImgLightbox url={linePartImgLightbox} onClose={()=>setLinePartImgLightbox(null)}/>}
+      {linePartImgLightbox?.length>0&&<ImgLightbox urls={linePartImgLightbox} onClose={()=>setLinePartImgLightbox(null)}/>}
 
       {/* ══ INSPECTION popup ══ */}
       {inspectPopup&&(
@@ -6276,7 +6277,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                   <div onClick={e=>e.stopPropagation()} style={{width:90,height:90,borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer",flexShrink:0,background:"var(--surface2)"}}>
                     <DriveImg url={wsShopPartView.part_photo} alt="" eager
                       style={{width:"100%",height:"100%",objectFit:"contain"}}
-                      onClick={()=>setWsShopPartPhotoLightbox(wsShopPartView.part_photo)}/>
+                      onClick={()=>setWsShopPartPhotoLightbox(wsShopPartView.part_photos?.length?wsShopPartView.part_photos:[wsShopPartView.part_photo])}/>
                   </div>
                 )}
                 <button onClick={()=>setWsShopPartView(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--text3)",padding:4,flexShrink:0}}>✕</button>
@@ -6316,7 +6317,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
           </div>
         )}
         {wsShopPartPhotoLightbox && (
-          <ImgLightbox url={wsShopPartPhotoLightbox} onClose={()=>setWsShopPartPhotoLightbox(null)}/>
+          <ImgLightbox urls={wsShopPartPhotoLightbox} onClose={()=>setWsShopPartPhotoLightbox(null)}/>
         )}
         {/* ── Billing flow stepper ── */}
         {(()=>{
@@ -6402,7 +6403,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
                         <span style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:99,background:item.type==="part"?"rgba(96,165,250,.15)":"rgba(52,211,153,.15)",color:item.type==="part"?"var(--blue)":"var(--green)",display:"inline-flex",alignItems:"center",gap:5}}>
                           {thumb
                             ? <img src={thumb} alt="" loading="lazy" referrerPolicy="no-referrer"
-                                onClick={e=>{e.stopPropagation();setLinePartImgLightbox(mp.image_url);}}
+                                onClick={e=>{e.stopPropagation();setLinePartImgLightbox(partPhotoUrls(mp));}}
                                 onError={e=>{e.target.style.display="none";}}
                                 style={{width:15,height:15,objectFit:"contain",borderRadius:3,cursor:"zoom-in",background:"#fff",flexShrink:0}}/>
                             : <span>{item.type==="part"?"🔩":"👷"}</span>}
@@ -10751,11 +10752,12 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
         || linkedPart?.image_1
         || ri.part_photo
         || "";
+      const resolvedPhotos=linkedPhotos.length?linkedPhotos:[resolvedPhoto].filter(Boolean);
       const resolvedSku=linkedPart?.sku||linkedPart?.oe_number||ri.sku||"";
       if(!replyMap[desc]||+ri.price>0) replyMap[desc]={
         available:!!ri.available, price:+ri.price||0,
         notes:ri.notes||"", part_name:ri.part_name||linkedPart?.name||ri.description||"",
-        sku:resolvedSku, part_id:ri.part_id||"", part_photo:resolvedPhoto,
+        sku:resolvedSku, part_id:ri.part_id||"", part_photo:resolvedPhoto, part_photos:resolvedPhotos,
         source:ri.source||null,
       };
     });
@@ -10929,7 +10931,7 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
               <div style={{marginBottom:14,textAlign:"center"}}>
                 <DriveImg url={modalPartDetail.part_photo} alt="" eager
                   style={{maxWidth:"100%",maxHeight:220,borderRadius:10,objectFit:"contain",border:"1px solid var(--border)",cursor:"pointer"}}
-                  onClick={()=>setModalPartPhotoLightbox(modalPartDetail.part_photo)}/>
+                  onClick={()=>setModalPartPhotoLightbox(modalPartDetail.part_photos?.length?modalPartDetail.part_photos:[modalPartDetail.part_photo])}/>
               </div>
             )}
             <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>{modalPartDetail.part_name}</div>
@@ -10949,7 +10951,7 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
         </div>
       )}
       {modalPartPhotoLightbox && (
-        <ImgLightbox url={modalPartPhotoLightbox} onClose={()=>setModalPartPhotoLightbox(null)}/>
+        <ImgLightbox urls={modalPartPhotoLightbox} onClose={()=>setModalPartPhotoLightbox(null)}/>
       )}
     </Overlay>
   );

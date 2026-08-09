@@ -69,6 +69,13 @@ export const toFullUrl = (url) => {
   return url;
 };
 
+// Primary photo + any extra photos for a part, in lightbox order (upgraded to full-res)
+export const partPhotoUrls = (p) => {
+  let extra = p?.photos;
+  if (!Array.isArray(extra)) { try { extra = JSON.parse(extra || "[]"); } catch { extra = []; } }
+  return [p?.image_url, ...(extra || [])].filter(Boolean).map(toFullUrl);
+};
+
 export const today = () => new Date().toISOString().slice(0, 10);
 export const fmtAmt = (n) => `${C()}${(n || 0).toLocaleString()}`;
 

@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems } from "../lib/helpers.js";
+import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner } from "../components/shared.jsx";
@@ -10061,7 +10061,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     const hasCached=_spCache.branchId===linkedBranchId&&Array.isArray(_spCache.data)&&_spCache.data.length>0;
     if(!hasCached) setLoading(true);
     // Only fetch columns shown in the UI — avoids transferring large unused fields over mobile data
-    const COLS="id,sku,name,brand,stock,price,image_url,image,bin_location,category,chinese_desc,make,model,year_range,oe_number";
+    const COLS="id,sku,name,brand,stock,price,image_url,photos,image,bin_location,category,chinese_desc,make,model,year_range,oe_number";
     // When coming from a job card (initialMake set), pre-filter by vehicle fitments so we only
     // download parts that fit the vehicle instead of the entire catalog — critical on SA mobile data
     // Chunked id=in.() fetch — scales to any fitment count without falling back
@@ -10212,7 +10212,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     const t=setTimeout(async()=>{
       const esc=term.replace(/[%,()*]/g," ").replace(/\s+/g," ").trim();
       const branchIds=[linkedBranchId,...(mainBranchId&&mainBranchId!==linkedBranchId?[mainBranchId]:[])].filter(Boolean);
-      const res=await api.get("parts",`branch_id=in.(${branchIds.join(",")})&or=(name.ilike.*${esc}*,sku.ilike.*${esc}*,oe_number.ilike.*${esc}*,brand.ilike.*${esc}*)&select=id,sku,name,brand,stock,price,image_url,image,bin_location,category,chinese_desc,make,model,year_range,oe_number&order=sku.asc&limit=60`).catch(()=>[]);
+      const res=await api.get("parts",`branch_id=in.(${branchIds.join(",")})&or=(name.ilike.*${esc}*,sku.ilike.*${esc}*,oe_number.ilike.*${esc}*,brand.ilike.*${esc}*)&select=id,sku,name,brand,stock,price,image_url,photos,image,bin_location,category,chinese_desc,make,model,year_range,oe_number&order=sku.asc&limit=60`).catch(()=>[]);
       if(!dead){ setExtraResults(Array.isArray(res)?res:[]); setExtraLoading(false); }
     },400);
     return ()=>{dead=true;clearTimeout(t);};
@@ -10265,7 +10265,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   return (
     <div>
       <AdBanner ads={ads} page="spareshop" userCtx={userCtx}/>
-      {lightbox&&<ImgLightbox url={lightbox.url} name={lightbox.name} onClose={()=>setLightbox(null)}/>}
+      {lightbox&&<ImgLightbox url={lightbox.url} urls={lightbox.urls} name={lightbox.name} onClose={()=>setLightbox(null)}/>}
       {showUnlock&&(
         <Overlay onClose={()=>{setShowUnlock(false);setUnlockPw("");setUnlockErr("");}}>
           <MHead title="🔐 Admin Unlock" onClose={()=>{setShowUnlock(false);setUnlockPw("");setUnlockErr("");}}/>
@@ -10638,7 +10638,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                         <img src={img} alt={p.name}
                           style={{width:"100%",height:120,objectFit:"contain",background:"#fff",borderRadius:9,cursor:"zoom-in",display:"block"}}
                           loading="lazy"
-                          onClick={()=>setLightbox({url:img,name:p.name})}
+                          onClick={()=>setLightbox({urls:partPhotoUrls(p),name:p.name})}
                           onError={e=>e.target.parentNode.style.display="none"}/>
                       </div>
                     : <div style={{width:"100%",height:90,background:"var(--surface2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:38,marginBottom:12,flexShrink:0}}>

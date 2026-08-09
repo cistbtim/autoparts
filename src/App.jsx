@@ -2,7 +2,7 @@
 import { api, setDemoMode } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
-import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag } from "./lib/helpers.js";
+import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag } from "./lib/helpers.js";
 import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess, CITY_PROVINCE } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
 import { CSS } from "./styles.js";
@@ -29,13 +29,6 @@ if(window.history.state?.appLoaded !== true){
 window.addEventListener("popstate",()=>{
   window.history.pushState({appLoaded:true},"");
 },{capture:true});
-
-// Primary photo + any extra photos for a part, in lightbox order (upgraded to full-res)
-const partPhotoUrls = (p) => {
-  let extra = p?.photos;
-  if(!Array.isArray(extra)){ try{ extra = JSON.parse(extra||"[]"); }catch{ extra = []; } }
-  return [p?.image_url, ...(extra||[])].filter(Boolean).map(toFullUrl);
-};
 
 const APP_VERSION = "2.0.0.1";
 const APP_UPDATE_DATE = __BUILD_DATE__;

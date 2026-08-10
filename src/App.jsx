@@ -1188,6 +1188,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(updated) db.parts.put(updated).catch(()=>{});
   };
 
+  // Generic single-field save for PartPhotoCapturePage (e.g. bin_location) — no photo attribution stamp
+  const savePartField=async(partId,field,value)=>{
+    const result=await api.patch("parts","id",partId,{[field]:value});
+    if(!Array.isArray(result)){ showToast(`Save failed: ${result?.message||"Unknown error"}`,"err"); return; }
+    setParts(prev=>prev.map(p=>String(p.id)===String(partId)?{...p,[field]:value}:p));
+    const updated=result[0];
+    if(updated) db.parts.put(updated).catch(()=>{});
+  };
+
   // Parts
   const savePart=async(data, keepOpen=false)=>{
     const ep=mData("editPart");
@@ -4733,7 +4742,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── PART PHOTOS ── */}
         {tab==="partPhotos"&&(
-          <PartPhotoCapturePage parts={parts} partFitments={partFitments} vehicles={vehicles} onSavePhotos={savePartPhotos} onRefresh={()=>refreshTables("parts")} t={t}/>
+          <PartPhotoCapturePage parts={parts} partFitments={partFitments} vehicles={vehicles} onSavePhotos={savePartPhotos} onSaveField={savePartField} onRefresh={()=>refreshTables("parts")} t={t}/>
         )}
 
         {/* ── STOCK MOVE ── */}

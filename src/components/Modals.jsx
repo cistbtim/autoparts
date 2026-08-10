@@ -7092,11 +7092,13 @@ Current: ${item.system_qty}`,item.system_qty));if(!isNaN(n)&&n>=0){onAdjustItem(
 // snap photos with the camera. First photo becomes the cover (image_url), the
 // rest are saved as extras (photos). No AI background removal here — this is
 // meant to be fast for photographing many parts in a row.
-export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], onSavePhotos, onRefresh, t={}}) {
+export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], onSavePhotos, onSaveField, onRefresh, t={}}) {
   const [search, setSearch] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [locationVal, setLocationVal] = useState("");
+  const [savingLocation, setSavingLocation] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(null);
@@ -7113,6 +7115,15 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], on
   },[menuOpen]);
 
   const selected = selectedId ? parts.find(p=>String(p.id)===String(selectedId)) : null;
+
+  useEffect(()=>{ setLocationVal(selected?.bin_location||""); },[selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveLocation = async () => {
+    if(!selected || locationVal===(selected.bin_location||"")) return;
+    setSavingLocation(true);
+    try{ await onSaveField(selected.id,"bin_location",locationVal.trim()); }
+    finally{ setSavingLocation(false); }
+  };
 
   const results = (() => {
     const words = searchDebounced.toLowerCase().split(" ").filter(Boolean);
@@ -7203,6 +7214,17 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], on
             <div style={{marginTop:6,padding:"8px 12px",borderRadius:8,background:"rgba(251,191,36,.1)",border:"1.5px solid rgba(251,191,36,.4)",display:"inline-block"}}>
               <div style={{fontSize:10,fontWeight:800,color:"var(--yellow)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>OE Number — check against the sticker</div>
               <div style={{fontFamily:"DM Mono,monospace",fontSize:22,fontWeight:800,letterSpacing:"1px",color:"var(--text)"}}>{selected.oe_number}</div>
+            </div>
+          )}
+          {onSaveField&&(
+            <div style={{marginTop:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>📍 Location</div>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <input className="inp" value={locationVal} onChange={e=>setLocationVal(e.target.value)}
+                  onBlur={saveLocation} onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}}}
+                  placeholder="A1-01, SHELF-B3" style={{maxWidth:220,fontSize:13}}/>
+                {savingLocation&&<span style={{fontSize:11,color:"var(--text3)"}}>Saving…</span>}
+              </div>
             </div>
           )}
           {(selected.make||selected.model)&&(

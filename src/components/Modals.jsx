@@ -7104,6 +7104,7 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], se
   const [uploading, setUploading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(null);
+  const [vehicleLightbox, setVehicleLightbox] = useState(null); // urls[] — enlarged fitment vehicle photos
   const fileRef = useRef(null);
   const camRef = useRef(null);
   const menuRef = useRef(null);
@@ -7142,6 +7143,8 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], se
     if(!Array.isArray(extra)){ try{ extra = JSON.parse(extra||"[]"); }catch{ extra = []; } }
     return [p?.image_url, ...(extra||[])].filter(Boolean);
   };
+
+  const vehiclePhotosOf = (v) => [v?.photo_front, v?.photo_side, v?.photo_rear].filter(Boolean);
 
   if(selected){
     const allPhotos = photosOf(selected);
@@ -7253,33 +7256,51 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], se
               <div className="card desk-table" style={{overflow:"hidden"}}>
                 <div className="tbl-wrap">
                   <table className="tbl">
-                    <thead><tr><th>Make</th><th>Model</th><th>Variant</th><th>Year</th><th>Code</th></tr></thead>
+                    <thead><tr><th>Photo</th><th>Make</th><th>Model</th><th>Variant</th><th>Year</th><th>Code</th></tr></thead>
                     <tbody>
-                      {fitments.map(v=>(
+                      {fitments.map(v=>{
+                        const vPhotos=vehiclePhotosOf(v);
+                        return (
                         <tr key={v.id}>
+                          <td>
+                            {vPhotos.length
+                              ? <img src={toImgUrl(vPhotos[0])} alt="" onClick={()=>setVehicleLightbox(vPhotos.map(toFullUrl))}
+                                  style={{width:44,height:34,objectFit:"cover",borderRadius:5,cursor:"zoom-in",border:"1px solid var(--border)"}} referrerPolicy="no-referrer"/>
+                              : <span style={{fontSize:16,opacity:.35}}>🚗</span>}
+                          </td>
                           <td>{v.make||"—"}</td>
                           <td>{v.model||"—"}</td>
                           <td style={{color:"var(--green)",fontWeight:600}}>{v.variant||"—"}</td>
                           <td style={{whiteSpace:"nowrap",color:"var(--red)",fontWeight:600}}>{v.year_from||""}{v.year_to?`–${v.year_to}`:v.year_from?"+":"—"}</td>
                           <td style={{fontFamily:"DM Mono,monospace"}}>{v.code||"—"}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
               {/* Mobile: cards */}
               <div className="mob-cards">
-                {fitments.map(v=>(
-                  <div key={v.id} className="card" style={{padding:"10px 12px"}}>
-                    <div style={{fontWeight:700,fontSize:13}}>{[v.make,v.model].filter(Boolean).join(" ")||"—"}</div>
-                    {v.variant&&<div style={{fontSize:12,color:"var(--green)",fontWeight:600,marginTop:1}}>{v.variant}</div>}
-                    <div style={{display:"flex",gap:10,marginTop:5,fontSize:11}}>
-                      <span style={{color:"var(--red)",fontWeight:600}}>{v.year_from||""}{v.year_to?`–${v.year_to}`:v.year_from?"+":""}</span>
-                      {v.code&&<span style={{fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{v.code}</span>}
+                {fitments.map(v=>{
+                  const vPhotos=vehiclePhotosOf(v);
+                  return (
+                    <div key={v.id} className="card" style={{padding:"10px 12px",display:"flex",gap:10,alignItems:"center"}}>
+                      {vPhotos.length
+                        ? <img src={toImgUrl(vPhotos[0])} alt="" onClick={()=>setVehicleLightbox(vPhotos.map(toFullUrl))}
+                            style={{width:52,height:40,objectFit:"cover",borderRadius:6,cursor:"zoom-in",border:"1px solid var(--border)",flexShrink:0}} referrerPolicy="no-referrer"/>
+                        : <div style={{width:52,height:40,borderRadius:6,background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,opacity:.35,flexShrink:0}}>🚗</div>}
+                      <div style={{minWidth:0,flex:1}}>
+                        <div style={{fontWeight:700,fontSize:13}}>{[v.make,v.model].filter(Boolean).join(" ")||"—"}</div>
+                        {v.variant&&<div style={{fontSize:12,color:"var(--green)",fontWeight:600,marginTop:1}}>{v.variant}</div>}
+                        <div style={{display:"flex",gap:10,marginTop:5,fontSize:11}}>
+                          <span style={{color:"var(--red)",fontWeight:600}}>{v.year_from||""}{v.year_to?`–${v.year_to}`:v.year_from?"+":""}</span>
+                          {v.code&&<span style={{fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{v.code}</span>}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -7292,6 +7313,9 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], se
 
         {lightboxIdx!==null&&(
           <ImgLightbox urls={allPhotos.map(toFullUrl)} startIdx={lightboxIdx} onClose={()=>setLightboxIdx(null)}/>
+        )}
+        {vehicleLightbox&&(
+          <ImgLightbox urls={vehicleLightbox} onClose={()=>setVehicleLightbox(null)}/>
         )}
 
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:10}}>

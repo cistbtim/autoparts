@@ -7209,13 +7209,23 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], on
               <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:5}}>
                 🔗 Fits {fitments.length} vehicle{fitments.length!==1?"s":""}
               </div>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {fitments.map(v=>(
-                  <span key={v.id} style={{fontSize:12,padding:"3px 10px",borderRadius:99,background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--text2)"}}>
-                    {[v.make,v.model,v.variant].filter(Boolean).join(" ")}
-                    {(v.year_from||v.year_to)?` · ${v.year_from||""}${v.year_to?`–${v.year_to}`:""}`:""}
-                  </span>
-                ))}
+              <div className="card" style={{overflow:"hidden"}}>
+                <div className="tbl-wrap">
+                  <table className="tbl">
+                    <thead><tr><th>Make</th><th>Model</th><th>Variant</th><th>Year</th><th>Code</th></tr></thead>
+                    <tbody>
+                      {fitments.map(v=>(
+                        <tr key={v.id}>
+                          <td>{v.make||"—"}</td>
+                          <td>{v.model||"—"}</td>
+                          <td>{v.variant||"—"}</td>
+                          <td style={{whiteSpace:"nowrap"}}>{v.year_from||""}{v.year_to?`–${v.year_to}`:v.year_from?"+":"—"}</td>
+                          <td style={{fontFamily:"DM Mono,monospace"}}>{v.code||"—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}

@@ -3203,6 +3203,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
   const [deleting, setDeleting] = useState(false);
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
   const [catalogSearch,setCatalogSearch]=useState("");
+  const [brandPickOpen,setBrandPickOpen]=useState(false);
   const [suppId,setSuppId]=useState("");
   const [suppPrice,setSuppPrice]=useState("");
   const [suppLead,setSuppLead]=useState("");
@@ -3412,7 +3413,32 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                 );
               })()}
             </div>
-            <div><FL label={t.brand}/><input className="inp" value={f.brand} onChange={e=>s("brand",e.target.value)} placeholder="GWM"/></div>
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                <FL label={t.brand}/>
+                <button type="button" onClick={()=>setBrandPickOpen(o=>!o)}
+                  style={{fontSize:11,padding:"2px 8px",borderRadius:6,cursor:"pointer",fontWeight:600,
+                    background:brandPickOpen?"var(--accent)":"var(--surface2)",
+                    color:brandPickOpen?"#fff":"var(--text3)",
+                    border:`1px solid ${brandPickOpen?"var(--accent)":"var(--border)"}`}}>
+                  🏷️ Quick pick {brandPickOpen?"▲":"▼"}
+                </button>
+              </div>
+              <input className="inp" value={f.brand} onChange={e=>s("brand",e.target.value)} placeholder="GWM"/>
+              {brandPickOpen&&(
+                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
+                  {["Original","OEM","Aftermarket","Bosch"].map(b=>(
+                    <button key={b} type="button" onClick={()=>{s("brand",b);setBrandPickOpen(false);}}
+                      style={{fontSize:11,padding:"3px 10px",borderRadius:99,cursor:"pointer",fontWeight:600,
+                        background:f.brand===b?"var(--accent)":"var(--surface2)",
+                        color:f.brand===b?"#fff":"var(--text2)",
+                        border:`1px solid ${f.brand===b?"var(--accent)":"var(--border)"}`}}>
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </FG>
           <FD>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>

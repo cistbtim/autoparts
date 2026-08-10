@@ -3412,21 +3412,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                 );
               })()}
             </div>
-            <div>
-              <FL label={t.brand}/>
-              <input className="inp" value={f.brand} onChange={e=>s("brand",e.target.value)} placeholder="GWM"/>
-              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
-                {["Original","OEM","Aftermarket","Bosch"].map(b=>(
-                  <button key={b} type="button" onClick={()=>s("brand",b)}
-                    style={{fontSize:11,padding:"3px 10px",borderRadius:99,cursor:"pointer",fontWeight:600,
-                      background:f.brand===b?"var(--accent)":"var(--surface2)",
-                      color:f.brand===b?"#fff":"var(--text2)",
-                      border:`1px solid ${f.brand===b?"var(--accent)":"var(--border)"}`}}>
-                    {b}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <div><FL label={t.brand}/><input className="inp" value={f.brand} onChange={e=>s("brand",e.target.value)} placeholder="GWM"/></div>
           </FG>
           <FD>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>

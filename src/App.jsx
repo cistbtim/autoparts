@@ -4733,7 +4733,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── PART PHOTOS ── */}
         {tab==="partPhotos"&&(
-          <PartPhotoCapturePage parts={parts} onSavePhotos={savePartPhotos} onRefresh={()=>refreshTables("parts")} t={t}/>
+          <PartPhotoCapturePage parts={parts} partFitments={partFitments} vehicles={vehicles} onSavePhotos={savePartPhotos} onRefresh={()=>refreshTables("parts")} t={t}/>
         )}
 
         {/* ── STOCK MOVE ── */}

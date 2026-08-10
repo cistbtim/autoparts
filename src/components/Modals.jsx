@@ -7092,7 +7092,7 @@ Current: ${item.system_qty}`,item.system_qty));if(!isNaN(n)&&n>=0){onAdjustItem(
 // snap photos with the camera. First photo becomes the cover (image_url), the
 // rest are saved as extras (photos). No AI background removal here — this is
 // meant to be fast for photographing many parts in a row.
-export function PartPhotoCapturePage({parts=[], onSavePhotos, onRefresh, t={}}) {
+export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], onSavePhotos, onRefresh, t={}}) {
   const [search, setSearch] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
   const [selectedId, setSelectedId] = useState(null);
@@ -7132,6 +7132,10 @@ export function PartPhotoCapturePage({parts=[], onSavePhotos, onRefresh, t={}}) 
 
   if(selected){
     const allPhotos = photosOf(selected);
+    const fitments = partFitments
+      .filter(pf=>String(pf.part_id)===String(selected.id))
+      .map(pf=>vehicles.find(v=>String(v.id)===String(pf.vehicle_id)))
+      .filter(Boolean);
 
     const resizeToBlob = (file) => new Promise((resolve,reject)=>{
       const url = URL.createObjectURL(file);
@@ -7195,8 +7199,28 @@ export function PartPhotoCapturePage({parts=[], onSavePhotos, onRefresh, t={}}) 
         <div style={{marginBottom:16}}>
           <div style={{fontSize:20,fontWeight:800}}>{selected.name}</div>
           <div style={{fontFamily:"DM Mono,monospace",fontSize:13,color:"var(--text3)"}}>{selected.sku}{selected.oe_number?` · OE ${selected.oe_number}`:""}</div>
+          {(selected.make||selected.model)&&(
+            <div style={{fontSize:13,color:"var(--blue)",marginTop:4}}>
+              🚗 {[selected.make,selected.model,selected.year_range].filter(Boolean).join(" · ")}
+            </div>
+          )}
+          {fitments.length>0&&(
+            <div style={{marginTop:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:5}}>
+                🔗 Fits {fitments.length} vehicle{fitments.length!==1?"s":""}
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {fitments.map(v=>(
+                  <span key={v.id} style={{fontSize:12,padding:"3px 10px",borderRadius:99,background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--text2)"}}>
+                    {[v.make,v.model,v.variant].filter(Boolean).join(" ")}
+                    {(v.year_from||v.year_to)?` · ${v.year_from||""}${v.year_to?`–${v.year_to}`:""}`:""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           {selected.photos_updated_at&&(
-            <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>
               🕒 Last updated {fmtDT(selected.photos_updated_at)}{selected.photos_updated_by?` by ${selected.photos_updated_by}`:""}
             </div>
           )}

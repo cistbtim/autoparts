@@ -7072,6 +7072,176 @@ Current: ${item.system_qty}`,item.system_qty));if(!isNaN(n)&&n>=0){onAdjustItem(
   );
 }
 
+// ── Part Photo Capture ── dedicated flow for field staff: search a part, then
+// snap photos with the camera. First photo becomes the cover (image_url), the
+// rest are saved as extras (photos). No AI background removal here — this is
+// meant to be fast for photographing many parts in a row.
+export function PartPhotoCapturePage({parts=[], onSavePhotos, t={}}) {
+  const [search, setSearch] = useState("");
+  const [searchDebounced, setSearchDebounced] = useState("");
+  const [selectedId, setSelectedId] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState(null);
+  const fileRef = useRef(null);
+  const camRef = useRef(null);
+  const menuRef = useRef(null);
+
+  useEffect(()=>{ const tmr=setTimeout(()=>setSearchDebounced(search.trim()),250); return ()=>clearTimeout(tmr); },[search]);
+  useEffect(()=>{
+    if(!menuOpen) return;
+    const onDocClick = e => { if(menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  },[menuOpen]);
+
+  const selected = selectedId ? parts.find(p=>String(p.id)===String(selectedId)) : null;
+
+  const results = (() => {
+    const q = searchDebounced.toLowerCase();
+    if(!q) return [];
+    return parts.filter(p=>
+      (p.sku||"").toLowerCase().includes(q) ||
+      (p.oe_number||"").toLowerCase().includes(q) ||
+      (p.name||"").toLowerCase().includes(q)
+    ).slice(0,60);
+  })();
+
+  const photosOf = (p) => {
+    let extra = p?.photos;
+    if(!Array.isArray(extra)){ try{ extra = JSON.parse(extra||"[]"); }catch{ extra = []; } }
+    return [p?.image_url, ...(extra||[])].filter(Boolean);
+  };
+
+  if(selected){
+    const allPhotos = photosOf(selected);
+
+    const resizeToBlob = (file) => new Promise((resolve,reject)=>{
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX=1200;
+        let w=img.width,h=img.height;
+        if(w>MAX||h>MAX){ const r=Math.min(MAX/w,MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+        const canvas=document.createElement("canvas");
+        canvas.width=w; canvas.height=h;
+        canvas.getContext("2d").drawImage(img,0,0,w,h);
+        canvas.toBlob(b=>b?resolve(b):reject(new Error("toBlob failed")),"image/jpeg",0.9);
+      };
+      img.onerror=reject;
+      img.src=url;
+    });
+
+    const addPhoto = async (file) => {
+      if(!file) return;
+      setMenuOpen(false);
+      setUploading(true);
+      try{
+        const blob = await resizeToBlob(file);
+        const path = `parts/${String(selected.sku||"part").replace(/[^a-zA-Z0-9_-]/g,"_")}/photo-${Date.now()}.jpg`;
+        const url = await uploadToStorage("cars_parts", path, blob);
+        const newAll = [...allPhotos, url];
+        await onSavePhotos(selected.id, {image_url:newAll[0], photos:newAll.slice(1)});
+      }catch(e){ alert("Upload failed: "+e.message); }
+      setUploading(false);
+    };
+
+    const pasteFromClipboard = async () => {
+      setMenuOpen(false);
+      try{
+        const items = await navigator.clipboard.read();
+        for(const item of items){
+          const imgType = item.types.find(ty=>ty.startsWith("image/"));
+          if(imgType){ await addPhoto(new File([await item.getType(imgType)],"pasted.png",{type:imgType})); return; }
+        }
+        alert("No image found in clipboard — copy an image first.");
+      }catch{ alert("Couldn't read clipboard. Try Take Photo or Choose File instead."); }
+    };
+
+    const removeAt = async (idx) => {
+      const newAll = allPhotos.filter((_,i)=>i!==idx);
+      await onSavePhotos(selected.id, {image_url:newAll[0]||"", photos:newAll.slice(1)});
+    };
+
+    const menuBtnStyle={display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",background:"none",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,color:"var(--text)",textAlign:"left"};
+
+    return (
+      <div style={{maxWidth:640,margin:"0 auto",padding:"0 4px"}}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>{setSelectedId(null);setMenuOpen(false);}} style={{marginBottom:14}}>← Back to search</button>
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:20,fontWeight:800}}>{selected.name}</div>
+          <div style={{fontFamily:"DM Mono,monospace",fontSize:13,color:"var(--text3)"}}>{selected.sku}{selected.oe_number?` · OE ${selected.oe_number}`:""}</div>
+        </div>
+
+        {lightboxIdx!==null&&(
+          <ImgLightbox urls={allPhotos.map(toFullUrl)} startIdx={lightboxIdx} onClose={()=>setLightboxIdx(null)}/>
+        )}
+
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:10}}>
+          {allPhotos.map((url,i)=>(
+            <div key={url+i} style={{position:"relative",aspectRatio:"1",borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer",background:"var(--surface2)"}}
+              onClick={()=>setLightboxIdx(i)}>
+              <img src={toImgUrl(url)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} referrerPolicy="no-referrer"/>
+              {i===0&&<span style={{position:"absolute",top:5,left:5,fontSize:9,fontWeight:800,padding:"2px 7px",borderRadius:99,background:"var(--accent)",color:"#fff"}}>COVER</span>}
+              <button onClick={e=>{e.stopPropagation();removeAt(i);}} title="Remove"
+                style={{position:"absolute",top:5,right:5,width:22,height:22,borderRadius:"50%",background:"rgba(0,0,0,.65)",color:"#fff",border:"none",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+            </div>
+          ))}
+          <div ref={menuRef} style={{position:"relative",aspectRatio:"1"}}>
+            <div onClick={()=>!uploading&&setMenuOpen(o=>!o)}
+              style={{width:"100%",height:"100%",borderRadius:10,border:"2px dashed var(--border2)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:30,color:"var(--text3)"}}>
+              {uploading?"⏳":"+"}
+            </div>
+            {menuOpen&&(
+              <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,zIndex:20,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 6px 20px rgba(0,0,0,.25)",overflow:"hidden",minWidth:180}}>
+                <button onClick={()=>{setMenuOpen(false);camRef.current?.click();}} style={menuBtnStyle}>📷 Take Photo</button>
+                <button onClick={()=>{setMenuOpen(false);fileRef.current?.click();}} style={{...menuBtnStyle,borderTop:"1px solid var(--border)"}}>📁 Choose File(s)</button>
+                <button onClick={pasteFromClipboard} style={{...menuBtnStyle,borderTop:"1px solid var(--border)"}}>📋 Paste</button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}}
+          onChange={async e=>{ for(const f of Array.from(e.target.files||[])) await addPhoto(f); e.target.value=""; }}/>
+        <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
+          onChange={e=>{ addPhoto(e.target.files[0]); e.target.value=""; }}/>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{maxWidth:640,margin:"0 auto",padding:"0 4px"}}>
+      <div style={{fontSize:22,fontWeight:800,marginBottom:14}}>📸 {t.partPhotos||"Part Photos"}</div>
+      <input className="inp" autoFocus value={search} onChange={e=>setSearch(e.target.value)}
+        placeholder="Search SKU, OE number, or part name…" style={{marginBottom:14,fontSize:15,padding:"11px 14px",width:"100%",boxSizing:"border-box"}}/>
+      {!searchDebounced&&<div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>Search for a part to photograph</div>}
+      {searchDebounced&&results.length===0&&<div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>No parts found</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {results.map(p=>{
+          const count=photosOf(p).length;
+          const thumb=toImgUrl(p.image_url);
+          return (
+            <div key={p.id} onClick={()=>setSelectedId(p.id)}
+              style={{display:"flex",alignItems:"center",gap:12,padding:12,borderRadius:10,border:"1px solid var(--border)",cursor:"pointer",background:"var(--surface)"}}>
+              <div style={{position:"relative",width:52,height:52,borderRadius:8,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {thumb?<img src={thumb} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} referrerPolicy="no-referrer"/>:<span style={{fontSize:20}}>🔩</span>}
+                {count>0&&<span style={{position:"absolute",bottom:-2,right:-2,minWidth:16,height:16,padding:"0 3px",borderRadius:8,background:"var(--green)",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{count}</span>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                <div style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)"}}>{p.sku}</div>
+              </div>
+              <span style={{fontSize:18,color:"var(--text3)"}}>›</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMany, onGoInventory, onClose }) {
   // Snapshot on mount so background loadAll() refreshes don't disturb the list while browsing
   const [rows] = useState(() => partSuppliers);

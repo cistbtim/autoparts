@@ -8,7 +8,7 @@ import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./l
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AdBanner, AdGridCard } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, PartPhotoCapturePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { SystemMapPage } from "./components/SystemMap.jsx";
@@ -1175,6 +1175,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     else showToast("Status updated");
 
     await api.patch("orders","id",id,{status:ns});await refreshTables("orders","parts","inventory_logs");
+  };
+
+  // Lightweight photo-only save for PartPhotoCapturePage — no modal/lock machinery needed
+  const savePartPhotos=async(partId,patch)=>{
+    const result=await api.patch("parts","id",partId,patch);
+    if(!Array.isArray(result)){ showToast(`Save failed: ${result?.message||"Unknown error"}`,"err"); return; }
+    setParts(prev=>prev.map(p=>String(p.id)===String(partId)?{...p,...patch}:p));
+    const updated=result[0];
+    if(updated) db.parts.put(updated).catch(()=>{});
   };
 
   // Parts
@@ -3298,6 +3307,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"inventory",icon:"📦",label:t.inventory,roles:["admin","manager","shipper","stockman"],badge:lowStock.length},
         {id:"stocktake",icon:"🔢",label:t.stockTake,roles:["admin","manager","shipper","stockman"]},
         {id:"stockmove",icon:"🔀",label:t.stockMove,roles:["admin","manager","shipper","stockman"]},
+        {id:"partPhotos",icon:"📸",label:t.partPhotos||"Part Photos",roles:["admin","manager","stockman"]},
         {id:"logs",icon:"📝",label:t.logs,roles:["admin","manager","branch_admin"]},
         {id:"requestsKanban",icon:"🗂️",label:"Requests",roles:["admin","manager","branch_admin","branch_manager"],
           badge:pendingPartRequests+pendingVehicleRequests+pendingTransferRequests+pendingWsShopRequests},
@@ -3479,6 +3489,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"inventory",icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"stocktake",icon:"🔢",label:t.stockTake},
       {id:"stockmove",icon:"🔀",label:t.stockMove},
+      {id:"partPhotos",icon:"📸",label:t.partPhotos||"Photos"},
     ];
     if(role==="scrapyard"||role==="scrapyard_admin") return [
       {id:"sy_dashboard",icon:"📊", label:t.syDashboard||"Dashboard"},
@@ -4716,6 +4727,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 showToast(`✅ ${item.part_name} → ${newQty}`);
               }
             }}/>
+        )}
+
+        {/* ── PART PHOTOS ── */}
+        {tab==="partPhotos"&&(
+          <PartPhotoCapturePage parts={parts} onSavePhotos={savePartPhotos} t={t}/>
         )}
 
         {/* ── STOCK MOVE ── */}

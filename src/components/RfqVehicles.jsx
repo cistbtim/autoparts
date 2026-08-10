@@ -1643,6 +1643,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
   const [photoOpen, setPhotoOpen] = useState(false); // expand full uploader in full-screen header
   const [compareVehicle, setCompareVehicle] = useState(null); // vehicle to show side-by-side with part photo
   const [compareIdx, setCompareIdx] = useState(0); // which vehicle angle (front/side/rear) is shown in compare view
+  const [compareEnlarge, setCompareEnlarge] = useState(null); // {url,label} — click either compare photo to zoom past the split-view size
   const [refreshing, setRefreshing] = useState(false);
   const [copyOpen,     setCopyOpen]     = useState(false); // "Copy Fits to Other Parts" overlay
   const [copySearch,   setCopySearch]   = useState("");
@@ -2038,7 +2039,8 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
               <div style={{flex:"1 1 320px",maxWidth:460,display:"flex",flexDirection:"column",alignItems:"center",minWidth:0}}>
                 <div style={{color:"#fff",fontSize:13,fontWeight:700,marginBottom:8,opacity:.85}}>📦 {part.name||part.sku||"Part"}</div>
                 <img src={toFullUrl(imageUrl)||toImgUrl(imageUrl)} alt="part"
-                  style={{maxWidth:"100%",maxHeight:"76vh",objectFit:"contain",borderRadius:10,background:"#fff",boxShadow:"0 8px 48px rgba(0,0,0,.6)"}}/>
+                  onClick={e=>{e.stopPropagation();setCompareEnlarge({url:toFullUrl(imageUrl)||imageUrl,label:part.name||part.sku||"Part"});}}
+                  style={{maxWidth:"100%",maxHeight:"76vh",objectFit:"contain",borderRadius:10,background:"#fff",boxShadow:"0 8px 48px rgba(0,0,0,.6)",cursor:"zoom-in"}}/>
               </div>
               <div style={{flex:"1 1 320px",maxWidth:460,display:"flex",flexDirection:"column",alignItems:"center",minWidth:0}}>
                 <div style={{color:"#fff",fontSize:13,fontWeight:700,marginBottom:8,opacity:.85}}>🚗 {compareVehicle.make} {compareVehicle.model}</div>
@@ -2048,7 +2050,8 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
                       style={{...navBtn,left:6}} title="Previous angle">‹</button>
                   )}
                   <img src={toFullUrl(vehicleUrl)} alt="vehicle"
-                    style={{maxWidth:"100%",maxHeight:"76vh",objectFit:"contain",borderRadius:10,boxShadow:"0 8px 48px rgba(0,0,0,.6)"}}/>
+                    onClick={e=>{e.stopPropagation();setCompareEnlarge({url:toFullUrl(vehicleUrl),label:`${compareVehicle.make} ${compareVehicle.model}`});}}
+                    style={{maxWidth:"100%",maxHeight:"76vh",objectFit:"contain",borderRadius:10,boxShadow:"0 8px 48px rgba(0,0,0,.6)",cursor:"zoom-in"}}/>
                   {angles.length>1&&(
                     <button onClick={()=>setCompareIdx(i=>(i+1)%angles.length)}
                       style={{...navBtn,right:6}} title="Next angle">›</button>
@@ -2061,6 +2064,9 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             </div>
             <button onClick={()=>setCompareVehicle(null)}
               style={{position:"absolute",top:18,right:22,background:"rgba(255,255,255,.12)",border:"none",borderRadius:"50%",width:38,height:38,fontSize:20,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+            {compareEnlarge&&(
+              <ImgLightbox url={compareEnlarge.url} onClose={()=>setCompareEnlarge(null)}/>
+            )}
           </div>
         );
       })()}

@@ -9797,14 +9797,29 @@ export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
   const [bin,setBin]=useState(part?.bin_location||"");
   const [supplierCode,setSupplierCode]=useState("");
   const [qty,setQty]=useState(1);
+  const [matchedCodes,setMatchedCodes]=useState([]); // [{supplier_id,supplier_name,supplier_part_no}]
 
-  // Try to load primary supplier code
+  // Load every linked supplier code for this part, so the user can pick one instead of retyping
   useEffect(()=>{
     if(!part?.id)return;
-    api.get("part_suppliers",`part_id=eq.${part.id}&select=supplier_part_no,supplier_id&limit=1`).then(r=>{
-      if(Array.isArray(r)&&r[0])setSupplierCode(r[0].supplier_part_no||"");
+    api.get("part_suppliers",`part_id=eq.${part.id}&select=supplier_part_no,supplier_id`).then(async r=>{
+      const rows=(Array.isArray(r)?r:[]).filter(row=>(row.supplier_part_no||"").trim());
+      if(!rows.length) return;
+      let names={};
+      if(suppliers.length){
+        names=Object.fromEntries(suppliers.map(s=>[String(s.id),s.name]));
+      } else {
+        const ids=[...new Set(rows.map(row=>row.supplier_id))].filter(Boolean);
+        if(ids.length){
+          const sRows=await api.get("suppliers",`id=in.(${ids.join(",")})&select=id,name`).catch(()=>[]);
+          names=Object.fromEntries((Array.isArray(sRows)?sRows:[]).map(s=>[String(s.id),s.name]));
+        }
+      }
+      const merged=rows.map(row=>({supplier_id:row.supplier_id,supplier_name:names[String(row.supplier_id)]||"Supplier",supplier_part_no:row.supplier_part_no}));
+      setMatchedCodes(merged);
+      setSupplierCode(prev=>prev||merged[0].supplier_part_no);
     });
-  },[part?.id]);
+  },[part?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePrint=()=>{
     const total=Math.max(1,+qty||1);
@@ -9831,7 +9846,23 @@ export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
       <MHead title="🏷️ Print Part Label" sub={part?.name||""} onClose={onClose}/>
       <FD><FL label="Part SKU"/><div style={{fontFamily:"DM Mono,monospace",fontSize:13,color:"var(--accent)",padding:"6px 0"}}>{part?.sku||"—"}</div></FD>
       <FD><FL label="Bin / Location"/><input className="inp" value={bin} onChange={e=>setBin(e.target.value)} placeholder="e.g. A1-02"/></FD>
-      <FD><FL label="Supplier Code (optional)"/><input className="inp" value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} placeholder="e.g. SUP-4567"/></FD>
+      <FD>
+        <FL label="Supplier Code (optional)"/>
+        <input className="inp" value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} placeholder="e.g. SUP-4567"/>
+        {matchedCodes.length>0&&(
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
+            {matchedCodes.map(m=>(
+              <button key={m.supplier_id+m.supplier_part_no} type="button" onClick={()=>setSupplierCode(m.supplier_part_no)}
+                style={{fontSize:11,padding:"3px 10px",borderRadius:99,cursor:"pointer",fontWeight:600,
+                  background:supplierCode===m.supplier_part_no?"var(--accent)":"var(--surface2)",
+                  color:supplierCode===m.supplier_part_no?"#fff":"var(--text2)",
+                  border:`1px solid ${supplierCode===m.supplier_part_no?"var(--accent)":"var(--border)"}`}}>
+                {m.supplier_name}: {m.supplier_part_no}
+              </button>
+            ))}
+          </div>
+        )}
+      </FD>
       <FD><FL label="Number of copies"/><input className="inp" type="number" min="1" max="999" value={qty} onChange={e=>setQty(e.target.value)} placeholder="1"/></FD>
       <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>
         Label size: {settings?.part_label_w||98}×{settings?.part_label_h||45}mm · Change in ⚙️ Settings → Inventory

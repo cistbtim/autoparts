@@ -4408,11 +4408,24 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                       return (
                         <tr key={p.id} id={`part-row-${p.id}`}>
                           <td style={{width:79,padding:"10px 8px"}}>
-                            {img
-                              ? <img className="part-img" src={img} alt={p.name} loading="lazy"
-                                  onClick={()=>setLightbox({urls:partPhotoUrls(p),name:p.name})}
-                                  onError={e=>{e.target.style.display="none";e.target.nextSibling&&(e.target.nextSibling.style.display="flex");}}/>
-                              : <div className="part-emoji">{p.image||"🔩"}</div>}
+                            {(()=>{
+                              const photoCount=partPhotoUrls(p).length;
+                              return (
+                                <div style={{position:"relative",width:63,height:63,flexShrink:0}}>
+                                  {img
+                                    ? <img className="part-img" src={img} alt={p.name} loading="lazy"
+                                        onClick={()=>setLightbox({urls:partPhotoUrls(p),name:p.name})}
+                                        onError={e=>{e.target.style.display="none";e.target.nextSibling&&(e.target.nextSibling.style.display="flex");}}/>
+                                    : <div className="part-emoji">{p.image||"🔩"}</div>}
+                                  {photoCount>1&&(
+                                    <span title={`${photoCount} photos`}
+                                      style={{position:"absolute",top:-6,right:-6,minWidth:18,height:18,padding:"0 4px",borderRadius:9,background:"var(--red)",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"1.5px solid var(--surface)",pointerEvents:"none"}}>
+                                      {photoCount}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td style={{whiteSpace:"nowrap"}}>
                             <code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{p.sku}</code>

@@ -7209,7 +7209,8 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], on
               <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:5}}>
                 🔗 Fits {fitments.length} vehicle{fitments.length!==1?"s":""}
               </div>
-              <div className="card" style={{overflow:"hidden"}}>
+              {/* Desktop: table */}
+              <div className="card desk-table" style={{overflow:"hidden"}}>
                 <div className="tbl-wrap">
                   <table className="tbl">
                     <thead><tr><th>Make</th><th>Model</th><th>Variant</th><th>Year</th><th>Code</th></tr></thead>
@@ -7226,6 +7227,19 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], on
                     </tbody>
                   </table>
                 </div>
+              </div>
+              {/* Mobile: cards */}
+              <div className="mob-cards">
+                {fitments.map(v=>(
+                  <div key={v.id} className="card" style={{padding:"10px 12px"}}>
+                    <div style={{fontWeight:700,fontSize:13}}>{[v.make,v.model].filter(Boolean).join(" ")||"—"}</div>
+                    {v.variant&&<div style={{fontSize:12,color:"var(--text2)",marginTop:1}}>{v.variant}</div>}
+                    <div style={{display:"flex",gap:10,marginTop:5,fontSize:11,color:"var(--text3)"}}>
+                      <span>{v.year_from||""}{v.year_to?`–${v.year_to}`:v.year_from?"+":""}</span>
+                      {v.code&&<span style={{fontFamily:"DM Mono,monospace"}}>{v.code}</span>}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

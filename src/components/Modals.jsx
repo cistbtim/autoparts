@@ -7219,8 +7219,8 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], on
                         <tr key={v.id}>
                           <td>{v.make||"—"}</td>
                           <td>{v.model||"—"}</td>
-                          <td>{v.variant||"—"}</td>
-                          <td style={{whiteSpace:"nowrap"}}>{v.year_from||""}{v.year_to?`–${v.year_to}`:v.year_from?"+":"—"}</td>
+                          <td style={{color:"var(--green)",fontWeight:600}}>{v.variant||"—"}</td>
+                          <td style={{whiteSpace:"nowrap",color:"var(--red)",fontWeight:600}}>{v.year_from||""}{v.year_to?`–${v.year_to}`:v.year_from?"+":"—"}</td>
                           <td style={{fontFamily:"DM Mono,monospace"}}>{v.code||"—"}</td>
                         </tr>
                       ))}
@@ -7233,10 +7233,10 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], on
                 {fitments.map(v=>(
                   <div key={v.id} className="card" style={{padding:"10px 12px"}}>
                     <div style={{fontWeight:700,fontSize:13}}>{[v.make,v.model].filter(Boolean).join(" ")||"—"}</div>
-                    {v.variant&&<div style={{fontSize:12,color:"var(--text2)",marginTop:1}}>{v.variant}</div>}
-                    <div style={{display:"flex",gap:10,marginTop:5,fontSize:11,color:"var(--text3)"}}>
-                      <span>{v.year_from||""}{v.year_to?`–${v.year_to}`:v.year_from?"+":""}</span>
-                      {v.code&&<span style={{fontFamily:"DM Mono,monospace"}}>{v.code}</span>}
+                    {v.variant&&<div style={{fontSize:12,color:"var(--green)",fontWeight:600,marginTop:1}}>{v.variant}</div>}
+                    <div style={{display:"flex",gap:10,marginTop:5,fontSize:11}}>
+                      <span style={{color:"var(--red)",fontWeight:600}}>{v.year_from||""}{v.year_to?`–${v.year_to}`:v.year_from?"+":""}</span>
+                      {v.code&&<span style={{fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{v.code}</span>}
                     </div>
                   </div>
                 ))}

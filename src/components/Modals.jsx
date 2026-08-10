@@ -7103,7 +7103,10 @@ export function PartPhotoCapturePage({parts=[], onSavePhotos, t={}}) {
     return parts.filter(p=>
       (p.sku||"").toLowerCase().includes(q) ||
       (p.oe_number||"").toLowerCase().includes(q) ||
-      (p.name||"").toLowerCase().includes(q)
+      (p.name||"").toLowerCase().includes(q) ||
+      (p.make||"").toLowerCase().includes(q) ||
+      (p.model||"").toLowerCase().includes(q) ||
+      (p.year_range||"").toLowerCase().includes(q)
     ).slice(0,60);
   })();
 
@@ -7212,28 +7215,29 @@ export function PartPhotoCapturePage({parts=[], onSavePhotos, t={}}) {
   }
 
   return (
-    <div style={{maxWidth:640,margin:"0 auto",padding:"0 4px"}}>
+    <div style={{maxWidth:1100,margin:"0 auto",padding:"0 4px"}}>
       <div style={{fontSize:22,fontWeight:800,marginBottom:14}}>📸 {t.partPhotos||"Part Photos"}</div>
       <input className="inp" autoFocus value={search} onChange={e=>setSearch(e.target.value)}
-        placeholder="Search SKU, OE number, or part name…" style={{marginBottom:14,fontSize:15,padding:"11px 14px",width:"100%",boxSizing:"border-box"}}/>
+        placeholder="Search SKU, OE number, part name, make, model, or year…" style={{marginBottom:14,fontSize:15,padding:"11px 14px",width:"100%",boxSizing:"border-box"}}/>
       {!searchDebounced&&<div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>Search for a part to photograph</div>}
       {searchDebounced&&results.length===0&&<div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>No parts found</div>}
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12}}>
         {results.map(p=>{
           const count=photosOf(p).length;
           const thumb=toImgUrl(p.image_url);
+          const vehicle=[p.make,p.model,p.year_range].filter(Boolean).join(" · ");
           return (
             <div key={p.id} onClick={()=>setSelectedId(p.id)}
-              style={{display:"flex",alignItems:"center",gap:12,padding:12,borderRadius:10,border:"1px solid var(--border)",cursor:"pointer",background:"var(--surface)"}}>
-              <div style={{position:"relative",width:52,height:52,borderRadius:8,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {thumb?<img src={thumb} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} referrerPolicy="no-referrer"/>:<span style={{fontSize:20}}>🔩</span>}
-                {count>0&&<span style={{position:"absolute",bottom:-2,right:-2,minWidth:16,height:16,padding:"0 3px",borderRadius:8,background:"var(--green)",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{count}</span>}
+              style={{borderRadius:12,border:"1px solid var(--border)",cursor:"pointer",background:"var(--surface)",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+              <div style={{position:"relative",width:"100%",aspectRatio:"1",background:"var(--surface2)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {thumb?<img src={thumb} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} referrerPolicy="no-referrer"/>:<span style={{fontSize:30}}>🔩</span>}
+                {count>0&&<span style={{position:"absolute",top:6,right:6,minWidth:20,height:20,padding:"0 5px",borderRadius:10,background:"var(--green)",color:"#fff",fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{count}</span>}
               </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                <div style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)"}}>{p.sku}</div>
+              <div style={{padding:10}}>
+                <div style={{fontWeight:700,fontSize:13,lineHeight:1.3,marginBottom:3,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
+                <div style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginBottom:vehicle?3:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.sku}</div>
+                {vehicle&&<div style={{fontSize:11,color:"var(--blue)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {vehicle}</div>}
               </div>
-              <span style={{fontSize:18,color:"var(--text3)"}}>›</span>
             </div>
           );
         })}

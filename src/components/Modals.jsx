@@ -7408,7 +7408,7 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], se
         {results.map(p=>{
           const count=photosOf(p).length;
           const thumb=toImgUrl(p.image_url);
-          const vehicle=[p.make,p.model,p.year_range].filter(Boolean).join(" · ");
+          const hasVehicle=p.make||p.model||p.year_range;
           return (
             <div key={p.id} onClick={()=>setSelectedId(p.id)}
               style={{borderRadius:12,border:"1px solid var(--border)",cursor:"pointer",background:"var(--surface)",overflow:"hidden",display:"flex",flexDirection:"column"}}>
@@ -7418,8 +7418,10 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], se
               </div>
               <div style={{padding:10}}>
                 <div style={{fontWeight:700,fontSize:13,lineHeight:1.3,marginBottom:3,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
-                <div style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginBottom:vehicle?3:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.sku}</div>
-                {vehicle&&<div style={{fontSize:11,color:"var(--blue)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {vehicle}</div>}
+                <div style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginBottom:hasVehicle?3:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.sku}</div>
+                {p.make&&<div style={{fontSize:11,color:"var(--blue)",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {p.make}</div>}
+                {p.model&&<div style={{fontSize:11,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.model}</div>}
+                {p.year_range&&<div style={{fontSize:11,color:"var(--red)",fontWeight:600}}>{p.year_range}</div>}
                 {p.photos_updated_at&&(
                   <div title={p.photos_updated_by?`Updated by ${p.photos_updated_by}`:""}
                     style={{fontSize:10,color:"var(--text3)",marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>

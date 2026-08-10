@@ -7092,13 +7092,15 @@ Current: ${item.system_qty}`,item.system_qty));if(!isNaN(n)&&n>=0){onAdjustItem(
 // snap photos with the camera. First photo becomes the cover (image_url), the
 // rest are saved as extras (photos). No AI background removal here — this is
 // meant to be fast for photographing many parts in a row.
-export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], onSavePhotos, onSaveField, onRefresh, t={}}) {
+export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], settings={}, onSavePhotos, onSaveField, onRefresh, t={}}) {
   const [search, setSearch] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [locationVal, setLocationVal] = useState("");
   const [savingLocation, setSavingLocation] = useState(false);
+  const [printPartLabel, setPrintPartLabel] = useState(false);
+  const [printShelfLabel, setPrintShelfLabel] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(null);
@@ -7226,6 +7228,16 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], on
                 {savingLocation&&<span style={{fontSize:11,color:"var(--text3)"}}>Saving…</span>}
               </div>
             </div>
+          )}
+          <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setPrintPartLabel(true)}>🏷️ Print Part Label</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setPrintShelfLabel(true)}>📋 Print Location Label</button>
+          </div>
+          {printPartLabel&&(
+            <PrintPartLabelModal part={selected} settings={settings} onClose={()=>setPrintPartLabel(false)}/>
+          )}
+          {printShelfLabel&&(
+            <PrintShelfLabelModal settings={settings} initialBin={selected.bin_location||""} onClose={()=>setPrintShelfLabel(false)}/>
           )}
           {(selected.make||selected.model)&&(
             <div style={{fontSize:13,color:"var(--blue)",marginTop:4}}>
@@ -10585,8 +10597,8 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
 // ═══════════════════════════════════════════════════════════════
 // PRINT SHELF LABEL MODAL
 // ═══════════════════════════════════════════════════════════════
-export function PrintShelfLabelModal({settings,onClose}) {
-  const [binName,setBinName]=useState("");
+export function PrintShelfLabelModal({settings,onClose,initialBin=""}) {
+  const [binName,setBinName]=useState(initialBin);
   const [description,setDescription]=useState("");
 
   const handlePrint=()=>{

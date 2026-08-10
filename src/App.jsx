@@ -4407,7 +4407,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                       const ps=getPartSupps(p.id);
                       return (
                         <tr key={p.id} id={`part-row-${p.id}`}>
-                          <td style={{width:52,padding:"10px 8px"}}>
+                          <td style={{width:79,padding:"10px 8px"}}>
                             {img
                               ? <img className="part-img" src={img} alt={p.name} loading="lazy"
                                   onClick={()=>setLightbox({urls:partPhotoUrls(p),name:p.name})}

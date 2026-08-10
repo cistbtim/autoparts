@@ -1017,6 +1017,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     tabRef.current === "pos" ||         // manual refresh only on POS
     tabRef.current === "shop" ||        // manual refresh only on shop
     tabRef.current === "inventory" ||   // manual refresh only on inventory
+    tabRef.current === "partPhotos" ||  // always pause — auto-refresh mid-upload interrupts photo capture
     tabRef.current === "vehicleRequests" || // always pause on vehicle requests
     tabRef.current === "settings" ||    // always pause on settings page
     tabRef.current === "wsprofile" ||   // always pause on workshop profile/settings
@@ -1179,6 +1180,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
   // Lightweight photo-only save for PartPhotoCapturePage — no modal/lock machinery needed
   const savePartPhotos=async(partId,patch)=>{
+    patch={...patch,photos_updated_at:new Date().toISOString(),photos_updated_by:user.name||user.username||""};
     const result=await api.patch("parts","id",partId,patch);
     if(!Array.isArray(result)){ showToast(`Save failed: ${result?.message||"Unknown error"}`,"err"); return; }
     setParts(prev=>prev.map(p=>String(p.id)===String(partId)?{...p,...patch}:p));

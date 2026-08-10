@@ -7195,6 +7195,11 @@ export function PartPhotoCapturePage({parts=[], onSavePhotos, onRefresh, t={}}) 
         <div style={{marginBottom:16}}>
           <div style={{fontSize:20,fontWeight:800}}>{selected.name}</div>
           <div style={{fontFamily:"DM Mono,monospace",fontSize:13,color:"var(--text3)"}}>{selected.sku}{selected.oe_number?` · OE ${selected.oe_number}`:""}</div>
+          {selected.photos_updated_at&&(
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>
+              🕒 Last updated {fmtDT(selected.photos_updated_at)}{selected.photos_updated_by?` by ${selected.photos_updated_by}`:""}
+            </div>
+          )}
         </div>
 
         {lightboxIdx!==null&&(
@@ -7271,6 +7276,12 @@ export function PartPhotoCapturePage({parts=[], onSavePhotos, onRefresh, t={}}) 
                 <div style={{fontWeight:700,fontSize:13,lineHeight:1.3,marginBottom:3,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
                 <div style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginBottom:vehicle?3:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.sku}</div>
                 {vehicle&&<div style={{fontSize:11,color:"var(--blue)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {vehicle}</div>}
+                {p.photos_updated_at&&(
+                  <div title={p.photos_updated_by?`Updated by ${p.photos_updated_by}`:""}
+                    style={{fontSize:10,color:"var(--text3)",marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    🕒 {fmtDT(p.photos_updated_at)}{p.photos_updated_by?` · ${p.photos_updated_by}`:""}
+                  </div>
+                )}
               </div>
             </div>
           );

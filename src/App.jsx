@@ -4731,7 +4731,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── PART PHOTOS ── */}
         {tab==="partPhotos"&&(
-          <PartPhotoCapturePage parts={parts} onSavePhotos={savePartPhotos} t={t}/>
+          <PartPhotoCapturePage parts={parts} onSavePhotos={savePartPhotos} onRefresh={()=>refreshTables("parts")} t={t}/>
         )}
 
         {/* ── STOCK MOVE ── */}

@@ -7092,10 +7092,11 @@ Current: ${item.system_qty}`,item.system_qty));if(!isNaN(n)&&n>=0){onAdjustItem(
 // snap photos with the camera. First photo becomes the cover (image_url), the
 // rest are saved as extras (photos). No AI background removal here — this is
 // meant to be fast for photographing many parts in a row.
-export function PartPhotoCapturePage({parts=[], onSavePhotos, t={}}) {
+export function PartPhotoCapturePage({parts=[], onSavePhotos, onRefresh, t={}}) {
   const [search, setSearch] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
   const [selectedId, setSelectedId] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(null);
@@ -7114,16 +7115,13 @@ export function PartPhotoCapturePage({parts=[], onSavePhotos, t={}}) {
   const selected = selectedId ? parts.find(p=>String(p.id)===String(selectedId)) : null;
 
   const results = (() => {
-    const q = searchDebounced.toLowerCase();
-    if(!q) return [];
-    return parts.filter(p=>
-      (p.sku||"").toLowerCase().includes(q) ||
-      (p.oe_number||"").toLowerCase().includes(q) ||
-      (p.name||"").toLowerCase().includes(q) ||
-      (p.make||"").toLowerCase().includes(q) ||
-      (p.model||"").toLowerCase().includes(q) ||
-      (p.year_range||"").toLowerCase().includes(q)
-    ).slice(0,60);
+    const words = searchDebounced.toLowerCase().split(" ").filter(Boolean);
+    if(!words.length) return [];
+    return parts.filter(p=>{
+      const fields = [p.sku, p.oe_number, p.name, p.chinese_desc, p.brand, p.make, p.model, p.year_range]
+        .map(v=>(v||"").toLowerCase()).join(" ");
+      return words.every(w=>fields.includes(w));
+    }).slice(0,60);
   })();
 
   const photosOf = (p) => {
@@ -7243,7 +7241,16 @@ export function PartPhotoCapturePage({parts=[], onSavePhotos, t={}}) {
 
   return (
     <div style={{maxWidth:1100,margin:"0 auto",padding:"0 4px"}}>
-      <div style={{fontSize:22,fontWeight:800,marginBottom:14}}>📸 {t.partPhotos||"Part Photos"}</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{fontSize:22,fontWeight:800}}>📸 {t.partPhotos||"Part Photos"}</div>
+        {onRefresh&&(
+          <button className="btn btn-ghost btn-sm" disabled={refreshing}
+            onClick={async()=>{setRefreshing(true);try{await onRefresh();}finally{setRefreshing(false);}}}
+            title="Reload inventory">
+            <span style={refreshing?{display:"inline-block",animation:"spin 1s linear infinite"}:{}}>{refreshing?"⟳":"↻"}</span> {refreshing?"Refreshing…":"Refresh Inventory"}
+          </button>
+        )}
+      </div>
       <input className="inp" autoFocus value={search} onChange={e=>setSearch(e.target.value)}
         placeholder="Search SKU, OE number, part name, make, model, or year…" style={{marginBottom:14,fontSize:15,padding:"11px 14px",width:"100%",boxSizing:"border-box"}}/>
       {!searchDebounced&&<div style={{textAlign:"center",padding:40,color:"var(--text3)"}}>Search for a part to photograph</div>}

@@ -1,10 +1,10 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
-import { C, curSym, getSettings } from "../lib/settings.js";
+import { C, curSym, getSettings, updateSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
 import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
-import { CAR_MAKES, getCategories, DEFAULT_CATS, OC } from "../lib/constants.js";
+import { CAR_MAKES, getCategories, DEFAULT_CATS, getBrands, OC } from "../lib/constants.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
@@ -3204,6 +3204,19 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
   const [catalogSearch,setCatalogSearch]=useState("");
   const [brandPickOpen,setBrandPickOpen]=useState(false);
+  const [brandList,setBrandList]=useState(getBrands);
+  const [newBrandVal,setNewBrandVal]=useState("");
+  const addBrand=()=>{
+    const v=newBrandVal.trim();
+    if(!v||brandList.some(b=>b.toLowerCase()===v.toLowerCase())){setNewBrandVal("");return;}
+    const updated=[...brandList,v];
+    setBrandList(updated);
+    updateSettings({part_brands:JSON.stringify(updated)});
+    api.patch("settings","id",1,{part_brands:JSON.stringify(updated)}).catch(()=>{});
+    s("brand",v);
+    setNewBrandVal("");
+    setBrandPickOpen(false);
+  };
   const [suppId,setSuppId]=useState("");
   const [suppPrice,setSuppPrice]=useState("");
   const [suppLead,setSuppLead]=useState("");
@@ -3426,16 +3439,29 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               </div>
               <input className="inp" value={f.brand} onChange={e=>s("brand",e.target.value)} placeholder="GWM"/>
               {brandPickOpen&&(
-                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
-                  {["Original","OEM","Aftermarket","Bosch"].map(b=>(
-                    <button key={b} type="button" onClick={()=>{s("brand",b);setBrandPickOpen(false);}}
-                      style={{fontSize:11,padding:"3px 10px",borderRadius:99,cursor:"pointer",fontWeight:600,
-                        background:f.brand===b?"var(--accent)":"var(--surface2)",
-                        color:f.brand===b?"#fff":"var(--text2)",
-                        border:`1px solid ${f.brand===b?"var(--accent)":"var(--border)"}`}}>
-                      {b}
+                <div style={{marginTop:6}}>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
+                    {brandList.map(b=>(
+                      <button key={b} type="button" onClick={()=>{s("brand",b);setBrandPickOpen(false);}}
+                        style={{fontSize:11,padding:"3px 10px",borderRadius:99,cursor:"pointer",fontWeight:600,
+                          background:f.brand===b?"var(--accent)":"var(--surface2)",
+                          color:f.brand===b?"#fff":"var(--text2)",
+                          border:`1px solid ${f.brand===b?"var(--accent)":"var(--border)"}`}}>
+                        {b}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{display:"flex",gap:5}}>
+                    <input className="inp" value={newBrandVal} onChange={e=>setNewBrandVal(e.target.value)}
+                      onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addBrand();}}}
+                      placeholder="Add new brand…" style={{fontSize:12,padding:"5px 9px"}}/>
+                    <button type="button" onClick={addBrand} disabled={!newBrandVal.trim()}
+                      style={{fontSize:11,padding:"5px 12px",borderRadius:6,cursor:newBrandVal.trim()?"pointer":"not-allowed",
+                        fontWeight:700,background:"var(--green)",color:"#fff",border:"none",
+                        opacity:newBrandVal.trim()?1:.5,flexShrink:0}}>
+                      + Add
                     </button>
-                  ))}
+                  </div>
                 </div>
               )}
             </div>

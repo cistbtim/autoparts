@@ -108,6 +108,17 @@ export const getCategories = () => {
   return DEFAULT_CATS;
 };
 
+export const DEFAULT_BRANDS = ["Original", "OEM", "Aftermarket", "Bosch"];
+
+export const getBrands = () => {
+  try {
+    const b = getSettings().part_brands;
+    if (b && typeof b === "string" && b.trim()) return JSON.parse(b);
+    if (Array.isArray(b) && b.length) return b;
+  } catch (e) { /* ignore malformed part_brands */ }
+  return DEFAULT_BRANDS;
+};
+
 export const TRIAL_DAYS = 30;
 
 export const getSubInfo = (u) => {

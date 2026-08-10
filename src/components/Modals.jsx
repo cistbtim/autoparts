@@ -3057,7 +3057,7 @@ function GrabImageOverlay({supplierUrl,partSku,onSave,onClose}) {
 // Unlimited extra photos for a part — thumbnail strip + add/remove. Uploads go
 // straight to Supabase Storage (no AI background removal — these are quick
 // reference shots, unlike the primary catalog photo).
-function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox}) {
+function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeCover}) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -3139,6 +3139,10 @@ function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox}) {
           <div key={url+i} style={{position:"relative",width:52,height:52,borderRadius:6,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer",flexShrink:0}}
             onClick={()=>onOpenLightbox(i)}>
             <img src={toImgUrl(url)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} referrerPolicy="no-referrer"/>
+            {onMakeCover&&(
+              <button onClick={e=>{e.stopPropagation();onMakeCover(i);}} title="Set as cover photo"
+                style={{position:"absolute",bottom:-1,left:-1,width:17,height:17,borderRadius:"50%",background:"rgba(0,0,0,.65)",color:"#fbbf24",border:"none",fontSize:10,lineHeight:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>⭐</button>
+            )}
             <button onClick={e=>{e.stopPropagation();removeAt(i);}} title="Remove"
               style={{position:"absolute",top:-1,right:-1,width:17,height:17,borderRadius:"50%",background:"rgba(0,0,0,.65)",color:"#fff",border:"none",fontSize:10,lineHeight:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
           </div>
@@ -3260,6 +3264,17 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
   };
   const handlePhotosChange = (newPhotos) => {
     const updated = {...f, photos: newPhotos};
+    setF(updated);
+    if (part) { onSave(buildPayload(updated), true); setDirty(false); setSaved(true); }
+    else setDirty(true);
+  };
+  // Promote an extra photo to be the cover, demoting the current cover into the extras list
+  const makeCoverPhoto = (extraIdx) => {
+    const extras = f.photos||[];
+    const newCover = extras[extraIdx];
+    if(!newCover) return;
+    const newExtras = [...(f.image_url?[f.image_url]:[]), ...extras.filter((_,i)=>i!==extraIdx)];
+    const updated = {...f, image_url:newCover, photos:newExtras};
     setF(updated);
     if (part) { onSave(buildPayload(updated), true); setDirty(false); setSaved(true); }
     else setDirty(true);
@@ -3549,7 +3564,8 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
           {part&&<div style={{fontSize:11,color:"var(--green)",marginBottom:8,background:"rgba(34,197,94,.08)",borderRadius:7,padding:"5px 9px"}}>✅ {t.phuAutoSave}</div>}
           <PartPhotoUploader imageUrl={f.image_url} onChange={handlePhotoChange} sku={f.sku} t={t} bucket="cars_parts"/>
           <ExtraPhotosStrip photos={f.photos} onChange={handlePhotosChange} sku={f.sku}
-            onOpenLightbox={i=>setExtraLightbox({idx:f.image_url?i+1:i})}/>
+            onOpenLightbox={i=>setExtraLightbox({idx:f.image_url?i+1:i})}
+            onMakeCover={makeCoverPhoto}/>
           {extraLightbox&&(
             <ImgLightbox urls={[f.image_url,...(f.photos||[])].filter(Boolean)} startIdx={extraLightbox.idx} onClose={()=>setExtraLightbox(null)}/>
           )}
@@ -7167,6 +7183,12 @@ export function PartPhotoCapturePage({parts=[], onSavePhotos, t={}}) {
       await onSavePhotos(selected.id, {image_url:newAll[0]||"", photos:newAll.slice(1)});
     };
 
+    const makeCover = async (idx) => {
+      if(idx===0) return;
+      const newAll = [allPhotos[idx], ...allPhotos.filter((_,i)=>i!==idx)];
+      await onSavePhotos(selected.id, {image_url:newAll[0], photos:newAll.slice(1)});
+    };
+
     const menuBtnStyle={display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",background:"none",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,color:"var(--text)",textAlign:"left"};
 
     return (
@@ -7186,7 +7208,12 @@ export function PartPhotoCapturePage({parts=[], onSavePhotos, t={}}) {
             <div key={url+i} style={{position:"relative",aspectRatio:"1",borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer",background:"var(--surface2)"}}
               onClick={()=>setLightboxIdx(i)}>
               <img src={toImgUrl(url)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} referrerPolicy="no-referrer"/>
-              {i===0&&<span style={{position:"absolute",top:5,left:5,fontSize:9,fontWeight:800,padding:"2px 7px",borderRadius:99,background:"var(--accent)",color:"#fff"}}>COVER</span>}
+              {i===0
+                ? <span style={{position:"absolute",top:5,left:5,fontSize:9,fontWeight:800,padding:"2px 7px",borderRadius:99,background:"var(--accent)",color:"#fff"}}>COVER</span>
+                : <button onClick={e=>{e.stopPropagation();makeCover(i);}} title="Set as cover photo"
+                    style={{position:"absolute",bottom:5,left:5,fontSize:9,fontWeight:800,padding:"3px 7px",borderRadius:99,background:"rgba(0,0,0,.65)",color:"#fff",border:"none",cursor:"pointer"}}>
+                    ⭐ Make cover
+                  </button>}
               <button onClick={e=>{e.stopPropagation();removeAt(i);}} title="Remove"
                 style={{position:"absolute",top:5,right:5,width:22,height:22,borderRadius:"50%",background:"rgba(0,0,0,.65)",color:"#fff",border:"none",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
             </div>

@@ -7198,7 +7198,13 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], on
         <button className="btn btn-ghost btn-sm" onClick={()=>{setSelectedId(null);setMenuOpen(false);}} style={{marginBottom:14}}>← Back to search</button>
         <div style={{marginBottom:16}}>
           <div style={{fontSize:20,fontWeight:800}}>{selected.name}</div>
-          <div style={{fontFamily:"DM Mono,monospace",fontSize:13,color:"var(--text3)"}}>{selected.sku}{selected.oe_number?` · OE ${selected.oe_number}`:""}</div>
+          <div style={{fontFamily:"DM Mono,monospace",fontSize:13,color:"var(--text3)"}}>SKU {selected.sku}</div>
+          {selected.oe_number&&(
+            <div style={{marginTop:6,padding:"8px 12px",borderRadius:8,background:"rgba(251,191,36,.1)",border:"1.5px solid rgba(251,191,36,.4)",display:"inline-block"}}>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--yellow)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>OE Number — check against the sticker</div>
+              <div style={{fontFamily:"DM Mono,monospace",fontSize:22,fontWeight:800,letterSpacing:"1px",color:"var(--text)"}}>{selected.oe_number}</div>
+            </div>
+          )}
           {(selected.make||selected.model)&&(
             <div style={{fontSize:13,color:"var(--blue)",marginTop:4}}>
               🚗 {[selected.make,selected.model,selected.year_range].filter(Boolean).join(" · ")}

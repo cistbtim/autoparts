@@ -1006,7 +1006,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
   };
 
   const _getFlippedBlob = async () => {
-    const srcUrl = toImgUrl(imageUrl) || imageUrl;
+    const srcUrl = toFullUrl(imageUrl) || imageUrl;
     const r = await fetch(srcUrl, {credentials:"omit"});
     if (!r.ok) throw new Error("fetch failed");
     const blob = await r.blob();

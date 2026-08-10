@@ -119,6 +119,17 @@ export const getBrands = () => {
   return DEFAULT_BRANDS;
 };
 
+// Recently-used bin/shelf locations, most-recent-first — shared across all
+// users via settings so the whole shop converges on the same location codes.
+export const getRecentLocations = () => {
+  try {
+    const l = getSettings().part_locations;
+    if (l && typeof l === "string" && l.trim()) return JSON.parse(l);
+    if (Array.isArray(l)) return l;
+  } catch (e) { /* ignore malformed part_locations */ }
+  return [];
+};
+
 export const TRIAL_DAYS = 30;
 
 export const getSubInfo = (u) => {

@@ -4,7 +4,7 @@ import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js"
 import { C, curSym, getSettings, updateSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
 import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow } from "../lib/helpers.js";
-import { CAR_MAKES, getCategories, DEFAULT_CATS, getBrands, OC } from "../lib/constants.js";
+import { CAR_MAKES, getCategories, DEFAULT_CATS, getBrands, getRecentLocations, OC } from "../lib/constants.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
@@ -7099,6 +7099,7 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], se
   const [refreshing, setRefreshing] = useState(false);
   const [locationVal, setLocationVal] = useState("");
   const [savingLocation, setSavingLocation] = useState(false);
+  const [locationFocused, setLocationFocused] = useState(false);
   const [printPartLabel, setPrintPartLabel] = useState(false);
   const [printShelfLabel, setPrintShelfLabel] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -7121,12 +7122,31 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], se
 
   useEffect(()=>{ setLocationVal(selected?.bin_location||""); },[selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const saveLocation = async () => {
-    if(!selected || locationVal===(selected.bin_location||"")) return;
+  const rememberLocation = (val) => {
+    if(!val) return;
+    const existing = getRecentLocations();
+    const updated = [val, ...existing.filter(l=>l.toLowerCase()!==val.toLowerCase())].slice(0,30);
+    updateSettings({part_locations:JSON.stringify(updated)});
+    api.patch("settings","id",1,{part_locations:JSON.stringify(updated)}).catch(()=>{});
+  };
+
+  const commitLocation = async (val) => {
+    val = val.trim();
+    if(!selected || val===(selected.bin_location||"")) return;
     setSavingLocation(true);
-    try{ await onSaveField(selected.id,"bin_location",locationVal.trim()); }
+    try{ await onSaveField(selected.id,"bin_location",val); rememberLocation(val); }
     finally{ setSavingLocation(false); }
   };
+
+  const pickLocationSuggestion = (val) => {
+    setLocationVal(val);
+    setLocationFocused(false);
+    commitLocation(val);
+  };
+
+  const locationSuggestions = locationFocused
+    ? getRecentLocations().filter(l=>l.toLowerCase().includes(locationVal.trim().toLowerCase())).slice(0,8)
+    : [];
 
   const results = (() => {
     const words = searchDebounced.toLowerCase().split(" ").filter(Boolean);
@@ -7224,11 +7244,23 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], se
           {onSaveField&&(
             <div style={{marginTop:8}}>
               <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>📍 Location</div>
-              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <div style={{position:"relative",display:"flex",gap:6,alignItems:"center"}}>
                 <input className="inp" value={locationVal} onChange={e=>setLocationVal(e.target.value)}
-                  onBlur={saveLocation} onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}}}
+                  onFocus={()=>setLocationFocused(true)}
+                  onBlur={()=>{commitLocation(locationVal);setLocationFocused(false);}}
+                  onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}else if(e.key==="Escape"){setLocationFocused(false);}}}
                   placeholder="A1-01, SHELF-B3" style={{maxWidth:220,fontSize:13}}/>
                 {savingLocation&&<span style={{fontSize:11,color:"var(--text3)"}}>Saving…</span>}
+                {locationSuggestions.length>0&&(
+                  <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:20,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 6px 20px rgba(0,0,0,.25)",overflow:"hidden",minWidth:220,maxHeight:220,overflowY:"auto"}}>
+                    {locationSuggestions.map(loc=>(
+                      <button key={loc} onMouseDown={e=>{e.preventDefault();pickLocationSuggestion(loc);}}
+                        style={{display:"block",width:"100%",padding:"8px 12px",background:"none",border:"none",borderTop:"1px solid var(--border)",cursor:"pointer",fontSize:12,fontFamily:"DM Mono,monospace",color:"var(--text)",textAlign:"left"}}>
+                        📍 {loc}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

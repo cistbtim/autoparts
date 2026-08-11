@@ -495,7 +495,7 @@ export function AdBanner({ads=[], page="shop", userCtx=null, height=220, mobileH
     } catch {}
   };
   return (
-    <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
+    <div style={{display:"flex",justifyContent:"center",marginBottom:12,padding:"0 16px",boxSizing:"border-box"}}>
     <div style={{position:"relative",borderRadius:10,overflow:"hidden",
       cursor:ad.link_url?"pointer":"default",border:"1px solid var(--border)",background:"var(--surface2)",
       width:"100%",maxWidth:1100,flexShrink:0,height:effectiveHeight}}

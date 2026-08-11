@@ -1282,6 +1282,35 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
   const AD_BLANK={title:"",description:"",image_url:"",link_url:"",cta_text:"Learn More",page:"shop",position:"banner",weather_condition:"any",contract_id:null,duration:6,active:true};
   const [adForm,setAdForm]=useState(AD_BLANK);
   const [editingAd,setEditingAd]=useState(null);
+  const [adImgUploading,setAdImgUploading]=useState(false);
+  const [adImgDragOver,setAdImgDragOver]=useState(false);
+  const adImgFileRef=useRef(null);
+  const uploadAdImage=async(file)=>{
+    if(!file||!file.type.startsWith("image/"))return;
+    setAdImgUploading(true);
+    try{
+      const blob=await new Promise((resolve,reject)=>{
+        const url=URL.createObjectURL(file);
+        const img=new Image();
+        img.onload=()=>{
+          URL.revokeObjectURL(url);
+          const MAX=1600;
+          let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          const canvas=document.createElement("canvas");
+          canvas.width=w;canvas.height=h;
+          canvas.getContext("2d").drawImage(img,0,0,w,h);
+          canvas.toBlob(b=>b?resolve(b):reject(new Error("toBlob failed")),"image/jpeg",0.9);
+        };
+        img.onerror=reject;
+        img.src=url;
+      });
+      const path=`ads/${Date.now()}.jpg`;
+      const url=await uploadToStorage("cars_parts",path,blob);
+      af("image_url",url);
+    }catch(e){ alert("Upload failed: "+e.message); }
+    setAdImgUploading(false);
+  };
   const af=(k,v)=>setAdForm(p=>({...p,[k]:v}));
   const startEditAd=(ad)=>{setAdForm({...ad});setEditingAd(ad.id);};
   const cancelEditAd=()=>{setAdForm(AD_BLANK);setEditingAd(null);};
@@ -1575,7 +1604,21 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
               </div>
               <div>
                 <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Image URL</div>
-                <input className="inp" value={adForm.image_url} onChange={e=>af("image_url",e.target.value)} placeholder="Google Drive or https://..."/>
+                <div style={{display:"flex",gap:6}}>
+                  <input className="inp" value={adForm.image_url} onChange={e=>af("image_url",e.target.value)} placeholder="Google Drive, https://..., or upload →" style={{flex:1}}/>
+                  <div onClick={()=>!adImgUploading&&adImgFileRef.current?.click()}
+                    onDragOver={e=>{e.preventDefault();setAdImgDragOver(true);}}
+                    onDragLeave={()=>setAdImgDragOver(false)}
+                    onDrop={e=>{e.preventDefault();setAdImgDragOver(false);uploadAdImage(e.dataTransfer.files[0]);}}
+                    title="Upload PNG/JPG"
+                    style={{flexShrink:0,width:40,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,cursor:"pointer",
+                      border:`1.5px dashed ${adImgDragOver?"var(--accent)":"var(--border2)"}`,
+                      background:adImgDragOver?"rgba(99,102,241,.08)":"var(--surface2)",fontSize:16}}>
+                    {adImgUploading?"⏳":"📁"}
+                  </div>
+                  <input ref={adImgFileRef} type="file" accept="image/*" style={{display:"none"}}
+                    onChange={e=>{uploadAdImage(e.target.files[0]);e.target.value="";}}/>
+                </div>
               </div>
               <div>
                 <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Button Text</div>

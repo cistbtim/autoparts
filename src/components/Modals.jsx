@@ -3190,7 +3190,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
     auto_reorder:p.auto_reorder||false, reorder_point:p.reorder_point??0, reorder_qty:p.reorder_qty??1,
     preferred_supplier_id:p.preferred_supplier_id||"",
   }:{
-    sku:branchSkuPrefix?branchSkuPrefix+"-":"", name:"", category:"Engine", brand:"", price:0, cost_price:0, stock:"", minStock:"",
+    sku:branchSkuPrefix?branchSkuPrefix+"-":"", name:"", category:"Engine", brand:"", price:0, cost_price:0, stock:"", minStock:1,
     image_url:"", photos:[], chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", reference_url:"", bin_location:"", is_quantum:false, is_hiace:false,
     auto_reorder:false, reorder_point:0, reorder_qty:1, preferred_supplier_id:"",
   };
@@ -3208,6 +3208,8 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
   const [catalogSearch,setCatalogSearch]=useState("");
   const [brandPickOpen,setBrandPickOpen]=useState(false);
+  const [stockPromptOpen,setStockPromptOpen]=useState(false);
+  const [stockPromptVal,setStockPromptVal]=useState("");
   const [brandList,setBrandList]=useState(getBrands);
   const [newBrandVal,setNewBrandVal]=useState("");
   const addBrand=()=>{
@@ -3605,18 +3607,44 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
             </div>
             <div>
               <FL label={`💰 ${t.costPrice}`}/>
-              <input className="inp" type="number" value={f.cost_price} onChange={e=>{
-                const cost=parseFloat(e.target.value)||0;
-                s("cost_price",e.target.value);
-                if(cost>0&&!(+f.price>0)){
-                  const taxRate=getSettings().tax_rate||0;
-                  const autoPrice=Math.round(cost*(1+taxRate/100)*1.35*100)/100;
-                  s("price",autoPrice);
-                }
-              }} placeholder="0.00"/>
+              <input className="inp" type="number" value={f.cost_price} onChange={e=>s("cost_price",e.target.value)} placeholder="0.00"/>
               {f.cost_price>0&&f.price>0&&<div style={{fontSize:11,color:"var(--green)",marginTop:3}}>Margin: {(((+f.price-(+f.cost_price))/(+f.price))*100).toFixed(1)}%</div>}
+              {+f.cost_price>0&&(
+                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
+                  {[30,25,22].map(m=>{
+                    const suggested=Math.round((+f.cost_price/(1-m/100))/10)*10;
+                    const active=+f.price===suggested;
+                    return (
+                      <button key={m} type="button"
+                        onClick={()=>{s("price",suggested);setStockPromptVal(String(f.stock||""));setStockPromptOpen(true);}}
+                        style={{fontSize:11,padding:"3px 9px",borderRadius:99,cursor:"pointer",fontWeight:600,
+                          background:active?"var(--accent)":"var(--surface2)",
+                          color:active?"#fff":"var(--text2)",
+                          border:`1px solid ${active?"var(--accent)":"var(--border)"}`}}>
+                        {m}%: {C()}{suggested.toLocaleString()}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </FG>
+          {stockPromptOpen&&(
+            <div style={{position:"fixed",inset:0,zIndex:100000,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center"}}
+              onClick={()=>setStockPromptOpen(false)}>
+              <div onClick={e=>e.stopPropagation()} style={{background:"var(--surface)",borderRadius:14,padding:22,width:280,boxShadow:"0 12px 48px rgba(0,0,0,.5)"}}>
+                <div style={{fontWeight:800,fontSize:15,marginBottom:4}}>📦 Set Stock Quantity</div>
+                <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>Price set to {C()}{(+f.price).toLocaleString()}. How many units in stock?</div>
+                <input className="inp" type="number" autoFocus value={stockPromptVal} onChange={e=>setStockPromptVal(e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter"){s("stock",stockPromptVal);setStockPromptOpen(false);}}}
+                  placeholder="0" style={{marginBottom:14,width:"100%",boxSizing:"border-box"}}/>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setStockPromptOpen(false)}>Skip</button>
+                  <button className="btn btn-primary" style={{flex:1}} onClick={()=>{s("stock",stockPromptVal);setStockPromptOpen(false);}}>Set Stock</button>
+                </div>
+              </div>
+            </div>
+          )}
           <FG cols="1fr 1fr">
             <div><FL label={t.stock}/><input className="inp" type="number" value={f.stock} onChange={e=>s("stock",e.target.value)} placeholder="0"/></div>
             <div><FL label={t.minStock}/><input className="inp" type="number" value={f.minStock} onChange={e=>s("minStock",e.target.value)} placeholder="1"/></div>

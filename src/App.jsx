@@ -530,11 +530,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       if(!firstLoadDoneRef.current && role==="admin"){
         const hasPending=br.some(b=>b.status==="pending");
         if(hasPending) setTab("branches");
-        firstLoadDoneRef.current=true;
       }
-    } else if(!firstLoadDoneRef.current){
-      firstLoadDoneRef.current=true;
     }
+    firstLoadDoneRef.current=true; // first loadAll() of the session is done — every role, always
     if(Array.isArray(st)&&st[0]){
       updateSettings(st[0]); // update global cache — used by ShopLogo on login page
       setSettings(getSettings());
@@ -543,10 +541,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
     if(isInitial) setLoading(false); // ← show UI immediately after critical data (initial load only)
 
-    // Background sync: full IndexedDB write on cold start, slim price/qty sync on warm start
+    // Background sync: full IndexedDB write on cold start AND on login (even with a warm
+    // cache) so parts added/edited elsewhere since the last session show up immediately —
+    // not just price/stock. Periodic/focus refreshes during the session stay on the cheap
+    // slim price-only sync (a full 44k-row reload every 5 min would be too slow/disruptive).
     setPartsLoading(true);
     if(!idbHasData){
-      // Cold start — load all remaining pages then persist to IndexedDB
+      // True cold start — partsFirst is already a fresh first-page fetch, keep paginating from it
       api.loadRest("parts",PARTS_Q,partsFirst.length,(extra)=>{
         setParts([...partsFirst,...extra]);
       }).then(async extra=>{
@@ -555,8 +556,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         try{await db.parts.bulkPut(full);}catch{}
         setPartsLoading(false);
       });
+    } else if(isInitial){
+      // Warm cache, but this is the first load of the session (post-login) — the cached
+      // rows were already painted for a fast screen, but they may be stale, so re-fetch
+      // everything from scratch (ignoring cache count) and replace outright.
+      api.loadRest("parts",PARTS_Q,0,(extra)=>{
+        setParts(extra);
+      }).then(async extra=>{
+        setParts(extra);
+        try{await db.parts.clear(); await db.parts.bulkPut(extra);}catch{}
+        setPartsLoading(false);
+      });
     } else {
-      // Warm start — slim fetch refreshes price/qty/cost_price (always fresh from server)
+      // Warm, mid-session refresh — slim fetch refreshes price/qty/cost_price only
       api.fresh("parts",SLIM_Q).then(async slim=>{
         if(!Array.isArray(slim)||slim.length===0){setPartsLoading(false);return;}
         const slimMap=new Map(slim.map(r=>[String(r.id),r]));

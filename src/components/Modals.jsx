@@ -1691,7 +1691,7 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
               <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Preview</div>
               <div style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface2)",width:"100%",height:220}}>
                 {adForm.image_url
-                  ? <img src={adForm.image_url} alt={adForm.title||"Ad"} style={{display:"block",width:"100%",height:"100%",objectFit:"contain"}}
+                  ? <img src={adForm.image_url} alt={adForm.title||"Ad"} style={{display:"block",width:"100%",height:"100%",objectFit:"cover"}}
                       onError={e=>{e.target.style.display="none";}}/>
                   : <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>
                       {adForm.title}

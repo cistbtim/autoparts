@@ -506,7 +506,7 @@ export function AdBanner({ads=[], page="shop", userCtx=null, height=220, mobileH
         ? ad.render
         : ad.image_url
           ? <img key={idx} src={ad.image_url} alt={ad.title||"Ad"}
-              style={{display:"block",width:"100%",height:"100%",objectFit:"contain"}}
+              style={{display:"block",width:"100%",height:"100%",objectFit:"cover"}}
               onError={e=>{e.target.style.display="none";const p=e.target.parentElement;if(p){p.style.minHeight="56px";const fb=p.querySelector('.ad-fb');if(fb)fb.style.display="flex";}}}/>
           : <div style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",
               fontSize:13,fontWeight:700,color:"var(--text2)",padding:"0 16px",textAlign:"center"}}>

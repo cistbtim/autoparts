@@ -4083,24 +4083,24 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
       {oppConfirm&&(
         <div style={{marginTop:14,background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.3)",borderRadius:10,padding:"12px 14px"}}>
           <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:"var(--purple)"}}>{oppConfirm.editableSku?"🔗 建立相似零件確認":"🔄 建立對應零件確認"}</div>
-          {oppConfirm.editableSku ? (
-            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>
-              <div>
-                <FL label="新 SKU *"/>
-                <input className="inp" autoFocus value={oppConfirm.sku} onChange={e=>setOppConfirm(p=>({...p,sku:e.target.value}))} placeholder="Enter the new part number"/>
-              </div>
-              <div>
-                <FL label="新名稱"/>
-                <input className="inp" value={oppConfirm.name} onChange={e=>setOppConfirm(p=>({...p,name:e.target.value}))}/>
-              </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>
+            <div>
+              <FL label="新 SKU *"/>
+              <input className="inp" autoFocus={oppConfirm.editableSku} value={oppConfirm.sku}
+                onChange={e=>setOppConfirm(p=>({...p,sku:e.target.value}))}
+                placeholder="Enter the new part number"
+                style={{fontFamily:"DM Mono,monospace"}}/>
             </div>
-          ) : (
-            <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"4px 10px",fontSize:12,marginBottom:10}}>
-              <span style={{color:"var(--text3)"}}>新 SKU</span><span style={{fontWeight:600,fontFamily:"monospace"}}>{oppConfirm.sku}</span>
-              <span style={{color:"var(--text3)"}}>新名稱</span><span>{oppConfirm.name}</span>
-              {oppConfirm.chineseDesc&&<><span style={{color:"var(--text3)"}}>中文說明</span><span>{oppConfirm.chineseDesc}</span></>}
+            <div>
+              <FL label="新名稱"/>
+              <input className="inp" value={oppConfirm.name} onChange={e=>setOppConfirm(p=>({...p,name:e.target.value}))}/>
             </div>
-          )}
+            {!oppConfirm.editableSku&&oppConfirm.chineseDesc&&(
+              <div style={{fontSize:12}}>
+                <span style={{color:"var(--text3)"}}>中文說明： </span><span>{oppConfirm.chineseDesc}</span>
+              </div>
+            )}
+          </div>
           <div style={{marginBottom:10,padding:"10px 12px",background:"rgba(139,92,246,.06)",borderRadius:8,border:"1px solid rgba(139,92,246,.2)"}}>
             <div style={{fontSize:11,fontWeight:700,color:"var(--purple)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>Copy from original part?</div>
             <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,cursor:"pointer",marginBottom:6}}>
@@ -4122,14 +4122,26 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               </span>
             </label>
           </div>
-          {oppConfirm.originalF?.image_url&&(
+          {oppConfirm.originalF?.image_url&&(()=>{
+            // Google Drive's thumbnail/uc endpoints send no Access-Control-Allow-Origin
+            // header, so the browser can never read those pixels into a canvas to flip
+            // them (a hard browser security limit, not something we can code around
+            // client-side). Supabase Storage URLs *do* send that header, so flipping
+            // only actually works for photos already migrated there.
+            const driveHosted=(oppConfirm.originalF.image_url||"").includes("drive.google.com");
+            return (
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"8px 10px",background:"rgba(139,92,246,.06)",borderRadius:7,border:"1px solid rgba(139,92,246,.2)"}}>
               <img src={toImgUrl(oppConfirm.originalF.image_url)} referrerPolicy="no-referrer"
                 style={{width:48,height:48,objectFit:"cover",borderRadius:5,border:"1px solid var(--border)",
-                  transform:oppConfirm.flipPhoto?"scaleX(-1)":"none",transition:"transform .2s",flexShrink:0}}
+                  transform:(oppConfirm.flipPhoto&&!driveHosted)?"scaleX(-1)":"none",transition:"transform .2s",flexShrink:0}}
                 onError={e=>e.target.style.display="none"}/>
               {oppConfirm.editableSku ? (
                 <span style={{fontSize:12,color:"var(--text3)"}}>Photo copied to the new part</span>
+              ) : driveHosted ? (
+                <span style={{fontSize:12,color:"var(--text3)"}}>
+                  Photo is on Google Drive — can't auto-flip (browser restriction).<br/>
+                  Copied as-is; mirror it manually on the Photo tab if needed.
+                </span>
               ) : (
                 <label style={{display:"flex",alignItems:"center",gap:7,fontSize:12,cursor:"pointer",userSelect:"none"}}>
                   <input type="checkbox" checked={oppConfirm.flipPhoto||false}
@@ -4139,11 +4151,12 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                 </label>
               )}
             </div>
-          )}
+            );
+          })()}
           <div style={{display:"flex",gap:8}}>
             <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setOppConfirm(null)}>取消</button>
             <button className="btn btn-sm" style={{flex:2,background:"var(--purple)",color:"#fff",border:"none"}}
-              disabled={oppConfirm.editableSku&&!oppConfirm.sku.trim()}
+              disabled={!oppConfirm.sku.trim()}
               onClick={()=>{ onCreateOpposite(oppConfirm); setOppConfirm(null); }}>
               ✅ 確認建立
             </button>
@@ -4228,7 +4241,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                   const newSku=swapLR(f.sku);
                   const newName=swapLR(f.name);
                   const newCd=swapLR(f.chinese_desc);
-                  setOppConfirm({sku:newSku,name:newName,chineseDesc:newCd,fitCount:myFitments.length,originalPart:part,originalF:f,flipPhoto:!!f.image_url,copyFits:myFitments.length>0,copyVehicleInfo:!!(f.make||f.model||f.year_range)});
+                  setOppConfirm({sku:newSku,name:newName,chineseDesc:newCd,fitCount:myFitments.length,originalPart:part,originalF:f,flipPhoto:!!f.image_url&&!f.image_url.includes("drive.google.com"),copyFits:myFitments.length>0,copyVehicleInfo:!!(f.make||f.model||f.year_range)});
                 }}>
                 🔄 對應零件
               </button>

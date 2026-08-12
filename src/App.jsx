@@ -819,6 +819,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     return ()=>{cancelled=true;};
   },[M.editPart?.data?.id]);
 
+  // Scoped load for supplier-restricted customer logins — the Shop tab is deliberately
+  // excluded from the full part_suppliers lazy-load above (that's a 69k+ row table and
+  // most shop visitors are unrestricted customers who don't need any of it). A scoped
+  // customer's part list is filtered by part_suppliers though, so fetch just the rows
+  // for their one supplier instead of the whole table.
+  useEffect(()=>{
+    if(role!=="customer"||!user.supplier_scope_id) return;
+    let cancelled=false;
+    (async()=>{
+      const data=await api.get("part_suppliers",`supplier_id=eq.${user.supplier_scope_id}&select=*`);
+      if(cancelled||!Array.isArray(data)) return;
+      setPartSuppliers(prev=>[...prev.filter(ps=>String(ps.supplier_id)!==String(user.supplier_scope_id)),...data]);
+    })();
+    return ()=>{cancelled=true;};
+  },[role,user.supplier_scope_id]);
+
   // Targeted refresh — fetch only the tables that a mutation actually dirtied.
   // Cuts ~40-table loadAll() down to 1-4 requests per save operation.
   const refreshTables=useCallback(async(...names)=>{

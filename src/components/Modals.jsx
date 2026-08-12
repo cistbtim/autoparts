@@ -5568,8 +5568,8 @@ export function InquiryDetailModal({inquiry,onUpdate,onAccept,onClose}) {
   );
 }
 
-export function CustomerModal({customer,onSave,onClose,t}) {
-  const [f,setF]=useState(customer?{name:customer.name,phone:customer.phone,email:customer.email||"",address:customer.address||""}:{name:"",phone:"",email:"",address:""});
+export function CustomerModal({customer,onSave,onClose,t,suppliers=[]}) {
+  const [f,setF]=useState(customer?{name:customer.name,phone:customer.phone,email:customer.email||"",address:customer.address||"",supplier_scope_id:customer.supplier_scope_id||""}:{name:"",phone:"",email:"",address:"",supplier_scope_id:""});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   return (
     <Overlay onClose={onClose}>
@@ -5577,7 +5577,15 @@ export function CustomerModal({customer,onSave,onClose,t}) {
       <FG><div><FL label={`${t.name} *`}/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)}/></div><div><FL label={`${t.phone} *`}/><input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div></FG>
       <FD><FL label={t.email}/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></FD>
       <FD><FL label="Address"/><input className="inp" value={f.address} onChange={e=>s("address",e.target.value)}/></FD>
-      <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.name||!f.phone)return;onSave(f);}}>{t.save}</button></div>
+      <FD>
+        <FL label="Restrict shop to one supplier's catalogue"/>
+        <select className="inp" value={f.supplier_scope_id} onChange={e=>s("supplier_scope_id",e.target.value?+e.target.value:"")}>
+          <option value="">— Full catalogue (no restriction) —</option>
+          {suppliers.map(sp=><option key={sp.id} value={sp.id}>{sp.name}</option>)}
+        </select>
+        {f.supplier_scope_id&&<div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>This login will only see parts linked to that supplier in the Shop.</div>}
+      </FD>
+      <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.name||!f.phone)return;onSave({...f,supplier_scope_id:f.supplier_scope_id||null});}}>{t.save}</button></div>
     </Overlay>
   );
 }

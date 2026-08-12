@@ -3120,7 +3120,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const supplierFilterPartIds=filterSupplier!=="__all__"
     ?new Set(partSuppliers.filter(ps=>String(ps.supplier_id)===filterSupplier).map(ps=>String(ps.part_id)))
     :null;
+  // Customer accounts scoped to a single supplier's catalogue (e.g. a reseller who
+  // should only ever see one supplier's parts) only see parts linked to that supplier.
+  const customerScopePartIds=(role==="customer"&&user.supplier_scope_id)
+    ?new Set(partSuppliers.filter(ps=>String(ps.supplier_id)===String(user.supplier_scope_id)).map(ps=>String(ps.part_id)))
+    :null;
   const fp=displayParts.filter(p=>{
+    if(customerScopePartIds&&!customerScopePartIds.has(String(p.id)))return false;
     // role-based access filter
     if(role==="branch_admin"){
       const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
@@ -6907,7 +6913,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {isOpen("partSupplier")&&<PartSupplierModal part={mData("partSupplier")} partSuppliers={getPartSupps(mData("partSupplier")?.id)} suppliers={suppliers} vehicles={vehicles} partFitments={partFitments} onSave={savePartSupplier} onDelete={deletePartSupplier} onUpdate={updatePartSupplier} onClose={()=>closeM("partSupplier")} onEditPart={(p,tab)=>{closeM("partSupplier");openM("editPart",{...p,_tab:tab||"info"});}} onMergePart={mergePart} branches={branches} allParts={parts} onGoToMainPart={(targetPart)=>{closeM("partSupplier");setTimeout(()=>{setTab("inventory");setFilterBranch("__all__");setSearchPart(targetPart.sku||"");},0);}} onAddSupplier={()=>openM("editSupplier")} onEditSupplier={(s)=>openM("editSupplier",s)} t={t}/>}
       {isOpen("inquiry")&&<InquiryModal part={mData("inquiry")} suppliers={suppliers} partSuppliers={getPartSupps(mData("inquiry")?.id)} inquiries={inquiries} onSend={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onClose={()=>closeM("inquiry")} t={t} isAdmin={role==="admin"} onEditPart={openPartEditor}/>}
       {isOpen("inquiryDetail")&&<InquiryDetailModal inquiry={mData("inquiryDetail")} onUpdate={updateInquiry} onAccept={async(inq)=>{closeM("inquiryDetail");await acceptInquiry(inq);}} onClose={()=>closeM("inquiryDetail")} settings={settings} t={t}/>}
-      {isOpen("editCustomer")&&<CustomerModal customer={mData("editCustomer")} onSave={saveCustomer} onClose={()=>closeM("editCustomer")} t={t}/>}
+      {isOpen("editCustomer")&&<CustomerModal customer={mData("editCustomer")} onSave={saveCustomer} onClose={()=>closeM("editCustomer")} t={t} suppliers={suppliers}/>}
       {isOpen("editUser")&&<UserModal user={mData("editUser")} onSave={saveUser} onClose={()=>closeM("editUser")} t={t}/>}
       {isOpen("custHistory")&&<CustHistoryModal customer={mData("custHistory")} orders={orders.filter(o=>o.customer_phone===mData("custHistory")?.phone)} onClose={()=>closeM("custHistory")}/>}
       {isOpen("supplierInvoice")&&<SupplierInvoiceModal data={mData("supplierInvoice")} suppliers={suppliers} parts={parts} onSave={saveSupplierInvoice} onDelete={deleteSupplierInvoice} onStockIn={stockInInvoice} onEditPart={openPartEditor} onClose={()=>closeM("supplierInvoice")} t={t} settings={invoiceSettings} role={role} branchId={branchId} branchStock={branchStock}/>}

@@ -70,7 +70,18 @@ const IcGrid   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="non
 export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLoginOnly=false,initialError=""}) {
   // Referral: ?ref=<workshop id> jumps straight to workshop signup and gets stamped on the new account
   const [wsReferrerId] = useState(()=>new URLSearchParams(window.location.search).get("ref")||"");
-  const [authTab,setAuthTab] = useState(wsLoginOnly?"workshop":(wsReferrerId?"workshop":"branch"));
+  // Catalog link: ?catalog=<supplier name> jumps straight to the Customer sign-in tab and,
+  // if someone registers a new account through it, scopes that account to just this
+  // supplier's parts (same idea as ?ref= above, just for customers instead of workshops).
+  const [catalogName] = useState(()=>new URLSearchParams(window.location.search).get("catalog")||"");
+  const [catalogSupplierId,setCatalogSupplierId] = useState("");
+  useEffect(()=>{
+    if(!catalogName) return;
+    api.get("suppliers",`name=ilike.${encodeURIComponent(catalogName.trim())}&select=id,name`).then(r=>{
+      if(Array.isArray(r)&&r.length>0) setCatalogSupplierId(r[0].id);
+    }).catch(()=>{});
+  },[catalogName]);
+  const [authTab,setAuthTab] = useState(wsLoginOnly?"workshop":(wsReferrerId?"workshop":(catalogName?"customer":"branch")));
   // branch
   const [branchName,setBranchName] = useState("");
   const [branchUser,setBranchUser] = useState(""); const [branchPass,setBranchPass] = useState("");
@@ -262,7 +273,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     setLoading(true);setErr("");
     const ex = await api.get("customers",`phone=eq.${encodeURIComponent(cPhone)}&select=id`);
     if(Array.isArray(ex)&&ex.length>0){setErr("Phone already registered — login instead");setLoading(false);return;}
-    const res = await api.upsert("customers",{name:cName,phone:cPhone,email:cEmail,password:cPass,address:"",orders:0,total_spent:0});
+    const res = await api.upsert("customers",{name:cName,phone:cPhone,email:cEmail,password:cPass,address:"",orders:0,total_spent:0,...(catalogSupplierId?{supplier_scope_id:catalogSupplierId}:{})});
     const c=Array.isArray(res)?res[0]:null;
     if(c){logLogin({username:cPhone,role:"customer"});onLogin({...c,username:c.phone,role:"customer",_isCustomer:true});}
     else setErr("Registration failed");
@@ -572,6 +583,11 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
           {/* ── Shop / Customer ── */}
           {authTab==="customer"&&(
             <div style={{display:"flex",flexDirection:"column",gap:0}}>
+              {catalogName&&(
+                <div style={{background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.25)",borderRadius:9,padding:"9px 12px",marginBottom:14,fontSize:12,color:"var(--text2)"}}>
+                  📦 Signing in to the <strong>{catalogName}</strong> parts catalogue
+                </div>
+              )}
               <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:18}}>
                 {[["login",t.signIn||"Sign In"],["register",t.registerNew||"Register"]].map(([id,lb])=>(
                   <button key={id} className={`auth-tab ${custTab===id?"on":""}`} onClick={()=>{setCustTab(id);setErr("");}}>{lb}</button>

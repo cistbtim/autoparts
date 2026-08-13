@@ -1153,7 +1153,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
 
     const oid=makeId("ORD");
-    const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",items:cart.map(i=>({partId:i.id,qty:i.qty,name:i.name,price:i.price})),total:cartTotal,branch_id:currentBranch?.id||null};
+    const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",items:cart.map(i=>({partId:i.id,sku:i.sku||"",qty:i.qty,name:i.name,price:i.price})),total:cartTotal,branch_id:currentBranch?.id||null};
     await api.upsert("orders",orderObj);
     // NO stock deduction on order — stock deducted when shipper sets 待出貨
     const ex=customers.find(c=>c.phone===form.phone);
@@ -7013,7 +7013,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {isOpen("orderConfirm")&&(()=>{
         const d=mData("orderConfirm")||{};const {order,phone,email}=d;
         if(!order)return null;
-        const items=Array.isArray(order?.items)?order.items.map(i=>`  • ${i.name} x${i.qty}  ${fmtAmt(i.price*i.qty)}`).join("\n"):"";
+        const items=Array.isArray(order?.items)?order.items.map((i,idx)=>`${idx+1}. ${i.name}${i.sku?` (Part #: ${i.sku})`:""} x${i.qty}  ${fmtAmt(i.price*i.qty)}`).join("\n"):"";
         const shopMsg=`Hello! I'd like to confirm my order 🛠️\n\nOrder ID: ${order?.id}\nDate: ${order?.date}\n\nItems:\n${items}\n\nTotal: ${fmtAmt(order?.total)}\n\nMy contact:\nName: ${order?.customer_name}\nPhone: ${order?.customer_phone}\n\nPlease confirm receipt, thank you!`;
         // Customer accounts scoped to one supplier's catalogue notify that supplier
         // directly (their own WhatsApp/email on file) instead of the shop's own —

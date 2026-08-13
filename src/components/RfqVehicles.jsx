@@ -572,7 +572,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
 // ═══════════════════════════════════════════════════════════════
 // PICKING PAGE — Order picking with barcode/QR scan + camera
 // ═══════════════════════════════════════════════════════════════
-export function PickingPage({orders=[], parts=[], onComplete, onRefresh, t, lang}) {
+export function PickingPage({orders=[], parts=[], onComplete, onDelete, onRefresh, t, lang}) {
   const [activeOrder, setActiveOrder] = useState(null);
   const [picked, setPicked] = useState({}); // {itemIndex: true}
   const [scanInput, setScanInput] = useState("");
@@ -712,10 +712,22 @@ export function PickingPage({orders=[], parts=[], onComplete, onRefresh, t, lang
                   </span>
                 ))}
               </div>
-              <button className="btn btn-primary btn-sm" style={{marginTop:12,width:"100%"}}
-                onClick={e=>{e.stopPropagation();setActiveOrder(o);setPicked({});setCameraPhoto(null);}}>
-                🔍 {t.startPicking}
-              </button>
+              <div style={{display:"flex",gap:8,marginTop:12}}>
+                <button className="btn btn-primary btn-sm" style={{flex:1}}
+                  onClick={e=>{e.stopPropagation();setActiveOrder(o);setPicked({});setCameraPhoto(null);}}>
+                  🔍 {t.startPicking}
+                </button>
+                {onDelete&&(
+                  <button className="btn btn-ghost btn-sm" style={{flexShrink:0,color:"var(--red)",borderColor:"rgba(239,68,68,.35)"}}
+                    title="Delete order"
+                    onClick={e=>{
+                      e.stopPropagation();
+                      if(window.confirm(`Delete order ${o.id} for ${o.customer_name}? This can't be undone.`)) onDelete(o.id);
+                    }}>
+                    🗑
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

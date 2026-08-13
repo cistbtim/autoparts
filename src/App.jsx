@@ -1206,6 +1206,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await api.patch("orders","id",id,{status:ns});await refreshTables("orders","parts","inventory_logs");
   };
 
+  // Admin-only: delete an order straight from the Picking queue. Only ever offered while
+  // the order is still "Processing" — no stock has been deducted yet at that point (stock
+  // deduction happens on the Processing → Ready to Ship transition above), so there's
+  // nothing to restore.
+  const deletePickingOrder=async(id)=>{
+    await api.delete("orders","id",id);
+    await refreshTables("orders");
+    showToast("Order deleted","err");
+  };
+
   // Lightweight photo-only save for PartPhotoCapturePage — no modal/lock machinery needed
   const savePartPhotos=async(partId,patch)=>{
     patch={...patch,photos_updated_at:new Date().toISOString(),photos_updated_by:user.name||user.username||""};
@@ -5003,6 +5013,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               await updateOrderStatus(orderId,"Ready to Ship");
               showToast("✅ Order picked — Ready to Ship!");
             }}
+            onDelete={role==="admin"?deletePickingOrder:null}
             onRefresh={loadAll}
             t={t} lang={lang}/>
         )}

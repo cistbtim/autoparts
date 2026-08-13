@@ -7004,16 +7004,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         if(!order)return null;
         const items=Array.isArray(order?.items)?order.items.map(i=>`  • ${i.name} x${i.qty}  ${fmtAmt(i.price*i.qty)}`).join("\n"):"";
         const shopMsg=`Hello! I'd like to confirm my order 🛠️\n\nOrder ID: ${order?.id}\nDate: ${order?.date}\n\nItems:\n${items}\n\nTotal: ${fmtAmt(order?.total)}\n\nMy contact:\nName: ${order?.customer_name}\nPhone: ${order?.customer_phone}\n\nPlease confirm receipt, thank you!`;
+        // Customer accounts scoped to one supplier's catalogue notify that supplier
+        // directly (their own WhatsApp/email on file) instead of the shop's own —
+        // they placed the order through that supplier's own catalogue link.
+        const scopedSupplier=(role==="customer"&&user.supplier_scope_id)?suppliers.find(s=>String(s.id)===String(user.supplier_scope_id)):null;
+        const notifyName=scopedSupplier?scopedSupplier.name:"Shop";
+        const notifyWa=scopedSupplier?scopedSupplier.phone:settings.whatsapp;
+        const notifyEmail=scopedSupplier?scopedSupplier.email:settings.email;
         return (
           <div className="overlay" onClick={()=>closeM("orderConfirm")}>
             <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:420}}>
               <div style={{textAlign:"center",marginBottom:18}}><div style={{fontSize:42,marginBottom:10}}>🎉</div><h2 style={{fontSize:19,fontWeight:700}}>Order Placed!</h2><p style={{color:"var(--text3)",fontSize:13,marginTop:5}}>{order?.id}</p></div>
               <div style={{background:"var(--surface2)",borderRadius:11,padding:13,marginBottom:18,fontSize:13,color:"var(--text2)",whiteSpace:"pre-line",lineHeight:1.7,maxHeight:150,overflowY:"auto"}}>{shopMsg}</div>
-              <p style={{fontSize:13,color:"var(--text3)",marginBottom:12,textAlign:"center",fontWeight:600}}>📬 Notify the shop about your order:</p>
+              <p style={{fontSize:13,color:"var(--text3)",marginBottom:12,textAlign:"center",fontWeight:600}}>📬 Notify {notifyName} about your order:</p>
               <div style={{display:"flex",flexDirection:"column",gap:9}}>
-                {settings.whatsapp&&<a href={waLink(settings.whatsapp,shopMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-primary" style={{width:"100%",background:"#25D366",padding:13,fontSize:15}}>📲 Send to Shop via WhatsApp</button></a>}
-                {settings.email&&<a href={mailLink(settings.email,`New Order - ${order?.id}`,shopMsg)} style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{width:"100%",padding:13}}>✉ Send to Shop via Email</button></a>}
-                {!settings.whatsapp&&!settings.email&&<p style={{fontSize:13,color:"var(--text3)",textAlign:"center"}}>⚙️ Set WhatsApp/Email in Settings to enable notifications</p>}
+                {notifyWa&&<a href={waLink(notifyWa,shopMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-primary" style={{width:"100%",background:"#25D366",padding:13,fontSize:15}}>📲 Send to {notifyName} via WhatsApp</button></a>}
+                {notifyEmail&&<a href={mailLink(notifyEmail,`New Order - ${order?.id}`,shopMsg)} style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{width:"100%",padding:13}}>✉ Send to {notifyName} via Email</button></a>}
+                {!notifyWa&&!notifyEmail&&<p style={{fontSize:13,color:"var(--text3)",textAlign:"center"}}>⚙️ {scopedSupplier?"No WhatsApp/Email on file for this supplier":"Set WhatsApp/Email in Settings to enable notifications"}</p>}
                 <button className="btn btn-ghost" style={{fontSize:13}} onClick={()=>closeM("orderConfirm")}>Skip for now</button>
               </div>
             </div>

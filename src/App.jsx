@@ -6923,14 +6923,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         onGoToPart={(part,catalogueState)=>{const sup=mData("supplierCatalogue");setReturnToCatalogue({sup,catalogueState});closeM("supplierCatalogue");setTab("inventory");openM("editPart",part);}}
         onAddToInventory={(item,sup,catalogueState)=>{
           setPendingCatalogueLink({supplier_id:sup?.id,supplier_part_no:item.supplier_part_no});
-          const _appLines=(item.application||"").split(/\n/).map(l=>l.trim()).filter(Boolean);
-          const _firstLine=_appLines[0]||"";
-          const _secondLine=_appLines[1]||"";
-          const _colon=_firstLine.indexOf(":");
-          const _make=_colon>-1?_firstLine.slice(0,_colon).trim():"";
-          const _model=_colon>-1?_firstLine.slice(_colon+1).trim():"";
+          // Prefer the dedicated make/model/year columns (set via the Make/Model/Year
+          // column mapping on import) — reliable, no guessing. Fall back to parsing the
+          // free-text Application field (old "MAKE: model" catalogue-note format) only
+          // for catalogue rows imported before those columns existed.
+          let _make=item.make||"", _model=item.model||"", _secondLine="";
+          if(!_make&&!_model){
+            const _appLines=(item.application||"").split(/\n/).map(l=>l.trim()).filter(Boolean);
+            const _firstLine=_appLines[0]||"";
+            _secondLine=_appLines[1]||"";
+            const _colon=_firstLine.indexOf(":");
+            _make=_colon>-1?_firstLine.slice(0,_colon).trim():"";
+            _model=_colon>-1?_firstLine.slice(_colon+1).trim():"";
+          }
           const _name=[item.description,_secondLine].filter(Boolean).join(" - ");
-          setNewPartInitialF({name:_name,oe_number:(item.oem_number||"").replace(/[\s,;]+/g," ").trim(),image_url:item.image_url||"",make:_make,model:_model});
+          setNewPartInitialF({name:_name,oe_number:(item.oem_number||"").replace(/[\s,;]+/g," ").trim(),image_url:item.image_url||"",make:_make,model:_model,year_range:item.year_range||""});
           setReturnToCatalogue({sup,catalogueState});
           closeM("supplierCatalogue");
           setTab("inventory");

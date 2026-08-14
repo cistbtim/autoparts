@@ -7692,6 +7692,9 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
       supplier_part_no: item.supplier_part_no || "",
       description:      item.description      || "",
       oem_number:       item.oem_number       || "",
+      make:             item.make             || "",
+      model:            item.model            || "",
+      year_range:       item.year_range       || "",
       application:      item.application      || "",
       image_url:        item.image_url        || "",
     });
@@ -7757,6 +7760,9 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
     supplier_part_no: getField(row, "supplier_part_no"),
     description:      getField(row, "description"),
     oem_number:       getField(row, "oem"),
+    make:             getField(row, "make"),
+    model:            getField(row, "model"),
+    year:             getField(row, "year"),
     application:      getField(row, "application"),
     image_url:        getField(row, "image_url"),
   }));
@@ -7764,14 +7770,26 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
   const doImport = async () => {
     setImporting(true);
     const toInsert = dataRows
-      .map(row => ({
-        supplier_id:      supplier.id,
-        supplier_part_no: getField(row, "supplier_part_no") || null,
-        description:      getField(row, "description") || null,
-        oem_number:       getField(row, "oem") || null,
-        application:      getField(row, "application") || null,
-        image_url:        getField(row, "image_url") || null,
-      }))
+      .map(row => {
+        const make = getField(row, "make");
+        const model = getField(row, "model");
+        const year = getField(row, "year");
+        // Separate Make/Model/Year columns (the common case) build a clean combined
+        // Application string for display; a file that already has one combined
+        // Application column takes priority if both are somehow mapped.
+        const application = getField(row, "application") || [make, model, year].filter(Boolean).join(" ") || null;
+        return {
+          supplier_id:      supplier.id,
+          supplier_part_no: getField(row, "supplier_part_no") || null,
+          description:      getField(row, "description") || null,
+          oem_number:       getField(row, "oem") || null,
+          make:             make || null,
+          model:            model || null,
+          year_range:       year || null,
+          application,
+          image_url:        getField(row, "image_url") || null,
+        };
+      })
       .filter(r => r.supplier_part_no || r.description);
 
     let inserted = 0, errors = 0;
@@ -7985,7 +8003,7 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                             <img src={toImgUrl(editForm.image_url)} alt="" style={{maxWidth:"100%",maxHeight:100,objectFit:"contain",borderRadius:6,border:"1px solid var(--border)"}} onError={e=>{e.target.style.display="none";}}/>
                           </div>
                         )}
-                        {[["Part No","supplier_part_no"],["Description","description"],["OEM Numbers","oem_number"],["Application","application"],["Image URL","image_url"]].map(([label,field])=>{
+                        {[["Part No","supplier_part_no"],["Description","description"],["OEM Numbers","oem_number"],["Make","make"],["Model","model"],["Year","year_range"],["Application","application"],["Image URL","image_url"]].map(([label,field])=>{
                           const multiLine = field==="oem_number"||field==="application";
                           return (
                             <div key={field} style={{marginBottom:8}}>
@@ -8206,12 +8224,15 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
             <div>
               <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>Map Columns</div>
               <p style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Auto-detected from headers — adjust if needed.</p>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:18}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:18}}>
                 {[
                   {field:"supplier_part_no",label:"Supplier Part No *"},
                   {field:"description",     label:"Description"},
                   {field:"oem",             label:"OEM Number"},
-                  {field:"application",     label:"Application"},
+                  {field:"make",            label:"Fitment: Make"},
+                  {field:"model",           label:"Fitment: Model"},
+                  {field:"year",            label:"Fitment: Year"},
+                  {field:"application",     label:"Application (combined text)"},
                 ].map(({field,label})=>{
                   const curIdx = Object.entries(colMap).find(([,f])=>f===field)?.[0] ?? "";
                   return (
@@ -8239,13 +8260,16 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
               <div style={{fontSize:12,fontWeight:700,marginBottom:6,color:"var(--text2)"}}>Preview (first 5 rows)</div>
               <div style={{overflowX:"auto",marginBottom:16}}>
                 <table className="tbl" style={{fontSize:11}}>
-                  <thead><tr><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Application</th></tr></thead>
+                  <thead><tr><th>Supplier Part No</th><th>Description</th><th>OEM Number</th><th>Make</th><th>Model</th><th>Year</th><th>Application</th></tr></thead>
                   <tbody>
                     {buildPreview().map((r,i)=>(
                       <tr key={i}>
                         <td style={{fontFamily:"DM Mono,monospace",whiteSpace:"nowrap"}}>{r.supplier_part_no||<span style={{color:"var(--text3)"}}>—</span>}</td>
                         <td>{r.description||<span style={{color:"var(--text3)"}}>—</span>}</td>
                         <td style={{fontFamily:"DM Mono,monospace",whiteSpace:"nowrap"}}>{r.oem_number||<span style={{color:"var(--text3)"}}>—</span>}</td>
+                        <td>{r.make||<span style={{color:"var(--text3)"}}>—</span>}</td>
+                        <td>{r.model||<span style={{color:"var(--text3)"}}>—</span>}</td>
+                        <td>{r.year||<span style={{color:"var(--text3)"}}>—</span>}</td>
                         <td style={{maxWidth:200,whiteSpace:"pre-wrap"}}>{r.application||<span style={{color:"var(--text3)"}}>—</span>}</td>
                       </tr>
                     ))}

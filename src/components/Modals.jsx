@@ -4346,10 +4346,14 @@ export function CheckoutModal({cart,customers,cartTotal,role,currentUser,onPlace
   );
 }
 
-export function SupplierModal({supplier,onSave,onClose,t}) {
+export function SupplierModal({supplier,onSave,onClose,t,portalUser,onCreatePortalLogin,onResetPortalPassword}) {
   const [f,setF]=useState(supplier?{name:supplier.name,email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||"",account_number:supplier.account_number||"",supplier_origin:supplier.supplier_origin||"",supplier_types:supplier.supplier_types||[]}:{name:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:"",account_number:"",supplier_origin:"",supplier_types:[]});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const toggleType=(tp)=>setF(p=>({...p,supplier_types:p.supplier_types.includes(tp)?p.supplier_types.filter(x=>x!==tp):[...p.supplier_types,tp]}));
+  const [newLoginUser,setNewLoginUser]=useState("");
+  const [newLoginPass,setNewLoginPass]=useState("");
+  const [showReset,setShowReset]=useState(false);
+  const [resetPass,setResetPass]=useState("");
   return (
     <Overlay onClose={onClose}>
       <MHead title={supplier?"Edit Supplier":"Add Supplier"} onClose={onClose}/>
@@ -4397,6 +4401,55 @@ export function SupplierModal({supplier,onSave,onClose,t}) {
         </div>}
       </FD>
       <FD><FL label={t.notes||"Notes"}/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)}/></FD>
+
+      {supplier&&onCreatePortalLogin&&(
+        <div style={{marginBottom:16,padding:"12px 14px",background:"rgba(192,132,252,.06)",border:"1px solid rgba(192,132,252,.25)",borderRadius:10}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#c084fc",textTransform:"uppercase",letterSpacing:".05em",marginBottom:8}}>🏭 Supplier Portal Login</div>
+          {portalUser ? (
+            <div>
+              <div style={{fontSize:13,marginBottom:8}}>
+                Login active: <strong style={{fontFamily:"DM Mono,monospace"}}>{portalUser.username}</strong>
+              </div>
+              {!showReset ? (
+                <button className="btn btn-ghost btn-sm" onClick={()=>setShowReset(true)}>🔑 Reset Password</button>
+              ) : (
+                <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+                  <div style={{flex:1}}>
+                    <FL label="New password"/>
+                    <input className="inp" type="text" value={resetPass} onChange={e=>setResetPass(e.target.value)} placeholder="New password"/>
+                  </div>
+                  <button className="btn btn-primary btn-sm" disabled={!resetPass.trim()}
+                    onClick={()=>{onResetPortalPassword(portalUser.id,resetPass.trim());setResetPass("");setShowReset(false);}}>
+                    Save
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>{setShowReset(false);setResetPass("");}}>Cancel</button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>
+                Give this supplier their own login to manage their own parts catalogue.
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:120}}>
+                  <FL label="Username"/>
+                  <input className="inp" type="text" value={newLoginUser} onChange={e=>setNewLoginUser(e.target.value)} placeholder="e.g. mck"/>
+                </div>
+                <div style={{flex:1,minWidth:120}}>
+                  <FL label="Password"/>
+                  <input className="inp" type="text" value={newLoginPass} onChange={e=>setNewLoginPass(e.target.value)} placeholder="Password"/>
+                </div>
+                <button className="btn btn-primary btn-sm" disabled={!newLoginUser.trim()||!newLoginPass.trim()}
+                  onClick={()=>{onCreatePortalLogin({username:newLoginUser.trim(),password:newLoginPass.trim()});setNewLoginUser("");setNewLoginPass("");}}>
+                  Create Login
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel||"Cancel"}</button><button className="btn btn-primary" style={{flex:2}} onClick={()=>{if(!f.name)return;onSave(f);}}>{t.save||"Save"}</button></div>
     </Overlay>
   );

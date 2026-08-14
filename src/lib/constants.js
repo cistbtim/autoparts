@@ -14,6 +14,7 @@ export const ROLES = {
   workshop:          { color: "#f59e0b", bg: "rgba(245,158,11,0.12)",   icon: "🔧" },
   scrapyard:         { color: "#6b7280", bg: "rgba(107,114,128,0.12)",  icon: "🚗" },
   scrapyard_admin:   { color: "#a78bfa", bg: "rgba(167,139,250,0.12)",  icon: "♻️" },
+  supplier:          { color: "#c084fc", bg: "rgba(192,132,252,0.12)",  icon: "🏭" },
 };
 
 export const BRANCH_ROLES = ["branch_admin","branch_manager","branch_warehouse","branch_picker","branch_salesman"];
@@ -170,6 +171,7 @@ export const canAccess = (u) => {
   if (u.role === "workshop") return true;
   if (u.role === "scrapyard") return true;
   if (u.role === "scrapyard_admin") return true;
+  if (u.role === "supplier") return true;
   if (u._isCustomer) return true;
   const s = getSubInfo(u);
   return s.status === "active" || s.status === "trial";

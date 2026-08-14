@@ -18,6 +18,7 @@ import { SupplierImportModal } from "./components/SupplierImport.jsx";
 import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
+import { SupplierPartsPage } from "./components/SupplierPortal.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage } from "./pages/PublicPages.jsx";
 
@@ -158,7 +159,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const isBranchUser = BRANCH_ROLES.includes(role);
   const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth<768;
-  const initTab = initialVehiclesMake&&role==="admin"?"vehicles":role==="customer"?"shop":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"requestsKanban":role==="branch_manager"?"requestsKanban":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"requestsKanban":"dashboard";
+  const initTab = initialVehiclesMake&&role==="admin"?"vehicles":role==="customer"?"shop":role==="supplier"?"supplierParts":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"requestsKanban":role==="branch_manager"?"requestsKanban":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"requestsKanban":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
@@ -187,6 +188,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [wsGrowthProfiles,setWsGrowthProfiles]=useState([]); // workshop_profiles + trial/referral fields, admin-only, for Workshop Growth dashboard
   const [wsGrowthLoginLogs,setWsGrowthLoginLogs]=useState([]); // full (unlimited) login_logs, workshop role only, for the same dashboard
   const [suppliers,setSuppliers]=useState([]);
+  const [supplierParts,setSupplierParts]=useState([]); // self-service catalogue for role:"supplier" logins
   const [supplierSearch,setSupplierSearch]=useState("");
   const [supplierOriginFilter,setSupplierOriginFilter]=useState("all");
   const [supplierTypeFilter,setSupplierTypeFilter]=useState([]);
@@ -471,6 +473,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const isScopedCustomer=role==="customer"&&!!user.supplier_scope_id; // one-supplier catalogue login
     const isInitial=!firstLoadDoneRef.current;
     if(isInitial){ setLoading(true); setLoadingItems([]); }
+
+    // Supplier portal login — none of the main-shop pipeline below applies (no parts
+    // table, no orders/customers/suppliers list, none of the 40-odd background tables).
+    // Its own data (supplier_parts) is loaded by a separate dedicated effect. Just pull
+    // settings for branding and get the loading screen out of the way.
+    if(role==="supplier"){
+      const st=await api.get("settings","id=eq.1&select=*");
+      if(Array.isArray(st)&&st[0]){ updateSettings(st[0]); setSettings(getSettings()); }
+      firstLoadDoneRef.current=true;
+      if(isInitial) setLoading(false);
+      return;
+    }
 
     // Wrap a get call with per-table timing tracking (initial load only)
     const track=(label,promise)=>{
@@ -838,6 +852,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     })();
     return ()=>{cancelled=true;};
   },[M.editPart?.data?.id]);
+
+  // Supplier portal login — scoped load of just this supplier's own self-service
+  // catalogue. Kept as its own small effect (not folded into the big loadAll pipeline)
+  // since a supplier login's data needs are completely different from every other role.
+  const reloadSupplierParts=useCallback(async()=>{
+    if(role!=="supplier"||!user.supplier_id) return;
+    const data=await api.fresh("supplier_parts",`supplier_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
+    setSupplierParts(Array.isArray(data)?data:[]);
+  },[role,user.supplier_id]);
+  useEffect(()=>{ reloadSupplierParts(); },[reloadSupplierParts]);
 
   // Targeted refresh — fetch only the tables that a mutation actually dirtied.
   // Cuts ~40-table loadAll() down to 1-4 requests per save operation.
@@ -2300,6 +2324,32 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
     await refreshTables("suppliers");closeM("editSupplier");showToast(es?"Supplier updated":"Supplier added");
   };
+  const createSupplierPortalLogin=async({username,password})=>{
+    const es=mData("editSupplier");
+    if(!es?.id)return;
+    const existing=await api.fresh("users",`username=eq.${encodeURIComponent(username)}&select=id`);
+    if(Array.isArray(existing)&&existing.length>0){showToast(`Username "${username}" already exists`,"err");return;}
+    await api.upsert("users",{username,password,role:"supplier",supplier_id:es.id,name:es.name});
+    await refreshTables("users");
+    showToast(`✅ Portal login created for ${es.name}`);
+  };
+  const resetSupplierPortalPassword=async(userId,password)=>{
+    await api.patch("users","id",userId,{password});
+    await refreshTables("users");
+    showToast("✅ Password updated");
+  };
+  const saveSupplierPart=async(data)=>{
+    const payload={...data,supplier_id:user.supplier_id,cost_price:data.cost_price===""?null:+data.cost_price};
+    if(data.id) await api.patch("supplier_parts","id",data.id,payload);
+    else await api.upsert("supplier_parts",payload);
+    await reloadSupplierParts();
+    showToast(data.id?"✅ Part updated":"✅ Part added");
+  };
+  const deleteSupplierPart=async(id)=>{
+    await api.delete("supplier_parts","id",id);
+    await reloadSupplierParts();
+    showToast("Deleted","err");
+  };
   const deleteSupplier=async(id)=>{
     const s=suppliers.find(x=>x.id===id);
     if(s&&role!=="admin"&&s.branch_id!==user.branch_id)return showToast("Cannot delete a global supplier","err");
@@ -3474,6 +3524,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       },
     ]:[]),
     {
+      id:"grp_supplier", icon:"🏭", label:"My Catalogue", roles:["supplier"],
+      children:[
+        {id:"supplierParts",  icon:"📦",label:"My Parts",   roles:["supplier"]},
+      ]
+    },
+    {
       id:"grp_sales", icon:"🛒", label:t.grpSales, roles:["admin","manager","shipper","customer"],
       badge: pendingCnt,
       children:[
@@ -3543,6 +3599,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"shop",    icon:"🛒",label:t.shop},
       {id:"myorders",icon:"📦",label:t.myOrders},
       {id:"myqueries",icon:"💬",label:t.myQueries},
+    ];
+    if(role==="supplier") return [
+      {id:"supplierParts",  icon:"📦",label:"My Parts"},
     ];
     if(role==="stockman") return [
       {id:"inventory",icon:"📦",label:t.inventory,badge:lowStock.length},
@@ -5081,6 +5140,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             <PH title={t.myOrders} subtitle={`${myO.length} orders`}/>
             {myO.length===0?<div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No orders yet — go shop!</div>:<OrdersTable orders={myO} canEdit={false} onStatusChange={updateOrderStatus} onCreateInvoice={()=>{}}/>}
           </div>
+        )}
+
+        {/* ── SUPPLIER PORTAL: MY PARTS ── */}
+        {tab==="supplierParts"&&role==="supplier"&&(
+          <SupplierPartsPage parts={supplierParts} supplierCode={user.supplier_code||user.supplier_name||"SUP"}
+            onSave={saveSupplierPart} onDelete={deleteSupplierPart} t={t}/>
         )}
 
         {/* ── PURCHASE INVOICES ── */}
@@ -6920,7 +6985,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {isOpen("branchStock")&&<BranchStockModal part={mData("branchStock")?.part} existing={mData("branchStock")?.existing} branchId={branchId} overrideBranchId={mData("branchStock")?.overrideBranchId} onClose={()=>closeM("branchStock")} onSave={async()=>{api.cacheInvalidate("branch_stock");await refreshTables("branch_stock");closeM("branchStock");showToast("Stock updated ✅");}} suppliers={suppliers} t={t}/>}
       {/* Can be opened from inside the Part modal (zIndex:250) via "+ Supplier" —
           pin above that so it doesn't render hidden behind it. */}
-      {isOpen("editSupplier")&&<div style={{position:"fixed",inset:0,zIndex:260}}><SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}/></div>}
+      {isOpen("editSupplier")&&<div style={{position:"fixed",inset:0,zIndex:260}}><SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}
+        portalUser={users.find(u=>u.role==="supplier"&&String(u.supplier_id)===String(mData("editSupplier")?.id))}
+        onCreatePortalLogin={createSupplierPortalLogin}
+        onResetPortalPassword={resetSupplierPortalPassword}/></div>}
       {isOpen("importSuppliers")&&<SupplierImportModal onImport={async()=>{await refreshTables("suppliers");}} onClose={()=>closeM("importSuppliers")}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}
       {isOpen("supplierCatalogue")&&<SupplierCatalogueModal parts={parts} supplier={mData("supplierCatalogue")}

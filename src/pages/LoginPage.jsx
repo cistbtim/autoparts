@@ -63,6 +63,7 @@ const IcWrench = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="non
 const IcCar    = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>;
 const IcCart   = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>;
 const IcStaff  = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+const IcFactory= () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M17 18h1"/><path d="M12 18h1"/><path d="M7 18h1"/></svg>;
 const IcUser   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
 const IcLock   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
 const IcGrid   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
@@ -87,6 +88,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const [branchUser,setBranchUser] = useState(""); const [branchPass,setBranchPass] = useState("");
   // staff
   const [staffUser,setStaffUser] = useState(""); const [staffPass,setStaffPass] = useState("");
+  // supplier
+  const [supplierUser,setSupplierUser] = useState(""); const [supplierPass,setSupplierPass] = useState("");
   // workshop
   const [wsCompany,setWsCompany] = useState("");
   const [wsUser,setWsUser] = useState(""); const [wsPass,setWsPass] = useState("");
@@ -161,6 +164,23 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       const accErr=checkAccess(res[0]);
       if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username});setLoading(false);return;}
       logLogin(res[0]);onLogin(res[0]);
+    } else setErr(t.wrongPass);
+    setLoading(false);
+  };
+
+  const doSupplierLogin = async () => {
+    if(!supplierUser||!supplierPass){setErr(t.wrongPass);return;}
+    setLoading(true);setErr("");setExpiredInfo(null);
+    const res = await api.fresh("users",`username=eq.${encodeURIComponent(supplierUser)}&password=eq.${encodeURIComponent(supplierPass)}&role=eq.supplier&select=*`);
+    if(Array.isArray(res)&&res.length>0){
+      let u=res[0];
+      if(u.supplier_id){
+        const sup=await api.fresh("suppliers",`id=eq.${u.supplier_id}&select=id,name,code`);
+        if(Array.isArray(sup)&&sup.length>0) u={...u,supplier_name:sup[0].name,supplier_code:sup[0].code||sup[0].name};
+      }
+      const accErr=checkAccess(u);
+      if(accErr){setErr(accErr);setExpiredInfo({name:u.name,username:u.username});setLoading(false);return;}
+      logLogin(u);onLogin(u);
     } else setErr(t.wrongPass);
     setLoading(false);
   };
@@ -305,6 +325,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     {id:"workshop", Icon:IcWrench, label:t.loginWorkshop||"Workshop"},
     {id:"scrapyard",Icon:IcCar,    label:t.loginScrapyard||"Scrapyard"},
     {id:"customer", Icon:IcCart,   label:t.loginShop||"Parts Shop"},
+    {id:"supplier", Icon:IcFactory,label:t.loginSupplier||"Supplier"},
     {id:"staff",    Icon:IcStaff,  label:t.loginStaff||"Staff"},
   ];
 
@@ -341,7 +362,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
         {/* Module tabs — hidden in workshop-only mode */}
         {!wsLoginOnly&&(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,marginBottom:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:14}}>
           {TAB_BTNS.map(({id,Icon,label})=>(
             <button key={id} onClick={()=>switchTab(id)} style={{
               padding:"12px 4px 10px",borderRadius:12,
@@ -646,6 +667,33 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Supplier ── */}
+          {authTab==="supplier"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:13}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+                <div style={{width:38,height:38,borderRadius:10,background:"rgba(192,132,252,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"#c084fc",flexShrink:0}}><IcFactory/></div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginSupplier||"Supplier"} {t.signIn||"Login"}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Manage your own parts catalogue</div>
+                </div>
+              </div>
+              <Field label={t.username||"Username"}>
+                <InpIcon inp={<input style={inpStyle} type="text" value={supplierUser} onChange={e=>setSupplierUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doSupplierLogin()} autoCapitalize="none" placeholder="Username"/>}><IcUser/></InpIcon>
+              </Field>
+              <Field label={t.password||"Password"}>
+                <InpIcon inp={<input style={inpStyle} type="password" value={supplierPass} onChange={e=>setSupplierPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doSupplierLogin()}/>}><IcLock/></InpIcon>
+              </Field>
+              {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
+              <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doSupplierLogin} disabled={loading}>
+                {loading?t.connecting||"Connecting…":"Sign In →"}
+              </button>
+              <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:"4px 0 0"}}>
+                Don't have a login? Ask your account contact to set one up for you.
+              </p>
             </div>
           )}
 

@@ -491,7 +491,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // Supplier-scoped customer login: skip the whole 44k-row parts pipeline (IndexedDB
     // cache, pagination, background sync — all built for staff needing the full
     // catalogue) and go straight to just this supplier's own parts. Small, one request,
-    // no "loading full catalogue" wait.
+    // no "loading full catalogue" wait. Everything else below (orders/suppliers/settings/
+    // branches, setLoading(false)) still runs unconditionally for every role.
+    const PARTS_Q="select=*&order=id.asc";
+    const SLIM_Q="select=id,price,stock,cost_price&order=id.asc";
+    let idbHasData=false, partsFirst=[];
     if(isScopedCustomer){
       // select=* (not just part_id) so supplier_part_no etc. is available for search,
       // same shape the old dedicated scoped-load effect used to fetch separately.
@@ -502,26 +506,24 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       setPartSuppliers(Array.isArray(links)?links:[]);
       setPartsLoading(false);
     } else {
-    // FAST: load parts from IndexedDB (persists across sessions, handles 44k+ rows)
-    const PARTS_Q="select=*&order=id.asc";
-    const SLIM_Q="select=id,price,stock,cost_price&order=id.asc";
-    const idbParts=await db.parts.toArray().catch(()=>[]);
-    const idbHasData=idbParts.length>0;
+      // FAST: load parts from IndexedDB (persists across sessions, handles 44k+ rows)
+      const idbParts=await db.parts.toArray().catch(()=>[]);
+      idbHasData=idbParts.length>0;
 
-    let partsFirst;
-    if(idbHasData){
-      setLoadingItems(prev=>[...prev,{label:'parts',status:'cached',ms:1,rows:idbParts.length}]);
-      setParts(idbParts);
-      partsFirst=idbParts;
-    } else {
-      // Cold start — fetch first 200 rows only so loading screen clears fast
-      const t0p=Date.now();
-      setLoadingItems(prev=>[...prev,{label:'parts (first 200)',status:'loading',ms:null,rows:null}]);
-      partsFirst=await api.getFirst("parts",PARTS_Q,200);
-      const msp=Date.now()-t0p;
-      setLoadingItems(prev=>prev.map(i=>i.label==='parts (first 200)'
-        ?{label:'parts (first 200)',status:'done',ms:msp,rows:Array.isArray(partsFirst)?partsFirst.length:0}:i));
-      setParts(Array.isArray(partsFirst)?partsFirst:[]);
+      if(idbHasData){
+        setLoadingItems(prev=>[...prev,{label:'parts',status:'cached',ms:1,rows:idbParts.length}]);
+        setParts(idbParts);
+        partsFirst=idbParts;
+      } else {
+        // Cold start — fetch first 200 rows only so loading screen clears fast
+        const t0p=Date.now();
+        setLoadingItems(prev=>[...prev,{label:'parts (first 200)',status:'loading',ms:null,rows:null}]);
+        partsFirst=await api.getFirst("parts",PARTS_Q,200);
+        const msp=Date.now()-t0p;
+        setLoadingItems(prev=>prev.map(i=>i.label==='parts (first 200)'
+          ?{label:'parts (first 200)',status:'done',ms:msp,rows:Array.isArray(partsFirst)?partsFirst.length:0}:i));
+        setParts(Array.isArray(partsFirst)?partsFirst:[]);
+      }
     }
 
     const [o,s,st,br]=await Promise.all([
@@ -560,38 +562,40 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // cache) so parts added/edited elsewhere since the last session show up immediately —
     // not just price/stock. Periodic/focus refreshes during the session stay on the cheap
     // slim price-only sync (a full 44k-row reload every 5 min would be too slow/disruptive).
-    setPartsLoading(true);
-    if(!idbHasData){
-      // True cold start — partsFirst is already a fresh first-page fetch, keep paginating from it
-      api.loadRest("parts",PARTS_Q,partsFirst.length,(extra)=>{
-        setParts([...partsFirst,...extra]);
-      }).then(async extra=>{
-        const full=[...partsFirst,...extra];
-        setParts(full);
-        try{await db.parts.bulkPut(full);}catch{}
-        setPartsLoading(false);
-      });
-    } else if(isInitial){
-      // Warm cache, but this is the first load of the session (post-login) — the cached
-      // rows were already painted for a fast screen, but they may be stale, so re-fetch
-      // everything from scratch (ignoring cache count) and replace outright.
-      api.loadRest("parts",PARTS_Q,0,(extra)=>{
-        setParts(extra);
-      }).then(async extra=>{
-        setParts(extra);
-        try{await db.parts.clear(); await db.parts.bulkPut(extra);}catch{}
-        setPartsLoading(false);
-      });
-    } else {
-      // Warm, mid-session refresh — slim fetch refreshes price/qty/cost_price only
-      api.fresh("parts",SLIM_Q).then(async slim=>{
-        if(!Array.isArray(slim)||slim.length===0){setPartsLoading(false);return;}
-        const slimMap=new Map(slim.map(r=>[String(r.id),r]));
-        setParts(prev=>prev.map(p=>{const s=slimMap.get(String(p.id));return s?{...p,price:s.price,stock:s.stock,cost_price:s.cost_price}:p;}));
-        try{await db.parts.toCollection().modify(p=>{const s=slimMap.get(String(p.id));if(s){p.price=s.price;p.stock=s.stock;p.cost_price=s.cost_price;}});}catch{}
-        setPartsLoading(false);
-      }).catch(()=>setPartsLoading(false));
-    }
+    // Scoped customers already have exactly the rows they need — nothing to sync.
+    if(!isScopedCustomer){
+      setPartsLoading(true);
+      if(!idbHasData){
+        // True cold start — partsFirst is already a fresh first-page fetch, keep paginating from it
+        api.loadRest("parts",PARTS_Q,partsFirst.length,(extra)=>{
+          setParts([...partsFirst,...extra]);
+        }).then(async extra=>{
+          const full=[...partsFirst,...extra];
+          setParts(full);
+          try{await db.parts.bulkPut(full);}catch{}
+          setPartsLoading(false);
+        });
+      } else if(isInitial){
+        // Warm cache, but this is the first load of the session (post-login) — the cached
+        // rows were already painted for a fast screen, but they may be stale, so re-fetch
+        // everything from scratch (ignoring cache count) and replace outright.
+        api.loadRest("parts",PARTS_Q,0,(extra)=>{
+          setParts(extra);
+        }).then(async extra=>{
+          setParts(extra);
+          try{await db.parts.clear(); await db.parts.bulkPut(extra);}catch{}
+          setPartsLoading(false);
+        });
+      } else {
+        // Warm, mid-session refresh — slim fetch refreshes price/qty/cost_price only
+        api.fresh("parts",SLIM_Q).then(async slim=>{
+          if(!Array.isArray(slim)||slim.length===0){setPartsLoading(false);return;}
+          const slimMap=new Map(slim.map(r=>[String(r.id),r]));
+          setParts(prev=>prev.map(p=>{const s=slimMap.get(String(p.id));return s?{...p,price:s.price,stock:s.stock,cost_price:s.cost_price}:p;}));
+          try{await db.parts.toCollection().modify(p=>{const s=slimMap.get(String(p.id));if(s){p.price=s.price;p.stock=s.stock;p.cost_price=s.cost_price;}});}catch{}
+          setPartsLoading(false);
+        }).catch(()=>setPartsLoading(false));
+      }
     }
 
     // LAZY: load secondary data in background

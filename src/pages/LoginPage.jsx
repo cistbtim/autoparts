@@ -77,7 +77,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const [catalogSupplierId,setCatalogSupplierId] = useState("");
   useEffect(()=>{
     if(!catalogName) return;
-    api.get("suppliers",`name=ilike.${encodeURIComponent(catalogName.trim())}&select=id,name`).then(r=>{
+    api.fresh("suppliers",`name=ilike.${encodeURIComponent(catalogName.trim())}&select=id,name`).then(r=>{
       if(Array.isArray(r)&&r.length>0) setCatalogSupplierId(r[0].id);
     }).catch(()=>{});
   },[catalogName]);
@@ -137,10 +137,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const doBranchLogin = async () => {
     if(!branchName||!branchUser||!branchPass){setErr("Branch name, username and password are required");return;}
     setLoading(true);setErr("");setExpiredInfo(null);
-    const brRes = await api.get("branches",`name=ilike.*${encodeURIComponent(branchName.trim())}*&status=eq.active&select=id,name,status`);
+    const brRes = await api.fresh("branches",`name=ilike.*${encodeURIComponent(branchName.trim())}*&status=eq.active&select=id,name,status`);
     if(!Array.isArray(brRes)||brRes.length===0){setErr("Branch not found or inactive");setLoading(false);return;}
     const branch = brRes[0];
-    const userRes = await api.get("users",`branch_id=eq.${branch.id}&username=eq.${encodeURIComponent(branchUser.trim())}&password=eq.${encodeURIComponent(branchPass)}&select=*`);
+    const userRes = await api.fresh("users",`branch_id=eq.${branch.id}&username=eq.${encodeURIComponent(branchUser.trim())}&password=eq.${encodeURIComponent(branchPass)}&select=*`);
     if(Array.isArray(userRes)&&userRes.length>0){
       const u={...userRes[0],_branchName:branch.name};
       const accErr=checkAccess(u);
@@ -156,7 +156,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const doStaffLogin = async () => {
     if(!staffUser||!staffPass){setErr(t.wrongPass);return;}
     setLoading(true);setErr("");setExpiredInfo(null);
-    const res = await api.get("users",`username=eq.${encodeURIComponent(staffUser)}&password=eq.${encodeURIComponent(staffPass)}&select=*`);
+    const res = await api.fresh("users",`username=eq.${encodeURIComponent(staffUser)}&password=eq.${encodeURIComponent(staffPass)}&select=*`);
     if(Array.isArray(res)&&res.length>0){
       const accErr=checkAccess(res[0]);
       if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username});setLoading(false);return;}
@@ -172,7 +172,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     // Check main workshop account
     let q = `username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&role=eq.workshop&select=*`;
     if(company) q += `&name=ilike.*${encodeURIComponent(company)}*`;
-    const res = await api.get("users", q);
+    const res = await api.fresh("users", q);
     if(Array.isArray(res)&&res.length>0){
       const accErr=checkAccess(res[0]);
       if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username,company:res[0].name});setLoading(false);return;}
@@ -182,13 +182,13 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     // Check workshop sub-users
     let suQ = `username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&is_active=eq.true&select=*`;
     if(company) {
-      const compRes = await api.get("users",`role=eq.workshop&name=ilike.*${encodeURIComponent(company)}*&select=id`);
+      const compRes = await api.fresh("users",`role=eq.workshop&name=ilike.*${encodeURIComponent(company)}*&select=id`);
       if(Array.isArray(compRes)&&compRes.length>0) suQ += `&workshop_id=eq.${compRes[0].id}`;
     }
-    const suRes = await api.get("workshop_users", suQ);
+    const suRes = await api.fresh("workshop_users", suQ);
     if(Array.isArray(suRes)&&suRes.length>0){
       const wu=suRes[0];
-      const mainRes=await api.get("users",`id=eq.${wu.workshop_id}&select=*`);
+      const mainRes=await api.fresh("users",`id=eq.${wu.workshop_id}&select=*`);
       if(Array.isArray(mainRes)&&mainRes.length>0){
         const userObj={...mainRes[0],wsRole:wu.ws_role,wsUsername:wu.username,name:wu.name||mainRes[0].name};
         const accErr=checkAccess(userObj);
@@ -208,7 +208,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     const company = scrapCompany.trim();
     let q = `username=eq.${encodeURIComponent(scrapUser)}&password=eq.${encodeURIComponent(scrapPass)}&role=in.(scrapyard,scrapyard_admin)&select=*`;
     if(company) q += `&name=ilike.*${encodeURIComponent(company)}*`;
-    const res = await api.get("users", q);
+    const res = await api.fresh("users", q);
     if(Array.isArray(res)&&res.length>0){
       const accErr=checkAccess(res[0]);
       if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username,company:res[0].name});setLoading(false);return;}
@@ -222,7 +222,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(wsRegPass!==wsRegPass2){setErr("Passwords don't match");return;}
     if(wsRegPass.length<4){setErr("Password must be at least 4 characters");return;}
     setLoading(true);setErr("");
-    const ex=await api.get("users",`username=eq.${encodeURIComponent(wsRegUser)}&select=id`).catch(()=>[]);
+    const ex=await api.fresh("users",`username=eq.${encodeURIComponent(wsRegUser)}&select=id`).catch(()=>[]);
     if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
     const wsId=makeId("WS");
     const today=new Date().toISOString().slice(0,10);
@@ -241,7 +241,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(scrapRegPass!==scrapRegPass2){setErr("Passwords don't match");return;}
     if(scrapRegPass.length<4){setErr("Password must be at least 4 characters");return;}
     setLoading(true);setErr("");
-    const ex=await api.get("users",`username=eq.${encodeURIComponent(scrapRegUser)}&select=id`).catch(()=>[]);
+    const ex=await api.fresh("users",`username=eq.${encodeURIComponent(scrapRegUser)}&select=id`).catch(()=>[]);
     if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
     const today=new Date().toISOString().slice(0,10);
     const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
@@ -259,7 +259,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const doCustLogin = async () => {
     if(!cPhone||!cPass){setErr("Fill phone & password");return;}
     setLoading(true);setErr("");
-    const res = await api.get("customers",`phone=eq.${encodeURIComponent(cPhone)}&password=eq.${encodeURIComponent(cPass)}&select=*`);
+    const res = await api.fresh("customers",`phone=eq.${encodeURIComponent(cPhone)}&password=eq.${encodeURIComponent(cPass)}&select=*`);
     if(Array.isArray(res)&&res.length>0){const c=res[0];logLogin({...c,username:c.phone,role:"customer"});onLogin({...c,username:c.phone,role:"customer",_isCustomer:true});}
     else setErr("Phone or password incorrect");
     setLoading(false);
@@ -271,7 +271,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     const digitsOnly=cPhone.replace(/[^0-9]/g,"");
     if(digitsOnly.length<9){setErr("Phone number too short (min 9 digits)");return;}
     setLoading(true);setErr("");
-    const ex = await api.get("customers",`phone=eq.${encodeURIComponent(cPhone)}&select=id`);
+    const ex = await api.fresh("customers",`phone=eq.${encodeURIComponent(cPhone)}&select=id`);
     if(Array.isArray(ex)&&ex.length>0){setErr("Phone already registered — login instead");setLoading(false);return;}
     const res = await api.upsert("customers",{name:cName,phone:cPhone,email:cEmail,password:cPass,address:"",orders:0,total_spent:0,...(catalogSupplierId?{supplier_scope_id:catalogSupplierId}:{})});
     const c=Array.isArray(res)?res[0]:null;

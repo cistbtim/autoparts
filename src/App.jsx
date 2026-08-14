@@ -1316,6 +1316,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const ep=mData("editPart");
     if(ep?.id){
       const d2={...data,image_url:toSaveUrl(data.image_url)};
+      // Stamped only when the price actually changes (not on every edit) so the
+      // supplier portal's "price updated" badge is specific to price, not noise.
+      if(+ep.price!==+d2.price) d2.price_updated_at=new Date().toISOString();
       setBusyMsg(`Saving ${d2.sku||ep.sku||"part"}…`);
       const result=await api.patch("parts","id",ep.id,d2).finally(()=>setBusyMsg(null));
       if(!Array.isArray(result)){

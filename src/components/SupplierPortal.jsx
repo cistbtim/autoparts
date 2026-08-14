@@ -14,6 +14,18 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [tab, setTab] = useState(existingParts.length?"existing":"mine");
 
+  // In-app "price changed since you last looked" badge — no outbound notification,
+  // just a local baseline captured once when this page first mounts (i.e. what they
+  // saw last time), then immediately reset for next time. Kept per-browser via
+  // localStorage rather than a schema addition; worst case on a new device/cleared
+  // storage is everything reads as "changed" once, which is harmless.
+  const lsKey=`supplier_portal_last_viewed_${supplierCode}`;
+  const [lastViewed]=useState(()=>{
+    const prev=localStorage.getItem(lsKey);
+    try{localStorage.setItem(lsKey,new Date().toISOString());}catch{}
+    return prev;
+  });
+
   return (
     <div className="fu">
       {editing&&<SupplierPartModal part={editing} supplierCode={supplierCode}
@@ -48,7 +60,8 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>These are managed by admin — view only.</div>
-            {existingParts.map(p=><PartRow key={p.id} p={p} code={p.sku} name={p.name} readOnly/>)}
+            {existingParts.map(p=><PartRow key={p.id} p={p} code={p.sku} name={p.name} readOnly
+              priceChanged={!!(lastViewed&&p.price_updated_at&&p.price_updated_at>lastViewed)}/>)}
           </div>
         )
       )}
@@ -68,9 +81,10 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
   );
 }
 
-function PartRow({p, code, name, readOnly, onClick}) {
+function PartRow({p, code, name, readOnly, priceChanged, onClick}) {
   return (
-    <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",cursor:onClick?"pointer":"default"}}
+    <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",cursor:onClick?"pointer":"default",
+      border:priceChanged?"1px solid rgba(96,165,250,.5)":undefined,background:priceChanged?"rgba(96,165,250,.05)":undefined}}
       onClick={onClick}>
       <div style={{width:52,height:52,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
         {p.image_url
@@ -83,6 +97,7 @@ function PartRow({p, code, name, readOnly, onClick}) {
         {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
       </div>
       <div style={{textAlign:"right",flexShrink:0}}>
+        {priceChanged&&<div style={{fontSize:10,fontWeight:700,color:"var(--blue)",marginBottom:2}}>🔔 PRICE UPDATED</div>}
         {p.price
           ? <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16}}>{fmtAmt(p.price)}</div>
           : <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:11}}>⏳ Awaiting pricing</span>}

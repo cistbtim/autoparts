@@ -10,8 +10,9 @@ import { PartPhotoUploader } from "./RfqVehicles.jsx";
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete, onRefresh}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete, onRefresh, onUpdateCostPrice}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
+  const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [tab, setTab] = useState(existingParts.length?"existing":"mine");
 
   // In-app "price changed since you last looked" badge — no outbound notification,
@@ -32,6 +33,10 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
         onSave={async(data)=>{await onSave(data);setEditing(null);}}
         onDelete={editing.id?async()=>{await onDelete(editing.id);setEditing(null);}:null}
         onClose={()=>setEditing(null)}/>}
+
+      {editingCost&&<SupplierCostPriceModal part={editingCost}
+        onSave={async(price)=>{await onUpdateCostPrice(editingCost._linkId,price);setEditingCost(null);}}
+        onClose={()=>setEditingCost(null)}/>}
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div>
@@ -59,9 +64,10 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
           </div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>These are managed by admin — view only.</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>Name, customer price & stock are managed by admin. Click a part to update your own cost price.</div>
             {existingParts.map(p=><PartRow key={p.id} p={p} code={p.sku} name={p.name} readOnly
-              priceChanged={!!(lastViewed&&p.price_updated_at&&p.price_updated_at>lastViewed)}/>)}
+              priceChanged={!!(lastViewed&&p.price_updated_at&&p.price_updated_at>lastViewed)}
+              onClick={onUpdateCostPrice?()=>setEditingCost(p):undefined}/>)}
           </div>
         )
       )}
@@ -95,6 +101,7 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick}) {
         <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{code}{readOnly&&<span title="Managed by admin" style={{marginLeft:6,fontSize:11,opacity:.6}}>🔒</span>}</div>
         <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
         {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
+        {readOnly&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Your cost: <strong style={{color:"var(--text2)"}}>{p._supplierPrice?fmtAmt(p._supplierPrice):"not set"}</strong></div>}
       </div>
       <div style={{textAlign:"right",flexShrink:0}}>
         {priceChanged&&<div style={{fontSize:10,fontWeight:700,color:"var(--blue)",marginBottom:2}}>🔔 PRICE UPDATED</div>}
@@ -104,6 +111,30 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick}) {
         <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Stock: {p.stock??0}</div>
       </div>
     </div>
+  );
+}
+
+function SupplierCostPriceModal({part, onSave, onClose}) {
+  const [price, setPrice] = useState(part._supplierPrice ?? "");
+  const [saving, setSaving] = useState(false);
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="Update Your Cost Price" sub={`${part.sku} — ${part.name}`} onClose={onClose}/>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
+        This is your own reference price for this part — it doesn't change what customers see or what's in admin's inventory.
+      </div>
+      <FD>
+        <FL label="Your Cost Price"/>
+        <input className="inp" type="number" min="0" step="0.01" autoFocus value={price} onChange={e=>setPrice(e.target.value)} placeholder="0"/>
+      </FD>
+      <div style={{display:"flex",gap:10}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={saving||price===""}
+          onClick={async()=>{setSaving(true);await onSave(+price);setSaving(false);}}>
+          {saving?"Saving…":"Save"}
+        </button>
+      </div>
+    </Overlay>
   );
 }
 

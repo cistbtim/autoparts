@@ -882,12 +882,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const qr=partIds.length?await api.fresh("customer_queries",`supplier_part_id=in.(${partIds.join(",")})&select=*&order=created_at.desc`):[];
     setSupplierQueries(Array.isArray(qr)?qr:[]);
     // Parts already in the main inventory that admin has linked to this supplier
-    // (via Link Supplier / catalogue import) — shown read-only so the supplier sees
-    // their whole existing catalogue, not just what they've self-added since.
+    // (via Link Supplier / catalogue import) — shown read-only (name/customer price/
+    // stock stay admin-controlled) except for their own cost price, which lives on
+    // the part_suppliers link row itself and is fair game for them to keep current.
     const links=await api.fresh("part_suppliers",`supplier_id=eq.${user.supplier_id}&select=*`);
-    const ids=Array.isArray(links)?links.map(l=>l.part_id):[];
-    const existing=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=*`):[];
-    setSupplierExistingParts(Array.isArray(existing)?existing:[]);
+    const linksArr=Array.isArray(links)?links:[];
+    const ids=linksArr.map(l=>l.part_id);
+    const existingRaw=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=*`):[];
+    const existing=(Array.isArray(existingRaw)?existingRaw:[]).map(p=>{
+      const link=linksArr.find(l=>String(l.part_id)===String(p.id));
+      return {...p, _linkId:link?.id, _supplierPrice:link?.supplier_price};
+    });
+    setSupplierExistingParts(existing);
     // Orders placed by customers scoped to this supplier's catalogue (stamped at checkout).
     const ord=await api.fresh("orders",`supplier_scope_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
     setSupplierOrders(Array.isArray(ord)?ord:[]);
@@ -2410,6 +2416,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await api.patch("customer_queries","id",id,data);
     setSupplierQueries(p=>p.map(q=>q.id===id?{...q,...data}:q));
     showToast("✅ Reply sent to customer!");
+  };
+  // Supplier updating their own cost price on a part already in the main inventory —
+  // patches the part_suppliers link row (supplier_price), never parts.cost_price
+  // directly, so this can never silently change admin's own margin numbers.
+  const updateSupplierCostPrice=async(linkId,price)=>{
+    await api.patch("part_suppliers","id",linkId,{supplier_price:price});
+    setSupplierExistingParts(prev=>prev.map(p=>p._linkId===linkId?{...p,_supplierPrice:price}:p));
+    showToast("✅ Cost price updated");
   };
   const deleteSupplier=async(id)=>{
     const s=suppliers.find(x=>x.id===id);
@@ -5211,7 +5225,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── SUPPLIER PORTAL: MY PARTS ── */}
         {tab==="supplierParts"&&role==="supplier"&&(
           <SupplierPartsPage parts={supplierParts} existingParts={supplierExistingParts} supplierCode={user.supplier_code||user.supplier_name||"SUP"}
-            onSave={saveSupplierPart} onDelete={deleteSupplierPart} onRefresh={reloadSupplierParts}/>
+            onSave={saveSupplierPart} onDelete={deleteSupplierPart} onRefresh={reloadSupplierParts}
+            onUpdateCostPrice={updateSupplierCostPrice}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY ORDERS ── */}

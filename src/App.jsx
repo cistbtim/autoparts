@@ -1332,7 +1332,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       const d2={...data,image_url:toSaveUrl(data.image_url)};
       // Stamped only when the price actually changes (not on every edit) so the
       // supplier portal's "price updated" badge is specific to price, not noise.
-      if(+ep.price!==+d2.price) d2.price_updated_at=new Date().toISOString();
+      // _origPrice (set when this edit was opened with a pre-filled suggested price,
+      // e.g. from a supplier cost-update review) is the true old value to compare
+      // against — ep.price itself would already equal the suggestion in that case.
+      const origPrice=ep._origPrice??ep.price;
+      if(+origPrice!==+d2.price) d2.price_updated_at=new Date().toISOString();
       setBusyMsg(`Saving ${d2.sku||ep.sku||"part"}…`);
       const result=await api.patch("parts","id",ep.id,d2).finally(()=>setBusyMsg(null));
       if(!Array.isArray(result)){
@@ -1344,6 +1348,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         return false;
       }
       if(ep.stock!==d2.stock)await logInv({...ep,...d2},ep.stock,d2.stock,"Edit Part","Admin edit");
+      if(ep._dismissCostUpdateLinkId) dismissSupplierCostUpdate(ep._dismissCostUpdateLinkId);
       showToast("Part updated");
       // Update local parts state — no full reload needed
       const updated={...ep,...d2};
@@ -5541,6 +5546,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {tab==="supplierPricing"&&role==="admin"&&(
           <SupplierPricingPage allParts={allSupplierParts} suppliers={suppliers} onSetPrice={setSupplierPartPrice}
             costUpdates={supplierCostUpdates} onDismissCostUpdate={dismissSupplierCostUpdate}
+            onRefresh={reloadAllSupplierParts}
             onGoToPart={(link)=>{
               const p=parts.find(pt=>String(pt.id)===String(link.part_id));
               if(!p) return;
@@ -5552,7 +5558,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               const suggested30=newCost>0?Math.round((newCost/(1-30/100))/10)*10:0;
               const newSellPrice=Math.max(suggested30,+p.price||0);
               setTab("inventory");
-              openM("editPart",{...p,cost_price:newCost,price:newSellPrice,_tab:"stock"});
+              // _dismissCostUpdateLinkId: savePart clears this review flag automatically
+              // once the edit that was prompted by it is actually saved. _origPrice keeps
+              // the real stored price so savePart's "did the price actually change" check
+              // (which drives the supplier-facing price-updated badge) still compares
+              // against the true old value instead of this pre-filled suggestion.
+              openM("editPart",{...p,cost_price:newCost,price:newSellPrice,_tab:"stock",_dismissCostUpdateLinkId:link.id,_origPrice:p.price});
             }}/>
         )}
 

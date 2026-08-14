@@ -206,7 +206,7 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
 // suppliers have self-added (across every supplier). A part stays invisible
 // to customers until it has a price here.
 // ═══════════════════════════════════════════════════════════════
-export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, costUpdates=[], onDismissCostUpdate, onGoToPart}) {
+export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, costUpdates=[], onDismissCostUpdate, onGoToPart, onRefresh}) {
   const [filter, setFilter] = useState(costUpdates.length?"costUpdates":"pending"); // "pending" | "all" | "costUpdates"
   const supName=(id)=>suppliers.find(s=>String(s.id)===String(id))?.name||`#${id}`;
   const supCode=(id)=>{const s=suppliers.find(s=>String(s.id)===String(id));return s?.code||s?.name||"";};
@@ -220,6 +220,7 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
           <h1 style={{fontSize:20,fontWeight:700}}>💰 Supplier Pricing</h1>
           <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{allParts.filter(p=>!p.price).length} awaiting pricing · {costUpdates.length} cost update{costUpdates.length!==1?"s":""} to review</p>
         </div>
+        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
       </div>
 
       <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:16}}>

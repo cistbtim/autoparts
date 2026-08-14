@@ -5541,7 +5541,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {tab==="supplierPricing"&&role==="admin"&&(
           <SupplierPricingPage allParts={allSupplierParts} suppliers={suppliers} onSetPrice={setSupplierPartPrice}
             costUpdates={supplierCostUpdates} onDismissCostUpdate={dismissSupplierCostUpdate}
-            onGoToPart={(partId)=>{const p=parts.find(pt=>String(pt.id)===String(partId));if(p){setTab("inventory");openM("editPart",p);}}}/>
+            onGoToPart={(link)=>{
+              const p=parts.find(pt=>String(pt.id)===String(link.part_id));
+              if(!p) return;
+              const newCost=+link.supplier_price||0;
+              // Pre-fill cost with the supplier's new number, and pre-select a selling
+              // price — the standard 30%-margin price on the new cost, or the part's
+              // current price if that's already higher (never auto-suggest a cut).
+              // Same margin formula/tiers as the Stock tab's own quick-price buttons.
+              const suggested30=newCost>0?Math.round((newCost/(1-30/100))/10)*10:0;
+              const newSellPrice=Math.max(suggested30,+p.price||0);
+              setTab("inventory");
+              openM("editPart",{...p,cost_price:newCost,price:newSellPrice,_tab:"stock"});
+            }}/>
         )}
 
         {/* ── INQUIRIES ── */}

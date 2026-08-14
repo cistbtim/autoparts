@@ -253,7 +253,7 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
                   New supplier cost<br/><strong>{l.supplier_price?fmtAmt(l.supplier_price):"—"}</strong>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
-                  {onGoToPart&&<button className="btn btn-primary btn-sm" onClick={()=>onGoToPart(l.part_id)}>✏️ Update Price</button>}
+                  {onGoToPart&&<button className="btn btn-primary btn-sm" onClick={()=>onGoToPart(l)}>✏️ Update Price</button>}
                   <button className="btn btn-ghost btn-sm" onClick={()=>onDismissCostUpdate(l.id)}>Dismiss</button>
                 </div>
               </div>

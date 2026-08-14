@@ -35,7 +35,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
         onClose={()=>setEditing(null)}/>}
 
       {editingCost&&<SupplierCostPriceModal part={editingCost}
-        onSave={async(price)=>{await onUpdateCostPrice(editingCost._linkId,price);setEditingCost(null);}}
+        onSave={async(price)=>{await onUpdateCostPrice(editingCost,price);setEditingCost(null);}}
         onClose={()=>setEditingCost(null)}/>}
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>

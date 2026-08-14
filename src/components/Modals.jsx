@@ -3248,6 +3248,16 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
   const [oppConfirm, setOppConfirm] = useState(null);
   const [newPartConfirm, setNewPartConfirm] = useState(null); // {copyFits, copyVehicleInfo}
   const [deleting, setDeleting] = useState(false);
+  const [priceHistory,setPriceHistory]=useState([]);
+  const [priceHistoryOpen,setPriceHistoryOpen]=useState(false);
+  useEffect(()=>{
+    if(!part?.id) return;
+    let cancelled=false;
+    api.fresh("part_price_history",`part_id=eq.${part.id}&select=*&order=created_at.desc&limit=20`).then(r=>{
+      if(!cancelled&&Array.isArray(r)) setPriceHistory(r);
+    }).catch(()=>{});
+    return ()=>{cancelled=true;};
+  },[part?.id]);
   const s=(k,v)=>{ setF(p=>({...p,[k]:v})); setDirty(true); setSaved(false); };
   const [catalogSearch,setCatalogSearch]=useState("");
   const [brandPickOpen,setBrandPickOpen]=useState(false);
@@ -3672,6 +3682,40 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               )}
             </div>
           </FG>
+
+          {part&&(
+            <div style={{marginTop:4,marginBottom:14}}>
+              <button type="button" onClick={()=>setPriceHistoryOpen(v=>!v)}
+                style={{background:"none",border:"none",cursor:"pointer",padding:0,fontSize:12,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}>
+                📜 Price History {priceHistory.length>0?`(${priceHistory.length})`:""} {priceHistoryOpen?"▲":"▼"}
+              </button>
+              {priceHistoryOpen&&(
+                priceHistory.length===0
+                  ? <div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>No price changes recorded yet.</div>
+                  : (
+                    <div style={{marginTop:8,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+                      {priceHistory.map(h=>(
+                        <div key={h.id} style={{padding:"8px 12px",borderBottom:"1px solid var(--border)",fontSize:12,display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                          <div>
+                            {h.old_price!=null&&h.new_price!=null&&+h.old_price!==+h.new_price&&(
+                              <div>Selling: {C()}{(+h.old_price).toLocaleString()} → <strong>{C()}{(+h.new_price).toLocaleString()}</strong></div>
+                            )}
+                            {h.old_cost_price!=null&&h.new_cost_price!=null&&+h.old_cost_price!==+h.new_cost_price&&(
+                              <div style={{color:"var(--text2)"}}>Cost: {C()}{(+h.old_cost_price).toLocaleString()} → <strong>{C()}{(+h.new_cost_price).toLocaleString()}</strong></div>
+                            )}
+                            <div style={{color:"var(--text3)",fontSize:11,marginTop:2}}>
+                              {h.source==="supplier_cost_update"?"🏭 Supplier update":"✏️ Admin edit"}{h.changed_by?` — ${h.changed_by}`:""}
+                            </div>
+                          </div>
+                          <div style={{color:"var(--text3)",fontSize:11,whiteSpace:"nowrap"}}>{fmtDT(h.created_at)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+              )}
+            </div>
+          )}
+
           {stockPromptOpen&&(
             <div style={{position:"fixed",inset:0,zIndex:100000,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center"}}
               onClick={()=>setStockPromptOpen(false)}>

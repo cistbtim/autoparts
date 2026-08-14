@@ -1336,6 +1336,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       // e.g. from a supplier cost-update review) is the true old value to compare
       // against — ep.price itself would already equal the suggestion in that case.
       const origPrice=ep._origPrice??ep.price;
+      const origCostPrice=ep._origCostPrice??ep.cost_price;
       if(+origPrice!==+d2.price) d2.price_updated_at=new Date().toISOString();
       setBusyMsg(`Saving ${d2.sku||ep.sku||"part"}…`);
       const result=await api.patch("parts","id",ep.id,d2).finally(()=>setBusyMsg(null));
@@ -1348,6 +1349,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         return false;
       }
       if(ep.stock!==d2.stock)await logInv({...ep,...d2},ep.stock,d2.stock,"Edit Part","Admin edit");
+      if(+origPrice!==+d2.price||+origCostPrice!==+d2.cost_price){
+        api.insert("part_price_history",{part_id:ep.id,sku:d2.sku||ep.sku,old_price:origPrice||null,new_price:d2.price||null,
+          old_cost_price:origCostPrice||null,new_cost_price:d2.cost_price||null,source:"admin_edit",changed_by:user.name||user.username||""}).catch(()=>{});
+      }
       if(ep._dismissCostUpdateLinkId) dismissSupplierCostUpdate(ep._dismissCostUpdateLinkId);
       showToast("Part updated");
       // Update local parts state — no full reload needed
@@ -2437,12 +2442,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // Supplier updating their own cost price on a part already in the main inventory —
   // patches the part_suppliers link row (supplier_price), never parts.cost_price
   // directly, so this can never silently change admin's own margin numbers.
-  const updateSupplierCostPrice=async(linkId,price)=>{
+  const updateSupplierCostPrice=async(part,price)=>{
     // cost_updated_at flags this link for admin's "Supplier Pricing" review list —
     // cleared (not just left stale) once admin dismisses/reviews it, so the flag
     // means "needs a look", not "was ever changed".
-    await api.patch("part_suppliers","id",linkId,{supplier_price:price,cost_updated_at:new Date().toISOString()});
-    setSupplierExistingParts(prev=>prev.map(p=>p._linkId===linkId?{...p,_supplierPrice:price}:p));
+    await api.patch("part_suppliers","id",part._linkId,{supplier_price:price,cost_updated_at:new Date().toISOString()});
+    setSupplierExistingParts(prev=>prev.map(p=>p._linkId===part._linkId?{...p,_supplierPrice:price}:p));
+    api.insert("part_price_history",{part_id:part.id,sku:part.sku,old_cost_price:part._supplierPrice||null,new_cost_price:price||null,
+      source:"supplier_cost_update",changed_by:user.supplier_name||user.supplier_code||user.username||""}).catch(()=>{});
     showToast("✅ Cost price updated");
   };
   const deleteSupplier=async(id)=>{
@@ -5563,7 +5570,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               // the real stored price so savePart's "did the price actually change" check
               // (which drives the supplier-facing price-updated badge) still compares
               // against the true old value instead of this pre-filled suggestion.
-              openM("editPart",{...p,cost_price:newCost,price:newSellPrice,_tab:"stock",_dismissCostUpdateLinkId:link.id,_origPrice:p.price});
+              openM("editPart",{...p,cost_price:newCost,price:newSellPrice,_tab:"stock",_dismissCostUpdateLinkId:link.id,_origPrice:p.price,_origCostPrice:p.cost_price});
             }}/>
         )}
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toImgUrl, fmtAmt } from "../lib/helpers.js";
-import { Overlay, MHead, FL, FG, FD } from "./shared.jsx";
+import { Overlay, MHead, FL, FG, FD, StatusBadge } from "./shared.jsx";
 import { PartPhotoUploader } from "./RfqVehicles.jsx";
 
 // ═══════════════════════════════════════════════════════════════
@@ -10,8 +10,9 @@ import { PartPhotoUploader } from "./RfqVehicles.jsx";
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], supplierCode, onSave, onDelete, t}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
+  const [tab, setTab] = useState(existingParts.length?"existing":"mine");
 
   return (
     <div className="fu">
@@ -20,43 +21,70 @@ export function SupplierPartsPage({parts=[], supplierCode, onSave, onDelete, t})
         onDelete={editing.id?async()=>{await onDelete(editing.id);setEditing(null);}:null}
         onClose={()=>setEditing(null)}/>}
 
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div>
           <h1 style={{fontSize:20,fontWeight:700}}>📦 My Parts</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{parts.length} part{parts.length!==1?"s":""} · {parts.filter(p=>!p.price).length} awaiting pricing</p>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
+            {existingParts.length} already in inventory · {parts.length} added by you ({parts.filter(p=>!p.price).length} awaiting pricing)
+          </p>
         </div>
         <button className="btn btn-primary" onClick={()=>setEditing({})}>+ Add Part</button>
       </div>
 
-      {parts.length===0 ? (
-        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
-          No parts yet — click "+ Add Part" to add your first one.
-        </div>
-      ) : (
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {parts.map(p=>(
-            <div key={p.id} className="card card-hover" style={{padding:14,display:"flex",gap:12,alignItems:"center",cursor:"pointer"}}
-              onClick={()=>setEditing(p)}>
-              <div style={{width:52,height:52,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {p.image_url
-                  ? <img src={toImgUrl(p.image_url)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
-                  : <span style={{fontSize:20,opacity:.3}}>🖼</span>}
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{supplierCode}-{p.part_code}</div>
-                <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
-              </div>
-              <div style={{textAlign:"right",flexShrink:0}}>
-                {p.price
-                  ? <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16}}>{fmtAmt(p.price)}</div>
-                  : <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:11}}>⏳ Awaiting pricing</span>}
-                <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Stock: {p.stock??0}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+      <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:16}}>
+        {[["existing",`Existing Catalogue (${existingParts.length})`],["mine",`Added by You (${parts.length})`]].map(([id,lb])=>(
+          <button key={id} className={`auth-tab ${tab===id?"on":""}`} onClick={()=>setTab(id)}>{lb}</button>
+        ))}
+      </div>
+
+      {tab==="existing"&&(
+        existingParts.length===0 ? (
+          <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
+            Nothing linked to you in the main inventory yet.
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>These are managed by admin — view only.</div>
+            {existingParts.map(p=><PartRow key={p.id} p={p} code={p.sku} name={p.name} readOnly/>)}
+          </div>
+        )
       )}
+
+      {tab==="mine"&&(
+        parts.length===0 ? (
+          <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
+            No parts yet — click "+ Add Part" to add your first one.
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {parts.map(p=><PartRow key={p.id} p={p} code={`${supplierCode}-${p.part_code}`} name={p.name} onClick={()=>setEditing(p)}/>)}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+function PartRow({p, code, name, readOnly, onClick}) {
+  return (
+    <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",cursor:onClick?"pointer":"default"}}
+      onClick={onClick}>
+      <div style={{width:52,height:52,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {p.image_url
+          ? <img src={toImgUrl(p.image_url)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+          : <span style={{fontSize:20,opacity:.3}}>🖼</span>}
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{code}{readOnly&&<span title="Managed by admin" style={{marginLeft:6,fontSize:11,opacity:.6}}>🔒</span>}</div>
+        <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
+        {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
+      </div>
+      <div style={{textAlign:"right",flexShrink:0}}>
+        {p.price
+          ? <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16}}>{fmtAmt(p.price)}</div>
+          : <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:11}}>⏳ Awaiting pricing</span>}
+        <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Stock: {p.stock??0}</div>
+      </div>
     </div>
   );
 }
@@ -119,6 +147,147 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
           onClick={()=>{if(window.confirm(`Delete ${supplierCode}-${f.part_code}?`)) onDelete();}}>🗑</button>}
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} disabled={!canSave} onClick={()=>onSave(f)}>Save</button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN: SUPPLIER PRICING — set the customer-facing price/markup on parts
+// suppliers have self-added (across every supplier). A part stays invisible
+// to customers until it has a price here.
+// ═══════════════════════════════════════════════════════════════
+export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice}) {
+  const [filter, setFilter] = useState("pending"); // "pending" | "all"
+  const supName=(id)=>suppliers.find(s=>String(s.id)===String(id))?.name||`#${id}`;
+  const supCode=(id)=>{const s=suppliers.find(s=>String(s.id)===String(id));return s?.code||s?.name||"";};
+  const rows=filter==="pending"?allParts.filter(p=>!p.price):allParts;
+  const [drafts, setDrafts] = useState({}); // {id: draftPriceString}
+
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>💰 Supplier Pricing</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{allParts.filter(p=>!p.price).length} awaiting pricing · {allParts.length} total</p>
+        </div>
+      </div>
+
+      <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:16}}>
+        {[["pending","Awaiting Pricing"],["all","All"]].map(([id,lb])=>(
+          <button key={id} className={`auth-tab ${filter===id?"on":""}`} onClick={()=>setFilter(id)}>{lb}</button>
+        ))}
+      </div>
+
+      {rows.length===0 ? (
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
+          {filter==="pending"?"Nothing waiting on a price 🎉":"No supplier-added parts yet."}
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {rows.map(p=>(
+            <div key={p.id} className="card" style={{padding:14,display:"flex",gap:12,alignItems:"center"}}>
+              <div style={{width:48,height:48,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {p.image_url
+                  ? <img src={toImgUrl(p.image_url)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                  : <span style={{fontSize:18,opacity:.3}}>🖼</span>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{supCode(p.supplier_id)}-{p.part_code}</div>
+                <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{supName(p.supplier_id)}{(p.make||p.model)?` · ${[p.make,p.model,p.year_range].filter(Boolean).join(" ")}`:""}</div>
+              </div>
+              <div style={{fontSize:12,color:"var(--text3)",textAlign:"right",flexShrink:0}}>
+                Cost<br/><strong style={{color:"var(--text2)"}}>{p.cost_price?fmtAmt(p.cost_price):"—"}</strong>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                <input className="inp" type="number" style={{width:100}} placeholder="Set price"
+                  value={drafts[p.id]??p.price??""}
+                  onChange={e=>setDrafts(d=>({...d,[p.id]:e.target.value}))}/>
+                <button className="btn btn-primary btn-sm"
+                  disabled={!String(drafts[p.id]??p.price??"").trim()}
+                  onClick={()=>onSetPrice(p.id,+drafts[p.id]||0)}>
+                  {p.price?"Update":"Set Live"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPPLIER: MY QUERIES — customer questions about parts this supplier added
+// themselves (matched via customer_queries.supplier_part_id).
+// ═══════════════════════════════════════════════════════════════
+export function SupplierQueriesPage({queries=[], onReply}) {
+  const [replying, setReplying] = useState(null); // query row being replied to
+
+  return (
+    <div className="fu">
+      {replying&&<SupplierQueryReplyModal query={replying}
+        onReply={async(id,data)=>{await onReply(id,data);setReplying(null);}}
+        onClose={()=>setReplying(null)}/>}
+
+      <div style={{marginBottom:20}}>
+        <h1 style={{fontSize:20,fontWeight:700}}>💬 My Queries</h1>
+        <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{queries.filter(q=>q.status==="pending").length} pending · {queries.length} total</p>
+      </div>
+
+      {queries.length===0 ? (
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No queries yet.</div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {queries.map(q=>(
+            <div key={q.id} className="card card-hover" style={{padding:14,cursor:"pointer"}} onClick={()=>setReplying(q)}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{q.part_name}</div>
+                  {q.part_sku&&<div style={{fontSize:12,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{q.part_sku}</div>}
+                  <div style={{fontSize:12,color:"var(--text2)",marginTop:4}}>👤 {q.customer_name} · 📞 {q.customer_phone} · Qty: {q.qty_requested}</div>
+                  {q.notes&&<div style={{fontSize:12,color:"var(--text3)",fontStyle:"italic",marginTop:4}}>"{q.notes}"</div>}
+                </div>
+                <StatusBadge status={q.status}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SupplierQueryReplyModal({query, onReply, onClose}) {
+  const [price,setPrice]=useState(query?.confirmed_price||"");
+  const [qty,setQty]=useState(query?.confirmed_qty||"");
+  const [notes,setNotes]=useState(query?.reply_notes||"");
+  const [saving,setSaving]=useState(false);
+  const handle=async()=>{
+    setSaving(true);
+    await onReply(query.id,{
+      confirmed_price:price?+price:null, confirmed_qty:qty?+qty:null,
+      reply_notes:notes, status:"replied", replied_at:new Date().toISOString(),
+    });
+    setSaving(false);
+  };
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="Reply to Query" sub={`${query.customer_name} — ${query.part_name}`} onClose={onClose}/>
+      <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",marginBottom:14,fontSize:13}}>
+        <div>👤 {query.customer_name} · 📞 {query.customer_phone}</div>
+        <div style={{marginTop:2}}>🔢 Requested qty: <strong>{query.qty_requested}</strong></div>
+        {query.notes&&<div style={{marginTop:6,color:"var(--text3)",fontStyle:"italic"}}>"{query.notes}"</div>}
+      </div>
+      <FG cols="1fr 1fr">
+        <div><FL label="Confirmed Price"/><input className="inp" type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} placeholder="Unit price"/></div>
+        <div><FL label="Confirmed Qty"/><input className="inp" type="number" min="0" value={qty} onChange={e=>setQty(e.target.value)} placeholder="Available qty"/></div>
+      </FG>
+      <FD><FL label="Notes to customer"/><textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} rows={3}/></FD>
+      <div style={{display:"flex",gap:10}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={saving} onClick={handle}>{saving?"Sending…":"Send Reply"}</button>
       </div>
     </Overlay>
   );

@@ -18,7 +18,7 @@ import { SupplierImportModal } from "./components/SupplierImport.jsx";
 import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
-import { SupplierPartsPage } from "./components/SupplierPortal.jsx";
+import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage } from "./components/SupplierPortal.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage } from "./pages/PublicPages.jsx";
 
@@ -189,6 +189,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [wsGrowthLoginLogs,setWsGrowthLoginLogs]=useState([]); // full (unlimited) login_logs, workshop role only, for the same dashboard
   const [suppliers,setSuppliers]=useState([]);
   const [supplierParts,setSupplierParts]=useState([]); // self-service catalogue for role:"supplier" logins
+  const [supplierExistingParts,setSupplierExistingParts]=useState([]); // their parts already in the main inventory
+  const [allSupplierParts,setAllSupplierParts]=useState([]); // admin: every supplier's self-added parts (for pricing)
+  const [supplierOrders,setSupplierOrders]=useState([]); // orders placed by this supplier's scoped customers
+  const [supplierQueries,setSupplierQueries]=useState([]); // customer_queries against this supplier's own self-added parts
   const [supplierSearch,setSupplierSearch]=useState("");
   const [supplierOriginFilter,setSupplierOriginFilter]=useState("all");
   const [supplierTypeFilter,setSupplierTypeFilter]=useState([]);
@@ -516,7 +520,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       const links=await api.fresh("part_suppliers",`supplier_id=eq.${user.supplier_scope_id}&select=*`);
       const ids=Array.isArray(links)?links.map(l=>l.part_id):[];
       const scopedParts=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=*`):[];
-      setParts(Array.isArray(scopedParts)?scopedParts:[]);
+      // Priced (live) parts the supplier added themselves via their own portal —
+      // merged in alongside the main-catalogue parts admin linked to them. Namespaced
+      // "sp_" id keeps these from ever colliding with (or being patched as) a real
+      // parts.id — stock for these lives on supplier_parts.stock, not parts.stock.
+      const supSelf=await api.fresh("supplier_parts",`supplier_id=eq.${user.supplier_scope_id}&price=not.is.null&select=*`);
+      const supRow=await api.fresh("suppliers",`id=eq.${user.supplier_scope_id}&select=code,name`);
+      const supCode=(Array.isArray(supRow)&&supRow[0]&&(supRow[0].code||supRow[0].name))||"SUP";
+      const selfParts=(Array.isArray(supSelf)?supSelf:[]).map(row=>({
+        id:`sp_${row.id}`, sku:`${supCode}-${row.part_code}`, name:row.name, chinese_desc:row.chinese_desc||"",
+        category:row.category||"", price:row.price, cost_price:row.cost_price, stock:row.stock??0,
+        image_url:row.image_url||"", make:row.make||"", model:row.model||"", year_range:row.year_range||"",
+        oe_number:row.oe_number||"", _isSupplierPart:true, _supplierPartId:row.id,
+      }));
+      setParts([...(Array.isArray(scopedParts)?scopedParts:[]),...selfParts]);
       setPartSuppliers(Array.isArray(links)?links:[]);
       setPartsLoading(false);
     } else {
@@ -860,8 +877,31 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(role!=="supplier"||!user.supplier_id) return;
     const data=await api.fresh("supplier_parts",`supplier_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
     setSupplierParts(Array.isArray(data)?data:[]);
+    // Queries customers submitted against this supplier's own self-added parts.
+    const partIds=(Array.isArray(data)?data:[]).map(p=>p.id);
+    const qr=partIds.length?await api.fresh("customer_queries",`supplier_part_id=in.(${partIds.join(",")})&select=*&order=created_at.desc`):[];
+    setSupplierQueries(Array.isArray(qr)?qr:[]);
+    // Parts already in the main inventory that admin has linked to this supplier
+    // (via Link Supplier / catalogue import) — shown read-only so the supplier sees
+    // their whole existing catalogue, not just what they've self-added since.
+    const links=await api.fresh("part_suppliers",`supplier_id=eq.${user.supplier_id}&select=*`);
+    const ids=Array.isArray(links)?links.map(l=>l.part_id):[];
+    const existing=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=*`):[];
+    setSupplierExistingParts(Array.isArray(existing)?existing:[]);
+    // Orders placed by customers scoped to this supplier's catalogue (stamped at checkout).
+    const ord=await api.fresh("orders",`supplier_scope_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
+    setSupplierOrders(Array.isArray(ord)?ord:[]);
   },[role,user.supplier_id]);
   useEffect(()=>{ reloadSupplierParts(); },[reloadSupplierParts]);
+
+  // Admin: every supplier's self-added parts, so pending ones can be priced.
+  // Small table (each supplier's own additions) — its own effect, same reasoning as above.
+  const reloadAllSupplierParts=useCallback(async()=>{
+    if(role!=="admin") return;
+    const data=await api.fresh("supplier_parts","select=*&order=created_at.desc");
+    setAllSupplierParts(Array.isArray(data)?data:[]);
+  },[role]);
+  useEffect(()=>{ reloadAllSupplierParts(); },[reloadAllSupplierParts]);
 
   // Targeted refresh — fetch only the tables that a mutation actually dirtied.
   // Cuts ~40-table loadAll() down to 1-4 requests per save operation.
@@ -1160,14 +1200,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const placeOrder=async(form)=>{
     if(!form.name||!form.phone){showToast("Fill name & phone","err");return;}
 
-    // Check latest stock & price before confirming
-    const ids=cart.map(i=>i.id).join(",");
-    const freshParts=await api.getFirst("parts",`id=in.(${ids})&select=id,name,price,stock`,500);
-    if(Array.isArray(freshParts)&&freshParts.length>0){
+    // Check latest stock & price before confirming — supplier-portal cart items live in
+    // supplier_parts (real numeric id kept as _supplierPartId), not parts, so they're
+    // checked separately rather than joined into one id=in.(...) query against parts.
+    const realIds=cart.filter(i=>!i._isSupplierPart).map(i=>i.id);
+    const supIds=cart.filter(i=>i._isSupplierPart).map(i=>i._supplierPartId);
+    const [freshParts,freshSupParts]=await Promise.all([
+      realIds.length?api.getFirst("parts",`id=in.(${realIds.join(",")})&select=id,name,price,stock`,500):Promise.resolve([]),
+      supIds.length?api.fresh("supplier_parts",`id=in.(${supIds.join(",")})&select=id,price,stock`):Promise.resolve([]),
+    ]);
+    {
       const stockIssues=[];
       const priceChanges=[];
       for(const item of cart){
-        const fp=freshParts.find(p=>String(p.id)===String(item.id));
+        const fp=item._isSupplierPart
+          ?(Array.isArray(freshSupParts)?freshSupParts.find(p=>String(p.id)===String(item._supplierPartId)):null)
+          :(Array.isArray(freshParts)?freshParts.find(p=>String(p.id)===String(item.id)):null);
         if(!fp) continue;
         if((fp.stock??0)<item.qty) stockIssues.push(`${item.name} (only ${fp.stock??0} left)`);
         else if(fp.price!==item.price) priceChanges.push({id:item.id,newPrice:fp.price,name:item.name,oldPrice:item.price});
@@ -1181,7 +1229,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
 
     const oid=makeId("ORD");
-    const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",items:cart.map(i=>({partId:i.id,sku:i.sku||"",qty:i.qty,name:i.name,price:i.price})),total:cartTotal,branch_id:currentBranch?.id||null};
+    const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",items:cart.map(i=>({partId:i.id,sku:i.sku||"",qty:i.qty,name:i.name,price:i.price})),total:cartTotal,branch_id:currentBranch?.id||null,supplier_scope_id:user.supplier_scope_id||null};
     await api.upsert("orders",orderObj);
     // NO stock deduction on order — stock deducted when shipper sets 待出貨
     const ex=customers.find(c=>c.phone===form.phone);
@@ -2350,6 +2398,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await reloadSupplierParts();
     showToast("Deleted","err");
   };
+  const setSupplierPartPrice=async(id,price)=>{
+    await api.patch("supplier_parts","id",id,{price});
+    await reloadAllSupplierParts();
+    showToast(price?"✅ Price set — now live":"Price cleared");
+  };
+  const replySupplierQuery=async(id,data)=>{
+    await api.patch("customer_queries","id",id,data);
+    setSupplierQueries(p=>p.map(q=>q.id===id?{...q,...data}:q));
+    showToast("✅ Reply sent to customer!");
+  };
   const deleteSupplier=async(id)=>{
     const s=suppliers.find(x=>x.id===id);
     if(s&&role!=="admin"&&s.branch_id!==user.branch_id)return showToast("Cannot delete a global supplier","err");
@@ -3206,7 +3264,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     ?new Set(partSuppliers.filter(ps=>String(ps.supplier_id)===String(user.supplier_scope_id)).map(ps=>String(ps.part_id)))
     :null;
   const fp=displayParts.filter(p=>{
-    if(customerScopePartIds&&!customerScopePartIds.has(String(p.id)))return false;
+    if(customerScopePartIds&&!p._isSupplierPart&&!customerScopePartIds.has(String(p.id)))return false;
     // role-based access filter
     if(role==="branch_admin"){
       const isMainCatalog=!p.branch_id||p.branch_id===mainBranchId;
@@ -3459,6 +3517,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       badge: pendingInq,
       children:[
         {id:"suppliers",icon:"🏭",label:t.suppliers,roles:["admin"]},
+        {id:"supplierPricing",icon:"💰",label:"Supplier Pricing",roles:["admin"],badge:allSupplierParts.filter(p=>!p.price).length||0},
         {id:"rfq",icon:"📋",label:t.rfqSession,roles:["admin"],badge:overdueAutoRfq||0},
         {id:"inquiries",icon:"📩",label:t.inquiries,roles:["admin"],badge:pendingInq},
         {id:"purchaseInvoices",icon:"🧾",label:t.purchaseInvoices,roles:["admin"]},
@@ -3527,6 +3586,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       id:"grp_supplier", icon:"🏭", label:"My Catalogue", roles:["supplier"],
       children:[
         {id:"supplierParts",  icon:"📦",label:"My Parts",   roles:["supplier"]},
+        {id:"supplierOrders", icon:"📋",label:"My Orders",  roles:["supplier"]},
+        {id:"supplierQueries",icon:"💬",label:"My Queries", roles:["supplier"],badge:supplierQueries.filter(q=>q.status==="pending").length||0},
       ]
     },
     {
@@ -3602,6 +3663,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     ];
     if(role==="supplier") return [
       {id:"supplierParts",  icon:"📦",label:"My Parts"},
+      {id:"supplierOrders", icon:"📋",label:"My Orders"},
+      {id:"supplierQueries",icon:"💬",label:"My Queries"},
     ];
     if(role==="stockman") return [
       {id:"inventory",icon:"📦",label:t.inventory,badge:lowStock.length},
@@ -5144,8 +5207,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── SUPPLIER PORTAL: MY PARTS ── */}
         {tab==="supplierParts"&&role==="supplier"&&(
-          <SupplierPartsPage parts={supplierParts} supplierCode={user.supplier_code||user.supplier_name||"SUP"}
-            onSave={saveSupplierPart} onDelete={deleteSupplierPart} t={t}/>
+          <SupplierPartsPage parts={supplierParts} existingParts={supplierExistingParts} supplierCode={user.supplier_code||user.supplier_name||"SUP"}
+            onSave={saveSupplierPart} onDelete={deleteSupplierPart}/>
+        )}
+
+        {/* ── SUPPLIER PORTAL: MY ORDERS ── */}
+        {tab==="supplierOrders"&&role==="supplier"&&(
+          <div className="fu">
+            <div style={{marginBottom:20}}>
+              <h1 style={{fontSize:20,fontWeight:700}}>📋 My Orders</h1>
+              <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{supplierOrders.length} order{supplierOrders.length!==1?"s":""} from your catalogue</p>
+            </div>
+            {supplierOrders.length===0
+              ? <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No orders yet.</div>
+              : <OrdersTable orders={supplierOrders} canEdit={false} onCreateInvoice={()=>{}}/>}
+          </div>
+        )}
+
+        {/* ── SUPPLIER PORTAL: MY QUERIES ── */}
+        {tab==="supplierQueries"&&role==="supplier"&&(
+          <SupplierQueriesPage queries={supplierQueries} onReply={replySupplierQuery}/>
         )}
 
         {/* ── PURCHASE INVOICES ── */}
@@ -5419,6 +5500,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           </div>
           );
         })()}
+
+        {/* ── SUPPLIER PRICING (admin) ── */}
+        {tab==="supplierPricing"&&role==="admin"&&(
+          <SupplierPricingPage allParts={allSupplierParts} suppliers={suppliers} onSetPrice={setSupplierPartPrice}/>
+        )}
 
         {/* ── INQUIRIES ── */}
         {tab==="inquiries"&&(role==="admin"||role==="branch_admin")&&(()=>{

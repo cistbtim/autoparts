@@ -4773,7 +4773,11 @@ export function CustomerQueryModal({part,currentUser,onSubmit,onClose,t}) {
     if(!form.name||!form.phone){alert(t.name+" & "+t.phone+" required");return;}
     setSaving(true);
     await onSubmit({
-      part_id:part.id,part_name:part.name,part_sku:part.sku||"",
+      // Supplier-portal parts use a namespaced "sp_123" id (not a real parts.id) —
+      // keep part_id null for those and reference supplier_part_id instead, so this
+      // never gets sent into an integer parts.id column as a string.
+      part_id:part._isSupplierPart?null:part.id, supplier_part_id:part._isSupplierPart?part._supplierPartId:null,
+      part_name:part.name,part_sku:part.sku||"",
       part_price:part.price||0,part_image:part.image_url||"",
       customer_name:form.name,customer_phone:form.phone,customer_email:form.email,
       qty_requested:+form.qty||1,notes:form.notes,

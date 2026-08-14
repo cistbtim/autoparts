@@ -468,6 +468,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // Branch filter prefix — limits fetch to this branch's records for branch users
     const bF=isBranchUser&&user.branch_id?`branch_id=eq.${user.branch_id}&`:"";
     const isSalesman=role==="branch_salesman"; // POS-only role — skip unneeded tables
+    const isScopedCustomer=role==="customer"&&!!user.supplier_scope_id; // one-supplier catalogue login
     const isInitial=!firstLoadDoneRef.current;
     if(isInitial){ setLoading(true); setLoadingItems([]); }
 
@@ -487,6 +488,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       });
     };
 
+    // Supplier-scoped customer login: skip the whole 44k-row parts pipeline (IndexedDB
+    // cache, pagination, background sync — all built for staff needing the full
+    // catalogue) and go straight to just this supplier's own parts. Small, one request,
+    // no "loading full catalogue" wait.
+    if(isScopedCustomer){
+      // select=* (not just part_id) so supplier_part_no etc. is available for search,
+      // same shape the old dedicated scoped-load effect used to fetch separately.
+      const links=await api.fresh("part_suppliers",`supplier_id=eq.${user.supplier_scope_id}&select=*`);
+      const ids=Array.isArray(links)?links.map(l=>l.part_id):[];
+      const scopedParts=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=*`):[];
+      setParts(Array.isArray(scopedParts)?scopedParts:[]);
+      setPartSuppliers(Array.isArray(links)?links:[]);
+      setPartsLoading(false);
+    } else {
     // FAST: load parts from IndexedDB (persists across sessions, handles 44k+ rows)
     const PARTS_Q="select=*&order=id.asc";
     const SLIM_Q="select=id,price,stock,cost_price&order=id.asc";
@@ -576,6 +591,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         try{await db.parts.toCollection().modify(p=>{const s=slimMap.get(String(p.id));if(s){p.price=s.price;p.stock=s.stock;p.cost_price=s.cost_price;}});}catch{}
         setPartsLoading(false);
       }).catch(()=>setPartsLoading(false));
+    }
     }
 
     // LAZY: load secondary data in background
@@ -818,22 +834,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     })();
     return ()=>{cancelled=true;};
   },[M.editPart?.data?.id]);
-
-  // Scoped load for supplier-restricted customer logins — the Shop tab is deliberately
-  // excluded from the full part_suppliers lazy-load above (that's a 69k+ row table and
-  // most shop visitors are unrestricted customers who don't need any of it). A scoped
-  // customer's part list is filtered by part_suppliers though, so fetch just the rows
-  // for their one supplier instead of the whole table.
-  useEffect(()=>{
-    if(role!=="customer"||!user.supplier_scope_id) return;
-    let cancelled=false;
-    (async()=>{
-      const data=await api.get("part_suppliers",`supplier_id=eq.${user.supplier_scope_id}&select=*`);
-      if(cancelled||!Array.isArray(data)) return;
-      setPartSuppliers(prev=>[...prev.filter(ps=>String(ps.supplier_id)!==String(user.supplier_scope_id)),...data]);
-    })();
-    return ()=>{cancelled=true;};
-  },[role,user.supplier_scope_id]);
 
   // Targeted refresh — fetch only the tables that a mutation actually dirtied.
   // Cuts ~40-table loadAll() down to 1-4 requests per save operation.

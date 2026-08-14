@@ -10,7 +10,7 @@ import { PartPhotoUploader } from "./RfqVehicles.jsx";
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete, onRefresh}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [tab, setTab] = useState(existingParts.length?"existing":"mine");
 
@@ -28,7 +28,10 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
             {existingParts.length} already in inventory · {parts.length} added by you ({parts.filter(p=>!p.price).length} awaiting pricing)
           </p>
         </div>
-        <button className="btn btn-primary" onClick={()=>setEditing({})}>+ Add Part</button>
+        <div style={{display:"flex",gap:8}}>
+          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh} title="Prices/stock can change on admin's side — refresh to see the latest">↺ Refresh</button>}
+          <button className="btn btn-primary" onClick={()=>setEditing({})}>+ Add Part</button>
+        </div>
       </div>
 
       <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:16}}>
@@ -222,7 +225,7 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice}) {
 // SUPPLIER: MY QUERIES — customer questions about parts this supplier added
 // themselves (matched via customer_queries.supplier_part_id).
 // ═══════════════════════════════════════════════════════════════
-export function SupplierQueriesPage({queries=[], onReply}) {
+export function SupplierQueriesPage({queries=[], onReply, onRefresh}) {
   const [replying, setReplying] = useState(null); // query row being replied to
 
   return (
@@ -231,9 +234,12 @@ export function SupplierQueriesPage({queries=[], onReply}) {
         onReply={async(id,data)=>{await onReply(id,data);setReplying(null);}}
         onClose={()=>setReplying(null)}/>}
 
-      <div style={{marginBottom:20}}>
-        <h1 style={{fontSize:20,fontWeight:700}}>💬 My Queries</h1>
-        <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{queries.filter(q=>q.status==="pending").length} pending · {queries.length} total</p>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>💬 My Queries</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{queries.filter(q=>q.status==="pending").length} pending · {queries.length} total</p>
+        </div>
+        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
       </div>
 
       {queries.length===0 ? (

@@ -5208,15 +5208,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── SUPPLIER PORTAL: MY PARTS ── */}
         {tab==="supplierParts"&&role==="supplier"&&(
           <SupplierPartsPage parts={supplierParts} existingParts={supplierExistingParts} supplierCode={user.supplier_code||user.supplier_name||"SUP"}
-            onSave={saveSupplierPart} onDelete={deleteSupplierPart}/>
+            onSave={saveSupplierPart} onDelete={deleteSupplierPart} onRefresh={reloadSupplierParts}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY ORDERS ── */}
         {tab==="supplierOrders"&&role==="supplier"&&(
           <div className="fu">
-            <div style={{marginBottom:20}}>
-              <h1 style={{fontSize:20,fontWeight:700}}>📋 My Orders</h1>
-              <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{supplierOrders.length} order{supplierOrders.length!==1?"s":""} from your catalogue</p>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+              <div>
+                <h1 style={{fontSize:20,fontWeight:700}}>📋 My Orders</h1>
+                <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{supplierOrders.length} order{supplierOrders.length!==1?"s":""} from your catalogue</p>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={reloadSupplierParts}>↺ Refresh</button>
             </div>
             {supplierOrders.length===0
               ? <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No orders yet.</div>
@@ -5226,7 +5229,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── SUPPLIER PORTAL: MY QUERIES ── */}
         {tab==="supplierQueries"&&role==="supplier"&&(
-          <SupplierQueriesPage queries={supplierQueries} onReply={replySupplierQuery}/>
+          <SupplierQueriesPage queries={supplierQueries} onReply={replySupplierQuery} onRefresh={reloadSupplierParts}/>
         )}
 
         {/* ── PURCHASE INVOICES ── */}

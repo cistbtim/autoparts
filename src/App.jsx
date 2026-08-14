@@ -191,6 +191,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [supplierParts,setSupplierParts]=useState([]); // self-service catalogue for role:"supplier" logins
   const [supplierExistingParts,setSupplierExistingParts]=useState([]); // their parts already in the main inventory
   const [allSupplierParts,setAllSupplierParts]=useState([]); // admin: every supplier's self-added parts (for pricing)
+  const [supplierCostUpdates,setSupplierCostUpdates]=useState([]); // admin: existing parts whose supplier just updated their cost
   const [supplierOrders,setSupplierOrders]=useState([]); // orders placed by this supplier's scoped customers
   const [supplierQueries,setSupplierQueries]=useState([]); // customer_queries against this supplier's own self-added parts
   const [supplierSearch,setSupplierSearch]=useState("");
@@ -906,6 +907,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(role!=="admin") return;
     const data=await api.fresh("supplier_parts","select=*&order=created_at.desc");
     setAllSupplierParts(Array.isArray(data)?data:[]);
+    // Existing-inventory parts where a supplier updated their own cost price via the
+    // portal — small, targeted query (not the full 69k-row part_suppliers table).
+    const links=await api.fresh("part_suppliers","cost_updated_at=not.is.null&select=*&order=cost_updated_at.desc");
+    const linksArr=Array.isArray(links)?links:[];
+    const ids=linksArr.map(l=>l.part_id);
+    const linkedParts=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=id,sku,name,price,image_url`):[];
+    setSupplierCostUpdates(linksArr.map(l=>({...l,_part:linkedParts.find(p=>String(p.id)===String(l.part_id))})));
   },[role]);
   useEffect(()=>{ reloadAllSupplierParts(); },[reloadAllSupplierParts]);
 
@@ -2412,6 +2420,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await reloadAllSupplierParts();
     showToast(price?"✅ Price set — now live":"Price cleared");
   };
+  const dismissSupplierCostUpdate=async(linkId)=>{
+    await api.patch("part_suppliers","id",linkId,{cost_updated_at:null});
+    setSupplierCostUpdates(prev=>prev.filter(l=>l.id!==linkId));
+  };
   const replySupplierQuery=async(id,data)=>{
     await api.patch("customer_queries","id",id,data);
     setSupplierQueries(p=>p.map(q=>q.id===id?{...q,...data}:q));
@@ -2421,7 +2433,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // patches the part_suppliers link row (supplier_price), never parts.cost_price
   // directly, so this can never silently change admin's own margin numbers.
   const updateSupplierCostPrice=async(linkId,price)=>{
-    await api.patch("part_suppliers","id",linkId,{supplier_price:price});
+    // cost_updated_at flags this link for admin's "Supplier Pricing" review list —
+    // cleared (not just left stale) once admin dismisses/reviews it, so the flag
+    // means "needs a look", not "was ever changed".
+    await api.patch("part_suppliers","id",linkId,{supplier_price:price,cost_updated_at:new Date().toISOString()});
     setSupplierExistingParts(prev=>prev.map(p=>p._linkId===linkId?{...p,_supplierPrice:price}:p));
     showToast("✅ Cost price updated");
   };
@@ -3534,7 +3549,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       badge: pendingInq,
       children:[
         {id:"suppliers",icon:"🏭",label:t.suppliers,roles:["admin"]},
-        {id:"supplierPricing",icon:"💰",label:"Supplier Pricing",roles:["admin"],badge:allSupplierParts.filter(p=>!p.price).length||0},
+        {id:"supplierPricing",icon:"💰",label:"Supplier Pricing",roles:["admin"],badge:(allSupplierParts.filter(p=>!p.price).length+supplierCostUpdates.length)||0},
         {id:"rfq",icon:"📋",label:t.rfqSession,roles:["admin"],badge:overdueAutoRfq||0},
         {id:"inquiries",icon:"📩",label:t.inquiries,roles:["admin"],badge:pendingInq},
         {id:"purchaseInvoices",icon:"🧾",label:t.purchaseInvoices,roles:["admin"]},
@@ -5524,7 +5539,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── SUPPLIER PRICING (admin) ── */}
         {tab==="supplierPricing"&&role==="admin"&&(
-          <SupplierPricingPage allParts={allSupplierParts} suppliers={suppliers} onSetPrice={setSupplierPartPrice}/>
+          <SupplierPricingPage allParts={allSupplierParts} suppliers={suppliers} onSetPrice={setSupplierPartPrice}
+            costUpdates={supplierCostUpdates} onDismissCostUpdate={dismissSupplierCostUpdate}
+            onGoToPart={(partId)=>{const p=parts.find(pt=>String(pt.id)===String(partId));if(p){setTab("inventory");openM("editPart",p);}}}/>
         )}
 
         {/* ── INQUIRIES ── */}

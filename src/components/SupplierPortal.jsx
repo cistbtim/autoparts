@@ -206,8 +206,8 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
 // suppliers have self-added (across every supplier). A part stays invisible
 // to customers until it has a price here.
 // ═══════════════════════════════════════════════════════════════
-export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice}) {
-  const [filter, setFilter] = useState("pending"); // "pending" | "all"
+export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, costUpdates=[], onDismissCostUpdate, onGoToPart}) {
+  const [filter, setFilter] = useState(costUpdates.length?"costUpdates":"pending"); // "pending" | "all" | "costUpdates"
   const supName=(id)=>suppliers.find(s=>String(s.id)===String(id))?.name||`#${id}`;
   const supCode=(id)=>{const s=suppliers.find(s=>String(s.id)===String(id));return s?.code||s?.name||"";};
   const rows=filter==="pending"?allParts.filter(p=>!p.price):allParts;
@@ -218,50 +218,86 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice}) {
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
         <div>
           <h1 style={{fontSize:20,fontWeight:700}}>💰 Supplier Pricing</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{allParts.filter(p=>!p.price).length} awaiting pricing · {allParts.length} total</p>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{allParts.filter(p=>!p.price).length} awaiting pricing · {costUpdates.length} cost update{costUpdates.length!==1?"s":""} to review</p>
         </div>
       </div>
 
       <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:16}}>
-        {[["pending","Awaiting Pricing"],["all","All"]].map(([id,lb])=>(
+        {[["costUpdates",`Cost Updates (${costUpdates.length})`],["pending","Awaiting Pricing"],["all","All Self-Added"]].map(([id,lb])=>(
           <button key={id} className={`auth-tab ${filter===id?"on":""}`} onClick={()=>setFilter(id)}>{lb}</button>
         ))}
       </div>
 
-      {rows.length===0 ? (
-        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
-          {filter==="pending"?"Nothing waiting on a price 🎉":"No supplier-added parts yet."}
-        </div>
-      ) : (
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {rows.map(p=>(
-            <div key={p.id} className="card" style={{padding:14,display:"flex",gap:12,alignItems:"center"}}>
-              <div style={{width:48,height:48,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {p.image_url
-                  ? <img src={toImgUrl(p.image_url)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
-                  : <span style={{fontSize:18,opacity:.3}}>🖼</span>}
+      {filter==="costUpdates"&&(
+        costUpdates.length===0 ? (
+          <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No cost price updates waiting on review 🎉</div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>Suppliers updated their cost on these parts — check if the selling price still makes sense.</div>
+            {costUpdates.map(l=>(
+              <div key={l.id} className="card" style={{padding:14,display:"flex",gap:12,alignItems:"center"}}>
+                <div style={{width:48,height:48,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {l._part?.image_url
+                    ? <img src={toImgUrl(l._part.image_url)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                    : <span style={{fontSize:18,opacity:.3}}>🖼</span>}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{l._part?.sku||`#${l.part_id}`}</div>
+                  <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l._part?.name||"—"}</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{supName(l.supplier_id)}</div>
+                </div>
+                <div style={{fontSize:12,color:"var(--text3)",textAlign:"right",flexShrink:0}}>
+                  Selling price<br/><strong style={{color:"var(--text2)"}}>{l._part?.price?fmtAmt(l._part.price):"—"}</strong>
+                </div>
+                <div style={{fontSize:12,color:"var(--blue)",textAlign:"right",flexShrink:0}}>
+                  New supplier cost<br/><strong>{l.supplier_price?fmtAmt(l.supplier_price):"—"}</strong>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+                  {onGoToPart&&<button className="btn btn-primary btn-sm" onClick={()=>onGoToPart(l.part_id)}>✏️ Update Price</button>}
+                  <button className="btn btn-ghost btn-sm" onClick={()=>onDismissCostUpdate(l.id)}>Dismiss</button>
+                </div>
               </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{supCode(p.supplier_id)}-{p.part_code}</div>
-                <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{supName(p.supplier_id)}{(p.make||p.model)?` · ${[p.make,p.model,p.year_range].filter(Boolean).join(" ")}`:""}</div>
+            ))}
+          </div>
+        )
+      )}
+
+      {(filter==="pending"||filter==="all")&&(
+        rows.length===0 ? (
+          <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
+            {filter==="pending"?"Nothing waiting on a price 🎉":"No supplier-added parts yet."}
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {rows.map(p=>(
+              <div key={p.id} className="card" style={{padding:14,display:"flex",gap:12,alignItems:"center"}}>
+                <div style={{width:48,height:48,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {p.image_url
+                    ? <img src={toImgUrl(p.image_url)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                    : <span style={{fontSize:18,opacity:.3}}>🖼</span>}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{supCode(p.supplier_id)}-{p.part_code}</div>
+                  <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{supName(p.supplier_id)}{(p.make||p.model)?` · ${[p.make,p.model,p.year_range].filter(Boolean).join(" ")}`:""}</div>
+                </div>
+                <div style={{fontSize:12,color:"var(--text3)",textAlign:"right",flexShrink:0}}>
+                  Cost<br/><strong style={{color:"var(--text2)"}}>{p.cost_price?fmtAmt(p.cost_price):"—"}</strong>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                  <input className="inp" type="number" style={{width:100}} placeholder="Set price"
+                    value={drafts[p.id]??p.price??""}
+                    onChange={e=>setDrafts(d=>({...d,[p.id]:e.target.value}))}/>
+                  <button className="btn btn-primary btn-sm"
+                    disabled={!String(drafts[p.id]??p.price??"").trim()}
+                    onClick={()=>onSetPrice(p.id,+drafts[p.id]||0)}>
+                    {p.price?"Update":"Set Live"}
+                  </button>
+                </div>
               </div>
-              <div style={{fontSize:12,color:"var(--text3)",textAlign:"right",flexShrink:0}}>
-                Cost<br/><strong style={{color:"var(--text2)"}}>{p.cost_price?fmtAmt(p.cost_price):"—"}</strong>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-                <input className="inp" type="number" style={{width:100}} placeholder="Set price"
-                  value={drafts[p.id]??p.price??""}
-                  onChange={e=>setDrafts(d=>({...d,[p.id]:e.target.value}))}/>
-                <button className="btn btn-primary btn-sm"
-                  disabled={!String(drafts[p.id]??p.price??"").trim()}
-                  onClick={()=>onSetPrice(p.id,+drafts[p.id]||0)}>
-                  {p.price?"Update":"Set Live"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );

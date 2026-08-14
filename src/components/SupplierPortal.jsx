@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { toImgUrl, fmtAmt } from "../lib/helpers.js";
+import { useState, useEffect } from "react";
+import { api } from "../lib/api.js";
+import { toImgUrl, fmtAmt, fmtDT } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge } from "./shared.jsx";
 import { PartPhotoUploader } from "./RfqVehicles.jsx";
 
@@ -117,6 +118,16 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick}) {
 function SupplierCostPriceModal({part, onSave, onClose}) {
   const [price, setPrice] = useState(part._supplierPrice ?? "");
   const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  useEffect(()=>{
+    if(!part?.id) return;
+    let cancelled=false;
+    api.fresh("part_price_history",`part_id=eq.${part.id}&select=*&order=created_at.desc&limit=20`).then(r=>{
+      if(!cancelled&&Array.isArray(r)) setHistory(r);
+    }).catch(()=>{});
+    return ()=>{cancelled=true;};
+  },[part?.id]);
   return (
     <Overlay onClose={onClose}>
       <MHead title="Update Your Cost Price" sub={`${part.sku} — ${part.name}`} onClose={onClose}/>
@@ -127,6 +138,38 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
         <FL label="Your Cost Price"/>
         <input className="inp" type="number" min="0" step="0.01" autoFocus value={price} onChange={e=>setPrice(e.target.value)} placeholder="0"/>
       </FD>
+
+      <div style={{marginBottom:14}}>
+        <button type="button" onClick={()=>setHistoryOpen(v=>!v)}
+          style={{background:"none",border:"none",cursor:"pointer",padding:0,fontSize:12,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}>
+          📜 Price History {history.length>0?`(${history.length})`:""} {historyOpen?"▲":"▼"}
+        </button>
+        {historyOpen&&(
+          history.length===0
+            ? <div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>No price changes recorded yet.</div>
+            : (
+              <div style={{marginTop:8,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+                {history.map(h=>(
+                  <div key={h.id} style={{padding:"8px 12px",borderBottom:"1px solid var(--border)",fontSize:12,display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                    <div>
+                      {h.old_price!=null&&h.new_price!=null&&+h.old_price!==+h.new_price&&(
+                        <div>Selling: {fmtAmt(h.old_price)} → <strong>{fmtAmt(h.new_price)}</strong></div>
+                      )}
+                      {h.old_cost_price!=null&&h.new_cost_price!=null&&+h.old_cost_price!==+h.new_cost_price&&(
+                        <div style={{color:"var(--text2)"}}>Cost: {fmtAmt(h.old_cost_price)} → <strong>{fmtAmt(h.new_cost_price)}</strong></div>
+                      )}
+                      <div style={{color:"var(--text3)",fontSize:11,marginTop:2}}>
+                        {h.source==="supplier_cost_update"?"🏭 Your update":"✏️ Admin update"}
+                      </div>
+                    </div>
+                    <div style={{color:"var(--text3)",fontSize:11,whiteSpace:"nowrap"}}>{fmtDT(h.created_at)}</div>
+                  </div>
+                ))}
+              </div>
+            )
+        )}
+      </div>
+
       <div style={{display:"flex",gap:10}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} disabled={saving||price===""}

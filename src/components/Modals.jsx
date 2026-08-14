@@ -11058,16 +11058,24 @@ const IMPORT_FIELDS = [
   { value: "supplier_part_no", label: "Supplier Part No" },
   { value: "description", label: "Description" },
   { value: "oem", label: "OEM Number" },
-  { value: "application", label: "Application / Fitment" },
+  { value: "make", label: "Fitment: Make" },
+  { value: "model", label: "Fitment: Model" },
+  { value: "application", label: "Application / Fitment (combined text)" },
   { value: "unit", label: "Unit" },
   { value: "price", label: "Price / Cost" },
 ];
 
+// Order matters: catAutoDetect keeps the first field whose hints match, so the more
+// specific make/model hints are checked before the looser "application" ones — a header
+// literally called "Vehicle Model" should land on the dedicated Model field, not the
+// free-text Application one.
 const CAT_FIELD_HINTS = {
   supplier_part_no: ["our no","part no","part num","item no","item code","article","ref no","sku","part code","no.","our code","supplier part"],
   description: ["desc","name","item name","product","part name","details"],
   oem: ["oem","oe no","original","cross ref","oe number","oem no"],
-  application: ["applic","fitment","fit","vehicle","car","model","use for","for model"],
+  make: ["make","car make","vehicle make"],
+  model: ["model","vehicle model","car model"],
+  application: ["applic","fitment","fits","use for","for model"],
   unit: ["unit","uom","u/m"],
   price: ["price","cost","rate","unit price"],
   image_url: ["image","img","photo","picture","pic url","image url","img url"],
@@ -11246,6 +11254,21 @@ function parseFitmentText(text, vehicles) {
   return suggestions;
 }
 
+// Fitment from two separate mapped columns (Make + Model) — used instead of
+// parseFitmentText's colon-delimited text parsing when the file has the make and
+// model already split into their own columns, which is the more common/reliable case.
+function matchMakeModelFitment(make, model, vehicles) {
+  const makeU = (make || "").toUpperCase().trim();
+  const modelU = (model || "").toUpperCase().trim();
+  if (!makeU && !modelU) return [];
+  const firstWord = modelU.split(/\s+/)[0] || "";
+  const matched = vehicles.filter(v =>
+    v.make?.toUpperCase() === makeU &&
+    (v.model?.toUpperCase() === modelU || (firstWord && v.model?.toUpperCase().startsWith(firstWord)) || v.code?.toUpperCase() === firstWord)
+  );
+  return [{ make: makeU, model: modelU, raw: modelU, vehicleIds: matched.map(v => v.id) }];
+}
+
 export function CatalogueImportModal({ suppliers, parts, vehicles=[], onClose, onImportDone }) {
   const [step, setStep] = useState(1);
   const [suppId, setSuppId] = useState("");
@@ -11317,8 +11340,14 @@ export function CatalogueImportModal({ suppliers, parts, vehicles=[], onClose, o
       const suppPartNo = get(row, "supplier_part_no");
       const description = get(row, "description");
       const oem = get(row, "oem");
+      const make = get(row, "make");
+      const model = get(row, "model");
       const application = get(row, "application");
-      const fitments = parseFitmentText(application, vehicles);
+      // Separate Make/Model columns give a reliable direct match — prefer them over
+      // parsing the free-text Application column when both are mapped.
+      const fitments = (make || model)
+        ? matchMakeModelFitment(make, model, vehicles)
+        : parseFitmentText(application, vehicles);
       const matchedPart = oem ? parts.find(p => p.oem?.trim().toLowerCase() === oem.toLowerCase()) : null;
       return { suppPartNo, description, oem, application, fitments, matchedPart, partId: matchedPart?.id || null, action: "import" };
     }).filter(r => r.suppPartNo || r.description || r.oem);

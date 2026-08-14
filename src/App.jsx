@@ -6753,6 +6753,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           <WorkshopRequestsPage wsShopRequests={wsShopRequests} parts={parts} settings={settings} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor} t={t} onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest} onDelete={deleteWsShopRequest} onRefresh={()=>refreshTables("ws_shop_requests")} userRole={role} userBranchId={user?.branch_id||null}/>
         )}
 
+        {tab==="requestsKanban"&&role==="admin"&&supplierCostUpdates.length>0&&(
+          <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",marginBottom:14,
+            background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.3)",borderRadius:10,cursor:"pointer"}}
+            onClick={()=>setTab("supplierPricing")}>
+            <span style={{fontSize:20}}>🔔</span>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:13}}>{supplierCostUpdates.length} supplier cost price update{supplierCostUpdates.length!==1?"s":""} waiting on review</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>A supplier changed their cost on a part already in your inventory — check if the selling price still makes sense.</div>
+            </div>
+            <button className="btn btn-primary btn-sm">Review →</button>
+          </div>
+        )}
+
         {tab==="requestsKanban"&&["admin","manager","branch_admin","branch_manager"].includes(role)&&(
           <RequestsKanbanPage
             wsShopRequests={wsShopRequests} branchStockRequests={branchStockRequests}

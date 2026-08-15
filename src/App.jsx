@@ -906,6 +906,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       return {...p, _linkId:link?.id, _supplierPrice:link?.supplier_price, _suggestedPrice:link?.suggested_price};
     });
     setSupplierExistingParts(existing);
+    // Vehicle fitments — the supplier login skips loadAll() entirely (see loadAll's
+    // early return for role==="supplier"), so vehicles/part_fitments are otherwise
+    // never loaded here. Reuses the same shared state (and saveFitment/deleteFitment
+    // below) as the admin Inventory page's Vehicle Fits tab, scoped to just the
+    // fitments on this supplier's own linked existing-catalogue parts.
+    const [vehRows,fitRows]=await Promise.all([
+      api.fresh("vehicles","select=*&order=make.asc,model.asc,year_from.asc").catch(()=>[]),
+      ids.length?api.fresh("part_fitments",`part_id=in.(${ids.join(",")})&select=*`).catch(()=>[]):Promise.resolve([]),
+    ]);
+    setVehicles(Array.isArray(vehRows)?vehRows:[]);
+    setPartFitments(Array.isArray(fitRows)?fitRows:[]);
     // Orders placed by customers scoped to this supplier's catalogue (stamped at checkout).
     const ord=await api.fresh("orders",`supplier_scope_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
     setSupplierOrders(Array.isArray(ord)?ord:[]);
@@ -2457,21 +2468,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // suggestedPrice is just a hint for admin's "Supplier Pricing" review — it never
   // touches parts.price itself. imageUrl (if changed) does patch parts.image_url
   // directly since the product photo isn't admin-exclusive like name/price/stock.
-  const updateSupplierCostPrice=async(part,{price,suggestedPrice,imageUrl,photos,fitments})=>{
+  const updateSupplierCostPrice=async(part,{price,suggestedPrice,imageUrl,photos})=>{
     // cost_updated_at flags this link for admin's "Supplier Pricing" review list —
     // cleared (not just left stale) once admin dismisses/reviews it, so the flag
     // means "needs a look", not "was ever changed".
     await api.patch("part_suppliers","id",part._linkId,{supplier_price:price,suggested_price:suggestedPrice??null,cost_updated_at:new Date().toISOString()});
     const photoChanged=imageUrl!=null&&imageUrl!==part.image_url;
-    // parts.photos/fitments are jsonb — Supabase already returns them as real
-    // arrays, not JSON strings (same convention as the main Inventory PartModal),
-    // so this is just a defensive normalize, not a parse of stringified JSON.
+    // parts.photos is jsonb — Supabase already returns it as a real array, not a
+    // JSON string (same convention as the main Inventory PartModal), so this is
+    // just a defensive normalize, not a parse of stringified JSON.
     const prevPhotos=Array.isArray(part.photos)?part.photos:[];
     const photosChanged=photos!=null&&JSON.stringify(photos)!==JSON.stringify(prevPhotos);
-    const prevFitments=Array.isArray(part.fitments)?part.fitments:[];
-    const fitmentsChanged=fitments!=null&&JSON.stringify(fitments)!==JSON.stringify(prevFitments);
-    if(photoChanged||photosChanged||fitmentsChanged) await api.patch("parts","id",part.id,{...(photoChanged?{image_url:imageUrl}:{}),...(photosChanged?{photos}:{}),...(fitmentsChanged?{fitments}:{})});
-    setSupplierExistingParts(prev=>prev.map(p=>p._linkId===part._linkId?{...p,_supplierPrice:price,_suggestedPrice:suggestedPrice??null,...(photoChanged?{image_url:imageUrl}:{}),...(photosChanged?{photos}:{}),...(fitmentsChanged?{fitments}:{})}:p));
+    if(photoChanged||photosChanged) await api.patch("parts","id",part.id,{...(photoChanged?{image_url:imageUrl}:{}),...(photosChanged?{photos}:{})});
+    setSupplierExistingParts(prev=>prev.map(p=>p._linkId===part._linkId?{...p,_supplierPrice:price,_suggestedPrice:suggestedPrice??null,...(photoChanged?{image_url:imageUrl}:{}),...(photosChanged?{photos}:{})}:p));
     api.insert("part_price_history",{part_id:part.id,sku:part.sku,old_cost_price:part._supplierPrice||null,new_cost_price:price||null,
       source:"supplier_cost_update",changed_by:user.supplier_name||user.supplier_code||user.username||""}).catch(()=>{});
     showToast("✅ Cost price updated");
@@ -5291,7 +5300,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {tab==="supplierParts"&&role==="supplier"&&(
           <SupplierPartsPage parts={supplierParts} existingParts={supplierExistingParts} supplierCode={user.supplier_code||user.supplier_name||"SUP"}
             onSave={saveSupplierPart} onDelete={deleteSupplierPart} onRefresh={reloadSupplierParts}
-            onUpdateCostPrice={updateSupplierCostPrice}/>
+            onUpdateCostPrice={updateSupplierCostPrice}
+            vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onDeleteFitment={deleteFitment}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY ORDERS ── */}

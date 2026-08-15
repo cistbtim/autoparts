@@ -3,7 +3,7 @@ import { api } from "../lib/api.js";
 import { getSettings, C } from "../lib/settings.js";
 import { toImgUrl, fmtAmt, fmtDT } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.jsx";
-import { PartPhotoUploader } from "./RfqVehicles.jsx";
+import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 import { PrintPartLabelModal, ExtraPhotosStrip } from "./Modals.jsx";
 
 // Margin brackets a supplier can one-tap into a suggested retail price — same
@@ -30,10 +30,11 @@ const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete, onRefresh, onUpdateCostPrice}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onDeleteFitment}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
+  const [fitmentPart, setFitmentPart] = useState(null); // existing-catalogue row having its vehicle fits edited
   const [tab, setTab] = useState(existingParts.length?"existing":"mine");
   const [search, setSearch] = useState("");
   const keywords=search.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -64,6 +65,11 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
         onClose={()=>setEditingCost(null)}/>}
 
       {labelPart&&<PrintPartLabelModal part={labelPart} settings={getSettings()} onClose={()=>setLabelPart(null)}/>}
+
+      {fitmentPart&&<VehicleFitmentTab part={fitmentPart} vehicles={vehicles}
+        partFitments={partFitments.filter(pf=>String(pf.part_id)===String(fitmentPart.id))}
+        onAdd={onAddFitment} onDelete={onDeleteFitment} onClose={()=>setFitmentPart(null)}
+        supplierMode t={{}} imageUrl={fitmentPart.image_url}/>}
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div>
@@ -100,7 +106,9 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
             {existingFiltered.map(p=><PartRow key={p.id} p={p} code={p.sku} name={p.name} readOnly
               priceChanged={!!(lastViewed&&p.price_updated_at&&p.price_updated_at>lastViewed)}
               onClick={onUpdateCostPrice?()=>setEditingCost(p):undefined}
-              onPrintLabel={()=>setLabelPart(p)}/>)}
+              onPrintLabel={()=>setLabelPart(p)}
+              onEditFitments={onAddFitment?()=>setFitmentPart(p):undefined}
+              fitCount={partFitments.filter(pf=>String(pf.part_id)===String(p.id)).length}/>)}
           </div>
         )
       )}
@@ -121,8 +129,8 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
   );
 }
 
-function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel}) {
-  const extraFits=parseJsonArray(p.fitments).length;
+function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, onEditFitments, fitCount=0}) {
+  const extraFits=readOnly?fitCount:parseJsonArray(p.fitments).length;
   return (
     <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",cursor:onClick?"pointer":"default",
       border:priceChanged?"1px solid rgba(96,165,250,.5)":undefined,background:priceChanged?"rgba(96,165,250,.05)":undefined}}
@@ -144,10 +152,16 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel})
           ? <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16}}>{fmtAmt(p.price)}</div>
           : <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:11}}>⏳ Awaiting pricing</span>}
         <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Stock: {p.stock??0}</div>
-        {onPrintLabel&&(
-          <button type="button" title="Print part label" className="btn btn-ghost btn-xs" style={{marginTop:6,fontSize:11}}
-            onClick={e=>{e.stopPropagation();onPrintLabel();}}>🏷️ Label</button>
-        )}
+        <div style={{display:"flex",gap:5,justifyContent:"flex-end",marginTop:6}}>
+          {onEditFitments&&(
+            <button type="button" title="Vehicle fits" className="btn btn-ghost btn-xs" style={{fontSize:11}}
+              onClick={e=>{e.stopPropagation();onEditFitments();}}>🚗 Fits{fitCount>0?` (${fitCount})`:""}</button>
+          )}
+          {onPrintLabel&&(
+            <button type="button" title="Print part label" className="btn btn-ghost btn-xs" style={{fontSize:11}}
+              onClick={e=>{e.stopPropagation();onPrintLabel();}}>🏷️ Label</button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -159,10 +173,6 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
   const [imageUrl, setImageUrl] = useState(part.image_url ?? "");
   const [photos, setPhotos] = useState(()=>parseJsonArray(part.photos));
   const [lightbox, setLightbox] = useState(null); // {idx} — urls built from imageUrl + photos
-  const [fitments, setFitments] = useState(()=>parseJsonArray(part.fitments));
-  const addFitment=()=>setFitments(f=>[...f,{make:"",model:"",year_range:""}]);
-  const updateFitment=(i,k,v)=>setFitments(f=>f.map((fit,idx)=>idx===i?{...fit,[k]:v}:fit));
-  const removeFitment=(i)=>setFitments(f=>f.filter((_,idx)=>idx!==i));
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -220,21 +230,6 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
         )}
       </FD>
 
-      <FD>
-        <FL label={`Also Fits (additional fitment vehicles)${(part.make||part.model)?` — currently listed as ${[part.make,part.model,part.year_range].filter(Boolean).join(" ")}`:""}`}/>
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {fitments.map((fit,i)=>(
-            <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:6}}>
-              <input className="inp" value={fit.make} onChange={e=>updateFitment(i,"make",e.target.value)} placeholder="Make"/>
-              <input className="inp" value={fit.model} onChange={e=>updateFitment(i,"model",e.target.value)} placeholder="Model"/>
-              <input className="inp" value={fit.year_range} onChange={e=>updateFitment(i,"year_range",e.target.value)} placeholder="2018-2022"/>
-              <button type="button" className="btn btn-ghost btn-sm" title="Remove" onClick={()=>removeFitment(i)}>🗑</button>
-            </div>
-          ))}
-          <button type="button" className="btn btn-ghost btn-sm" style={{alignSelf:"flex-start"}} onClick={addFitment}>+ Add Vehicle</button>
-        </div>
-      </FD>
-
       <div style={{marginBottom:14}}>
         <button type="button" onClick={()=>setHistoryOpen(v=>!v)}
           style={{background:"none",border:"none",cursor:"pointer",padding:0,fontSize:12,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}>
@@ -269,7 +264,7 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
       <div style={{display:"flex",gap:10}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} disabled={saving||price===""}
-          onClick={async()=>{setSaving(true);await onSave({price:+price,suggestedPrice,imageUrl,photos,fitments});setSaving(false);}}>
+          onClick={async()=>{setSaving(true);await onSave({price:+price,suggestedPrice,imageUrl,photos});setSaving(false);}}>
           {saving?"Saving…":"Save"}
         </button>
       </div>

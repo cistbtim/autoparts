@@ -1645,7 +1645,12 @@ export function matchSparetoToVehicles(data, internalVehicles) {
 // ═══════════════════════════════════════════════════════════════
 // VEHICLE FITMENT TAB — inside PartModal
 // ═══════════════════════════════════════════════════════════════
-export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, onRefreshVehicles, initialSearch="", t, imageUrl="", onPhotoChange, allParts=[], allFitments=[]}) {
+// supplierMode hides the admin-only bulk/management actions (Manage Vehicles nav,
+// Copy Fits to Other Parts, Match from Spareto) — the core search-and-link-vehicles
+// experience stays identical. onClose is called (in addition to the internal
+// setExpanded(false)) when the fullscreen overlay's close button is used, so a
+// caller that mounts this standalone (not as a PartModal tab) can unmount it.
+export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, onRefreshVehicles, initialSearch="", t, imageUrl="", onPhotoChange, allParts=[], allFitments=[], supplierMode=false, onClose}) {
   const [search,  setSearch]  = useState(initialSearch);
   const [pending, setPending] = useState(new Set()); // selected but not yet saved
   const [saving,  setSaving]  = useState(false);
@@ -2194,22 +2199,26 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
               ⛶ Full Screen
             </button>
           )}
-          <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)",whiteSpace:"nowrap"}}
-            onClick={()=>onGoVehicles&&onGoVehicles()}>
-            🚗 Manage Vehicles →
-          </button>
-          {linked.length>0&&(
+          {!supplierMode&&(
+            <button className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)",whiteSpace:"nowrap"}}
+              onClick={()=>onGoVehicles&&onGoVehicles()}>
+              🚗 Manage Vehicles →
+            </button>
+          )}
+          {!supplierMode&&linked.length>0&&(
             <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(251,146,60,.35)",whiteSpace:"nowrap"}}
               disabled={hasChanges} title={hasChanges?"Save pending changes to this part's fitments first":"Copy this part's linked vehicles onto other parts"}
               onClick={()=>{setCopyOpen(true);setCopyDone(null);}}>
               📋 Copy Fits to Parts
             </button>
           )}
-          <button className="btn btn-ghost btn-sm" style={{color:"var(--green)",borderColor:"rgba(52,211,153,.35)",whiteSpace:"nowrap"}}
-            title="Paste scraped Spareto fitment data and match it against your Vehicles table"
-            onClick={()=>{setMatchOpen(true);setMatchError("");}}>
-            🔗 Match from Spareto
-          </button>
+          {!supplierMode&&(
+            <button className="btn btn-ghost btn-sm" style={{color:"var(--green)",borderColor:"rgba(52,211,153,.35)",whiteSpace:"nowrap"}}
+              title="Paste scraped Spareto fitment data and match it against your Vehicles table"
+              onClick={()=>{setMatchOpen(true);setMatchError("");}}>
+              🔗 Match from Spareto
+            </button>
+          )}
         </div>
       </div>
 
@@ -2409,9 +2418,10 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
     </>
   );
 
+  const closeExpanded=()=>{ setExpanded(false); onClose&&onClose(); };
   if(expanded) return (
-    <Overlay onClose={()=>setExpanded(false)} maxWidth="1100px">
-      <MHead title={`🔗 Vehicle Fits — ${part.sku||""}`} sub={part.name} onClose={()=>setExpanded(false)}/>
+    <Overlay onClose={closeExpanded} maxWidth="1100px">
+      <MHead title={`🔗 Vehicle Fits — ${part.sku||""}`} sub={part.name} onClose={closeExpanded}/>
       {body}
     </Overlay>
   );

@@ -2679,6 +2679,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const q=await api.get("customer_queries",`${_bId?`branch_id=eq.${_bId}&`:""}select=*&order=created_at.desc`).catch(()=>[]);
     setCustomerQueries(Array.isArray(q)?q:[]);
     showToast("✅ Query submitted! We'll reply soon.");
+    // Customer accounts scoped to one supplier's catalogue notify that supplier
+    // directly (their own WhatsApp/email on file) instead of the shop's own —
+    // same pattern as the order-confirm flow, since they queried through that
+    // supplier's own catalogue link.
+    const scopedSupplier=(role==="customer"&&user.supplier_scope_id)?suppliers.find(s=>String(s.id)===String(user.supplier_scope_id)):null;
+    const notifyWa=scopedSupplier?scopedSupplier.phone:settings.whatsapp;
+    const notifyEmail=scopedSupplier?scopedSupplier.email:settings.email;
+    if(notifyWa||notifyEmail){
+      const msg=`Hello! I'd like to query price & quantity for a part 🔍\n\nPart: ${data.part_name}${data.part_sku?` (Part #: ${data.part_sku})`:""}\nQty requested: ${data.qty_requested}\n${data.notes?`Notes: ${data.notes}\n`:""}\nMy contact:\nName: ${data.customer_name}\nPhone: ${data.customer_phone}`;
+      openM("queryConfirm",{message:msg,notifyWa,notifyEmail,notifyName:scopedSupplier?scopedSupplier.name:"Shop"});
+    }
   };
   const replyToQuery=async(id,data)=>{
     await api.patch("customer_queries","id",id,data);
@@ -7286,6 +7297,28 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 {notifyEmail&&<a href={mailLink(notifyEmail,`New Order - ${order?.id}`,shopMsg)} style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{width:"100%",padding:13}}>✉ Send to {notifyName} via Email</button></a>}
                 {!notifyWa&&!notifyEmail&&<p style={{fontSize:13,color:"var(--text3)",textAlign:"center"}}>⚙️ {scopedSupplier?"No WhatsApp/Email on file for this supplier":"Set WhatsApp/Email in Settings to enable notifications"}</p>}
                 <button className="btn btn-ghost" style={{fontSize:13}} onClick={()=>closeM("orderConfirm")}>Skip for now</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* QUERY PRICE & QTY CONFIRM — same pattern as ORDER CONFIRM above: offer to
+          push the just-submitted query straight to the scoped supplier's WhatsApp/
+          email so it doesn't just sit unnoticed in customer_queries. */}
+      {isOpen("queryConfirm")&&(()=>{
+        const d=mData("queryConfirm")||{};const {message,notifyWa,notifyEmail,notifyName}=d;
+        if(!message)return null;
+        return (
+          <div className="overlay" onClick={()=>closeM("queryConfirm")}>
+            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:420}}>
+              <div style={{textAlign:"center",marginBottom:18}}><div style={{fontSize:42,marginBottom:10}}>🔍</div><h2 style={{fontSize:19,fontWeight:700}}>Query Submitted!</h2></div>
+              <div style={{background:"var(--surface2)",borderRadius:11,padding:13,marginBottom:18,fontSize:13,color:"var(--text2)",whiteSpace:"pre-line",lineHeight:1.7,maxHeight:150,overflowY:"auto"}}>{message}</div>
+              <p style={{fontSize:13,color:"var(--text3)",marginBottom:12,textAlign:"center",fontWeight:600}}>📬 Notify {notifyName} about your query:</p>
+              <div style={{display:"flex",flexDirection:"column",gap:9}}>
+                {notifyWa&&<a href={waLink(notifyWa,message)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-primary" style={{width:"100%",background:"#25D366",padding:13,fontSize:15}}>📲 Send to {notifyName} via WhatsApp</button></a>}
+                {notifyEmail&&<a href={mailLink(notifyEmail,"New Price & Qty Query",message)} style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{width:"100%",padding:13}}>✉ Send to {notifyName} via Email</button></a>}
+                <button className="btn btn-ghost" style={{fontSize:13}} onClick={()=>closeM("queryConfirm")}>Skip for now</button>
               </div>
             </div>
           </div>

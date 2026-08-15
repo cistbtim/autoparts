@@ -4,18 +4,13 @@ import { getSettings, C } from "../lib/settings.js";
 import { toImgUrl, fmtAmt, fmtDT, waLink } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
-import { PrintPartLabelModal, ExtraPhotosStrip, DEFAULT_MARGIN_OPTIONS } from "./Modals.jsx";
+import { PrintPartLabelModal, ExtraPhotosStrip, resolveMarginOptions } from "./Modals.jsx";
 
 // Markup brackets a supplier can one-tap into a suggested retail price — cost
 // plus a straight % on top (cost * (1 + pct/100)), same "round to nearest 10"
-// behaviour as the admin Inventory PartModal's Stock tab. A supplier can
-// customize their own 3 numbers (suppliers.margin_options); falls back to the
-// shop-wide default (settings.margin_options), then the hardcoded default if
-// neither has been set.
-const resolveMarginOptions=(supplierOwn)=>
-  (supplierOwn&&supplierOwn.length?supplierOwn:null) ||
-  (getSettings().margin_options?.length?getSettings().margin_options:null) ||
-  DEFAULT_MARGIN_OPTIONS;
+// behaviour as the admin Inventory PartModal's Stock tab. resolveMarginOptions
+// (shared with Modals.jsx) picks: the supplier's own numbers, else this part's
+// category default, else the shop-wide default, else the hardcoded fallback.
 const suggestPriceAt=(cost,markupPct)=>Math.round((+cost*(1+markupPct/100))/10)*10;
 
 // photos/fitments are stored as JSON-stringified arrays (same convention as
@@ -42,7 +37,9 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
   const [fitmentTarget, setFitmentTarget] = useState(null); // {part, kind:"existing"|"self"} — row having its vehicle fits edited
   const [tab, setTab] = useState(existingParts.length?"existing":"mine");
-  const effectiveMarginOptions=resolveMarginOptions(marginOptions);
+  // No category here — this is just the supplier's own base line shown in the
+  // "Your Suggested Markup %" card; each modal resolves its own part's category on top of this.
+  const supplierBaseMarginOptions=resolveMarginOptions({supplierOptions:marginOptions});
   const [search, setSearch] = useState("");
   const keywords=search.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const existingFiltered=keywords.length?existingParts.filter(p=>matchesSearch(searchBlob(p,p.sku),keywords)):existingParts;
@@ -62,12 +59,12 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
 
   return (
     <div className="fu">
-      {editing&&<SupplierPartModal part={editing} supplierCode={supplierCode} marginOptions={effectiveMarginOptions}
+      {editing&&<SupplierPartModal part={editing} supplierCode={supplierCode} supplierMarginOptions={marginOptions}
         onSave={async(data)=>{await onSave(data);setEditing(null);}}
         onDelete={editing.id?async()=>{await onDelete(editing.id);setEditing(null);}:null}
         onClose={()=>setEditing(null)}/>}
 
-      {editingCost&&<SupplierCostPriceModal part={editingCost} marginOptions={effectiveMarginOptions}
+      {editingCost&&<SupplierCostPriceModal part={editingCost} supplierMarginOptions={marginOptions}
         onSave={async(data)=>{await onUpdateCostPrice(editingCost,data);setEditingCost(null);}}
         onClose={()=>setEditingCost(null)}/>}
 
@@ -102,7 +99,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
       </div>
 
       {supplierName&&<ShareCatalogueCard supplierName={supplierName}/>}
-      {onUpdateMarginOptions&&<MarkupOptionsCard marginOptions={marginOptions} effectiveMarginOptions={effectiveMarginOptions} onSave={onUpdateMarginOptions}/>}
+      {onUpdateMarginOptions&&<MarkupOptionsCard marginOptions={marginOptions} effectiveMarginOptions={supplierBaseMarginOptions} onSave={onUpdateMarginOptions}/>}
 
       <div style={{marginBottom:14}}>
         <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
@@ -259,7 +256,8 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, 
   );
 }
 
-function SupplierCostPriceModal({part, marginOptions=DEFAULT_MARGIN_OPTIONS, onSave, onClose}) {
+function SupplierCostPriceModal({part, supplierMarginOptions=null, onSave, onClose}) {
+  const marginOptions=resolveMarginOptions({supplierOptions:supplierMarginOptions,category:part.category});
   const [price, setPrice] = useState(part._supplierPrice ?? "");
   const [suggestedPrice, setSuggestedPrice] = useState(part._suggestedPrice ?? null);
   const [imageUrl, setImageUrl] = useState(part.image_url ?? "");
@@ -369,7 +367,7 @@ function SupplierCostPriceModal({part, marginOptions=DEFAULT_MARGIN_OPTIONS, onS
   );
 }
 
-function SupplierPartModal({part, supplierCode, marginOptions=DEFAULT_MARGIN_OPTIONS, onSave, onDelete, onClose}) {
+function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSave, onDelete, onClose}) {
   const isEdit=!!part?.id;
   const [f,setF]=useState(isEdit?{
     part_code:part.part_code||"", name:part.name||"", chinese_desc:part.chinese_desc||"",
@@ -381,6 +379,7 @@ function SupplierPartModal({part, supplierCode, marginOptions=DEFAULT_MARGIN_OPT
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const canSave=f.part_code.trim()&&f.name.trim();
   const [lightbox,setLightbox]=useState(null); // {idx} — urls built from f.image_url + f.photos
+  const marginOptions=resolveMarginOptions({supplierOptions:supplierMarginOptions,category:f.category});
 
   return (
     <Overlay onClose={onClose}>

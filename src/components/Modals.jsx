@@ -17,6 +17,18 @@ const FormError = ({errors,k}) => errors[k] ? <div style={{fontSize:11,color:"va
 // a supplier hasn't set their own margin_options on their suppliers row.
 export const DEFAULT_MARGIN_OPTIONS=[30,25,22];
 
+// Resolves which 3 quick-margin %s to show, most-specific first:
+// an explicit override (e.g. the linked supplier's own numbers) → this part's
+// category default (settings.category_margin_options[category]) → the shop-wide
+// default (settings.margin_options) → the hardcoded fallback above.
+export const resolveMarginOptions=({supplierOptions,category}={})=>{
+  if(supplierOptions?.length) return supplierOptions;
+  const catMap=getSettings().category_margin_options;
+  if(category&&catMap&&catMap[category]?.length) return catMap[category];
+  if(getSettings().margin_options?.length) return getSettings().margin_options;
+  return DEFAULT_MARGIN_OPTIONS;
+};
+
 // ── Opposite-side part helpers ──────────────────────────────────────────────
 const _LR_MAP = {
   'Left':'Right','Right':'Left','left':'right','right':'left','LEFT':'RIGHT','RIGHT':'LEFT',
@@ -1541,6 +1553,45 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
               ))}
             </FG>
             <button className="btn btn-primary btn-sm" style={{marginTop:10}} onClick={()=>onSave({margin_options:f.margin_options||DEFAULT_MARGIN_OPTIONS})}>💾 Save Markup %</button>
+          </div>
+          <div className="card" style={{padding:22}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>💰 Markup % by Category</h3>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Override the markup % for specific categories — e.g. Body parts might carry a different margin than Electrical. Leave a row blank to use the general default above.</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {cats.map(cat=>{
+                const catOpts=(f.category_margin_options||{})[cat]||["","",""];
+                const hasAny=catOpts.some(v=>v!==""&&v!=null);
+                return (
+                  <div key={cat} style={{display:"grid",gridTemplateColumns:"1fr 70px 70px 70px auto",gap:8,alignItems:"center"}}>
+                    <span style={{fontSize:13,fontWeight:600}}>{cat}</span>
+                    {[0,1,2].map(i=>(
+                      <input key={i} className="inp" type="number" min="0" max="99" placeholder="—" value={catOpts[i]}
+                        onChange={e=>{
+                          const cur={...(f.category_margin_options||{})};
+                          const rowVals=[...(cur[cat]||["","",""])];
+                          rowVals[i]=e.target.value;
+                          cur[cat]=rowVals;
+                          s("category_margin_options",cur);
+                        }}/>
+                    ))}
+                    {hasAny
+                      ? <button type="button" className="btn btn-ghost btn-xs" title="Clear override — use the general default"
+                          onClick={()=>{const cur={...(f.category_margin_options||{})};delete cur[cat];s("category_margin_options",cur);}}>✕</button>
+                      : <span/>}
+                  </div>
+                );
+              })}
+            </div>
+            <button className="btn btn-primary btn-sm" style={{marginTop:14}} onClick={()=>{
+              // Only keep rows the admin actually touched — coerce blanks within a
+              // touched row to 0, drop rows nobody typed into at all.
+              const cleaned={};
+              Object.entries(f.category_margin_options||{}).forEach(([cat,vals])=>{
+                if(vals.some(v=>v!==""&&v!=null)) cleaned[cat]=vals.map(v=>+v||0);
+              });
+              s("category_margin_options",cleaned);
+              onSave({category_margin_options:cleaned});
+            }}>💾 Save Category Markup %</button>
           </div>
           <div className="card" style={{padding:22}}>
             <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🏷️ Part Label Size</h3>
@@ -3324,14 +3375,11 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
   const myFitments = part ? partFitments.filter(pf=>String(pf.part_id)===String(part.id)) : [];
 
   // Stock tab's quick-price %s: prefer the linked supplier's own numbers (set in
-  // their portal) over the shop-wide default, so what admin sees here matches what
-  // that supplier suggested — a preferred supplier wins over "only one link", which
-  // wins over the shop default, which wins over the hardcoded fallback.
+  // their portal), else this part's category default, else the shop-wide default —
+  // a preferred supplier wins over "only one link" for picking which supplier.
   const stockMarginSupplierId=f.preferred_supplier_id||(partSuppliers.length===1?partSuppliers[0].supplier_id:null);
   const stockMarginSupplier=stockMarginSupplierId?suppliers.find(s=>String(s.id)===String(stockMarginSupplierId)):null;
-  const stockMarginOptions=(stockMarginSupplier?.margin_options?.length?stockMarginSupplier.margin_options:null)
-    || (getSettings().margin_options?.length?getSettings().margin_options:null)
-    || DEFAULT_MARGIN_OPTIONS;
+  const stockMarginOptions=resolveMarginOptions({supplierOptions:stockMarginSupplier?.margin_options,category:f.category});
 
   const buildPayload=(fv)=>({
     sku:fv.sku.trim(), name:fv.name.trim(), category:fv.category, brand:fv.brand,
@@ -3700,6 +3748,9 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6,alignItems:"center"}}>
                   {stockMarginSupplier?.margin_options?.length>0&&(
                     <span style={{fontSize:10,color:"var(--text3)",width:"100%"}}>Using {stockMarginSupplier.name}'s markup %</span>
+                  )}
+                  {!stockMarginSupplier?.margin_options?.length&&f.category&&getSettings().category_margin_options?.[f.category]?.length>0&&(
+                    <span style={{fontSize:10,color:"var(--text3)",width:"100%"}}>Using {f.category}'s markup %</span>
                   )}
                   {stockMarginOptions.map(m=>{
                     const suggested=Math.round((+f.cost_price*(1+m/100))/10)*10;

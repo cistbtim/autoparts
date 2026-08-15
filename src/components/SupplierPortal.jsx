@@ -31,7 +31,7 @@ const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions, onBulkUpdateSuggestedPrices}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
@@ -41,6 +41,15 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
   // "Your Suggested Markup %" card; each modal resolves its own part's category on top of this.
   const supplierBaseMarginOptions=resolveMarginOptions({supplierOptions:marginOptions});
   const [search, setSearch] = useState("");
+
+  // Bulk-apply a new markup % to many already-priced Existing Catalogue parts at
+  // once, without opening each part's cost modal individually — recomputes
+  // suggested_price from each part's own already-set cost, doesn't touch cost itself.
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const toggleSelect=(id)=>setSelectedIds(prev=>{const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n;});
+  const exitBulkMode=()=>{setBulkMode(false);setSelectedIds(new Set());};
   const keywords=search.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const existingFiltered=keywords.length?existingParts.filter(p=>matchesSearch(searchBlob(p,p.sku),keywords)):existingParts;
   const minesFiltered=keywords.length?parts.filter(p=>matchesSearch(searchBlob(p,`${supplierCode}-${p.part_code}`),keywords)):parts;
@@ -94,12 +103,43 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
         </div>
         <div style={{display:"flex",gap:8}}>
           {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh} title="Prices/stock can change on admin's side — refresh to see the latest">↺ Refresh</button>}
+          {onBulkUpdateSuggestedPrices&&(
+            <button className="btn btn-ghost btn-sm" onClick={()=>{if(bulkMode)exitBulkMode();else{setBulkMode(true);setTab("existing");}}}>
+              {bulkMode?"✕ Exit Bulk Update":"☑ Bulk Update Prices"}
+            </button>
+          )}
           <button className="btn btn-primary" onClick={()=>setEditing({})}>+ Add Part</button>
         </div>
       </div>
 
       {supplierName&&<ShareCatalogueCard supplierName={supplierName}/>}
       {onUpdateMarginOptions&&<MarkupOptionsCard marginOptions={marginOptions} effectiveMarginOptions={supplierBaseMarginOptions} onSave={onUpdateMarginOptions}/>}
+
+      {bulkMode&&(()=>{
+        const eligible=existingFiltered.filter(p=>p._supplierPrice);
+        return (
+          <div className="card" style={{padding:"12px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <div style={{fontSize:13,fontWeight:700}}>{selectedIds.size} selected</div>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedIds(new Set(eligible.map(p=>p.id)))}>Select All ({eligible.length} with cost set)</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedIds(new Set())} disabled={!selectedIds.size}>Clear</button>
+            <div style={{flex:1,minWidth:8}}/>
+            <span style={{fontSize:12,color:"var(--text3)"}}>Apply markup to selected:</span>
+            {supplierBaseMarginOptions.map(m=>(
+              <button key={m} type="button" className="btn btn-primary btn-sm" disabled={!selectedIds.size||bulkApplying}
+                onClick={async()=>{
+                  setBulkApplying(true);
+                  const updates=existingParts.filter(p=>selectedIds.has(p.id)&&p._supplierPrice)
+                    .map(p=>({linkId:p._linkId,suggestedPrice:suggestPriceAt(p._supplierPrice,m)}));
+                  await onBulkUpdateSuggestedPrices(updates);
+                  setBulkApplying(false);
+                  exitBulkMode();
+                }}>
+                {bulkApplying?"Applying…":`${m}%`}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       <div style={{marginBottom:14}}>
         <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
@@ -119,13 +159,16 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
           </div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>Name, customer price & stock are managed by admin. Click a part to update your own cost price or photo.</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>
+              {bulkMode?"Tick parts to bulk-update, then pick a markup % above (only parts with a cost already set can be selected).":"Name, customer price & stock are managed by admin. Click a part to update your own cost price or photo."}
+            </div>
             {existingFiltered.map(p=><PartRow key={p.id} p={p} code={p.sku} name={p.name} readOnly
               priceChanged={!!(lastViewed&&p.price_updated_at&&p.price_updated_at>lastViewed)}
-              onClick={onUpdateCostPrice?()=>setEditingCost(p):undefined}
-              onPrintLabel={()=>setLabelPart(p)}
-              onEditFitments={onAddFitment?()=>setFitmentTarget({part:p,kind:"existing"}):undefined}
-              fitCount={partFitments.filter(pf=>String(pf.part_id)===String(p.id)).length}/>)}
+              onClick={bulkMode?(p._supplierPrice?()=>toggleSelect(p.id):undefined):(onUpdateCostPrice?()=>setEditingCost(p):undefined)}
+              onPrintLabel={bulkMode?undefined:()=>setLabelPart(p)}
+              onEditFitments={bulkMode?undefined:(onAddFitment?()=>setFitmentTarget({part:p,kind:"existing"}):undefined)}
+              fitCount={partFitments.filter(pf=>String(pf.part_id)===String(p.id)).length}
+              bulkMode={bulkMode} selected={selectedIds.has(p.id)} selectable={!!p._supplierPrice}/>)}
           </div>
         )
       )}
@@ -219,11 +262,16 @@ function MarkupOptionsCard({marginOptions, effectiveMarginOptions, onSave}) {
   );
 }
 
-function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, onEditFitments, fitCount=0}) {
+function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, onEditFitments, fitCount=0, bulkMode=false, selected=false, selectable=true}) {
   return (
-    <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",cursor:onClick?"pointer":"default",
-      border:priceChanged?"1px solid rgba(96,165,250,.5)":undefined,background:priceChanged?"rgba(96,165,250,.05)":undefined}}
+    <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",
+      cursor:onClick?"pointer":"default",opacity:bulkMode&&!selectable?.5:1,
+      border:selected?"1.5px solid var(--accent)":(priceChanged?"1px solid rgba(96,165,250,.5)":undefined),
+      background:selected?"rgba(249,115,22,.06)":(priceChanged?"rgba(96,165,250,.05)":undefined)}}
       onClick={onClick}>
+      {bulkMode&&(
+        <input type="checkbox" checked={selected} disabled={!selectable} readOnly style={{width:18,height:18,flexShrink:0,cursor:selectable?"pointer":"not-allowed"}}/>
+      )}
       <div style={{width:52,height:52,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
         {p.image_url
           ? <img src={toImgUrl(p.image_url)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>

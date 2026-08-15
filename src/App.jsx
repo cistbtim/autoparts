@@ -2514,6 +2514,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setSupplierMarginOptions(opts);
     showToast(opts?"✅ Markup % updated":"Reset to shop default");
   };
+  // Bulk-recompute suggested_price for many existing-catalogue parts at once, from
+  // each part's own already-set cost — a one-time re-apply after the supplier
+  // changes their markup %, without opening each part's cost modal individually.
+  // updates: [{linkId, suggestedPrice}]. Doesn't touch supplier_price (cost) itself.
+  const bulkUpdateSupplierSuggestedPrices=async(updates)=>{
+    if(!updates.length) return;
+    await Promise.all(updates.map(u=>api.patch("part_suppliers","id",u.linkId,{suggested_price:u.suggestedPrice})));
+    const byLinkId=new Map(updates.map(u=>[u.linkId,u.suggestedPrice]));
+    setSupplierExistingParts(prev=>prev.map(p=>byLinkId.has(p._linkId)?{...p,_suggestedPrice:byLinkId.get(p._linkId)}:p));
+    showToast(`✅ Updated suggested price for ${updates.length} part${updates.length!==1?"s":""}`);
+  };
   const deleteSupplier=async(id)=>{
     const s=suppliers.find(x=>x.id===id);
     if(s&&role!=="admin"&&s.branch_id!==user.branch_id)return showToast("Cannot delete a global supplier","err");
@@ -5332,7 +5343,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onSave={saveSupplierPart} onDelete={deleteSupplierPart} onRefresh={reloadSupplierParts}
             onUpdateCostPrice={updateSupplierCostPrice}
             vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onAddSelfFitment={saveSupplierSelfFitment} onDeleteFitment={deleteFitment}
-            marginOptions={supplierMarginOptions} onUpdateMarginOptions={updateSupplierMarginOptions}/>
+            marginOptions={supplierMarginOptions} onUpdateMarginOptions={updateSupplierMarginOptions}
+            onBulkUpdateSuggestedPrices={bulkUpdateSupplierSuggestedPrices}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY ORDERS ── */}

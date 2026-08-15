@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
 import { api } from "../lib/api.js";
+import { getSettings, C } from "../lib/settings.js";
 import { toImgUrl, fmtAmt, fmtDT } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge } from "./shared.jsx";
 import { PartPhotoUploader } from "./RfqVehicles.jsx";
+import { PrintPartLabelModal } from "./Modals.jsx";
+
+// Margin brackets a supplier can one-tap into a suggested retail price — same
+// buckets and same "round to nearest 10" behaviour as the admin Inventory
+// PartModal's Stock tab, so the two flows feel identical.
+const MARGIN_OPTIONS=[30,25,22];
+const suggestPriceAt=(cost,marginPct)=>Math.round((+cost/(1-marginPct/100))/10)*10;
 
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER PORTAL — self-service parts catalogue for a supplier login
@@ -14,6 +22,7 @@ import { PartPhotoUploader } from "./RfqVehicles.jsx";
 export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete, onRefresh, onUpdateCostPrice}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
+  const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
   const [tab, setTab] = useState(existingParts.length?"existing":"mine");
 
   // In-app "price changed since you last looked" badge — no outbound notification,
@@ -36,8 +45,10 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
         onClose={()=>setEditing(null)}/>}
 
       {editingCost&&<SupplierCostPriceModal part={editingCost}
-        onSave={async(price)=>{await onUpdateCostPrice(editingCost,price);setEditingCost(null);}}
+        onSave={async(data)=>{await onUpdateCostPrice(editingCost,data);setEditingCost(null);}}
         onClose={()=>setEditingCost(null)}/>}
+
+      {labelPart&&<PrintPartLabelModal part={labelPart} settings={getSettings()} onClose={()=>setLabelPart(null)}/>}
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div>
@@ -65,10 +76,11 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
           </div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>Name, customer price & stock are managed by admin. Click a part to update your own cost price.</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>Name, customer price & stock are managed by admin. Click a part to update your own cost price or photo.</div>
             {existingParts.map(p=><PartRow key={p.id} p={p} code={p.sku} name={p.name} readOnly
               priceChanged={!!(lastViewed&&p.price_updated_at&&p.price_updated_at>lastViewed)}
-              onClick={onUpdateCostPrice?()=>setEditingCost(p):undefined}/>)}
+              onClick={onUpdateCostPrice?()=>setEditingCost(p):undefined}
+              onPrintLabel={()=>setLabelPart(p)}/>)}
           </div>
         )
       )}
@@ -80,7 +92,8 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
           </div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {parts.map(p=><PartRow key={p.id} p={p} code={`${supplierCode}-${p.part_code}`} name={p.name} onClick={()=>setEditing(p)}/>)}
+            {parts.map(p=><PartRow key={p.id} p={p} code={`${supplierCode}-${p.part_code}`} name={p.name} onClick={()=>setEditing(p)}
+              onPrintLabel={()=>setLabelPart({...p, sku:`${supplierCode}-${p.part_code}`})}/>)}
           </div>
         )
       )}
@@ -88,7 +101,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
   );
 }
 
-function PartRow({p, code, name, readOnly, priceChanged, onClick}) {
+function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel}) {
   return (
     <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",cursor:onClick?"pointer":"default",
       border:priceChanged?"1px solid rgba(96,165,250,.5)":undefined,background:priceChanged?"rgba(96,165,250,.05)":undefined}}
@@ -102,7 +115,7 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick}) {
         <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{code}{readOnly&&<span title="Managed by admin" style={{marginLeft:6,fontSize:11,opacity:.6}}>🔒</span>}</div>
         <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
         {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
-        {readOnly&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Your cost: <strong style={{color:"var(--text2)"}}>{p._supplierPrice?fmtAmt(p._supplierPrice):"not set"}</strong></div>}
+        {readOnly&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Your cost: <strong style={{color:"var(--text2)"}}>{p._supplierPrice?fmtAmt(p._supplierPrice):"not set"}</strong>{p._suggestedPrice?<span style={{marginLeft:8}}>· Suggested retail: <strong style={{color:"var(--text2)"}}>{fmtAmt(p._suggestedPrice)}</strong></span>:null}</div>}
       </div>
       <div style={{textAlign:"right",flexShrink:0}}>
         {priceChanged&&<div style={{fontSize:10,fontWeight:700,color:"var(--blue)",marginBottom:2}}>🔔 PRICE UPDATED</div>}
@@ -110,6 +123,10 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick}) {
           ? <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16}}>{fmtAmt(p.price)}</div>
           : <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:11}}>⏳ Awaiting pricing</span>}
         <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Stock: {p.stock??0}</div>
+        {onPrintLabel&&(
+          <button type="button" title="Print part label" className="btn btn-ghost btn-xs" style={{marginTop:6,fontSize:11}}
+            onClick={e=>{e.stopPropagation();onPrintLabel();}}>🏷️ Label</button>
+        )}
       </div>
     </div>
   );
@@ -117,6 +134,8 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick}) {
 
 function SupplierCostPriceModal({part, onSave, onClose}) {
   const [price, setPrice] = useState(part._supplierPrice ?? "");
+  const [suggestedPrice, setSuggestedPrice] = useState(part._suggestedPrice ?? null);
+  const [imageUrl, setImageUrl] = useState(part.image_url ?? "");
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -132,11 +151,35 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
     <Overlay onClose={onClose}>
       <MHead title="Update Your Cost Price" sub={`${part.sku} — ${part.name}`} onClose={onClose}/>
       <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
-        This is your own reference price for this part — it doesn't change what customers see or what's in admin's inventory.
+        Your cost price is just your own reference — it doesn't change what customers see. The suggested retail price
+        below is a hint for admin to consider when they set the live selling price.
       </div>
       <FD>
         <FL label="Your Cost Price"/>
-        <input className="inp" type="number" min="0" step="0.01" autoFocus value={price} onChange={e=>setPrice(e.target.value)} placeholder="0"/>
+        <input className="inp" type="number" min="0" step="0.01" autoFocus value={price} onChange={e=>{setPrice(e.target.value);setSuggestedPrice(null);}} placeholder="0"/>
+        {+price>0&&(
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
+            {MARGIN_OPTIONS.map(m=>{
+              const suggested=suggestPriceAt(price,m);
+              const active=suggestedPrice===suggested;
+              return (
+                <button key={m} type="button" onClick={()=>setSuggestedPrice(suggested)}
+                  style={{fontSize:11,padding:"3px 9px",borderRadius:99,cursor:"pointer",fontWeight:600,
+                    background:active?"var(--accent)":"var(--surface2)",
+                    color:active?"#fff":"var(--text2)",
+                    border:`1px solid ${active?"var(--accent)":"var(--border)"}`}}>
+                  {m}%: {C()}{suggested.toLocaleString()}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {suggestedPrice!=null&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Suggested retail price for admin to review: <strong style={{color:"var(--text2)"}}>{C()}{suggestedPrice.toLocaleString()}</strong></div>}
+      </FD>
+
+      <FD>
+        <FL label="Photo"/>
+        <PartPhotoUploader imageUrl={imageUrl} onChange={setImageUrl} sku={part.sku} t={{}} bucket="cars_parts"/>
       </FD>
 
       <div style={{marginBottom:14}}>
@@ -173,7 +216,7 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
       <div style={{display:"flex",gap:10}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} disabled={saving||price===""}
-          onClick={async()=>{setSaving(true);await onSave(+price);setSaving(false);}}>
+          onClick={async()=>{setSaving(true);await onSave({price:+price,suggestedPrice,imageUrl});setSaving(false);}}>
           {saving?"Saving…":"Save"}
         </button>
       </div>
@@ -187,8 +230,8 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
     part_code:part.part_code||"", name:part.name||"", chinese_desc:part.chinese_desc||"",
     category:part.category||"", cost_price:part.cost_price??"", stock:part.stock??0,
     image_url:part.image_url||"", make:part.make||"", model:part.model||"",
-    year_range:part.year_range||"", oe_number:part.oe_number||"",
-  }:{part_code:"",name:"",chinese_desc:"",category:"",cost_price:"",stock:0,image_url:"",make:"",model:"",year_range:"",oe_number:""});
+    year_range:part.year_range||"", oe_number:part.oe_number||"", suggested_price:part.suggested_price??"",
+  }:{part_code:"",name:"",chinese_desc:"",category:"",cost_price:"",stock:0,image_url:"",make:"",model:"",year_range:"",oe_number:"",suggested_price:""});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const canSave=f.part_code.trim()&&f.name.trim();
 
@@ -214,9 +257,30 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
         <div><FL label="Category"/><input className="inp" value={f.category} onChange={e=>s("category",e.target.value)} placeholder="Body, Engine..."/></div>
       </FG>
       <FG>
-        <div><FL label="Your Cost Price"/><input className="inp" type="number" value={f.cost_price} onChange={e=>s("cost_price",e.target.value)} placeholder="0"/></div>
+        <div>
+          <FL label="Your Cost Price"/>
+          <input className="inp" type="number" value={f.cost_price} onChange={e=>s("cost_price",e.target.value)} placeholder="0"/>
+          {+f.cost_price>0&&(
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
+              {MARGIN_OPTIONS.map(m=>{
+                const suggested=suggestPriceAt(f.cost_price,m);
+                const active=+f.suggested_price===suggested;
+                return (
+                  <button key={m} type="button" onClick={()=>s("suggested_price",suggested)}
+                    style={{fontSize:11,padding:"3px 9px",borderRadius:99,cursor:"pointer",fontWeight:600,
+                      background:active?"var(--accent)":"var(--surface2)",
+                      color:active?"#fff":"var(--text2)",
+                      border:`1px solid ${active?"var(--accent)":"var(--border)"}`}}>
+                    {m}%: {C()}{suggested.toLocaleString()}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
         <div><FL label="Stock"/><input className="inp" type="number" value={f.stock} onChange={e=>s("stock",+e.target.value||0)}/></div>
       </FG>
+      {+f.suggested_price>0&&<div style={{fontSize:11,color:"var(--text3)",marginTop:-8,marginBottom:14}}>Your suggested retail price for admin to review: <strong style={{color:"var(--text2)"}}>{C()}{(+f.suggested_price).toLocaleString()}</strong></div>}
 
       <FD>
         <FL label="Photo"/>
@@ -296,6 +360,11 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
                 <div style={{fontSize:12,color:"var(--blue)",textAlign:"right",flexShrink:0}}>
                   New supplier cost<br/><strong>{l.supplier_price?fmtAmt(l.supplier_price):"—"}</strong>
                 </div>
+                {l.suggested_price&&(
+                  <div style={{fontSize:12,color:"var(--green)",textAlign:"right",flexShrink:0}}>
+                    Supplier suggests<br/><strong>{fmtAmt(l.suggested_price)}</strong>
+                  </div>
+                )}
                 <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
                   {onGoToPart&&<button className="btn btn-primary btn-sm" onClick={()=>onGoToPart(l)}>✏️ Update Price</button>}
                   <button className="btn btn-ghost btn-sm" onClick={()=>onDismissCostUpdate(l.id)}>Dismiss</button>
@@ -327,14 +396,15 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
                 </div>
                 <div style={{fontSize:12,color:"var(--text3)",textAlign:"right",flexShrink:0}}>
                   Cost<br/><strong style={{color:"var(--text2)"}}>{p.cost_price?fmtAmt(p.cost_price):"—"}</strong>
+                  {p.suggested_price&&<div style={{color:"var(--green)",marginTop:2}}>Suggests: <strong>{fmtAmt(p.suggested_price)}</strong></div>}
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
                   <input className="inp" type="number" style={{width:100}} placeholder="Set price"
-                    value={drafts[p.id]??p.price??""}
+                    value={drafts[p.id]??p.price??p.suggested_price??""}
                     onChange={e=>setDrafts(d=>({...d,[p.id]:e.target.value}))}/>
                   <button className="btn btn-primary btn-sm"
-                    disabled={!String(drafts[p.id]??p.price??"").trim()}
-                    onClick={()=>onSetPrice(p.id,+drafts[p.id]||0)}>
+                    disabled={!String(drafts[p.id]??p.price??p.suggested_price??"").trim()}
+                    onClick={()=>onSetPrice(p.id,+(drafts[p.id]??p.price??p.suggested_price)||0)}>
                     {p.price?"Update":"Set Live"}
                   </button>
                 </div>

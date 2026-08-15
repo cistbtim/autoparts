@@ -892,7 +892,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const existingRaw=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=*`):[];
     const existing=(Array.isArray(existingRaw)?existingRaw:[]).map(p=>{
       const link=linksArr.find(l=>String(l.part_id)===String(p.id));
-      return {...p, _linkId:link?.id, _supplierPrice:link?.supplier_price};
+      return {...p, _linkId:link?.id, _supplierPrice:link?.supplier_price, _suggestedPrice:link?.suggested_price};
     });
     setSupplierExistingParts(existing);
     // Orders placed by customers scoped to this supplier's catalogue (stamped at checkout).
@@ -2414,7 +2414,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     showToast("✅ Password updated");
   };
   const saveSupplierPart=async(data)=>{
-    const payload={...data,supplier_id:user.supplier_id,cost_price:data.cost_price===""?null:+data.cost_price};
+    const payload={...data,supplier_id:user.supplier_id,cost_price:data.cost_price===""?null:+data.cost_price,
+      suggested_price:data.suggested_price===""||data.suggested_price==null?null:+data.suggested_price};
     if(data.id) await api.patch("supplier_parts","id",data.id,payload);
     else await api.upsert("supplier_parts",payload);
     await reloadSupplierParts();
@@ -2442,12 +2443,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // Supplier updating their own cost price on a part already in the main inventory —
   // patches the part_suppliers link row (supplier_price), never parts.cost_price
   // directly, so this can never silently change admin's own margin numbers.
-  const updateSupplierCostPrice=async(part,price)=>{
+  // suggestedPrice is just a hint for admin's "Supplier Pricing" review — it never
+  // touches parts.price itself. imageUrl (if changed) does patch parts.image_url
+  // directly since the product photo isn't admin-exclusive like name/price/stock.
+  const updateSupplierCostPrice=async(part,{price,suggestedPrice,imageUrl})=>{
     // cost_updated_at flags this link for admin's "Supplier Pricing" review list —
     // cleared (not just left stale) once admin dismisses/reviews it, so the flag
     // means "needs a look", not "was ever changed".
-    await api.patch("part_suppliers","id",part._linkId,{supplier_price:price,cost_updated_at:new Date().toISOString()});
-    setSupplierExistingParts(prev=>prev.map(p=>p._linkId===part._linkId?{...p,_supplierPrice:price}:p));
+    await api.patch("part_suppliers","id",part._linkId,{supplier_price:price,suggested_price:suggestedPrice??null,cost_updated_at:new Date().toISOString()});
+    const photoChanged=imageUrl!=null&&imageUrl!==part.image_url;
+    if(photoChanged) await api.patch("parts","id",part.id,{image_url:imageUrl});
+    setSupplierExistingParts(prev=>prev.map(p=>p._linkId===part._linkId?{...p,_supplierPrice:price,_suggestedPrice:suggestedPrice??null,...(photoChanged?{image_url:imageUrl}:{})}:p));
     api.insert("part_price_history",{part_id:part.id,sku:part.sku,old_cost_price:part._supplierPrice||null,new_cost_price:price||null,
       source:"supplier_cost_update",changed_by:user.supplier_name||user.supplier_code||user.username||""}).catch(()=>{});
     showToast("✅ Cost price updated");
@@ -5559,11 +5565,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               if(!p) return;
               const newCost=+link.supplier_price||0;
               // Pre-fill cost with the supplier's new number, and pre-select a selling
-              // price — the standard 30%-margin price on the new cost, or the part's
+              // price — the supplier's own suggested retail price if they gave one,
+              // else the standard 30%-margin price on the new cost — or the part's
               // current price if that's already higher (never auto-suggest a cut).
               // Same margin formula/tiers as the Stock tab's own quick-price buttons.
               const suggested30=newCost>0?Math.round((newCost/(1-30/100))/10)*10:0;
-              const newSellPrice=Math.max(suggested30,+p.price||0);
+              const newSellPrice=Math.max(+link.suggested_price||suggested30,+p.price||0);
               setTab("inventory");
               // _dismissCostUpdateLinkId: savePart clears this review flag automatically
               // once the edit that was prompted by it is actually saved. _origPrice keeps

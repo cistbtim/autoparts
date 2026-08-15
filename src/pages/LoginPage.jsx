@@ -375,8 +375,9 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
           </div>
         </div>
 
-        {/* Module tabs — hidden in workshop-only mode */}
-        {!wsLoginOnly&&(
+        {/* Module tabs — hidden in workshop-only mode, and on a supplier catalogue
+            link (?catalog=) so a shared link only ever shows that one login form. */}
+        {!wsLoginOnly&&!catalogName&&(
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:10}}>
           {TAB_BTNS.map(({id,Icon,label})=>(
             <button key={id} onClick={()=>switchTab(id)} style={{

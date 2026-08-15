@@ -122,6 +122,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
 }
 
 function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel}) {
+  const extraFits=parseJsonArray(p.fitments).length;
   return (
     <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",cursor:onClick?"pointer":"default",
       border:priceChanged?"1px solid rgba(96,165,250,.5)":undefined,background:priceChanged?"rgba(96,165,250,.05)":undefined}}
@@ -134,7 +135,7 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel})
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{code}{readOnly&&<span title="Managed by admin" style={{marginLeft:6,fontSize:11,opacity:.6}}>🔒</span>}</div>
         <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
-        {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
+        {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}{extraFits>0&&<span> · +{extraFits} more fit{extraFits!==1?"s":""}</span>}</div>}
         {readOnly&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Your cost: <strong style={{color:"var(--text2)"}}>{p._supplierPrice?fmtAmt(p._supplierPrice):"not set"}</strong>{p._suggestedPrice?<span style={{marginLeft:8}}>· Suggested retail: <strong style={{color:"var(--text2)"}}>{fmtAmt(p._suggestedPrice)}</strong></span>:null}</div>}
       </div>
       <div style={{textAlign:"right",flexShrink:0}}>
@@ -158,6 +159,10 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
   const [imageUrl, setImageUrl] = useState(part.image_url ?? "");
   const [photos, setPhotos] = useState(()=>parseJsonArray(part.photos));
   const [lightbox, setLightbox] = useState(null); // {idx} — urls built from imageUrl + photos
+  const [fitments, setFitments] = useState(()=>parseJsonArray(part.fitments));
+  const addFitment=()=>setFitments(f=>[...f,{make:"",model:"",year_range:""}]);
+  const updateFitment=(i,k,v)=>setFitments(f=>f.map((fit,idx)=>idx===i?{...fit,[k]:v}:fit));
+  const removeFitment=(i)=>setFitments(f=>f.filter((_,idx)=>idx!==i));
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -215,6 +220,21 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
         )}
       </FD>
 
+      <FD>
+        <FL label={`Also Fits (additional fitment vehicles)${(part.make||part.model)?` — currently listed as ${[part.make,part.model,part.year_range].filter(Boolean).join(" ")}`:""}`}/>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {fitments.map((fit,i)=>(
+            <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:6}}>
+              <input className="inp" value={fit.make} onChange={e=>updateFitment(i,"make",e.target.value)} placeholder="Make"/>
+              <input className="inp" value={fit.model} onChange={e=>updateFitment(i,"model",e.target.value)} placeholder="Model"/>
+              <input className="inp" value={fit.year_range} onChange={e=>updateFitment(i,"year_range",e.target.value)} placeholder="2018-2022"/>
+              <button type="button" className="btn btn-ghost btn-sm" title="Remove" onClick={()=>removeFitment(i)}>🗑</button>
+            </div>
+          ))}
+          <button type="button" className="btn btn-ghost btn-sm" style={{alignSelf:"flex-start"}} onClick={addFitment}>+ Add Vehicle</button>
+        </div>
+      </FD>
+
       <div style={{marginBottom:14}}>
         <button type="button" onClick={()=>setHistoryOpen(v=>!v)}
           style={{background:"none",border:"none",cursor:"pointer",padding:0,fontSize:12,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}>
@@ -249,7 +269,7 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
       <div style={{display:"flex",gap:10}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} disabled={saving||price===""}
-          onClick={async()=>{setSaving(true);await onSave({price:+price,suggestedPrice,imageUrl,photos});setSaving(false);}}>
+          onClick={async()=>{setSaving(true);await onSave({price:+price,suggestedPrice,imageUrl,photos,fitments});setSaving(false);}}>
           {saving?"Saving…":"Save"}
         </button>
       </div>

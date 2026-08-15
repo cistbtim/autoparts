@@ -5639,10 +5639,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               const newCost=+link.supplier_price||0;
               // Pre-fill cost with the supplier's new number, and pre-select a selling
               // price — the supplier's own suggested retail price if they gave one,
-              // else the standard 30%-margin price on the new cost — or the part's
+              // else the standard 30%-markup price on the new cost — or the part's
               // current price if that's already higher (never auto-suggest a cut).
-              // Same margin formula/tiers as the Stock tab's own quick-price buttons.
-              const suggested30=newCost>0?Math.round((newCost/(1-30/100))/10)*10:0;
+              // Same markup formula/tiers as the Stock tab's own quick-price buttons.
+              const suggested30=newCost>0?Math.round((newCost*(1+30/100))/10)*10:0;
               const newSellPrice=Math.max(+link.suggested_price||suggested30,+p.price||0);
               setTab("inventory");
               // _dismissCostUpdateLinkId: savePart clears this review flag automatically

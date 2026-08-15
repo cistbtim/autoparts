@@ -3689,7 +3689,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               {+f.cost_price>0&&(
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
                   {(getSettings().margin_options?.length?getSettings().margin_options:DEFAULT_MARGIN_OPTIONS).map(m=>{
-                    const suggested=Math.round((+f.cost_price/(1-m/100))/10)*10;
+                    const suggested=Math.round((+f.cost_price*(1+m/100))/10)*10;
                     const active=+f.price===suggested;
                     return (
                       <button key={m} type="button"

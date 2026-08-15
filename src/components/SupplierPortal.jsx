@@ -6,16 +6,17 @@ import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.j
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 import { PrintPartLabelModal, ExtraPhotosStrip, DEFAULT_MARGIN_OPTIONS } from "./Modals.jsx";
 
-// Margin brackets a supplier can one-tap into a suggested retail price — same
-// "round to nearest 10" behaviour as the admin Inventory PartModal's Stock
-// tab. A supplier can customize their own 3 numbers (suppliers.margin_options);
-// falls back to the shop-wide default (settings.margin_options), then the
-// hardcoded default if neither has been set.
+// Markup brackets a supplier can one-tap into a suggested retail price — cost
+// plus a straight % on top (cost * (1 + pct/100)), same "round to nearest 10"
+// behaviour as the admin Inventory PartModal's Stock tab. A supplier can
+// customize their own 3 numbers (suppliers.margin_options); falls back to the
+// shop-wide default (settings.margin_options), then the hardcoded default if
+// neither has been set.
 const resolveMarginOptions=(supplierOwn)=>
   (supplierOwn&&supplierOwn.length?supplierOwn:null) ||
   (getSettings().margin_options?.length?getSettings().margin_options:null) ||
   DEFAULT_MARGIN_OPTIONS;
-const suggestPriceAt=(cost,marginPct)=>Math.round((+cost/(1-marginPct/100))/10)*10;
+const suggestPriceAt=(cost,markupPct)=>Math.round((+cost*(1+markupPct/100))/10)*10;
 
 // photos/fitments are stored as JSON-stringified arrays (same convention as
 // parts.photos in the main Inventory PartModal) — parse defensively since the

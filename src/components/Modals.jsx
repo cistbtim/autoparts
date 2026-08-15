@@ -4823,6 +4823,7 @@ export function CustomerQueryModal({part,currentUser,onSubmit,onClose,t}) {
       part_id:part._isSupplierPart?null:part.id, supplier_part_id:part._isSupplierPart?part._supplierPartId:null,
       part_name:part.name,part_sku:part.sku||"",
       part_price:part.price||0,part_image:part.image_url||"",
+      part_oe_number:part.oe_number||"",part_make:part.make||"",part_model:part.model||"",part_year_range:part.year_range||"",
       customer_name:form.name,customer_phone:form.phone,customer_email:form.email,
       qty_requested:+form.qty||1,notes:form.notes,
       status:"pending",created_at:new Date().toISOString(),
@@ -4862,6 +4863,7 @@ export function CustomerQueryReplyModal({query,onReply,onClose,t,settings,onGoIn
   const [deposit,setDeposit]=useState(query?.deposit_amount||"");
   const [depositNote,setDepositNote]=useState(query?.deposit_note||`Please pay a deposit of ${settings?.currency||""} to confirm your order. Contact us for payment details.`);
   const [saving,setSaving]=useState(false);
+  const [lightbox,setLightbox]=useState(false);
   const handle=async()=>{
     setSaving(true);
     await onReply(query.id,{
@@ -4879,23 +4881,34 @@ export function CustomerQueryReplyModal({query,onReply,onClose,t,settings,onGoIn
   return (
     <Overlay onClose={onClose}>
       <MHead title={t.queryReply} sub={`${query.customer_name} — ${query.part_name}`} onClose={onClose}/>
+      {lightbox&&query.part_image&&<ImgLightbox url={toImgUrl(query.part_image)} onClose={()=>setLightbox(false)}/>}
 
       {/* Part info + quick-action buttons */}
       <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
-          <div>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:3}}>{query.part_name}</div>
-            {query.part_sku&&(
-              <div style={{fontSize:13,color:"var(--blue)",fontFamily:"DM Mono,monospace",fontWeight:600,marginBottom:6}}>
-                SKU: {query.part_sku}
-              </div>
-            )}
-            <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:13,color:"var(--text2)"}}>
-              <span>👤 {query.customer_name}</span>
-              <span>📞 {query.customer_phone}</span>
-              <span>🔢 Qty: <strong>{query.qty_requested}</strong></span>
+          <div style={{display:"flex",gap:12}}>
+            <div style={{width:64,height:64,borderRadius:8,overflow:"hidden",background:"var(--surface3)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:query.part_image?"zoom-in":"default"}}
+              onClick={()=>query.part_image&&setLightbox(true)} title={query.part_image?"Click to enlarge":undefined}>
+              {query.part_image
+                ? <img src={toImgUrl(query.part_image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                : <span style={{fontSize:22,opacity:.3}}>🖼</span>}
             </div>
-            {query.notes&&<div style={{marginTop:5,fontSize:12,color:"var(--text3)",fontStyle:"italic"}}>"{query.notes}"</div>}
+            <div>
+              <div style={{fontWeight:700,fontSize:15,marginBottom:3}}>{query.part_name}</div>
+              {query.part_sku&&(
+                <div style={{fontSize:13,color:"var(--blue)",fontFamily:"DM Mono,monospace",fontWeight:600,marginBottom:2}}>
+                  SKU: {query.part_sku}
+                </div>
+              )}
+              {query.part_oe_number&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>OE: {query.part_oe_number}</div>}
+              {(query.part_make||query.part_model)&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>{[query.part_make,query.part_model,query.part_year_range].filter(Boolean).join(" · ")}</div>}
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:13,color:"var(--text2)"}}>
+                <span>👤 {query.customer_name}</span>
+                <span>📞 {query.customer_phone}</span>
+                <span>🔢 Qty: <strong>{query.qty_requested}</strong></span>
+              </div>
+              {query.notes&&<div style={{marginTop:5,fontSize:12,color:"var(--text3)",fontStyle:"italic"}}>"{query.notes}"</div>}
+            </div>
           </div>
           {/* Quick-action buttons */}
           <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>

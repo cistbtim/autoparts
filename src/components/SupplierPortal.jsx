@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { api } from "../lib/api.js";
 import { getSettings, C } from "../lib/settings.js";
 import { toImgUrl, fmtAmt, fmtDT } from "../lib/helpers.js";
-import { Overlay, MHead, FL, FG, FD, StatusBadge } from "./shared.jsx";
+import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.jsx";
 import { PartPhotoUploader } from "./RfqVehicles.jsx";
 import { PrintPartLabelModal } from "./Modals.jsx";
 
@@ -458,11 +458,17 @@ export function SupplierQueriesPage({queries=[], onReply, onRefresh}) {
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {queries.map(q=>(
-            <div key={q.id} className="card card-hover" style={{padding:14,cursor:"pointer"}} onClick={()=>setReplying(q)}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+            <div key={q.id} className="card card-hover" style={{padding:14,cursor:"pointer",display:"flex",gap:12,alignItems:"flex-start"}} onClick={()=>setReplying(q)}>
+              <div style={{width:44,height:44,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {q.part_image
+                  ? <img src={toImgUrl(q.part_image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                  : <span style={{fontSize:18,opacity:.3}}>🖼</span>}
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flex:1,minWidth:0}}>
                 <div style={{minWidth:0}}>
                   <div style={{fontWeight:700,fontSize:14}}>{q.part_name}</div>
                   {q.part_sku&&<div style={{fontSize:12,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{q.part_sku}</div>}
+                  {(q.part_make||q.part_model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[q.part_make,q.part_model,q.part_year_range].filter(Boolean).join(" · ")}</div>}
                   <div style={{fontSize:12,color:"var(--text2)",marginTop:4}}>👤 {q.customer_name} · 📞 {q.customer_phone} · Qty: {q.qty_requested}</div>
                   {q.notes&&<div style={{fontSize:12,color:"var(--text3)",fontStyle:"italic",marginTop:4}}>"{q.notes}"</div>}
                 </div>
@@ -481,6 +487,7 @@ function SupplierQueryReplyModal({query, onReply, onClose}) {
   const [qty,setQty]=useState(query?.confirmed_qty||"");
   const [notes,setNotes]=useState(query?.reply_notes||"");
   const [saving,setSaving]=useState(false);
+  const [lightbox,setLightbox]=useState(false);
   const handle=async()=>{
     setSaving(true);
     await onReply(query.id,{
@@ -492,11 +499,23 @@ function SupplierQueryReplyModal({query, onReply, onClose}) {
   return (
     <Overlay onClose={onClose}>
       <MHead title="Reply to Query" sub={`${query.customer_name} — ${query.part_name}`} onClose={onClose}/>
-      <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",marginBottom:14,fontSize:13}}>
-        <div>👤 {query.customer_name} · 📞 {query.customer_phone}</div>
-        <div style={{marginTop:2}}>🔢 Requested qty: <strong>{query.qty_requested}</strong></div>
-        {query.notes&&<div style={{marginTop:6,color:"var(--text3)",fontStyle:"italic"}}>"{query.notes}"</div>}
+      {lightbox&&query.part_image&&<ImgLightbox url={toImgUrl(query.part_image)} onClose={()=>setLightbox(false)}/>}
+      <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",marginBottom:14,fontSize:13,display:"flex",gap:12}}>
+        <div style={{width:64,height:64,borderRadius:8,overflow:"hidden",background:"var(--surface3)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:query.part_image?"zoom-in":"default"}}
+          onClick={()=>query.part_image&&setLightbox(true)} title={query.part_image?"Click to enlarge":undefined}>
+          {query.part_image
+            ? <img src={toImgUrl(query.part_image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+            : <span style={{fontSize:22,opacity:.3}}>🖼</span>}
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          {query.part_sku&&<div style={{fontFamily:"DM Mono,monospace",fontWeight:700,color:"var(--blue)"}}>{query.part_sku}</div>}
+          {query.part_oe_number&&<div style={{color:"var(--text3)",fontSize:12,marginTop:1}}>OE: {query.part_oe_number}</div>}
+          {(query.part_make||query.part_model)&&<div style={{color:"var(--text3)",fontSize:12,marginTop:1}}>{[query.part_make,query.part_model,query.part_year_range].filter(Boolean).join(" · ")}</div>}
+          <div style={{marginTop:6}}>👤 {query.customer_name} · 📞 {query.customer_phone}</div>
+          <div style={{marginTop:2}}>🔢 Requested qty: <strong>{query.qty_requested}</strong></div>
+        </div>
       </div>
+      {query.notes&&<div style={{marginTop:-8,marginBottom:14,color:"var(--text3)",fontStyle:"italic",fontSize:13}}>"{query.notes}"</div>}
       <FG cols="1fr 1fr">
         <div><FL label="Confirmed Price"/><input className="inp" type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} placeholder="Unit price"/></div>
         <div><FL label="Confirmed Qty"/><input className="inp" type="number" min="0" value={qty} onChange={e=>setQty(e.target.value)} placeholder="Available qty"/></div>

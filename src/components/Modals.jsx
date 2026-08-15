@@ -4823,7 +4823,6 @@ export function CustomerQueryModal({part,currentUser,onSubmit,onClose,t}) {
       part_id:part._isSupplierPart?null:part.id, supplier_part_id:part._isSupplierPart?part._supplierPartId:null,
       part_name:part.name,part_sku:part.sku||"",
       part_price:part.price||0,part_image:part.image_url||"",
-      part_oe_number:part.oe_number||"",part_make:part.make||"",part_model:part.model||"",part_year_range:part.year_range||"",
       customer_name:form.name,customer_phone:form.phone,customer_email:form.email,
       qty_requested:+form.qty||1,notes:form.notes,
       status:"pending",created_at:new Date().toISOString(),
@@ -4855,7 +4854,12 @@ export function CustomerQueryModal({part,currentUser,onSubmit,onClose,t}) {
 }
 
 // ── Customer Query Reply Modal (admin replies + requests deposit) ─────
-export function CustomerQueryReplyModal({query,onReply,onClose,t,settings,onGoInventory,onGoRFQ}) {
+// `part` is the live record looked up by the caller from already-loaded state
+// (parts or allSupplierParts, by query.part_id / query.supplier_part_id) — used
+// for image/OE/make/model/year so this always reflects the current part, not a
+// stale snapshot, and works for queries submitted before these fields existed.
+export function CustomerQueryReplyModal({query,part,onReply,onClose,t,settings,onGoInventory,onGoRFQ}) {
+  const img=part?.image_url||query.part_image;
   const [price,setPrice]=useState(query?.confirmed_price||"");
   const [qty,setQty]=useState(query?.confirmed_qty||"");
   const [notes,setNotes]=useState(query?.reply_notes||"");
@@ -4881,16 +4885,16 @@ export function CustomerQueryReplyModal({query,onReply,onClose,t,settings,onGoIn
   return (
     <Overlay onClose={onClose}>
       <MHead title={t.queryReply} sub={`${query.customer_name} — ${query.part_name}`} onClose={onClose}/>
-      {lightbox&&query.part_image&&<ImgLightbox url={toImgUrl(query.part_image)} onClose={()=>setLightbox(false)}/>}
+      {lightbox&&img&&<ImgLightbox url={toImgUrl(img)} onClose={()=>setLightbox(false)}/>}
 
       {/* Part info + quick-action buttons */}
       <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
           <div style={{display:"flex",gap:12}}>
-            <div style={{width:64,height:64,borderRadius:8,overflow:"hidden",background:"var(--surface3)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:query.part_image?"zoom-in":"default"}}
-              onClick={()=>query.part_image&&setLightbox(true)} title={query.part_image?"Click to enlarge":undefined}>
-              {query.part_image
-                ? <img src={toImgUrl(query.part_image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+            <div style={{width:64,height:64,borderRadius:8,overflow:"hidden",background:"var(--surface3)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:img?"zoom-in":"default"}}
+              onClick={()=>img&&setLightbox(true)} title={img?"Click to enlarge":undefined}>
+              {img
+                ? <img src={toImgUrl(img)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
                 : <span style={{fontSize:22,opacity:.3}}>🖼</span>}
             </div>
             <div>
@@ -4900,8 +4904,8 @@ export function CustomerQueryReplyModal({query,onReply,onClose,t,settings,onGoIn
                   SKU: {query.part_sku}
                 </div>
               )}
-              {query.part_oe_number&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>OE: {query.part_oe_number}</div>}
-              {(query.part_make||query.part_model)&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>{[query.part_make,query.part_model,query.part_year_range].filter(Boolean).join(" · ")}</div>}
+              {part?.oe_number&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>OE: {part.oe_number}</div>}
+              {(part?.make||part?.model)&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>{[part.make,part.model,part.year_range].filter(Boolean).join(" · ")}</div>}
               <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:13,color:"var(--text2)"}}>
                 <span>👤 {query.customer_name}</span>
                 <span>📞 {query.customer_phone}</span>

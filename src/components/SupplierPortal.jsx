@@ -433,15 +433,24 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SUPPLIER: MY QUERIES — customer questions about parts this supplier added
-// themselves (matched via customer_queries.supplier_part_id).
+// SUPPLIER: MY QUERIES — customer questions against either this supplier's own
+// self-added parts (matched via supplier_part_id, looked up in selfParts) or
+// existing-catalogue parts they're linked to (matched via part_id, looked up
+// in existingParts) — resolved live from already-loaded state rather than a
+// submission-time snapshot, so image/OE/make/model/year always reflect the
+// current part and work for queries submitted before this lookup existed.
 // ═══════════════════════════════════════════════════════════════
-export function SupplierQueriesPage({queries=[], onReply, onRefresh}) {
+export function SupplierQueriesPage({queries=[], existingParts=[], selfParts=[], onReply, onRefresh}) {
   const [replying, setReplying] = useState(null); // query row being replied to
+  const resolvePart=(q)=>{
+    if(q.part_id) return existingParts.find(p=>String(p.id)===String(q.part_id))||null;
+    if(q.supplier_part_id) return selfParts.find(p=>String(p.id)===String(q.supplier_part_id))||null;
+    return null;
+  };
 
   return (
     <div className="fu">
-      {replying&&<SupplierQueryReplyModal query={replying}
+      {replying&&<SupplierQueryReplyModal query={replying} part={resolvePart(replying)}
         onReply={async(id,data)=>{await onReply(id,data);setReplying(null);}}
         onClose={()=>setReplying(null)}/>}
 
@@ -457,32 +466,37 @@ export function SupplierQueriesPage({queries=[], onReply, onRefresh}) {
         <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No queries yet.</div>
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {queries.map(q=>(
+          {queries.map(q=>{
+            const p=resolvePart(q);
+            const img=p?.image_url||q.part_image;
+            return (
             <div key={q.id} className="card card-hover" style={{padding:14,cursor:"pointer",display:"flex",gap:12,alignItems:"flex-start"}} onClick={()=>setReplying(q)}>
               <div style={{width:44,height:44,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {q.part_image
-                  ? <img src={toImgUrl(q.part_image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                {img
+                  ? <img src={toImgUrl(img)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
                   : <span style={{fontSize:18,opacity:.3}}>🖼</span>}
               </div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flex:1,minWidth:0}}>
                 <div style={{minWidth:0}}>
                   <div style={{fontWeight:700,fontSize:14}}>{q.part_name}</div>
                   {q.part_sku&&<div style={{fontSize:12,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{q.part_sku}</div>}
-                  {(q.part_make||q.part_model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[q.part_make,q.part_model,q.part_year_range].filter(Boolean).join(" · ")}</div>}
+                  {(p?.make||p?.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
                   <div style={{fontSize:12,color:"var(--text2)",marginTop:4}}>👤 {q.customer_name} · 📞 {q.customer_phone} · Qty: {q.qty_requested}</div>
                   {q.notes&&<div style={{fontSize:12,color:"var(--text3)",fontStyle:"italic",marginTop:4}}>"{q.notes}"</div>}
                 </div>
                 <StatusBadge status={q.status}/>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function SupplierQueryReplyModal({query, onReply, onClose}) {
+function SupplierQueryReplyModal({query, part, onReply, onClose}) {
+  const img=part?.image_url||query.part_image;
   const [price,setPrice]=useState(query?.confirmed_price||"");
   const [qty,setQty]=useState(query?.confirmed_qty||"");
   const [notes,setNotes]=useState(query?.reply_notes||"");
@@ -499,18 +513,18 @@ function SupplierQueryReplyModal({query, onReply, onClose}) {
   return (
     <Overlay onClose={onClose}>
       <MHead title="Reply to Query" sub={`${query.customer_name} — ${query.part_name}`} onClose={onClose}/>
-      {lightbox&&query.part_image&&<ImgLightbox url={toImgUrl(query.part_image)} onClose={()=>setLightbox(false)}/>}
+      {lightbox&&img&&<ImgLightbox url={toImgUrl(img)} onClose={()=>setLightbox(false)}/>}
       <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",marginBottom:14,fontSize:13,display:"flex",gap:12}}>
-        <div style={{width:64,height:64,borderRadius:8,overflow:"hidden",background:"var(--surface3)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:query.part_image?"zoom-in":"default"}}
-          onClick={()=>query.part_image&&setLightbox(true)} title={query.part_image?"Click to enlarge":undefined}>
-          {query.part_image
-            ? <img src={toImgUrl(query.part_image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+        <div style={{width:64,height:64,borderRadius:8,overflow:"hidden",background:"var(--surface3)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:img?"zoom-in":"default"}}
+          onClick={()=>img&&setLightbox(true)} title={img?"Click to enlarge":undefined}>
+          {img
+            ? <img src={toImgUrl(img)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
             : <span style={{fontSize:22,opacity:.3}}>🖼</span>}
         </div>
         <div style={{flex:1,minWidth:0}}>
           {query.part_sku&&<div style={{fontFamily:"DM Mono,monospace",fontWeight:700,color:"var(--blue)"}}>{query.part_sku}</div>}
-          {query.part_oe_number&&<div style={{color:"var(--text3)",fontSize:12,marginTop:1}}>OE: {query.part_oe_number}</div>}
-          {(query.part_make||query.part_model)&&<div style={{color:"var(--text3)",fontSize:12,marginTop:1}}>{[query.part_make,query.part_model,query.part_year_range].filter(Boolean).join(" · ")}</div>}
+          {part?.oe_number&&<div style={{color:"var(--text3)",fontSize:12,marginTop:1}}>OE: {part.oe_number}</div>}
+          {(part?.make||part?.model)&&<div style={{color:"var(--text3)",fontSize:12,marginTop:1}}>{[part.make,part.model,part.year_range].filter(Boolean).join(" · ")}</div>}
           <div style={{marginTop:6}}>👤 {query.customer_name} · 📞 {query.customer_phone}</div>
           <div style={{marginTop:2}}>🔢 Requested qty: <strong>{query.qty_requested}</strong></div>
         </div>

@@ -5305,7 +5305,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── SUPPLIER PORTAL: MY QUERIES ── */}
         {tab==="supplierQueries"&&role==="supplier"&&(
-          <SupplierQueriesPage queries={supplierQueries} onReply={replySupplierQuery} onRefresh={reloadSupplierParts}/>
+          <SupplierQueriesPage queries={supplierQueries} existingParts={supplierExistingParts} selfParts={supplierParts} onReply={replySupplierQuery} onRefresh={reloadSupplierParts}/>
         )}
 
         {/* ── PURCHASE INVOICES ── */}
@@ -7274,7 +7274,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {isOpen("customerReturn")&&<CustomerReturnModal data={mData("customerReturn")} customers={customers} parts={parts} customerInvoices={customerInvoices} onSave={saveCustomerReturn} onClose={()=>closeM("customerReturn")} t={t} settings={settings}/>}
       {isOpen("checkout")&&<CheckoutModal cart={cart} customers={customers} cartTotal={cartTotal} role={role} currentUser={user} onPlace={placeOrder} onClose={()=>closeM("checkout")} onRemove={removeFromCart} onQty={qtyCart} t={t} lang={lang}/>}
       {isOpen("customerQuery")&&<CustomerQueryModal part={mData("customerQuery")} currentUser={user} onSubmit={submitCustomerQuery} onClose={()=>closeM("customerQuery")} t={t}/>}
-      {isOpen("queryReply")&&<CustomerQueryReplyModal query={mData("queryReply")} onReply={replyToQuery} onClose={()=>closeM("queryReply")} t={t} settings={settings}
+      {isOpen("queryReply")&&<CustomerQueryReplyModal query={mData("queryReply")}
+        part={(()=>{const q=mData("queryReply");if(!q)return null;
+          if(q.part_id) return parts.find(pt=>String(pt.id)===String(q.part_id))||null;
+          if(q.supplier_part_id) return allSupplierParts.find(sp=>String(sp.id)===String(q.supplier_part_id))||null;
+          return null;})()}
+        onReply={replyToQuery} onClose={()=>closeM("queryReply")} t={t} settings={settings}
         onGoInventory={()=>{
           const q=mData("queryReply"); closeM("queryReply"); setTab("inventory");
           if(q?.part_id){const p=parts.find(pt=>pt.id===q.part_id||pt.id===+q.part_id); if(p) openM("editPart",p);}

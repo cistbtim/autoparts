@@ -71,17 +71,10 @@ const IcGrid   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="non
 export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLoginOnly=false,initialError=""}) {
   // Referral: ?ref=<workshop id> jumps straight to workshop signup and gets stamped on the new account
   const [wsReferrerId] = useState(()=>new URLSearchParams(window.location.search).get("ref")||"");
-  // Catalog link: ?catalog=<supplier name> jumps straight to the Customer sign-in tab and,
-  // if someone registers a new account through it, scopes that account to just this
-  // supplier's parts (same idea as ?ref= above, just for customers instead of workshops).
+  // Catalog link: ?catalog=<supplier name> jumps straight to the Customer sign-in tab and
+  // pre-fills the Supplier field below — same field the customer could otherwise type
+  // into by hand, so a shared link is just a shortcut, not the only way in.
   const [catalogName] = useState(()=>new URLSearchParams(window.location.search).get("catalog")||"");
-  const [catalogSupplierId,setCatalogSupplierId] = useState("");
-  useEffect(()=>{
-    if(!catalogName) return;
-    api.fresh("suppliers",`name=ilike.${encodeURIComponent(catalogName.trim())}&select=id,name`).then(r=>{
-      if(Array.isArray(r)&&r.length>0) setCatalogSupplierId(r[0].id);
-    }).catch(()=>{});
-  },[catalogName]);
   const [authTab,setAuthTab] = useState(wsLoginOnly?"workshop":(wsReferrerId?"workshop":(catalogName?"customer":"branch")));
   // branch
   const [branchName,setBranchName] = useState("");
@@ -110,6 +103,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const [custTab,setCustTab] = useState("login");
   const [cName,setCName] = useState(""); const [cPhone,setCPhone] = useState("");
   const [cEmail,setCEmail] = useState(""); const [cPass,setCPass] = useState(""); const [cPass2,setCPass2] = useState("");
+  // Supplier field — same idea as Spare Shop's Branch Name: scopes both login and
+  // registration to one supplier's catalogue only. Empty = the main multi-supplier
+  // shop, same as today. Pre-filled from a ?catalog= link but freely editable.
+  const [custSupplierName,setCustSupplierName] = useState(catalogName||"");
 
   const [err,setErr] = useState(initialError); const [loading,setLoading] = useState(false);
   const [detectingLoc,setDetectingLoc] = useState(false);
@@ -276,12 +273,28 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     setLoading(false);
   };
 
+  // Resolves the typed Supplier field to a suppliers.id — same ilike-exact-name
+  // lookup the old catalog-link effect used, just run on submit instead of on
+  // mount so it works whether the name came from a link or was typed by hand.
+  const resolveCustSupplier = async () => {
+    const n=custSupplierName.trim();
+    if(!n) return {id:null,notFound:false};
+    const r=await api.fresh("suppliers",`name=ilike.${encodeURIComponent(n)}&select=id,name`);
+    return Array.isArray(r)&&r.length>0 ? {id:r[0].id,notFound:false} : {id:null,notFound:true};
+  };
+
   const doCustLogin = async () => {
     if(!cPhone||!cPass){setErr("Fill phone & password");return;}
     setLoading(true);setErr("");
-    const res = await api.fresh("customers",`phone=eq.${encodeURIComponent(cPhone)}&password=eq.${encodeURIComponent(cPass)}&select=*`);
+    let supId=null;
+    if(custSupplierName.trim()){
+      const {id,notFound}=await resolveCustSupplier();
+      if(notFound){setErr(`No supplier found matching "${custSupplierName}"`);setLoading(false);return;}
+      supId=id;
+    }
+    const res = await api.fresh("customers",`phone=eq.${encodeURIComponent(cPhone)}&password=eq.${encodeURIComponent(cPass)}${supId?`&supplier_scope_id=eq.${supId}`:""}&select=*`);
     if(Array.isArray(res)&&res.length>0){const c=res[0];logLogin({...c,username:c.phone,role:"customer"});onLogin({...c,username:c.phone,role:"customer",_isCustomer:true});}
-    else setErr("Phone or password incorrect");
+    else setErr(supId?`Phone/password incorrect, or this account isn't part of ${custSupplierName.trim()}'s catalogue`:"Phone or password incorrect");
     setLoading(false);
   };
 
@@ -291,9 +304,15 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     const digitsOnly=cPhone.replace(/[^0-9]/g,"");
     if(digitsOnly.length<9){setErr("Phone number too short (min 9 digits)");return;}
     setLoading(true);setErr("");
+    let supId=null;
+    if(custSupplierName.trim()){
+      const {id,notFound}=await resolveCustSupplier();
+      if(notFound){setErr(`No supplier found matching "${custSupplierName}"`);setLoading(false);return;}
+      supId=id;
+    }
     const ex = await api.fresh("customers",`phone=eq.${encodeURIComponent(cPhone)}&select=id`);
     if(Array.isArray(ex)&&ex.length>0){setErr("Phone already registered — login instead");setLoading(false);return;}
-    const res = await api.upsert("customers",{name:cName,phone:cPhone,email:cEmail,password:cPass,address:"",orders:0,total_spent:0,...(catalogSupplierId?{supplier_scope_id:catalogSupplierId}:{})});
+    const res = await api.upsert("customers",{name:cName,phone:cPhone,email:cEmail,password:cPass,address:"",orders:0,total_spent:0,...(supId?{supplier_scope_id:supId}:{})});
     const c=Array.isArray(res)?res[0]:null;
     if(c){logLogin({username:cPhone,role:"customer"});onLogin({...c,username:c.phone,role:"customer",_isCustomer:true});}
     else setErr("Registration failed");
@@ -620,6 +639,9 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                       <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Browse and order parts</div>
                     </div>
                   </div>
+                  <Field label="Supplier" hint="Leave blank for the main shop">
+                    <InpIcon inp={<input style={inpStyle} type="text" value={custSupplierName} onChange={e=>setCustSupplierName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustLogin()} placeholder="e.g. MCK" autoCapitalize="words"/>}><IcGrid/></InpIcon>
+                  </Field>
                   <Field label={t.phone||"Phone"}>
                     <InpIcon inp={<input style={inpStyle} type="tel" value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="+27..."/>}><IcUser/></InpIcon>
                   </Field>
@@ -639,6 +661,9 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
               {custTab==="register"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  <Field label="Supplier" hint="Leave blank for the main shop">
+                    <input style={inpStyle} type="text" value={custSupplierName} onChange={e=>setCustSupplierName(e.target.value)} placeholder="e.g. MCK" autoCapitalize="words"/>
+                  </Field>
                   <Field label={(t.name||"Name")+" *"}>
                     <input style={inpStyle} value={cName} onChange={e=>setCName(e.target.value)}/>
                   </Field>

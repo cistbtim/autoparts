@@ -878,10 +878,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(role!=="supplier"||!user.supplier_id) return;
     const data=await api.fresh("supplier_parts",`supplier_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
     setSupplierParts(Array.isArray(data)?data:[]);
-    // Queries customers submitted against this supplier's own self-added parts.
+    // Queries customers submitted — either against this supplier's own self-added
+    // parts (matched via supplier_part_id) or against any part while browsing this
+    // supplier's scoped catalogue, including existing-catalogue parts that have no
+    // supplier_part_id of their own (matched via supplier_scope_id, same column
+    // orders already use). Merged and de-duped since a self-added part queried
+    // through the scoped catalogue could technically match both.
     const partIds=(Array.isArray(data)?data:[]).map(p=>p.id);
-    const qr=partIds.length?await api.fresh("customer_queries",`supplier_part_id=in.(${partIds.join(",")})&select=*&order=created_at.desc`):[];
-    setSupplierQueries(Array.isArray(qr)?qr:[]);
+    const [qrBySelfPart,qrByScope]=await Promise.all([
+      partIds.length?api.fresh("customer_queries",`supplier_part_id=in.(${partIds.join(",")})&select=*&order=created_at.desc`):Promise.resolve([]),
+      api.fresh("customer_queries",`supplier_scope_id=eq.${user.supplier_id}&select=*&order=created_at.desc`).catch(()=>[]),
+    ]);
+    const seenQ=new Set();
+    const qr=[...(Array.isArray(qrBySelfPart)?qrBySelfPart:[]),...(Array.isArray(qrByScope)?qrByScope:[])]
+      .filter(q=>seenQ.has(q.id)?false:(seenQ.add(q.id),true));
+    setSupplierQueries(qr);
     // Parts already in the main inventory that admin has linked to this supplier
     // (via Link Supplier / catalogue import) — shown read-only (name/customer price/
     // stock stay admin-controlled) except for their own cost price, which lives on
@@ -2675,15 +2686,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
   // Customer Queries
   const submitCustomerQuery=async(data)=>{
-    await api.insert("customer_queries",{...data,...(_bId?{branch_id:_bId}:{})});
-    const q=await api.get("customer_queries",`${_bId?`branch_id=eq.${_bId}&`:""}select=*&order=created_at.desc`).catch(()=>[]);
-    setCustomerQueries(Array.isArray(q)?q:[]);
-    showToast("✅ Query submitted! We'll reply soon.");
     // Customer accounts scoped to one supplier's catalogue notify that supplier
     // directly (their own WhatsApp/email on file) instead of the shop's own —
     // same pattern as the order-confirm flow, since they queried through that
-    // supplier's own catalogue link.
+    // supplier's own catalogue link. supplier_scope_id is also stamped onto the
+    // row itself (same column orders already use for this) so it shows up in
+    // that supplier's own "My Queries" portal page even for an existing-catalogue
+    // part that has no supplier_part_id of its own.
     const scopedSupplier=(role==="customer"&&user.supplier_scope_id)?suppliers.find(s=>String(s.id)===String(user.supplier_scope_id)):null;
+    await api.insert("customer_queries",{...data,...(_bId?{branch_id:_bId}:{}),...(user.supplier_scope_id?{supplier_scope_id:user.supplier_scope_id}:{})});
+    const q=await api.get("customer_queries",`${_bId?`branch_id=eq.${_bId}&`:""}select=*&order=created_at.desc`).catch(()=>[]);
+    setCustomerQueries(Array.isArray(q)?q:[]);
+    showToast("✅ Query submitted! We'll reply soon.");
     const notifyWa=scopedSupplier?scopedSupplier.phone:settings.whatsapp;
     const notifyEmail=scopedSupplier?scopedSupplier.email:settings.email;
     if(notifyWa||notifyEmail){

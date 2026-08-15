@@ -5639,11 +5639,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               const newCost=+link.supplier_price||0;
               // Pre-fill cost with the supplier's new number, and pre-select a selling
               // price — the supplier's own suggested retail price if they gave one,
-              // else the standard 30%-markup price on the new cost — or the part's
-              // current price if that's already higher (never auto-suggest a cut).
-              // Same markup formula/tiers as the Stock tab's own quick-price buttons.
-              const suggested30=newCost>0?Math.round((newCost*(1+30/100))/10)*10:0;
-              const newSellPrice=Math.max(+link.suggested_price||suggested30,+p.price||0);
+              // else the top markup % on the new cost (that supplier's own numbers if
+              // they've set any, else the shop default) — or the part's current price
+              // if that's already higher (never auto-suggest a cut). Same markup
+              // formula/tiers/priority as the Stock tab's own quick-price buttons.
+              const fallbackSupplier=suppliers.find(s=>String(s.id)===String(link.supplier_id));
+              const fallbackMarginOptions=(fallbackSupplier?.margin_options?.length?fallbackSupplier.margin_options:null)
+                ||(settings.margin_options?.length?settings.margin_options:null)||[30,25,22];
+              const suggestedFallback=newCost>0?Math.round((newCost*(1+fallbackMarginOptions[0]/100))/10)*10:0;
+              const newSellPrice=Math.max(+link.suggested_price||suggestedFallback,+p.price||0);
               setTab("inventory");
               // _dismissCostUpdateLinkId: savePart clears this review flag automatically
               // once the edit that was prompted by it is actually saved. _origPrice keeps

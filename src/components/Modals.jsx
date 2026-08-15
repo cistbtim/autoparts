@@ -3323,6 +3323,16 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
   const side = part ? detectSide(f.sku, f.name) : null;
   const myFitments = part ? partFitments.filter(pf=>String(pf.part_id)===String(part.id)) : [];
 
+  // Stock tab's quick-price %s: prefer the linked supplier's own numbers (set in
+  // their portal) over the shop-wide default, so what admin sees here matches what
+  // that supplier suggested — a preferred supplier wins over "only one link", which
+  // wins over the shop default, which wins over the hardcoded fallback.
+  const stockMarginSupplierId=f.preferred_supplier_id||(partSuppliers.length===1?partSuppliers[0].supplier_id:null);
+  const stockMarginSupplier=stockMarginSupplierId?suppliers.find(s=>String(s.id)===String(stockMarginSupplierId)):null;
+  const stockMarginOptions=(stockMarginSupplier?.margin_options?.length?stockMarginSupplier.margin_options:null)
+    || (getSettings().margin_options?.length?getSettings().margin_options:null)
+    || DEFAULT_MARGIN_OPTIONS;
+
   const buildPayload=(fv)=>({
     sku:fv.sku.trim(), name:fv.name.trim(), category:fv.category, brand:fv.brand,
     price:+fv.price, cost_price:+fv.cost_price||0, stock:+fv.stock, min_stock:+fv.minStock,
@@ -3687,8 +3697,11 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               <input className="inp" type="number" value={f.cost_price} onChange={e=>s("cost_price",e.target.value)} placeholder="0.00"/>
               {f.cost_price>0&&f.price>0&&<div style={{fontSize:11,color:"var(--green)",marginTop:3}}>Margin: {(((+f.price-(+f.cost_price))/(+f.price))*100).toFixed(1)}%</div>}
               {+f.cost_price>0&&(
-                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
-                  {(getSettings().margin_options?.length?getSettings().margin_options:DEFAULT_MARGIN_OPTIONS).map(m=>{
+                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6,alignItems:"center"}}>
+                  {stockMarginSupplier?.margin_options?.length>0&&(
+                    <span style={{fontSize:10,color:"var(--text3)",width:"100%"}}>Using {stockMarginSupplier.name}'s markup %</span>
+                  )}
+                  {stockMarginOptions.map(m=>{
                     const suggested=Math.round((+f.cost_price*(1+m/100))/10)*10;
                     const active=+f.price===suggested;
                     return (

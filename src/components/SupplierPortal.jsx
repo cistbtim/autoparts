@@ -12,6 +12,12 @@ import { PrintPartLabelModal } from "./Modals.jsx";
 const MARGIN_OPTIONS=[30,25,22];
 const suggestPriceAt=(cost,marginPct)=>Math.round((+cost/(1-marginPct/100))/10)*10;
 
+// Multi-keyword search — every space-separated word must appear somewhere in the
+// part's searchable text (in any order/field), so "bmw x1 head lamp" matches a part
+// whose make/model/name between them contain all four words, not one whole phrase.
+const searchBlob=(p,code)=>[code,p.name,p.make,p.model,p.year_range,p.category,p.oe_number,p.chinese_desc].filter(Boolean).join(" ").toLowerCase();
+const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
+
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER PORTAL — self-service parts catalogue for a supplier login
 // (role:"supplier", scoped to one suppliers.id via user.supplier_id).
@@ -24,6 +30,10 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
   const [tab, setTab] = useState(existingParts.length?"existing":"mine");
+  const [search, setSearch] = useState("");
+  const keywords=search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const existingFiltered=keywords.length?existingParts.filter(p=>matchesSearch(searchBlob(p,p.sku),keywords)):existingParts;
+  const minesFiltered=keywords.length?parts.filter(p=>matchesSearch(searchBlob(p,`${supplierCode}-${p.part_code}`),keywords)):parts;
 
   // In-app "price changed since you last looked" badge — no outbound notification,
   // just a local baseline captured once when this page first mounts (i.e. what they
@@ -63,21 +73,26 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
         </div>
       </div>
 
+      <div style={{marginBottom:14}}>
+        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="Search e.g. bmw x1 head lamp — matches any word in any order"/>
+      </div>
+
       <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:16}}>
-        {[["existing",`Existing Catalogue (${existingParts.length})`],["mine",`Added by You (${parts.length})`]].map(([id,lb])=>(
+        {[["existing",`Existing Catalogue (${existingFiltered.length})`],["mine",`Added by You (${minesFiltered.length})`]].map(([id,lb])=>(
           <button key={id} className={`auth-tab ${tab===id?"on":""}`} onClick={()=>setTab(id)}>{lb}</button>
         ))}
       </div>
 
       {tab==="existing"&&(
-        existingParts.length===0 ? (
+        existingFiltered.length===0 ? (
           <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
-            Nothing linked to you in the main inventory yet.
+            {existingParts.length===0?"Nothing linked to you in the main inventory yet.":"No parts match your search."}
           </div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>Name, customer price & stock are managed by admin. Click a part to update your own cost price or photo.</div>
-            {existingParts.map(p=><PartRow key={p.id} p={p} code={p.sku} name={p.name} readOnly
+            {existingFiltered.map(p=><PartRow key={p.id} p={p} code={p.sku} name={p.name} readOnly
               priceChanged={!!(lastViewed&&p.price_updated_at&&p.price_updated_at>lastViewed)}
               onClick={onUpdateCostPrice?()=>setEditingCost(p):undefined}
               onPrintLabel={()=>setLabelPart(p)}/>)}
@@ -86,13 +101,13 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
       )}
 
       {tab==="mine"&&(
-        parts.length===0 ? (
+        minesFiltered.length===0 ? (
           <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
-            No parts yet — click "+ Add Part" to add your first one.
+            {parts.length===0?'No parts yet — click "+ Add Part" to add your first one.':"No parts match your search."}
           </div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {parts.map(p=><PartRow key={p.id} p={p} code={`${supplierCode}-${p.part_code}`} name={p.name} onClick={()=>setEditing(p)}
+            {minesFiltered.map(p=><PartRow key={p.id} p={p} code={`${supplierCode}-${p.part_code}`} name={p.name} onClick={()=>setEditing(p)}
               onPrintLabel={()=>setLabelPart({...p, sku:`${supplierCode}-${p.part_code}`})}/>)}
           </div>
         )

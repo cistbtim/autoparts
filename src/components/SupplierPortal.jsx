@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../lib/api.js";
 import { getSettings, C } from "../lib/settings.js";
-import { toImgUrl, fmtAmt, fmtDT } from "../lib/helpers.js";
+import { toImgUrl, fmtAmt, fmtDT, waLink } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 import { PrintPartLabelModal, ExtraPhotosStrip } from "./Modals.jsx";
@@ -30,7 +30,7 @@ const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
@@ -94,6 +94,8 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
         </div>
       </div>
 
+      {supplierName&&<ShareCatalogueCard supplierName={supplierName}/>}
+
       <div style={{marginBottom:14}}>
         <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Search e.g. bmw x1 head lamp — matches any word in any order"/>
@@ -137,6 +139,35 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
           </div>
         )
       )}
+    </div>
+  );
+}
+
+// A ?catalog=<supplier name> link jumps straight to the customer sign-up tab, and
+// any account registered through it is auto-scoped to just this supplier's parts
+// (see LoginPage.jsx's catalogName/catalogSupplierId handling) — that whole flow
+// already exists, this just gives the supplier an easy way to grab their own link
+// instead of hand-building the URL.
+function ShareCatalogueCard({supplierName}) {
+  const [copied,setCopied]=useState(false);
+  const link=`${window.location.origin}${window.location.pathname}?catalog=${encodeURIComponent(supplierName)}`;
+  const waMsg=`Hi! Browse our parts catalogue and create your account here:\n${link}`;
+  return (
+    <div className="card" style={{padding:"12px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+      <div style={{flex:1,minWidth:220}}>
+        <div style={{fontSize:13,fontWeight:700}}>📤 Share Your Catalogue</div>
+        <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Anyone who signs up through this link only sees your parts</div>
+        <div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--blue)",marginTop:4,wordBreak:"break-all"}}>{link}</div>
+      </div>
+      <div style={{display:"flex",gap:6,flexShrink:0}}>
+        <button type="button" className="btn btn-ghost btn-sm"
+          onClick={()=>{navigator.clipboard.writeText(link);setCopied(true);setTimeout(()=>setCopied(false),1500);}}>
+          {copied?"✅ Copied":"📋 Copy Link"}
+        </button>
+        <a href={waLink("",waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+          <button type="button" className="btn btn-ghost btn-sm" style={{background:"#25D366",color:"#fff",border:"none"}}>📲 WhatsApp</button>
+        </a>
+      </div>
     </div>
   );
 }

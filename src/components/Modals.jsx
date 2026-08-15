@@ -11,6 +11,12 @@ import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 
 const FormError = ({errors,k}) => errors[k] ? <div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {errors[k]}</div> : null;
 
+// Fallback quick-margin % buttons shown next to Cost Price — used only when
+// settings.margin_options hasn't been customized in Settings → Inventory.
+// Also the supplier portal's own fallback (via settings.margin_options) when
+// a supplier hasn't set their own margin_options on their suppliers row.
+export const DEFAULT_MARGIN_OPTIONS=[30,25,22];
+
 // ── Opposite-side part helpers ──────────────────────────────────────────────
 const _LR_MAP = {
   'Left':'Right','Right':'Left','left':'right','right':'left','LEFT':'RIGHT','RIGHT':'LEFT',
@@ -1517,6 +1523,24 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
               <button className="btn btn-primary btn-sm" onClick={addCat} disabled={!newCat.trim()}>+ Add</button>
             </div>
             <div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>Categories are saved locally on this device.</div>
+          </div>
+          <div className="card" style={{padding:22}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>💰 Suggested Markup %</h3>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>The 3 quick-price buttons shown next to Cost Price in Inventory — also the default for suppliers in their portal who haven't set their own.</div>
+            <FG cols="1fr 1fr 1fr">
+              {[0,1,2].map(i=>(
+                <div key={i}>
+                  <FL label={`Option ${i+1}`}/>
+                  <input className="inp" type="number" min="0" max="99" value={(f.margin_options||DEFAULT_MARGIN_OPTIONS)[i]}
+                    onChange={e=>{
+                      const cur=[...(f.margin_options||DEFAULT_MARGIN_OPTIONS)];
+                      cur[i]=+e.target.value||0;
+                      s("margin_options",cur);
+                    }}/>
+                </div>
+              ))}
+            </FG>
+            <button className="btn btn-primary btn-sm" style={{marginTop:10}} onClick={()=>onSave({margin_options:f.margin_options||DEFAULT_MARGIN_OPTIONS})}>💾 Save Markup %</button>
           </div>
           <div className="card" style={{padding:22}}>
             <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🏷️ Part Label Size</h3>
@@ -3664,7 +3688,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               {f.cost_price>0&&f.price>0&&<div style={{fontSize:11,color:"var(--green)",marginTop:3}}>Margin: {(((+f.price-(+f.cost_price))/(+f.price))*100).toFixed(1)}%</div>}
               {+f.cost_price>0&&(
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
-                  {[30,25,22].map(m=>{
+                  {(getSettings().margin_options?.length?getSettings().margin_options:DEFAULT_MARGIN_OPTIONS).map(m=>{
                     const suggested=Math.round((+f.cost_price/(1-m/100))/10)*10;
                     const active=+f.price===suggested;
                     return (

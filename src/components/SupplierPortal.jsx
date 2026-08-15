@@ -4,12 +4,17 @@ import { getSettings, C } from "../lib/settings.js";
 import { toImgUrl, fmtAmt, fmtDT, waLink } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
-import { PrintPartLabelModal, ExtraPhotosStrip } from "./Modals.jsx";
+import { PrintPartLabelModal, ExtraPhotosStrip, DEFAULT_MARGIN_OPTIONS } from "./Modals.jsx";
 
 // Margin brackets a supplier can one-tap into a suggested retail price — same
-// buckets and same "round to nearest 10" behaviour as the admin Inventory
-// PartModal's Stock tab, so the two flows feel identical.
-const MARGIN_OPTIONS=[30,25,22];
+// "round to nearest 10" behaviour as the admin Inventory PartModal's Stock
+// tab. A supplier can customize their own 3 numbers (suppliers.margin_options);
+// falls back to the shop-wide default (settings.margin_options), then the
+// hardcoded default if neither has been set.
+const resolveMarginOptions=(supplierOwn)=>
+  (supplierOwn&&supplierOwn.length?supplierOwn:null) ||
+  (getSettings().margin_options?.length?getSettings().margin_options:null) ||
+  DEFAULT_MARGIN_OPTIONS;
 const suggestPriceAt=(cost,marginPct)=>Math.round((+cost/(1-marginPct/100))/10)*10;
 
 // photos/fitments are stored as JSON-stringified arrays (same convention as
@@ -30,12 +35,13 @@ const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
   const [fitmentTarget, setFitmentTarget] = useState(null); // {part, kind:"existing"|"self"} — row having its vehicle fits edited
   const [tab, setTab] = useState(existingParts.length?"existing":"mine");
+  const effectiveMarginOptions=resolveMarginOptions(marginOptions);
   const [search, setSearch] = useState("");
   const keywords=search.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const existingFiltered=keywords.length?existingParts.filter(p=>matchesSearch(searchBlob(p,p.sku),keywords)):existingParts;
@@ -55,12 +61,12 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
 
   return (
     <div className="fu">
-      {editing&&<SupplierPartModal part={editing} supplierCode={supplierCode}
+      {editing&&<SupplierPartModal part={editing} supplierCode={supplierCode} marginOptions={effectiveMarginOptions}
         onSave={async(data)=>{await onSave(data);setEditing(null);}}
         onDelete={editing.id?async()=>{await onDelete(editing.id);setEditing(null);}:null}
         onClose={()=>setEditing(null)}/>}
 
-      {editingCost&&<SupplierCostPriceModal part={editingCost}
+      {editingCost&&<SupplierCostPriceModal part={editingCost} marginOptions={effectiveMarginOptions}
         onSave={async(data)=>{await onUpdateCostPrice(editingCost,data);setEditingCost(null);}}
         onClose={()=>setEditingCost(null)}/>}
 
@@ -95,6 +101,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
       </div>
 
       {supplierName&&<ShareCatalogueCard supplierName={supplierName}/>}
+      {onUpdateMarginOptions&&<MarkupOptionsCard marginOptions={marginOptions} effectiveMarginOptions={effectiveMarginOptions} onSave={onUpdateMarginOptions}/>}
 
       <div style={{marginBottom:14}}>
         <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
@@ -172,6 +179,48 @@ function ShareCatalogueCard({supplierName}) {
   );
 }
 
+// Lets a supplier customize their own 3 quick-margin buttons (suppliers.margin_options)
+// instead of always using the shop-wide default. marginOptions is the raw stored
+// value (null if not customized); effectiveMarginOptions is what's actually in use
+// right now (own → shop default → hardcoded), shown as the starting point to edit.
+function MarkupOptionsCard({marginOptions, effectiveMarginOptions, onSave}) {
+  const [editing,setEditing]=useState(false);
+  const [vals,setVals]=useState(effectiveMarginOptions);
+  const [saving,setSaving]=useState(false);
+  const isCustom=!!(marginOptions&&marginOptions.length);
+  const startEdit=()=>{setVals(effectiveMarginOptions);setEditing(true);};
+  const save=async()=>{setSaving(true);await onSave(vals.map(v=>+v||0));setSaving(false);setEditing(false);};
+  const reset=async()=>{setSaving(true);await onSave(null);setSaving(false);setEditing(false);};
+  return (
+    <div className="card" style={{padding:"12px 14px",marginBottom:14}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:220}}>
+          <div style={{fontSize:13,fontWeight:700}}>💰 Your Suggested Markup %</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>
+            {isCustom?"Using your own percentages":"Using the shop's default percentages"} — shown as quick-price buttons next to Cost Price
+          </div>
+        </div>
+        {!editing&&<button type="button" className="btn btn-ghost btn-sm" onClick={startEdit}>✏️ Edit</button>}
+      </div>
+      {editing&&(
+        <div style={{marginTop:10}}>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {[0,1,2].map(i=>(
+              <input key={i} className="inp" type="number" min="0" max="99" style={{width:90}}
+                value={vals[i]} onChange={e=>setVals(v=>v.map((x,idx)=>idx===i?+e.target.value||0:x))}/>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:10}}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>Cancel</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
+            {isCustom&&<button type="button" className="btn btn-ghost btn-sm" onClick={reset} disabled={saving}>Reset to shop default</button>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, onEditFitments, fitCount=0}) {
   return (
     <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",cursor:onClick?"pointer":"default",
@@ -209,7 +258,7 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, 
   );
 }
 
-function SupplierCostPriceModal({part, onSave, onClose}) {
+function SupplierCostPriceModal({part, marginOptions=DEFAULT_MARGIN_OPTIONS, onSave, onClose}) {
   const [price, setPrice] = useState(part._supplierPrice ?? "");
   const [suggestedPrice, setSuggestedPrice] = useState(part._suggestedPrice ?? null);
   const [imageUrl, setImageUrl] = useState(part.image_url ?? "");
@@ -238,7 +287,7 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
         <input className="inp" type="number" min="0" step="0.01" autoFocus value={price} onChange={e=>{setPrice(e.target.value);setSuggestedPrice(null);}} placeholder="0"/>
         {+price>0&&(
           <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
-            {MARGIN_OPTIONS.map(m=>{
+            {marginOptions.map(m=>{
               const suggested=suggestPriceAt(price,m);
               const active=suggestedPrice===suggested;
               return (
@@ -314,7 +363,7 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
   );
 }
 
-function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
+function SupplierPartModal({part, supplierCode, marginOptions=DEFAULT_MARGIN_OPTIONS, onSave, onDelete, onClose}) {
   const isEdit=!!part?.id;
   const [f,setF]=useState(isEdit?{
     part_code:part.part_code||"", name:part.name||"", chinese_desc:part.chinese_desc||"",
@@ -361,7 +410,7 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
           <input className="inp" type="number" value={f.cost_price} onChange={e=>s("cost_price",e.target.value)} placeholder="0"/>
           {+f.cost_price>0&&(
             <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
-              {MARGIN_OPTIONS.map(m=>{
+              {marginOptions.map(m=>{
                 const suggested=suggestPriceAt(f.cost_price,m);
                 const active=+f.suggested_price===suggested;
                 return (

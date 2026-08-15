@@ -194,6 +194,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [supplierCostUpdates,setSupplierCostUpdates]=useState([]); // admin: existing parts whose supplier just updated their cost
   const [supplierOrders,setSupplierOrders]=useState([]); // orders placed by this supplier's scoped customers
   const [supplierQueries,setSupplierQueries]=useState([]); // customer_queries against this supplier's own self-added parts
+  const [supplierMarginOptions,setSupplierMarginOptions]=useState(null); // this supplier's own custom quick-margin %s (suppliers.margin_options), null = using shop default
   const [supplierSearch,setSupplierSearch]=useState("");
   const [supplierOriginFilter,setSupplierOriginFilter]=useState("all");
   const [supplierTypeFilter,setSupplierTypeFilter]=useState([]);
@@ -878,6 +879,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(role!=="supplier"||!user.supplier_id) return;
     const data=await api.fresh("supplier_parts",`supplier_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
     setSupplierParts(Array.isArray(data)?data:[]);
+    api.fresh("suppliers",`id=eq.${user.supplier_id}&select=margin_options`).then(r=>{
+      const opts=Array.isArray(r)&&r[0]?.margin_options;
+      setSupplierMarginOptions(Array.isArray(opts)&&opts.length?opts:null);
+    }).catch(()=>{});
     // Queries customers submitted — either against this supplier's own self-added
     // parts (matched via supplier_part_id) or against any part while browsing this
     // supplier's scoped catalogue, including existing-catalogue parts that have no
@@ -2501,6 +2506,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     api.insert("part_price_history",{part_id:part.id,sku:part.sku,old_cost_price:part._supplierPrice||null,new_cost_price:price||null,
       source:"supplier_cost_update",changed_by:user.supplier_name||user.supplier_code||user.username||""}).catch(()=>{});
     showToast("✅ Cost price updated");
+  };
+  // Supplier customizing their own quick-margin % buttons (suppliers.margin_options).
+  // opts=null clears the customization back to the shop-wide default.
+  const updateSupplierMarginOptions=async(opts)=>{
+    await api.patch("suppliers","id",user.supplier_id,{margin_options:opts});
+    setSupplierMarginOptions(opts);
+    showToast(opts?"✅ Markup % updated":"Reset to shop default");
   };
   const deleteSupplier=async(id)=>{
     const s=suppliers.find(x=>x.id===id);
@@ -5319,7 +5331,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             supplierName={user.supplier_name||""}
             onSave={saveSupplierPart} onDelete={deleteSupplierPart} onRefresh={reloadSupplierParts}
             onUpdateCostPrice={updateSupplierCostPrice}
-            vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onAddSelfFitment={saveSupplierSelfFitment} onDeleteFitment={deleteFitment}/>
+            vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onAddSelfFitment={saveSupplierSelfFitment} onDeleteFitment={deleteFitment}
+            marginOptions={supplierMarginOptions} onUpdateMarginOptions={updateSupplierMarginOptions}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY ORDERS ── */}

@@ -303,7 +303,12 @@ function SupplierCostPriceModal({part, marginOptions=DEFAULT_MARGIN_OPTIONS, onS
             })}
           </div>
         )}
-        {suggestedPrice!=null&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Suggested retail price for admin to review: <strong style={{color:"var(--text2)"}}>{C()}{suggestedPrice.toLocaleString()}</strong></div>}
+        {suggestedPrice!=null&&(
+          <div style={{marginTop:10,padding:"10px 14px",borderRadius:10,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <span style={{fontSize:12,fontWeight:600,color:"var(--text2)"}}>Suggested retail price for admin to review</span>
+            <span style={{fontSize:22,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{C()}{suggestedPrice.toLocaleString()}</span>
+          </div>
+        )}
       </FD>
 
       <FD>
@@ -429,7 +434,12 @@ function SupplierPartModal({part, supplierCode, marginOptions=DEFAULT_MARGIN_OPT
         </div>
         <div><FL label="Stock"/><input className="inp" type="number" value={f.stock} onChange={e=>s("stock",+e.target.value||0)}/></div>
       </FG>
-      {+f.suggested_price>0&&<div style={{fontSize:11,color:"var(--text3)",marginTop:-8,marginBottom:14}}>Your suggested retail price for admin to review: <strong style={{color:"var(--text2)"}}>{C()}{(+f.suggested_price).toLocaleString()}</strong></div>}
+      {+f.suggested_price>0&&(
+        <div style={{marginTop:-4,marginBottom:14,padding:"10px 14px",borderRadius:10,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+          <span style={{fontSize:12,fontWeight:600,color:"var(--text2)"}}>Suggested retail price for admin to review</span>
+          <span style={{fontSize:22,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{C()}{(+f.suggested_price).toLocaleString()}</span>
+        </div>
+      )}
 
       <FD>
         <FL label="Photo"/>

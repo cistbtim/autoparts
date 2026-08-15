@@ -1383,6 +1383,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           old_cost_price:origCostPrice||null,new_cost_price:d2.cost_price||null,source:"admin_edit",changed_by:user.name||user.username||""}).catch(()=>{});
       }
       if(ep._dismissCostUpdateLinkId) dismissSupplierCostUpdate(ep._dismissCostUpdateLinkId);
+      // Auto-fill the linked supplier's own cost (part_suppliers.supplier_price) to
+      // match, when there's exactly one linked supplier and they haven't entered
+      // their own value yet via their portal — a convenience default only, never
+      // overwriting a supplier-entered price (that stays theirs to manage).
+      if(+origCostPrice!==+d2.cost_price&&+d2.cost_price>0){
+        const links=partSuppliers.filter(ps=>String(ps.part_id)===String(ep.id));
+        if(links.length===1&&(links[0].supplier_price==null||links[0].supplier_price==="")){
+          api.patch("part_suppliers","id",links[0].id,{supplier_price:d2.cost_price}).then(()=>{
+            setPartSuppliers(prev=>prev.map(ps=>ps.id===links[0].id?{...ps,supplier_price:d2.cost_price}:ps));
+          }).catch(()=>{});
+        }
+      }
       showToast("Part updated");
       // Update local parts state — no full reload needed
       const updated={...ep,...d2};

@@ -2457,14 +2457,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // suggestedPrice is just a hint for admin's "Supplier Pricing" review — it never
   // touches parts.price itself. imageUrl (if changed) does patch parts.image_url
   // directly since the product photo isn't admin-exclusive like name/price/stock.
-  const updateSupplierCostPrice=async(part,{price,suggestedPrice,imageUrl})=>{
+  const updateSupplierCostPrice=async(part,{price,suggestedPrice,imageUrl,photos})=>{
     // cost_updated_at flags this link for admin's "Supplier Pricing" review list —
     // cleared (not just left stale) once admin dismisses/reviews it, so the flag
     // means "needs a look", not "was ever changed".
     await api.patch("part_suppliers","id",part._linkId,{supplier_price:price,suggested_price:suggestedPrice??null,cost_updated_at:new Date().toISOString()});
     const photoChanged=imageUrl!=null&&imageUrl!==part.image_url;
-    if(photoChanged) await api.patch("parts","id",part.id,{image_url:imageUrl});
-    setSupplierExistingParts(prev=>prev.map(p=>p._linkId===part._linkId?{...p,_supplierPrice:price,_suggestedPrice:suggestedPrice??null,...(photoChanged?{image_url:imageUrl}:{})}:p));
+    // parts.photos is jsonb — Supabase already returns it as a real array, not a
+    // JSON string (same convention as the main Inventory PartModal), so this is
+    // just a defensive normalize, not a parse of stringified JSON.
+    const prevPhotos=Array.isArray(part.photos)?part.photos:[];
+    const photosChanged=photos!=null&&JSON.stringify(photos)!==JSON.stringify(prevPhotos);
+    if(photoChanged||photosChanged) await api.patch("parts","id",part.id,{...(photoChanged?{image_url:imageUrl}:{}),...(photosChanged?{photos}:{})});
+    setSupplierExistingParts(prev=>prev.map(p=>p._linkId===part._linkId?{...p,_supplierPrice:price,_suggestedPrice:suggestedPrice??null,...(photoChanged?{image_url:imageUrl}:{}),...(photosChanged?{photos}:{})}:p));
     api.insert("part_price_history",{part_id:part.id,sku:part.sku,old_cost_price:part._supplierPrice||null,new_cost_price:price||null,
       source:"supplier_cost_update",changed_by:user.supplier_name||user.supplier_code||user.username||""}).catch(()=>{});
     showToast("✅ Cost price updated");

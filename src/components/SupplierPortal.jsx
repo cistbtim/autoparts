@@ -4,13 +4,18 @@ import { getSettings, C } from "../lib/settings.js";
 import { toImgUrl, fmtAmt, fmtDT } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.jsx";
 import { PartPhotoUploader } from "./RfqVehicles.jsx";
-import { PrintPartLabelModal } from "./Modals.jsx";
+import { PrintPartLabelModal, ExtraPhotosStrip } from "./Modals.jsx";
 
 // Margin brackets a supplier can one-tap into a suggested retail price — same
 // buckets and same "round to nearest 10" behaviour as the admin Inventory
 // PartModal's Stock tab, so the two flows feel identical.
 const MARGIN_OPTIONS=[30,25,22];
 const suggestPriceAt=(cost,marginPct)=>Math.round((+cost/(1-marginPct/100))/10)*10;
+
+// photos/fitments are stored as JSON-stringified arrays (same convention as
+// parts.photos in the main Inventory PartModal) — parse defensively since the
+// column may be null, "", or already-invalid JSON from manual DB edits.
+const parseJsonArray=(v)=>{ if(Array.isArray(v)) return v; try{ const a=JSON.parse(v||"[]"); return Array.isArray(a)?a:[]; }catch{ return []; } };
 
 // Multi-keyword search — every space-separated word must appear somewhere in the
 // part's searchable text (in any order/field), so "bmw x1 head lamp" matches a part
@@ -151,6 +156,8 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
   const [price, setPrice] = useState(part._supplierPrice ?? "");
   const [suggestedPrice, setSuggestedPrice] = useState(part._suggestedPrice ?? null);
   const [imageUrl, setImageUrl] = useState(part.image_url ?? "");
+  const [photos, setPhotos] = useState(()=>parseJsonArray(part.photos));
+  const [lightbox, setLightbox] = useState(null); // {idx} — urls built from imageUrl + photos
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -195,6 +202,17 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
       <FD>
         <FL label="Photo"/>
         <PartPhotoUploader imageUrl={imageUrl} onChange={setImageUrl} sku={part.sku} t={{}} bucket="cars_parts"/>
+        <ExtraPhotosStrip photos={photos} onChange={setPhotos} sku={part.sku}
+          onOpenLightbox={i=>setLightbox({idx:imageUrl?i+1:i})}
+          onMakeCover={extraIdx=>{
+            const newCover=photos[extraIdx];
+            if(!newCover) return;
+            setPhotos([...(imageUrl?[imageUrl]:[]), ...photos.filter((_,i)=>i!==extraIdx)]);
+            setImageUrl(newCover);
+          }}/>
+        {lightbox&&(
+          <ImgLightbox urls={[imageUrl,...photos].filter(Boolean)} startIdx={lightbox.idx} onClose={()=>setLightbox(null)}/>
+        )}
       </FD>
 
       <div style={{marginBottom:14}}>
@@ -231,7 +249,7 @@ function SupplierCostPriceModal({part, onSave, onClose}) {
       <div style={{display:"flex",gap:10}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} disabled={saving||price===""}
-          onClick={async()=>{setSaving(true);await onSave({price:+price,suggestedPrice,imageUrl});setSaving(false);}}>
+          onClick={async()=>{setSaving(true);await onSave({price:+price,suggestedPrice,imageUrl,photos});setSaving(false);}}>
           {saving?"Saving…":"Save"}
         </button>
       </div>
@@ -246,9 +264,14 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
     category:part.category||"", cost_price:part.cost_price??"", stock:part.stock??0,
     image_url:part.image_url||"", make:part.make||"", model:part.model||"",
     year_range:part.year_range||"", oe_number:part.oe_number||"", suggested_price:part.suggested_price??"",
-  }:{part_code:"",name:"",chinese_desc:"",category:"",cost_price:"",stock:0,image_url:"",make:"",model:"",year_range:"",oe_number:"",suggested_price:""});
+    photos:parseJsonArray(part.photos), fitments:parseJsonArray(part.fitments),
+  }:{part_code:"",name:"",chinese_desc:"",category:"",cost_price:"",stock:0,image_url:"",make:"",model:"",year_range:"",oe_number:"",suggested_price:"",photos:[],fitments:[]});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const canSave=f.part_code.trim()&&f.name.trim();
+  const [lightbox,setLightbox]=useState(null); // {idx} — urls built from f.image_url + f.photos
+  const addFitment=()=>s("fitments",[...f.fitments,{make:"",model:"",year_range:""}]);
+  const updateFitment=(i,k,v)=>s("fitments",f.fitments.map((fit,idx)=>idx===i?{...fit,[k]:v}:fit));
+  const removeFitment=(i)=>s("fitments",f.fitments.filter((_,idx)=>idx!==i));
 
   return (
     <Overlay onClose={onClose}>
@@ -267,6 +290,22 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
         <div><FL label="Model"/><input className="inp" value={f.model} onChange={e=>s("model",e.target.value)} placeholder="X3"/></div>
         <div><FL label="Year"/><input className="inp" value={f.year_range} onChange={e=>s("year_range",e.target.value)} placeholder="2021-2024"/></div>
       </FG>
+
+      <FD>
+        <FL label="Also Fits (additional fitment vehicles)"/>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {f.fitments.map((fit,i)=>(
+            <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:6}}>
+              <input className="inp" value={fit.make} onChange={e=>updateFitment(i,"make",e.target.value)} placeholder="Make"/>
+              <input className="inp" value={fit.model} onChange={e=>updateFitment(i,"model",e.target.value)} placeholder="Model"/>
+              <input className="inp" value={fit.year_range} onChange={e=>updateFitment(i,"year_range",e.target.value)} placeholder="2018-2022"/>
+              <button type="button" className="btn btn-ghost btn-sm" title="Remove" onClick={()=>removeFitment(i)}>🗑</button>
+            </div>
+          ))}
+          <button type="button" className="btn btn-ghost btn-sm" style={{alignSelf:"flex-start"}} onClick={addFitment}>+ Add Vehicle</button>
+        </div>
+      </FD>
+
       <FG>
         <div><FL label="OE Number"/><input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)}/></div>
         <div><FL label="Category"/><input className="inp" value={f.category} onChange={e=>s("category",e.target.value)} placeholder="Body, Engine..."/></div>
@@ -300,6 +339,16 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
       <FD>
         <FL label="Photo"/>
         <PartPhotoUploader imageUrl={f.image_url} onChange={url=>s("image_url",url)} sku={`${supplierCode}-${f.part_code||"part"}`} t={{}} bucket="cars_parts"/>
+        <ExtraPhotosStrip photos={f.photos} onChange={photos=>s("photos",photos)} sku={`${supplierCode}-${f.part_code||"part"}`}
+          onOpenLightbox={i=>setLightbox({idx:f.image_url?i+1:i})}
+          onMakeCover={extraIdx=>{
+            const newCover=f.photos[extraIdx];
+            if(!newCover) return;
+            setF(p=>({...p, image_url:newCover, photos:[...(p.image_url?[p.image_url]:[]), ...p.photos.filter((_,i)=>i!==extraIdx)]}));
+          }}/>
+        {lightbox&&(
+          <ImgLightbox urls={[f.image_url,...f.photos].filter(Boolean)} startIdx={lightbox.idx} onClose={()=>setLightbox(null)}/>
+        )}
       </FD>
 
       {isEdit&&(

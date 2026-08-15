@@ -3100,7 +3100,7 @@ function GrabImageOverlay({supplierUrl,partSku,onSave,onClose}) {
 // Unlimited extra photos for a part — thumbnail strip + add/remove. Uploads go
 // straight to Supabase Storage (no AI background removal — these are quick
 // reference shots, unlike the primary catalog photo).
-function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeCover}) {
+export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeCover}) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);

@@ -47,13 +47,13 @@ export const ShopLogo = ({settings, size="md", style={}}) => {
 };
 
 export const MotorDeskBanner = () => (
-  <div style={{position:"relative",background:"linear-gradient(135deg,#080d14 0%,#111827 55%,#0c1420 100%)",borderRadius:12,padding:"28px 24px 20px",overflow:"hidden",textAlign:"center"}}>
+  <div style={{position:"relative",background:"linear-gradient(135deg,#080d14 0%,#111827 55%,#0c1420 100%)",borderRadius:12,padding:"16px 20px 12px",overflow:"hidden",textAlign:"center"}}>
     {/* Ambient glow circles */}
     <div style={{position:"absolute",top:-40,right:-40,width:180,height:180,borderRadius:"50%",background:"rgba(249,115,22,0.07)",pointerEvents:"none"}}/>
     <div style={{position:"absolute",bottom:-50,left:-50,width:200,height:200,borderRadius:"50%",background:"rgba(249,115,22,0.04)",pointerEvents:"none"}}/>
     {/* Icon + name row */}
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:18,marginBottom:10,position:"relative"}}>
-      <svg width="52" height="52" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0,filter:"drop-shadow(0 0 10px rgba(249,115,22,0.5))"}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:14,marginBottom:6,position:"relative"}}>
+      <svg width="38" height="38" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0,filter:"drop-shadow(0 0 10px rgba(249,115,22,0.5))"}}>
         <circle cx="32" cy="32" r="30" fill="rgba(249,115,22,0.12)"/>
         <g transform="translate(32,32)">
           <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316"/>
@@ -75,14 +75,14 @@ export const MotorDeskBanner = () => (
         </g>
       </svg>
       <div style={{textAlign:"left"}}>
-        <div style={{fontSize:46,fontWeight:900,fontFamily:"Rajdhani,sans-serif",letterSpacing:"1px",lineHeight:1,background:"linear-gradient(90deg,#f97316 0%,#fb923c 60%,#fdba74 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>MotorDesk</div>
-        <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",letterSpacing:".18em",textTransform:"uppercase",fontWeight:700,marginTop:3}}>Automotive Workshop Management</div>
+        <div style={{fontSize:32,fontWeight:900,fontFamily:"Rajdhani,sans-serif",letterSpacing:"1px",lineHeight:1,background:"linear-gradient(90deg,#f97316 0%,#fb923c 60%,#fdba74 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>MotorDesk</div>
+        <div style={{fontSize:9,color:"rgba(255,255,255,0.4)",letterSpacing:".16em",textTransform:"uppercase",fontWeight:700,marginTop:2}}>Automotive Workshop Management</div>
       </div>
     </div>
     {/* Divider */}
-    <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(249,115,22,0.5),transparent)",margin:"14px 0 12px",position:"relative"}}/>
+    <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(249,115,22,0.5),transparent)",margin:"8px 0 8px",position:"relative"}}/>
     {/* Feature badges */}
-    <div style={{display:"flex",justifyContent:"center",gap:20,flexWrap:"wrap",position:"relative"}}>
+    <div style={{display:"flex",justifyContent:"center",gap:16,flexWrap:"wrap",position:"relative"}}>
       {["BOOK IN","QUOTATION","INVOICE","REPORTS"].map(b=>(
         <span key={b} style={{fontSize:9,fontWeight:800,color:"rgba(255,255,255,0.35)",letterSpacing:".14em"}}>{b}</span>
       ))}

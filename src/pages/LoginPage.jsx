@@ -41,7 +41,7 @@ const ErrBox = ({msg}) => (
 /* Stitch-style field — uppercase label + optional right hint */
 const Field = ({label, hint, children}) => (
   <div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
       <label style={{fontSize:10,fontWeight:700,color:"var(--text3)",letterSpacing:".08em",textTransform:"uppercase"}}>{label}</label>
       {hint&&<span style={{fontSize:11,color:"var(--accent)",cursor:"pointer",fontWeight:500}}>{hint}</span>}
     </div>
@@ -337,23 +337,19 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const companyInpStyle = {...inpStyle, borderColor:"rgba(37,99,235,.25)", background:"rgba(37,99,235,.03)"};
 
   return (
-    <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 16px"}}>
+    <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",padding:"20px 16px"}}>
       <style>{CSS}</style>
       <div style={{width:"100%",maxWidth:480}}>
 
         {/* Logo card */}
-        <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:14,padding:"20px",textAlign:"center",marginBottom:18,boxShadow:"var(--shadow)"}}>
+        <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:14,padding:"12px",textAlign:"center",marginBottom:10,boxShadow:"var(--shadow)"}}>
           <MotorDeskBanner/>
-          {langs.length>1&&(
-            <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:10}}>
-              {langs.map(l=>(
-                <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
-                  {l.flag||l.lang.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
-          <div style={{display:"flex",justifyContent:"center",marginTop:10}}>
+          <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:10,marginTop:8,flexWrap:"wrap"}}>
+            {langs.length>1&&langs.map(l=>(
+              <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
+                {l.flag||l.lang.toUpperCase()}
+              </button>
+            ))}
             {dbStatus==="checking"&&<span style={{fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}><span style={{width:6,height:6,borderRadius:"50%",background:"var(--text3)",display:"inline-block",opacity:.5}}/>Checking…</span>}
             {dbStatus==="connected"&&<span style={{fontSize:11,fontWeight:600,color:"#16a34a",display:"flex",alignItems:"center",gap:5,padding:"3px 10px",borderRadius:20,background:"rgba(22,163,74,.1)",border:"1px solid rgba(22,163,74,.25)"}}><span style={{width:6,height:6,borderRadius:"50%",background:"#16a34a",display:"inline-block"}}/>Database Connected</span>}
             {dbStatus==="disconnected"&&<span style={{fontSize:11,fontWeight:600,color:"var(--red)",display:"flex",alignItems:"center",gap:5,padding:"3px 10px",borderRadius:20,background:"rgba(220,38,38,.07)",border:"1px solid rgba(220,38,38,.2)"}}><span style={{width:6,height:6,borderRadius:"50%",background:"var(--red)",display:"inline-block"}}/>Disconnected</span>}
@@ -362,17 +358,17 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
         {/* Module tabs — hidden in workshop-only mode */}
         {!wsLoginOnly&&(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:10}}>
           {TAB_BTNS.map(({id,Icon,label})=>(
             <button key={id} onClick={()=>switchTab(id)} style={{
-              padding:"12px 4px 10px",borderRadius:12,
+              padding:"7px 4px 6px",borderRadius:10,
               border:`1.5px solid ${authTab===id?"var(--accent)":"var(--border2)"}`,
               cursor:"pointer",
               background:authTab===id?"var(--accent)":"var(--surface)",
               color:authTab===id?"#fff":"var(--text3)",
               fontWeight:authTab===id?700:500,
               fontSize:10,letterSpacing:".06em",textTransform:"uppercase",
-              display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+              display:"flex",flexDirection:"column",alignItems:"center",gap:4,
               boxShadow:authTab===id?"0 4px 14px rgba(249,115,22,.25)":"none",
               transition:"all .15s",
             }}>
@@ -384,15 +380,15 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
         )}
 
         {/* Card */}
-        <div style={{background:"var(--surface)",borderRadius:16,border:"1px solid var(--border2)",boxShadow:"var(--shadow-lg)",padding:"28px 26px",overflow:"hidden"}}>
+        <div style={{background:"var(--surface)",borderRadius:16,border:"1px solid var(--border2)",boxShadow:"var(--shadow-lg)",padding:"18px 20px",overflow:"hidden"}}>
 
           {/* ── Branch ── */}
           {authTab==="branch"&&(
-            <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
-                <div style={{width:38,height:38,borderRadius:10,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcBox/></div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:0}}>
+                <div style={{width:32,height:32,borderRadius:9,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcBox/></div>
                 <div>
-                  <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginSpareShop||"Spare Shop"} {t.signIn||"Login"}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:"var(--text)"}}>{t.loginSpareShop||"Spare Shop"} {t.signIn||"Login"}</div>
                   <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginSpareShopSub||"Sign in to your spare parts shop"}</div>
                 </div>
               </div>
@@ -407,7 +403,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               </Field>
               {err&&<ErrBox msg={err}/>}
               {waRenewLink}
-              <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doBranchLogin} disabled={loading}>
+              <button className="btn btn-primary" style={{width:"100%",padding:"11px",fontSize:15,borderRadius:10,marginTop:0}} onClick={doBranchLogin} disabled={loading}>
                 {loading?t.connecting||"Connecting…":"Sign In →"}
               </button>
             </div>

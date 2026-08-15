@@ -908,15 +908,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setSupplierExistingParts(existing);
     // Vehicle fitments — the supplier login skips loadAll() entirely (see loadAll's
     // early return for role==="supplier"), so vehicles/part_fitments are otherwise
-    // never loaded here. Reuses the same shared state (and saveFitment/deleteFitment
-    // below) as the admin Inventory page's Vehicle Fits tab, scoped to just the
-    // fitments on this supplier's own linked existing-catalogue parts.
-    const [vehRows,fitRows]=await Promise.all([
+    // never loaded here. Reuses the same shared state (and saveFitment/deleteFitment/
+    // addSupplierSelfFitment below) as the admin Inventory page's Vehicle Fits tab —
+    // fetched for both existing-catalogue parts (part_id) and this supplier's own
+    // self-added parts (supplier_part_id) and merged into one list.
+    const [vehRows,fitRowsExisting,fitRowsSelf]=await Promise.all([
       api.fresh("vehicles","select=*&order=make.asc,model.asc,year_from.asc").catch(()=>[]),
       ids.length?api.fresh("part_fitments",`part_id=in.(${ids.join(",")})&select=*`).catch(()=>[]):Promise.resolve([]),
+      partIds.length?api.fresh("part_fitments",`supplier_part_id=in.(${partIds.join(",")})&select=*`).catch(()=>[]):Promise.resolve([]),
     ]);
     setVehicles(Array.isArray(vehRows)?vehRows:[]);
-    setPartFitments(Array.isArray(fitRows)?fitRows:[]);
+    setPartFitments([...(Array.isArray(fitRowsExisting)?fitRowsExisting:[]),...(Array.isArray(fitRowsSelf)?fitRowsSelf:[])]);
     // Orders placed by customers scoped to this supplier's catalogue (stamped at checkout).
     const ord=await api.fresh("orders",`supplier_scope_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
     setSupplierOrders(Array.isArray(ord)?ord:[]);
@@ -2348,6 +2350,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await api.delete("part_fitments","id",id);
     setPartFitments(prev=>prev.filter(f=>String(f.id)!==String(id)));
     showToast("Removed","err");
+  };
+  // Same as saveFitment but for a supplier's own self-added part (supplier_parts.id,
+  // not a real parts.id) — links via part_fitments.supplier_part_id instead of
+  // part_id so self-added parts can share the exact same Vehicle Fits UI/table as
+  // existing-catalogue parts. deleteFitment above works unchanged for either kind
+  // since it just deletes by the fitment row's own id.
+  const saveSupplierSelfFitment=async(supplierPartId,vehicleId)=>{
+    const r=await api.upsert("part_fitments",{supplier_part_id:supplierPartId,vehicle_id:vehicleId});
+    if(r&&!Array.isArray(r)&&(r.code||r.message)) throw new Error(r.message||r.code);
+    const row=Array.isArray(r)&&r[0]?r[0]:{supplier_part_id:supplierPartId,vehicle_id:vehicleId};
+    setPartFitments(prev=>{
+      const exists=prev.find(f=>String(f.supplier_part_id)===String(supplierPartId)&&String(f.vehicle_id)===String(vehicleId));
+      return exists?prev.map(f=>(String(f.supplier_part_id)===String(supplierPartId)&&String(f.vehicle_id)===String(vehicleId))?{...f,...row}:f):[...prev,row];
+    });
+    showToast("Vehicle linked");
   };
 
   // Every table scoped by workshop_id — used to fully wipe a workshop account.
@@ -5301,7 +5318,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           <SupplierPartsPage parts={supplierParts} existingParts={supplierExistingParts} supplierCode={user.supplier_code||user.supplier_name||"SUP"}
             onSave={saveSupplierPart} onDelete={deleteSupplierPart} onRefresh={reloadSupplierParts}
             onUpdateCostPrice={updateSupplierCostPrice}
-            vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onDeleteFitment={deleteFitment}/>
+            vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onAddSelfFitment={saveSupplierSelfFitment} onDeleteFitment={deleteFitment}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY ORDERS ── */}

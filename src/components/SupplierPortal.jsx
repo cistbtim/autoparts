@@ -30,11 +30,11 @@ const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onDeleteFitment}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
-  const [fitmentPart, setFitmentPart] = useState(null); // existing-catalogue row having its vehicle fits edited
+  const [fitmentTarget, setFitmentTarget] = useState(null); // {part, kind:"existing"|"self"} — row having its vehicle fits edited
   const [tab, setTab] = useState(existingParts.length?"existing":"mine");
   const [search, setSearch] = useState("");
   const keywords=search.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -66,10 +66,20 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
 
       {labelPart&&<PrintPartLabelModal part={labelPart} settings={getSettings()} onClose={()=>setLabelPart(null)}/>}
 
-      {fitmentPart&&<VehicleFitmentTab part={fitmentPart} vehicles={vehicles}
-        partFitments={partFitments.filter(pf=>String(pf.part_id)===String(fitmentPart.id))}
-        onAdd={onAddFitment} onDelete={onDeleteFitment} onClose={()=>setFitmentPart(null)}
-        supplierMode t={{}} imageUrl={fitmentPart.image_url}/>}
+      {fitmentTarget&&(()=>{
+        const isSelf=fitmentTarget.kind==="self";
+        const p=fitmentTarget.part;
+        const fkKey=isSelf?"supplier_part_id":"part_id";
+        return (
+          <VehicleFitmentTab
+            part={isSelf?{...p, sku:`${supplierCode}-${p.part_code}`}:p}
+            vehicles={vehicles}
+            partFitments={partFitments.filter(pf=>String(pf[fkKey])===String(p.id))}
+            onAdd={isSelf?onAddSelfFitment:onAddFitment} onDelete={onDeleteFitment}
+            onClose={()=>setFitmentTarget(null)}
+            supplierMode t={{}} imageUrl={p.image_url}/>
+        );
+      })()}
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div>
@@ -107,7 +117,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
               priceChanged={!!(lastViewed&&p.price_updated_at&&p.price_updated_at>lastViewed)}
               onClick={onUpdateCostPrice?()=>setEditingCost(p):undefined}
               onPrintLabel={()=>setLabelPart(p)}
-              onEditFitments={onAddFitment?()=>setFitmentPart(p):undefined}
+              onEditFitments={onAddFitment?()=>setFitmentTarget({part:p,kind:"existing"}):undefined}
               fitCount={partFitments.filter(pf=>String(pf.part_id)===String(p.id)).length}/>)}
           </div>
         )
@@ -121,7 +131,9 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {minesFiltered.map(p=><PartRow key={p.id} p={p} code={`${supplierCode}-${p.part_code}`} name={p.name} onClick={()=>setEditing(p)}
-              onPrintLabel={()=>setLabelPart({...p, sku:`${supplierCode}-${p.part_code}`})}/>)}
+              onPrintLabel={()=>setLabelPart({...p, sku:`${supplierCode}-${p.part_code}`})}
+              onEditFitments={onAddSelfFitment?()=>setFitmentTarget({part:p,kind:"self"}):undefined}
+              fitCount={partFitments.filter(pf=>String(pf.supplier_part_id)===String(p.id)).length}/>)}
           </div>
         )
       )}
@@ -130,7 +142,6 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, onS
 }
 
 function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, onEditFitments, fitCount=0}) {
-  const extraFits=readOnly?fitCount:parseJsonArray(p.fitments).length;
   return (
     <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",cursor:onClick?"pointer":"default",
       border:priceChanged?"1px solid rgba(96,165,250,.5)":undefined,background:priceChanged?"rgba(96,165,250,.05)":undefined}}
@@ -143,7 +154,7 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, 
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{code}{readOnly&&<span title="Managed by admin" style={{marginLeft:6,fontSize:11,opacity:.6}}>🔒</span>}</div>
         <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
-        {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}{extraFits>0&&<span> · +{extraFits} more fit{extraFits!==1?"s":""}</span>}</div>}
+        {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}{fitCount>0&&<span> · +{fitCount} more fit{fitCount!==1?"s":""}</span>}</div>}
         {readOnly&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Your cost: <strong style={{color:"var(--text2)"}}>{p._supplierPrice?fmtAmt(p._supplierPrice):"not set"}</strong>{p._suggestedPrice?<span style={{marginLeft:8}}>· Suggested retail: <strong style={{color:"var(--text2)"}}>{fmtAmt(p._suggestedPrice)}</strong></span>:null}</div>}
       </div>
       <div style={{textAlign:"right",flexShrink:0}}>
@@ -279,14 +290,11 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
     category:part.category||"", cost_price:part.cost_price??"", stock:part.stock??0,
     image_url:part.image_url||"", make:part.make||"", model:part.model||"",
     year_range:part.year_range||"", oe_number:part.oe_number||"", suggested_price:part.suggested_price??"",
-    photos:parseJsonArray(part.photos), fitments:parseJsonArray(part.fitments),
-  }:{part_code:"",name:"",chinese_desc:"",category:"",cost_price:"",stock:0,image_url:"",make:"",model:"",year_range:"",oe_number:"",suggested_price:"",photos:[],fitments:[]});
+    photos:parseJsonArray(part.photos),
+  }:{part_code:"",name:"",chinese_desc:"",category:"",cost_price:"",stock:0,image_url:"",make:"",model:"",year_range:"",oe_number:"",suggested_price:"",photos:[]});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const canSave=f.part_code.trim()&&f.name.trim();
   const [lightbox,setLightbox]=useState(null); // {idx} — urls built from f.image_url + f.photos
-  const addFitment=()=>s("fitments",[...f.fitments,{make:"",model:"",year_range:""}]);
-  const updateFitment=(i,k,v)=>s("fitments",f.fitments.map((fit,idx)=>idx===i?{...fit,[k]:v}:fit));
-  const removeFitment=(i)=>s("fitments",f.fitments.filter((_,idx)=>idx!==i));
 
   return (
     <Overlay onClose={onClose}>
@@ -306,20 +314,11 @@ function SupplierPartModal({part, supplierCode, onSave, onDelete, onClose}) {
         <div><FL label="Year"/><input className="inp" value={f.year_range} onChange={e=>s("year_range",e.target.value)} placeholder="2021-2024"/></div>
       </FG>
 
-      <FD>
-        <FL label="Also Fits (additional fitment vehicles)"/>
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {f.fitments.map((fit,i)=>(
-            <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:6}}>
-              <input className="inp" value={fit.make} onChange={e=>updateFitment(i,"make",e.target.value)} placeholder="Make"/>
-              <input className="inp" value={fit.model} onChange={e=>updateFitment(i,"model",e.target.value)} placeholder="Model"/>
-              <input className="inp" value={fit.year_range} onChange={e=>updateFitment(i,"year_range",e.target.value)} placeholder="2018-2022"/>
-              <button type="button" className="btn btn-ghost btn-sm" title="Remove" onClick={()=>removeFitment(i)}>🗑</button>
-            </div>
-          ))}
-          <button type="button" className="btn btn-ghost btn-sm" style={{alignSelf:"flex-start"}} onClick={addFitment}>+ Add Vehicle</button>
+      {isEdit&&(
+        <div style={{fontSize:11,color:"var(--text3)",marginTop:-8,marginBottom:14}}>
+          More fitment vehicles can be linked from the part's "🚗 Fits" button once saved.
         </div>
-      </FD>
+      )}
 
       <FG>
         <div><FL label="OE Number"/><input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)}/></div>

@@ -4462,28 +4462,32 @@ export function CheckoutModal({cart,customers,cartTotal,customerDiscountPct=0,ca
               const lineDiscounted=lineHasDiscount?Math.round(i.price*(1-customerDiscountPct/100)*100)/100:i.price;
               const photos=[i.image_url,...(Array.isArray(i.photos)?i.photos:[])].filter(Boolean);
               return (
-              <div key={i.id} style={{display:"flex",gap:10,alignItems:"center",padding:"9px 0",borderBottom:"1px solid var(--border)"}}>
-                <div style={{width:46,height:46,borderRadius:6,overflow:"hidden",background:"var(--surface3)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:photos.length?"zoom-in":"default"}}
-                  onClick={()=>photos.length&&setLightbox({urls:photos,startIdx:0})} title={photos.length?`Click to enlarge${photos.length>1?` (${photos.length} photos)`:""}`:undefined}>
-                  {photos.length
-                    ? <img src={toImgUrl(photos[0])} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
-                    : <span style={{fontSize:16,opacity:.3}}>🖼</span>}
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:14,fontWeight:600}}>{i.name}</div>
-                  {(i.make||i.model||i.year_range)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>🚗 {[i.make,i.model,i.year_range].filter(Boolean).join(" · ")}</div>}
-                  {i.oe_number&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>OE: {i.oe_number}</div>}
-                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>
-                    {lineHasDiscount?<><span style={{textDecoration:"line-through"}}>{fmtAmt(i.price)}</span> {fmtAmt(lineDiscounted)} each</>:`${fmtAmt(i.price)} each`}
+              <div key={i.id} style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"center",padding:"9px 0",borderBottom:"1px solid var(--border)"}}>
+                <div style={{display:"flex",gap:10,alignItems:"center",flex:"1 1 220px",minWidth:0}}>
+                  <div style={{width:46,height:46,borderRadius:6,overflow:"hidden",background:"var(--surface3)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:photos.length?"zoom-in":"default"}}
+                    onClick={()=>photos.length&&setLightbox({urls:photos,startIdx:0})} title={photos.length?`Click to enlarge${photos.length>1?` (${photos.length} photos)`:""}`:undefined}>
+                    {photos.length
+                      ? <img src={toImgUrl(photos[0])} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                      : <span style={{fontSize:16,opacity:.3}}>🖼</span>}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.name}</div>
+                    {(i.make||i.model||i.year_range)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🚗 {[i.make,i.model,i.year_range].filter(Boolean).join(" · ")}</div>}
+                    {i.oe_number&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>OE: {i.oe_number}</div>}
+                    <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>
+                      {lineHasDiscount?<><span style={{textDecoration:"line-through"}}>{fmtAmt(i.price)}</span> {fmtAmt(lineDiscounted)} each</>:`${fmtAmt(i.price)} each`}
+                    </div>
                   </div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
-                  <button className="btn btn-ghost btn-xs" style={{padding:"5px 11px"}} onClick={()=>onQty(i.id,i.qty-1)}>−</button>
-                  <span style={{fontWeight:700,minWidth:20,textAlign:"center"}}>{i.qty}</span>
-                  <button className="btn btn-ghost btn-xs" style={{padding:"5px 11px"}} onClick={()=>onQty(i.id,i.qty+1)}>+</button>
-                  <button className="btn btn-danger btn-xs" onClick={()=>onRemove(i.id)}>✕</button>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flex:"1 1 220px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
+                    <button className="btn btn-ghost btn-xs" style={{padding:"5px 11px"}} onClick={()=>onQty(i.id,i.qty-1)}>−</button>
+                    <span style={{fontWeight:700,minWidth:20,textAlign:"center"}}>{i.qty}</span>
+                    <button className="btn btn-ghost btn-xs" style={{padding:"5px 11px"}} onClick={()=>onQty(i.id,i.qty+1)}>+</button>
+                    <button className="btn btn-danger btn-xs" onClick={()=>onRemove(i.id)}>✕</button>
+                  </div>
+                  <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:15,textAlign:"right",flexShrink:0}}>{fmtAmt(lineDiscounted*i.qty)}</div>
                 </div>
-                <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:15,minWidth:80,textAlign:"right",flexShrink:0}}>{fmtAmt(lineDiscounted*i.qty)}</div>
               </div>
               );
             })}

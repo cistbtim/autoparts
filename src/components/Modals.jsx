@@ -1594,6 +1594,15 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
             }}>💾 Save Category Markup %</button>
           </div>
           <div className="card" style={{padding:22}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🎁 Max Supplier Discount %</h3>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Caps the "Customer Discount" a supplier can offer their own catalogue signups in their portal — protects your margins from being undercut. Leave at 0 for no cap.</div>
+            <FD>
+              <FL label="Maximum discount %"/>
+              <input className="inp" type="number" min="0" max="100" value={f.max_customer_discount_pct||0} onChange={e=>s("max_customer_discount_pct",+e.target.value||0)} placeholder="0 = no limit" style={{maxWidth:160}}/>
+            </FD>
+            <button className="btn btn-primary btn-sm" onClick={()=>onSave({max_customer_discount_pct:f.max_customer_discount_pct||0})}>💾 Save Max Discount</button>
+          </div>
+          <div className="card" style={{padding:22}}>
             <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🏷️ Part Label Size</h3>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Size for part/inventory labels (SKU, bin, supplier code, invoice)</div>
             <FG cols="1fr 1fr">

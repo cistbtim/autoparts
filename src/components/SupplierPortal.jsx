@@ -31,7 +31,7 @@ const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions, onBulkUpdateSuggestedPrices, discountPct=0, onUpdateDiscountPct}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions, onBulkUpdateSuggestedPrices, discountPct=0, onUpdateDiscountPct, maxDiscountPct=0}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
@@ -114,7 +114,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
 
       {supplierName&&<ShareCatalogueCard supplierName={supplierName}/>}
       {onUpdateMarginOptions&&<MarkupOptionsCard marginOptions={marginOptions} effectiveMarginOptions={supplierBaseMarginOptions} onSave={onUpdateMarginOptions}/>}
-      {onUpdateDiscountPct&&<CustomerDiscountCard discountPct={discountPct} onSave={onUpdateDiscountPct}/>}
+      {onUpdateDiscountPct&&<CustomerDiscountCard discountPct={discountPct} maxDiscountPct={maxDiscountPct} onSave={onUpdateDiscountPct}/>}
 
       {bulkMode&&(()=>{
         const eligible=existingFiltered.filter(p=>p._supplierPrice);
@@ -267,13 +267,15 @@ function MarkupOptionsCard({marginOptions, effectiveMarginOptions, onSave}) {
 // supplier's own ?catalog= link (see the Share Your Catalogue card above) — applied
 // live in the Shop/Cart/Checkout for those customers, never touching customers
 // scoped elsewhere or browsing the main multi-supplier shop.
-function CustomerDiscountCard({discountPct, onSave}) {
+function CustomerDiscountCard({discountPct, maxDiscountPct=0, onSave}) {
   const [editing,setEditing]=useState(false);
   const [val,setVal]=useState(discountPct||0);
   const [saving,setSaving]=useState(false);
+  const hasCap=maxDiscountPct>0;
   const startEdit=()=>{setVal(discountPct||0);setEditing(true);};
-  const save=async()=>{setSaving(true);await onSave(Math.max(0,Math.min(100,+val||0)));setSaving(false);setEditing(false);};
+  const save=async()=>{setSaving(true);await onSave(Math.max(0,Math.min(hasCap?maxDiscountPct:100,+val||0)));setSaving(false);setEditing(false);};
   const remove=async()=>{setSaving(true);await onSave(0);setSaving(false);setEditing(false);};
+  const step=(delta)=>setVal(v=>Math.max(0,Math.min(hasCap?maxDiscountPct:100,(+v||0)+delta)));
   return (
     <div className="card" style={{padding:"12px 14px",marginBottom:14}}>
       <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
@@ -281,6 +283,7 @@ function CustomerDiscountCard({discountPct, onSave}) {
           <div style={{fontSize:13,fontWeight:700}}>🎁 Customer Discount</div>
           <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>
             {discountPct>0?`${discountPct}% off automatically for customers who sign up through your catalogue link`:"No discount set — customers pay full price"}
+            {hasCap&&<span> · max {maxDiscountPct}%</span>}
           </div>
         </div>
         {!editing&&<button type="button" className="btn btn-ghost btn-sm" onClick={startEdit}>✏️ Edit</button>}
@@ -288,8 +291,11 @@ function CustomerDiscountCard({discountPct, onSave}) {
       {editing&&(
         <div style={{marginTop:10}}>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <input className="inp" type="number" min="0" max="100" style={{width:90}} value={val} onChange={e=>setVal(e.target.value)}/>
-            <span style={{fontSize:13,color:"var(--text3)"}}>%</span>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>step(-1)} disabled={saving}>−</button>
+            <input className="inp" type="number" min="0" max={hasCap?maxDiscountPct:100} step="1" style={{width:90,textAlign:"center"}}
+              value={val} onChange={e=>setVal(e.target.value)}/>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>step(1)} disabled={saving}>+</button>
+            <span style={{fontSize:13,color:"var(--text3)"}}>%{hasCap?` (max ${maxDiscountPct}%)`:""}</span>
           </div>
           <div style={{display:"flex",gap:8,marginTop:10}}>
             <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>Cancel</button>

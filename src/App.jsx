@@ -2614,10 +2614,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // Discount % this supplier offers customers who signed up through their own
   // ?catalog= link (user.supplier_scope_id) — applied automatically in Shop/Cart/
   // Checkout for those customers, see customerDiscountPct/discountPrice above.
+  // Clamped server-side (not just via the input's max attribute) to whatever cap
+  // admin has set in Settings — max_customer_discount_pct of 0 means no cap.
   const updateSupplierDiscountPct=async(pct)=>{
-    await api.patch("suppliers","id",user.supplier_id,{customer_discount_pct:pct});
-    setSupplierDiscountPct(pct);
-    showToast(pct>0?`✅ Customer discount set to ${pct}%`:"Customer discount removed");
+    const cap=+settings.max_customer_discount_pct||0;
+    const clamped=cap>0?Math.min(pct,cap):pct;
+    await api.patch("suppliers","id",user.supplier_id,{customer_discount_pct:clamped});
+    setSupplierDiscountPct(clamped);
+    if(clamped<pct) showToast(`⚠️ Capped at ${clamped}% (shop maximum)`,"err");
+    else showToast(clamped>0?`✅ Customer discount set to ${clamped}%`:"Customer discount removed");
   };
   // Bulk-recompute suggested_price for many existing-catalogue parts at once, from
   // each part's own already-set cost — a one-time re-apply after the supplier
@@ -5540,7 +5545,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onAddSelfFitment={saveSupplierSelfFitment} onDeleteFitment={deleteFitment}
             marginOptions={supplierMarginOptions} onUpdateMarginOptions={updateSupplierMarginOptions}
             onBulkUpdateSuggestedPrices={bulkUpdateSupplierSuggestedPrices}
-            discountPct={supplierDiscountPct} onUpdateDiscountPct={updateSupplierDiscountPct}/>
+            discountPct={supplierDiscountPct} onUpdateDiscountPct={updateSupplierDiscountPct} maxDiscountPct={+settings.max_customer_discount_pct||0}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY ORDERS ── */}

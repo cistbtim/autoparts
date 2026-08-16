@@ -18,7 +18,7 @@ import { SupplierImportModal } from "./components/SupplierImport.jsx";
 import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
-import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage } from "./components/SupplierPortal.jsx";
+import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage } from "./components/SupplierPortal.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage } from "./pages/PublicPages.jsx";
 
@@ -193,6 +193,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [allSupplierParts,setAllSupplierParts]=useState([]); // admin: every supplier's self-added parts (for pricing)
   const [supplierCostUpdates,setSupplierCostUpdates]=useState([]); // admin: existing parts whose supplier just updated their cost
   const [supplierOrders,setSupplierOrders]=useState([]); // orders placed by this supplier's scoped customers
+  const [supplierCustomers,setSupplierCustomers]=useState([]); // customers registered through this supplier's ?catalog= link
   const [supplierQueries,setSupplierQueries]=useState([]); // customer_queries against this supplier's own self-added parts
   const [supplierMarginOptions,setSupplierMarginOptions]=useState(null); // this supplier's own custom quick-margin %s (suppliers.margin_options), null = using shop default
   const [supplierDiscountPct,setSupplierDiscountPct]=useState(0); // % this supplier offers customers scoped to their own ?catalog= link (suppliers.customer_discount_pct)
@@ -935,6 +936,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // Orders placed by customers scoped to this supplier's catalogue (stamped at checkout).
     const ord=await api.fresh("orders",`supplier_scope_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
     setSupplierOrders(Array.isArray(ord)?ord:[]);
+    // Customers who registered through this supplier's own ?catalog= link — lets
+    // them set an individual discount % per customer (capped by settings.max_customer_discount_pct).
+    const custs=await api.fresh("customers",`supplier_scope_id=eq.${user.supplier_id}&select=*&order=name.asc`);
+    setSupplierCustomers(Array.isArray(custs)?custs:[]);
   },[role,user.supplier_id]);
   useEffect(()=>{ reloadSupplierParts(); },[reloadSupplierParts]);
 
@@ -1245,8 +1250,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // Checkout) and baked into the order total at checkout, but never mutates a
   // cart item's own .price, so the stock/price-recheck in placeOrder below still
   // compares against the real un-discounted price from the parts table.
+  // This customer's own individual override (customers.discount_pct, set by the
+  // supplier in their "My Customers" list) wins if set; otherwise falls back to
+  // the supplier's blanket default (suppliers.customer_discount_pct). Note this
+  // only reflects what was true at login — a discount changed mid-session won't
+  // show until the customer logs in again.
   const customerDiscountPct=(role==="customer"&&user.supplier_scope_id)
-    ? (+(suppliers.find(s=>String(s.id)===String(user.supplier_scope_id))?.customer_discount_pct)||0)
+    ? (user.discount_pct!=null ? +user.discount_pct : (+(suppliers.find(s=>String(s.id)===String(user.supplier_scope_id))?.customer_discount_pct)||0))
     : 0;
   const discountPrice=(price)=>customerDiscountPct>0?Math.round((+price||0)*(1-customerDiscountPct/100)*100)/100:(+price||0);
 
@@ -2624,6 +2634,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(clamped<pct) showToast(`⚠️ Capped at ${clamped}% (shop maximum)`,"err");
     else showToast(clamped>0?`✅ Customer discount set to ${clamped}%`:"Customer discount removed");
   };
+  // Per-customer override on top of the blanket default above — lets a supplier
+  // pick exactly who among their own catalogue signups gets a discount, and how
+  // much, instead of it always applying to everyone. null = "use the supplier's
+  // default"; any number (incl. 0) = an explicit override for just this customer.
+  // Same server-side cap as the blanket default.
+  const updateCustomerDiscount=async(customerId,pct)=>{
+    const cap=+settings.max_customer_discount_pct||0;
+    const clamped=pct==null?null:(cap>0?Math.min(pct,cap):pct);
+    await api.patch("customers","id",customerId,{discount_pct:clamped});
+    setSupplierCustomers(prev=>prev.map(c=>c.id===customerId?{...c,discount_pct:clamped}:c));
+    if(clamped!=null&&pct!=null&&clamped<pct) showToast(`⚠️ Capped at ${clamped}% (shop maximum)`,"err");
+    else showToast(clamped==null?"Using default discount":clamped>0?`✅ Discount set to ${clamped}%`:"Discount removed for this customer");
+  };
   // Bulk-recompute suggested_price for many existing-catalogue parts at once, from
   // each part's own already-set cost — a one-time re-apply after the supplier
   // changes their markup %, without opening each part's cost modal individually.
@@ -3868,6 +3891,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"supplierParts",  icon:"📦",label:"My Parts",   roles:["supplier"]},
         {id:"supplierOrders", icon:"📋",label:"My Orders",  roles:["supplier"]},
         {id:"supplierQueries",icon:"💬",label:"My Queries", roles:["supplier"],badge:supplierQueries.filter(q=>q.status==="pending").length||0},
+        {id:"supplierCustomers",icon:"🎁",label:"My Customers", roles:["supplier"]},
       ]
     },
     {
@@ -3945,6 +3969,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"supplierParts",  icon:"📦",label:"My Parts"},
       {id:"supplierOrders", icon:"📋",label:"My Orders"},
       {id:"supplierQueries",icon:"💬",label:"My Queries"},
+      {id:"supplierCustomers",icon:"🎁",label:"My Customers"},
     ];
     if(role==="stockman") return [
       {id:"inventory",icon:"📦",label:t.inventory,badge:lowStock.length},
@@ -5567,6 +5592,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── SUPPLIER PORTAL: MY QUERIES ── */}
         {tab==="supplierQueries"&&role==="supplier"&&(
           <SupplierQueriesPage queries={supplierQueries} existingParts={supplierExistingParts} selfParts={supplierParts} onReply={replySupplierQuery} onRefresh={reloadSupplierParts}/>
+        )}
+
+        {tab==="supplierCustomers"&&role==="supplier"&&(
+          <SupplierCustomersPage customers={supplierCustomers} defaultDiscountPct={supplierDiscountPct}
+            maxDiscountPct={+settings.max_customer_discount_pct||0}
+            onUpdateDiscount={updateCustomerDiscount} onRefresh={reloadSupplierParts}/>
         )}
 
         {/* ── PURCHASE INVOICES ── */}

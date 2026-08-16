@@ -799,6 +799,79 @@ export function SupplierQueriesPage({queries=[], existingParts=[], selfParts=[],
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SUPPLIER: MY CUSTOMERS — customers who registered through this supplier's own
+// ?catalog= link. Lets the supplier pick who among them gets a discount and how
+// much, per customer, on top of the blanket default set in the Customer Discount
+// card back on My Parts. Only customers actually scoped to this supplier show up
+// here — never another supplier's or the main shop's customers.
+// ═══════════════════════════════════════════════════════════════
+export function SupplierCustomersPage({customers=[], defaultDiscountPct=0, maxDiscountPct=0, onUpdateDiscount, onRefresh}) {
+  const [editingId, setEditingId] = useState(null);
+  const [val, setVal] = useState("");
+  const [saving, setSaving] = useState(false);
+  const hasCap=maxDiscountPct>0;
+  const startEdit=(c)=>{setVal(c.discount_pct!=null?String(c.discount_pct):"");setEditingId(c.id);};
+  const save=async(id)=>{
+    setSaving(true);
+    const pct=val.trim()===""?null:Math.max(0,Math.min(hasCap?maxDiscountPct:100,+val||0));
+    await onUpdateDiscount(id,pct);
+    setSaving(false);setEditingId(null);
+  };
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>🎁 My Customers</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
+            {customers.length} registered through your catalogue link · default discount {defaultDiscountPct||0}%{hasCap?` · max ${maxDiscountPct}%`:""}
+          </p>
+        </div>
+        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+      </div>
+
+      {customers.length===0 ? (
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
+          Nobody's registered through your catalogue link yet — share it from My Parts.
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {customers.map(c=>{
+            const isOverride=c.discount_pct!=null;
+            const effective=isOverride?c.discount_pct:(defaultDiscountPct||0);
+            return (
+              <div key={c.id} className="card" style={{padding:14,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:180}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{c.name}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>📞 {c.phone}{c.email?` · ${c.email}`:""}</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{c.orders||0} order{c.orders!==1?"s":""} · {fmtAmt(c.total_spent||0)} spent</div>
+                </div>
+                {editingId===c.id ? (
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                    <input className="inp" type="number" min="0" max={hasCap?maxDiscountPct:100} style={{width:80}}
+                      placeholder={String(defaultDiscountPct||0)} value={val} onChange={e=>setVal(e.target.value)} autoFocus/>
+                    <span style={{fontSize:12,color:"var(--text3)"}}>%</span>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditingId(null)} disabled={saving}>Cancel</button>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={()=>save(c.id)} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
+                  </div>
+                ) : (
+                  <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:16,fontWeight:800,color:effective>0?"var(--green)":"var(--text3)",fontFamily:"Rajdhani,sans-serif"}}>{effective}% off</div>
+                      <div style={{fontSize:10,color:"var(--text3)"}}>{isOverride?"Custom":"Default"}</div>
+                    </div>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={()=>startEdit(c)}>✏️ Edit</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SupplierQueryReplyModal({query, part, onReply, onClose}) {
   const img=part?.image_url||query.part_image;
   const [price,setPrice]=useState(query?.confirmed_price||"");

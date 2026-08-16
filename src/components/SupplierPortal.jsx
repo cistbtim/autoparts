@@ -279,29 +279,38 @@ function CustomerDiscountCard({discountPct, maxDiscountPct=0, onSave}) {
   return (
     <div className="card" style={{padding:"12px 14px",marginBottom:14}}>
       <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-        <div style={{flex:1,minWidth:220}}>
-          <div style={{fontSize:13,fontWeight:700}}>🎁 Customer Discount</div>
-          <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>
-            {discountPct>0?`${discountPct}% off automatically for customers who sign up through your catalogue link`:"No discount set — customers pay full price"}
-            {hasCap&&<span> · max {maxDiscountPct}%</span>}
-          </div>
-        </div>
+        <div style={{fontSize:13,fontWeight:700,flex:1,minWidth:160}}>🎁 Customer Discount</div>
         {!editing&&<button type="button" className="btn btn-ghost btn-sm" onClick={startEdit}>✏️ Edit</button>}
       </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:10}}>
+        <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px"}}>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>Default Amount</div>
+          {editing?(
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <button type="button" className="btn btn-ghost btn-xs" onClick={()=>step(-1)} disabled={saving}>−</button>
+              <input className="inp" type="number" min="0" max={hasCap?maxDiscountPct:100} step="1" style={{width:70,textAlign:"center"}}
+                value={val} onChange={e=>setVal(e.target.value)} autoFocus/>
+              <button type="button" className="btn btn-ghost btn-xs" onClick={()=>step(1)} disabled={saving}>+</button>
+              <span style={{fontSize:13,color:"var(--text3)"}}>%</span>
+            </div>
+          ):(
+            <div style={{fontSize:20,fontWeight:800,color:discountPct>0?"var(--green)":"var(--text3)",fontFamily:"Rajdhani,sans-serif"}}>{discountPct||0}%</div>
+          )}
+        </div>
+        <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px"}}>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>Maximum Discount Limit</div>
+          <div style={{fontSize:20,fontWeight:800,color:"var(--text2)",fontFamily:"Rajdhani,sans-serif"}}>{hasCap?`${maxDiscountPct}%`:"No limit"}</div>
+          <div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>Set by admin — not editable here</div>
+        </div>
+      </div>
+      <div style={{fontSize:11,color:"var(--text3)",marginTop:8}}>
+        {discountPct>0?"Applied automatically for customers who sign up through your catalogue link":"No discount set — customers pay full price"}
+      </div>
       {editing&&(
-        <div style={{marginTop:10}}>
-          <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>step(-1)} disabled={saving}>−</button>
-            <input className="inp" type="number" min="0" max={hasCap?maxDiscountPct:100} step="1" style={{width:90,textAlign:"center"}}
-              value={val} onChange={e=>setVal(e.target.value)}/>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>step(1)} disabled={saving}>+</button>
-            <span style={{fontSize:13,color:"var(--text3)"}}>%{hasCap?` (max ${maxDiscountPct}%)`:""}</span>
-          </div>
-          <div style={{display:"flex",gap:8,marginTop:10}}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>Cancel</button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
-            {discountPct>0&&<button type="button" className="btn btn-ghost btn-sm" onClick={remove} disabled={saving}>Remove discount</button>}
-          </div>
+        <div style={{display:"flex",gap:8,marginTop:10}}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>Cancel</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
+          {discountPct>0&&<button type="button" className="btn btn-ghost btn-sm" onClick={remove} disabled={saving}>Remove discount</button>}
         </div>
       )}
     </div>

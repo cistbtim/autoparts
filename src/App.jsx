@@ -2511,10 +2511,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const saveSupplierPart=async(data)=>{
     const payload={...data,supplier_id:user.supplier_id,cost_price:data.cost_price===""?null:+data.cost_price,
       suggested_price:data.suggested_price===""||data.suggested_price==null?null:+data.suggested_price};
-    if(data.id) await api.patch("supplier_parts","id",data.id,payload);
-    else await api.upsert("supplier_parts",payload);
+    const res=data.id?await api.patch("supplier_parts","id",data.id,payload):await api.upsert("supplier_parts",payload);
+    if(res&&!Array.isArray(res)&&(res.code||res.message)){
+      showToast(`❌ Save failed: ${res.message||res.code}`,"err");
+      return false;
+    }
     await reloadSupplierParts();
     showToast(data.id?"✅ Part updated":"✅ Part added");
+    return true;
   };
   const deleteSupplierPart=async(id)=>{
     await api.delete("supplier_parts","id",id);

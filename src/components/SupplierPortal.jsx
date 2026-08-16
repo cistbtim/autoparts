@@ -70,7 +70,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
   return (
     <div className="fu">
       {editing&&<SupplierPartModal part={editing} supplierCode={supplierCode} supplierMarginOptions={marginOptions}
-        onSave={async(data)=>{await onSave(data);setEditing(null);}}
+        onSave={async(data)=>{ if(await onSave(data)!==false) setEditing(null); }}
         onDelete={editing.id?async()=>{await onDelete(editing.id);setEditing(null);}:null}
         onClose={()=>setEditing(null)}/>}
 

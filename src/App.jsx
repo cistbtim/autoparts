@@ -5569,8 +5569,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onUpdateCostPrice={updateSupplierCostPrice}
             vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onAddSelfFitment={saveSupplierSelfFitment} onDeleteFitment={deleteFitment}
             marginOptions={supplierMarginOptions} onUpdateMarginOptions={updateSupplierMarginOptions}
-            onBulkUpdateSuggestedPrices={bulkUpdateSupplierSuggestedPrices}
-            discountPct={supplierDiscountPct} onUpdateDiscountPct={updateSupplierDiscountPct} maxDiscountPct={+settings.max_customer_discount_pct||0}/>
+            onBulkUpdateSuggestedPrices={bulkUpdateSupplierSuggestedPrices}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY ORDERS ── */}
@@ -5597,7 +5596,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {tab==="supplierCustomers"&&role==="supplier"&&(
           <SupplierCustomersPage customers={supplierCustomers} defaultDiscountPct={supplierDiscountPct}
             maxDiscountPct={+settings.max_customer_discount_pct||0}
-            onUpdateDiscount={updateCustomerDiscount} onRefresh={reloadSupplierParts}/>
+            onUpdateDiscount={updateCustomerDiscount} onUpdateDefaultDiscount={updateSupplierDiscountPct} onRefresh={reloadSupplierParts}/>
         )}
 
         {/* ── PURCHASE INVOICES ── */}

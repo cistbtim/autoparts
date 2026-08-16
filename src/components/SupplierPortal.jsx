@@ -31,7 +31,7 @@ const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions, onBulkUpdateSuggestedPrices, discountPct=0, onUpdateDiscountPct, maxDiscountPct=0}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions, onBulkUpdateSuggestedPrices}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
@@ -114,7 +114,6 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
 
       {supplierName&&<ShareCatalogueCard supplierName={supplierName}/>}
       {onUpdateMarginOptions&&<MarkupOptionsCard marginOptions={marginOptions} effectiveMarginOptions={supplierBaseMarginOptions} onSave={onUpdateMarginOptions}/>}
-      {onUpdateDiscountPct&&<CustomerDiscountCard discountPct={discountPct} maxDiscountPct={maxDiscountPct} onSave={onUpdateDiscountPct}/>}
 
       {bulkMode&&(()=>{
         const eligible=existingFiltered.filter(p=>p._supplierPrice);
@@ -815,7 +814,7 @@ export function SupplierQueriesPage({queries=[], existingParts=[], selfParts=[],
 // card back on My Parts. Only customers actually scoped to this supplier show up
 // here — never another supplier's or the main shop's customers.
 // ═══════════════════════════════════════════════════════════════
-export function SupplierCustomersPage({customers=[], defaultDiscountPct=0, maxDiscountPct=0, onUpdateDiscount, onRefresh}) {
+export function SupplierCustomersPage({customers=[], defaultDiscountPct=0, maxDiscountPct=0, onUpdateDiscount, onUpdateDefaultDiscount, onRefresh}) {
   const [editingId, setEditingId] = useState(null);
   const [val, setVal] = useState("");
   const [saving, setSaving] = useState(false);
@@ -833,11 +832,13 @@ export function SupplierCustomersPage({customers=[], defaultDiscountPct=0, maxDi
         <div>
           <h1 style={{fontSize:20,fontWeight:700}}>🎁 My Customers</h1>
           <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
-            {customers.length} registered through your catalogue link · default discount {defaultDiscountPct||0}%{hasCap?` · max ${maxDiscountPct}%`:""}
+            {customers.length} registered through your catalogue link
           </p>
         </div>
         {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
       </div>
+
+      {onUpdateDefaultDiscount&&<CustomerDiscountCard discountPct={defaultDiscountPct} maxDiscountPct={maxDiscountPct} onSave={onUpdateDefaultDiscount}/>}
 
       {customers.length===0 ? (
         <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>

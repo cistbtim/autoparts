@@ -4458,7 +4458,8 @@ export function CheckoutModal({cart,customers,cartTotal,customerDiscountPct=0,ca
         <>
           <div style={{background:"var(--surface2)",borderRadius:12,padding:14,marginBottom:16}}>
             {cart.map(i=>{
-              const lineDiscounted=customerDiscountPct>0?Math.round(i.price*(1-customerDiscountPct/100)*100)/100:i.price;
+              const lineHasDiscount=customerDiscountPct>0&&+i.price>0;
+              const lineDiscounted=lineHasDiscount?Math.round(i.price*(1-customerDiscountPct/100)*100)/100:i.price;
               const photos=[i.image_url,...(Array.isArray(i.photos)?i.photos:[])].filter(Boolean);
               return (
               <div key={i.id} style={{display:"flex",gap:10,alignItems:"center",padding:"9px 0",borderBottom:"1px solid var(--border)"}}>
@@ -4473,7 +4474,7 @@ export function CheckoutModal({cart,customers,cartTotal,customerDiscountPct=0,ca
                   {(i.make||i.model||i.year_range)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>🚗 {[i.make,i.model,i.year_range].filter(Boolean).join(" · ")}</div>}
                   {i.oe_number&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>OE: {i.oe_number}</div>}
                   <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>
-                    {customerDiscountPct>0?<><span style={{textDecoration:"line-through"}}>{fmtAmt(i.price)}</span> {fmtAmt(lineDiscounted)} each</>:`${fmtAmt(i.price)} each`}
+                    {lineHasDiscount?<><span style={{textDecoration:"line-through"}}>{fmtAmt(i.price)}</span> {fmtAmt(lineDiscounted)} each</>:`${fmtAmt(i.price)} each`}
                   </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>

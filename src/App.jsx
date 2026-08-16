@@ -5460,7 +5460,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     </div>
                     {/* Price + button always at bottom */}
                     <div style={{marginTop:8}}>
-                      {customerDiscountPct>0?(
+                      {customerDiscountPct>0&&+p.price>0?(
                         <div style={{marginBottom:4}}>
                           <div style={{display:"flex",alignItems:"baseline",gap:7}}>
                             <span style={{fontSize:20,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(discountPrice(p.price))}</span>

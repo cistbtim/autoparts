@@ -514,6 +514,7 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const canSave=f.part_code.trim()&&f.name.trim();
   const [lightbox,setLightbox]=useState(null); // {idx} — urls built from f.image_url + f.photos
+  const [saving,setSaving]=useState(false);
   const marginOptions=resolveMarginOptions({supplierOptions:supplierMarginOptions,category:f.category});
 
   return (
@@ -624,7 +625,7 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
         {onDelete&&<button className="btn btn-ghost" style={{color:"var(--red)",borderColor:"rgba(239,68,68,.3)"}}
           onClick={()=>{if(window.confirm(`Delete ${supplierCode}-${f.part_code}?`)) onDelete();}}>🗑</button>}
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" style={{flex:2}} disabled={!canSave} onClick={()=>onSave(f)}>Save</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={!canSave||saving} onClick={async()=>{setSaving(true);try{await onSave(f);}finally{setSaving(false);}}}>{saving?"Saving…":"Save"}</button>
       </div>
     </Overlay>
   );

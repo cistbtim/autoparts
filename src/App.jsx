@@ -2541,6 +2541,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const supplier=suppliers.find(s=>String(s.id)===String(sp.supplier_id));
     const supplierCode=supplier?.code||supplier?.name||"SUP";
     setBusyMsg(`Setting price for ${supplierCode}-${sp.part_code}…`);
+    const chk=(r,label)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message)) throw new Error(`${label}: ${r.message||r.code}`); return r; };
     try{
       const newPartPayload={
         sku:`${supplierCode}-${sp.part_code}`, name:sp.name||"", chinese_desc:sp.chinese_desc||"",
@@ -2548,13 +2549,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         image_url:sp.image_url||"", photos:Array.isArray(sp.photos)?sp.photos:[],
         make:sp.make||"", model:sp.model||"", year_range:sp.year_range||"", oe_number:sp.oe_number||"",
       };
-      const r=await api.upsert("parts",newPartPayload);
+      const r=chk(await api.upsert("parts",newPartPayload),"Create part");
       const newPart=Array.isArray(r)&&r[0]?r[0]:null;
-      if(!newPart?.id){ showToast("Failed to create Inventory part — check SKU isn't already taken","err"); return; }
-      const linkR=await api.upsert("part_suppliers",{
+      if(!newPart?.id) throw new Error("Create part: no row returned");
+      const linkR=chk(await api.upsert("part_suppliers",{
         part_id:newPart.id, supplier_id:sp.supplier_id, supplier_part_no:sp.part_code,
         supplier_price:sp.cost_price||null, suggested_price:sp.suggested_price||null,
-      });
+      }),"Link supplier");
       const newLink=Array.isArray(linkR)&&linkR[0]?linkR[0]:null;
       // Re-point anything that referenced the old supplier_part_id onto the new real part.
       await Promise.all([
@@ -2570,6 +2571,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       setCustomerQueries(prev=>prev.map(q=>String(q.supplier_part_id)===String(sp.id)?{...q,part_id:newPart.id,supplier_part_id:null}:q));
       await reloadAllSupplierParts();
       showToast(`✅ ${newPartPayload.sku} is now live in Inventory`);
+    } catch(e){
+      showToast(`❌ ${e.message||"Failed to set price"}`,"err");
     } finally {
       setBusyMsg(null);
     }

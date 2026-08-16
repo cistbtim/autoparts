@@ -4526,7 +4526,7 @@ export function CheckoutModal({cart,customers,cartTotal,customerDiscountPct=0,ca
 }
 
 export function SupplierModal({supplier,onSave,onClose,t,portalUser,onCreatePortalLogin,onResetPortalPassword}) {
-  const [f,setF]=useState(supplier?{name:supplier.name,email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||"",account_number:supplier.account_number||"",supplier_origin:supplier.supplier_origin||"",supplier_types:supplier.supplier_types||[]}:{name:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:"",account_number:"",supplier_origin:"",supplier_types:[]});
+  const [f,setF]=useState(supplier?{name:supplier.name,email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||"",account_number:supplier.account_number||"",supplier_origin:supplier.supplier_origin||"",supplier_types:supplier.supplier_types||[],is_catalogue_supplier:!!supplier.is_catalogue_supplier}:{name:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:"",account_number:"",supplier_origin:"",supplier_types:[],is_catalogue_supplier:false});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const toggleType=(tp)=>setF(p=>({...p,supplier_types:p.supplier_types.includes(tp)?p.supplier_types.filter(x=>x!==tp):[...p.supplier_types,tp]}));
   const [newLoginUser,setNewLoginUser]=useState("");
@@ -4571,6 +4571,19 @@ export function SupplierModal({supplier,onSave,onClose,t,portalUser,onCreatePort
           </div>
         </div>
       </FG>
+      <FD>
+        <div style={{padding:"12px 14px",background:"rgba(52,211,153,.06)",border:"1px solid rgba(52,211,153,.25)",borderRadius:10}}>
+          <label style={{display:"flex",alignItems:"flex-start",gap:8,cursor:"pointer"}}>
+            <input type="checkbox" checked={f.is_catalogue_supplier} onChange={e=>s("is_catalogue_supplier",e.target.checked)} style={{accentColor:"var(--green)",marginTop:2}}/>
+            <div>
+              <div style={{fontSize:13,fontWeight:700}}>🎁 Catalogue Supplier</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>
+                Lets this supplier's own customers register/log in through their <code>?catalog=</code> link and Supplier field on the Parts Shop login. Off by default — a supplier not marked here can't be selected by customers even if the name matches.
+              </div>
+            </div>
+          </label>
+        </div>
+      </FD>
       <FD>
         <FL label="Part Search URL" sub="Placeholders: {sku} = supplier/our part no · {vehicle_code} = car model code (e.g. VW18D)"/>
         <input className="inp" value={f.search_url} onChange={e=>s("search_url",e.target.value)}

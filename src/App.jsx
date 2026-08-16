@@ -201,6 +201,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [supplierSearch,setSupplierSearch]=useState("");
   const [supplierOriginFilter,setSupplierOriginFilter]=useState("all");
   const [supplierTypeFilter,setSupplierTypeFilter]=useState([]);
+  const [supplierCatalogueFilter,setSupplierCatalogueFilter]=useState(false); // show only suppliers marked is_catalogue_supplier
   const [partSuppliers,setPartSuppliers]=useState([]);
   const [inquiries,setInquiries]=useState([]);
   const [customerQueries,setCustomerQueries]=useState([]);
@@ -5819,6 +5820,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               const st=s.supplier_types||[];
               if(!supplierTypeFilter.every(t=>st.includes(t))) return false;
             }
+            if(supplierCatalogueFilter&&!s.is_catalogue_supplier) return false;
             return true;
           });
           const toggleTypeF=(t)=>setSupplierTypeFilter(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
@@ -5853,6 +5855,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     {type.charAt(0).toUpperCase()+type.slice(1)}
                   </label>
                 ))}
+                <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:13,fontWeight:supplierCatalogueFilter?700:400,color:supplierCatalogueFilter?"var(--green)":"var(--text2)"}}>
+                  <input type="checkbox" checked={supplierCatalogueFilter} onChange={()=>setSupplierCatalogueFilter(v=>!v)} style={{accentColor:"var(--green)"}}/>
+                  🎁 Catalogue
+                </label>
               </div>
             </div>
 
@@ -5872,6 +5878,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                             ?<span style={{fontSize:10,fontWeight:700,background:"rgba(99,102,241,.12)",color:"#818cf8",borderRadius:4,padding:"1px 6px"}}>GLOBAL</span>
                             :<span style={{fontSize:10,fontWeight:700,background:"rgba(52,211,153,.12)",color:"var(--green)",borderRadius:4,padding:"1px 6px"}}>MY BRANCH</span>
                           }
+                          {s.is_catalogue_supplier&&<span title="Has a customer-facing catalogue" style={{fontSize:10,fontWeight:700,background:"rgba(52,211,153,.12)",color:"var(--green)",borderRadius:4,padding:"1px 6px"}}>🎁 CATALOGUE</span>}
                         </div>
                         <div style={{fontSize:12,color:"var(--text3)"}}>📍 {s.country||"—"}</div>
                         <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:5}}>

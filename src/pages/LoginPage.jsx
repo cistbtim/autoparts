@@ -276,11 +276,16 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   // Resolves the typed Supplier field to a suppliers.id — same ilike-exact-name
   // lookup the old catalog-link effect used, just run on submit instead of on
   // mount so it works whether the name came from a link or was typed by hand.
+  // Only resolves suppliers admin has explicitly marked is_catalogue_supplier —
+  // a name that matches but isn't enabled is treated the same as not found, so
+  // typing any supplier's name can't be used to register/log in under them
+  // without admin having turned catalogue access on for that supplier first.
   const resolveCustSupplier = async () => {
     const n=custSupplierName.trim();
     if(!n) return {id:null,notFound:false};
-    const r=await api.fresh("suppliers",`name=ilike.${encodeURIComponent(n)}&select=id,name`);
-    return Array.isArray(r)&&r.length>0 ? {id:r[0].id,notFound:false} : {id:null,notFound:true};
+    const r=await api.fresh("suppliers",`name=ilike.${encodeURIComponent(n)}&select=id,name,is_catalogue_supplier`);
+    const match=Array.isArray(r)&&r.length>0?r[0]:null;
+    return match&&match.is_catalogue_supplier ? {id:match.id,notFound:false} : {id:null,notFound:true};
   };
 
   const doCustLogin = async () => {
@@ -289,7 +294,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     let supId=null;
     if(custSupplierName.trim()){
       const {id,notFound}=await resolveCustSupplier();
-      if(notFound){setErr(`No supplier found matching "${custSupplierName}"`);setLoading(false);return;}
+      if(notFound){setErr(`"${custSupplierName}" doesn't have a customer catalogue`);setLoading(false);return;}
       supId=id;
     }
     const res = await api.fresh("customers",`phone=eq.${encodeURIComponent(cPhone)}&password=eq.${encodeURIComponent(cPass)}${supId?`&supplier_scope_id=eq.${supId}`:""}&select=*`);
@@ -307,7 +312,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     let supId=null;
     if(custSupplierName.trim()){
       const {id,notFound}=await resolveCustSupplier();
-      if(notFound){setErr(`No supplier found matching "${custSupplierName}"`);setLoading(false);return;}
+      if(notFound){setErr(`"${custSupplierName}" doesn't have a customer catalogue`);setLoading(false);return;}
       supId=id;
     }
     const ex = await api.fresh("customers",`phone=eq.${encodeURIComponent(cPhone)}&select=id`);

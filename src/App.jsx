@@ -5840,6 +5840,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                   style={{width:"100%",fontSize:14,padding:"8px 32px 8px 12px",boxSizing:"border-box",color:"var(--text)",background:"var(--bg)"}}/>
                 {supplierSearch&&<button onClick={()=>setSupplierSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:15,color:"var(--text3)"}}>✕</button>}
               </div>
+              <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:13,fontWeight:supplierCatalogueFilter?700:400,color:supplierCatalogueFilter?"var(--green)":"var(--text2)"}}>
+                <input type="checkbox" checked={supplierCatalogueFilter} onChange={()=>setSupplierCatalogueFilter(v=>!v)} style={{accentColor:"var(--green)"}}/>
+                🎁 Catalogue
+              </label>
               {/* Origin pills */}
               {[["all","All"],["local","🏠 Local"],["international","✈ International"]].map(([v,label])=>(
                 <button key={v} onClick={()=>setSupplierOriginFilter(v)}
@@ -5855,10 +5859,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     {type.charAt(0).toUpperCase()+type.slice(1)}
                   </label>
                 ))}
-                <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:13,fontWeight:supplierCatalogueFilter?700:400,color:supplierCatalogueFilter?"var(--green)":"var(--text2)"}}>
-                  <input type="checkbox" checked={supplierCatalogueFilter} onChange={()=>setSupplierCatalogueFilter(v=>!v)} style={{accentColor:"var(--green)"}}/>
-                  🎁 Catalogue
-                </label>
               </div>
             </div>
 

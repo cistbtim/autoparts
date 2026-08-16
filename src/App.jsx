@@ -5460,7 +5460,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     </div>
                     {/* Price + button always at bottom */}
                     <div style={{marginTop:8}}>
-                      {customerDiscountPct>0&&+p.price>0?(
+                      {(+p.price<=0||p.stock<=0)?(
+                        <div style={{marginBottom:4,cursor:"pointer"}} onClick={()=>openM("customerQuery",p)}>
+                          <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:12,fontWeight:700}}>🔍 Ask for Price &amp; Availability</span>
+                        </div>
+                      ):customerDiscountPct>0?(
                         <div style={{marginBottom:4}}>
                           <div style={{display:"flex",alignItems:"baseline",gap:7}}>
                             <span style={{fontSize:20,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(discountPrice(p.price))}</span>
@@ -5476,7 +5480,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                         ? <button className="btn btn-ghost" style={{width:"100%",fontSize:12,color:"var(--text3)"}} disabled>🔒 Demo</button>
                         : inCart
                           ? <div style={{display:"flex",alignItems:"center",gap:7}}><button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty-1)}>−</button><span style={{flex:1,textAlign:"center",fontWeight:700,fontSize:16}}>{inCart.qty}</span><button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty+1)}>+</button><button className="btn btn-danger btn-xs" onClick={()=>removeFromCart(p.id)}>✕</button></div>
-                          : <button className="btn btn-primary" style={{width:"100%"}} disabled={p.stock===0} onClick={()=>addToCart(p)}>{t.addToCart}</button>}
+                          : <button className="btn btn-primary" style={{width:"100%"}} disabled={p.stock===0||+p.price<=0} onClick={()=>addToCart(p)}>{t.addToCart}</button>}
                       <button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:6,fontSize:12,borderColor:"var(--blue)",color:"var(--blue)"}} onClick={()=>openM("customerQuery",p)}>
                         🔍 {t.queryPriceQty}
                       </button>

@@ -2589,12 +2589,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // each part's own already-set cost — a one-time re-apply after the supplier
   // changes their markup %, without opening each part's cost modal individually.
   // updates: [{linkId, suggestedPrice}]. Doesn't touch supplier_price (cost) itself.
+  // Also stamps cost_updated_at — the flag admin's Supplier Pricing → Cost Updates
+  // review list actually keys off — otherwise a new suggested price here never
+  // surfaces for admin to see or bulk-approve at all (only the cost-price flow set
+  // this flag before, so a markup-only re-suggestion silently went nowhere).
   const bulkUpdateSupplierSuggestedPrices=async(updates)=>{
     if(!updates.length) return;
-    await Promise.all(updates.map(u=>api.patch("part_suppliers","id",u.linkId,{suggested_price:u.suggestedPrice})));
+    const nowIso=new Date().toISOString();
+    await Promise.all(updates.map(u=>api.patch("part_suppliers","id",u.linkId,{suggested_price:u.suggestedPrice,cost_updated_at:nowIso})));
     const byLinkId=new Map(updates.map(u=>[u.linkId,u.suggestedPrice]));
     setSupplierExistingParts(prev=>prev.map(p=>byLinkId.has(p._linkId)?{...p,_suggestedPrice:byLinkId.get(p._linkId)}:p));
-    showToast(`✅ Updated suggested price for ${updates.length} part${updates.length!==1?"s":""}`);
+    showToast(`✅ Updated suggested price for ${updates.length} part${updates.length!==1?"s":""} — sent to admin for review`);
   };
   const deleteSupplier=async(id)=>{
     const s=suppliers.find(x=>x.id===id);

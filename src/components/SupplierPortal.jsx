@@ -5,6 +5,7 @@ import { toImgUrl, fmtAmt, fmtDT, waLink } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 import { PrintPartLabelModal, ExtraPhotosStrip, resolveMarginOptions } from "./Modals.jsx";
+import { getCategories } from "../lib/constants.js";
 
 // Markup brackets a supplier can one-tap into a suggested retail price — cost
 // plus a straight % on top (cost * (1 + pct/100)), same "round to nearest 10"
@@ -553,7 +554,14 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
             </select>
           )}
         </div>
-        <div><FL label="Category"/><input className="inp" value={f.category} onChange={e=>s("category",e.target.value)} placeholder="Body, Engine..."/></div>
+        <div>
+          <FL label="Category"/>
+          <select className="inp" value={f.category} onChange={e=>s("category",e.target.value)}>
+            <option value="">— Select —</option>
+            {getCategories().map(c=><option key={c} value={c}>{c}</option>)}
+            {f.category&&!getCategories().includes(f.category)&&<option value={f.category}>{f.category}</option>}
+          </select>
+        </div>
       </FG>
       <FG>
         <div>

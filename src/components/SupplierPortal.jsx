@@ -266,15 +266,35 @@ function MarkupOptionsCard({marginOptions, effectiveMarginOptions, onSave}) {
 // supplier's own ?catalog= link (see the Share Your Catalogue card above) — applied
 // live in the Shop/Cart/Checkout for those customers, never touching customers
 // scoped elsewhere or browsing the main multi-supplier shop.
-function CustomerDiscountCard({discountPct, maxDiscountPct=0, onSave}) {
+// Both numbers here are scoped to just this one supplier's own catalogue/customers
+// — maxDiscountPct is the supplier's own self-set ceiling (suppliers.max_discount_pct),
+// never affecting any other supplier's customers. shopWideCap (if admin has set one
+// in Settings) is an outer bound shown for reference — the supplier's own max can
+// only tighten it further, never exceed it.
+function CustomerDiscountCard({discountPct, maxDiscountPct=0, shopWideCap=0, onSave, onSaveMax}) {
   const [editing,setEditing]=useState(false);
   const [val,setVal]=useState(discountPct||0);
+  const [maxVal,setMaxVal]=useState(maxDiscountPct||0);
   const [saving,setSaving]=useState(false);
-  const hasCap=maxDiscountPct>0;
-  const startEdit=()=>{setVal(discountPct||0);setEditing(true);};
-  const save=async()=>{setSaving(true);await onSave(Math.max(0,Math.min(hasCap?maxDiscountPct:100,+val||0)));setSaving(false);setEditing(false);};
+  // Effective ceiling for the Default Amount field itself: your own max, further
+  // bounded by the shop-wide cap if admin has one set.
+  const effectiveCap=(()=>{
+    if(maxDiscountPct>0&&shopWideCap>0) return Math.min(maxDiscountPct,shopWideCap);
+    return maxDiscountPct>0?maxDiscountPct:shopWideCap;
+  })();
+  const hasCap=effectiveCap>0;
+  const startEdit=()=>{setVal(discountPct||0);setMaxVal(maxDiscountPct||0);setEditing(true);};
+  const save=async()=>{
+    setSaving(true);
+    const clampedMax=Math.max(0,Math.min(shopWideCap>0?shopWideCap:100,+maxVal||0));
+    if(onSaveMax) await onSaveMax(clampedMax);
+    const newCap=(clampedMax>0&&shopWideCap>0)?Math.min(clampedMax,shopWideCap):(clampedMax>0?clampedMax:shopWideCap);
+    await onSave(Math.max(0,Math.min(newCap>0?newCap:100,+val||0)));
+    setSaving(false);setEditing(false);
+  };
   const remove=async()=>{setSaving(true);await onSave(0);setSaving(false);setEditing(false);};
-  const step=(delta)=>setVal(v=>Math.max(0,Math.min(hasCap?maxDiscountPct:100,(+v||0)+delta)));
+  const step=(delta)=>setVal(v=>Math.max(0,Math.min(hasCap?effectiveCap:100,(+v||0)+delta)));
+  const stepMax=(delta)=>setMaxVal(v=>Math.max(0,Math.min(shopWideCap>0?shopWideCap:100,(+v||0)+delta)));
   return (
     <div className="card" style={{padding:"12px 14px",marginBottom:14}}>
       <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
@@ -287,7 +307,7 @@ function CustomerDiscountCard({discountPct, maxDiscountPct=0, onSave}) {
           {editing?(
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <button type="button" className="btn btn-ghost btn-xs" onClick={()=>step(-1)} disabled={saving}>−</button>
-              <input className="inp" type="number" min="0" max={hasCap?maxDiscountPct:100} step="1" style={{width:70,textAlign:"center"}}
+              <input className="inp" type="number" min="0" max={hasCap?effectiveCap:100} step="1" style={{width:70,textAlign:"center"}}
                 value={val} onChange={e=>setVal(e.target.value)} autoFocus/>
               <button type="button" className="btn btn-ghost btn-xs" onClick={()=>step(1)} disabled={saving}>+</button>
               <span style={{fontSize:13,color:"var(--text3)"}}>%</span>
@@ -298,8 +318,20 @@ function CustomerDiscountCard({discountPct, maxDiscountPct=0, onSave}) {
         </div>
         <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px"}}>
           <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>Maximum Discount Limit</div>
-          <div style={{fontSize:20,fontWeight:800,color:"var(--text2)",fontFamily:"Rajdhani,sans-serif"}}>{hasCap?`${maxDiscountPct}%`:"No limit"}</div>
-          <div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>Set by admin — not editable here</div>
+          {editing?(
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <button type="button" className="btn btn-ghost btn-xs" onClick={()=>stepMax(-1)} disabled={saving}>−</button>
+              <input className="inp" type="number" min="0" max={shopWideCap>0?shopWideCap:100} step="1" style={{width:70,textAlign:"center"}}
+                value={maxVal} onChange={e=>setMaxVal(e.target.value)}/>
+              <button type="button" className="btn btn-ghost btn-xs" onClick={()=>stepMax(1)} disabled={saving}>+</button>
+              <span style={{fontSize:13,color:"var(--text3)"}}>%</span>
+            </div>
+          ):(
+            <div style={{fontSize:20,fontWeight:800,color:"var(--text2)",fontFamily:"Rajdhani,sans-serif"}}>{maxDiscountPct>0?`${maxDiscountPct}%`:"No limit"}</div>
+          )}
+          <div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>
+            Only affects your own catalogue{shopWideCap>0?` · shop ceiling ${shopWideCap}%`:""}
+          </div>
         </div>
       </div>
       <div style={{fontSize:11,color:"var(--text3)",marginTop:8}}>
@@ -814,15 +846,23 @@ export function SupplierQueriesPage({queries=[], existingParts=[], selfParts=[],
 // card back on My Parts. Only customers actually scoped to this supplier show up
 // here — never another supplier's or the main shop's customers.
 // ═══════════════════════════════════════════════════════════════
-export function SupplierCustomersPage({customers=[], defaultDiscountPct=0, maxDiscountPct=0, onUpdateDiscount, onUpdateDefaultDiscount, onRefresh}) {
+// maxDiscountPct here is this supplier's OWN self-set ceiling — never shared with
+// or affected by any other supplier. shopWideCap is admin's optional shop-wide
+// outer bound (0 = none); the effective cap for per-customer overrides is
+// whichever of the two is set and more restrictive.
+export function SupplierCustomersPage({customers=[], defaultDiscountPct=0, maxDiscountPct=0, shopWideCap=0, onUpdateDiscount, onUpdateDefaultDiscount, onUpdateMaxDiscount, onRefresh}) {
   const [editingId, setEditingId] = useState(null);
   const [val, setVal] = useState("");
   const [saving, setSaving] = useState(false);
-  const hasCap=maxDiscountPct>0;
+  const effectiveCap=(()=>{
+    if(maxDiscountPct>0&&shopWideCap>0) return Math.min(maxDiscountPct,shopWideCap);
+    return maxDiscountPct>0?maxDiscountPct:shopWideCap;
+  })();
+  const hasCap=effectiveCap>0;
   const startEdit=(c)=>{setVal(c.discount_pct!=null?String(c.discount_pct):"");setEditingId(c.id);};
   const save=async(id)=>{
     setSaving(true);
-    const pct=val.trim()===""?null:Math.max(0,Math.min(hasCap?maxDiscountPct:100,+val||0));
+    const pct=val.trim()===""?null:Math.max(0,Math.min(hasCap?effectiveCap:100,+val||0));
     await onUpdateDiscount(id,pct);
     setSaving(false);setEditingId(null);
   };
@@ -838,7 +878,7 @@ export function SupplierCustomersPage({customers=[], defaultDiscountPct=0, maxDi
         {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
       </div>
 
-      {onUpdateDefaultDiscount&&<CustomerDiscountCard discountPct={defaultDiscountPct} maxDiscountPct={maxDiscountPct} onSave={onUpdateDefaultDiscount}/>}
+      {onUpdateDefaultDiscount&&<CustomerDiscountCard discountPct={defaultDiscountPct} maxDiscountPct={maxDiscountPct} shopWideCap={shopWideCap} onSave={onUpdateDefaultDiscount} onSaveMax={onUpdateMaxDiscount}/>}
 
       {customers.length===0 ? (
         <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
@@ -858,7 +898,7 @@ export function SupplierCustomersPage({customers=[], defaultDiscountPct=0, maxDi
                 </div>
                 {editingId===c.id ? (
                   <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-                    <input className="inp" type="number" min="0" max={hasCap?maxDiscountPct:100} style={{width:80}}
+                    <input className="inp" type="number" min="0" max={hasCap?effectiveCap:100} style={{width:80}}
                       placeholder={String(defaultDiscountPct||0)} value={val} onChange={e=>setVal(e.target.value)} autoFocus/>
                     <span style={{fontSize:12,color:"var(--text3)"}}>%</span>
                     <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditingId(null)} disabled={saving}>Cancel</button>

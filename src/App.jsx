@@ -197,6 +197,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [supplierQueries,setSupplierQueries]=useState([]); // customer_queries against this supplier's own self-added parts
   const [supplierMarginOptions,setSupplierMarginOptions]=useState(null); // this supplier's own custom quick-margin %s (suppliers.margin_options), null = using shop default
   const [supplierDiscountPct,setSupplierDiscountPct]=useState(0); // % this supplier offers customers scoped to their own ?catalog= link (suppliers.customer_discount_pct)
+  const [supplierMaxDiscountPct,setSupplierMaxDiscountPct]=useState(0); // this supplier's own self-set ceiling for their discount (suppliers.max_discount_pct) — scoped to just their catalogue, doesn't touch other suppliers
   const [supplierSearch,setSupplierSearch]=useState("");
   const [supplierOriginFilter,setSupplierOriginFilter]=useState("all");
   const [supplierTypeFilter,setSupplierTypeFilter]=useState([]);
@@ -886,11 +887,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(role!=="supplier"||!user.supplier_id) return;
     const data=await api.fresh("supplier_parts",`supplier_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
     setSupplierParts(Array.isArray(data)?data:[]);
-    api.fresh("suppliers",`id=eq.${user.supplier_id}&select=margin_options,customer_discount_pct`).then(r=>{
+    api.fresh("suppliers",`id=eq.${user.supplier_id}&select=margin_options,customer_discount_pct,max_discount_pct`).then(r=>{
       const row=Array.isArray(r)&&r[0];
       const opts=row?.margin_options;
       setSupplierMarginOptions(Array.isArray(opts)&&opts.length?opts:null);
       setSupplierDiscountPct(+row?.customer_discount_pct||0);
+      setSupplierMaxDiscountPct(+row?.max_discount_pct||0);
     }).catch(()=>{});
     // Queries customers submitted — either against this supplier's own self-added
     // parts (matched via supplier_part_id) or against any part while browsing this
@@ -2621,30 +2623,50 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setSupplierMarginOptions(opts);
     showToast(opts?"✅ Markup % updated":"Reset to shop default");
   };
+  // The discount ceiling actually in effect for THIS supplier only — their own
+  // self-set max (suppliers.max_discount_pct, edited in their own portal, never
+  // touching other suppliers) further bounded by admin's shop-wide ceiling in
+  // Settings if one's set. Whichever of the two is set and lower wins; 0 = no cap.
+  const resolveSupplierDiscountCap=()=>{
+    const adminCap=+settings.max_customer_discount_pct||0;
+    const ownCap=+supplierMaxDiscountPct||0;
+    if(ownCap>0&&adminCap>0) return Math.min(ownCap,adminCap);
+    return ownCap>0?ownCap:adminCap;
+  };
   // Discount % this supplier offers customers who signed up through their own
   // ?catalog= link (user.supplier_scope_id) — applied automatically in Shop/Cart/
   // Checkout for those customers, see customerDiscountPct/discountPrice above.
-  // Clamped server-side (not just via the input's max attribute) to whatever cap
-  // admin has set in Settings — max_customer_discount_pct of 0 means no cap.
   const updateSupplierDiscountPct=async(pct)=>{
-    const cap=+settings.max_customer_discount_pct||0;
+    const cap=resolveSupplierDiscountCap();
     const clamped=cap>0?Math.min(pct,cap):pct;
     await api.patch("suppliers","id",user.supplier_id,{customer_discount_pct:clamped});
     setSupplierDiscountPct(clamped);
-    if(clamped<pct) showToast(`⚠️ Capped at ${clamped}% (shop maximum)`,"err");
+    if(clamped<pct) showToast(`⚠️ Capped at ${clamped}% (your own maximum)`,"err");
     else showToast(clamped>0?`✅ Customer discount set to ${clamped}%`:"Customer discount removed");
+  };
+  // This supplier's own ceiling for their Customer Discount — set by the supplier
+  // themselves in their own portal, scoped to only their own catalogue/customers,
+  // never affecting any other supplier. Still bounded by admin's shop-wide cap
+  // (if admin has set one) as an outer limit.
+  const updateSupplierMaxDiscountPct=async(pct)=>{
+    const adminCap=+settings.max_customer_discount_pct||0;
+    const clamped=adminCap>0?Math.min(pct,adminCap):pct;
+    await api.patch("suppliers","id",user.supplier_id,{max_discount_pct:clamped});
+    setSupplierMaxDiscountPct(clamped);
+    if(clamped<pct) showToast(`⚠️ Capped at ${clamped}% (shop-wide ceiling)`,"err");
+    else showToast(clamped>0?`✅ Your maximum discount set to ${clamped}%`:"Maximum discount limit removed");
   };
   // Per-customer override on top of the blanket default above — lets a supplier
   // pick exactly who among their own catalogue signups gets a discount, and how
   // much, instead of it always applying to everyone. null = "use the supplier's
   // default"; any number (incl. 0) = an explicit override for just this customer.
-  // Same server-side cap as the blanket default.
+  // Same cap as the blanket default.
   const updateCustomerDiscount=async(customerId,pct)=>{
-    const cap=+settings.max_customer_discount_pct||0;
+    const cap=resolveSupplierDiscountCap();
     const clamped=pct==null?null:(cap>0?Math.min(pct,cap):pct);
     await api.patch("customers","id",customerId,{discount_pct:clamped});
     setSupplierCustomers(prev=>prev.map(c=>c.id===customerId?{...c,discount_pct:clamped}:c));
-    if(clamped!=null&&pct!=null&&clamped<pct) showToast(`⚠️ Capped at ${clamped}% (shop maximum)`,"err");
+    if(clamped!=null&&pct!=null&&clamped<pct) showToast(`⚠️ Capped at ${clamped}% (your own maximum)`,"err");
     else showToast(clamped==null?"Using default discount":clamped>0?`✅ Discount set to ${clamped}%`:"Discount removed for this customer");
   };
   // Bulk-recompute suggested_price for many existing-catalogue parts at once, from
@@ -5595,8 +5617,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {tab==="supplierCustomers"&&role==="supplier"&&(
           <SupplierCustomersPage customers={supplierCustomers} defaultDiscountPct={supplierDiscountPct}
-            maxDiscountPct={+settings.max_customer_discount_pct||0}
-            onUpdateDiscount={updateCustomerDiscount} onUpdateDefaultDiscount={updateSupplierDiscountPct} onRefresh={reloadSupplierParts}/>
+            maxDiscountPct={supplierMaxDiscountPct} shopWideCap={+settings.max_customer_discount_pct||0}
+            onUpdateDiscount={updateCustomerDiscount} onUpdateDefaultDiscount={updateSupplierDiscountPct}
+            onUpdateMaxDiscount={updateSupplierMaxDiscountPct} onRefresh={reloadSupplierParts}/>
         )}
 
         {/* ── PURCHASE INVOICES ── */}

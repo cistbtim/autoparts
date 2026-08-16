@@ -550,6 +550,13 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
   const [selectedCostUpdates, setSelectedCostUpdates] = useState(new Set());
   const [approving, setApproving] = useState(false);
   const toggleCostUpdateSelect=(id)=>setSelectedCostUpdates(prev=>{const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n;});
+  // Which supplier's cost updates to work through — "__all__" or one supplier at a
+  // time, so admin can bulk-approve just one supplier's batch, or go row by row.
+  const [costUpdateSupplier, setCostUpdateSupplier] = useState("__all__");
+  const costUpdateSupplierOptions=[...new Set(costUpdates.map(l=>String(l.supplier_id)))]
+    .map(id=>({id,name:supName(id),count:costUpdates.filter(l=>String(l.supplier_id)===id).length}))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  const visibleCostUpdates=costUpdateSupplier==="__all__"?costUpdates:costUpdates.filter(l=>String(l.supplier_id)===costUpdateSupplier);
 
   return (
     <div className="fu">
@@ -573,10 +580,21 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>Suppliers updated their cost on these parts — check if the selling price still makes sense.</div>
+            {costUpdateSupplierOptions.length>1&&(
+              <div style={{marginBottom:2}}>
+                <select className="inp" style={{width:"auto",minWidth:220}} value={costUpdateSupplier}
+                  onChange={e=>{setCostUpdateSupplier(e.target.value);setSelectedCostUpdates(new Set());}}>
+                  <option value="__all__">All Suppliers ({costUpdates.length})</option>
+                  {costUpdateSupplierOptions.map(s=>(
+                    <option key={s.id} value={s.id}>{s.name} ({s.count})</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {onBulkApproveCostUpdates&&(
               <div className="card" style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:2}}>
                 <div style={{fontSize:13,fontWeight:700}}>{selectedCostUpdates.size} selected</div>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedCostUpdates(new Set(costUpdates.map(l=>l.id)))}>Select All ({costUpdates.length})</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedCostUpdates(new Set(visibleCostUpdates.map(l=>l.id)))}>Select All ({visibleCostUpdates.length})</button>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedCostUpdates(new Set())} disabled={!selectedCostUpdates.size}>Clear</button>
                 <div style={{flex:1,minWidth:8}}/>
                 <button type="button" className="btn btn-primary btn-sm" disabled={!selectedCostUpdates.size||approving}
@@ -591,7 +609,10 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
                 </button>
               </div>
             )}
-            {costUpdates.map(l=>(
+            {visibleCostUpdates.length===0&&(
+              <div className="card" style={{padding:32,textAlign:"center",color:"var(--text3)"}}>No cost updates from this supplier.</div>
+            )}
+            {visibleCostUpdates.map(l=>(
               <div key={l.id} className="card" style={{padding:14,display:"flex",gap:12,alignItems:"center"}}>
                 {onBulkApproveCostUpdates&&(
                   <input type="checkbox" checked={selectedCostUpdates.has(l.id)} onChange={()=>toggleCostUpdateSelect(l.id)} style={{width:18,height:18,flexShrink:0,cursor:"pointer"}}/>

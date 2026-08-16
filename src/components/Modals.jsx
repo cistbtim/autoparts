@@ -3010,7 +3010,7 @@ export function CustomerReturnModal({data,customerInvoices,onSave,onClose,t,sett
 // ALL OTHER MODALS
 // ═══════════════════════════════════════════════════════════════
 // ── Part Actions Dropdown (... menu) ────────────────────────
-export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,onDelete,onPrintLabel,t}) {
+export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,onDelete,onPrintLabel,onApprove,t}) {
   const [open,setOpen] = useState(false);
   const [menuPos,setMenuPos] = useState({top:0,left:0});
   const ref = useRef(null);
@@ -3039,6 +3039,7 @@ export function PartActionsMenu({onAdjust,onEdit,onMove,onSupplier,onRfq,onLogs,
   };
 
   const actions = [
+    ...(onApprove?[{label:"✅ Approve", color:"#34d399", fn:onApprove}]:[]),
     {label:"± "+t.adjustStock, color:"var(--yellow)", fn:onAdjust},
     {label:"✏️ "+t.edit, color:"var(--text)", fn:onEdit},
     {label:"🔀 "+t.stockMove, color:"var(--blue)", fn:onMove},

@@ -5158,6 +5158,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                                     onLogs={()=>{setLogSearch(p.sku||"");setTab("logs");}}
                                     onPrintLabel={()=>openM("printPartLabel",p)}
                                     onDelete={()=>deletePart(p.id)}
+                                    onApprove={p.review_status==="pending"?()=>approvePart(p.id):null}
                                     t={t}
                                   />
                                 )}

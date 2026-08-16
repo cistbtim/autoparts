@@ -8,7 +8,7 @@ import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./l
 import { CSS } from "./styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AdBanner, AdGridCard } from "./components/shared.jsx";
 
-import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, PartPhotoCapturePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage } from "./components/Modals.jsx";
+import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, PartPhotoCapturePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage, resolveMarginOptions } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { SystemMapPage } from "./components/SystemMap.jsx";
@@ -261,6 +261,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [invPage,setInvPage]=useState(0);   // inventory page
   const [invSort,setInvSort]=useState("sku"); // "default"|"sku"
   const [invReport,setInvReport]=useState(null); // null | "quantum" | "hiace" | "others"
+  // Bulk price update — select parts (from the current search/filter results) with
+  // a cost already set, then recompute + save price from cost via one markup %.
+  const [bulkPriceMode,setBulkPriceMode]=useState(false);
+  const [bulkPriceSelected,setBulkPriceSelected]=useState(new Set());
+  const [bulkPriceApplying,setBulkPriceApplying]=useState(false);
   const [activePicker,setActivePicker]=useState(null); // {userId, date} — inline expiry date picker in Users table
   const [shopPage,setShopPage]=useState(0); // shop page
   const [shopSort,setShopSort]=useState("sku"); // "default"|"sku"
@@ -2601,6 +2606,40 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setSupplierExistingParts(prev=>prev.map(p=>byLinkId.has(p._linkId)?{...p,_suggestedPrice:byLinkId.get(p._linkId)}:p));
     showToast(`✅ Updated suggested price for ${updates.length} part${updates.length!==1?"s":""} — sent to admin for review`);
   };
+  // Admin bulk-recomputing selling price from cost across many Inventory parts at
+  // once (same markup formula as the Stock tab's own quick-price buttons and the
+  // supplier portal's bulk update) — parts must already have a cost price set.
+  // Tracks per-part outcome instead of a blanket success toast, same reasoning as
+  // bulkApproveSupplierCostUpdates: a large batch silently doing nothing for some
+  // rows should never look identical to it fully succeeding.
+  const bulkUpdateInventoryPrices=async(partIds,pct)=>{
+    if(!partIds.length) return;
+    setBusyMsg(`Updating price for ${partIds.length} part${partIds.length!==1?"s":""}…`);
+    let ok=0, unchanged=0, failed=0; let firstError="";
+    try{
+      await Promise.all(partIds.map(async id=>{
+        const p=parts.find(pt=>String(pt.id)===String(id));
+        if(!p||!(+p.cost_price>0)){ failed++; firstError=firstError||`Part #${id}: no cost price set`; return; }
+        const newPrice=Math.round((+p.cost_price*(1+pct/100))/10)*10;
+        if(+p.price===newPrice){ unchanged++; return; }
+        const d2={price:newPrice, price_updated_at:new Date().toISOString()};
+        const result=await api.patch("parts","id",p.id,d2);
+        if(!Array.isArray(result)||!result.length){
+          failed++; firstError=firstError||(result&&result.message)||`${p.sku||p.id}: save failed`; return;
+        }
+        ok++;
+        api.insert("part_price_history",{part_id:p.id,sku:p.sku,old_price:p.price||null,new_price:newPrice||null,
+          old_cost_price:p.cost_price||null,new_cost_price:p.cost_price||null,source:"admin_edit",changed_by:user.name||user.username||""}).catch(()=>{});
+        const updated={...p,...d2};
+        setParts(prev=>prev.map(pt=>String(pt.id)===String(p.id)?updated:pt));
+        db.parts.put(updated).catch(()=>{});
+      }));
+      if(failed>0) showToast(`⚠️ ${ok} updated, ${failed} failed (${firstError})${unchanged?`, ${unchanged} already matched`:""}`,"err");
+      else showToast(`✅ ${ok} price${ok!==1?"s":""} updated${unchanged?`, ${unchanged} already matched`:""}`);
+    } finally {
+      setBusyMsg(null);
+    }
+  };
   const deleteSupplier=async(id)=>{
     const s=suppliers.find(x=>x.id===id);
     if(s&&role!=="admin"&&s.branch_id!==user.branch_id)return showToast("Cannot delete a global supplier","err");
@@ -4469,8 +4508,35 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>openM("printShelfLabel")} title="Print shelf/bin label">📋 Shelf Label</button>}
                 {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>openM("importCatalogue")} title="Import supplier catalogue (CSV/Excel)">⬆ Import</button>}
                 {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>openM("bulkImages")} title="Bulk upload images by filename">🖼 Images</button>}
+                {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>{if(bulkPriceMode)setBulkPriceSelected(new Set());setBulkPriceMode(v=>!v);}} title="Bulk-recompute price from cost across selected parts">
+                  {bulkPriceMode?"✕ Exit Bulk Price":"☑ Bulk Update Prices"}
+                </button>}
                 {(role==="admin"||role==="branch_admin")&&<button className="btn btn-primary" onClick={()=>openM("editPart")}>+ {t.addPart}</button>}
               </div>}/>
+            {bulkPriceMode&&(()=>{
+              const eligible=fp.filter(p=>+p.cost_price>0);
+              const bulkMarginOptions=resolveMarginOptions({category:filterCat!=="__all__"?filterCat:undefined});
+              return (
+                <div className="card" style={{padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                  <div style={{fontSize:13,fontWeight:700}}>{bulkPriceSelected.size} selected</div>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setBulkPriceSelected(new Set(eligible.map(p=>p.id)))}>Select All ({eligible.length} with cost set, from current search/filters)</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setBulkPriceSelected(new Set())} disabled={!bulkPriceSelected.size}>Clear</button>
+                  <div style={{flex:1,minWidth:8}}/>
+                  <span style={{fontSize:12,color:"var(--text3)"}}>Apply markup to selected:</span>
+                  {bulkMarginOptions.map(m=>(
+                    <button key={m} type="button" className="btn btn-primary btn-sm" disabled={!bulkPriceSelected.size||bulkPriceApplying}
+                      onClick={async()=>{
+                        setBulkPriceApplying(true);
+                        await bulkUpdateInventoryPrices([...bulkPriceSelected],m);
+                        setBulkPriceApplying(false);
+                        setBulkPriceSelected(new Set());
+                      }}>
+                      {bulkPriceApplying?"Applying…":`${m}%`}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
             {showCrossBranch&&branches.length>1&&(
               <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:12,padding:16,marginBottom:16}}>
                 <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>🏢 {t.branchCrossTitle}</div>
@@ -4696,8 +4762,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 const img=toImgUrl(p.image_url);
                 const ps=getPartSupps(p.id);
                 return (
-                  <div key={p.id} id={`part-row-${p.id}`} className="card" style={{padding:14,
+                  <div key={p.id} id={`part-row-${p.id}`} className="card" style={{padding:14,position:"relative",
+                    background:bulkPriceSelected.has(p.id)?"rgba(249,115,22,.06)":undefined,
                     borderLeft:`3px solid ${(role==="branch_admin"&&!p._bsSet)?"var(--border)":p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--border)"}`}}>
+                    {bulkPriceMode&&(
+                      <input type="checkbox" checked={bulkPriceSelected.has(p.id)} disabled={!(+p.cost_price>0)}
+                        onChange={()=>setBulkPriceSelected(prev=>{const n=new Set(prev); n.has(p.id)?n.delete(p.id):n.add(p.id); return n;})}
+                        style={{position:"absolute",top:10,right:10,width:20,height:20,cursor:+p.cost_price>0?"pointer":"not-allowed"}}/>
+                    )}
                     <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                       {/* Photo */}
                       {img
@@ -4794,6 +4866,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               <div className="tbl-wrap">
                 <table className="tbl">
                   <thead><tr>
+                    {bulkPriceMode&&<th style={{width:32}}/>}
                     {["",t.sku,`${t.name} / ${t.chineseDesc}`,t.bin||t.binLocation||"Bin",t.make,t.model,t.yearRange,t.oeNumber,t.category,t.price,t.cost||t.costPrice||"Cost",t.stock||"St"].map(h=><th key={h}>{h}</th>)}
                     <th style={{textAlign:"center",whiteSpace:"nowrap"}}>🚗</th>
                     <th style={{textAlign:"center",whiteSpace:"nowrap"}} title="Toyota Quantum">🚐Q</th>
@@ -4805,7 +4878,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                       const img=toImgUrl(p.image_url);
                       const ps=getPartSupps(p.id);
                       return (
-                        <tr key={p.id} id={`part-row-${p.id}`}>
+                        <tr key={p.id} id={`part-row-${p.id}`} style={bulkPriceSelected.has(p.id)?{background:"rgba(249,115,22,.06)"}:undefined}>
+                          {bulkPriceMode&&(
+                            <td style={{width:32,padding:"10px 4px",textAlign:"center"}}>
+                              <input type="checkbox" checked={bulkPriceSelected.has(p.id)} disabled={!(+p.cost_price>0)}
+                                onChange={()=>setBulkPriceSelected(prev=>{const n=new Set(prev); n.has(p.id)?n.delete(p.id):n.add(p.id); return n;})}
+                                style={{width:16,height:16,cursor:+p.cost_price>0?"pointer":"not-allowed"}}/>
+                            </td>
+                          )}
                           <td style={{width:79,padding:"10px 8px"}}>
                             {(()=>{
                               const photoCount=partPhotoUrls(p).length;

@@ -2521,10 +2521,58 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await reloadSupplierParts();
     showToast("Deleted","err");
   };
+  // Setting a price on a supplier's self-added part "graduates" it into a real
+  // Inventory part — until now it only ever lived in supplier_parts (invisible to
+  // admin's Inventory search/list even after being priced). Once priced: create
+  // the real parts row, link it back to the supplier via part_suppliers (so it
+  // shows up as an "Existing Catalogue" item in that supplier's own portal from
+  // now on, not "Added by You"), re-point any fitments/queries that referenced
+  // the old supplier_part_id, then remove the now-redundant supplier_parts row.
+  // price=0/falsy just clears the price and leaves it un-graduated, same as before.
   const setSupplierPartPrice=async(id,price)=>{
-    await api.patch("supplier_parts","id",id,{price});
-    await reloadAllSupplierParts();
-    showToast(price?"✅ Price set — now live":"Price cleared");
+    if(!price){
+      await api.patch("supplier_parts","id",id,{price:null});
+      await reloadAllSupplierParts();
+      showToast("Price cleared");
+      return;
+    }
+    const sp=allSupplierParts.find(p=>String(p.id)===String(id));
+    if(!sp){ showToast("Part not found","err"); return; }
+    const supplier=suppliers.find(s=>String(s.id)===String(sp.supplier_id));
+    const supplierCode=supplier?.code||supplier?.name||"SUP";
+    setBusyMsg(`Setting price for ${supplierCode}-${sp.part_code}…`);
+    try{
+      const newPartPayload={
+        sku:`${supplierCode}-${sp.part_code}`, name:sp.name||"", chinese_desc:sp.chinese_desc||"",
+        category:sp.category||"", price:+price, cost_price:+sp.cost_price||0, stock:+sp.stock||0,
+        image_url:sp.image_url||"", photos:Array.isArray(sp.photos)?sp.photos:[],
+        make:sp.make||"", model:sp.model||"", year_range:sp.year_range||"", oe_number:sp.oe_number||"",
+      };
+      const r=await api.upsert("parts",newPartPayload);
+      const newPart=Array.isArray(r)&&r[0]?r[0]:null;
+      if(!newPart?.id){ showToast("Failed to create Inventory part — check SKU isn't already taken","err"); return; }
+      const linkR=await api.upsert("part_suppliers",{
+        part_id:newPart.id, supplier_id:sp.supplier_id, supplier_part_no:sp.part_code,
+        supplier_price:sp.cost_price||null, suggested_price:sp.suggested_price||null,
+      });
+      const newLink=Array.isArray(linkR)&&linkR[0]?linkR[0]:null;
+      // Re-point anything that referenced the old supplier_part_id onto the new real part.
+      await Promise.all([
+        api.patch("part_fitments","supplier_part_id",sp.id,{part_id:newPart.id,supplier_part_id:null}).catch(()=>{}),
+        api.patch("customer_queries","supplier_part_id",sp.id,{part_id:newPart.id,supplier_part_id:null}).catch(()=>{}),
+      ]);
+      await api.delete("supplier_parts","id",sp.id);
+      // parts/part_suppliers/part_fitments are large tables — update local state
+      // directly instead of refetching (see memory: refreshTables("parts") ~28s).
+      setParts(prev=>[...prev,newPart]);
+      if(newLink) setPartSuppliers(prev=>[...prev,newLink]);
+      setPartFitments(prev=>prev.map(f=>String(f.supplier_part_id)===String(sp.id)?{...f,part_id:newPart.id,supplier_part_id:null}:f));
+      setCustomerQueries(prev=>prev.map(q=>String(q.supplier_part_id)===String(sp.id)?{...q,part_id:newPart.id,supplier_part_id:null}:q));
+      await reloadAllSupplierParts();
+      showToast(`✅ ${newPartPayload.sku} is now live in Inventory`);
+    } finally {
+      setBusyMsg(null);
+    }
   };
   const dismissSupplierCostUpdate=async(linkId)=>{
     await api.patch("part_suppliers","id",linkId,{cost_updated_at:null});

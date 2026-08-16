@@ -454,7 +454,19 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
       )}
 
       <FG>
-        <div><FL label="OE Number"/><input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)}/></div>
+        <div>
+          <FL label="OE Number"/>
+          <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)}/>
+          {f.oe_number&&(
+            <select className="inp" style={{fontSize:11,color:"#1d4ed8",marginTop:6}}
+              value="" onChange={e=>{if(e.target.value)window.open(`https://www.lllparts.co.uk/search/${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+              <option value="">🔍 Search on lllparts…</option>
+              {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
+                <option key={i} value={tok}>{tok}</option>
+              ))}
+            </select>
+          )}
+        </div>
         <div><FL label="Category"/><input className="inp" value={f.category} onChange={e=>s("category",e.target.value)} placeholder="Body, Engine..."/></div>
       </FG>
       <FG>

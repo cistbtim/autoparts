@@ -2136,6 +2136,13 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
                     <option key={i} value={tok}>{tok}</option>
                   ))}
                 </select>
+                <select className="inp" style={{fontSize:11,color:"#1d4ed8",width:"auto",padding:"3px 6px"}}
+                  value="" onChange={e=>{if(e.target.value)window.open(`https://www.lllparts.co.uk/search/${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+                  <option value="">🔍 lllparts…</option>
+                  {part.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
+                    <option key={i} value={tok}>{tok}</option>
+                  ))}
+                </select>
               </div>
             ) : <span style={{fontSize:12,color:"var(--text3)"}}>No OE number set</span>}
           </div>
@@ -2228,13 +2235,22 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
           ✅ Linked Vehicles ({linked.length})
         </div>
         {part?.oe_number&&!expanded&&(
-          <select className="inp" style={{fontSize:12,color:"#e65c00"}}
-            value="" onChange={e=>{if(e.target.value)window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-            <option value="">🔍 Search on SpareTO…</option>
-            {part.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
-              <option key={i} value={tok}>{tok}</option>
-            ))}
-          </select>
+          <div style={{display:"flex",gap:6}}>
+            <select className="inp" style={{fontSize:12,color:"#e65c00"}}
+              value="" onChange={e=>{if(e.target.value)window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+              <option value="">🔍 Search on SpareTO…</option>
+              {part.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
+                <option key={i} value={tok}>{tok}</option>
+              ))}
+            </select>
+            <select className="inp" style={{fontSize:12,color:"#1d4ed8"}}
+              value="" onChange={e=>{if(e.target.value)window.open(`https://www.lllparts.co.uk/search/${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+              <option value="">🔍 Search on lllparts…</option>
+              {part.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
+                <option key={i} value={tok}>{tok}</option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
       {linked.length === 0 && pending.size === 0 && (

@@ -3645,13 +3645,22 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               {f.oe_number&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.oe_number)}>📋 Copy OE</button>}
             </div>
             {f.oe_number&&(
-              <select className="inp" style={{marginBottom:6,color:"#e65c00",fontSize:12}}
-                value="" onChange={e=>{if(e.target.value)window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-                <option value="">🔍 Search on SpareTO…</option>
-                {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
-                  <option key={i} value={tok}>{tok}</option>
-                ))}
-              </select>
+              <div style={{display:"flex",gap:6,marginBottom:6}}>
+                <select className="inp" style={{color:"#e65c00",fontSize:12}}
+                  value="" onChange={e=>{if(e.target.value)window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+                  <option value="">🔍 Search on SpareTO…</option>
+                  {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
+                    <option key={i} value={tok}>{tok}</option>
+                  ))}
+                </select>
+                <select className="inp" style={{color:"#1d4ed8",fontSize:12}}
+                  value="" onChange={e=>{if(e.target.value)window.open(`https://www.lllparts.co.uk/search/${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+                  <option value="">🔍 Search on lllparts…</option>
+                  {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
+                    <option key={i} value={tok}>{tok}</option>
+                  ))}
+                </select>
+              </div>
             )}
             <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)} placeholder="OE number / OEM reference"/>
           </FD>

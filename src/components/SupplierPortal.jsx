@@ -541,12 +541,15 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
 // suppliers have self-added (across every supplier). A part stays invisible
 // to customers until it has a price here.
 // ═══════════════════════════════════════════════════════════════
-export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, costUpdates=[], onDismissCostUpdate, onGoToPart, onRefresh}) {
+export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, costUpdates=[], onDismissCostUpdate, onGoToPart, onBulkApproveCostUpdates, onRefresh}) {
   const [filter, setFilter] = useState(costUpdates.length?"costUpdates":"pending"); // "pending" | "all" | "costUpdates"
   const supName=(id)=>suppliers.find(s=>String(s.id)===String(id))?.name||`#${id}`;
   const supCode=(id)=>{const s=suppliers.find(s=>String(s.id)===String(id));return s?.code||s?.name||"";};
   const rows=filter==="pending"?allParts.filter(p=>!p.price):allParts;
   const [drafts, setDrafts] = useState({}); // {id: draftPriceString}
+  const [selectedCostUpdates, setSelectedCostUpdates] = useState(new Set());
+  const [approving, setApproving] = useState(false);
+  const toggleCostUpdateSelect=(id)=>setSelectedCostUpdates(prev=>{const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n;});
 
   return (
     <div className="fu">
@@ -570,8 +573,29 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>Suppliers updated their cost on these parts — check if the selling price still makes sense.</div>
+            {onBulkApproveCostUpdates&&(
+              <div className="card" style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:2}}>
+                <div style={{fontSize:13,fontWeight:700}}>{selectedCostUpdates.size} selected</div>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedCostUpdates(new Set(costUpdates.map(l=>l.id)))}>Select All ({costUpdates.length})</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedCostUpdates(new Set())} disabled={!selectedCostUpdates.size}>Clear</button>
+                <div style={{flex:1,minWidth:8}}/>
+                <button type="button" className="btn btn-primary btn-sm" disabled={!selectedCostUpdates.size||approving}
+                  onClick={async()=>{
+                    setApproving(true);
+                    const links=costUpdates.filter(l=>selectedCostUpdates.has(l.id));
+                    await onBulkApproveCostUpdates(links);
+                    setApproving(false);
+                    setSelectedCostUpdates(new Set());
+                  }}>
+                  {approving?"Approving…":`✅ Approve ${selectedCostUpdates.size||""} Selected`}
+                </button>
+              </div>
+            )}
             {costUpdates.map(l=>(
               <div key={l.id} className="card" style={{padding:14,display:"flex",gap:12,alignItems:"center"}}>
+                {onBulkApproveCostUpdates&&(
+                  <input type="checkbox" checked={selectedCostUpdates.has(l.id)} onChange={()=>toggleCostUpdateSelect(l.id)} style={{width:18,height:18,flexShrink:0,cursor:"pointer"}}/>
+                )}
                 <div style={{width:48,height:48,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                   {l._part?.image_url
                     ? <img src={toImgUrl(l._part.image_url)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>

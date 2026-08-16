@@ -2491,6 +2491,49 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await api.patch("part_suppliers","id",linkId,{cost_updated_at:null});
     setSupplierCostUpdates(prev=>prev.filter(l=>l.id!==linkId));
   };
+  // Shared by the single "Update Price" flow (pre-fills the PartModal) and the
+  // bulk-approve flow below — the supplier's own suggested retail price if they
+  // gave one, else the top markup % on the new cost (that supplier's own numbers
+  // if they've set any, else the shop default), or the part's current price if
+  // that's already higher (never auto-suggest a cut).
+  const resolveCostUpdateNewPrice=(link,p)=>{
+    const newCost=+link.supplier_price||0;
+    const fallbackSupplier=suppliers.find(s=>String(s.id)===String(link.supplier_id));
+    const fallbackMarginOptions=(fallbackSupplier?.margin_options?.length?fallbackSupplier.margin_options:null)
+      ||(settings.margin_options?.length?settings.margin_options:null)||[30,25,22];
+    const suggestedFallback=newCost>0?Math.round((newCost*(1+fallbackMarginOptions[0]/100))/10)*10:0;
+    return {newCost, newSellPrice:Math.max(+link.suggested_price||suggestedFallback,+p.price||0)};
+  };
+  // Bulk-apply the same "Update Price" logic across many cost-update links at
+  // once, without opening the part editor for each — admin reviewing 40+ supplier
+  // cost updates individually was the actual blocker for prices ever going live.
+  const bulkApproveSupplierCostUpdates=async(links)=>{
+    if(!links.length) return;
+    setBusyMsg(`Approving ${links.length} price update${links.length!==1?"s":""}…`);
+    try{
+      await Promise.all(links.map(async link=>{
+        const p=parts.find(pt=>String(pt.id)===String(link.part_id));
+        if(!p) return;
+        const {newCost,newSellPrice}=resolveCostUpdateNewPrice(link,p);
+        const origPrice=p.price, origCost=p.cost_price;
+        const d2={cost_price:newCost, price:newSellPrice};
+        if(+origPrice!==+newSellPrice) d2.price_updated_at=new Date().toISOString();
+        const result=await api.patch("parts","id",p.id,d2);
+        if(!Array.isArray(result)||!result.length) return;
+        if(+origPrice!==+newSellPrice||+origCost!==+newCost){
+          api.insert("part_price_history",{part_id:p.id,sku:p.sku,old_price:origPrice||null,new_price:newSellPrice||null,
+            old_cost_price:origCost||null,new_cost_price:newCost||null,source:"admin_edit",changed_by:user.name||user.username||""}).catch(()=>{});
+        }
+        const updated={...p,...d2};
+        setParts(prev=>prev.map(pt=>String(pt.id)===String(p.id)?updated:pt));
+        db.parts.put(updated).catch(()=>{});
+        await dismissSupplierCostUpdate(link.id);
+      }));
+      showToast(`✅ Approved ${links.length} price update${links.length!==1?"s":""}`);
+    } finally {
+      setBusyMsg(null);
+    }
+  };
   const replySupplierQuery=async(id,data)=>{
     await api.patch("customer_queries","id",id,data);
     setSupplierQueries(p=>p.map(q=>q.id===id?{...q,...data}:q));
@@ -5657,21 +5700,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           <SupplierPricingPage allParts={allSupplierParts} suppliers={suppliers} onSetPrice={setSupplierPartPrice}
             costUpdates={supplierCostUpdates} onDismissCostUpdate={dismissSupplierCostUpdate}
             onRefresh={reloadAllSupplierParts}
+            onBulkApproveCostUpdates={bulkApproveSupplierCostUpdates}
             onGoToPart={(link)=>{
               const p=parts.find(pt=>String(pt.id)===String(link.part_id));
               if(!p) return;
-              const newCost=+link.supplier_price||0;
-              // Pre-fill cost with the supplier's new number, and pre-select a selling
-              // price — the supplier's own suggested retail price if they gave one,
-              // else the top markup % on the new cost (that supplier's own numbers if
-              // they've set any, else the shop default) — or the part's current price
-              // if that's already higher (never auto-suggest a cut). Same markup
-              // formula/tiers/priority as the Stock tab's own quick-price buttons.
-              const fallbackSupplier=suppliers.find(s=>String(s.id)===String(link.supplier_id));
-              const fallbackMarginOptions=(fallbackSupplier?.margin_options?.length?fallbackSupplier.margin_options:null)
-                ||(settings.margin_options?.length?settings.margin_options:null)||[30,25,22];
-              const suggestedFallback=newCost>0?Math.round((newCost*(1+fallbackMarginOptions[0]/100))/10)*10:0;
-              const newSellPrice=Math.max(+link.suggested_price||suggestedFallback,+p.price||0);
+              const {newCost,newSellPrice}=resolveCostUpdateNewPrice(link,p);
               setTab("inventory");
               // _dismissCostUpdateLinkId: savePart clears this review flag automatically
               // once the edit that was prompted by it is actually saved. _origPrice keeps

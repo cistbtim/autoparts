@@ -2507,19 +2507,34 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // Bulk-apply the same "Update Price" logic across many cost-update links at
   // once, without opening the part editor for each — admin reviewing 40+ supplier
   // cost updates individually was the actual blocker for prices ever going live.
+  // Every failure/skip is tracked and reported — silently swallowing them made an
+  // earlier version of this look like "nothing happened" with no way to tell why.
   const bulkApproveSupplierCostUpdates=async(links)=>{
     if(!links.length) return;
     setBusyMsg(`Approving ${links.length} price update${links.length!==1?"s":""}…`);
+    let ok=0, unchanged=0, failed=0; let firstError="";
     try{
       await Promise.all(links.map(async link=>{
-        const p=parts.find(pt=>String(pt.id)===String(link.part_id));
-        if(!p) return;
+        // parts may still be mid-load (background sync) — fall back to a fresh
+        // fetch instead of silently skipping if it's not in local state yet.
+        let p=parts.find(pt=>String(pt.id)===String(link.part_id));
+        if(!p){
+          const fresh=await api.fresh("parts",`id=eq.${link.part_id}&select=*`).catch(()=>null);
+          p=Array.isArray(fresh)&&fresh[0]?fresh[0]:null;
+        }
+        if(!p){ failed++; firstError=firstError||`Part #${link.part_id} not found`; return; }
         const {newCost,newSellPrice}=resolveCostUpdateNewPrice(link,p);
         const origPrice=p.price, origCost=p.cost_price;
+        if(+origPrice===+newSellPrice&&+origCost===+newCost){ unchanged++; await dismissSupplierCostUpdate(link.id); return; }
         const d2={cost_price:newCost, price:newSellPrice};
         if(+origPrice!==+newSellPrice) d2.price_updated_at=new Date().toISOString();
         const result=await api.patch("parts","id",p.id,d2);
-        if(!Array.isArray(result)||!result.length) return;
+        if(!Array.isArray(result)||!result.length){
+          failed++;
+          firstError=firstError||(result&&result.message)||`${p.sku||p.id}: save failed`;
+          return;
+        }
+        ok++;
         if(+origPrice!==+newSellPrice||+origCost!==+newCost){
           api.insert("part_price_history",{part_id:p.id,sku:p.sku,old_price:origPrice||null,new_price:newSellPrice||null,
             old_cost_price:origCost||null,new_cost_price:newCost||null,source:"admin_edit",changed_by:user.name||user.username||""}).catch(()=>{});
@@ -2529,7 +2544,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         db.parts.put(updated).catch(()=>{});
         await dismissSupplierCostUpdate(link.id);
       }));
-      showToast(`✅ Approved ${links.length} price update${links.length!==1?"s":""}`);
+      if(failed>0) showToast(`⚠️ ${ok} updated, ${failed} failed (${firstError})${unchanged?`, ${unchanged} already matched`:""}`,"err");
+      else showToast(`✅ ${ok} price${ok!==1?"s":""} updated${unchanged?`, ${unchanged} already matched (dismissed)`:""}`);
     } finally {
       setBusyMsg(null);
     }

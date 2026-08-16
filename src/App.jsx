@@ -195,6 +195,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [supplierOrders,setSupplierOrders]=useState([]); // orders placed by this supplier's scoped customers
   const [supplierQueries,setSupplierQueries]=useState([]); // customer_queries against this supplier's own self-added parts
   const [supplierMarginOptions,setSupplierMarginOptions]=useState(null); // this supplier's own custom quick-margin %s (suppliers.margin_options), null = using shop default
+  const [supplierDiscountPct,setSupplierDiscountPct]=useState(0); // % this supplier offers customers scoped to their own ?catalog= link (suppliers.customer_discount_pct)
   const [supplierSearch,setSupplierSearch]=useState("");
   const [supplierOriginFilter,setSupplierOriginFilter]=useState("all");
   const [supplierTypeFilter,setSupplierTypeFilter]=useState([]);
@@ -884,9 +885,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(role!=="supplier"||!user.supplier_id) return;
     const data=await api.fresh("supplier_parts",`supplier_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
     setSupplierParts(Array.isArray(data)?data:[]);
-    api.fresh("suppliers",`id=eq.${user.supplier_id}&select=margin_options`).then(r=>{
-      const opts=Array.isArray(r)&&r[0]?.margin_options;
+    api.fresh("suppliers",`id=eq.${user.supplier_id}&select=margin_options,customer_discount_pct`).then(r=>{
+      const row=Array.isArray(r)&&r[0];
+      const opts=row?.margin_options;
       setSupplierMarginOptions(Array.isArray(opts)&&opts.length?opts:null);
+      setSupplierDiscountPct(+row?.customer_discount_pct||0);
     }).catch(()=>{});
     // Queries customers submitted — either against this supplier's own self-added
     // parts (matched via supplier_part_id) or against any part while browsing this
@@ -1237,11 +1240,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     return ()=>clearInterval(poll);
   },[tab,refreshTables]);
 
+  // Discount % a supplier can offer customers scoped to their own catalogue
+  // (registered through their ?catalog= link) — applied at display time (Shop,
+  // Checkout) and baked into the order total at checkout, but never mutates a
+  // cart item's own .price, so the stock/price-recheck in placeOrder below still
+  // compares against the real un-discounted price from the parts table.
+  const customerDiscountPct=(role==="customer"&&user.supplier_scope_id)
+    ? (+(suppliers.find(s=>String(s.id)===String(user.supplier_scope_id))?.customer_discount_pct)||0)
+    : 0;
+  const discountPrice=(price)=>customerDiscountPct>0?Math.round((+price||0)*(1-customerDiscountPct/100)*100)/100:(+price||0);
+
   // Cart
   const addToCart=(part)=>{setCart(p=>{const ex=p.find(i=>i.id===part.id);return ex?p.map(i=>i.id===part.id?{...i,qty:i.qty+1}:i):[...p,{...part,qty:1}];});showToast(`Added: ${part.name}`);};
   const removeFromCart=(id)=>setCart(p=>p.filter(i=>i.id!==id));
   const qtyCart=(id,qty)=>{if(qty<1)return;setCart(p=>p.map(i=>i.id===id?{...i,qty}:i));};
   const cartTotal=cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const cartDiscountedTotal=discountPrice(cartTotal);
+  const cartSaved=cartTotal-cartDiscountedTotal;
   const cartCount=cart.reduce((s,i)=>s+i.qty,0);
 
   // Orders
@@ -1277,12 +1292,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
 
     const oid=makeId("ORD");
-    const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",items:cart.map(i=>({partId:i.id,sku:i.sku||"",qty:i.qty,name:i.name,price:i.price})),total:cartTotal,branch_id:currentBranch?.id||null,supplier_scope_id:user.supplier_scope_id||null};
+    // Item price is the discounted unit price actually charged; orig_price/discount_pct
+    // kept alongside for an audit trail even after the supplier changes their %. total/
+    // discount_total on the order likewise reflect what was actually charged, not the
+    // pre-discount cartTotal (that's what customers.total_spent should track too).
+    const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",
+      items:cart.map(i=>({partId:i.id,sku:i.sku||"",qty:i.qty,name:i.name,price:discountPrice(i.price),...(customerDiscountPct>0?{orig_price:i.price,discount_pct:customerDiscountPct}:{})})),
+      total:cartDiscountedTotal,discount_total:cartSaved||0,branch_id:currentBranch?.id||null,supplier_scope_id:user.supplier_scope_id||null};
     await api.upsert("orders",orderObj);
     // NO stock deduction on order — stock deducted when shipper sets 待出貨
     const ex=customers.find(c=>c.phone===form.phone);
-    if(ex) await api.patch("customers","phone",form.phone,{orders:ex.orders+1,total_spent:ex.total_spent+cartTotal});
-    else await api.upsert("customers",{name:form.name,phone:form.phone,email:form.email||"",address:form.address||"",orders:1,total_spent:cartTotal,branch_id:currentBranch?.id||null});
+    if(ex) await api.patch("customers","phone",form.phone,{orders:ex.orders+1,total_spent:ex.total_spent+cartDiscountedTotal});
+    else await api.upsert("customers",{name:form.name,phone:form.phone,email:form.email||"",address:form.address||"",orders:1,total_spent:cartDiscountedTotal,branch_id:currentBranch?.id||null});
     await refreshTables("orders","customers");setCart([]);closeM("checkout");
     openM("orderConfirm",{order:orderObj,phone:form.phone,email:form.email||""});
     setTab(role==="customer"?"myorders":"orders");
@@ -2589,6 +2610,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await api.patch("suppliers","id",user.supplier_id,{margin_options:opts});
     setSupplierMarginOptions(opts);
     showToast(opts?"✅ Markup % updated":"Reset to shop default");
+  };
+  // Discount % this supplier offers customers who signed up through their own
+  // ?catalog= link (user.supplier_scope_id) — applied automatically in Shop/Cart/
+  // Checkout for those customers, see customerDiscountPct/discountPrice above.
+  const updateSupplierDiscountPct=async(pct)=>{
+    await api.patch("suppliers","id",user.supplier_id,{customer_discount_pct:pct});
+    setSupplierDiscountPct(pct);
+    showToast(pct>0?`✅ Customer discount set to ${pct}%`:"Customer discount removed");
   };
   // Bulk-recompute suggested_price for many existing-catalogue parts at once, from
   // each part's own already-set cost — a one-time re-apply after the supplier
@@ -5311,7 +5340,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                   ? <span style={{marginLeft:"auto",flexShrink:0,fontSize:12,color:"var(--text3)",padding:"6px 12px",border:"1px solid var(--border)",borderRadius:8}}>🔒 Demo — orders disabled</span>
                   : <button className="btn btn-primary" style={{marginLeft:"auto",flexShrink:0}}
                       onClick={()=>openM("checkout")}>
-                      🛒 {cartCount>0?`(${cartCount}) `:""}Checkout{cartTotal>0?` · ${fmtAmt(cartTotal)}`:""}
+                      🛒 {cartCount>0?`(${cartCount}) `:""}Checkout{cartTotal>0?` · ${fmtAmt(cartDiscountedTotal)}`:""}
                     </button>
                 }
               </div>
@@ -5379,7 +5408,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     </div>
                     {/* Price + button always at bottom */}
                     <div style={{marginTop:8}}>
-                      <div style={{fontSize:20,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginBottom:4}}>{fmtAmt(p.price)}</div>
+                      {customerDiscountPct>0?(
+                        <div style={{marginBottom:4}}>
+                          <div style={{display:"flex",alignItems:"baseline",gap:7}}>
+                            <span style={{fontSize:20,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(discountPrice(p.price))}</span>
+                            <span style={{fontSize:11,fontWeight:700,color:"#fff",background:"var(--green)",padding:"1px 6px",borderRadius:99}}>-{customerDiscountPct}%</span>
+                          </div>
+                          <div style={{fontSize:11,color:"var(--text3)",textDecoration:"line-through"}}>{fmtAmt(p.price)}</div>
+                        </div>
+                      ):(
+                        <div style={{fontSize:20,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginBottom:4}}>{fmtAmt(p.price)}</div>
+                      )}
                       <div style={{fontSize:12,color:p.stock>0?"var(--green)":"var(--red)",marginBottom:10}}>{p.stock>0?`${p.stock} in stock`:t.outOfStock}</div>
                       {isDemo
                         ? <button className="btn btn-ghost" style={{width:"100%",fontSize:12,color:"var(--text3)"}} disabled>🔒 Demo</button>
@@ -5500,7 +5539,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onUpdateCostPrice={updateSupplierCostPrice}
             vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onAddSelfFitment={saveSupplierSelfFitment} onDeleteFitment={deleteFitment}
             marginOptions={supplierMarginOptions} onUpdateMarginOptions={updateSupplierMarginOptions}
-            onBulkUpdateSuggestedPrices={bulkUpdateSupplierSuggestedPrices}/>
+            onBulkUpdateSuggestedPrices={bulkUpdateSupplierSuggestedPrices}
+            discountPct={supplierDiscountPct} onUpdateDiscountPct={updateSupplierDiscountPct}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY ORDERS ── */}
@@ -7482,7 +7522,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         );
       })()}
       {isOpen("customerReturn")&&<CustomerReturnModal data={mData("customerReturn")} customers={customers} parts={parts} customerInvoices={customerInvoices} onSave={saveCustomerReturn} onClose={()=>closeM("customerReturn")} t={t} settings={settings}/>}
-      {isOpen("checkout")&&<CheckoutModal cart={cart} customers={customers} cartTotal={cartTotal} role={role} currentUser={user} onPlace={placeOrder} onClose={()=>closeM("checkout")} onRemove={removeFromCart} onQty={qtyCart} t={t} lang={lang}/>}
+      {isOpen("checkout")&&<CheckoutModal cart={cart} customers={customers} cartTotal={cartTotal} customerDiscountPct={customerDiscountPct} cartDiscountedTotal={cartDiscountedTotal} cartSaved={cartSaved} role={role} currentUser={user} onPlace={placeOrder} onClose={()=>closeM("checkout")} onRemove={removeFromCart} onQty={qtyCart} t={t} lang={lang}/>}
       {isOpen("customerQuery")&&<CustomerQueryModal part={mData("customerQuery")} currentUser={user} onSubmit={submitCustomerQuery} onClose={()=>closeM("customerQuery")} t={t}/>}
       {isOpen("queryReply")&&<CustomerQueryReplyModal query={mData("queryReply")}
         part={(()=>{const q=mData("queryReply");if(!q)return null;

@@ -4436,7 +4436,7 @@ export function AdjustModal({part,onApply,onClose,t}) {
   );
 }
 
-export function CheckoutModal({cart,customers,cartTotal,role,currentUser,onPlace,onClose,onRemove,onQty,t,lang}) {
+export function CheckoutModal({cart,customers,cartTotal,customerDiscountPct=0,cartDiscountedTotal,cartSaved=0,role,currentUser,onPlace,onClose,onRemove,onQty,t,lang}) {
   const [form,setForm]=useState({name:currentUser?._isCustomer?(currentUser.name||""):"",phone:currentUser?._isCustomer?(currentUser.phone||""):"",email:currentUser?._isCustomer?(currentUser.email||""):"",address:currentUser?._isCustomer?(currentUser.address||""):""});
   const sf=(k,v)=>setForm(p=>({...p,[k]:v}));
   const fill=(c)=>setForm({phone:c.phone,name:c.name,email:c.email||"",address:c.address||""});
@@ -4446,19 +4446,32 @@ export function CheckoutModal({cart,customers,cartTotal,role,currentUser,onPlace
       {cart.length===0?<p style={{color:"var(--text3)",textAlign:"center",padding:30}}>Cart is empty</p>:(
         <>
           <div style={{background:"var(--surface2)",borderRadius:12,padding:14,marginBottom:16}}>
-            {cart.map(i=>(
+            {cart.map(i=>{
+              const lineDiscounted=customerDiscountPct>0?Math.round(i.price*(1-customerDiscountPct/100)*100)/100:i.price;
+              return (
               <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid var(--border)"}}>
-                <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600}}>{i.name}</div><div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{fmtAmt(i.price)} each</div></div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:600}}>{i.name}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>
+                    {customerDiscountPct>0?<><span style={{textDecoration:"line-through"}}>{fmtAmt(i.price)}</span> {fmtAmt(lineDiscounted)} each</>:`${fmtAmt(i.price)} each`}
+                  </div>
+                </div>
                 <div style={{display:"flex",alignItems:"center",gap:7}}>
                   <button className="btn btn-ghost btn-xs" style={{padding:"5px 11px"}} onClick={()=>onQty(i.id,i.qty-1)}>−</button>
                   <span style={{fontWeight:700,minWidth:20,textAlign:"center"}}>{i.qty}</span>
                   <button className="btn btn-ghost btn-xs" style={{padding:"5px 11px"}} onClick={()=>onQty(i.id,i.qty+1)}>+</button>
                   <button className="btn btn-danger btn-xs" onClick={()=>onRemove(i.id)}>✕</button>
                 </div>
-                <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:15,minWidth:80,textAlign:"right"}}>{fmtAmt(i.price*i.qty)}</div>
+                <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:15,minWidth:80,textAlign:"right"}}>{fmtAmt(lineDiscounted*i.qty)}</div>
               </div>
-            ))}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0 0",fontWeight:700,fontSize:17}}><span>{t.total}</span><span style={{color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:21}}>{fmtAmt(cartTotal)}</span></div>
+              );
+            })}
+            {customerDiscountPct>0&&(
+              <div style={{display:"flex",justifyContent:"space-between",padding:"10px 0 0",fontSize:13,color:"var(--green)",fontWeight:600}}>
+                <span>🎉 You're saving ({customerDiscountPct}% off)</span><span>−{fmtAmt(cartSaved)}</span>
+              </div>
+            )}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0 0",fontWeight:700,fontSize:17}}><span>{t.total}</span><span style={{color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:21}}>{fmtAmt(cartDiscountedTotal??cartTotal)}</span></div>
           </div>
           {role==="admin"&&customers.length>0&&(
             <FD><FL label="Quick select customer"/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{customers.slice(0,8).map(c=><button key={c.id} className="btn btn-ghost btn-xs" style={{borderColor:form.phone===c.phone?"var(--accent)":"var(--border)",color:form.phone===c.phone?"var(--accent)":"var(--text2)"}} onClick={()=>fill(c)}>{c.name}</button>)}</div></FD>

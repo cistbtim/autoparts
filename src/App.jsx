@@ -2509,9 +2509,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     showToast("✅ Password updated");
   };
   const saveSupplierPart=async(data)=>{
-    const payload={...data,supplier_id:user.supplier_id,cost_price:data.cost_price===""?null:+data.cost_price,
+    const {id,...rest}=data;
+    const payload={...rest,supplier_id:user.supplier_id,cost_price:data.cost_price===""?null:+data.cost_price,
       suggested_price:data.suggested_price===""||data.suggested_price==null?null:+data.suggested_price};
-    const res=data.id?await api.patch("supplier_parts","id",data.id,payload):await api.upsert("supplier_parts",payload);
+    const res=id?await api.patch("supplier_parts","id",id,payload):await api.upsert("supplier_parts",payload);
     if(res&&!Array.isArray(res)&&(res.code||res.message)){
       showToast(`❌ Save failed: ${res.message||res.code}`,"err");
       return false;

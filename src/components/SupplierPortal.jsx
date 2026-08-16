@@ -505,7 +505,7 @@ function SupplierCostPriceModal({part, supplierMarginOptions=null, onSave, onClo
 function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSave, onDelete, onClose}) {
   const isEdit=!!part?.id;
   const [f,setF]=useState(isEdit?{
-    part_code:part.part_code||"", name:part.name||"", chinese_desc:part.chinese_desc||"",
+    id:part.id, part_code:part.part_code||"", name:part.name||"", chinese_desc:part.chinese_desc||"",
     category:part.category||"", cost_price:part.cost_price??"", stock:part.stock??0,
     image_url:part.image_url||"", make:part.make||"", model:part.model||"",
     year_range:part.year_range||"", oe_number:part.oe_number||"", suggested_price:part.suggested_price??"",

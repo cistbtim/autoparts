@@ -143,7 +143,7 @@ function ExportPartsPdfModal({rowCount, tabLabel, selected, onToggle, onExport, 
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", supplierContactPerson="", supplierPhone="", supplierFullName="", supplierAddress="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions, onBulkUpdateSuggestedPrices}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", supplierContactPerson="", supplierPhone="", supplierFullName="", supplierAddress="", supplierTypes=[], onSave, onDelete, onRefresh, onUpdateCostPrice, onUpdateBusinessInfo, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions, onBulkUpdateSuggestedPrices}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
@@ -262,6 +262,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
       </div>
 
       {supplierName&&<ShareCatalogueCard supplierName={supplierName}/>}
+      {onUpdateBusinessInfo&&<BusinessInfoCard fullName={supplierFullName} address={supplierAddress} contactPerson={supplierContactPerson} phone={supplierPhone} supplierTypes={supplierTypes} onSave={onUpdateBusinessInfo}/>}
       {onUpdateMarginOptions&&<MarkupOptionsCard marginOptions={marginOptions} effectiveMarginOptions={supplierBaseMarginOptions} onSave={onUpdateMarginOptions}/>}
 
       {bulkMode&&(()=>{
@@ -365,6 +366,82 @@ function ShareCatalogueCard({supplierName}) {
           <button type="button" className="btn btn-ghost btn-sm" style={{background:"#25D366",color:"#fff",border:"none"}}>📲 WhatsApp</button>
         </a>
       </div>
+    </div>
+  );
+}
+
+// Lets a supplier edit their own company details — full legal name, address,
+// contact person, phone, and which supplier type(s) they are (New/Used/Dealer/
+// Factory). Same fields as the admin's Edit Supplier modal, minus the nickname
+// (kept admin-only since it's baked into every SKU prefix already issued).
+function BusinessInfoCard({fullName="", address="", contactPerson="", phone="", supplierTypes=[], onSave}) {
+  const [editing,setEditing]=useState(false);
+  const [f,setF]=useState({full_name:fullName, address, contact_person:contactPerson, phone, supplier_types:supplierTypes});
+  const [saving,setSaving]=useState(false);
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const toggleType=(tp)=>setF(p=>({...p,supplier_types:p.supplier_types.includes(tp)?p.supplier_types.filter(x=>x!==tp):[...p.supplier_types,tp]}));
+  const startEdit=()=>{setF({full_name:fullName, address, contact_person:contactPerson, phone, supplier_types:supplierTypes});setEditing(true);};
+  const save=async()=>{setSaving(true);await onSave(f);setSaving(false);setEditing(false);};
+  const hasAny=fullName||address||contactPerson||phone||supplierTypes.length>0;
+  return (
+    <div className="card" style={{padding:"12px 14px",marginBottom:14}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:220}}>
+          <div style={{fontSize:13,fontWeight:700}}>🏢 Business Info</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Shown to admin and on your exported catalogue PDF</div>
+        </div>
+        {!editing&&<button type="button" className="btn btn-ghost btn-sm" onClick={startEdit}>✏️ Edit</button>}
+      </div>
+      {editing ? (
+        <div style={{marginTop:10}}>
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>Company Full Name</div>
+            <input className="inp" value={f.full_name} onChange={e=>s("full_name",e.target.value)} placeholder="e.g. MCK Auto Parts (Pty) Ltd"/>
+          </div>
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>Address</div>
+            <textarea className="inp" value={f.address} onChange={e=>s("address",e.target.value)} placeholder="Street, city, postal code"/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>Contact Person</div>
+              <input className="inp" value={f.contact_person} onChange={e=>s("contact_person",e.target.value)}/>
+            </div>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>Phone</div>
+              <input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/>
+            </div>
+          </div>
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:5}}>Supplier Types</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
+              {["new","used","dealer","factory"].map(tp=>(
+                <label key={tp} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:13}}>
+                  <input type="checkbox" checked={f.supplier_types.includes(tp)} onChange={()=>toggleType(tp)} style={{accentColor:"var(--accent)"}}/>
+                  {tp.charAt(0).toUpperCase()+tp.slice(1)}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>Cancel</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
+          </div>
+        </div>
+      ) : hasAny ? (
+        <div style={{marginTop:8,fontSize:13,color:"var(--text2)"}}>
+          {fullName&&<div style={{marginBottom:2}}>{fullName}</div>}
+          {address&&<div style={{marginBottom:2,color:"var(--text3)",fontSize:12}}>📍 {address}</div>}
+          {(contactPerson||phone)&&<div style={{marginBottom:2,color:"var(--text3)",fontSize:12}}>{[contactPerson,phone].filter(Boolean).join(" · ")}</div>}
+          {supplierTypes.length>0&&(
+            <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:5}}>
+              {supplierTypes.map(tp=><span key={tp} style={{fontSize:10,fontWeight:700,borderRadius:4,padding:"1px 6px",background:"rgba(99,102,241,.1)",color:"#818cf8",textTransform:"capitalize"}}>{tp}</span>)}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{marginTop:8,fontSize:12,color:"var(--text3)"}}>Not set yet — click Edit to add your business details.</div>
+      )}
     </div>
   );
 }

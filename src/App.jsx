@@ -198,6 +198,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [supplierMarginOptions,setSupplierMarginOptions]=useState(null); // this supplier's own custom quick-margin %s (suppliers.margin_options), null = using shop default
   const [supplierDiscountPct,setSupplierDiscountPct]=useState(0); // % this supplier offers customers scoped to their own ?catalog= link (suppliers.customer_discount_pct)
   const [supplierMaxDiscountPct,setSupplierMaxDiscountPct]=useState(0); // this supplier's own self-set ceiling for their discount (suppliers.max_discount_pct) — scoped to just their catalogue, doesn't touch other suppliers
+  const [supplierProfile,setSupplierProfile]=useState({full_name:"",address:"",contact_person:"",phone:"",supplier_types:[]}); // this supplier's own editable company details — same fields as admin's Edit Supplier modal minus the nickname
   const [supplierSearch,setSupplierSearch]=useState("");
   const [supplierOriginFilter,setSupplierOriginFilter]=useState("all");
   const [supplierTypeFilter,setSupplierTypeFilter]=useState([]);
@@ -894,6 +895,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       setSupplierMarginOptions(Array.isArray(opts)&&opts.length?opts:null);
       setSupplierDiscountPct(+row?.customer_discount_pct||0);
       setSupplierMaxDiscountPct(+row?.max_discount_pct||0);
+    }).catch(()=>{});
+    // Separate request (not merged into the one above) so that if full_name/address
+    // don't exist yet on an older DB — before the ALTER TABLE for them has been run —
+    // that failure can't also blank out the margin/discount fields it's fetched with.
+    api.fresh("suppliers",`id=eq.${user.supplier_id}&select=full_name,address,contact_person,phone,supplier_types`).then(r=>{
+      const row=Array.isArray(r)&&r[0];
+      if(!row) return;
+      setSupplierProfile({
+        full_name:row.full_name||"", address:row.address||"",
+        contact_person:row.contact_person||"", phone:row.phone||"",
+        supplier_types:Array.isArray(row.supplier_types)?row.supplier_types:[],
+      });
     }).catch(()=>{});
     // Queries customers submitted — either against this supplier's own self-added
     // parts (matched via supplier_part_id) or against any part while browsing this
@@ -2672,6 +2685,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     api.insert("part_price_history",{part_id:part.id,sku:part.sku,old_cost_price:part._supplierPrice||null,new_cost_price:price||null,
       source:"supplier_cost_update",changed_by:user.supplier_name||user.supplier_code||user.username||""}).catch(()=>{});
     showToast("✅ Cost price updated");
+  };
+  // Supplier self-editing their own business details (company name, address,
+  // contact, phone, supplier type) — patches suppliers directly, then updates
+  // supplierProfile (same live-state pattern as margin/discount above) so the
+  // portal and the PDF export both reflect the change immediately.
+  const updateSupplierBusinessInfo=async(data)=>{
+    if(!user.supplier_id) return;
+    await api.patch("suppliers","id",user.supplier_id,data);
+    setSupplierProfile(prev=>({...prev,...data}));
+    showToast("✅ Business info updated");
   };
   // Supplier customizing their own quick-margin % buttons (suppliers.margin_options).
   // opts=null clears the customization back to the shop-wide default.
@@ -5648,10 +5671,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── SUPPLIER PORTAL: MY PARTS ── */}
         {tab==="supplierParts"&&role==="supplier"&&(
           <SupplierPartsPage parts={supplierParts} existingParts={supplierExistingParts} supplierCode={user.supplier_code||user.supplier_name||"SUP"}
-            supplierName={user.supplier_name||""} supplierContactPerson={user.supplier_contact_person||""} supplierPhone={user.supplier_phone||""}
-            supplierFullName={user.supplier_full_name||""} supplierAddress={user.supplier_address||""}
+            supplierName={user.supplier_name||""} supplierContactPerson={supplierProfile.contact_person} supplierPhone={supplierProfile.phone}
+            supplierFullName={supplierProfile.full_name} supplierAddress={supplierProfile.address} supplierTypes={supplierProfile.supplier_types}
             onSave={saveSupplierPart} onDelete={deleteSupplierPart} onRefresh={reloadSupplierParts}
-            onUpdateCostPrice={updateSupplierCostPrice}
+            onUpdateCostPrice={updateSupplierCostPrice} onUpdateBusinessInfo={updateSupplierBusinessInfo}
             vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onAddSelfFitment={saveSupplierSelfFitment} onDeleteFitment={deleteFitment}
             marginOptions={supplierMarginOptions} onUpdateMarginOptions={updateSupplierMarginOptions}
             onBulkUpdateSuggestedPrices={bulkUpdateSupplierSuggestedPrices}/>

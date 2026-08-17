@@ -181,21 +181,24 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSelected, setExportSelected] = useState(()=>new Set(EXPORT_FIELDS.filter(f=>f.default).map(f=>f.key)));
   const toggleExportField=(key)=>setExportSelected(prev=>{const n=new Set(prev); n.has(key)?n.delete(key):n.add(key); return n;});
+  // Make first (Audi, BMW, Mercedes-Benz… alphabetically), SKU/part number second.
+  const sortByMakeThenSku=(rows)=>[...rows].sort((a,b)=>
+    (a.make||"").localeCompare(b.make||"")||(a.sku||"").localeCompare(b.sku||""));
   const buildExportRows=()=>{
     if(tab==="existing"){
-      return existingFiltered.map(p=>({
+      return sortByMakeThenSku(existingFiltered.map(p=>({
         photo:p.image_url, sku:p.sku, name:p.name, chinese_desc:p.chinese_desc, brand:p.brand, category:p.category,
         make:p.make, model:p.model, year_range:p.year_range, oe_number:p.oe_number,
         cost:p._supplierPrice, suggested:p._suggestedPrice, customerPrice:p.price, stock:p.stock,
         fits:partFitments.filter(pf=>String(pf.part_id)===String(p.id)).length,
-      }));
+      })));
     }
-    return minesFiltered.map(p=>({
+    return sortByMakeThenSku(minesFiltered.map(p=>({
       photo:p.image_url, sku:`${supplierCode}-${p.part_code}`, name:p.name, chinese_desc:p.chinese_desc, brand:p.brand, category:p.category,
       make:p.make, model:p.model, year_range:p.year_range, oe_number:p.oe_number,
       cost:p.cost_price, suggested:p.suggested_price, customerPrice:p.price, stock:p.stock,
       fits:partFitments.filter(pf=>String(pf.supplier_part_id)===String(p.id)).length,
-    }));
+    })));
   };
 
   // In-app "price changed since you last looked" badge — no outbound notification,

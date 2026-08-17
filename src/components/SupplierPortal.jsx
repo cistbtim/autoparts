@@ -62,7 +62,20 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
     return esc(v||"—");
   };
   const headHtml=fields.map(f=>`<th${f.numeric?' class="num"':""}>${esc(f.label)}</th>`).join("");
-  const rowsHtml=rows.map(row=>`<tr>${fields.map(f=>`<td${f.numeric?' class="num"':""}>${cell(f,row)}</td>`).join("")}</tr>`).join("");
+  // Rows are already sorted make-then-SKU (see sortByMakeThenSku) — insert a
+  // divider row every time the make changes, spanning the full table width.
+  const makeCounts={};
+  rows.forEach(r=>{ const k=r.make||"—"; makeCounts[k]=(makeCounts[k]||0)+1; });
+  let lastMake=null;
+  const rowsHtml=rows.map(row=>{
+    const mk=row.make||"—";
+    let groupHtml="";
+    if(mk!==lastMake){
+      groupHtml=`<tr class="makegroup"><td colspan="${fields.length}">${esc(mk)} — ${makeCounts[mk]} part${makeCounts[mk]!==1?"s":""}</td></tr>`;
+      lastMake=mk;
+    }
+    return groupHtml+`<tr>${fields.map(f=>`<td${f.numeric?' class="num"':""}>${cell(f,row)}</td>`).join("")}</tr>`;
+  }).join("");
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(supplierLabel)} — ${esc(tabLabel)}</title>
   <style>
     @page{margin:20mm 14mm}
@@ -82,6 +95,8 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
     thead th.num{text-align:right}
     tbody tr:nth-child(even){background:#f9f9f9}
     tbody td{padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:12px;vertical-align:middle}
+    tbody tr.makegroup{background:#fdecdc;page-break-after:avoid}
+    tbody tr.makegroup td{padding:6px 10px;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#c2410c;border-top:1px solid #f97316;border-bottom:2px solid #f97316}
     .num{text-align:right;font-family:monospace}
     .thumb{width:42px;height:42px;object-fit:contain;background:#fff;border:1px solid #e5e5e5;border-radius:4px;display:block;cursor:pointer}
     .print-btn{display:flex;gap:10px;align-items:center;margin-bottom:20px}

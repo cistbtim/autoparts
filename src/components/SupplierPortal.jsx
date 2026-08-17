@@ -33,6 +33,7 @@ const EXPORT_FIELDS=[
   {key:"sku", label:"SKU", default:true},
   {key:"name", label:"Name", default:true},
   {key:"chinese_desc", label:"Chinese Description", default:false},
+  {key:"brand", label:"Brand", default:false},
   {key:"category", label:"Category", default:false},
   {key:"make", label:"Make", default:true},
   {key:"model", label:"Model", default:true},
@@ -166,14 +167,14 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
   const buildExportRows=()=>{
     if(tab==="existing"){
       return existingFiltered.map(p=>({
-        photo:p.image_url, sku:p.sku, name:p.name, chinese_desc:p.chinese_desc, category:p.category,
+        photo:p.image_url, sku:p.sku, name:p.name, chinese_desc:p.chinese_desc, brand:p.brand, category:p.category,
         make:p.make, model:p.model, year_range:p.year_range, oe_number:p.oe_number,
         cost:p._supplierPrice, suggested:p._suggestedPrice, customerPrice:p.price, stock:p.stock,
         fits:partFitments.filter(pf=>String(pf.part_id)===String(p.id)).length,
       }));
     }
     return minesFiltered.map(p=>({
-      photo:p.image_url, sku:`${supplierCode}-${p.part_code}`, name:p.name, chinese_desc:p.chinese_desc, category:p.category,
+      photo:p.image_url, sku:`${supplierCode}-${p.part_code}`, name:p.name, chinese_desc:p.chinese_desc, brand:p.brand, category:p.category,
       make:p.make, model:p.model, year_range:p.year_range, oe_number:p.oe_number,
       cost:p.cost_price, suggested:p.suggested_price, customerPrice:p.price, stock:p.stock,
       fits:partFitments.filter(pf=>String(pf.supplier_part_id)===String(p.id)).length,

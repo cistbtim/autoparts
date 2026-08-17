@@ -29,6 +29,7 @@ const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
 // underlying values shown on each PartRow card, plus a few extras (chinese
 // description, OE number, fits count) that only fit on paper, not the card.
 const EXPORT_FIELDS=[
+  {key:"photo", label:"Photo", default:true, image:true},
   {key:"sku", label:"SKU", default:true},
   {key:"name", label:"Name", default:true},
   {key:"chinese_desc", label:"Chinese Description", default:false},
@@ -54,6 +55,7 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel)=>{
   const dateStr=new Date().toLocaleDateString();
   const cell=(f,row)=>{
     const v=row[f.key];
+    if(f.image) return v?`<img class="thumb" src="${esc(toImgUrl(v))}" onerror="this.style.visibility='hidden'"/>`:"";
     if(f.currency) return v!=null&&v!==""?cur+(+v).toFixed(2):"—";
     if(f.numeric) return v??0;
     return esc(v||"—");
@@ -74,8 +76,9 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel)=>{
     thead th{padding:9px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
     thead th.num{text-align:right}
     tbody tr:nth-child(even){background:#f9f9f9}
-    tbody td{padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:12px}
+    tbody td{padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:12px;vertical-align:middle}
     .num{text-align:right;font-family:monospace}
+    .thumb{width:42px;height:42px;object-fit:contain;background:#fff;border:1px solid #e5e5e5;border-radius:4px;display:block}
     .print-btn{display:flex;gap:10px;margin-bottom:20px}
     .btn{padding:8px 20px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer}
     .btn-print{background:#1d4ed8;color:#fff}
@@ -163,14 +166,14 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
   const buildExportRows=()=>{
     if(tab==="existing"){
       return existingFiltered.map(p=>({
-        sku:p.sku, name:p.name, chinese_desc:p.chinese_desc, category:p.category,
+        photo:p.image_url, sku:p.sku, name:p.name, chinese_desc:p.chinese_desc, category:p.category,
         make:p.make, model:p.model, year_range:p.year_range, oe_number:p.oe_number,
         cost:p._supplierPrice, suggested:p._suggestedPrice, customerPrice:p.price, stock:p.stock,
         fits:partFitments.filter(pf=>String(pf.part_id)===String(p.id)).length,
       }));
     }
     return minesFiltered.map(p=>({
-      sku:`${supplierCode}-${p.part_code}`, name:p.name, chinese_desc:p.chinese_desc, category:p.category,
+      photo:p.image_url, sku:`${supplierCode}-${p.part_code}`, name:p.name, chinese_desc:p.chinese_desc, category:p.category,
       make:p.make, model:p.model, year_range:p.year_range, oe_number:p.oe_number,
       cost:p.cost_price, suggested:p.suggested_price, customerPrice:p.price, stock:p.stock,
       fits:partFitments.filter(pf=>String(pf.supplier_part_id)===String(p.id)).length,

@@ -49,7 +49,7 @@ const EXPORT_FIELDS=[
 // Opens the same "print → Save as PDF" window used elsewhere in the app (e.g.
 // App.jsx's Inventory Stock Value Report) — no PDF library needed, the browser's
 // own print dialog does the export.
-const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,phone)=>{
+const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,phone,fullName,address)=>{
   const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const cur=C();
   const dateStr=new Date().toLocaleDateString();
@@ -69,6 +69,7 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
     body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:32px;max-width:1000px;margin:0 auto}
     .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #111}
     .shop{font-size:22px;font-weight:900;color:#f97316}
+    .fullname{font-size:13px;font-weight:600;color:#333;margin-top:3px}
     .meta{font-size:11px;color:#666;margin-top:4px}
     .report-title{font-size:18px;font-weight:700;text-align:right}
     .report-date{font-size:11px;color:#666;text-align:right;margin-top:4px}
@@ -91,7 +92,12 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
     <button class="btn btn-pdf" onclick="window.print()">📄 Save as PDF</button>
   </div>
   <div class="header">
-    <div><div class="shop">${esc(supplierLabel)}</div><div class="meta">${esc(contactLine)}</div></div>
+    <div>
+      <div class="shop">${esc(supplierLabel)}</div>
+      ${fullName?`<div class="fullname">${esc(fullName)}</div>`:""}
+      <div class="meta">${esc(contactLine)}</div>
+      ${address?`<div class="meta">${esc(address)}</div>`:""}
+    </div>
     <div><div class="report-title">${esc(tabLabel)}</div><div class="report-date">Date: ${dateStr} · ${rows.length} parts</div></div>
   </div>
   <table>
@@ -137,7 +143,7 @@ function ExportPartsPdfModal({rowCount, tabLabel, selected, onToggle, onExport, 
 // from the main inventory, until an admin sets a customer-facing price.
 // ═══════════════════════════════════════════════════════════════
 
-export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", supplierContactPerson="", supplierPhone="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions, onBulkUpdateSuggestedPrices}) {
+export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, supplierName="", supplierContactPerson="", supplierPhone="", supplierFullName="", supplierAddress="", onSave, onDelete, onRefresh, onUpdateCostPrice, vehicles=[], partFitments=[], onAddFitment, onAddSelfFitment, onDeleteFitment, marginOptions=null, onUpdateMarginOptions, onBulkUpdateSuggestedPrices}) {
   const [editing, setEditing] = useState(null); // null | {} (new) | existing row
   const [editingCost, setEditingCost] = useState(null); // existing-catalogue row having its cost price updated
   const [labelPart, setLabelPart] = useState(null); // part being label-printed (same modal admin/stockman use)
@@ -213,7 +219,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
           onExport={()=>{
             openSupplierPartsPdf(buildExportRows(), EXPORT_FIELDS.filter(f=>exportSelected.has(f.key)),
               tab==="existing"?"Existing Catalogue":"Added by You", supplierName||supplierCode,
-              supplierContactPerson, supplierPhone);
+              supplierContactPerson, supplierPhone, supplierFullName, supplierAddress);
             setExportOpen(false);
           }}
           onClose={()=>setExportOpen(false)}/>

@@ -5649,6 +5649,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {tab==="supplierParts"&&role==="supplier"&&(
           <SupplierPartsPage parts={supplierParts} existingParts={supplierExistingParts} supplierCode={user.supplier_code||user.supplier_name||"SUP"}
             supplierName={user.supplier_name||""} supplierContactPerson={user.supplier_contact_person||""} supplierPhone={user.supplier_phone||""}
+            supplierFullName={user.supplier_full_name||""} supplierAddress={user.supplier_address||""}
             onSave={saveSupplierPart} onDelete={deleteSupplierPart} onRefresh={reloadSupplierParts}
             onUpdateCostPrice={updateSupplierCostPrice}
             vehicles={vehicles} partFitments={partFitments} onAddFitment={saveFitment} onAddSelfFitment={saveSupplierSelfFitment} onDeleteFitment={deleteFitment}

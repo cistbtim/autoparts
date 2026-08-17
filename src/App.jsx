@@ -5937,7 +5937,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                           }
                           {s.is_catalogue_supplier&&<span title="Has a customer-facing catalogue" style={{fontSize:10,fontWeight:700,background:"rgba(52,211,153,.12)",color:"var(--green)",borderRadius:4,padding:"1px 6px"}}>🎁 CATALOGUE</span>}
                         </div>
-                        <div style={{fontSize:12,color:"var(--text3)"}}>📍 {s.country||"—"}</div>
+                        {s.full_name&&<div style={{fontSize:12,color:"var(--text3)"}}>{s.full_name}</div>}
+                        <div style={{fontSize:12,color:"var(--text3)"}}>📍 {s.address?`${s.address} · `:""}{s.country||"—"}</div>
                         <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:5}}>
                           {s.supplier_origin&&<span style={{fontSize:10,fontWeight:700,borderRadius:4,padding:"1px 6px",background:s.supplier_origin==="local"?"rgba(52,211,153,.15)":"rgba(251,191,36,.15)",color:s.supplier_origin==="local"?"var(--green)":"#b45309"}}>{s.supplier_origin==="local"?"🏠 Local":"✈ International"}</span>}
                           {(s.supplier_types||[]).map(tp=><span key={tp} style={{fontSize:10,fontWeight:700,borderRadius:4,padding:"1px 6px",background:"rgba(99,102,241,.1)",color:"#818cf8",textTransform:"capitalize"}}>{tp}</span>)}

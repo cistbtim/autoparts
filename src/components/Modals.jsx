@@ -4816,7 +4816,7 @@ export function CheckoutModal({cart,customers,cartTotal,customerDiscountPct=0,ca
 }
 
 export function SupplierModal({supplier,onSave,onClose,t,portalUser,onCreatePortalLogin,onResetPortalPassword}) {
-  const [f,setF]=useState(supplier?{name:supplier.name,email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||"",account_number:supplier.account_number||"",supplier_origin:supplier.supplier_origin||"",supplier_types:supplier.supplier_types||[],is_catalogue_supplier:!!supplier.is_catalogue_supplier}:{name:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:"",account_number:"",supplier_origin:"",supplier_types:[],is_catalogue_supplier:false});
+  const [f,setF]=useState(supplier?{name:supplier.name,full_name:supplier.full_name||"",address:supplier.address||"",email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||"",account_number:supplier.account_number||"",supplier_origin:supplier.supplier_origin||"",supplier_types:supplier.supplier_types||[],is_catalogue_supplier:!!supplier.is_catalogue_supplier}:{name:"",full_name:"",address:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:"",account_number:"",supplier_origin:"",supplier_types:[],is_catalogue_supplier:false});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const toggleType=(tp)=>setF(p=>({...p,supplier_types:p.supplier_types.includes(tp)?p.supplier_types.filter(x=>x!==tp):[...p.supplier_types,tp]}));
   const [newLoginUser,setNewLoginUser]=useState("");
@@ -4826,7 +4826,9 @@ export function SupplierModal({supplier,onSave,onClose,t,portalUser,onCreatePort
   return (
     <Overlay onClose={onClose}>
       <MHead title={supplier?"Edit Supplier":"Add Supplier"} onClose={onClose}/>
-      <FD><FL label={`${t.supplierName||"Supplier Name"} *`}/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)}/></FD>
+      <FD><FL label="Nickname *" sub="Short name — used for SKU prefixes and quick search"/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)}/></FD>
+      <FD><FL label="Company Full Name"/><input className="inp" value={f.full_name} onChange={e=>s("full_name",e.target.value)} placeholder="e.g. MCK Auto Parts (Pty) Ltd"/></FD>
+      <FD><FL label="Address"/><textarea className="inp" value={f.address} onChange={e=>s("address",e.target.value)} placeholder="Street, city, postal code"/></FD>
       <FG><div><FL label={t.country||"Country"}/><input className="inp" value={f.country} onChange={e=>s("country",e.target.value)} placeholder="Taiwan, Japan..."/></div><div><FL label={t.contactPerson||"Contact Person"}/><input className="inp" value={f.contact_person} onChange={e=>s("contact_person",e.target.value)}/></div></FG>
       <FG><div><FL label={t.email||"Email"}/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div><div><FL label={t.phone||"Phone"}/><input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/></div></FG>
       <FG>

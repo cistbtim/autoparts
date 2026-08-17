@@ -172,8 +172,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(Array.isArray(res)&&res.length>0){
       let u=res[0];
       if(u.supplier_id){
-        const sup=await api.fresh("suppliers",`id=eq.${u.supplier_id}&select=id,name,code`);
-        if(Array.isArray(sup)&&sup.length>0) u={...u,supplier_name:sup[0].name,supplier_code:sup[0].code||sup[0].name};
+        const sup=await api.fresh("suppliers",`id=eq.${u.supplier_id}&select=id,name,code,contact_person,phone`);
+        if(Array.isArray(sup)&&sup.length>0) u={...u,supplier_name:sup[0].name,supplier_code:sup[0].code||sup[0].name,supplier_contact_person:sup[0].contact_person||"",supplier_phone:sup[0].phone||""};
       }
       const accErr=checkAccess(u);
       if(accErr){setErr(accErr);setExpiredInfo({name:u.name,username:u.username});setLoading(false);return;}

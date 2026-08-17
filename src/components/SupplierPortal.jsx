@@ -576,38 +576,38 @@ function CustomerDiscountCard({discountPct, maxDiscountPct=0, shopWideCap=0, onS
 
 function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, onEditFitments, fitCount=0, bulkMode=false, selected=false, selectable=true}) {
   return (
-    <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",gap:12,alignItems:"center",
+    <div className={onClick?"card card-hover":"card"} style={{padding:16,display:"flex",gap:14,alignItems:"center",
       cursor:onClick?"pointer":"default",opacity:bulkMode&&!selectable?.5:1,
       border:selected?"1.5px solid var(--accent)":(priceChanged?"1px solid rgba(96,165,250,.5)":undefined),
       background:selected?"rgba(249,115,22,.06)":(priceChanged?"rgba(96,165,250,.05)":undefined)}}
       onClick={onClick}>
       {bulkMode&&(
-        <input type="checkbox" checked={selected} disabled={!selectable} readOnly style={{width:18,height:18,flexShrink:0,cursor:selectable?"pointer":"not-allowed"}}/>
+        <input type="checkbox" checked={selected} disabled={!selectable} readOnly style={{width:20,height:20,flexShrink:0,cursor:selectable?"pointer":"not-allowed"}}/>
       )}
-      <div style={{width:52,height:52,borderRadius:6,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:80,height:80,borderRadius:8,overflow:"hidden",background:"var(--surface2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
         {p.image_url
           ? <img src={toImgUrl(p.image_url)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
-          : <span style={{fontSize:20,opacity:.3}}>🖼</span>}
+          : <span style={{fontSize:30,opacity:.3}}>🖼</span>}
       </div>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:13}}>{code}{readOnly&&<span title="Managed by admin" style={{marginLeft:6,fontSize:11,opacity:.6}}>🔒</span>}</div>
-        <div style={{fontSize:13,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
-        {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}{fitCount>0&&<span> · +{fitCount} more fit{fitCount!==1?"s":""}</span>}</div>}
-        {readOnly&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Your cost: <strong style={{color:"var(--text2)"}}>{p._supplierPrice?fmtAmt(p._supplierPrice):"not set"}</strong>{p._suggestedPrice?<span style={{marginLeft:8}}>· Suggested retail: <strong style={{color:"var(--text2)"}}>{fmtAmt(p._suggestedPrice)}</strong></span>:null}</div>}
+        <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:16}}>{code}{readOnly&&<span title="Managed by admin" style={{marginLeft:6,fontSize:13,opacity:.6}}>🔒</span>}</div>
+        <div style={{fontSize:16,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
+        {(p.make||p.model)&&<div style={{fontSize:13,color:"var(--text3)",marginTop:3}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}{fitCount>0&&<span> · +{fitCount} more fit{fitCount!==1?"s":""}</span>}</div>}
+        {readOnly&&<div style={{fontSize:13,color:"var(--text3)",marginTop:3}}>Your cost: <strong style={{color:"var(--text2)"}}>{p._supplierPrice?fmtAmt(p._supplierPrice):"not set"}</strong>{p._suggestedPrice?<span style={{marginLeft:8}}>· Suggested retail: <strong style={{color:"var(--text2)"}}>{fmtAmt(p._suggestedPrice)}</strong></span>:null}</div>}
       </div>
       <div style={{textAlign:"right",flexShrink:0}}>
-        {priceChanged&&<div style={{fontSize:10,fontWeight:700,color:"var(--blue)",marginBottom:2}}>🔔 PRICE UPDATED</div>}
+        {priceChanged&&<div style={{fontSize:11,fontWeight:700,color:"var(--blue)",marginBottom:3}}>🔔 PRICE UPDATED</div>}
         {p.price
-          ? <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16}}>{fmtAmt(p.price)}</div>
-          : <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:11}}>⏳ Awaiting pricing</span>}
-        <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Stock: {p.stock??0}</div>
-        <div style={{display:"flex",gap:5,justifyContent:"flex-end",marginTop:6}}>
+          ? <div style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:20}}>{fmtAmt(p.price)}</div>
+          : <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:13}}>⏳ Awaiting pricing</span>}
+        <div style={{fontSize:13,color:"var(--text3)",marginTop:4}}>Stock: {p.stock??0}</div>
+        <div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:8}}>
           {onEditFitments&&(
-            <button type="button" title="Vehicle fits" className="btn btn-ghost btn-xs" style={{fontSize:11}}
+            <button type="button" title="Vehicle fits" className="btn btn-ghost btn-xs" style={{fontSize:13}}
               onClick={e=>{e.stopPropagation();onEditFitments();}}>🚗 Fits{fitCount>0?` (${fitCount})`:""}</button>
           )}
           {onPrintLabel&&(
-            <button type="button" title="Print part label" className="btn btn-ghost btn-xs" style={{fontSize:11}}
+            <button type="button" title="Print part label" className="btn btn-ghost btn-xs" style={{fontSize:13}}
               onClick={e=>{e.stopPropagation();onPrintLabel();}}>🏷️ Label</button>
           )}
         </div>

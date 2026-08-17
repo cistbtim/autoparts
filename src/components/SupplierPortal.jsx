@@ -65,8 +65,9 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
   const rowsHtml=rows.map(row=>`<tr>${fields.map(f=>`<td${f.numeric?' class="num"':""}>${cell(f,row)}</td>`).join("")}</tr>`).join("");
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(supplierLabel)} — ${esc(tabLabel)}</title>
   <style>
+    @page{margin:20mm 14mm}
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:32px;max-width:1000px;margin:0 auto}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:32px 32px 48px;max-width:1000px;margin:0 auto}
     .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #111}
     .shop{font-size:22px;font-weight:900;color:#f97316}
     .fullname{font-size:13px;font-weight:600;color:#333;margin-top:3px}
@@ -74,6 +75,8 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
     .report-title{font-size:18px;font-weight:700;text-align:right}
     .report-date{font-size:11px;color:#666;text-align:right;margin-top:4px}
     table{width:100%;border-collapse:collapse;margin-top:8px}
+    thead{display:table-header-group}
+    tr{page-break-inside:avoid}
     thead tr{background:#111;color:#fff}
     thead th{padding:9px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
     thead th.num{text-align:right}
@@ -81,15 +84,22 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
     tbody td{padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:12px;vertical-align:middle}
     .num{text-align:right;font-family:monospace}
     .thumb{width:42px;height:42px;object-fit:contain;background:#fff;border:1px solid #e5e5e5;border-radius:4px;display:block;cursor:pointer}
-    .print-btn{display:flex;gap:10px;margin-bottom:20px}
+    .print-btn{display:flex;gap:10px;align-items:center;margin-bottom:20px}
+    .print-hint{font-size:11px;color:#888}
     .btn{padding:8px 20px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer}
     .btn-print{background:#1d4ed8;color:#fff}
     .btn-pdf{background:#dc2626;color:#fff}
-    @media print{.print-btn{display:none!important}body{padding:16px}}
+    .pagefoot{display:none}
+    @media print{
+      .print-btn{display:none!important}
+      body{padding:16px 16px 40px}
+      .pagefoot{display:block;position:fixed;left:0;right:0;bottom:0;text-align:center;font-size:10px;color:#999;padding:6px 0}
+    }
   </style></head><body>
   <div class="print-btn">
     <button class="btn btn-print" onclick="window.print()">🖨 Print</button>
     <button class="btn btn-pdf" onclick="window.print()">📄 Save as PDF</button>
+    <span class="print-hint">💡 Tick "Headers and footers" in the print dialog for automatic page numbers</span>
   </div>
   <div class="header">
     <div>
@@ -104,6 +114,7 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
     <thead><tr>${headHtml}</tr></thead>
     <tbody>${rowsHtml}</tbody>
   </table>
+  <div class="pagefoot">${esc(supplierLabel)} — ${esc(tabLabel)} · ${dateStr}</div>
   </body></html>`;
   const w=window.open("","_blank","width=1000,height=800");
   if(!w){ alert("Please allow pop-ups for this site to export the PDF"); return; }

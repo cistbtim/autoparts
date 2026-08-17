@@ -448,6 +448,7 @@ function SupplierCostPriceModal({part, supplierMarginOptions=null, onSave, onClo
         <FL label="Photo"/>
         <PartPhotoUploader imageUrl={imageUrl} onChange={setImageUrl} sku={part.sku} t={{}} bucket="cars_parts"/>
         <ExtraPhotosStrip photos={photos} onChange={setPhotos} sku={part.sku}
+          autosave={newPhotos=>api.patch("parts","id",part.id,{photos:newPhotos})}
           onOpenLightbox={i=>setLightbox({idx:imageUrl?i+1:i})}
           onMakeCover={extraIdx=>{
             const newCover=photos[extraIdx];
@@ -599,6 +600,7 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
         <FL label="Photo"/>
         <PartPhotoUploader imageUrl={f.image_url} onChange={url=>s("image_url",url)} sku={`${supplierCode}-${f.part_code||"part"}`} t={{}} bucket="cars_parts"/>
         <ExtraPhotosStrip photos={f.photos} onChange={photos=>s("photos",photos)} sku={`${supplierCode}-${f.part_code||"part"}`}
+          autosave={isEdit?(newPhotos=>api.patch("supplier_parts","id",f.id,{photos:newPhotos})):undefined}
           onOpenLightbox={i=>setLightbox({idx:f.image_url?i+1:i})}
           onMakeCover={extraIdx=>{
             const newCover=f.photos[extraIdx];

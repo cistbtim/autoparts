@@ -3186,12 +3186,24 @@ function GrabImageOverlay({supplierUrl,partSku,onSave,onClose}) {
 // Unlimited extra photos for a part — thumbnail strip + add/remove. Uploads go
 // straight to Supabase Storage (no AI background removal — these are quick
 // reference shots, unlike the primary catalog photo).
-export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeCover}) {
+// autosave (optional): if given, called with the new photos array right after
+// every change so it lands in the DB immediately — mirrors the main Inventory
+// PartModal's auto-save-on-photo-change behaviour instead of waiting for the
+// caller's own explicit Save button (which the Supplier Portal modals have).
+export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeCover, autosave}) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [autosaveErr, setAutosaveErr] = useState(null);
   const fileRef = useRef(null);
   const menuRef = useRef(null);
+
+  const _commit = async (newPhotos) => {
+    onChange(newPhotos);
+    if (!autosave) return;
+    try { await autosave(newPhotos); setAutosaveErr(null); }
+    catch (e) { setAutosaveErr("Auto-save failed: " + (e.message||e)); }
+  };
 
   // Per-photo edit tools (Remove BG / Touch Up / Watermark) — mirrors the
   // main-photo tools in PartPhotoUploader, scoped to one photo in the array.
@@ -3232,15 +3244,15 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
     cv.toBlob(b => b ? res(b) : rej(new Error("toBlob failed")), "image/jpeg", 0.92);
   });
 
-  const _replaceEditedAt = (idx, url) => {
-    onChange((photos||[]).map((p,i)=>i===idx?url:p));
+  const _replaceEditedAt = async (idx, url) => {
+    await _commit((photos||[]).map((p,i)=>i===idx?url:p));
   };
 
   const _saveEditedBlob = async (blob, suffix) => {
     const _sku = String(sku||"part").replace(/[^a-zA-Z0-9_-]/g,"_");
     const path = `parts/${_sku}/extra-${Date.now()}-${suffix}.jpg`;
     const url = await uploadToStorage("cars_parts", path, blob);
-    _replaceEditedAt(editIdx, url);
+    await _replaceEditedAt(editIdx, url);
   };
 
   const removeBgAtEdit = async () => {
@@ -3425,7 +3437,7 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
         const path = `parts/${String(sku||"part").replace(/[^a-zA-Z0-9_-]/g,"_")}/extra-${Date.now()}-${newUrls.length}.jpg`;
         newUrls.push(await uploadToStorage("cars_parts", path, blob));
       }
-      onChange([...(photos||[]), ...newUrls]);
+      await _commit([...(photos||[]), ...newUrls]);
     }catch(e){ alert("Upload failed: "+e.message); }
     setUploading(false);
   };
@@ -3455,7 +3467,7 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
     }
   };
 
-  const removeAt = (idx) => onChange((photos||[]).filter((_,i)=>i!==idx));
+  const removeAt = (idx) => _commit((photos||[]).filter((_,i)=>i!==idx));
 
   return (
     <div style={{marginTop:10}}>
@@ -3503,6 +3515,11 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}}
           onChange={e=>{addFiles(e.target.files); e.target.value="";}}/>
       </div>
+      {autosaveErr&&(
+        <div style={{fontSize:11,color:"var(--red)",marginTop:6,padding:"6px 10px",background:"rgba(248,113,113,.1)",borderRadius:7}}>
+          {autosaveErr}
+        </div>
+      )}
 
       {/* Per-photo edit popup — Remove BG / Touch Up / Watermark on one extra photo */}
       {editIdx!=null&&!showTouchUp&&(

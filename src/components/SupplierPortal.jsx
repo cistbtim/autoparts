@@ -25,6 +25,107 @@ const parseJsonArray=(v)=>{ if(Array.isArray(v)) return v; try{ const a=JSON.par
 const searchBlob=(p,code)=>[code,p.name,p.make,p.model,p.year_range,p.category,p.oe_number,p.chinese_desc].filter(Boolean).join(" ").toLowerCase();
 const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
 
+// Columns the supplier can pick between for the "My Parts" PDF export — same
+// underlying values shown on each PartRow card, plus a few extras (chinese
+// description, OE number, fits count) that only fit on paper, not the card.
+const EXPORT_FIELDS=[
+  {key:"sku", label:"SKU", default:true},
+  {key:"name", label:"Name", default:true},
+  {key:"chinese_desc", label:"Chinese Description", default:false},
+  {key:"category", label:"Category", default:false},
+  {key:"make", label:"Make", default:true},
+  {key:"model", label:"Model", default:true},
+  {key:"year_range", label:"Year Range", default:true},
+  {key:"oe_number", label:"OE Number", default:false},
+  {key:"cost", label:"Your Cost", default:true, numeric:true, currency:true},
+  {key:"suggested", label:"Suggested Retail", default:true, numeric:true, currency:true},
+  {key:"customerPrice", label:"Customer Price", default:false, numeric:true, currency:true},
+  {key:"stock", label:"Stock", default:true, numeric:true},
+  {key:"fits", label:"Fits", default:false, numeric:true},
+];
+
+// Opens the same "print → Save as PDF" window used elsewhere in the app (e.g.
+// App.jsx's Inventory Stock Value Report) — no PDF library needed, the browser's
+// own print dialog does the export.
+const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel)=>{
+  const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const cur=C();
+  const shopName=getSettings().shop_name||"";
+  const dateStr=new Date().toLocaleDateString();
+  const cell=(f,row)=>{
+    const v=row[f.key];
+    if(f.currency) return v!=null&&v!==""?cur+(+v).toFixed(2):"—";
+    if(f.numeric) return v??0;
+    return esc(v||"—");
+  };
+  const headHtml=fields.map(f=>`<th${f.numeric?' class="num"':""}>${esc(f.label)}</th>`).join("");
+  const rowsHtml=rows.map(row=>`<tr>${fields.map(f=>`<td${f.numeric?' class="num"':""}>${cell(f,row)}</td>`).join("")}</tr>`).join("");
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(supplierLabel)} — ${esc(tabLabel)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:32px;max-width:1000px;margin:0 auto}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #111}
+    .shop{font-size:22px;font-weight:900;color:#f97316}
+    .meta{font-size:11px;color:#666;margin-top:4px}
+    .report-title{font-size:18px;font-weight:700;text-align:right}
+    .report-date{font-size:11px;color:#666;text-align:right;margin-top:4px}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    thead tr{background:#111;color:#fff}
+    thead th{padding:9px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+    thead th.num{text-align:right}
+    tbody tr:nth-child(even){background:#f9f9f9}
+    tbody td{padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:12px}
+    .num{text-align:right;font-family:monospace}
+    .print-btn{display:flex;gap:10px;margin-bottom:20px}
+    .btn{padding:8px 20px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer}
+    .btn-print{background:#1d4ed8;color:#fff}
+    .btn-pdf{background:#dc2626;color:#fff}
+    @media print{.print-btn{display:none!important}body{padding:16px}}
+  </style></head><body>
+  <div class="print-btn">
+    <button class="btn btn-print" onclick="window.print()">🖨 Print</button>
+    <button class="btn btn-pdf" onclick="window.print()">📄 Save as PDF</button>
+  </div>
+  <div class="header">
+    <div><div class="shop">${esc(shopName)}</div><div class="meta">${esc(supplierLabel)} — Parts List</div></div>
+    <div><div class="report-title">${esc(tabLabel)}</div><div class="report-date">Date: ${dateStr} · ${rows.length} parts</div></div>
+  </div>
+  <table>
+    <thead><tr>${headHtml}</tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+  </body></html>`;
+  const w=window.open("","_blank","width=1000,height=800");
+  if(!w){ alert("Please allow pop-ups for this site to export the PDF"); return; }
+  w.document.write(html);
+  w.document.close();
+};
+
+// Field-picker shown before export — lets the supplier choose which columns
+// land on the PDF/print-out.
+function ExportPartsPdfModal({rowCount, tabLabel, selected, onToggle, onExport, onClose}){
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="📄 Export PDF" sub={`${rowCount} part${rowCount!==1?"s":""} from "${tabLabel}" — matches your current search`} onClose={onClose}/>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Choose which columns to include:</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginBottom:18}}>
+        {EXPORT_FIELDS.map(f=>(
+          <label key={f.key} style={{display:"flex",alignItems:"center",gap:7,fontSize:13,cursor:"pointer"}}>
+            <input type="checkbox" checked={selected.has(f.key)} onChange={()=>onToggle(f.key)}/>
+            {f.label}
+          </label>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:10}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={rowCount===0||selected.size===0} onClick={onExport}>
+          📄 Export {rowCount} Part{rowCount!==1?"s":""}
+        </button>
+      </div>
+    </Overlay>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER PORTAL — self-service parts catalogue for a supplier login
 // (role:"supplier", scoped to one suppliers.id via user.supplier_id).
@@ -55,6 +156,27 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
   const existingFiltered=keywords.length?existingParts.filter(p=>matchesSearch(searchBlob(p,p.sku),keywords)):existingParts;
   const minesFiltered=keywords.length?parts.filter(p=>matchesSearch(searchBlob(p,`${supplierCode}-${p.part_code}`),keywords)):parts;
 
+  // PDF export — exports whichever tab/search the supplier is currently looking at.
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportSelected, setExportSelected] = useState(()=>new Set(EXPORT_FIELDS.filter(f=>f.default).map(f=>f.key)));
+  const toggleExportField=(key)=>setExportSelected(prev=>{const n=new Set(prev); n.has(key)?n.delete(key):n.add(key); return n;});
+  const buildExportRows=()=>{
+    if(tab==="existing"){
+      return existingFiltered.map(p=>({
+        sku:p.sku, name:p.name, chinese_desc:p.chinese_desc, category:p.category,
+        make:p.make, model:p.model, year_range:p.year_range, oe_number:p.oe_number,
+        cost:p._supplierPrice, suggested:p._suggestedPrice, customerPrice:p.price, stock:p.stock,
+        fits:partFitments.filter(pf=>String(pf.part_id)===String(p.id)).length,
+      }));
+    }
+    return minesFiltered.map(p=>({
+      sku:`${supplierCode}-${p.part_code}`, name:p.name, chinese_desc:p.chinese_desc, category:p.category,
+      make:p.make, model:p.model, year_range:p.year_range, oe_number:p.oe_number,
+      cost:p.cost_price, suggested:p.suggested_price, customerPrice:p.price, stock:p.stock,
+      fits:partFitments.filter(pf=>String(pf.supplier_part_id)===String(p.id)).length,
+    }));
+  };
+
   // In-app "price changed since you last looked" badge — no outbound notification,
   // just a local baseline captured once when this page first mounts (i.e. what they
   // saw last time), then immediately reset for next time. Kept per-browser via
@@ -77,6 +199,20 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
       {editingCost&&<SupplierCostPriceModal part={editingCost} supplierMarginOptions={marginOptions}
         onSave={async(data)=>{await onUpdateCostPrice(editingCost,data);setEditingCost(null);}}
         onClose={()=>setEditingCost(null)}/>}
+
+      {exportOpen&&(
+        <ExportPartsPdfModal
+          rowCount={tab==="existing"?existingFiltered.length:minesFiltered.length}
+          tabLabel={tab==="existing"?`Existing Catalogue (${existingFiltered.length})`:`Added by You (${minesFiltered.length})`}
+          selected={exportSelected}
+          onToggle={toggleExportField}
+          onExport={()=>{
+            openSupplierPartsPdf(buildExportRows(), EXPORT_FIELDS.filter(f=>exportSelected.has(f.key)),
+              tab==="existing"?"Existing Catalogue":"Added by You", supplierName||supplierCode);
+            setExportOpen(false);
+          }}
+          onClose={()=>setExportOpen(false)}/>
+      )}
 
       {labelPart&&<PrintPartLabelModal part={labelPart} settings={getSettings()} onClose={()=>setLabelPart(null)}/>}
 
@@ -104,6 +240,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
         </div>
         <div style={{display:"flex",gap:8}}>
           {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh} title="Prices/stock can change on admin's side — refresh to see the latest">↺ Refresh</button>}
+          <button className="btn btn-ghost btn-sm" onClick={()=>setExportOpen(true)}>📄 Export PDF</button>
           {onBulkUpdateSuggestedPrices&&(
             <button className="btn btn-ghost btn-sm" onClick={()=>{if(bulkMode)exitBulkMode();else{setBulkMode(true);setTab("existing");}}}>
               {bulkMode?"✕ Exit Bulk Update":"☑ Bulk Update Prices"}

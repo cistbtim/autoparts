@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { removeBackground } from "@imgly/background-removal";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
 import { C, curSym, getSettings, updateSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
@@ -3192,6 +3193,205 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
   const fileRef = useRef(null);
   const menuRef = useRef(null);
 
+  // Per-photo edit tools (Remove BG / Touch Up / Watermark) — mirrors the
+  // main-photo tools in PartPhotoUploader, scoped to one photo in the array.
+  const [editIdx, setEditIdx] = useState(null); // index into photos being edited, or null
+  const [editBusy, setEditBusy] = useState(false);
+  const [editStatus, setEditStatus] = useState("");
+  const [editError, setEditError] = useState(null);
+  const [showTouchUp, setShowTouchUp] = useState(false);
+  const [brushSize, setBrushSize] = useState(28);
+  const touchUpCanvasRef = useRef(null);
+  const touchUpHistoryRef = useRef([]);
+  const touchUpOrigRef = useRef(null);
+  const touchUpDrawingRef = useRef(false);
+
+  const editUrl = editIdx!=null ? (photos||[])[editIdx] : null;
+
+  const _fetchAsImage = async (url) => {
+    const r = await fetch(toImgUrl(url)||url, {credentials:"omit"});
+    if (!r.ok) throw new Error("fetch failed");
+    const blob = await r.blob();
+    if (!blob.type.startsWith("image/")) throw new Error("not an image");
+    return new Promise((res, rej) => {
+      const objUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload  = () => { URL.revokeObjectURL(objUrl); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(objUrl); rej(new Error("img load failed")); };
+      img.src = objUrl;
+    });
+  };
+
+  const _canvasBlob = (img, drawExtra) => new Promise((res, rej) => {
+    const cv = document.createElement("canvas");
+    cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(img, 0, 0);
+    if (drawExtra) drawExtra(ctx, cv.width, cv.height);
+    cv.toBlob(b => b ? res(b) : rej(new Error("toBlob failed")), "image/jpeg", 0.92);
+  });
+
+  const _replaceEditedAt = (idx, url) => {
+    onChange((photos||[]).map((p,i)=>i===idx?url:p));
+  };
+
+  const _saveEditedBlob = async (blob, suffix) => {
+    const _sku = String(sku||"part").replace(/[^a-zA-Z0-9_-]/g,"_");
+    const path = `parts/${_sku}/extra-${Date.now()}-${suffix}.jpg`;
+    const url = await uploadToStorage("cars_parts", path, blob);
+    _replaceEditedAt(editIdx, url);
+  };
+
+  const removeBgAtEdit = async () => {
+    if (editUrl==null) return;
+    setEditBusy(true); setEditError(null); setEditStatus("Removing background…");
+    try {
+      const r = await fetch(toImgUrl(editUrl)||editUrl, {credentials:"omit"});
+      if (!r.ok) throw new Error("fetch failed");
+      const blob = await r.blob();
+      const processed = await removeBackground(blob, {
+        model: "large",
+        progress: (_key, current, total) => { if (total > 0) setEditStatus(`Removing background… ${Math.round(current/total*100)}%`); },
+      });
+      const MAX = 1200;
+      const finalBlob = await new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(processed);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const canvas = document.createElement("canvas");
+          let w = img.width, h = img.height;
+          if (w > MAX || h > MAX) { const rr = Math.min(MAX/w, MAX/h); w=Math.round(w*rr); h=Math.round(h*rr); }
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(b => b ? resolve(b) : reject(new Error("toBlob failed")), "image/jpeg", 0.92);
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+      await _saveEditedBlob(finalBlob, "nobg");
+    } catch (e) { setEditError("Could not remove background — " + (e.message||e)); }
+    setEditBusy(false); setEditStatus("");
+  };
+
+  const watermarkAtEdit = async () => {
+    if (editUrl==null) return;
+    setEditBusy(true); setEditError(null); setEditStatus("Adding watermark…");
+    try {
+      const img = await _fetchAsImage(editUrl);
+      const text = getSettings().shop_name || "MotorDesk";
+      const stamped = await _canvasBlob(img, (ctx, w, h) => {
+        const fontSize = Math.max(14, Math.round(w*0.045));
+        ctx.font = `700 ${fontSize}px DM Sans, sans-serif`;
+        ctx.textBaseline = "bottom";
+        const pad = Math.round(w*0.02);
+        const tw = ctx.measureText(text).width;
+        ctx.fillStyle = "rgba(0,0,0,.35)";
+        ctx.fillRect(w-tw-pad*2, h-fontSize-pad*1.6, tw+pad*2, fontSize+pad*1.2);
+        ctx.fillStyle = "rgba(255,255,255,.92)";
+        ctx.fillText(text, w-tw-pad, h-pad*0.7);
+      });
+      await _saveEditedBlob(stamped, "wm");
+    } catch (e) { setEditError("Could not add watermark — " + (e.message||e)); }
+    setEditBusy(false); setEditStatus("");
+  };
+
+  const openTouchUpAtEdit = async () => {
+    if (editUrl==null) return;
+    setEditError(null);
+    try {
+      const img = await _fetchAsImage(editUrl);
+      const off = document.createElement("canvas");
+      off.width = img.naturalWidth; off.height = img.naturalHeight;
+      const octx = off.getContext("2d");
+      octx.fillStyle = "#ffffff"; octx.fillRect(0, 0, off.width, off.height);
+      octx.drawImage(img, 0, 0);
+      touchUpOrigRef.current = { dataUrl: off.toDataURL("image/png"), w: off.width, h: off.height };
+      touchUpHistoryRef.current = [];
+      setShowTouchUp(true);
+    } catch (e) { setEditError("Could not open touch-up — " + (e.message||e)); }
+  };
+
+  useEffect(() => {
+    if (!showTouchUp) return;
+    const data = touchUpOrigRef.current;
+    const cv = touchUpCanvasRef.current;
+    if (!data || !cv) return;
+    cv.width = data.w; cv.height = data.h;
+    const ctx = cv.getContext("2d");
+    const im = new Image();
+    im.onload = () => ctx.drawImage(im, 0, 0);
+    im.src = data.dataUrl;
+  }, [showTouchUp]);
+
+  const _touchUpPos = (e) => {
+    const cv = touchUpCanvasRef.current;
+    const r = cv.getBoundingClientRect();
+    const sx = cv.width / r.width, sy = cv.height / r.height;
+    return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
+  };
+
+  const touchUpPointerDown = (e) => {
+    const cv = touchUpCanvasRef.current;
+    if (!cv) return;
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    const ctx = cv.getContext("2d");
+    try {
+      touchUpHistoryRef.current.push(ctx.getImageData(0, 0, cv.width, cv.height));
+      if (touchUpHistoryRef.current.length > 15) touchUpHistoryRef.current.shift();
+    } catch (err) { console.error("Touch-up: could not snapshot for undo:", err); }
+    touchUpDrawingRef.current = true;
+    const { x, y } = _touchUpPos(e);
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(x, y, brushSize/2, 0, Math.PI*2); ctx.fill();
+    ctx.lineWidth = brushSize; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#ffffff";
+    ctx.beginPath(); ctx.moveTo(x, y);
+  };
+
+  const touchUpPointerMove = (e) => {
+    if (!touchUpDrawingRef.current) return;
+    e.preventDefault();
+    const cv = touchUpCanvasRef.current;
+    const ctx = cv.getContext("2d");
+    const { x, y } = _touchUpPos(e);
+    ctx.lineTo(x, y); ctx.stroke();
+  };
+
+  const touchUpPointerUp = () => { touchUpDrawingRef.current = false; };
+
+  const touchUpUndo = () => {
+    const cv = touchUpCanvasRef.current;
+    const last = touchUpHistoryRef.current.pop();
+    if (!cv || !last) return;
+    cv.getContext("2d").putImageData(last, 0, 0);
+  };
+
+  const touchUpReset = () => {
+    const cv = touchUpCanvasRef.current;
+    const data = touchUpOrigRef.current;
+    if (!cv || !data) return;
+    const ctx = cv.getContext("2d");
+    const im = new Image();
+    im.onload = () => ctx.drawImage(im, 0, 0);
+    im.src = data.dataUrl;
+    touchUpHistoryRef.current = [];
+  };
+
+  const touchUpSaveEdit = async () => {
+    const cv = touchUpCanvasRef.current;
+    if (!cv) return;
+    setShowTouchUp(false);
+    setEditBusy(true); setEditError(null); setEditStatus("Saving touch-up…");
+    try {
+      const blob = await new Promise((res, rej) => cv.toBlob(b => b ? res(b) : rej(new Error("toBlob failed")), "image/jpeg", 0.92));
+      await _saveEditedBlob(blob, "touchup");
+    } catch (e) { setEditError("Could not save touch-up — " + (e.message||e)); }
+    setEditBusy(false); setEditStatus("");
+  };
+
   useEffect(()=>{
     if(!menuOpen) return;
     const onDocClick = e => { if(menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
@@ -3273,6 +3473,8 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
             )}
             <button onClick={e=>{e.stopPropagation();removeAt(i);}} title="Remove"
               style={{position:"absolute",top:-1,right:-1,width:17,height:17,borderRadius:"50%",background:"rgba(0,0,0,.65)",color:"#fff",border:"none",fontSize:10,lineHeight:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+            <button onClick={e=>{e.stopPropagation();setEditError(null);setEditIdx(i);}} title="Remove BG / Touch Up / Watermark"
+              style={{position:"absolute",top:-1,left:-1,width:17,height:17,borderRadius:"50%",background:"rgba(0,0,0,.65)",color:"#fff",border:"none",fontSize:9,lineHeight:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
           </div>
         ))}
         <div ref={menuRef} style={{position:"relative"}}>
@@ -3301,6 +3503,76 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}}
           onChange={e=>{addFiles(e.target.files); e.target.value="";}}/>
       </div>
+
+      {/* Per-photo edit popup — Remove BG / Touch Up / Watermark on one extra photo */}
+      {editIdx!=null&&!showTouchUp&&(
+        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
+          onClick={()=>{if(!editBusy){setEditIdx(null);setEditError(null);}}}>
+          <div style={{background:"var(--surface)",borderRadius:16,padding:20,maxWidth:360,width:"92vw",boxShadow:"0 16px 48px rgba(0,0,0,.5)"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:12,textAlign:"center"}}>Edit Extra Photo</div>
+            <div style={{background:"var(--surface2)",borderRadius:10,padding:10,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",minHeight:160,position:"relative"}}>
+              {editBusy?(
+                <div style={{textAlign:"center",color:"var(--accent)",padding:"0 12px"}}>
+                  <div style={{width:26,height:26,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 8px"}}/>
+                  <div style={{fontSize:12,fontWeight:600}}>{editStatus}</div>
+                </div>
+              ):(
+                <img src={toImgUrl(editUrl)} alt="" style={{maxWidth:"100%",maxHeight:200,objectFit:"contain",display:"block"}}/>
+              )}
+            </div>
+            {editError&&(
+              <div style={{fontSize:11,color:"var(--red)",marginBottom:10,padding:"6px 10px",background:"rgba(248,113,113,.1)",borderRadius:7}}>
+                {editError}
+              </div>
+            )}
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
+              <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={editBusy}
+                onClick={removeBgAtEdit} title="Remove the background from this photo">
+                🪄 Remove BG
+              </button>
+              <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={editBusy}
+                onClick={openTouchUpAtEdit} title="Manually brush away leftover watermark or background bits">
+                ✏️ Touch Up
+              </button>
+              <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={editBusy}
+                onClick={watermarkAtEdit} title="Stamp your shop name onto this photo">
+                💧 Watermark
+              </button>
+            </div>
+            <button className="btn btn-ghost btn-sm" style={{width:"100%"}} disabled={editBusy}
+              onClick={()=>{setEditIdx(null);setEditError(null);}}>✕ Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Manual touch-up editor — brush white over leftover watermark/background */}
+      {showTouchUp&&(
+        <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.88)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:14}}>
+          <div style={{fontWeight:700,fontSize:14,color:"#fff",marginBottom:8}}>✏️ Touch Up — brush over what to erase</div>
+          <div style={{background:"#fff",borderRadius:8,padding:4,maxWidth:"94vw",maxHeight:"64vh",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+            <canvas ref={touchUpCanvasRef}
+              style={{maxWidth:"92vw",maxHeight:"60vh",cursor:"crosshair",touchAction:"none",display:"block"}}
+              onPointerDown={touchUpPointerDown}
+              onPointerMove={touchUpPointerMove}
+              onPointerUp={touchUpPointerUp}
+              onPointerLeave={touchUpPointerUp}/>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginTop:14,color:"#fff",fontSize:12}}>
+            <span>Brush size</span>
+            <input type="range" min="8" max="90" value={brushSize} onChange={e=>setBrushSize(+e.target.value)} style={{width:120}}/>
+            <span style={{width:24,textAlign:"right"}}>{brushSize}</span>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14,justifyContent:"center"}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setShowTouchUp(false);setEditError(null);}}>✕ Cancel</button>
+            <button className="btn btn-ghost btn-sm" onClick={touchUpUndo}>↩ Undo</button>
+            <button className="btn btn-ghost btn-sm" onClick={touchUpReset}>⟲ Reset</button>
+            <button className="btn btn-primary btn-sm" style={{background:"var(--accent)",border:"none"}} onClick={touchUpSaveEdit}>
+              💾 Save Touch-Up
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

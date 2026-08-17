@@ -63,16 +63,20 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
   };
   const headHtml=fields.map(f=>`<th${f.numeric?' class="num"':""}>${esc(f.label)}</th>`).join("");
   // Rows are already sorted make-then-SKU (see sortByMakeThenSku) — insert a
-  // divider row every time the make changes, spanning the full table width.
+  // divider row every time the make changes, spanning the full table width,
+  // and force a page break before every make after the first (not the first —
+  // that one's already at the top of page 1, breaking there would just leave
+  // a blank page).
   const makeCounts={};
   rows.forEach(r=>{ const k=r.make||"—"; makeCounts[k]=(makeCounts[k]||0)+1; });
-  let lastMake=null;
+  let lastMake=null, firstGroup=true;
   const rowsHtml=rows.map(row=>{
     const mk=row.make||"—";
     let groupHtml="";
     if(mk!==lastMake){
-      groupHtml=`<tr class="makegroup"><td colspan="${fields.length}">${esc(mk)} — ${makeCounts[mk]} part${makeCounts[mk]!==1?"s":""}</td></tr>`;
-      lastMake=mk;
+      const breakStyle=firstGroup?"":' style="page-break-before:always"';
+      groupHtml=`<tr class="makegroup"${breakStyle}><td colspan="${fields.length}">${esc(mk)} — ${makeCounts[mk]} part${makeCounts[mk]!==1?"s":""}</td></tr>`;
+      lastMake=mk; firstGroup=false;
     }
     return groupHtml+`<tr>${fields.map(f=>`<td${f.numeric?' class="num"':""}>${cell(f,row)}</td>`).join("")}</tr>`;
   }).join("");

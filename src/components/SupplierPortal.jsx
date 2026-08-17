@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../lib/api.js";
 import { getSettings, C } from "../lib/settings.js";
-import { toImgUrl, fmtAmt, fmtDT, waLink } from "../lib/helpers.js";
+import { toImgUrl, toFullUrl, fmtAmt, fmtDT, waLink } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 import { PrintPartLabelModal, ExtraPhotosStrip, resolveMarginOptions } from "./Modals.jsx";
@@ -56,7 +56,7 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel)=>{
   const dateStr=new Date().toLocaleDateString();
   const cell=(f,row)=>{
     const v=row[f.key];
-    if(f.image) return v?`<img class="thumb" src="${esc(toImgUrl(v))}" onerror="this.style.visibility='hidden'"/>`:"";
+    if(f.image) return v?`<a href="${esc(toFullUrl(v)||v)}" target="_blank" rel="noopener"><img class="thumb" src="${esc(toImgUrl(v))}" onerror="this.style.visibility='hidden'"/></a>`:"";
     if(f.currency) return v!=null&&v!==""?cur+(+v).toFixed(2):"—";
     if(f.numeric) return v??0;
     return esc(v||"—");
@@ -79,7 +79,7 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel)=>{
     tbody tr:nth-child(even){background:#f9f9f9}
     tbody td{padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:12px;vertical-align:middle}
     .num{text-align:right;font-family:monospace}
-    .thumb{width:42px;height:42px;object-fit:contain;background:#fff;border:1px solid #e5e5e5;border-radius:4px;display:block}
+    .thumb{width:42px;height:42px;object-fit:contain;background:#fff;border:1px solid #e5e5e5;border-radius:4px;display:block;cursor:pointer}
     .print-btn{display:flex;gap:10px;margin-bottom:20px}
     .btn{padding:8px 20px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer}
     .btn-print{background:#1d4ed8;color:#fff}

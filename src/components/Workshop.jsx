@@ -6730,12 +6730,16 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
               <button onClick={()=>setSupplierModal(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(37,211,102,.3)",background:"rgba(37,211,102,.08)",color:"#25D366",fontWeight:700,fontSize:12,cursor:"pointer"}}>
                 📤 {t.wsqtSendQuote}
               </button>
-              {wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&(
+              {/* Seeing what a supplier quoted back, and placing the order against it, are
+                  both money-sensitive — kept out of the mechanic tier same as the customer
+                  quote/invoice screens elsewhere in this file. Sending the initial parts
+                  request above stays open to mechanics since it never shows a price. */}
+              {wsRole!=="mechanic"&&wsSupplierRequests.filter(r=>r.job_id===job.id).length>0&&(
                 <button onClick={()=>setReturnQuoteOpen(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(56,189,248,.3)",background:"rgba(56,189,248,.08)",color:"#38bdf8",fontWeight:700,fontSize:12,cursor:"pointer"}}>
                   ↩️ {t.wsqtReturnQuote}
                 </button>
               )}
-              {(wsSupplierQuotes.filter(q=>q.job_id===job.id).length>0||sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id)).length>0)&&(
+              {wsRole!=="mechanic"&&(wsSupplierQuotes.filter(q=>q.job_id===job.id).length>0||sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id)).length>0)&&(
                 <button onClick={()=>setCreatePoOpen(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(251,146,60,.3)",background:"rgba(251,146,60,.1)",color:"var(--accent)",fontWeight:700,fontSize:12,cursor:"pointer"}}>
                   📦 {t.wsqtCreateOrder}
                 </button>
@@ -7745,17 +7749,21 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         <Overlay onClose={()=>setSupplierModal(false)}>
           <SupplierSendModal
             job={job} items={items} wsSuppliers={wsSuppliers} wsVehicles={wsVehicles} vehicles={vehicles} settings={settings}
-            history={wsSupplierRequests.filter(r=>r.job_id===job.id)}
-            quotes={wsSupplierQuotes.filter(q=>q.job_id===job.id)}
-            sqReplies={sqReplies}
+            // Mechanics may compose and send the parts request (top half of this modal,
+            // which never shows a price) but not the "Send History" section below it —
+            // that's where returned quote prices and a "Create PO from Reply" shortcut
+            // live, so it's kept empty/off for them rather than patched piecemeal.
+            history={wsRole==="mechanic"?[]:wsSupplierRequests.filter(r=>r.job_id===job.id)}
+            quotes={wsRole==="mechanic"?[]:wsSupplierQuotes.filter(q=>q.job_id===job.id)}
+            sqReplies={wsRole==="mechanic"?[]:sqReplies}
             onLogSend={onSaveWsSupplierRequest?(data)=>{onSaveWsSupplierRequest(data);advanceJobStatus("Quoting");}:undefined}
-            onDeleteSend={onDeleteWsSupplierRequest}
-            onSaveQuote={onSaveWsSupplierQuote}
+            onDeleteSend={wsRole==="mechanic"?undefined:onDeleteWsSupplierRequest}
+            onSaveQuote={wsRole==="mechanic"?undefined:onSaveWsSupplierQuote}
             onSaveItem={onSaveItem}
             onSaveWsStock={onSaveWsStock}
             onSaveWsSupplier={onSaveWsSupplier}
             onGenerateLink={onGenerateWsQuoteLink?(info,linkItems)=>onGenerateWsQuoteLink(info,linkItems).then(url=>{advanceJobStatus("Quoting");return url;}):undefined}
-            onCreatePO={onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);advanceJobStatus("Ordered");setSupplierModal(false);if(onViewPurchaseOrders)onViewPurchaseOrders();}:undefined}
+            onCreatePO={wsRole==="mechanic"?undefined:(onSaveWsPurchaseOrder?(poData)=>{onSaveWsPurchaseOrder(poData,poData.items||[]);advanceJobStatus("Ordered");setSupplierModal(false);if(onViewPurchaseOrders)onViewPurchaseOrders();}:undefined)}
             onClose={()=>setSupplierModal(false)}/>
         </Overlay>
       )}

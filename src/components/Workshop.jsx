@@ -3431,6 +3431,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
   const [linkCopied,    setLinkCopied]   = useState(false);
   const [generatingLink,setGeneratingLink]=useState(false);
   const [extraInput,  setExtraInput]  = useState("");
+  const [extraQty,    setExtraQty]    = useState(1);
 
   const [supplierId,  setSupplierId]  = useState("");
   const [manualPhone, setManualPhone] = useState("");
@@ -3517,16 +3518,20 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
   const addExtra = async () => {
     const v = extraInput.trim();
     if (!v) return;
+    const qty = Math.max(1, +extraQty || 1);
     const sku = makePartSku(v);
     const tempId = "extra_" + Date.now();
-    setExtraParts(p => [...p, {id: tempId, label: v, sku, saving: true}]);
+    setExtraParts(p => [...p, {id: tempId, label: v, sku, qty, saving: true}]);
     setSelected(p => [...p, tempId]);
     setExtraInput("");
-    // Insert to job items AND workshop stock in parallel
+    setExtraQty(1);
+    // Insert to job items AND workshop stock in parallel — qty here is how many
+    // are needed for this job, not workshop shelf stock (that stays 0: adding
+    // 4 to a job's needed list doesn't mean 4 are sitting on the shelf).
     try {
       await Promise.all([
         onSaveItem
-          ? onSaveItem({job_id: job.id, type: "part", description: v, part_sku: sku, qty: 1, unit_price: 0, total: 0})
+          ? onSaveItem({job_id: job.id, type: "part", description: v, part_sku: sku, qty, unit_price: 0, total: 0})
           : Promise.resolve(),
         onSaveWsStock
           ? onSaveWsStock({name: v, sku, qty: 0, unit_cost: 0, unit_price: 0, min_qty: 0})
@@ -3547,7 +3552,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
   // Build combined list: job items + extras
   const allItems = [
     ...items.filter(i => i.description?.trim()).map(i => ({id: i.id, label: i.description, qty: +i.qty||1, sku: i.part_sku||"", isExtra: false})),
-    ...extraParts.map(e => ({id: e.id, label: e.label, qty: 1, sku: e.sku||"", isExtra: true})),
+    ...extraParts.map(e => ({id: e.id, label: e.label, qty: +e.qty||1, sku: e.sku||"", isExtra: true})),
   ];
   const selectedItems = allItems.filter(i => selected.includes(i.id));
 
@@ -3690,6 +3695,7 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
                 {e.error&&<span style={{color:"var(--red)",fontWeight:600}}>✗ save failed</span>}
               </div>}
             </div>
+            {+e.qty>1&&<span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>×{e.qty}</span>}
             <button onClick={ev=>{ev.preventDefault();removeExtra(e.id);}}
               style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
           </label>
@@ -3700,6 +3706,10 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
             value={extraInput} onChange={e=>setExtraInput(e.target.value)}
             onKeyDown={e=>e.key==="Enter"&&addExtra()}
             style={{flex:1,fontSize:12,padding:"5px 10px"}}/>
+          <input className="inp" type="number" min="1" title="Quantity needed"
+            value={extraQty} onChange={e=>setExtraQty(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&addExtra()}
+            style={{width:52,fontSize:12,padding:"5px 6px",textAlign:"center",flexShrink:0}}/>
           <button className="btn btn-ghost btn-xs" onClick={addExtra} style={{flexShrink:0,fontSize:12,padding:"0 10px"}}>Add</button>
         </div>
       </div>

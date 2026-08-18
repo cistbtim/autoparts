@@ -3543,7 +3543,10 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
       alert(`How many cylinders does this vehicle have? "${v}" needs one per cylinder — pick a quantity first.`);
       return;
     }
-    const qty = Math.max(1, +extraQty || 1);
+    // A matched stock item's own default_qty (e.g. brake discs = 2, a pair) wins
+    // over whatever's currently sitting in the qty picker — clicking a suggestion
+    // is a fresh choice, not a continuation of whatever qty was last left selected.
+    const qty = match?.default_qty>0 ? +match.default_qty : Math.max(1, +extraQty || 1);
     const sku = match?.sku || makePartSku(v);
     const tempId = "extra_" + Date.now();
     setExtraParts(p => [...p, {id: tempId, label: v, sku, qty, saving: true}]);
@@ -3554,6 +3557,12 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
     // Insert to job items AND (for brand-new parts only) workshop stock in parallel —
     // qty here is how many are needed for this job, not workshop shelf stock (that
     // stays 0: adding 4 to a job's needed list doesn't mean 4 are sitting on the shelf).
+    // Also teach the match's default_qty when a different qty was deliberately picked
+    // for it (e.g. brake discs = 2), same self-learning the admin's Add Part screen
+    // already does — so the dropdown suggests the right number next time, unprompted.
+    if (match && !match.qty_per_cylinder && qty!==(+match.default_qty||1) && onSaveWsStock) {
+      onSaveWsStock({id: match.id, default_qty: qty}).catch(()=>{});
+    }
     try {
       const [savedItem] = await Promise.all([
         onSaveItem
@@ -3817,7 +3826,9 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
               }}
               style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:"none",border:"none",borderBottom:"1px solid var(--border)",cursor:"pointer",textAlign:"left",fontSize:12,color:"var(--text)"}}>
               <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {s.name}{s.qty_per_cylinder&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"var(--yellow)"}}>🔧 per cylinder</span>}
+                {s.name}
+                {s.qty_per_cylinder&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"var(--yellow)"}}>🔧 per cylinder</span>}
+                {!s.qty_per_cylinder&&+s.default_qty>1&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"var(--accent)"}}>×{s.default_qty} default</span>}
               </span>
               {s.sku&&<span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace",flexShrink:0}}>{s.sku}</span>}
             </button>

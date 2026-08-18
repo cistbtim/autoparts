@@ -3686,7 +3686,8 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
         Select Parts to Include
       </div>
       <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:8}}>
-        {/* Job items */}
+        {/* Job items — includes extras from an earlier visit to this modal, since
+            extraParts is local state that resets when the modal is closed/reopened */}
         {jobItemsList.map((item, idx) => (
           <label key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:selected.includes(item.id)?"var(--surface2)":"transparent"}}>
             <input type="checkbox" checked={selected.includes(item.id)} onChange={()=>toggleItem(item.id)}
@@ -3696,6 +3697,10 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
               {item.part_sku&&<div style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{item.part_sku}</div>}
             </div>
             {+item.qty>1&&<span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>×{item.qty}</span>}
+            {onDeleteItem&&(
+              <button onClick={ev=>{ev.preventDefault();setSelected(p=>p.filter(x=>x!==item.id));onDeleteItem(item.id);}}
+                style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
+            )}
           </label>
         ))}
         {/* Extra parts added manually */}

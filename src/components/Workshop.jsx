@@ -3685,7 +3685,11 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
       <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:6}}>
         Select Parts to Include
       </div>
-      <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:8}}>
+      {/* position:relative wrapper so the autocomplete dropdown below can escape the
+          box's own overflow:hidden (needed there to clip row backgrounds to the
+          rounded corners) instead of being invisibly clipped along with them */}
+      <div style={{position:"relative",marginBottom:8}}>
+      <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden"}}>
         {/* Job items — includes extras from an earlier visit to this modal, since
             extraParts is local state that resets when the modal is closed/reopened */}
         {jobItemsList.map((item, idx) => (
@@ -3723,7 +3727,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
           </label>
         ))}
         {/* Add extra part row */}
-        <div style={{position:"relative",padding:"8px 10px"}}>
+        <div style={{padding:"8px 10px"}}>
           <div style={{display:"flex",gap:6}}>
             <input className="inp" placeholder="+ Type extra part name & press Enter" autoComplete="off"
               value={extraInput} onChange={e=>setExtraInput(e.target.value)}
@@ -3738,20 +3742,23 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
           <div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>
             Searching {wsStock.length} workshop stock item{wsStock.length!==1?"s":""}
           </div>
-          {/* Autocomplete — matches against workshop stock so re-typing an existing
-              part reuses its SKU instead of minting a duplicate stock row */}
-          {stockMatches.length>0&&(
-            <div style={{position:"absolute",top:"100%",left:10,right:66,zIndex:5,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 6px 18px rgba(0,0,0,.2)",marginTop:2,overflow:"hidden"}}>
-              {stockMatches.map(s=>(
-                <button key={s.id||s.sku} type="button" onClick={()=>addExtra(s)}
-                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:"none",border:"none",borderBottom:"1px solid var(--border)",cursor:"pointer",textAlign:"left",fontSize:12,color:"var(--text)"}}>
-                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</span>
-                  {s.sku&&<span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace",flexShrink:0}}>{s.sku}</span>}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
+      </div>
+      {/* Autocomplete — a sibling of the bordered box above (not nested inside its
+          overflow:hidden) so it's actually visible instead of being clipped.
+          Matches against workshop stock so re-typing an existing part reuses its
+          SKU instead of minting a duplicate stock row. */}
+      {stockMatches.length>0&&(
+        <div style={{position:"absolute",top:"100%",left:10,right:66,zIndex:20,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 6px 18px rgba(0,0,0,.2)",marginTop:2,overflow:"hidden"}}>
+          {stockMatches.map(s=>(
+            <button key={s.id||s.sku} type="button" onClick={()=>addExtra(s)}
+              style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:"none",border:"none",borderBottom:"1px solid var(--border)",cursor:"pointer",textAlign:"left",fontSize:12,color:"var(--text)"}}>
+              <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</span>
+              {s.sku&&<span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace",flexShrink:0}}>{s.sku}</span>}
+            </button>
+          ))}
+        </div>
+      )}
       </div>
       {jobItemsList.length===0&&extraParts.length===0&&(
         <div style={{fontSize:12,color:"var(--text3)",marginBottom:8,paddingLeft:4}}>No job items yet — type parts above to include them</div>

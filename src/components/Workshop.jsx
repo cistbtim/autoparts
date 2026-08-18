@@ -1013,8 +1013,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                       badge's styling below) since this is the thing that keeps getting
                       skipped with no visible consequence anywhere else on the board */}
                   {!job.is_cancelled&&(()=>{ const pend=checklistPendingFor(job.id); return pend>0&&(
-                    <div style={{fontSize:10,fontWeight:800,color:"#fff",marginBottom:5,background:"#dc2626",borderRadius:6,padding:"3px 8px",display:"flex",alignItems:"center",justifyContent:"center",gap:5,animation:pend===CHECKLIST_ITEMS.length?"pulseWarn 1.6s ease-in-out infinite":undefined}}>
-                      ⚠️ Inspection: {CHECKLIST_ITEMS.length-pend}/{CHECKLIST_ITEMS.length}
+                    <div style={{fontSize:10,fontWeight:800,color:"var(--red)",marginBottom:5,background:"rgba(248,113,113,.12)",border:"1px solid var(--red)",borderRadius:6,padding:"3px 8px",display:"flex",alignItems:"center",justifyContent:"center",gap:5,animation:pend===CHECKLIST_ITEMS.length?"pulseWarn 1.6s ease-in-out infinite":undefined}}>
+                      📋 Inspection: {CHECKLIST_ITEMS.length-pend}/{CHECKLIST_ITEMS.length}
                     </div>
                   );})()}
                   {/* workshop badge — admin viewing all workshops */}
@@ -5137,29 +5137,29 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],onChecklistSaved,par
           <button onClick={()=>setInspectPopup(true)} style={{
             display:"flex",alignItems:"center",justifyContent:"space-between",
             width:"100%",marginBottom:8,padding:"10px 16px",
-            background:active?"#16a34a":allDone?"rgba(22,163,74,.12)":pending?"#dc2626":"var(--surface2)",
-            border:`1.5px solid ${active?"#16a34a":allDone?"#16a34a":pending?"#dc2626":"var(--border)"}`,
+            background:active?"#16a34a":allDone?"rgba(22,163,74,.12)":pending?"rgba(248,113,113,.12)":"var(--surface2)",
+            border:`1.5px solid ${active?"#16a34a":allDone?"#16a34a":pending?"var(--red)":"var(--border)"}`,
             borderRadius:10,cursor:"pointer",boxSizing:"border-box",
-            boxShadow:active?"0 2px 10px rgba(22,163,74,.3)":pending?"0 2px 10px rgba(220,38,38,.35)":"none",
+            boxShadow:active?"0 2px 10px rgba(22,163,74,.3)":"none",
             animation:notStarted&&!active?"pulseWarn 1.6s ease-in-out infinite":undefined,
           }}>
             <span style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:18}}>{pending&&!active?"⚠️":"✅"}</span>
-              <span style={{fontSize:14,fontWeight:800,color:active||pending?"#fff":allDone?"#16a34a":"var(--text2)",letterSpacing:".01em"}}>
+              <span style={{fontSize:18}}>{pending&&!active?"📋":"✅"}</span>
+              <span style={{fontSize:14,fontWeight:800,color:active?"#fff":pending?"var(--red)":allDone?"#16a34a":"var(--text2)",letterSpacing:".01em"}}>
                 {pending&&!active?"Inspection not done":(t.wsTabInspect||"Inspection")}
               </span>
             </span>
             <span style={{display:"flex",alignItems:"center",gap:6}}>
               {checklistLoaded&&(
                 <span style={{fontSize:11,fontWeight:700,
-                  color:active||pending?"rgba(255,255,255,.9)":allDone?"#16a34a":"var(--text3)",
-                  background:active||pending?"rgba(255,255,255,.2)":allDone?"rgba(22,163,74,.15)":"var(--surface3)",
+                  color:active?"rgba(255,255,255,.9)":pending?"var(--red)":allDone?"#16a34a":"var(--text3)",
+                  background:active?"rgba(255,255,255,.2)":pending?"rgba(248,113,113,.15)":allDone?"rgba(22,163,74,.15)":"var(--surface3)",
                   borderRadius:99,padding:"2px 8px"}}>
                   {done}/{total}
                 </span>
               )}
               {allDone&&!active&&<span style={{fontSize:18}}>✅</span>}
-              <span style={{fontSize:14,color:active||pending?"rgba(255,255,255,.7)":"var(--text3)"}}>›</span>
+              <span style={{fontSize:14,color:active?"rgba(255,255,255,.7)":pending?"var(--red)":"var(--text3)"}}>›</span>
             </span>
           </button>
         );

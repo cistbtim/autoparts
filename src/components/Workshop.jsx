@@ -3442,6 +3442,11 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
   const [generatingLink,setGeneratingLink]=useState(false);
   const [extraInput,  setExtraInput]  = useState("");
   const [extraQty,    setExtraQty]    = useState(1);
+  // A stock match picked from the autocomplete that's flagged qty_per_cylinder
+  // (spark plugs, injectors, coils…) — same flag the admin's Add Part screen
+  // already uses. Cleared to "" instead of defaulting to 1 so it can't be added
+  // without a deliberate qty choice, matching that screen's behaviour.
+  const [pendingMatch,setPendingMatch] = useState(null);
 
   const [supplierId,  setSupplierId]  = useState("");
   const [manualPhone, setManualPhone] = useState("");
@@ -3527,17 +3532,25 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
 
   // existingMatch (optional): a wsStock row picked from the autocomplete list below
   // the input — reuses its real name/sku instead of minting a fresh one, so picking
-  // the same part twice doesn't create two stock rows for it.
+  // the same part twice doesn't create two stock rows for it. Falls back to
+  // pendingMatch so the Add button / Enter key still know about a per-cylinder
+  // pick made a moment ago.
   const addExtra = async (existingMatch) => {
-    const v = (existingMatch?.name || extraInput).trim();
+    const match = existingMatch || pendingMatch;
+    const v = (match?.name || extraInput).trim();
     if (!v) return;
+    if (match?.qty_per_cylinder && !(+extraQty>0)) {
+      alert(`How many cylinders does this vehicle have? "${v}" needs one per cylinder — pick a quantity first.`);
+      return;
+    }
     const qty = Math.max(1, +extraQty || 1);
-    const sku = existingMatch?.sku || makePartSku(v);
+    const sku = match?.sku || makePartSku(v);
     const tempId = "extra_" + Date.now();
     setExtraParts(p => [...p, {id: tempId, label: v, sku, qty, saving: true}]);
     setSelected(p => [...p, tempId]);
     setExtraInput("");
     setExtraQty(1);
+    setPendingMatch(null);
     // Insert to job items AND (for brand-new parts only) workshop stock in parallel —
     // qty here is how many are needed for this job, not workshop shelf stock (that
     // stays 0: adding 4 to a job's needed list doesn't mean 4 are sitting on the shelf).
@@ -3546,7 +3559,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
         onSaveItem
           ? onSaveItem({job_id: job.id, type: "part", description: v, part_sku: sku, qty, unit_price: 0, total: 0})
           : Promise.resolve(null),
-        (!existingMatch && onSaveWsStock)
+        (!match && onSaveWsStock)
           ? onSaveWsStock({name: v, sku, qty: 0, unit_cost: 0, unit_price: 0, min_qty: 0})
           : Promise.resolve(null),
       ]);
@@ -3765,30 +3778,47 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
         <div style={{padding:"8px 10px"}}>
           <div style={{display:"flex",gap:6}}>
             <input className="inp" placeholder="+ Type extra part name & press Enter" autoComplete="off"
-              value={extraInput} onChange={e=>setExtraInput(e.target.value)}
+              value={extraInput} onChange={e=>{setExtraInput(e.target.value);setPendingMatch(null);}}
               onKeyDown={e=>e.key==="Enter"&&addExtra()}
               style={{flex:1,fontSize:12,padding:"5px 10px"}}/>
-            <select className="inp" title="Quantity needed" value={extraQty} onChange={e=>setExtraQty(+e.target.value)}
-              style={{width:58,fontSize:12,padding:"5px 6px",textAlign:"center",flexShrink:0,cursor:"pointer"}}>
-              {qtyOptionsFor(extraQty).map(q=><option key={q} value={q}>×{q}</option>)}
+            <select className="inp" title="Quantity needed" value={extraQty} onChange={e=>setExtraQty(+e.target.value||"")}
+              style={{width:58,fontSize:12,padding:"5px 6px",textAlign:"center",flexShrink:0,cursor:"pointer",
+                borderColor:pendingMatch&&!extraQty?"var(--yellow)":undefined}}>
+              {extraQty===""&&<option value="">?</option>}
+              {qtyOptionsFor(extraQty||1).map(q=><option key={q} value={q}>×{q}</option>)}
             </select>
             <button className="btn btn-ghost btn-xs" onClick={()=>addExtra()} style={{flexShrink:0,fontSize:12,padding:"0 10px"}}>Add</button>
           </div>
-          <div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>
-            Searching {wsStock.length} workshop stock item{wsStock.length!==1?"s":""}
-          </div>
+          {pendingMatch ? (
+            <div style={{fontSize:11,fontWeight:700,color:"var(--yellow)",marginTop:3}}>
+              🔧 How many cylinders does this vehicle have? "{pendingMatch.name}" needs one per cylinder.
+            </div>
+          ) : (
+            <div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>
+              Searching {wsStock.length} workshop stock item{wsStock.length!==1?"s":""}
+            </div>
+          )}
         </div>
       </div>
       {/* Autocomplete — a sibling of the bordered box above (not nested inside its
           overflow:hidden) so it's actually visible instead of being clipped.
           Matches against workshop stock so re-typing an existing part reuses its
-          SKU instead of minting a duplicate stock row. */}
-      {stockMatches.length>0&&(
+          SKU instead of minting a duplicate stock row. A match flagged
+          qty_per_cylinder (same flag the admin's Add Part screen uses for spark
+          plugs/injectors/coils) doesn't get added straight away — it becomes the
+          pendingMatch above and waits for a real qty instead of silently taking 1. */}
+      {stockMatches.length>0&&!pendingMatch&&(
         <div style={{position:"absolute",top:"100%",left:10,right:66,zIndex:20,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 6px 18px rgba(0,0,0,.2)",marginTop:2,overflow:"hidden"}}>
           {stockMatches.map(s=>(
-            <button key={s.id||s.sku} type="button" onClick={()=>addExtra(s)}
+            <button key={s.id||s.sku} type="button"
+              onClick={()=>{
+                if(s.qty_per_cylinder){ setPendingMatch(s); setExtraInput(s.name); setExtraQty(""); }
+                else addExtra(s);
+              }}
               style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:"none",border:"none",borderBottom:"1px solid var(--border)",cursor:"pointer",textAlign:"left",fontSize:12,color:"var(--text)"}}>
-              <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</span>
+              <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {s.name}{s.qty_per_cylinder&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"var(--yellow)"}}>🔧 per cylinder</span>}
+              </span>
               {s.sku&&<span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace",flexShrink:0}}>{s.sku}</span>}
             </button>
           ))}

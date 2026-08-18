@@ -3419,6 +3419,16 @@ const makePartSku = (name) => {
   return `ws-${abbr}-${rand}`;
 };
 
+// Quick quantity picks for the Send to Supplier parts list — includes common
+// engine cylinder counts (3/4/6/8) since spark plugs, injectors, coils etc.
+// are usually needed "one per cylinder". current is folded in too, in case a
+// qty saved some other way (e.g. from the admin item editor) isn't one of these.
+const SUPPLIER_QTY_OPTIONS = [1,2,3,4,5,6,7,8,10,12];
+const qtyOptionsFor = (current) => {
+  const c = +current || 1;
+  return SUPPLIER_QTY_OPTIONS.includes(c) ? SUPPLIER_QTY_OPTIONS : [...SUPPLIER_QTY_OPTIONS, c].sort((a,b)=>a-b);
+};
+
 function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[], vehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onDeleteItem, onSaveWsStock, onSaveWsSupplier, onGenerateLink, onCreatePO, onClose}) {
   const shopName = settings?.shop_name || "Workshop";
 
@@ -3562,6 +3572,23 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
     if (target?.dbId && onDeleteItem) onDeleteItem(target.dbId);
   };
 
+  // Qty edits on an already-on-the-job item (jobItemsList row) — preserves
+  // whatever unit_price it already has (mechanics never set one) and keeps
+  // total consistent with it.
+  const updateJobItemQty = (item, newQty) => {
+    if (!onSaveItem || newQty===+item.qty) return;
+    onSaveItem({...item, qty: newQty, total: (+item.unit_price||0)*newQty});
+  };
+  // Qty edits on a part added via this modal (extraParts row) — updates the
+  // local row immediately and, once its DB id has come back from the initial
+  // save, persists the new qty too.
+  const updateExtraQty = (extra, newQty) => {
+    setExtraParts(p => p.map(x => x.id===extra.id ? {...x, qty: newQty} : x));
+    if (onSaveItem && extra.dbId) {
+      onSaveItem({id: extra.dbId, job_id: job.id, type: "part", description: extra.label, part_sku: extra.sku, qty: newQty, unit_price: 0, total: 0});
+    }
+  };
+
   // Build combined list: job items + extras
   const allItems = [
     ...items.filter(i => i.description?.trim()).map(i => ({id: i.id, label: i.description, qty: +i.qty||1, sku: i.part_sku||"", isExtra: false})),
@@ -3700,7 +3727,11 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
               <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.description}</div>
               {item.part_sku&&<div style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{item.part_sku}</div>}
             </div>
-            {+item.qty>1&&<span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>×{item.qty}</span>}
+            <select value={+item.qty||1} onClick={ev=>ev.stopPropagation()}
+              onChange={ev=>updateJobItemQty(item,+ev.target.value)} title="Quantity needed"
+              style={{fontSize:12,fontWeight:700,color:"var(--text)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 6px",flexShrink:0,cursor:"pointer"}}>
+              {qtyOptionsFor(item.qty).map(q=><option key={q} value={q}>×{q}</option>)}
+            </select>
             {onDeleteItem&&(
               <button onClick={ev=>{ev.preventDefault();setSelected(p=>p.filter(x=>x!==item.id));onDeleteItem(item.id);}}
                 style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
@@ -3721,7 +3752,11 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
                 {e.error&&<span style={{color:"var(--red)",fontWeight:600}}>✗ save failed</span>}
               </div>}
             </div>
-            {+e.qty>1&&<span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>×{e.qty}</span>}
+            <select value={+e.qty||1} onClick={ev=>ev.stopPropagation()}
+              onChange={ev=>updateExtraQty(e,+ev.target.value)} title="Quantity needed"
+              style={{fontSize:12,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 6px",flexShrink:0,cursor:"pointer"}}>
+              {qtyOptionsFor(e.qty).map(q=><option key={q} value={q}>×{q}</option>)}
+            </select>
             <button onClick={ev=>{ev.preventDefault();removeExtra(e.id);}}
               style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
           </label>
@@ -3733,10 +3768,10 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
               value={extraInput} onChange={e=>setExtraInput(e.target.value)}
               onKeyDown={e=>e.key==="Enter"&&addExtra()}
               style={{flex:1,fontSize:12,padding:"5px 10px"}}/>
-            <input className="inp" type="number" min="1" title="Quantity needed"
-              value={extraQty} onChange={e=>setExtraQty(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&addExtra()}
-              style={{width:52,fontSize:12,padding:"5px 6px",textAlign:"center",flexShrink:0}}/>
+            <select className="inp" title="Quantity needed" value={extraQty} onChange={e=>setExtraQty(+e.target.value)}
+              style={{width:58,fontSize:12,padding:"5px 6px",textAlign:"center",flexShrink:0,cursor:"pointer"}}>
+              {qtyOptionsFor(extraQty).map(q=><option key={q} value={q}>×{q}</option>)}
+            </select>
             <button className="btn btn-ghost btn-xs" onClick={()=>addExtra()} style={{flexShrink:0,fontSize:12,padding:"0 10px"}}>Add</button>
           </div>
           <div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>

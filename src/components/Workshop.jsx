@@ -5267,7 +5267,14 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             {id:"ch_partsq",icon:"📋", label:"Parts Quotation",         color:"#0f766e", tabs:[],              onClick:()=>{ setQuotePopupQuoteOnly(true);  setQuotePopup(true); setQuotePopupTab("quote"); }},
             {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote & Invoice",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{ setQuotePopupQuoteOnly(false); setQuotePopup(true); setQuotePopupTab(invoice?"invoice":"quote"); }},
             {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"],      onClick:()=>setPayPopup(true)},
-          ]:[]),
+          ]:[
+            // Mechanics can't open "Parts Quotation" (it's inside the money-gated
+            // Quote/Invoice popup, which also shows priced job items) — but they still
+            // need a way to send a parts list to a supplier, so give them a direct tile
+            // straight to SupplierSendModal, which is itself already mechanic-safe
+            // (its price-showing "Send History" half is fed empty data for this role).
+            {id:"ch_supplier",icon:"📤", label:"Send to Supplier", color:"#16a34a", tabs:[], onClick:()=>setSupplierModal(true)},
+          ]),
         ];
 
         // ── Hub menu state: show tiles only ──

@@ -3419,7 +3419,7 @@ const makePartSku = (name) => {
   return `ws-${abbr}-${rand}`;
 };
 
-function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onSaveWsSupplier, onGenerateLink, onCreatePO, onClose}) {
+function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[], vehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onSaveWsSupplier, onGenerateLink, onCreatePO, onClose}) {
   const shopName = settings?.shop_name || "Workshop";
 
   // Job items — parts only, pre-ticked (labour items excluded from supplier requests)
@@ -3515,25 +3515,28 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
     setGeneratedLink("");
   };
 
-  const addExtra = async () => {
-    const v = extraInput.trim();
+  // existingMatch (optional): a wsStock row picked from the autocomplete list below
+  // the input — reuses its real name/sku instead of minting a fresh one, so picking
+  // the same part twice doesn't create two stock rows for it.
+  const addExtra = async (existingMatch) => {
+    const v = (existingMatch?.name || extraInput).trim();
     if (!v) return;
     const qty = Math.max(1, +extraQty || 1);
-    const sku = makePartSku(v);
+    const sku = existingMatch?.sku || makePartSku(v);
     const tempId = "extra_" + Date.now();
     setExtraParts(p => [...p, {id: tempId, label: v, sku, qty, saving: true}]);
     setSelected(p => [...p, tempId]);
     setExtraInput("");
     setExtraQty(1);
-    // Insert to job items AND workshop stock in parallel — qty here is how many
-    // are needed for this job, not workshop shelf stock (that stays 0: adding
-    // 4 to a job's needed list doesn't mean 4 are sitting on the shelf).
+    // Insert to job items AND (for brand-new parts only) workshop stock in parallel —
+    // qty here is how many are needed for this job, not workshop shelf stock (that
+    // stays 0: adding 4 to a job's needed list doesn't mean 4 are sitting on the shelf).
     try {
       await Promise.all([
         onSaveItem
           ? onSaveItem({job_id: job.id, type: "part", description: v, part_sku: sku, qty, unit_price: 0, total: 0})
           : Promise.resolve(),
-        onSaveWsStock
+        (!existingMatch && onSaveWsStock)
           ? onSaveWsStock({name: v, sku, qty: 0, unit_cost: 0, unit_price: 0, min_qty: 0})
           : Promise.resolve(),
       ]);
@@ -3543,6 +3546,10 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
       setExtraParts(p => p.map(e => e.id===tempId ? {...e, saving: false, error: true} : e));
     }
   };
+  const extraQuery = extraInput.trim().toLowerCase();
+  const stockMatches = extraQuery.length>=2
+    ? wsStock.filter(s=>(s.name||"").toLowerCase().includes(extraQuery)).slice(0,6)
+    : [];
 
   const removeExtra = id => {
     setExtraParts(p => p.filter(x => x.id !== id));
@@ -3701,16 +3708,31 @@ function SupplierSendModal({job, items, wsSuppliers=[], wsVehicles=[], vehicles=
           </label>
         ))}
         {/* Add extra part row */}
-        <div style={{display:"flex",gap:6,padding:"8px 10px"}}>
-          <input className="inp" placeholder="+ Type extra part name & press Enter"
-            value={extraInput} onChange={e=>setExtraInput(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&addExtra()}
-            style={{flex:1,fontSize:12,padding:"5px 10px"}}/>
-          <input className="inp" type="number" min="1" title="Quantity needed"
-            value={extraQty} onChange={e=>setExtraQty(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&addExtra()}
-            style={{width:52,fontSize:12,padding:"5px 6px",textAlign:"center",flexShrink:0}}/>
-          <button className="btn btn-ghost btn-xs" onClick={addExtra} style={{flexShrink:0,fontSize:12,padding:"0 10px"}}>Add</button>
+        <div style={{position:"relative",padding:"8px 10px"}}>
+          <div style={{display:"flex",gap:6}}>
+            <input className="inp" placeholder="+ Type extra part name & press Enter" autoComplete="off"
+              value={extraInput} onChange={e=>setExtraInput(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&addExtra()}
+              style={{flex:1,fontSize:12,padding:"5px 10px"}}/>
+            <input className="inp" type="number" min="1" title="Quantity needed"
+              value={extraQty} onChange={e=>setExtraQty(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&addExtra()}
+              style={{width:52,fontSize:12,padding:"5px 6px",textAlign:"center",flexShrink:0}}/>
+            <button className="btn btn-ghost btn-xs" onClick={()=>addExtra()} style={{flexShrink:0,fontSize:12,padding:"0 10px"}}>Add</button>
+          </div>
+          {/* Autocomplete — matches against workshop stock so re-typing an existing
+              part reuses its SKU instead of minting a duplicate stock row */}
+          {stockMatches.length>0&&(
+            <div style={{position:"absolute",top:"100%",left:10,right:66,zIndex:5,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,boxShadow:"0 6px 18px rgba(0,0,0,.2)",marginTop:2,overflow:"hidden"}}>
+              {stockMatches.map(s=>(
+                <button key={s.id||s.sku} type="button" onClick={()=>addExtra(s)}
+                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:"none",border:"none",borderBottom:"1px solid var(--border)",cursor:"pointer",textAlign:"left",fontSize:12,color:"var(--text)"}}>
+                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</span>
+                  {s.sku&&<span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace",flexShrink:0}}>{s.sku}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       {jobItemsList.length===0&&extraParts.length===0&&(
@@ -7765,7 +7787,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       {supplierModal&&(
         <Overlay onClose={()=>setSupplierModal(false)}>
           <SupplierSendModal
-            job={job} items={items} wsSuppliers={wsSuppliers} wsVehicles={wsVehicles} vehicles={vehicles} settings={settings}
+            job={job} items={items} wsStock={wsStock} wsSuppliers={wsSuppliers} wsVehicles={wsVehicles} vehicles={vehicles} settings={settings}
             // Mechanics may compose and send the parts request (top half of this modal,
             // which never shows a price) but not the "Send History" section below it —
             // that's where returned quote prices and a "Create PO from Reply" shortcut

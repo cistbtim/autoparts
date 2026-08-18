@@ -3419,7 +3419,7 @@ const makePartSku = (name) => {
   return `ws-${abbr}-${rand}`;
 };
 
-function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[], vehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onSaveWsStock, onSaveWsSupplier, onGenerateLink, onCreatePO, onClose}) {
+function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[], vehicles=[], settings, history=[], quotes=[], sqReplies=[], onLogSend, onDeleteSend, onSaveQuote, onSaveItem, onDeleteItem, onSaveWsStock, onSaveWsSupplier, onGenerateLink, onCreatePO, onClose}) {
   const shopName = settings?.shop_name || "Workshop";
 
   // Job items — parts only, pre-ticked (labour items excluded from supplier requests)
@@ -3532,15 +3532,17 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
     // qty here is how many are needed for this job, not workshop shelf stock (that
     // stays 0: adding 4 to a job's needed list doesn't mean 4 are sitting on the shelf).
     try {
-      await Promise.all([
+      const [savedItem] = await Promise.all([
         onSaveItem
           ? onSaveItem({job_id: job.id, type: "part", description: v, part_sku: sku, qty, unit_price: 0, total: 0})
-          : Promise.resolve(),
+          : Promise.resolve(null),
         (!existingMatch && onSaveWsStock)
           ? onSaveWsStock({name: v, sku, qty: 0, unit_cost: 0, unit_price: 0, min_qty: 0})
-          : Promise.resolve(),
+          : Promise.resolve(null),
       ]);
-      setExtraParts(p => p.map(e => e.id===tempId ? {...e, saving: false, saved: true} : e));
+      // Keep the real DB id so removing this row can actually delete it, not just
+      // hide it from this modal's checklist while it silently stays on the job.
+      setExtraParts(p => p.map(e => e.id===tempId ? {...e, saving: false, saved: true, dbId: savedItem?.id} : e));
     } catch(e) {
       console.error("Add item failed", e);
       setExtraParts(p => p.map(e => e.id===tempId ? {...e, saving: false, error: true} : e));
@@ -3552,8 +3554,12 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
     : [];
 
   const removeExtra = id => {
+    const target = extraParts.find(e => e.id === id);
     setExtraParts(p => p.filter(x => x.id !== id));
     setSelected(p => p.filter(x => x !== id));
+    // Actually delete the underlying job item, not just hide it from this checklist —
+    // it was already saved to the job the moment it was added above.
+    if (target?.dbId && onDeleteItem) onDeleteItem(target.dbId);
   };
 
   // Build combined list: job items + extras
@@ -3651,7 +3657,11 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
     });
   };
 
-  const jobItemsList = items.filter(i => i.description?.trim() && i.type !== "labour");
+  // Once an extra part's onSaveItem finishes and the parent refreshes its items
+  // list, the same row starts showing up here too (now with a real DB id) — excluded
+  // by SKU so it doesn't render twice while still being tracked as an extra above.
+  const extraSkus = new Set(extraParts.map(e=>e.sku).filter(Boolean));
+  const jobItemsList = items.filter(i => i.description?.trim() && i.type !== "labour" && !(i.part_sku && extraSkus.has(i.part_sku)));
 
   return (
     <div style={{maxWidth:520,width:"100%"}}>
@@ -7799,6 +7809,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
             onDeleteSend={wsRole==="mechanic"?undefined:onDeleteWsSupplierRequest}
             onSaveQuote={wsRole==="mechanic"?undefined:onSaveWsSupplierQuote}
             onSaveItem={onSaveItem}
+            onDeleteItem={onDeleteItem}
             onSaveWsStock={onSaveWsStock}
             onSaveWsSupplier={onSaveWsSupplier}
             onGenerateLink={onGenerateWsQuoteLink?(info,linkItems)=>onGenerateWsQuoteLink(info,linkItems).then(url=>{advanceJobStatus("Quoting");return url;}):undefined}

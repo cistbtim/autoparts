@@ -1849,6 +1849,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
     if(res&&!Array.isArray(res)&&res.message) throw new Error(res.message);
     await refreshTables("workshop_job_items","workshop_stock");
+    return Array.isArray(res)?res[0]:res;
   };
   const deleteJobItem=async(id)=>{
     await api.delete("workshop_job_items","id",id);

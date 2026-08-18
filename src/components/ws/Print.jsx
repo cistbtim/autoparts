@@ -35,8 +35,11 @@ export const CHECKLIST_ITEMS=[
   {key:"spare_wheel",  label:"Spare Wheel",           icon:"🛞"},
   {key:"fuel_level",   label:"Fuel Level",            icon:"⛽"},
   {key:"interior",     label:"Interior Condition",    icon:"💺"},
+  {key:"seat_front",   label:"Front Seat",            icon:"💺"},
+  {key:"seat_rear",    label:"Rear Seat",             icon:"🪑"},
   {key:"dash_lights",  label:"Dashboard Warning Lights",icon:"⚠️"},
   {key:"boot",         label:"Boot / Trunk",          icon:"📦"},
+  {key:"boot_inside",  label:"Inside the Boot",       icon:"🧳"},
   {key:"radio",        label:"Radio / Electronics",   icon:"📻"},
 ];
 

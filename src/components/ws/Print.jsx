@@ -39,9 +39,9 @@ export const CHECKLIST_ITEMS=[
   {key:"seat_front",   label:"Front Seat",            icon:"💺"},
   {key:"seat_rear",    label:"Rear Seat",             icon:"🪑"},
   {key:"dash_lights",  label:"Dashboard Warning Lights",icon:"⚠️"},
+  {key:"radio",        label:"Radio / Electronics",   icon:"📻"},
   {key:"boot",         label:"Boot / Trunk",          icon:"📦"},
   {key:"boot_inside",  label:"Inside the Boot",       icon:"🧳"},
-  {key:"radio",        label:"Radio / Electronics",   icon:"📻"},
 ];
 
 export function printStockLabel(p, settings, labelType="shop") {

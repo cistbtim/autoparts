@@ -15,6 +15,7 @@ function resolveVehicleModel(job, vehicles=[]) {
 // the printed report can never drift apart again (they previously did: this
 // list was missing brakes/engine/coolant that the UI already had).
 export const CHECKLIST_ITEMS=[
+  {key:"windscreen",   label:"Windscreen",            icon:"🔲"},
   {key:"body_front",    label:"Front Bumper / Body",   icon:"🚗"},
   {key:"lights_front", label:"Front Lights",          icon:"💡"},
   {key:"body_left",     label:"Left Side Body",        icon:"◀️"},
@@ -26,7 +27,6 @@ export const CHECKLIST_ITEMS=[
   {key:"body_right",   label:"Right Side Body",       icon:"▶️"},
   {key:"door_glass_right", label:"Door Glass Right Side", icon:"🪟"},
   {key:"mirror_glass_right", label:"Door Mirror Glass Right Side", icon:"🪞"},
-  {key:"windscreen",   label:"Windscreen",            icon:"🔲"},
   {key:"wipers",       label:"Wipers",                icon:"🌧️"},
   {key:"tyres",        label:"Tyres Condition",       icon:"⚫"},
   {key:"brakes_front", label:"Front Brakes",          icon:"🛑"},

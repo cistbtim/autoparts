@@ -95,6 +95,39 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     const timer=setInterval(poll,30000);
     return()=>{cancelled=true;clearInterval(timer);};
   },[wsId,wsProfile?.linked_branch_id]);
+  // Check-in inspection completion, per active job — used to show an unmissable
+  // "inspection pending" badge on kanban cards and a banner on the job detail page,
+  // since inspections were getting skipped with nothing surfacing that fact anywhere
+  // outside the Inspect tab itself. Scoped to non-Done/non-cancelled jobs only (a
+  // finished job's inspection state isn't actionable anymore), and polled the same
+  // way spareShopQuotedCount is above so it stays current across devices too.
+  const activeJobIdsKey = jobs.filter(j=>j.status!=="Done"&&!j.is_cancelled).map(j=>j.id).join(",");
+  const [jobChecklists, setJobChecklists] = useState([]);
+  useEffect(()=>{
+    if(!activeJobIdsKey){ setJobChecklists([]); return; }
+    let cancelled=false;
+    const poll=()=>{
+      api.get("workshop_job_checklist",`job_id=in.(${activeJobIdsKey})&select=job_id,item_key,status`).then(rows=>{
+        if(!cancelled&&Array.isArray(rows)) setJobChecklists(rows);
+      }).catch(()=>{});
+    };
+    poll();
+    const timer=setInterval(poll,60000);
+    return()=>{cancelled=true;clearInterval(timer);};
+  },[activeJobIdsKey]);
+  // Optimistic local patch so the badge/banner update instantly in this session
+  // instead of waiting for the next 60s poll.
+  const onChecklistSaved=(jobId,key,status)=>{
+    setJobChecklists(prev=>{
+      const idx=prev.findIndex(r=>r.job_id===jobId&&r.item_key===key);
+      if(idx>=0){ const next=[...prev]; next[idx]={...next[idx],status}; return next; }
+      return [...prev,{job_id:jobId,item_key:key,status}];
+    });
+  };
+  const checklistPendingFor=(jobId)=>{
+    const doneKeys=new Set(jobChecklists.filter(c=>c.job_id===jobId&&c.status&&c.status!=="pending").map(c=>c.item_key));
+    return CHECKLIST_ITEMS.length-doneKeys.size;
+  };
   const [kanbanZoom,      setKanbanZoom]      = useState(()=>{try{return Number(localStorage.getItem("ws_kanban_zoom")||1);}catch{return 1;}});
   const KANBAN_WIDTHS=[150,200,270,340,420];
   const kanbanColW=KANBAN_WIDTHS[Math.max(0,Math.min(4,kanbanZoom))];
@@ -335,7 +368,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
       <>
       <WorkshopJobDetail
         job={activeJob} items={items} invoice={inv} quote={quote}
-        jobs={jobs}
+        jobs={jobs} onChecklistSaved={onChecklistSaved}
         parts={parts} partFitments={partFitments} vehicles={vehicles} onRefreshVehicles={onRefreshVehicles} settings={settings}
         wsVehicles={wsVehicles} wsCustomers={wsCustomers} wsStock={wsStock} wsServices={wsServices}
         suppliers={suppliers} wsSuppliers={wsSuppliers} wsSupplierRequests={wsSupplierRequests}
@@ -976,6 +1009,14 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 )}
 
                 <div style={{padding:"8px 10px"}}>
+                  {/* inspection-pending banner — deliberately loud (matches the complaint
+                      badge's styling below) since this is the thing that keeps getting
+                      skipped with no visible consequence anywhere else on the board */}
+                  {!job.is_cancelled&&(()=>{ const pend=checklistPendingFor(job.id); return pend>0&&(
+                    <div style={{fontSize:10,fontWeight:800,color:"#fff",marginBottom:5,background:"#dc2626",borderRadius:6,padding:"3px 8px",display:"flex",alignItems:"center",justifyContent:"center",gap:5,animation:pend===CHECKLIST_ITEMS.length?"pulseWarn 1.6s ease-in-out infinite":undefined}}>
+                      ⚠️ Inspection: {CHECKLIST_ITEMS.length-pend}/{CHECKLIST_ITEMS.length}
+                    </div>
+                  );})()}
                   {/* workshop badge — admin viewing all workshops */}
                   {!wsId&&job.workshop_id&&(
                     <div style={{textAlign:"center",marginBottom:5}}>
@@ -4271,7 +4312,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
+function WorkshopJobDetail({job,items,invoice,quote,jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -4599,7 +4640,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
   const clCamRefs = useRef({});
 
   useEffect(()=>{
-    if(!inspectPopup||checklistLoaded) return;
+    // Loads on mount rather than waiting for the Inspect popup to actually be
+    // opened, so the "inspection pending" banner on this page can be accurate
+    // from the moment the job is opened, not just after someone clicks Inspect.
+    if(checklistLoaded) return;
     api.get("workshop_job_checklist",`job_id=eq.${job.id}`)
       .then(rows=>{
         const map={};
@@ -4608,7 +4652,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         setChecklistLoaded(true);
       })
       .catch(()=>setChecklistLoaded(true));
-  },[inspectPopup,checklistLoaded,job.id]);
+  },[checklistLoaded,job.id]);
 
   const saveChecklistItem=async(key,patch)=>{
     const current=checklist[key]||{status:"pending",note:"",photo_url:""};
@@ -4619,6 +4663,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
       const rec={id,job_id:job.id,item_key:key,status:updated.status,note:updated.note||"",photo_url:updated.photo_url||""};
       await api.upsert("workshop_job_checklist",rec);
       if(!updated.id) setChecklist(p=>({...p,[key]:{...updated,id}}));
+      onChecklistSaved?.(job.id,key,updated.status);
     }catch(e){ console.error("Checklist save error:",e); alert("Save failed — make sure the workshop_job_checklist table exists in Supabase."); }
   };
 
@@ -5078,38 +5123,43 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],parts=[],partFitment
         )}
         <div style={{flex:1}}/>
       </div>
-      {/* ── Inspect shortcut ── */}
+      {/* ── Inspect shortcut — deliberately alarming while incomplete. This used to sit
+          here looking like any other neutral button, which is exactly why inspections
+          kept getting skipped: nothing about it said "you haven't done this yet". ── */}
       {(()=>{
         const done = checklistLoaded ? CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")!=="pending").length : 0;
         const total = CHECKLIST_ITEMS.length;
         const allDone = checklistLoaded && done===total && total>0;
+        const notStarted = checklistLoaded && done===0;
+        const pending = checklistLoaded && !allDone;
         const active = inspectPopup;
         return (
           <button onClick={()=>setInspectPopup(true)} style={{
             display:"flex",alignItems:"center",justifyContent:"space-between",
             width:"100%",marginBottom:8,padding:"10px 16px",
-            background:active?"#16a34a":allDone?"rgba(22,163,74,.12)":"var(--surface2)",
-            border:`1.5px solid ${active?"#16a34a":allDone?"#16a34a":"var(--border)"}`,
+            background:active?"#16a34a":allDone?"rgba(22,163,74,.12)":pending?"#dc2626":"var(--surface2)",
+            border:`1.5px solid ${active?"#16a34a":allDone?"#16a34a":pending?"#dc2626":"var(--border)"}`,
             borderRadius:10,cursor:"pointer",boxSizing:"border-box",
-            boxShadow:active?"0 2px 10px rgba(22,163,74,.3)":"none",
+            boxShadow:active?"0 2px 10px rgba(22,163,74,.3)":pending?"0 2px 10px rgba(220,38,38,.35)":"none",
+            animation:notStarted&&!active?"pulseWarn 1.6s ease-in-out infinite":undefined,
           }}>
             <span style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:18}}>✅</span>
-              <span style={{fontSize:14,fontWeight:800,color:active?"#fff":allDone?"#16a34a":"var(--text2)",letterSpacing:".01em"}}>
-                {t.wsTabInspect||"Inspection"}
+              <span style={{fontSize:18}}>{pending&&!active?"⚠️":"✅"}</span>
+              <span style={{fontSize:14,fontWeight:800,color:active||pending?"#fff":allDone?"#16a34a":"var(--text2)",letterSpacing:".01em"}}>
+                {pending&&!active?"Inspection not done":(t.wsTabInspect||"Inspection")}
               </span>
             </span>
             <span style={{display:"flex",alignItems:"center",gap:6}}>
               {checklistLoaded&&(
                 <span style={{fontSize:11,fontWeight:700,
-                  color:active?"rgba(255,255,255,.85)":allDone?"#16a34a":"var(--text3)",
-                  background:active?"rgba(255,255,255,.18)":allDone?"rgba(22,163,74,.15)":"var(--surface3)",
+                  color:active||pending?"rgba(255,255,255,.9)":allDone?"#16a34a":"var(--text3)",
+                  background:active||pending?"rgba(255,255,255,.2)":allDone?"rgba(22,163,74,.15)":"var(--surface3)",
                   borderRadius:99,padding:"2px 8px"}}>
                   {done}/{total}
                 </span>
               )}
               {allDone&&!active&&<span style={{fontSize:18}}>✅</span>}
-              <span style={{fontSize:14,color:active?"rgba(255,255,255,.7)":"var(--text3)"}}>›</span>
+              <span style={{fontSize:14,color:active||pending?"rgba(255,255,255,.7)":"var(--text3)"}}>›</span>
             </span>
           </button>
         );

@@ -3735,6 +3735,9 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
               style={{width:52,fontSize:12,padding:"5px 6px",textAlign:"center",flexShrink:0}}/>
             <button className="btn btn-ghost btn-xs" onClick={()=>addExtra()} style={{flexShrink:0,fontSize:12,padding:"0 10px"}}>Add</button>
           </div>
+          <div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>
+            Searching {wsStock.length} workshop stock item{wsStock.length!==1?"s":""}
+          </div>
           {/* Autocomplete — matches against workshop stock so re-typing an existing
               part reuses its SKU instead of minting a duplicate stock row */}
           {stockMatches.length>0&&(

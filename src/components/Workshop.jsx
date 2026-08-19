@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems } from "../lib/helpers.js";
+import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner } from "../components/shared.jsx";
@@ -4927,6 +4927,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],onChecklistSaved,par
     {label:"RealOEM",   icon:"🚗", color:"var(--green)",  bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`},
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},
     {label:"17VIN",     icon:"🆔", color:"var(--text2)",  bg:"rgba(148,163,184,.13)", href:`https://en.17vin.com/vin/${encodeURIComponent(job.vin)}`},
+    {label:"DecodeThis",icon:"🧬", color:"#a78bfa",       bg:"rgba(167,139,250,.13)", href:`https://decodethis.com/web/vin/${encodeURIComponent(job.vin)}`},
     {label:"Willard 🔋",icon:"🔋", color:"#ef4444",       bg:"rgba(220,38,38,.11)",   href:"https://willard.co.za/battery-selection-tool/"},
     {label:"VARTA 🔋",  icon:"⚡", color:"#6366f1",       bg:"rgba(99,102,241,.11)",  href:"https://www.varta-automotive.com/battery-finder"},
     {label:"Safeline",  icon:"🛑", color:"#dc2626",       bg:"rgba(220,38,38,.09)",   href:"https://safelinebrakes.co.za/"},
@@ -9027,6 +9028,10 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], wsId=nul
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(251,191,36,.12)",color:"var(--yellow)",border:"1px solid rgba(251,191,36,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                     VinDecoderz
                   </a>
+                  <a href={`https://decodethis.com/web/vin/${encodeURIComponent(f.vin)}`} target="_blank" rel="noopener noreferrer"
+                    style={{fontSize:11,padding:"2px 8px",background:"rgba(167,139,250,.12)",color:"#a78bfa",border:"1px solid rgba(167,139,250,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
+                    DecodeThis
+                  </a>
                   <button onClick={()=>{navigator.clipboard.writeText(f.vin);alert(`VIN copied to clipboard:\n\n${f.vin}\n\nPaste it into the VIN field on WolfOil.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(249,115,22,.12)",color:"#f97316",border:"1px solid rgba(249,115,22,.3)",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap"}}>
                     WolfOil 📋
@@ -9501,6 +9506,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
   const [selSource,   setSelSource]   = useState(null); // "stock" | "main"
   const [skipMainSearch, setSkipMainSearch] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [jbCopied,    setJbCopied]    = useState(false);
   const [search,      setSearch]      = useState("");
   const [saving,      setSaving]      = useState(false);
   const [justAdded,   setJustAdded]   = useState(false);
@@ -9817,6 +9823,18 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
     finally{ setSaving(false); }
   };
 
+  // Only ~11 makes get a real justbrakes.co.za landing page (see justBrakesUrl) —
+  // for everything else the link dumps the user on the generic catalogue with an
+  // empty "search makes" box, so copy the make to the clipboard to paste in there.
+  const openJustBrakes=()=>{
+    if(vehicleMake&&!justBrakesHasMakePage(vehicleMake)){
+      navigator.clipboard?.writeText(vehicleMake).then(()=>{
+        setJbCopied(true);
+        setTimeout(()=>setJbCopied(false),4000);
+      }).catch(()=>{});
+    }
+  };
+
   const stockBadge=(p)=>{
     if(type!=="part") return null;
     const q=+p.qty||0;
@@ -9838,6 +9856,22 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
             placeholder={type==="part"?"Search part name, SKU...":"Search service name..."}
             onKeyDown={e=>{ if(e.key==="Enter"&&search.trim()&&filtered.length===0) useSearchAsDesc(); }}/>
         </div>
+
+        {type==="part"&&hasVehicle&&(
+          <div style={{marginBottom:8,display:"flex",gap:14,flexWrap:"wrap"}}>
+            <a href={justBrakesUrl(vehicleMake)} target="_blank" rel="noopener noreferrer" onClick={openJustBrakes}
+              style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,color:"var(--blue)",textDecoration:"none"}}
+              title={`Check pricing/fitment on Just Brakes for ${vehicleMake}`}>
+              🛞 Check Just Brakes catalogue for {vehicleMake} →
+            </a>
+            <a href={SAFELINE_BRAKES_URL} target="_blank" rel="noopener noreferrer"
+              style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,color:"var(--blue)",textDecoration:"none"}}
+              title="Open Safeline's Brake Finder (Manufacturer/Series/Part Number search)">
+              🛡️ Safeline Brake Finder →
+            </a>
+            {jbCopied&&<div style={{width:"100%",fontSize:11,color:"var(--green)"}}>✅ "{vehicleMake}" copied — paste it into Just Brakes' "Search makes…" box</div>}
+          </div>
+        )}
 
         {hasVehicle&&(
           <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--text3)",marginBottom:8,cursor:"pointer"}}>
@@ -9875,7 +9909,20 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
                         + Add to WS Stock
                       </button>
                     )}
+                    {search&&type==="part"&&(
+                      <a href={justBrakesUrl(vehicleMake)} target="_blank" rel="noopener noreferrer" onClick={openJustBrakes}
+                        className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)",textDecoration:"none"}}>
+                        🛞 Search Just Brakes{vehicleMake?` (${vehicleMake})`:""}
+                      </a>
+                    )}
+                    {search&&type==="part"&&(
+                      <a href={SAFELINE_BRAKES_URL} target="_blank" rel="noopener noreferrer"
+                        className="btn btn-ghost btn-sm" style={{color:"var(--blue)",borderColor:"rgba(96,165,250,.3)",textDecoration:"none"}}>
+                        🛡️ Safeline Brake Finder
+                      </a>
+                    )}
                   </div>
+                  {jbCopied&&<div style={{fontSize:11,color:"var(--green)",marginTop:6}}>✅ "{vehicleMake}" copied — paste it into Just Brakes' "Search makes…" box</div>}
                 </div>
               : (search?filtered:list.slice(0,20)).map(p=>(
                   <div key={p.id} onClick={()=>selectItem(p)}
@@ -10427,7 +10474,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     const t=setTimeout(async()=>{
       const esc=term.replace(/[%,()*]/g," ").replace(/\s+/g," ").trim();
       const branchIds=[linkedBranchId,...(mainBranchId&&mainBranchId!==linkedBranchId?[mainBranchId]:[])].filter(Boolean);
-      const res=await api.get("parts",`branch_id=in.(${branchIds.join(",")})&or=(name.ilike.*${esc}*,sku.ilike.*${esc}*,oe_number.ilike.*${esc}*,brand.ilike.*${esc}*)&select=id,sku,name,brand,stock,price,image_url,photos,image,bin_location,category,chinese_desc,make,model,year_range,oe_number&order=sku.asc&limit=60`).catch(()=>[]);
+      const res=await api.get("parts",`branch_id=in.(${branchIds.join(",")})&or=(name.ilike.*${esc}*,sku.ilike.*${esc}*,oe_number.ilike.*${esc}*,brand.ilike.*${esc}*,category.ilike.*${esc}*)&select=id,sku,name,brand,stock,price,image_url,photos,image,bin_location,category,chinese_desc,make,model,year_range,oe_number&order=sku.asc&limit=60`).catch(()=>[]);
       if(!dead){ setExtraResults(Array.isArray(res)?res:[]); setExtraLoading(false); }
     },400);
     return ()=>{dead=true;clearTimeout(t);};
@@ -10435,7 +10482,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
 
   const q=search.trim().toLowerCase();
   const baseFiltered=(q
-    ?shopParts.filter(p=>(p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q))
+    ?shopParts.filter(p=>(p.name||"").toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)||(p.brand||"").toLowerCase().includes(q)||(p.category||"").toLowerCase().includes(q))
     :shopParts
   ).filter(p=>!vehicleFilterIds||vehicleFilterIds.has(String(p.id)))
    .filter(p=>!stockOnly||p.stock>0);
@@ -10873,7 +10920,10 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                     <div style={{fontSize:14,fontWeight:700,marginBottom:2,lineHeight:1.3}}>{p.name}</div>
                     {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:2}}>{p.chinese_desc}</div>}
                     {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>🚗 {[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
-                    {showSku&&p.oe_number&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace"}}>OE: {p.oe_number}</div>}
+                    {showSku&&p.oe_number&&(()=>{const codes=p.oe_number.split(",").map(s=>s.trim()).filter(Boolean);const more=codes.length-1;return(
+                      <div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}
+                        title={p.oe_number}>OE: {codes[0]}{more>0?` +${more}`:""}</div>
+                    );})()}
                   </div>
                   <div style={{marginTop:8}}>
                     {p._source==="local"

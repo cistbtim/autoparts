@@ -1116,6 +1116,14 @@ export function WsSupplierQuoteReplyPage({token}) {
                     </button>
                   </a>
                 )}
+                {req.vin&&(
+                  <a href={`https://decodethis.com/web/vin/${encodeURIComponent(req.vin)}`}
+                    target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                    <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(167,139,250,.4)",background:"rgba(167,139,250,.12)",color:"#a78bfa",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                      🧬 DecodeThis
+                    </button>
+                  </a>
+                )}
               </div>
             )}
             {req.supplier_name&&<div style={{fontSize:11,color:"#64748b",marginTop:8}}>For: {req.supplier_name}</div>}

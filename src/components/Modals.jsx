@@ -8612,7 +8612,10 @@ export function SupplierCatalogueModal({ supplier, onClose, onGoToPart, onAddToI
                                         <div style={{minWidth:0,flex:1}}>
                                           <div style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:12}}>{p.sku}</div>
                                           <div style={{fontSize:12,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                                          {p.oe_number&&<div style={{fontSize:11,color:"var(--text3)"}}>OE: {p.oe_number}</div>}
+                                          {p.oe_number&&(()=>{const codes=p.oe_number.split(",").map(s=>s.trim()).filter(Boolean);const more=codes.length-1;return(
+                                            <div style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}
+                                              title={p.oe_number}>OE: {codes[0]}{more>0?` +${more}`:""}</div>
+                                          );})()}
                                         </div>
                                         {onGoToPart&&<button className="btn btn-ghost btn-sm" style={{flexShrink:0,fontSize:11}} onClick={async()=>{
                                           try {
@@ -10872,6 +10875,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
                   {label:"RealOEM",   icon:"🚗", color:"#34d399", bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(req.vin)}`},
                   {label:"VIN Decode",icon:"🔎", color:"#fbbf24", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(req.vin)}`},
                   {label:"17VIN",     icon:"🆔", color:"#94a3b8", bg:"rgba(148,163,184,.13)", href:`https://en.17vin.com/vin/${encodeURIComponent(req.vin)}`},
+                  {label:"DecodeThis",icon:"🧬", color:"#a78bfa", bg:"rgba(167,139,250,.13)", href:`https://decodethis.com/web/vin/${encodeURIComponent(req.vin)}`},
                   {label:"Willard",   icon:"🔋", color:"#ef4444", bg:"rgba(220,38,38,.11)",   href:"https://willard.co.za/battery-selection-tool/"},
                   {label:"VARTA",     icon:"⚡", color:"#6366f1", bg:"rgba(99,102,241,.11)",  href:"https://www.varta-automotive.com/battery-finder"},
                   {label:"Safeline",  icon:"🛑", color:"#dc2626", bg:"rgba(220,38,38,.09)",   href:"https://safelinebrakes.co.za/"},
@@ -12542,6 +12546,12 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
           <a href={`https://www.vindecoderz.com/EN/check-lookup/${r.vin}`} target="_blank" rel="noopener noreferrer"
             className="btn btn-ghost btn-sm" style={{fontSize:12,color:"var(--blue)",textDecoration:"none"}}>
             🔍 Search VIN
+          </a>
+        )}
+        {isAdmin&&r.vin&&(
+          <a href={`https://decodethis.com/web/vin/${encodeURIComponent(r.vin)}`} target="_blank" rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm" style={{fontSize:12,color:"#a78bfa",textDecoration:"none"}}>
+            🧬 DecodeThis
           </a>
         )}
         {isAdmin&&r.vin&&(

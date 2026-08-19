@@ -76,6 +76,31 @@ export const partPhotoUrls = (p) => {
   return [p?.image_url, ...(extra || [])].filter(Boolean).map(toFullUrl);
 };
 
+// justbrakes.co.za only publishes a static /vehicles/{make}-pads landing page for
+// these makes — everything else 404s — so only deep-link the ones confirmed live
+// and fall back to their generic catalogue (has its own make/model picker) for
+// any other make rather than sending staff to a dead page.
+const JUST_BRAKES_MAKES = new Set([
+  "AUDI", "BMW", "FIAT", "FORD", "HYUNDAI", "MERCEDES BENZ",
+  "NISSAN", "OPEL", "RENAULT", "TOYOTA", "VOLKSWAGEN",
+]);
+const _jbNorm = (make) => (make || "").trim().toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+// Whether justBrakesUrl() lands on that make's own page vs. the generic catalogue —
+// the generic catalogue's make search box has no URL param, so the caller needs to
+// know when it should offer to copy the make name for the user to paste in instead.
+export const justBrakesHasMakePage = (make) => JUST_BRAKES_MAKES.has(_jbNorm(make));
+export const justBrakesUrl = (make) => {
+  const norm = _jbNorm(make);
+  if (!JUST_BRAKES_MAKES.has(norm)) return "https://justbrakes.co.za/catalogue";
+  return `https://justbrakes.co.za/vehicles/${norm.toLowerCase().replace(/\s+/g, "-")}-pads`;
+};
+
+// safelinebrakes.co.za's Brake Finder is a pure JS/AJAX widget (WordPress admin-ajax.php
+// with a nonce, Make/Series <select> dropdowns) — no static per-make pages and nothing
+// reads a URL param, so unlike Just Brakes there's no deep link or auto-fill possible,
+// just the one search page.
+export const SAFELINE_BRAKES_URL = "https://safelinebrakes.co.za/part-finder/";
+
 export const today = () => new Date().toISOString().slice(0, 10);
 export const fmtAmt = (n) => `${C()}${(n || 0).toLocaleString()}`;
 

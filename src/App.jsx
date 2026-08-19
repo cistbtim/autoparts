@@ -5138,16 +5138,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                               : <span style={{color:"var(--text3)",fontSize:12}}>—</span>}
                           </td>
                           <td style={{color:"var(--text2)",fontSize:13}}>{p.make||"—"}</td>
-                          <td style={{color:"var(--text2)",fontSize:13}}>{p.model||"—"}</td>
+                          <td style={{color:"var(--text2)",fontSize:13,maxWidth:180}}>
+                            {p.model
+                              ? (()=>{const fits=p.model.split(";").map(s=>s.trim()).filter(Boolean);const more=fits.length-1;return(
+                                <span style={{display:"inline-block",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",verticalAlign:"bottom"}}
+                                  title={p.model}>{fits[0]}{more>0?` +${more} more`:""}</span>
+                              );})()
+                              : "—"}
+                          </td>
                           <td style={{color:"var(--text2)",fontSize:13}}>{p.year_range||"—"}</td>
                           <td>
                             {p.oe_number
-                              ? <a href={`https://www.google.com/search?q=${encodeURIComponent(p.oe_number)}`}
+                              ? (()=>{const codes=p.oe_number.split(",").map(s=>s.trim()).filter(Boolean);const more=codes.length-1;return(
+                                <a href={`https://www.google.com/search?q=${encodeURIComponent(p.oe_number)}`}
                                   target="_blank" rel="noopener noreferrer"
-                                  style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)",textDecoration:"none"}}
-                                  title="Search on Google">
-                                  {p.oe_number} 🔍
+                                  style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--blue)",textDecoration:"none",
+                                    display:"inline-block",maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",verticalAlign:"bottom"}}
+                                  title={`${p.oe_number} — click to search Google`}>
+                                  {codes[0]}{more>0?` +${more}`:""} 🔍
                                 </a>
+                              );})()
                               : <span style={{color:"var(--text3)"}}>—</span>}
                           </td>
                           <td><span className="badge" style={{background:"var(--surface3)",color:"var(--text2)"}}>{p.category}</span></td>
@@ -5566,7 +5576,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                       <div style={{fontSize:14,fontWeight:700,marginBottom:2,lineHeight:1.3}}>{p.name}</div>
                       {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:2}}>{p.chinese_desc}</div>}
                       {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>🚗 {[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
-                      {p.oe_number&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace"}}>OE: {p.oe_number}</div>}
+                      {p.oe_number&&(()=>{const codes=p.oe_number.split(",").map(s=>s.trim()).filter(Boolean);const more=codes.length-1;return(
+                        <div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}
+                          title={p.oe_number}>OE: {codes[0]}{more>0?` +${more}`:""}</div>
+                      );})()}
                     </div>
                     {/* Price + button always at bottom */}
                     <div style={{marginTop:8}}>

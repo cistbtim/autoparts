@@ -10090,6 +10090,18 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 // WS SPARE SHOP TAB
 // ═══════════════════════════════════════════════════════════════
 const WS_SHOP_PAGE_SIZE=20;
+function WsShopCartThumb({item}) {
+  const img=toImgUrl(item.image_url);
+  const [lb,setLb]=useState(false);
+  if(!img) return <div style={{width:52,height:52,flexShrink:0,borderRadius:8,background:"var(--surface3,#eee)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔩</div>;
+  return (<>
+    <img src={img} alt="" loading="lazy" referrerPolicy="no-referrer"
+      onClick={()=>setLb(true)}
+      onError={e=>{e.target.style.display="none";}}
+      style={{width:52,height:52,objectFit:"contain",borderRadius:8,background:"#fff",border:"1px solid var(--border)",cursor:"zoom-in",flexShrink:0}}/>
+    {lb&&<ImgLightbox urls={partPhotoUrls(item)} onClose={()=>setLb(false)}/>}
+  </>);
+}
 function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onConfirm,onClose}) {
   const [confirming,setConfirming]=useState(false);
   const [notes,setNotes]=useState("");
@@ -10132,9 +10144,10 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
         {localCart.length>0&&<div style={{marginBottom:20}}>
           <div style={{fontWeight:700,fontSize:14,color:"var(--green)",marginBottom:10}}>🏪 Local Stock — Order Now</div>
           {localCart.map(i=>(
-            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"var(--surface2)",borderRadius:8,marginBottom:6}}>
-              <div><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
-              <div style={{textAlign:"right"}}><div style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</div><div style={{fontWeight:700,fontSize:13}}>{Cs}{(i.price*i.qty).toFixed(2)}</div></div>
+            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"8px 12px",background:"var(--surface2)",borderRadius:8,marginBottom:6}}>
+              <WsShopCartThumb item={i}/>
+              <div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
+              <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</div><div style={{fontWeight:700,fontSize:13}}>{Cs}{(i.price*i.qty).toFixed(2)}</div></div>
             </div>
           ))}
           <div style={{textAlign:"right",fontWeight:800,fontSize:15,marginTop:6}}>Total: {Cs}{localTotal.toFixed(2)}</div>
@@ -10143,9 +10156,10 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
           <div style={{fontWeight:700,fontSize:14,color:"var(--accent)",marginBottom:6}}>📦 Out of Stock — Request from Branch</div>
           <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>These items are currently out of stock. The branch will be notified to restock or source them.</div>
           {requestCart.map(i=>(
-            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)",borderRadius:8,marginBottom:6}}>
-              <div><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
-              <div style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</div>
+            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)",borderRadius:8,marginBottom:6}}>
+              <WsShopCartThumb item={i}/>
+              <div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
+              <div style={{fontSize:13,color:"var(--text2)",flexShrink:0}}>×{i.qty}</div>
             </div>
           ))}
         </div>}
@@ -10153,9 +10167,10 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
           <div style={{fontWeight:700,fontSize:14,color:"var(--blue)",marginBottom:6}}>🏭 Head Office — Request</div>
           <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>These items will be requested from head office. They'll confirm stock and contact you before ordering.</div>
           {mainCart.map(i=>(
-            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"rgba(96,165,250,.06)",border:"1px solid rgba(96,165,250,.2)",borderRadius:8,marginBottom:6}}>
-              <div><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
-              <div style={{fontSize:13,color:"var(--text2)"}}>×{i.qty}</div>
+            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(96,165,250,.06)",border:"1px solid rgba(96,165,250,.2)",borderRadius:8,marginBottom:6}}>
+              <WsShopCartThumb item={i}/>
+              <div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
+              <div style={{fontSize:13,color:"var(--text2)",flexShrink:0}}>×{i.qty}</div>
             </div>
           ))}
           <div style={{marginTop:8,fontSize:12,color:"var(--text3)"}}>📱 We'll contact: {wsProfile.phone||wsProfile.whatsapp||"(no phone on profile)"}{wsProfile.email?` · ${wsProfile.email}`:""}</div>
@@ -10437,7 +10452,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   const addToCart=(p)=>setCart(prev=>{
     const ex=prev.find(i=>i.id===p.id);
     if(ex) return prev.map(i=>i.id===p.id?{...i,qty:i.qty+1}:i);
-    return [...prev,{id:p.id,sku:p.sku,name:p.name,price:+p.price||0,qty:1,_source:p._source||"local"}];
+    return [...prev,{id:p.id,sku:p.sku,name:p.name,price:+p.price||0,qty:1,_source:p._source||"local",image_url:p.image_url,photos:p.photos}];
   });
   const removeFromCart=(id)=>setCart(prev=>prev.filter(i=>i.id!==id));
   const qtyCart=(id,qty)=>setCart(prev=>prev.map(i=>i.id===id?{...i,qty:Math.max(1,+qty||1)}:i));

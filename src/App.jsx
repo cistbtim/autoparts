@@ -2456,13 +2456,41 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setUsers(prev=>prev.filter(u=>String(u.id)!==String(targetWsId)));
     showToast("Workshop account deleted","err");
   };
+  // parts.sku is derived from vehicle.code (e.g. "CR050B-002NH" under code "CR050B"),
+  // and the fitment-suggestion logic (RfqVehicles VehicleFitmentTab) matches a part's
+  // SKU prefix straight back to vehicles.code — so renaming a vehicle's code without
+  // renaming its parts' SKUs would silently break that match. Cascade the rename here.
+  const renameVehicleCodeInParts=async(oldCode,newCode)=>{
+    const affected=parts.filter(p=>p.sku===oldCode||(p.sku||"").toUpperCase().startsWith(oldCode+"-"));
+    if(!affected.length) return;
+    const updates=affected.map(p=>({
+      id:p.id,
+      sku:newCode+p.sku.slice(oldCode.length),
+      name:p.name&&p.name.includes(`=${oldCode}-`)?p.name.split(`=${oldCode}-`).join(`=${newCode}-`):p.name,
+    }));
+    await Promise.all(updates.map(u=>api.patch("parts","id",u.id,{sku:u.sku,name:u.name})));
+    setParts(prev=>prev.map(p=>{
+      const u=updates.find(x=>x.id===p.id);
+      return u?{...p,sku:u.sku,name:u.name}:p;
+    }));
+  };
   const saveVehicle=async(v)=>{
     const {id, ...data} = v;
+    const existing = id ? vehicles.find(x=>String(x.id)===String(id)) : null;
+    const oldCode = (existing?.code||"").trim().toUpperCase();
+    const newCode = (data.code||"").trim().toUpperCase();
+    const codeChanged = id && oldCode && newCode && oldCode!==newCode;
+    // Pre-check for a SKU collision before writing anything, so a blocked rename
+    // never leaves the vehicle record and its parts out of sync with each other.
+    if(codeChanged && parts.some(p=>p.sku===newCode||(p.sku||"").toUpperCase().startsWith(newCode+"-"))){
+      throw new Error("sku_conflict");
+    }
     const res = id ? await api.patch("vehicles","id",id,data) : await api.insert("vehicles",data);
     if(res?.code||res?.message){
       if(res.code==="23505"&&(res.message||"").includes("code")){throw new Error("code_exists");}
       showToast("Unable to save vehicle","err");throw new Error("save failed");
     }
+    if(codeChanged) await renameVehicleCodeInParts(oldCode,newCode);
     await refreshTables("vehicles"); showToast("Vehicle saved");
   };
   const deleteVehicle=async(id)=>{

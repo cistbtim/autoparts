@@ -3241,7 +3241,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
 
     {editV&&(
       <ErrorBoundary name="VehicleModal">
-        <VehicleModal vehicle={editV} onSave={async(data)=>{ await onSave(data); setEditV(null); }}
+        <VehicleModal vehicle={editV} parts={parts} onSave={async(data)=>{ await onSave(data); setEditV(null); }}
           onClose={()=>setEditV(null)} t={t} nextCodeForMake={nextCodeForMake} wikiForModel={wikiForModel}/>
       </ErrorBoundary>
     )}
@@ -3352,7 +3352,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
 }
 
 // ── Vehicle Add/Edit Modal ──
-function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake, wikiForModel}) {
+function VehicleModal({vehicle, parts=[], onSave, onClose, t, nextCodeForMake, wikiForModel}) {
   const isNew = !vehicle.id;
   const [f, setF] = useState({
     id:          vehicle.id||null,
@@ -3384,6 +3384,13 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake, wikiForMode
   };
   const [err, setErr] = useState({});
   const [codeErr, setCodeErr] = useState("");
+  // Editing the code of an existing vehicle also renames every part's SKU prefix
+  // (parts.sku is derived from vehicle.code, e.g. "CR050B-002NH") — warn how many
+  // parts are affected before the admin commits to it.
+  const oldCode = (vehicle.code||"").trim().toUpperCase();
+  const newCodeTrim = (f.code||"").trim().toUpperCase();
+  const codeChanged = !isNew && !!oldCode && !!newCodeTrim && oldCode!==newCodeTrim;
+  const affectedParts = codeChanged ? parts.filter(p=>p.sku===oldCode||(p.sku||"").toUpperCase().startsWith(oldCode+"-")) : [];
   const handleClose = () => {
     if (dirty && !window.confirm("You have unsaved changes. Close without saving?")) return;
     onClose();
@@ -3434,6 +3441,13 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake, wikiForMode
           <input className="inp" value={f.code} onChange={e=>{s("code",e.target.value.toUpperCase());setCodeErr("");}}
             placeholder="FD50A, BA3, GJ..." style={{borderColor:codeErr?"var(--red)":undefined,textTransform:"uppercase"}}/>
           {codeErr&&<div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {codeErr}</div>}
+          {codeChanged&&(
+            <div style={{marginTop:4,fontSize:11,color:"var(--yellow)"}}>
+              ⚠️ {affectedParts.length>0
+                ? `Saving will also rename ${affectedParts.length} part SKU${affectedParts.length>1?"s":""}: ${oldCode} → ${newCodeTrim}`
+                : `No parts currently use ${oldCode} — only the vehicle record will change.`}
+            </div>
+          )}
           {!f.code && nextCodeForMake&&(()=>{const sugg=nextCodeForMake(f.make,f.model);return sugg?(
             <div style={{marginTop:4,fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:6}}>
               Suggested:
@@ -3517,8 +3531,13 @@ function VehicleModal({vehicle, onSave, onClose, t, nextCodeForMake, wikiForMode
         <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{t.cancel}</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={async()=>{
           if(!validate()) return;
+          if(codeChanged && affectedParts.length>0 &&
+             !window.confirm(`This will rename ${affectedParts.length} part SKU${affectedParts.length>1?"s":""} from ${oldCode} to ${newCodeTrim}. Continue?`)) return;
           try{ await onSave(f); setDirty(false); }
-          catch(e){ if(e.message==="code_exists") setCodeErr("Code already exists in database"); }
+          catch(e){
+            if(e.message==="code_exists") setCodeErr("Code already exists in database");
+            else if(e.message==="sku_conflict") setCodeErr(`Parts already exist under ${newCodeTrim} — choose a different code`);
+          }
         }}>
           💾 {t.save}
         </button>

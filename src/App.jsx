@@ -418,6 +418,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
   const showToast=(msg,type="ok")=>{setToast({msg,type});setTimeout(()=>setToast(null),2800);};
 
+  // Forces a genuinely fresh copy of the app — clears the SWR response cache and the
+  // Dexie offline cache, then reloads via a cache-busted URL. A plain location.reload()
+  // isn't reliable for this: browsers (mobile especially) can keep serving the old
+  // index.html — and therefore the old JS bundle — straight from HTTP cache regardless.
+  // Doesn't touch login session or preferences (ap_user/ap_lang/etc.) — this is for
+  // "the app looks out of date", not for signing out.
+  const clearAppCache=()=>{
+    if(!window.confirm("Reload the app with a fresh copy from the server?\n\nAny unsaved changes will be lost.")) return;
+    try{ api.cacheClearAll(); }catch{}
+    try{ db.tables.forEach(t=>t.clear().catch(()=>{})); }catch{}
+    if(window.caches) caches.keys().then(keys=>keys.forEach(k=>caches.delete(k))).catch(()=>{});
+    const url=new URL(window.location.href);
+    url.searchParams.set("_r",Date.now());
+    window.location.replace(url.toString());
+  };
+
   // Alarm: notify admin/manager when new workshop parts requests arrive
   useEffect(()=>{
     if(!["admin","manager","branch_admin","branch_manager"].includes(role)) return;
@@ -4384,6 +4400,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             </button>
           )}
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>openM("changePassword")}>{t.changePassword||"Change Password"}</button>
+          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={clearAppCache} title="App looking out of date? Force a fresh reload">🧹 Clear Cache</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12,color:"rgba(248,113,113,.85)"}} onClick={onLogout}>{t.logout||"Sign Out"}</button>
           <div style={{fontSize:10,color:"var(--text3)",textAlign:"center",marginTop:2,letterSpacing:".03em"}}>v{APP_VERSION} · {APP_UPDATE_DATE}</div>
         </div>
@@ -4443,6 +4460,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             </button>
           )}
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>{openM("changePassword");setDrawerOpen(false);}}>🔑 Change Password</button>
+          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={clearAppCache} title="App looking out of date? Force a fresh reload">🧹 Clear Cache</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 {t.logout}</button>
           <div style={{display:"flex",justifyContent:"center",marginTop:2,position:"relative"}}>
             <button onClick={()=>setVersionTip(v=>!v)} style={{background:"none",border:"none",color:"var(--text3)",fontSize:18,cursor:"pointer",padding:"2px 8px",lineHeight:1}} title="App version">ℹ️</button>
@@ -4527,6 +4545,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               {/* Action buttons */}
               <div className="ws-more-actions">
                 <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12}} onClick={()=>{openM("changePassword");setWsMoreOpen(false);}}>🔑 {t.changePassword||"Password"}</button>
+                <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12}} onClick={clearAppCache} title="App looking out of date? Force a fresh reload">🧹 Cache</button>
                 <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 {t.logout||"Logout"}</button>
               </div>
             </div>

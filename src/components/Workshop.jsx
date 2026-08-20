@@ -10290,6 +10290,37 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   },[wsId,reqsRefreshKey]);
   const [shopParts,setShopPartsRaw]=useState(cachedMatch?_spCache.data:[]);
   const setShopParts=(d)=>{_spCache.data=d;_spCache.branchId=linkedBranchId;_spCache.ts=Date.now();setShopPartsRaw(d);};
+  // Only fetch columns shown in the UI — avoids transferring large unused fields over mobile data
+  const SP_COLS="id,sku,name,brand,stock,price,image_url,photos,image,bin_location,category,chinese_desc,make,model,year_range,oe_number";
+  // Chunked id=in.() fetch — scales to any fitment count without falling back
+  // to a full-catalog scan (was 28s+ on the 44k-row parts table for vehicles
+  // like Ford Ranger that have hundreds of fitted parts)
+  const SP_CHUNK=300;
+  const fetchPartsByIds=(ids,extra="")=>{
+    if(!ids||ids.length===0) return Promise.resolve([]);
+    const chunks=[];
+    for(let i=0;i<ids.length;i+=SP_CHUNK) chunks.push(ids.slice(i,i+SP_CHUNK));
+    return Promise.all(chunks.map(c=>
+      api.get("parts",`${extra}id=in.(${c.join(",")})&select=${SP_COLS}&order=sku.asc`).catch(()=>[])
+    )).then(pages=>pages.flat());
+  };
+  // Standalone "Find parts for my car" search (VehicleSearchBar) only ever matches within
+  // whatever's already in shopParts — but shopParts is fetched by branch_id (own + main
+  // branch only), so fitment-linked parts with no branch_id (catalog-wide/head-office
+  // items) are never loaded and silently vanish from the results even though the fitment
+  // match itself (computed straight from part_fitments) found them correctly. Backfill
+  // any matched ids missing from shopParts before applying the filter.
+  const onVehicleSearchFilter=(ids)=>{
+    if(!ids||ids.size===0){ setVehicleFilterIds(ids); setPage(0); return; }
+    const have=new Set(shopParts.map(p=>String(p.id)));
+    const missing=[...ids].filter(id=>id!=="__none__"&&!have.has(id));
+    if(missing.length===0){ setVehicleFilterIds(ids); setPage(0); return; }
+    fetchPartsByIds(missing).then(extra=>{
+      if(extra.length>0) setShopParts([...shopParts,...extra]);
+      setVehicleFilterIds(ids);
+      setPage(0);
+    });
+  };
   const [page,setPage]=useState(0);
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [stockOnly,setStockOnly]=useState(false);
@@ -10322,22 +10353,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     // Skip loading spinner if we have cached data (tab switch) — only show it for first load or explicit refresh
     const hasCached=_spCache.branchId===linkedBranchId&&Array.isArray(_spCache.data)&&_spCache.data.length>0;
     if(!hasCached) setLoading(true);
-    // Only fetch columns shown in the UI — avoids transferring large unused fields over mobile data
-    const COLS="id,sku,name,brand,stock,price,image_url,photos,image,bin_location,category,chinese_desc,make,model,year_range,oe_number";
+    const COLS=SP_COLS;
     // When coming from a job card (initialMake set), pre-filter by vehicle fitments so we only
     // download parts that fit the vehicle instead of the entire catalog — critical on SA mobile data
-    // Chunked id=in.() fetch — scales to any fitment count without falling back
-    // to a full-catalog scan (was 28s+ on the 44k-row parts table for vehicles
-    // like Ford Ranger that have hundreds of fitted parts)
-    const CHUNK=300;
-    const fetchPartsByIds=(ids,extra="")=>{
-      if(!ids||ids.length===0) return Promise.resolve([]);
-      const chunks=[];
-      for(let i=0;i<ids.length;i+=CHUNK) chunks.push(ids.slice(i,i+CHUNK));
-      return Promise.all(chunks.map(c=>
-        api.get("parts",`${extra}id=in.(${c.join(",")})&select=${COLS}&order=sku.asc`).catch(()=>[])
-      )).then(pages=>pages.flat());
-    };
     // Always re-fetch part_fitments fresh from DB in job mode — the in-memory
     // partFitments prop reflects whatever was last loaded in THIS session, so a
     // fitment added/removed from another login (the common case: whoever edits
@@ -10829,7 +10847,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
         );
       })():(
         <VehicleSearchBar vehicles={vehicles} partFitments={partFitments} parts={shopParts}
-          t={{}} onFilter={(ids)=>{setVehicleFilterIds(ids);setPage(0);}}
+          t={{}} onFilter={onVehicleSearchFilter}
           vin={initialVin} engineNo={initialEngineNo} reg={initialReg}
           user={userCtx?.id?{id:userCtx.id}:null}/>
       )}

@@ -2493,12 +2493,12 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
     return Object.values(map).sort((a,b)=>(a.code||a.model).localeCompare(b.code||b.model));
   })();
 
-  const applyFilter = (make, model) => {
+  const applyFilter = (make, model, extraFitmentRows=[]) => {
     if (!make) {
       if(onFilter) onFilter(null);
       if(onVehicleChange) onVehicleChange(null);
       setActive(false);
-      return;
+      return null;
     }
     // Code-first: if any vehicles have this exact code, use only those.
     // Fall back to model-name matching only for vehicles with no code.
@@ -2515,7 +2515,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
     // 1. Fitment-linked part IDs (part_fitments table)
     const vehicleIds = new Set(matchVehicles.map(v => String(v.id)));
     const fitmentIds = new Set(
-      partFitments.filter(f => vehicleIds.has(String(f.vehicle_id))).map(f => String(f.part_id))
+      [...partFitments, ...extraFitmentRows].filter(f => vehicleIds.has(String(f.vehicle_id))).map(f => String(f.part_id))
     );
 
     // 2. Code/SKU prefix matched part IDs
@@ -2562,6 +2562,20 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
       onFilter(allIds.size > 0 ? allIds : new Set(["__none__"]));
     }
     setActive(true);
+    // Refetch fitments for just this vehicle from the DB — the `partFitments` prop is
+    // a snapshot loaded once at app start, so a fitment added since then (from another
+    // device/session, e.g. a phone that's been open for a while) stays invisible here
+    // otherwise. Scoped to these vehicle ids only, so it's a tiny request, not a
+    // full-table reload — matters on mobile data.
+    if(vehicleIds.size>0 && extraFitmentRows.length===0){
+      api.fresh("part_fitments",`vehicle_id=in.(${[...vehicleIds].join(",")})&select=part_id,vehicle_id`).then(fresh=>{
+        if(!Array.isArray(fresh)||fresh.length===0) return;
+        const known=new Set(partFitments.filter(f=>vehicleIds.has(String(f.vehicle_id))).map(f=>`${f.part_id}|${f.vehicle_id}`));
+        const isNew=fresh.some(f=>!known.has(`${f.part_id}|${f.vehicle_id}`));
+        if(isNew) applyFilter(make, model, fresh);
+      }).catch(()=>{});
+    }
+    return allIds;
   };
 
   const clear = () => {

@@ -247,6 +247,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
 
   const jobInvoice = (jobId) => invoices.find(i=>i.job_id===jobId);
   const jobQuote   = (jobId) => quotes.find(q=>q.job_id===jobId);
+  const jobQuotes  = (jobId) => quotes.filter(q=>q.job_id===jobId);
 
   const C   = curSym(settings.currency||getSettings().currency);
   const fmt = v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -363,11 +364,11 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   if(view==="job"&&activeJob){
     const items = jobItems.filter(i=>i.job_id===activeJob.id);
     const inv   = jobInvoice(activeJob.id);
-    const quote = jobQuote(activeJob.id);
+    const quotesForJob = jobQuotes(activeJob.id);
     return (
       <>
       <WorkshopJobDetail
-        job={activeJob} items={items} invoice={inv} quote={quote}
+        job={activeJob} items={items} invoice={inv} quotes={quotesForJob}
         jobs={jobs} onChecklistSaved={onChecklistSaved}
         parts={parts} partFitments={partFitments} vehicles={vehicles} onRefreshVehicles={onRefreshVehicles} settings={settings}
         wsVehicles={wsVehicles} wsCustomers={wsCustomers} wsStock={wsStock} wsServices={wsServices}
@@ -742,7 +743,14 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
           // ── helpers ──────────────────────────────────────────
           const kq = kanbanSearch.trim().toLowerCase();
           const matchesWs = j => (wsId || filterWs==="__all__" || j.workshop_id===filterWs) && (!jobIdFilterSet || jobIdFilterSet.has(j.id));
-          const matchesSearch = j => matchesWs(j) && (!kq || [j.customer_name,j.vehicle_reg,j.vehicle_make,j.vehicle_model,j.complaint,j.notes,j.assigned_to].some(f=>(f||"").toLowerCase().includes(kq)));
+          // job.vehicle_model often holds an internal catalog code (e.g. "BM001D"), not the
+          // human-readable text ("F48 X1") shown on the card — resolve it the same way the
+          // card badge does so a search for what's actually displayed finds a match.
+          const resolvedModelOf = j => {
+            const v = j.vehicle_model&&j.vehicle_make ? vehicles.find(v=>(v.code===j.vehicle_model||v.model===j.vehicle_model)&&v.make?.toLowerCase()===j.vehicle_make?.toLowerCase()) : null;
+            return v ? v.model : j.vehicle_model;
+          };
+          const matchesSearch = j => matchesWs(j) && (!kq || [j.customer_name,j.vehicle_reg,j.vehicle_make,j.vehicle_model,resolvedModelOf(j),j.complaint,j.notes,j.assigned_to].some(f=>(f||"").toLowerCase().includes(kq)));
 
           const highlight = (text) => {
             if(!kq||!text) return text;
@@ -4312,7 +4320,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quote,jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
+function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -4370,6 +4378,9 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],onChecklistSaved,par
   const [paymentModal, setPaymentModal] = useState(false);
   const [statementModal,setStatementModal]=useState(false);
   const [quoteModal,   setQuoteModal]   = useState(false);  // create/edit quote
+  const [creatingNewQuote,setCreatingNewQuote]=useState(false); // true = "+ New Quote" (blank), false = editing the selected one
+  const [activeQuoteId,setActiveQuoteId]=useState(null); // which of this job's (possibly several) quotes is selected
+  const quote = quotes.find(q=>q.id===activeQuoteId) || quotes[0] || null;
   const [deletingQuote,setDeletingQuote]= useState(false);
   const [quoteSrcForInv,setQuoteSrcForInv]= useState(null); // quote being converted to invoice
   const [approvalModal, setApprovalModal] = useState(false);
@@ -6696,7 +6707,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],onChecklistSaved,par
                     <span className="badge" style={{background:item.type==="part"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:item.type==="part"?"var(--blue)":"var(--green)",display:"inline-flex",alignItems:"center",gap:5}}>
                       {thumb
                         ? <img src={thumb} alt="" loading="lazy" referrerPolicy="no-referrer"
-                            onClick={e=>{e.stopPropagation();setLinePartImgLightbox(mp.image_url);}}
+                            onClick={e=>{e.stopPropagation();setLinePartImgLightbox(partPhotoUrls(mp));}}
                             onError={e=>{e.target.style.display="none";}}
                             style={{width:15,height:15,objectFit:"contain",borderRadius:3,cursor:"zoom-in",background:"#fff",flexShrink:0}}/>
                         : <span>{item.type==="part"?"🔩":"👷"}</span>}
@@ -6941,6 +6952,24 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],onChecklistSaved,par
         </div>{/* end outer card */}
           </>);
         })()}
+        {/* Quote selector — only shown once a job has more than one saved quotation */}
+        {quotes.length>1&&(
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
+            {quotes.map((q,qi)=>(
+              <button key={q.id} onClick={()=>setActiveQuoteId(q.id)}
+                style={{fontSize:11,fontWeight:700,padding:"5px 10px",borderRadius:8,cursor:"pointer",
+                  border:`1px solid ${q.id===quote?.id?"var(--accent)":"var(--border)"}`,
+                  background:q.id===quote?.id?"rgba(251,146,60,.15)":"var(--surface2)",
+                  color:q.id===quote?.id?"var(--accent)":"var(--text3)"}}>
+                📝 Quote {qi+1} · {q.status.charAt(0).toUpperCase()+q.status.slice(1)}
+              </button>
+            ))}
+            {!wsLocked&&<button onClick={()=>{setCreatingNewQuote(true);setQuoteModal(true);}}
+              style={{fontSize:11,fontWeight:700,padding:"5px 10px",borderRadius:8,cursor:"pointer",border:"1px dashed var(--border)",background:"transparent",color:"var(--text3)"}}>
+              + New Quote
+            </button>}
+          </div>
+        )}
         {/* Quote */}
         {quote ? (()=>{
           // Only send/print the items actually selected for this quote, not every item on the job.
@@ -7068,7 +7097,10 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],onChecklistSaved,par
               </button>
             )}
             {!wsLocked&&quote.status!=="converted"&&(
-              <button className="btn btn-ghost btn-xs" onClick={()=>setQuoteModal(true)}>✏️ Edit</button>
+              <button className="btn btn-ghost btn-xs" onClick={()=>{setCreatingNewQuote(false);setQuoteModal(true);}}>✏️ Edit</button>
+            )}
+            {!wsLocked&&quotes.length===1&&(
+              <button className="btn btn-ghost btn-xs" onClick={()=>{setCreatingNewQuote(true);setQuoteModal(true);}}>➕ New Quote</button>
             )}
             {!wsLocked&&!invoice&&quote.status==="accepted"&&(
               <button className="btn btn-primary btn-sm" onClick={()=>{ setQuoteSrcForInv(quote); setCreatingInv(true); }}>🧾 {t.wsqtConvertInv}</button>
@@ -7817,11 +7849,11 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],onChecklistSaved,par
       {quoteModal&&(
         <WsQuoteModal
           job={job} items={quoteItems} subtotal={quoteSubtotal} tax={quoteTax} total={quoteTotal}
-          existing={quote} settings={settings} vehicles={vehicles}
+          existing={creatingNewQuote?null:quote} settings={settings} vehicles={vehicles}
           wsSupplierQuotes={wsSupplierQuotes} wsSupplierRequests={wsSupplierRequests} sqReplies={sqReplies}
           onApplySupplierPrice={onApplySupplierPrice}
-          onSave={async(q)=>{ await onSaveQuote(q); setQuoteModal(false); }}
-          onClose={()=>setQuoteModal(false)}/>
+          onSave={async(q)=>{ const savedId=await onSaveQuote(q); setActiveQuoteId(savedId||null); setQuoteModal(false); setCreatingNewQuote(false); }}
+          onClose={()=>{ setQuoteModal(false); setCreatingNewQuote(false); }}/>
       )}
 
       {/* Delete quote confirm */}
@@ -7833,7 +7865,7 @@ function WorkshopJobDetail({job,items,invoice,quote,jobs=[],onChecklistSaved,par
           </p>
           <div style={{display:"flex",gap:10}}>
             <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setDeletingQuote(false)}>Cancel</button>
-            <button className="btn btn-danger" style={{flex:1}} onClick={async()=>{ await onDeleteQuote(quote.id); setDeletingQuote(false); }}>Delete</button>
+            <button className="btn btn-danger" style={{flex:1}} onClick={async()=>{ await onDeleteQuote(quote.id); setActiveQuoteId(null); setDeletingQuote(false); }}>Delete</button>
           </div>
         </Overlay>
       )}
@@ -10422,9 +10454,14 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       });
       // For local parts (branch_stock exists), use branch qty exclusively — don't leak global catalog stock
       const applyBs=p=>{const bs=bStockMap[String(p.id)];return bs?{...p,stock:bs.stock??0,price:bs.price??p.price,bin_location:bs.bin_location||p.bin_location}:p;};
-      // A part is "local" (Main Branch, can buy) only if admin has explicitly set branch stock for it.
-      // Parts with no branch_stock entry are "main" (Head Office, request only).
-      const srcOf=p=>bStockMap[String(p.id)]?"local":"main";
+      // A part is "local" (this workshop's own branch, can buy now) only if branch_stock
+      // exists specifically for the linked branch — a branch_stock row that only exists
+      // at the main/Head Office branch must NOT count as local.
+      // Parts with no local branch_stock entry are "main" (Head Office, request only).
+      const srcOf=p=>{
+        const bs=bStockMap[String(p.id)];
+        return bs&&String(bs.branch_id)===String(linkedBranchId)?"local":"main";
+      };
       const seen=new Set(ownArr.map(p=>String(p.id)));
       const mainOnlyArr=mainArr.filter(p=>!seen.has(String(p.id)));
       const linkedParts=[...ownArr.map(applyBs),...mainOnlyArr.map(applyBs)];

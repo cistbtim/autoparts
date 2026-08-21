@@ -86,6 +86,7 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplier
   const candidatesByItem = buildCandidatesByItem(items,jobSupQuotes,wsSupplierRequests,sqReplies);
   const hasLabour = selItems.some(i=>i.type==="labour");
   const blockedNoLabour = !hasLabour && selItems.length>0 && !noLabourConfirmed;
+  const noPriceCount = selItems.filter(i=>!(candidatesByItem[i.id]?.length>0)).length;
 
   const applyPrice=async(itemId,price)=>{
     if(!onApplySupplierPrice) return;
@@ -150,6 +151,11 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplier
                         })}
                       </div>
                     )}
+                    {candidates.length===0&&(
+                      <div style={{marginTop:4}} title="No supplier price on record for this item — cost not verified">
+                        <span style={{fontSize:10,fontWeight:600,color:"var(--yellow)",whiteSpace:"nowrap"}}>⚠️ no supplier price</span>
+                      </div>
+                    )}
                   </td>
                   <td style={{textAlign:"right",fontWeight:700}}>{fmt(i.total)}</td>
                 </tr>
@@ -172,6 +178,13 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplier
             <input type="checkbox" checked={noLabourConfirmed} onChange={e=>setNoLabourConfirmed(e.target.checked)} style={{cursor:"pointer"}}/>
             Don't need labour
           </label>
+        </div>
+      )}
+
+      {noPriceCount>0&&(
+        <div style={{background:"rgba(251,191,36,.15)",border:"1px solid rgba(251,191,36,.5)",borderRadius:6,padding:"7px 12px",marginBottom:14,fontSize:12,display:"flex",alignItems:"center",gap:8}}>
+          <span>⚠️</span>
+          <span style={{flex:1}}>{noPriceCount} of {selItems.length} item{selItems.length!==1?"s":""} in this quote {noPriceCount===1?"has":"have"} no supplier price on record — {noPriceCount===1?"its":"their"} cost isn't verified.</span>
         </div>
       )}
 

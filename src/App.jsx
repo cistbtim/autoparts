@@ -1892,9 +1892,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   };
   const saveWorkshopQuote=async(q)=>{
     const {id,...rest}=q;
+    const savedId=id||makeId("WSQ");
     if(id){ await api.patch("workshop_quotes","id",id,rest); showToast("Quote updated"); }
-    else { await api.insert("workshop_quotes",{...rest,id:makeId("WSQ"),workshop_id:wsId||null}); showToast("Quote created"); }
+    else { await api.insert("workshop_quotes",{...rest,id:savedId,workshop_id:wsId||null}); showToast("Quote created"); }
     await refreshTables("workshop_quotes");
+    return savedId;
   };
   const sendQuoteForApproval=async(quoteId)=>{
     const token=makeToken();

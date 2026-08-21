@@ -49,7 +49,7 @@ function buildCandidatesByItem(items,jobSupQuotes,wsSupplierRequests,sqReplies){
   return byItem;
 }
 
-export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplierQuotes=[],wsSupplierRequests=[],sqReplies=[],onApplySupplierPrice,onSave,onClose}) {
+export function WsQuoteModal({job,items,existing,settings,vehicles=[],parts=[],wsSupplierQuotes=[],wsSupplierRequests=[],sqReplies=[],onApplySupplierPrice,onSave,onClose}) {
   const C=curSym(settings.currency||getSettings().currency);
   const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [selectedIds,setSelectedIds]=useState(()=>{
@@ -199,7 +199,7 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],wsSupplier
         <button className="btn btn-ghost" style={{flex:1}} disabled={saving||selItems.length===0||blockedNoLabour} onClick={async()=>{
           setSaving(true);
           const q={...f,subtotal:selSubtotal,tax:selTax,total:selTotal,selected_item_ids:JSON.stringify([...selectedIds])};
-          try{ await onSave(q); printWorkshopQuote(job,selItems,q,settings,{},false,vehicles); }catch(e){alert(e.message);}
+          try{ await onSave(q); printWorkshopQuote(job,selItems,q,settings,{},false,vehicles,parts); }catch(e){alert(e.message);}
           finally{setSaving(false);}
         }}>💾 Save &amp; Print</button>
         <button className="btn btn-primary" style={{flex:1}} disabled={saving||selItems.length===0||blockedNoLabour} onClick={async()=>{

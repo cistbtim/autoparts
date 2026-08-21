@@ -492,7 +492,7 @@ export function printWorkshopInvoice(job, items, invoice, settings, photos={}, v
   setTimeout(()=>w.print(),400);
 }
 
-export function printWorkshopQuote(job, allItems, quote, settings, photos={}, shareMode=false, vehicles=[]) {
+export function printWorkshopQuote(job, allItems, quote, settings, photos={}, shareMode=false, vehicles=[], parts=[]) {
   // Only print the items actually selected for this quote (quote.selected_item_ids), not every item on the job.
   const items = quote.selected_item_ids
     ? (()=>{ try{ const ids=new Set(JSON.parse(quote.selected_item_ids)); const f=allItems.filter(i=>ids.has(i.id)); return f.length>0?f:allItems; }catch{ return allItems; } })()
@@ -525,17 +525,35 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
     return (PT_ORDER[a.part_type]??99)-(PT_ORDER[b.part_type]??99);
   });
 
-  const rowsHtml = sortedItems.map((i,idx)=>`
+  // Resolve a quote line back to its main-inventory part (by SKU) so the row can
+  // show the real product photo, same lookup WorkshopJobDetail uses for the badge.
+  const photoFor = i => {
+    if(i.type!=="part"||!i.part_sku) return "";
+    const p = parts.find(p=>p.sku && p.sku.toLowerCase()===i.part_sku.toLowerCase());
+    return p ? (toImgUrl(p.image_url)||"") : "";
+  };
+
+  const attrEsc = s => String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+
+  const rowsHtml = sortedItems.map((i,idx)=>{
+    const thumb = photoFor(i);
+    const thumbHref = attrEsc(thumb);
+    return `
     <tr style="background:${idx%2===0?"#fff":"#f9f9f9"}">
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          ${thumb?`<a href="${thumbHref}" target="_blank" rel="noopener" style="flex-shrink:0"><img src="${thumbHref}" referrerpolicy="no-referrer" style="width:76px;height:76px;object-fit:contain;background:#fff;border:1px solid #e5e5e5;border-radius:6px;display:block" onerror="this.style.display='none'"/></a>`:""}
+          <div style="flex:1;min-width:0">
         <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${i.type==="part"?"#dbeafe":"#dcfce7"};color:${i.type==="part"?"#1d4ed8":"#166534"};margin-right:6px">${i.type==="part"?"PART":"LABOUR"}</span>
         ${i.description}${i.part_sku?`<br/><span style="font-size:11px;color:#888;font-family:monospace;margin-left:2px">${i.part_sku}</span>`:""}
         ${(i.part_type||i.remark)?`<div style="margin-top:5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${i.part_type?`<span style="display:inline-block;padding:2px 9px;border-radius:6px;background:#f3f4f6;border:1px solid #d1d5db;font-size:10px;font-weight:700;white-space:nowrap">${i.part_type}</span>`:""} ${i.remark?`<span style="font-size:11px;color:#555;font-style:italic">${i.remark}</span>`:""}</div>`:""}
+          </div>
+        </div>
       </td>
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${i.qty}</td>
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${fmt(i.unit_price)}</td>
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:700">${fmt(i.total)}</td>
-    </tr>`).join("");
+    </tr>`;}).join("");
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Quotation ${quote.id}</title>

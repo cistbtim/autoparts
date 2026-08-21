@@ -1466,7 +1466,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                                 {j&&q.status==="accepted"&&!invoices.find(i=>i.job_id===q.job_id)&&(
                                   <button className="btn btn-primary btn-xs" onClick={()=>{const its=jobItems.filter(i=>i.job_id===q.job_id);const sub=its.reduce((s,i)=>s+(+i.total||0),0);const tx=settings.vat_number?sub*(settings.tax_rate||0)/100:0;setQInvModal({job:j,items:its,quote:q,subtotal:sub,tax:tx,total:sub+tx});}}>🧾 Invoice</button>
                                 )}
-                                {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},false,vehicles);}}>🖨️</button>}
+                                {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},false,vehicles,parts);}}>🖨️</button>}
                               </div>
                             </td>
                           </tr>
@@ -1510,7 +1510,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                           {j&&q.status==="accepted"&&!invoices.find(i=>i.job_id===q.job_id)&&(
                             <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={()=>{const its=jobItems.filter(i=>i.job_id===q.job_id);const sub=its.reduce((s,i)=>s+(+i.total||0),0);const tx=settings.vat_number?sub*(settings.tax_rate||0)/100:0;setQInvModal({job:j,items:its,quote:q,subtotal:sub,tax:tx,total:sub+tx});}}>🧾 Invoice</button>
                           )}
-                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},false,vehicles);}}>🖨️</button>}
+                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},false,vehicles,parts);}}>🖨️</button>}
                         </div>
                       </div>
                     );
@@ -7026,7 +7026,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           )}
           {/* Actions */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border)",paddingTop:10}}>
-            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos,false,vehicles)}>🖨️ {t.wsqtPrintPdf}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopQuote(job,items,quote,settings,vehiclePhotos,false,vehicles,parts)}>🖨️ {t.wsqtPrintPdf}</button>
             {/* Send Customer Quotation — prominent green button */}
             {(quote.quote_phone||job.customer_phone||quote.quote_email||job.customer_email)&&quote.status!=="converted"&&(
               <button className="btn btn-sm" style={{background:"#0f766e",color:"#fff",border:"none",fontWeight:700,flex:1,minWidth:160}}
@@ -7849,7 +7849,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
       {quoteModal&&(
         <WsQuoteModal
           job={job} items={quoteItems} subtotal={quoteSubtotal} tax={quoteTax} total={quoteTotal}
-          existing={creatingNewQuote?null:quote} settings={settings} vehicles={vehicles}
+          existing={creatingNewQuote?null:quote} settings={settings} vehicles={vehicles} parts={parts}
           wsSupplierQuotes={wsSupplierQuotes} wsSupplierRequests={wsSupplierRequests} sqReplies={sqReplies}
           onApplySupplierPrice={onApplySupplierPrice}
           onSave={async(q)=>{ const savedId=await onSaveQuote(q); setActiveQuoteId(savedId||null); setQuoteModal(false); setCreatingNewQuote(false); }}

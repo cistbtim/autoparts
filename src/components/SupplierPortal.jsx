@@ -806,8 +806,8 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
           <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)}/>
           {f.oe_number&&(
             <select className="inp" style={{fontSize:11,color:"#1d4ed8",marginTop:6}}
-              value="" onChange={e=>{if(e.target.value)window.open(`https://www.lllparts.co.uk/search/${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-              <option value="">🔍 Search on lllparts…</option>
+              value="" onChange={e=>{if(e.target.value)window.open(`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+              <option value="">🔍 Search on Alibaba…</option>
               {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
                 <option key={i} value={tok}>{tok}</option>
               ))}

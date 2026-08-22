@@ -3953,8 +3953,8 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                   ))}
                 </select>
                 <select className="inp" style={{color:"#1d4ed8",fontSize:12}}
-                  value="" onChange={e=>{if(e.target.value)window.open(`https://www.lllparts.co.uk/search/${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-                  <option value="">🔍 Search on lllparts…</option>
+                  value="" onChange={e=>{if(e.target.value)window.open(`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+                  <option value="">🔍 Search on Alibaba…</option>
                   {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
                     <option key={i} value={tok}>{tok}</option>
                   ))}

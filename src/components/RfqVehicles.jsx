@@ -921,6 +921,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
   const [copied, setCopied]       = useState(false);
   const [hasClip, setHasClip]     = useState(!!_appPhotoClip);
   const [showTouchUp, setShowTouchUp] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [pasteCompare, setPasteCompare] = useState(null); // {blob, previewUrl} — shown instead of an instant overwrite when a photo already exists
   const [brushSize, setBrushSize] = useState(28);
   const fileRef = useRef(null);
@@ -1088,8 +1089,10 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
 
   // Shared helpers for the Remove BG / Watermark / Add Text tools below —
   // all three fetch the current photo, run it through a canvas, then re-upload.
-  const _fetchCurrentAsImage = async () => {
-    const srcUrl = toImgUrl(imageUrl) || imageUrl;
+  // `full` bypasses toImgUrl()'s 400px thumbnail render — needed by the Renn
+  // template diff, which has to match the photo's real native pixel dimensions.
+  const _fetchCurrentAsImage = async ({full=false}={}) => {
+    const srcUrl = full ? imageUrl : (toImgUrl(imageUrl) || imageUrl);
     const r = await fetch(srcUrl, {credentials:"omit"});
     if (!r.ok) throw new Error("fetch failed");
     const blob = await r.blob();
@@ -1135,6 +1138,152 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
       const processed = await _processImage(blob);
       await _saveDerivedBlob(processed, "nobg");
     } catch (e) { setError("Could not remove background — " + (e.message||e)); }
+    setUploading(false); setUploadStatus("");
+  };
+
+  // Strip the Rennen Autoteile supplier watermark (flat gray/teal ring + laurel
+  // logo background, plus the per-listing caption text underneath the product).
+  //
+  // A color threshold alone is NOT safe here — the ring/logo's own gray/teal
+  // tones overlap the tones of ordinary gray, chrome, or brushed-metal parts, so
+  // a broad "grayish/teal" rule strips real product along with the watermark
+  // (verified: it wiped a bumper's paintwork down to bare outline). Instead this
+  // diffs the photo against a precomputed per-cluster median template — the exact
+  // fixed watermark pixels for this canvas size + background shade, built offline
+  // from ~200 sample photos (python/rennenauto_clean.py) — so only pixels that
+  // match the KNOWN watermark art at that exact position get flagged, regardless
+  // of what color the product happens to be. A border-connected flood fill on top
+  // makes sure only background actually reachable from the canvas edge gets
+  // flattened, so a glossy reflection that coincidentally matches the template
+  // mid-photo is never mistaken for background.
+  //
+  // Only covers the handful of (size, corner-color) clusters that were built
+  // offline — see public/renn-templates/. A photo outside those exact dimensions
+  // (already resized/cropped by some other step) has no template to diff against,
+  // so this bails out with an error rather than guessing — use Touch Up instead.
+  const _RENN_TEMPLATES = [
+    { w: 2274, h: 2475, r: 168, g: 168, b: 168, file: "tmpl_2274x2475_168-168-168.png" },
+    { w: 1080, h: 1080, r: 168, g: 168, b: 168, file: "tmpl_1080x1080_168-168-168.png" },
+    { w: 1080, h: 1080, r: 252, g: 252, b: 252, file: "tmpl_1080x1080_252-252-252.png" },
+    { w: 500,  h: 500,  r: 168, g: 168, b: 168, file: "tmpl_500x500_168-168-168.png" },
+  ];
+  const _RENN_DIFF_THRESHOLD = 45;
+
+  const _loadImageEl = (src) => new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error("template load failed"));
+    im.src = src;
+  });
+
+  const _cleanRennWatermark = async (img) => {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    const srcData = ctx.getImageData(0, 0, w, h);
+    const sd = srcData.data;
+    const cornerIdx = (5 * w + 5) * 4;
+    const cr = sd[cornerIdx], cg = sd[cornerIdx+1], cb = sd[cornerIdx+2];
+
+    // Nearest-color match among same-size templates, not an exact quantized
+    // equality check — the offline builder quantizes with Python's round-half-
+    // to-even, which disagrees with JS's Math.round on exact .5 values (a pure
+    // white corner, 255/6=42.5, quantizes to 252 in Python but 258 in JS), so
+    // requiring bit-exact equality silently missed real matches.
+    const sameSize = _RENN_TEMPLATES.filter(t => t.w === w && t.h === h);
+    if (!sameSize.length) throw new Error(`No watermark template for a ${w}×${h} photo — use Touch Up instead`);
+    let tmpl = null, bestDist = Infinity;
+    for (const t of sameSize) {
+      const dist = Math.abs(cr-t.r) + Math.abs(cg-t.g) + Math.abs(cb-t.b);
+      if (dist < bestDist) { bestDist = dist; tmpl = t; }
+    }
+    if (bestDist > 20) throw new Error(`No watermark template matches this ${w}×${h} photo's background shade — use Touch Up instead`);
+
+    const tplImg = await _loadImageEl(`${import.meta.env.BASE_URL}renn-templates/${tmpl.file}`);
+    const tcv = document.createElement("canvas");
+    tcv.width = w; tcv.height = h;
+    const tctx = tcv.getContext("2d");
+    tctx.drawImage(tplImg, 0, 0);
+    const td = tctx.getImageData(0, 0, w, h).data;
+
+    const n = w * h;
+    const candidate = new Uint8Array(n);
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      const diff = Math.abs(sd[p]-td[p]) + Math.abs(sd[p+1]-td[p+1]) + Math.abs(sd[p+2]-td[p+2]);
+      if (diff <= _RENN_DIFF_THRESHOLD) candidate[i] = 1;
+    }
+
+    // Border-connected flood fill (iterative, typed-array stack) — only candidate
+    // pixels reachable from the canvas edge are real background.
+    const trueBg = new Uint8Array(n);
+    const stack = new Int32Array(n);
+    let sp = 0;
+    const seed = (x, y) => {
+      const i = y * w + x;
+      if (candidate[i] && !trueBg[i]) { trueBg[i] = 1; stack[sp++] = i; }
+    };
+    for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h-1); }
+    for (let y = 0; y < h; y++) { seed(0, y); seed(w-1, y); }
+    while (sp > 0) {
+      const i = stack[--sp];
+      const x = i % w, y = (i / w) | 0;
+      if (x > 0)   { const ni = i-1; if (candidate[ni] && !trueBg[ni]) { trueBg[ni] = 1; stack[sp++] = ni; } }
+      if (x < w-1) { const ni = i+1; if (candidate[ni] && !trueBg[ni]) { trueBg[ni] = 1; stack[sp++] = ni; } }
+      if (y > 0)   { const ni = i-w; if (candidate[ni] && !trueBg[ni]) { trueBg[ni] = 1; stack[sp++] = ni; } }
+      if (y < h-1) { const ni = i+w; if (candidate[ni] && !trueBg[ni]) { trueBg[ni] = 1; stack[sp++] = ni; } }
+    }
+
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      if (trueBg[i]) { sd[p] = 255; sd[p+1] = 255; sd[p+2] = 255; }
+    }
+    ctx.putImageData(srcData, 0, 0);
+
+    // Caption crop — positional, not color-based, so it's safe regardless of the
+    // product's color: the tallest vertical band of remaining non-white content
+    // is always the part itself, since a per-listing caption is a much shorter
+    // text band underneath it.
+    const d2 = ctx.getImageData(0, 0, w, h).data;
+    const rowHasContent = new Uint8Array(h);
+    for (let y = 0; y < h; y++) {
+      let count = 0;
+      for (let x = 0; x < w; x++) {
+        const p = (y * w + x) * 4;
+        if ((255 - d2[p]) + (255 - d2[p+1]) + (255 - d2[p+2]) > 30) { count++; if (count > 3) break; }
+      }
+      rowHasContent[y] = count > 3 ? 1 : 0;
+    }
+    let bestStart = 0, bestLen = 0, curStart = -1;
+    for (let y = 0; y <= h; y++) {
+      const v = y < h ? rowHasContent[y] : 0;
+      if (v && curStart < 0) curStart = y;
+      if (!v && curStart >= 0) {
+        const len = y - curStart;
+        if (len > bestLen) { bestLen = len; bestStart = curStart; }
+        curStart = -1;
+      }
+    }
+    if (bestLen > 0) {
+      ctx.fillStyle = "#ffffff";
+      if (bestStart > 0) ctx.fillRect(0, 0, w, bestStart);
+      const bottomStart = bestStart + bestLen;
+      if (bottomStart < h) ctx.fillRect(0, bottomStart, w, h - bottomStart);
+    }
+
+    return new Promise((resolve, reject) => {
+      cv.toBlob(b => b ? resolve(b) : reject(new Error("toBlob failed")), "image/jpeg", 0.92);
+    });
+  };
+
+  const removeRennLogo = async () => {
+    if (!imageUrl) return;
+    setUploading(true); setError(null); setUploadStatus("Removing Renn watermark…");
+    try {
+      const img = await _fetchCurrentAsImage({full:true});
+      const cleaned = await _cleanRennWatermark(img);
+      await _saveDerivedBlob(cleaned, "clean");
+    } catch (e) { setError("Could not remove watermark — " + (e.message||e)); }
     setUploading(false); setUploadStatus("");
   };
 
@@ -1357,25 +1506,42 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
         </div>
       )}
 
-      {/* Photo edit tools — operate on whatever photo is currently showing */}
+      {/* Photo edit tools — operate on whatever photo is currently showing.
+          Collapsed into one dropdown so 5 actions don't wrap into stacked rows
+          and push the rest of the form down. */}
       {imageUrl&&(bucket||SCRIPT_URL)&&(
-        <div style={{display:"flex",gap:5,marginBottom:7,flexWrap:"wrap"}}>
-          <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={uploading}
-            onClick={removeBgFromCurrent} title="Re-run background removal on this photo">
-            🪄 Remove BG
+        <div style={{position:"relative",marginBottom:7}}>
+          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:11}} disabled={uploading}
+            onClick={()=>setShowToolsMenu(o=>!o)}>
+            🛠 Photo Tools {showToolsMenu?"▲":"▼"}
           </button>
-          <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={uploading}
-            onClick={openTouchUp} title="Manually brush away leftover watermark or background bits">
-            ✏️ Touch Up
-          </button>
-          <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={uploading}
-            onClick={addWatermark} title="Stamp your shop name onto this photo">
-            💧 Watermark
-          </button>
-          <button className="btn btn-ghost btn-sm" style={{flex:"1 1 auto",fontSize:11}} disabled={uploading}
-            onClick={addCaption} title="Add a text caption to this photo">
-            🔤 Add Text
-          </button>
+          {showToolsMenu&&(<>
+            <div style={{position:"fixed",inset:0,zIndex:40}} onClick={()=>setShowToolsMenu(false)}/>
+            <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:41,
+              background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,
+              boxShadow:"0 8px 24px rgba(0,0,0,.25)",padding:5,display:"flex",flexDirection:"column",gap:3}}>
+              <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:11,justifyContent:"flex-start"}} disabled={uploading}
+                onClick={()=>{setShowToolsMenu(false);removeBgFromCurrent();}} title="Re-run background removal on this photo">
+                🪄 Remove BG
+              </button>
+              <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:11,justifyContent:"flex-start"}} disabled={uploading}
+                onClick={()=>{setShowToolsMenu(false);removeRennLogo();}} title="Strip the Rennen Autoteile watermark ring/logo + caption text — only works on photos at their original scraped size; use Touch Up for anything else or leftover residue">
+                🧼 Remove Renn Logo
+              </button>
+              <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:11,justifyContent:"flex-start"}} disabled={uploading}
+                onClick={()=>{setShowToolsMenu(false);openTouchUp();}} title="Manually brush away leftover watermark or background bits">
+                ✏️ Touch Up
+              </button>
+              <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:11,justifyContent:"flex-start"}} disabled={uploading}
+                onClick={()=>{setShowToolsMenu(false);addWatermark();}} title="Stamp your shop name onto this photo">
+                💧 Watermark
+              </button>
+              <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:11,justifyContent:"flex-start"}} disabled={uploading}
+                onClick={()=>{setShowToolsMenu(false);addCaption();}} title="Add a text caption to this photo">
+                🔤 Add Text
+              </button>
+            </div>
+          </>)}
         </div>
       )}
 
@@ -2137,8 +2303,8 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
                   ))}
                 </select>
                 <select className="inp" style={{fontSize:11,color:"#1d4ed8",width:"auto",padding:"3px 6px"}}
-                  value="" onChange={e=>{if(e.target.value)window.open(`https://www.lllparts.co.uk/search/${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-                  <option value="">🔍 lllparts…</option>
+                  value="" onChange={e=>{if(e.target.value)window.open(`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+                  <option value="">🔍 Alibaba…</option>
                   {part.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
                     <option key={i} value={tok}>{tok}</option>
                   ))}
@@ -2244,8 +2410,8 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
               ))}
             </select>
             <select className="inp" style={{fontSize:12,color:"#1d4ed8"}}
-              value="" onChange={e=>{if(e.target.value)window.open(`https://www.lllparts.co.uk/search/${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-              <option value="">🔍 Search on lllparts…</option>
+              value="" onChange={e=>{if(e.target.value)window.open(`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+              <option value="">🔍 Search on Alibaba…</option>
               {part.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
                 <option key={i} value={tok}>{tok}</option>
               ))}

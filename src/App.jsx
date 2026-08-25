@@ -265,6 +265,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [branchMatchedOnly,setBranchMatchedOnly]=useState("matched"); // "matched"|"own"|"all"
   const [invPage,setInvPage]=useState(0);   // inventory page
   const [invSort,setInvSort]=useState("sku"); // "default"|"sku"
+  const [invZoom,setInvZoom]=useState(()=>{try{return +localStorage.getItem("inv_zoom")||1;}catch{return 1;}}); // table image/text zoom, 0.7–1.6
+  const setInvZoomPersist=useCallback(z=>{setInvZoom(z);try{localStorage.setItem("inv_zoom",String(z));}catch{/* ignore */}},[]);
   const [invReport,setInvReport]=useState(null); // null | "quantum" | "hiace" | "others"
   // Bulk price update — select parts (from the current search/filter results) with
   // a cost already set, then recompute + save price from cost via one markup %.
@@ -4941,6 +4943,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 <option value="__all__">🏭 All Suppliers</option>
                 {suppliers.sort((a,b)=>a.name.localeCompare(b.name)).map(s=><option key={s.id} value={String(s.id)}>{s.name}</option>)}
               </select>
+              {/* Table zoom — scales row image + text size together via CSS `zoom`,
+                  so it actually reflows the table (unlike a transform: scale). */}
+              <div style={{display:"flex",alignItems:"center",gap:2,background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:2}}>
+                <button className="btn btn-ghost btn-sm" style={{padding:"5px 9px"}} disabled={invZoom<=0.7}
+                  onClick={()=>setInvZoomPersist(Math.max(0.7,+(invZoom-0.1).toFixed(2)))} title="Zoom out (smaller images/text)">
+                  🔍−
+                </button>
+                <span style={{fontSize:11,color:"var(--text3)",minWidth:36,textAlign:"center",fontWeight:600,cursor:invZoom!==1?"pointer":"default"}}
+                  onClick={()=>invZoom!==1&&setInvZoomPersist(1)} title={invZoom!==1?"Reset to 100%":undefined}>
+                  {Math.round(invZoom*100)}%
+                </span>
+                <button className="btn btn-ghost btn-sm" style={{padding:"5px 9px"}} disabled={invZoom>=1.6}
+                  onClick={()=>setInvZoomPersist(Math.min(1.6,+(invZoom+0.1).toFixed(2)))} title="Zoom in (bigger images/text)">
+                  🔍＋
+                </button>
+              </div>
               {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace||filterInStock||filterNoPhoto||filterSupplier!=="__all__")&&(
                 <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterPendingReview(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setFilterInStock(false);setFilterNoPhoto(false);setFilterSupplier("__all__");setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
               )}
@@ -4968,7 +4986,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               {fp.length===0&&<span style={{color:"var(--red)",marginLeft:8}}>— try fewer words</span>}
             </div>}
             {/* ── MOBILE INVENTORY CARDS ── */}
-            <div className="mob-cards">
+            <div className="mob-cards" style={{zoom:invZoom}}>
               {invSortedFp.slice(invPage*PAGE_SIZE,(invPage+1)*PAGE_SIZE).map(p=>{
                 const img=toImgUrl(p.image_url);
                 const ps=getPartSupps(p.id);
@@ -5074,7 +5092,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
             {/* ── DESKTOP INVENTORY TABLE ── */}
             <div className="card desk-table" style={{overflow:"hidden"}}>
-              <div className="tbl-wrap">
+              <div className="tbl-wrap" style={{zoom:invZoom}}>
                 <table className="tbl">
                   <thead><tr>
                     {bulkPriceMode&&<th style={{width:32}}/>}

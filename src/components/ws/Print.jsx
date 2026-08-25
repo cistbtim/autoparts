@@ -94,17 +94,18 @@ export function printChecklistReport(job, checklist, settings) {
     const cl=checklist[item.key]||{};
     const st=cl.status||"pending";
     const note=cl.note||"";
-    const photo=cl.photo_url||"";
-    const thumbUrl=photo?toImgUrl(photo).replace(/sz=w200/,"sz=w120"):"";
-    const fullUrl=photo?(() => {
+    const photos=Array.isArray(cl.photo_urls)?cl.photo_urls:(cl.photo_url?[cl.photo_url]:[]);
+    const thumbs=photos.map(photo=>{
+      const thumbUrl=toImgUrl(photo).replace(/sz=w200/,"sz=w120");
       const m = photo.match(/\/file\/d\/([^/]+)/) || photo.match(/thumbnail[?]id=([^&]+)/) || photo.match(/[?&]id=([^&]+)/);
-      return m ? `https://drive.google.com/uc?export=view&id=${m[1]}` : photo;
-    })():"";
+      const fullUrl = m ? `https://drive.google.com/uc?export=view&id=${m[1]}` : photo;
+      return `<a href="${fullUrl}" target="_blank" style="cursor:pointer;text-decoration:none"><img src="${thumbUrl}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb;transition:opacity 0.2s;cursor:pointer" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"/></a>`;
+    }).join("");
     return `<tr>
       <td style="padding:6px 8px;font-size:12px">${item.icon} ${item.label}</td>
       <td style="padding:6px 8px;text-align:center;font-weight:700;font-size:14px;color:${statusColor(st)}">${statusIcon(st)}</td>
       <td style="padding:6px 8px;font-size:11px;color:#374151">${note||""}</td>
-      <td style="padding:6px 8px;text-align:center">${thumbUrl?`<a href="${fullUrl}" target="_blank" style="cursor:pointer;text-decoration:none"><img src="${thumbUrl}" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb;transition:opacity 0.2s;cursor:pointer" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"/></a>`:""}</td>
+      <td style="padding:6px 8px;text-align:center"><div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center">${thumbs}</div></td>
     </tr>`;
   }).join("");
   const okCount   = CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length;

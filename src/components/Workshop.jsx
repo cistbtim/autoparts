@@ -4645,10 +4645,14 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   };
 
   // ── Check-in Checklist ────────────────────────────────────────
-  const [checklist,       setChecklist]       = useState({}); // { item_key: {status,note,photo_url} }
+  const [checklist,       setChecklist]       = useState({}); // { item_key: {status,note,photo_urls:[]} }
   const [checklistLoaded, setChecklistLoaded] = useState(false);
   const [clUploading,     setClUploading]     = useState({}); // { item_key: bool }
+  const [clPhotoView,     setClPhotoView]     = useState(null); // {urls,startIdx} | null
   const clCamRefs = useRef({});
+
+  const clPhotos = cl => Array.isArray(cl?.photo_urls) ? cl.photo_urls
+    : (()=>{ try{return JSON.parse(cl?.photo_urls||"[]");}catch{return[];} })();
 
   useEffect(()=>{
     // Loads on mount rather than waiting for the Inspect popup to actually be
@@ -4658,7 +4662,10 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     api.get("workshop_job_checklist",`job_id=eq.${job.id}`)
       .then(rows=>{
         const map={};
-        (Array.isArray(rows)?rows:[]).forEach(r=>{ map[r.item_key]={status:r.status||"pending",note:r.note||"",photo_url:r.photo_url||"",id:r.id}; });
+        (Array.isArray(rows)?rows:[]).forEach(r=>{
+          const urls=Array.isArray(r.photo_urls)?r.photo_urls:(()=>{try{return JSON.parse(r.photo_urls||"[]");}catch{return[];}})();
+          map[r.item_key]={status:r.status||"pending",note:r.note||"",photo_urls:urls.length?urls:(r.photo_url?[r.photo_url]:[]),id:r.id};
+        });
         setChecklist(map);
         setChecklistLoaded(true);
       })
@@ -4666,12 +4673,13 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   },[checklistLoaded,job.id]);
 
   const saveChecklistItem=async(key,patch)=>{
-    const current=checklist[key]||{status:"pending",note:"",photo_url:""};
+    const current=checklist[key]||{status:"pending",note:"",photo_urls:[]};
     const updated={...current,...patch};
     setChecklist(p=>({...p,[key]:updated}));
     try{
       const id=updated.id||makeId("CL");
-      const rec={id,job_id:job.id,item_key:key,status:updated.status,note:updated.note||"",photo_url:updated.photo_url||""};
+      const urls=updated.photo_urls||[];
+      const rec={id,job_id:job.id,item_key:key,status:updated.status,note:updated.note||"",photo_urls:urls,photo_url:urls[0]||""};
       await api.upsert("workshop_job_checklist",rec);
       if(!updated.id) setChecklist(p=>({...p,[key]:{...updated,id}}));
       onChecklistSaved?.(job.id,key,updated.status);
@@ -4694,13 +4702,21 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
         img.onerror=rej; img.src=dataUrl;
       });
       const now=new Date(); const pad2=n=>String(n).padStart(2,"0");
-      const ts=`${now.getFullYear()}${pad2(now.getMonth()+1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;
+      const ts=`${now.getFullYear()}${pad2(now.getMonth()+1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}_${Math.random().toString(36).slice(2,6)}`;
       const reg=(job.vehicle_reg||"REG").replace(/[\s/\\]/g,"_").toUpperCase();
       const path=`checklist/${reg}/${ts}_${key}.jpg`;
       const url=await uploadToStorage("cars_parts",path,blob);
-      await saveChecklistItem(key,{photo_url:url});
+      const existing=clPhotos(checklist[key]);
+      await saveChecklistItem(key,{photo_urls:[...existing,url]});
     }catch(e){ alert("Upload error: "+e.message); }
     finally{ setClUploading(p=>({...p,[key]:false})); }
+  };
+
+  const removeChecklistPhoto=(key,url)=>{
+    if(!window.confirm("Delete this photo? You can take a new one after.")) return;
+    const remaining=clPhotos(checklist[key]).filter(u=>u!==url);
+    saveChecklistItem(key,{photo_urls:remaining});
+    deleteFromStorage(url); // best-effort cleanup of the stored file
   };
 
   // ── Job documents ─────────────────────────────────────────────
@@ -5917,6 +5933,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
       })()}
 
       {linePartImgLightbox?.length>0&&<ImgLightbox urls={linePartImgLightbox} onClose={()=>setLinePartImgLightbox(null)}/>}
+      {clPhotoView&&<ImgLightbox urls={clPhotoView.urls} startIdx={clPhotoView.startIdx} onClose={()=>setClPhotoView(null)}/>}
 
       {/* ══ INSPECTION popup ══ */}
       {inspectPopup&&(
@@ -5935,7 +5952,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             ):(
               <>
                 {CHECKLIST_ITEMS.map(item=>{
-                  const cl=checklist[item.key]||{status:"pending",note:"",photo_url:""};
+                  const cl=checklist[item.key]||{status:"pending",note:"",photo_urls:[]};
+                  const photos=clPhotos(cl);
                   return(
                     <div key={item.key} style={{padding:"10px 14px",borderBottom:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:6}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
@@ -5955,33 +5973,27 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                             </button>
                           ))}
                         </div>
-                        <button onClick={()=>clCamRefs.current[item.key]?.click()}
+                        <button onClick={()=>clCamRefs.current[item.key]?.click()} title="Add photo"
                           style={{fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",
-                            background:cl.photo_url?"rgba(96,165,250,.15)":"transparent",
-                            color:cl.photo_url?"var(--blue)":"var(--text3)",
-                            border:`1px solid ${cl.photo_url?"rgba(96,165,250,.3)":"var(--border)"}`}}>
-                          {clUploading[item.key]?"⏳":cl.photo_url?"📷 ✓":"📷"}
+                            background:photos.length?"rgba(96,165,250,.15)":"transparent",
+                            color:photos.length?"var(--blue)":"var(--text3)",
+                            border:`1px solid ${photos.length?"rgba(96,165,250,.3)":"var(--border)"}`}}>
+                          {clUploading[item.key]?"⏳":photos.length?`📷 +${photos.length}`:"📷"}
                         </button>
                         <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
                           ref={el=>clCamRefs.current[item.key]=el}
                           onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;const fr=new FileReader();fr.onload=ev=>uploadChecklistPhoto(item.key,ev.target.result);fr.readAsDataURL(file);}}/>
-                        {cl.photo_url&&(
-                          <div style={{position:"relative",flexShrink:0}}>
-                            <img src={toImgUrl(cl.photo_url)} alt="check" onClick={()=>setViewPhoto(cl.photo_url)}
+                        {photos.map((url,pi)=>(
+                          <div key={url+pi} style={{position:"relative",flexShrink:0}}>
+                            <img src={toImgUrl(url)} alt="check" onClick={()=>setClPhotoView({urls:photos,startIdx:pi})}
                               style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)",display:"block"}}
                               referrerPolicy="no-referrer"
-                              onError={e=>{const m=cl.photo_url.match(/thumbnail[?]id=([^&]+)/)||cl.photo_url.match(/[?&]id=([^&]+)/)||cl.photo_url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {e.target.style.display="none";}}}/>
+                              onError={e=>{const m=url.match(/thumbnail[?]id=([^&]+)/)||url.match(/[?&]id=([^&]+)/)||url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {e.target.style.display="none";}}}/>
                             <button title="Delete photo"
-                              onClick={e=>{
-                                e.stopPropagation();
-                                if(!window.confirm(`Delete the ${item.label} photo? You can take a new one after.`)) return;
-                                const oldUrl=cl.photo_url;
-                                saveChecklistItem(item.key,{photo_url:""});
-                                deleteFromStorage(oldUrl); // best-effort cleanup of the stored file
-                              }}
+                              onClick={e=>{ e.stopPropagation(); removeChecklistPhoto(item.key,url); }}
                               style={{position:"absolute",top:-6,right:-6,width:16,height:16,borderRadius:"50%",border:"none",cursor:"pointer",background:"var(--red)",color:"#fff",fontSize:10,fontWeight:800,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0,boxShadow:"0 1px 4px rgba(0,0,0,.35)"}}>✕</button>
                           </div>
-                        )}
+                        ))}
                       </div>
                       <input className="inp" placeholder="Note (optional)..." value={cl.note}
                         onChange={e=>setChecklist(p=>({...p,[item.key]:{...cl,note:e.target.value}}))}

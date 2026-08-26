@@ -4219,6 +4219,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"grp_demo",icon:"🛍️",label:"Demo",roles:["demo"],children:[
         {id:"inventory",icon:"📦",label:t.inventory,roles:["demo"]},
         {id:"shop",icon:"🛒",label:t.shop,roles:["demo"]},
+        {id:"vehicles",icon:"🚗",label:t.vehicleMgmt||"Vehicles",roles:["demo"]},
+        {id:"orders",icon:"📋",label:t.orders,roles:["demo"]},
+        {id:"salesInvoices",icon:"🧾",label:t.salesInvoices,roles:["demo"]},
+        {id:"suppliers",icon:"🏭",label:t.suppliers,roles:["demo"]},
         {id:"reports",icon:"📊",label:t.reports,roles:["demo"]},
       ]}
     );
@@ -5971,7 +5975,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         )}
 
         {/* ── SUPPLIERS ── */}
-        {tab==="suppliers"&&(role==="admin"||isBranchUser)&&(()=>{
+        {tab==="suppliers"&&(role==="admin"||isBranchUser||role==="demo")&&(()=>{
           const TYPES = ["new","used","dealer","factory"];
           const filteredSuppliers = suppliers.filter(s=>{
             if(supplierSearch.trim()){
@@ -7251,7 +7255,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             t={t} lang={lang}/>
         )}
 
-        {tab==="vehicles"&&role==="admin"&&(
+        {tab==="vehicles"&&(role==="admin"||role==="demo")&&(
           <VehiclesPage vehicles={vehicles} partFitments={partFitments} parts={parts} workshopJobs={workshopJobs} onSave={saveVehicle} onDelete={deleteVehicle}
             onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
             onViewJobs={(label,jobIds,make,model,searchKw)=>{setWorkshopJobFilter({label,jobIds,returnMake:make,returnModel:model,returnSearch:searchKw});setTab("workshop");}}
@@ -7672,7 +7676,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         onCreatePortalLogin={createSupplierPortalLogin}
         onResetPortalPassword={resetSupplierPortalPassword}/></div>}
       {isOpen("importSuppliers")&&<SupplierImportModal onImport={async()=>{await refreshTables("suppliers");}} onClose={()=>closeM("importSuppliers")}/>}
-      {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onGoInventory={(part)=>{closeM("supplierParts");setTab("inventory");openM("editPart",part);}} onClose={()=>closeM("supplierParts")}/>}
+      {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onClose={()=>closeM("supplierParts")}/>}
       {isOpen("supplierCatalogue")&&<SupplierCatalogueModal parts={parts} supplier={mData("supplierCatalogue")}
         onGoToPart={(part,catalogueState)=>{const sup=mData("supplierCatalogue");setReturnToCatalogue({sup,catalogueState});closeM("supplierCatalogue");setTab("inventory");openM("editPart",part);}}
         onAddToInventory={(item,sup,catalogueState)=>{

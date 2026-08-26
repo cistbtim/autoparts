@@ -8087,7 +8087,7 @@ export function PartPhotoCapturePage({parts=[], partFitments=[], vehicles=[], se
   );
 }
 
-export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMany, onGoInventory, onClose }) {
+export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMany, onClose }) {
   // Snapshot on mount so background loadAll() refreshes don't disturb the list while browsing
   const [rows] = useState(() => partSuppliers);
   const [partsSnap] = useState(() => parts);
@@ -8135,7 +8135,6 @@ export function SupplierPartsModal({ supplier, partSuppliers, parts, onDeleteMan
                     <div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{part?.sku||""}{ps.supplier_part_no?` · Supp#: ${ps.supplier_part_no}`:""}</div>
                   </div>
                   {ps.supplier_price!=null&&<div style={{fontSize:13,fontWeight:700,color:"var(--green)",flexShrink:0}}>{ps.supplier_price}</div>}
-                  {part&&<button className="btn btn-ghost btn-sm" style={{flexShrink:0,fontSize:11,padding:"2px 8px"}} onClick={e=>{e.stopPropagation();onGoInventory(part);}} title="Open in Inventory">✏️</button>}
                 </div>
               );
             })}

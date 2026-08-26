@@ -4188,6 +4188,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"vehicleRequests", icon:"🚗",label:"Vehicle Requests",badge:pendingVehicleRequests},
       {id:"branch_users",    icon:"👤",label:"Users"},
     ];
+    if(role==="demo") return [
+      {id:"vehicles",  icon:"🚗",label:t.vehicleMgmt||"Vehicles"},
+      {id:"suppliers", icon:"🏭",label:t.suppliers},
+      {id:"inventory", icon:"📦",label:t.inventory},
+      {id:"shop",      icon:"🛒",label:t.shop},
+    ];
     // admin — show most used
     return [
       {id:"dashboard", icon:"📊",label:t.dashboard},
@@ -8109,7 +8115,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         </div>
       </div>}
 
-      {isDemo&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9999,background:"linear-gradient(90deg,#f59e0b,#f97316)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
+      {isDemo&&<div className="demo-banner" style={{position:"fixed",bottom:0,left:0,right:0,zIndex:90,background:"linear-gradient(90deg,#f59e0b,#f97316)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
         🔒 Demo Mode — all data is read-only. Contact us to get your own account.
       </div>}
       {role==="workshop"&&subStatus&&!subStatus.expired&&subStatus.daysLeft<=7&&(

@@ -61,6 +61,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 @media(max-width:767px){
   .mobile-nav{display:flex}.sidebar{display:none!important}
   .main-content{margin-left:0!important;padding:12px!important;padding-bottom:76px!important}
+  .demo-banner{bottom:76px!important}
   .page-header{flex-direction:column;align-items:flex-start;gap:10px}
   .grid-4{grid-template-columns:1fr 1fr!important}
   .hide-mobile{display:none!important}

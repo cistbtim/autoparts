@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    allowedHosts: ['.trycloudflare.com'],
   },
   base: process.env.VITE_BASE_PATH || '/',
   define: {

@@ -117,31 +117,55 @@ async function scrape(url, { deep = false } = {}) {
 
 // ── CLI ──
 import { pathToFileURL } from "node:url";
+import * as readline from "node:readline";
+
+async function promptForUrl() {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const url = await new Promise(res => rl.question("Paste Spareto product URL: ", res));
+  rl.close();
+  return url.trim();
+}
+
+async function runOne(url, { deep, outFile }) {
+  const data = await scrape(url, { deep });
+  const json = JSON.stringify(data, null, 2);
+  if (outFile) {
+    const fs = await import("node:fs/promises");
+    await fs.writeFile(outFile, json);
+    console.error(`Wrote ${outFile}`);
+  } else {
+    console.log(json);
+  }
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
-  const url = args.find(a => !a.startsWith("--"));
+  const argUrl = args.find(a => !a.startsWith("--"));
   const deep = args.includes("--deep");
   const outIdx = args.indexOf("--out");
   const outFile = outIdx >= 0 ? args[outIdx + 1] : null;
 
-  if (!url) {
-    console.error("Usage: node scripts/scrape-spareto.mjs <spareto-product-url> [--deep] [--out file.json]");
-    process.exit(1);
+  if (argUrl) {
+    runOne(argUrl, { deep, outFile }).catch(e => {
+      console.error("Scrape failed:", e.message);
+      process.exit(1);
+    });
+  } else {
+    // No URL given on the command line — prompt for one, then keep prompting
+    // for more (Ctrl+C or an empty line to stop) so this can run once and
+    // scrape several pages in a row.
+    (async () => {
+      for (;;) {
+        const url = await promptForUrl();
+        if (!url) break;
+        try {
+          await runOne(url, { deep, outFile });
+        } catch (e) {
+          console.error("Scrape failed:", e.message);
+        }
+      }
+    })();
   }
-
-  scrape(url, { deep }).then(async (data) => {
-    const json = JSON.stringify(data, null, 2);
-    if (outFile) {
-      const fs = await import("node:fs/promises");
-      await fs.writeFile(outFile, json);
-      console.error(`Wrote ${outFile}`);
-    } else {
-      console.log(json);
-    }
-  }).catch(e => {
-    console.error("Scrape failed:", e.message);
-    process.exit(1);
-  });
 }
 
 export { scrape, parseProduct, parseGenerations };

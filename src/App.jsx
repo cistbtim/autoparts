@@ -4219,6 +4219,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"grp_demo",icon:"🛍️",label:"Demo",roles:["demo"],children:[
         {id:"inventory",icon:"📦",label:t.inventory,roles:["demo"]},
         {id:"shop",icon:"🛒",label:t.shop,roles:["demo"]},
+        {id:"reports",icon:"📊",label:t.reports,roles:["demo"]},
       ]}
     );
   }
@@ -7344,7 +7345,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         )}
 
         {/* ── REPORTS ── */}
-        {tab==="reports"&&(role==="admin"||role==="branch_admin"||role==="manager"||role==="branch_manager")&&(
+        {tab==="reports"&&(role==="admin"||role==="branch_admin"||role==="manager"||role==="branch_manager"||role==="demo")&&(
           <ReportsPage orders={orders} parts={parts} customers={customers}
             supplierInvoices={supplierInvoices} payments={payments}
             customerInvoices={customerInvoices} customerReturns={customerReturns}

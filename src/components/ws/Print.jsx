@@ -85,7 +85,7 @@ export function printStockLabel(p, settings, labelType="shop") {
   w.document.close();
 }
 
-export function printChecklistReport(job, checklist, settings) {
+export function printChecklistReport(job, checklist, settings, removedParts=[]) {
   const shopName = settings?.shop_name||"MotorDesk";
   const now = new Date().toLocaleString();
   const statusIcon = s => s==="ok"?"✓":s==="issue"?"✗":s==="na"?"—":"·";
@@ -111,6 +111,19 @@ export function printChecklistReport(job, checklist, settings) {
   const okCount   = CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length;
   const issCount  = CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length;
   const naCount   = CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="na").length;
+  const rpRows = removedParts.map(rp=>{
+    const thumbs=(rp.photo_urls||[]).map(photo=>{
+      const thumbUrl=toImgUrl(photo).replace(/sz=w200/,"sz=w120");
+      const m = photo.match(/\/file\/d\/([^/]+)/) || photo.match(/thumbnail[?]id=([^&]+)/) || photo.match(/[?&]id=([^&]+)/);
+      const fullUrl = m ? `https://drive.google.com/uc?export=view&id=${m[1]}` : photo;
+      return `<a href="${fullUrl}" target="_blank" style="cursor:pointer;text-decoration:none"><img src="${thumbUrl}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb"/></a>`;
+    }).join("");
+    return `<tr>
+      <td style="padding:6px 8px;font-size:12px">${rp.part_name||""}</td>
+      <td style="padding:6px 8px;font-size:11px;color:#374151">${rp.note||""}</td>
+      <td style="padding:6px 8px;text-align:center"><div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center">${thumbs}</div></td>
+    </tr>`;
+  }).join("");
   const w=window.open("","_blank","width=800,height=900");
   if(!w) return;
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Check-in Report</title>
@@ -164,6 +177,16 @@ export function printChecklistReport(job, checklist, settings) {
       <span class="badge" style="background:#fee2e2;color:#dc2626">✗ Issues: ${issCount}</span>
       <span class="badge" style="background:#f3f4f6;color:#6b7280">— N/A: ${naCount}</span>
     </div>
+    ${removedParts.length?`
+    <h2 style="font-size:14px;margin:20px 0 8px">🔧 Removed Parts</h2>
+    <table>
+      <thead><tr>
+        <th style="width:36%">Part</th>
+        <th style="width:50%">Memo</th>
+        <th style="width:14%;text-align:center">Photo</th>
+      </tr></thead>
+      <tbody>${rpRows}</tbody>
+    </table>`:""}
     <div class="sig">
       <div class="sig-box">Customer Signature</div>
       <div class="sig-box">Staff Signature</div>

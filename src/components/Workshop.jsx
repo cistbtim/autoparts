@@ -4719,6 +4719,76 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     deleteFromStorage(url); // best-effort cleanup of the stored file
   };
 
+  // ── Removed / Old Parts (taken off the car during the job) ─────
+  const [removedParts,       setRemovedParts]       = useState([]); // [{id,part_name,note,photo_urls}]
+  const [removedPartsLoaded, setRemovedPartsLoaded] = useState(false);
+  const [newRpName,          setNewRpName]          = useState("");
+  const [rpUploading,        setRpUploading]        = useState({}); // {rp_id: bool}
+  const [rpPhotoView,        setRpPhotoView]        = useState(null); // {urls,startIdx} | null
+  const rpCamRefs = useRef({});
+
+  useEffect(()=>{
+    if(removedPartsLoaded) return;
+    api.get("workshop_job_removed_parts",`job_id=eq.${job.id}&order=created_at.asc`)
+      .then(rows=>{ setRemovedParts(Array.isArray(rows)?rows:[]); setRemovedPartsLoaded(true); })
+      .catch(()=>setRemovedPartsLoaded(true));
+  },[removedPartsLoaded,job.id]);
+
+  const addRemovedPart=async()=>{
+    const name=newRpName.trim();
+    if(!name) return;
+    const rec={id:makeId("RP"),job_id:job.id,part_name:name,note:"",photo_urls:[],created_at:new Date().toISOString()};
+    setRemovedParts(p=>[...p,rec]);
+    setNewRpName("");
+    try{ await api.upsert("workshop_job_removed_parts",rec); }
+    catch(e){ console.error("Removed part save error:",e); alert("Save failed — make sure the workshop_job_removed_parts table exists in Supabase."); }
+  };
+
+  const saveRemovedPartField=async(id,patch)=>{
+    setRemovedParts(p=>p.map(r=>r.id===id?{...r,...patch}:r));
+    try{ await api.patch("workshop_job_removed_parts","id",id,patch); }
+    catch(e){ console.error("Removed part save error:",e); }
+  };
+
+  const deleteRemovedPart=async(rp)=>{
+    if(!window.confirm(`Remove "${rp.part_name}" from the list? This deletes its photos too.`)) return;
+    setRemovedParts(p=>p.filter(r=>r.id!==rp.id));
+    try{ await api.delete("workshop_job_removed_parts","id",rp.id); }
+    catch(e){ console.error("Removed part delete error:",e); }
+    (rp.photo_urls||[]).forEach(u=>deleteFromStorage(u));
+  };
+
+  const uploadRemovedPartPhoto=async(rp,dataUrl)=>{
+    setRpUploading(p=>({...p,[rp.id]:true}));
+    try{
+      const blob=await new Promise((res,rej)=>{
+        const img=new Image();
+        img.onload=()=>{
+          const MAX=1200; const canvas=document.createElement("canvas");
+          let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          canvas.width=w;canvas.height=h;
+          canvas.getContext("2d").drawImage(img,0,0,w,h);
+          canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
+        };
+        img.onerror=rej; img.src=dataUrl;
+      });
+      const now=new Date(); const pad2=n=>String(n).padStart(2,"0");
+      const ts=`${now.getFullYear()}${pad2(now.getMonth()+1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}_${Math.random().toString(36).slice(2,6)}`;
+      const reg=(job.vehicle_reg||"REG").replace(/[\s/\\]/g,"_").toUpperCase();
+      const path=`removed-parts/${reg}/${ts}_${rp.id}.jpg`;
+      const url=await uploadToStorage("cars_parts",path,blob);
+      await saveRemovedPartField(rp.id,{photo_urls:[...(rp.photo_urls||[]),url]});
+    }catch(e){ alert("Upload error: "+e.message); }
+    finally{ setRpUploading(p=>({...p,[rp.id]:false})); }
+  };
+
+  const removeRemovedPartPhoto=(rp,url)=>{
+    if(!window.confirm("Delete this photo?")) return;
+    saveRemovedPartField(rp.id,{photo_urls:(rp.photo_urls||[]).filter(u=>u!==url)});
+    deleteFromStorage(url);
+  };
+
   // ── Job documents ─────────────────────────────────────────────
   const [jobDocs,       setJobDocs]       = useState([]);
   const [docName,       setDocName]       = useState("");
@@ -6004,13 +6074,73 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 })}
                 <div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"var(--text3)",flexWrap:"wrap",gap:8}}>
                   <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="na").length} N/A · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="pending").length} Pending</span>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>printChecklistReport(job,checklist,settings)}>🖨️ Print Report</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>printChecklistReport(job,checklist,settings,removedParts)}>🖨️ Print Report</button>
+                </div>
+
+                {/* ══ Removed / Old Parts — photo + memo record of what came off the car ══ */}
+                <div style={{borderTop:"6px solid var(--bg)",padding:"12px 14px 14px"}}>
+                  <div style={{fontSize:13,fontWeight:700,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+                    🔧 Removed Parts <span style={{fontWeight:400,color:"var(--text3)",fontSize:11}}>({removedParts.length})</span>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginBottom:10}}>
+                    <input className="inp" placeholder="Old part name (e.g. Front brake pads)…" value={newRpName}
+                      onChange={e=>setNewRpName(e.target.value)}
+                      onKeyDown={e=>e.key==="Enter"&&addRemovedPart()}
+                      style={{fontSize:12,padding:"6px 8px",flex:1}}/>
+                    <button className="btn btn-primary btn-sm" disabled={!newRpName.trim()} onClick={addRemovedPart}>+ Add</button>
+                  </div>
+                  {!removedPartsLoaded?(
+                    <div style={{padding:12,textAlign:"center",color:"var(--text3)",fontSize:12}}>Loading…</div>
+                  ):removedParts.length===0?(
+                    <div style={{padding:12,textAlign:"center",color:"var(--text3)",fontSize:12}}>No removed parts recorded yet.</div>
+                  ):(
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {removedParts.map(rp=>{
+                        const photos=Array.isArray(rp.photo_urls)?rp.photo_urls:[];
+                        return (
+                          <div key={rp.id} style={{padding:"8px 10px",borderRadius:8,background:"var(--surface2)",border:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:6}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                              <span style={{fontSize:13,fontWeight:600,flex:1,minWidth:120}}>{rp.part_name}</span>
+                              <button onClick={()=>rpCamRefs.current[rp.id]?.click()} title="Add photo"
+                                style={{fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",
+                                  background:photos.length?"rgba(96,165,250,.15)":"transparent",
+                                  color:photos.length?"var(--blue)":"var(--text3)",
+                                  border:`1px solid ${photos.length?"rgba(96,165,250,.3)":"var(--border)"}`}}>
+                                {rpUploading[rp.id]?"⏳":photos.length?`📷 +${photos.length}`:"📷"}
+                              </button>
+                              <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+                                ref={el=>rpCamRefs.current[rp.id]=el}
+                                onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;const fr=new FileReader();fr.onload=ev=>uploadRemovedPartPhoto(rp,ev.target.result);fr.readAsDataURL(file);}}/>
+                              {photos.map((url,pi)=>(
+                                <div key={url+pi} style={{position:"relative",flexShrink:0}}>
+                                  <img src={toImgUrl(url)} alt="removed part" onClick={()=>setRpPhotoView({urls:photos,startIdx:pi})}
+                                    style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)",display:"block"}}
+                                    referrerPolicy="no-referrer"
+                                    onError={e=>{const m=url.match(/thumbnail[?]id=([^&]+)/)||url.match(/[?&]id=([^&]+)/)||url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {e.target.style.display="none";}}}/>
+                                  <button title="Delete photo"
+                                    onClick={e=>{ e.stopPropagation(); removeRemovedPartPhoto(rp,url); }}
+                                    style={{position:"absolute",top:-6,right:-6,width:16,height:16,borderRadius:"50%",border:"none",cursor:"pointer",background:"var(--red)",color:"#fff",fontSize:10,fontWeight:800,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0,boxShadow:"0 1px 4px rgba(0,0,0,.35)"}}>✕</button>
+                                </div>
+                              ))}
+                              <button title="Remove from list" onClick={()=>deleteRemovedPart(rp)}
+                                style={{marginLeft:"auto",fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",background:"transparent",color:"var(--red)",border:"1px solid rgba(239,68,68,.3)"}}>🗑</button>
+                            </div>
+                            <input className="inp" placeholder="Memo (optional)…" value={rp.note||""}
+                              onChange={e=>setRemovedParts(p=>p.map(r=>r.id===rp.id?{...r,note:e.target.value}:r))}
+                              onBlur={e=>saveRemovedPartField(rp.id,{note:e.target.value})}
+                              style={{fontSize:12,padding:"4px 8px"}}/>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </>
             )}
           </div>
         </Overlay>
       )}
+      {rpPhotoView&&<ImgLightbox urls={rpPhotoView.urls} startIdx={rpPhotoView.startIdx} onClose={()=>setRpPhotoView(null)}/>}
 
       {/* ══ PHOTO LIGHTBOX (global) ══ */}
       {viewPhoto&&(

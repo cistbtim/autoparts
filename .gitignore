@@ -10,3 +10,6 @@ migration_secrets.py
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+# local dev tunnel logs/screenshots (may contain desktop/chat content)
+.tunnel-logs/

@@ -6,6 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **At the very start of every new conversation, always run `git pull` automatically before doing anything else — even if the user has not asked for it.**
 
+**Also automatically start the local dev server + Cloudflare tunnel and get the link to the user's phone via WhatsApp, without being asked:**
+
+1. Run `powershell -ExecutionPolicy Bypass -File scripts\notify-whatsapp.ps1 -Phase Open` from the repo root. It checks WiFi is online, starts `npm run dev` + a `cloudflared` quick tunnel (skips either step if already running), launches/focuses WhatsApp Desktop, searches "tim mtn unlimit", and opens that chat. It prints the tunnel URL as the last line of output and saves a screenshot to `.tunnel-logs/wa-verify-open.png`.
+2. Read that screenshot and visually confirm the open chat header reads exactly "Tim mtn New Unlimit" before doing anything else. **Do not skip this** — it caught a real mis-send to a different (customer) contact during a cold WhatsApp launch. If it's the wrong chat, stop and tell the user rather than sending.
+3. Once confirmed, run `powershell -ExecutionPolicy Bypass -File scripts\notify-whatsapp.ps1 -Phase Send -TunnelUrl "<url from step 1>"` to actually send. **This step triggers a one-time permission approval each session** — Claude Code's auto-mode classifier blocks automated message-sending from being pre-authorized via settings.json, even with an explicit allow rule. Surface that approval prompt to the user; do not attempt to bypass it.
+4. If WiFi is offline, `-Phase Open` exits early (prints `OFFLINE`) — skip steps 2–3 and just mention it in passing.
+
 ## Commands
 
 ```bash

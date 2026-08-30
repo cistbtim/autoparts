@@ -3717,6 +3717,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const customerScopePartIds=(role==="customer"&&user.supplier_scope_id)
     ?new Set(partSuppliers.filter(ps=>String(ps.supplier_id)===String(user.supplier_scope_id)).map(ps=>String(ps.part_id)))
     :null;
+  // Precompute once (O(M)) instead of re-scanning all partFitments per part per row (was O(N*M) - very slow with many parts/fitments)
+  const fitmentCountByPart={};
+  partFitments.forEach(f=>{const k=String(f.part_id);fitmentCountByPart[k]=(fitmentCountByPart[k]||0)+1;});
   const fp=displayParts.filter(p=>{
     if(customerScopePartIds&&!p._isSupplierPart&&!customerScopePartIds.has(String(p.id)))return false;
     // role-based access filter
@@ -3762,7 +3765,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
     if(invVehicleFilterIds&&!invVehicleFilterIds.has(String(p.id)))return false;
     if(filterFits!=="__all__"){
-      const hasFit=partFitments.some(f=>String(f.part_id)===String(p.id));
+      const hasFit=!!fitmentCountByPart[String(p.id)];
       if(filterFits==="none"&&hasFit)return false;
       if(filterFits==="has"&&!hasFit)return false;
     }
@@ -5056,7 +5059,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
                           <span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:16}}>{fmtAmt(p.price)}</span>
                           <div style={{display:"flex",gap:5,alignItems:"center"}}>
-                            {(()=>{const cnt=partFitments.filter(f=>String(f.part_id)===String(p.id)).length;return cnt>0?<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{cnt} 🚗</span>:null;})()}
+                            {(()=>{const cnt=fitmentCountByPart[String(p.id)]||0;return cnt>0?<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{cnt} 🚗</span>:null;})()}
                             {(role==="branch_admin"&&!p._bsSet)
                               ? <span className="badge" style={{background:"var(--surface3)",color:"var(--text3)"}}>Not set</span>
                               : p.stock===0
@@ -5221,7 +5224,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                             {(role==="branch_admin"&&!p._bsSet)?"⚪":p.stock===0?"🔴":p.stock<=p.min_stock?"🟡":"🟢"}
                           </td>
                           <td style={{textAlign:"center"}}>
-                            {(()=>{const cnt=partFitments.filter(f=>String(f.part_id)===String(p.id)).length;return cnt>0?<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{cnt} 🚗</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>;})()}
+                            {(()=>{const cnt=fitmentCountByPart[String(p.id)]||0;return cnt>0?<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{cnt} 🚗</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>;})()}
                           </td>
                           <td style={{textAlign:"center",fontSize:16}} title={p.is_quantum?"Toyota Quantum part":""}>
                             {p.is_quantum?<span title="Toyota Quantum">🚐</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>}

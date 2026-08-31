@@ -253,6 +253,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [filterCat,setFilterCat]=useState("__all__");
   const [filterLow,setFilterLow]=useState(false);
   const [filterPendingReview,setFilterPendingReview]=useState(false);
+  const [filterNeedsReview,setFilterNeedsReview]=useState(false);
   const [filterFits,setFilterFits]=useState("__all__"); // __all__ | none | has
   const [filterBranch,setFilterBranch]=useState("__all__"); // __all__ | "main" | branch_id
   const [filterQuantum,setFilterQuantum]=useState(false);
@@ -342,7 +343,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   },[searchPart]);
 
   // Reset page when filters change
-  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier,filterPendingReview,invVehicleFilterIds]);
+  useEffect(()=>{ setInvPage(0); },[filterCat,filterLow,filterFits,filterQuantum,filterHiace,filterInStock,filterNoPhoto,filterSupplier,filterPendingReview,filterNeedsReview,invVehicleFilterIds]);
   useEffect(()=>{ setShopPage(0); },[searchPart]);
   // Modals
   const [M,setM]=useState({});
@@ -3762,6 +3763,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(filterNoPhoto&&(p.image_url||p.image_data))return false;
     if(supplierFilterPartIds&&!supplierFilterPartIds.has(String(p.id)))return false;
     if(filterPendingReview&&p.review_status!=="pending")return false;
+    if(filterNeedsReview&&!p.needs_review)return false;
     if(filterCat!=="__all__"&&p.category!==filterCat)return false;
     if(invVehicleFilterIds&&!invVehicleFilterIds.has(String(p.id)))return false;
     if(filterFits!=="__all__"){
@@ -3801,6 +3803,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     return [u.name,u.username,u.phone,u.email,u.role].some(v=>v?.toLowerCase().includes(q));
   });
   const pendingPartsReview=(role==="admin"||role==="manager")?parts.filter(p=>p.review_status==="pending").length:0;
+  const needsReviewCount=(role==="admin"||role==="manager"||role==="branch_admin")?parts.filter(p=>p.needs_review).length:0;
   const lowStock=displayParts.filter(p=>{
     if(role==="branch_admin"){const isMain=!p.branch_id||p.branch_id===mainBranchId;const isOwn=p.branch_id===branchId;return (isMain||isOwn)&&p.stock<=p.min_stock;}
     return (branchId?p.branch_id===branchId:true)&&p.stock<=p.min_stock;
@@ -4729,6 +4732,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 </span>
               </div>
             )}
+            {(role==="admin"||role==="manager"||role==="branch_admin")&&needsReviewCount>0&&(
+              <div onClick={()=>setFilterNeedsReview(f=>!f)} style={{
+                background:filterNeedsReview?"rgba(167,139,250,.18)":"rgba(167,139,250,.07)",
+                border:`1px solid ${filterNeedsReview?"rgba(167,139,250,.7)":"rgba(167,139,250,.3)"}`,
+                borderRadius:10,padding:"10px 16px",marginBottom:14,
+                display:"flex",alignItems:"center",gap:10,cursor:"pointer",transition:"all .15s"
+              }}>
+                <span style={{fontSize:18}}>🔍</span>
+                <div style={{flex:1,fontSize:13}}>
+                  <span style={{fontWeight:700,color:"var(--purple)"}}>{needsReviewCount} part{needsReviewCount!==1?"s":""} flagged for review</span>
+                  <span style={{color:"var(--text3)",marginLeft:8}}>Marked "Needs Review" in Edit Part — double-check before trusting the data</span>
+                </div>
+                <span style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",
+                  color:filterNeedsReview?"var(--purple)":"var(--text3)",
+                  background:filterNeedsReview?"rgba(167,139,250,.15)":"var(--surface2)",
+                  padding:"3px 10px",borderRadius:99,border:`1px solid ${filterNeedsReview?"rgba(167,139,250,.5)":"var(--border)"}`}}>
+                  {filterNeedsReview?"✓ Showing flagged":"Review"}
+                </span>
+              </div>
+            )}
             <PH title={t.inventory} subtitle={`${parts.length} parts · ${lowStock.length} low`}
               action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <button className="btn btn-ghost btn-sm" disabled={invRefreshing} onClick={async()=>{setInvRefreshing(true);try{api.cacheClearAll();await refreshTables("parts","branch_stock","part_fitments","part_suppliers","vehicles","orders","customers","suppliers","inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes","inventory_logs","customer_queries","workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes","workshop_customers","workshop_vehicles","workshop_stock","workshop_services","workshop_suppliers","ws_supplier_requests","ws_supplier_quotes","ws_supplier_invoices","ws_supplier_invoice_items","ws_supplier_payments","ws_supplier_returns","ws_purchase_orders","ws_po_items");}finally{setInvRefreshing(false);}}} title="Reload all data">
@@ -5039,6 +5062,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                           {p.bin_location&&<span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--blue)",background:"rgba(96,165,250,.1)",padding:"1px 7px",borderRadius:5}}>📦 {p.bin_location}</span>}
                           {p.category&&<span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:10}}>{p.category}</span>}
                           {p.review_status==="pending"&&<span className="badge" style={{background:"rgba(251,191,36,.18)",color:"#fbbf24",fontSize:10,border:"1px solid rgba(251,191,36,.4)"}}>⏳ Pending Review</span>}
+                          {p.needs_review&&<span className="badge" style={{background:"rgba(167,139,250,.18)",color:"var(--purple)",fontSize:10,border:"1px solid rgba(167,139,250,.4)"}}>🔍 Needs Review</span>}
                           {p.is_quantum&&<span className="badge" style={{background:"rgba(249,115,22,.12)",color:"var(--accent)",fontSize:10}}>🚐 Quantum</span>}
                           {p.is_hiace&&<span className="badge" style={{background:"rgba(59,130,246,.12)",color:"var(--blue)",fontSize:10}}>🚐 Hiace</span>}
                         </div>

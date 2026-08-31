@@ -3605,11 +3605,11 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
     reference_url:p.reference_url||"",
     bin_location:p.bin_location||"", is_quantum:p.is_quantum||false, is_hiace:p.is_hiace||false,
     auto_reorder:p.auto_reorder||false, reorder_point:p.reorder_point??0, reorder_qty:p.reorder_qty??1,
-    preferred_supplier_id:p.preferred_supplier_id||"",
+    preferred_supplier_id:p.preferred_supplier_id||"", needs_review:p.needs_review||false,
   }:{
     sku:branchSkuPrefix?branchSkuPrefix+"-":"", name:"", category:"Engine", brand:"", price:0, cost_price:0, stock:"", minStock:1,
     image_url:"", photos:[], chinese_desc:"", make:"", model:"", year_range:"", oe_number:"", reference_url:"", bin_location:"", is_quantum:false, is_hiace:false,
-    auto_reorder:false, reorder_point:0, reorder_qty:1, preferred_supplier_id:"",
+    auto_reorder:false, reorder_point:0, reorder_qty:1, preferred_supplier_id:"", needs_review:false,
   };
   const [f,setF]=useState(()=>initialF?{...makeF(part),...initialF}:makeF(part));
   const [ptab, setPtab] = useState(()=>{
@@ -3689,6 +3689,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
     bin_location:fv.bin_location||"", is_quantum:!!fv.is_quantum, is_hiace:!!fv.is_hiace,
     auto_reorder:!!fv.auto_reorder, reorder_point:+fv.reorder_point||0, reorder_qty:+fv.reorder_qty||1,
     preferred_supplier_id:fv.preferred_supplier_id?+fv.preferred_supplier_id:null,
+    needs_review:!!fv.needs_review,
   });
 
   // Auto-save immediately when photo is uploaded (existing part only)
@@ -4000,6 +4001,19 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               <div>
                 <div style={{fontWeight:600,fontSize:12}}>🚐 Toyota Hiace</div>
                 <div style={{fontSize:10,color:"var(--text3)"}}>Hiace-specific stock</div>
+              </div>
+            </label>
+            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",userSelect:"none",flex:"1 1 auto"}}>
+              <div onClick={()=>s("needs_review",!f.needs_review)} style={{
+                width:38,height:22,borderRadius:11,background:f.needs_review?"var(--purple)":"var(--surface3)",
+                border:`1.5px solid ${f.needs_review?"var(--purple)":"var(--border)"}`,
+                position:"relative",transition:"background .18s,border-color .18s",flexShrink:0,cursor:"pointer"
+              }}>
+                <div style={{position:"absolute",top:2,left:f.needs_review?18:2,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left .18s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/>
+              </div>
+              <div>
+                <div style={{fontWeight:600,fontSize:12}}>🔍 Needs Review</div>
+                <div style={{fontSize:10,color:"var(--text3)"}}>Flag for a human to double-check (e.g. after AI-assisted research)</div>
               </div>
             </label>
           </div>

@@ -3624,6 +3624,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
   const [deleting, setDeleting] = useState(false);
   const [priceHistory,setPriceHistory]=useState([]);
   const [priceHistoryOpen,setPriceHistoryOpen]=useState(false);
+  const [selectedOeTok,setSelectedOeTok]=useState("");
   useEffect(()=>{
     if(!part?.id) return;
     let cancelled=false;
@@ -3946,6 +3947,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
             </div>
             {f.oe_number&&(()=>{
               const oeTokens=f.oe_number.split(/[\s,;]+/).filter(Boolean);
+              const activeTok=oeTokens.includes(selectedOeTok)?selectedOeTok:oeTokens[0];
               const sites=[
                 {label:"SpareTO",color:"#e65c00",url:v=>`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(v)}`},
                 {label:"Alibaba",color:"#1d4ed8",url:v=>`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(v)}`},
@@ -3953,16 +3955,16 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                 {label:"eBay",color:"#e53238",url:v=>`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(v)}`},
               ];
               return (
-                <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
-                  {sites.map(site=>oeTokens.length>1 ? (
-                    <select key={site.label} className="cp-btn" style={{color:site.color}}
-                      value="" onChange={e=>{if(e.target.value)window.open(site.url(e.target.value),"_blank","noopener,noreferrer");}}>
-                      <option value="">🔍 {site.label}…</option>
+                <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
+                  {oeTokens.length>1&&(
+                    <select className="cp-btn" style={{fontWeight:700}}
+                      value={activeTok} onChange={e=>setSelectedOeTok(e.target.value)}>
                       {oeTokens.map((tok,i)=>(<option key={i} value={tok}>{tok}</option>))}
                     </select>
-                  ) : (
+                  )}
+                  {sites.map(site=>(
                     <button key={site.label} className="cp-btn" style={{color:site.color}}
-                      onClick={()=>window.open(site.url(oeTokens[0]),"_blank","noopener,noreferrer")}>
+                      onClick={()=>window.open(site.url(activeTok),"_blank","noopener,noreferrer")}>
                       🔍 {site.label}
                     </button>
                   ))}

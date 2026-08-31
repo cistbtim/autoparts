@@ -26,14 +26,21 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .kb-card:hover{box-shadow:0 8px 28px rgba(0,0,0,.4);transform:translateY(-2px);border-color:var(--border2)}
 .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
 .tbl{width:100%;border-collapse:collapse}
-.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;position:relative}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;position:relative;
+  background:
+    linear-gradient(to right,var(--surface) 30%,rgba(0,0,0,0)) left,
+    linear-gradient(to left,var(--surface) 30%,rgba(0,0,0,0)) right,
+    radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.22),rgba(0,0,0,0)) left,
+    radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.22),rgba(0,0,0,0)) right;
+  background-repeat:no-repeat;background-color:var(--surface);
+  background-size:26px 100%,26px 100%,12px 100%,12px 100%;
+  background-attachment:local,local,scroll,scroll;}
 .mob-cards{display:none;flex-direction:column;gap:10px}
 .desk-table{display:block}
 @media(max-width:640px){.mob-cards{display:flex!important}.desk-table{display:none!important}}
 @media(max-width:640px){
   .tbl-wrap{border-radius:0 0 var(--radius) var(--radius)}
   .tbl th,.tbl td{padding:8px 10px;font-size:12px;white-space:nowrap}
-  .tbl-scroll-hint::after{content:"";position:absolute;right:0;top:0;bottom:0;width:32px;background:linear-gradient(to right,transparent,var(--surface));pointer-events:none;border-radius:0 var(--radius) var(--radius) 0}
 }
 .tbl th{padding:11px 14px;text-align:left;font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap}
 .tbl td{padding:13px 14px;font-size:14px;border-bottom:1px solid var(--border);vertical-align:middle}

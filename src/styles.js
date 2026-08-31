@@ -34,7 +34,12 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
     radial-gradient(farthest-side at 100% 50%,rgba(249,115,22,.45),rgba(0,0,0,0)) right;
   background-repeat:no-repeat;background-color:var(--surface);
   background-size:26px 100%,26px 100%,12px 100%,12px 100%;
-  background-attachment:local,local,scroll,scroll;}
+  background-attachment:local,local,scroll,scroll;
+  scrollbar-width:auto;scrollbar-color:rgba(249,115,22,.6) var(--surface2);}
+.tbl-wrap::-webkit-scrollbar{height:10px}
+.tbl-wrap::-webkit-scrollbar-track{background:var(--surface2);border-radius:99px}
+.tbl-wrap::-webkit-scrollbar-thumb{background:rgba(249,115,22,.6);border-radius:99px}
+.tbl-wrap::-webkit-scrollbar-thumb:hover{background:rgba(249,115,22,.9)}
 .mob-cards{display:none;flex-direction:column;gap:10px}
 .desk-table{display:block}
 @media(max-width:640px){.mob-cards{display:flex!important}.desk-table{display:none!important}}

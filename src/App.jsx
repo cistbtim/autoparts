@@ -5139,8 +5139,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 <table className="tbl">
                   <thead><tr>
                     {bulkPriceMode&&<th style={{width:32}}/>}
-                    {["",t.sku,`${t.name} / ${t.chineseDesc}`,t.bin||t.binLocation||"Bin",t.make,t.model,t.yearRange,t.oeNumber,t.category,t.price,t.cost||t.costPrice||"Cost",t.stock||"St"].map(h=><th key={h}>{h}</th>)}
+                    {["",t.sku,`${t.name} / ${t.chineseDesc}`].map(h=><th key={h}>{h}</th>)}
                     <th style={{textAlign:"center",whiteSpace:"nowrap"}}>🚗</th>
+                    {[t.bin||t.binLocation||"Bin",t.make,t.model,t.yearRange,t.oeNumber,t.category,t.price,t.cost||t.costPrice||"Cost",t.stock||"St"].map(h=><th key={h}>{h}</th>)}
                     <th style={{textAlign:"center",whiteSpace:"nowrap"}} title="Toyota Quantum">🚐Q</th>
                     <th style={{textAlign:"center",whiteSpace:"nowrap"}} title="Toyota Hiace">🚐H</th>
                     {(role==="admin"||role==="branch_admin")&&<th style={{position:"sticky",right:0,background:"var(--surface2)",zIndex:2,boxShadow:"-2px 0 8px rgba(0,0,0,.3)"}}>{t.actions||"Actions"}</th>}
@@ -5214,6 +5215,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                               );})()}
                             </div>
                           </td>
+                          <td style={{textAlign:"center"}}>
+                            {(()=>{const cnt=fitmentCountByPart[String(p.id)]||0;return cnt>0?<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{cnt} 🚗</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>;})()}
+                          </td>
                           <td>
                             {p.bin_location
                               ? <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",fontFamily:"DM Mono,monospace",fontSize:11,maxWidth:56,overflow:"hidden",textOverflow:"ellipsis",display:"inline-block",whiteSpace:"nowrap"}} title={p.bin_location}>{p.bin_location}</span>
@@ -5247,9 +5251,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                           <td style={{fontFamily:"Rajdhani,sans-serif",fontSize:13,color:"var(--text3)"}}>{p.cost_price>0?fmtAmt(p.cost_price):"—"}</td>
                           <td style={{textAlign:"center",fontSize:16}} title={(role==="branch_admin"&&!p._bsSet)?"Not configured":p.stock===0?"Out of Stock":p.stock<=p.min_stock?"Low Stock":"In Stock"}>
                             {(role==="branch_admin"&&!p._bsSet)?"⚪":p.stock===0?"🔴":p.stock<=p.min_stock?"🟡":"🟢"}
-                          </td>
-                          <td style={{textAlign:"center"}}>
-                            {(()=>{const cnt=fitmentCountByPart[String(p.id)]||0;return cnt>0?<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)"}}>{cnt} 🚗</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>;})()}
                           </td>
                           <td style={{textAlign:"center",fontSize:16}} title={p.is_quantum?"Toyota Quantum part":""}>
                             {p.is_quantum?<span title="Toyota Quantum">🚐</span>:<span style={{color:"var(--text3)",fontSize:11}}>—</span>}

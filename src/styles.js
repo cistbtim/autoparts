@@ -133,6 +133,8 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .sidebar .lang{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.7)}.sidebar .lang.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .sidebar .btn-ghost{background:rgba(255,255,255,.07);color:rgba(255,255,255,.65);border-color:rgba(255,255,255,.1)}.sidebar .btn-ghost:hover{background:rgba(255,255,255,.12);color:#fff}
 .tbl th{background:var(--sidebar-bg);color:rgba(255,255,255,.78);border-bottom:none}
+.tbl thead th:first-child{box-shadow:inset 10px 0 8px -8px rgba(249,115,22,.55)}
+.tbl thead th:last-child{box-shadow:inset -10px 0 8px -8px rgba(249,115,22,.55)}
 .inp-wrap{position:relative;width:100%}.inp-wrap .inp-icon{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;display:flex;align-items:center;justify-content:center}
 .status-bar{position:fixed;bottom:0;left:240px;right:0;height:28px;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:16px;font-size:10.5px;color:var(--text3);letter-spacing:.03em;z-index:40}
 @media(max-width:767px){.status-bar{left:0;bottom:66px}}

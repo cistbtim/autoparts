@@ -30,8 +30,8 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   background:
     linear-gradient(to right,var(--surface) 30%,rgba(0,0,0,0)) left,
     linear-gradient(to left,var(--surface) 30%,rgba(0,0,0,0)) right,
-    radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.22),rgba(0,0,0,0)) left,
-    radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.22),rgba(0,0,0,0)) right;
+    radial-gradient(farthest-side at 0 50%,rgba(249,115,22,.45),rgba(0,0,0,0)) left,
+    radial-gradient(farthest-side at 100% 50%,rgba(249,115,22,.45),rgba(0,0,0,0)) right;
   background-repeat:no-repeat;background-color:var(--surface);
   background-size:26px 100%,26px 100%,12px 100%,12px 100%;
   background-attachment:local,local,scroll,scroll;}

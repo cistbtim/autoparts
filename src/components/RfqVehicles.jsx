@@ -1411,7 +1411,26 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
     const cv = touchUpCanvasRef.current;
     const last = touchUpHistoryRef.current.pop();
     if (!cv || !last) return;
+    cv.width = last.width; cv.height = last.height;
     cv.getContext("2d").putImageData(last, 0, 0);
+  };
+
+  const touchUpRotate = () => {
+    const cv = touchUpCanvasRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    try {
+      touchUpHistoryRef.current.push(ctx.getImageData(0, 0, cv.width, cv.height));
+      if (touchUpHistoryRef.current.length > 15) touchUpHistoryRef.current.shift();
+    } catch (err) { console.error("Touch-up: could not snapshot for undo:", err); }
+    const off = document.createElement("canvas");
+    off.width = cv.height; off.height = cv.width;
+    const octx = off.getContext("2d");
+    octx.translate(off.width/2, off.height/2);
+    octx.rotate(Math.PI/2);
+    octx.drawImage(cv, -cv.width/2, -cv.height/2);
+    cv.width = off.width; cv.height = off.height;
+    ctx.drawImage(off, 0, 0);
   };
 
   const touchUpReset = () => {
@@ -1698,6 +1717,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14,justifyContent:"center"}}>
             <button className="btn btn-ghost btn-sm" onClick={()=>{setShowTouchUp(false);setError(null);}}>✕ Cancel</button>
             <button className="btn btn-ghost btn-sm" onClick={touchUpUndo}>↩ Undo</button>
+            <button className="btn btn-ghost btn-sm" onClick={touchUpRotate} title="Rotate 90°">↻ Rotate</button>
             <button className="btn btn-ghost btn-sm" onClick={touchUpReset}>⟲ Reset</button>
             <button className="btn btn-primary btn-sm" style={{background:"var(--accent)",border:"none"}} onClick={touchUpSave}>
               💾 Save Touch-Up

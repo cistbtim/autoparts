@@ -3945,7 +3945,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               {f.oe_number&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.oe_number)}>📋 Copy OE</button>}
             </div>
             {f.oe_number&&(
-              <div style={{display:"flex",gap:6,marginBottom:6}}>
+              <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
                 <select className="inp" style={{color:"#e65c00",fontSize:12}}
                   value="" onChange={e=>{if(e.target.value)window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
                   <option value="">🔍 Search on SpareTO…</option>
@@ -3956,6 +3956,20 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                 <select className="inp" style={{color:"#1d4ed8",fontSize:12}}
                   value="" onChange={e=>{if(e.target.value)window.open(`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
                   <option value="">🔍 Search on Alibaba…</option>
+                  {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
+                    <option key={i} value={tok}>{tok}</option>
+                  ))}
+                </select>
+                <select className="inp" style={{color:"#059669",fontSize:12}}
+                  value="" onChange={e=>{if(e.target.value)window.open(`https://rrr.lt/en/search?exact=1&q=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+                  <option value="">🔍 Search on RRR.lt…</option>
+                  {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
+                    <option key={i} value={tok}>{tok}</option>
+                  ))}
+                </select>
+                <select className="inp" style={{color:"#e53238",fontSize:12}}
+                  value="" onChange={e=>{if(e.target.value)window.open(`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
+                  <option value="">🔍 Search on eBay…</option>
                   {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
                     <option key={i} value={tok}>{tok}</option>
                   ))}

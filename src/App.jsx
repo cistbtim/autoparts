@@ -7652,6 +7652,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           nextPart={nextPart}
           vehicles={vehicles} partFitments={partFitments}
           onRefreshVehicles={()=>refreshTables("vehicles")}
+          onSaveVehicle={saveVehicle}
           onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart}
           onDelete={ep&&canEditPart(ep)?async(p)=>{ if(p.id)releaseLock("part",p.id); await deletePart(p.id); closeM("editPart"); }:null}
           onCreateOpposite={createOpposite}

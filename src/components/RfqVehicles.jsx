@@ -1816,7 +1816,8 @@ export function matchSparetoToVehicles(data, internalVehicles) {
 // experience stays identical. onClose is called (in addition to the internal
 // setExpanded(false)) when the fullscreen overlay's close button is used, so a
 // caller that mounts this standalone (not as a PartModal tab) can unmount it.
-export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, onRefreshVehicles, initialSearch="", t, imageUrl="", onPhotoChange, allParts=[], allFitments=[], supplierMode=false, onClose}) {
+export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, onSaveVehicle, onRefreshVehicles, initialSearch="", t, imageUrl="", onPhotoChange, allParts=[], allFitments=[], supplierMode=false, onClose}) {
+  const [editVehicle, setEditVehicle] = useState(null);
   const [search,  setSearch]  = useState(initialSearch);
   const [pending, setPending] = useState(new Set()); // selected but not yet saved
   const [saving,  setSaving]  = useState(false);
@@ -2448,10 +2449,15 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
                   {v.engine&&<span style={{fontSize:11,color:"var(--blue)",marginLeft:6}}>🔧 {v.engine}</span>}
                 </div>
               </div>
-              <button className="btn btn-ghost btn-xs" style={{flexShrink:0,color:marked?"var(--green)":"var(--red)"}}
-                onClick={()=>toggleDelete(f.id)}>
-                {marked ? "↩ Undo" : "✕"}
-              </button>
+              <div style={{display:"flex",gap:4,flexShrink:0}}>
+                {onSaveVehicle&&!marked&&(
+                  <button className="btn btn-ghost btn-xs" title="Edit this vehicle" onClick={()=>setEditVehicle({...v})}>✏️</button>
+                )}
+                <button className="btn btn-ghost btn-xs" style={{color:marked?"var(--green)":"var(--red)"}}
+                  onClick={()=>toggleDelete(f.id)}>
+                  {marked ? "↩ Undo" : "✕"}
+                </button>
+              </div>
             </div>
           );
         })}
@@ -2601,14 +2607,22 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
   );
 
   const closeExpanded=()=>{ setExpanded(false); onClose&&onClose(); };
+  const vehicleEditOverlay = editVehicle && onSaveVehicle && (
+    <ErrorBoundary name="VehicleModal">
+      <VehicleModal vehicle={editVehicle} parts={allParts}
+        onSave={async(data)=>{ await onSaveVehicle(data); setEditVehicle(null); refreshVehicles(); }}
+        onClose={()=>setEditVehicle(null)} t={t}/>
+    </ErrorBoundary>
+  );
   if(expanded) return (
     <Overlay onClose={closeExpanded} maxWidth="1100px">
       <MHead title={`🔗 Vehicle Fits — ${part.sku||""}`} sub={part.name} onClose={closeExpanded}/>
       {body}
+      {vehicleEditOverlay}
     </Overlay>
   );
 
-  return <div>{body}</div>;
+  return <div>{body}{vehicleEditOverlay}</div>;
 }
 
 // ═══════════════════════════════════════════════════════════════

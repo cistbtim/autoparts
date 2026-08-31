@@ -3595,7 +3595,7 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onRefreshVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onEditSupplier,onGoBack=null}) {
+export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onSaveVehicle,onRefreshVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onEditSupplier,onGoBack=null}) {
   const parsePhotos = (v) => { if(Array.isArray(v)) return v; try{ const a=JSON.parse(v||"[]"); return Array.isArray(a)?a:[]; }catch{ return []; } };
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
@@ -4221,6 +4221,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
           onAdd={onSaveFitment}
           onDelete={onDeleteFitment}
           onGoVehicles={onGoVehicles}
+          onSaveVehicle={onSaveVehicle}
           onRefreshVehicles={onRefreshVehicles}
           initialSearch={initialFitSearch}
           t={t}

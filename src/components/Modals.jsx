@@ -3944,38 +3944,31 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               <FL label={t.oeNumber}/>
               {f.oe_number&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.oe_number)}>📋 Copy OE</button>}
             </div>
-            {f.oe_number&&(
-              <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
-                <select className="inp" style={{color:"#e65c00",fontSize:12}}
-                  value="" onChange={e=>{if(e.target.value)window.open(`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-                  <option value="">🔍 Search on SpareTO…</option>
-                  {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
-                    <option key={i} value={tok}>{tok}</option>
+            {f.oe_number&&(()=>{
+              const oeTokens=f.oe_number.split(/[\s,;]+/).filter(Boolean);
+              const sites=[
+                {label:"SpareTO",color:"#e65c00",url:v=>`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(v)}`},
+                {label:"Alibaba",color:"#1d4ed8",url:v=>`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(v)}`},
+                {label:"RRR.lt",color:"#059669",url:v=>`https://rrr.lt/en/search?exact=1&q=${encodeURIComponent(v)}`},
+                {label:"eBay",color:"#e53238",url:v=>`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(v)}`},
+              ];
+              return (
+                <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                  {sites.map(site=>oeTokens.length>1 ? (
+                    <select key={site.label} className="cp-btn" style={{color:site.color}}
+                      value="" onChange={e=>{if(e.target.value)window.open(site.url(e.target.value),"_blank","noopener,noreferrer");}}>
+                      <option value="">🔍 {site.label}…</option>
+                      {oeTokens.map((tok,i)=>(<option key={i} value={tok}>{tok}</option>))}
+                    </select>
+                  ) : (
+                    <button key={site.label} className="cp-btn" style={{color:site.color}}
+                      onClick={()=>window.open(site.url(oeTokens[0]),"_blank","noopener,noreferrer")}>
+                      🔍 {site.label}
+                    </button>
                   ))}
-                </select>
-                <select className="inp" style={{color:"#1d4ed8",fontSize:12}}
-                  value="" onChange={e=>{if(e.target.value)window.open(`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-                  <option value="">🔍 Search on Alibaba…</option>
-                  {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
-                    <option key={i} value={tok}>{tok}</option>
-                  ))}
-                </select>
-                <select className="inp" style={{color:"#059669",fontSize:12}}
-                  value="" onChange={e=>{if(e.target.value)window.open(`https://rrr.lt/en/search?exact=1&q=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-                  <option value="">🔍 Search on RRR.lt…</option>
-                  {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
-                    <option key={i} value={tok}>{tok}</option>
-                  ))}
-                </select>
-                <select className="inp" style={{color:"#e53238",fontSize:12}}
-                  value="" onChange={e=>{if(e.target.value)window.open(`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-                  <option value="">🔍 Search on eBay…</option>
-                  {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
-                    <option key={i} value={tok}>{tok}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+                </div>
+              );
+            })()}
             <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)} placeholder="OE number / OEM reference"/>
           </FD>
           <FD>

@@ -1836,8 +1836,9 @@ export function matchSparetoToVehicles(data, internalVehicles) {
 // experience stays identical. onClose is called (in addition to the internal
 // setExpanded(false)) when the fullscreen overlay's close button is used, so a
 // caller that mounts this standalone (not as a PartModal tab) can unmount it.
-export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, onSaveVehicle, onRefreshVehicles, initialSearch="", t, imageUrl="", onPhotoChange, allParts=[], allFitments=[], supplierMode=false, onClose}) {
+export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete, onGoVehicles, onSaveVehicle, onLogVehicleMiss, onRefreshVehicles, initialSearch="", t, imageUrl="", onPhotoChange, allParts=[], allFitments=[], supplierMode=false, onClose}) {
   const [editVehicle, setEditVehicle] = useState(null);
+  const [linkNewVehicle, setLinkNewVehicle] = useState(false); // true when editVehicle came from the "add new + link" quick-add, not an edit
   const [search,  setSearch]  = useState(initialSearch);
   const [pending, setPending] = useState(new Set()); // selected but not yet saved
   const [saving,  setSaving]  = useState(false);
@@ -1924,6 +1925,18 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
     return tokens.every(tok=>hay.includes(tok)); // every keyword must appear, in any order
   });
   const filtered = searchMatched.filter(v => !pending.has(String(v.id)));
+
+  // Auto-log a zero-result search to the Vehicle Requests review queue, debounced
+  // so it only fires once the user has paused typing (not per keystroke) and the
+  // search still genuinely has no match. Skipped entirely once any match exists.
+  useEffect(() => {
+    const term = search.trim();
+    if(!term || filtered.length > 0 || supplierMode || !onLogVehicleMiss) return;
+    const timer = setTimeout(() => {
+      onLogVehicleMiss(part.id, part.sku, part.make, term);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [search, filtered.length, supplierMode, onLogVehicleMiss, part.id, part.sku, part.make]);
 
   const toggle = (vid) => {
     setPending(p => {
@@ -2471,7 +2484,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
               </div>
               <div style={{display:"flex",gap:4,flexShrink:0}}>
                 {onSaveVehicle&&!marked&&(
-                  <button className="btn btn-ghost btn-xs" title="Edit this vehicle" onClick={()=>setEditVehicle({...v})}>✏️</button>
+                  <button className="btn btn-ghost btn-xs" title="Edit this vehicle" onClick={()=>{setLinkNewVehicle(false);setEditVehicle({...v});}}>✏️</button>
                 )}
                 <button className="btn btn-ghost btn-xs" style={{color:marked?"var(--green)":"var(--red)"}}
                   onClick={()=>toggleDelete(f.id)}>
@@ -2607,7 +2620,20 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
           </div>
         ))}
         {filtered.length === 0 && search && (
-          <div style={{textAlign:"center",padding:16,color:"var(--text3)",fontSize:13}}>No vehicles found</div>
+          <div style={{textAlign:"center",padding:16,color:"var(--text3)",fontSize:13}}>
+            No vehicles found
+            {onSaveVehicle && !supplierMode && (
+              <div style={{marginTop:10}}>
+                <button className="btn btn-primary btn-sm"
+                  onClick={()=>{
+                    setLinkNewVehicle(true);
+                    setEditVehicle({make:part.make||"", model:search.trim().toUpperCase()});
+                  }}>
+                  ➕ Add "{search.trim()}" as New Vehicle &amp; Link
+                </button>
+              </div>
+            )}
+          </div>
         )}
         {filtered.length === 0 && !search && linked.length > 0 && (
           <div style={{textAlign:"center",padding:16,color:"var(--green)",fontSize:13}}>✅ All vehicles linked!</div>
@@ -2630,8 +2656,18 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
   const vehicleEditOverlay = editVehicle && onSaveVehicle && (
     <ErrorBoundary name="VehicleModal">
       <VehicleModal vehicle={editVehicle} parts={allParts}
-        onSave={async(data)=>{ await onSaveVehicle(data); setEditVehicle(null); refreshVehicles(); }}
-        onClose={()=>setEditVehicle(null)} t={t}/>
+        onSave={async(data)=>{
+          const saved = await onSaveVehicle(data);
+          const shouldLink = linkNewVehicle;
+          setEditVehicle(null);
+          setLinkNewVehicle(false);
+          await refreshVehicles();
+          if(shouldLink && saved?.id){
+            try{ await onAdd(part.id, saved.id); }
+            catch(e){ alert(`❌ Vehicle saved but failed to link it to this part: ${e.message||e}`); }
+          }
+        }}
+        onClose={()=>{setEditVehicle(null);setLinkNewVehicle(false);}} t={t}/>
     </ErrorBoundary>
   );
   if(expanded) return (

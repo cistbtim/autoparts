@@ -32,6 +32,8 @@ export const CHECKLIST_ITEMS=[
   {key:"brakes_front", label:"Front Brakes",          icon:"🛑"},
   {key:"brakes_rear",  label:"Rear Brakes",           icon:"🟥"},
   {key:"engine",       label:"Engine Check",          icon:"⚙️"},
+  {key:"oil_cap",      label:"Oil Cap",               icon:"🛢️"},
+  {key:"belt",         label:"Belt",                  icon:"➰"},
   {key:"coolant",      label:"Coolant Level",         icon:"💧"},
   {key:"spare_wheel",  label:"Spare Wheel",           icon:"🛞"},
   {key:"fuel_level",   label:"Fuel Level",            icon:"⛽"},

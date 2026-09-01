@@ -3615,7 +3615,7 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
 }
 
 // Smart image preview with clear status feedback
-export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onSaveVehicle,onRefreshVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onEditSupplier,onGoBack=null}) {
+export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitments=[],onSaveFitment,onDeleteFitment,onGoVehicles,onSaveVehicle,onLogVehicleMiss,onRefreshVehicles,onGoSupplier,onGoToPart,onGoToMainPart,onCreateOpposite,inquiries=[],rfqQuotes=[],rfqItems=[],rfqSessions=[],initialTab,initialFitSearch="",prevPart,nextPart,branches=[],currentBranch=null,allParts=[],onRequestNewPart=null,onAddNewPart=null,initialF=null,branchSkuPrefix="",partSuppliers=[],suppliers=[],allPartSuppliers=[],onSavePartSupplier,onDeletePartSupplier,onUpdatePartSupplier,onLoadSuppliers,onAddSupplier,onEditSupplier,onGoBack=null}) {
   const parsePhotos = (v) => { if(Array.isArray(v)) return v; try{ const a=JSON.parse(v||"[]"); return Array.isArray(a)?a:[]; }catch{ return []; } };
   const makeF = (p) => p?{
     sku:p.sku||"", name:p.name||"", category:p.category||"Engine",
@@ -4251,6 +4251,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
           onDelete={onDeleteFitment}
           onGoVehicles={onGoVehicles}
           onSaveVehicle={onSaveVehicle}
+          onLogVehicleMiss={onLogVehicleMiss}
           onRefreshVehicles={onRefreshVehicles}
           initialSearch={initialFitSearch}
           t={t}
@@ -12485,7 +12486,7 @@ const VehiclePhotoRow = ({urls, startIdx, label, onImageClick}) => urls.length==
   </div>
 );
 
-export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApprove,onGoToVehicles,onRefresh}) {
+export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApprove,onLinkFitment,onGoToVehicles,onGoToPart,onRefresh}) {
   const [isRejecting,setIsRejecting] = useState(false);
   const [rejectReason,setRejectReason] = useState("");
   const [busy,setBusy] = useState(false);
@@ -12504,8 +12505,11 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
   const approve = async () => {
     setBusy(true);
     try {
-      await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
+      const saved = await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
       await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
+      if(r.part_id && saved?.id && onLinkFitment){
+        try{ await onLinkFitment(r.part_id, saved.id); }catch{/* vehicle still saved+approved either way */}
+      }
       await onRefresh();
       setBusy(false);
       onGoToVehicles&&onGoToVehicles(r.make, r.model);
@@ -12548,6 +12552,12 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
       <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
         <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
         {statusBadge(r.status)}
+        {r.source==="fitment_search"&&(
+          <span style={{fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:600,background:"rgba(96,165,250,.12)",color:"var(--blue)"}}
+            title="Auto-logged from a Vehicle Fits search that found no match">
+            🔗 Fitment search{r.part_sku?` · ${r.part_sku}`:""}
+          </span>
+        )}
       </div>
       {isAdmin&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>{branchName(r.branch_id)}</div>}
       <div style={{fontSize:12,color:"var(--text3)"}}>{(r.year_from||r.year_to)&&<span>{r.year_from||"?"}–{r.year_to||"present"}</span>}</div>
@@ -12585,6 +12595,11 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
             Edit in Vehicles →
           </button>
         )}
+        {isAdmin&&r.part_sku&&onGoToPart&&(
+          <button className="btn btn-ghost btn-sm" style={{fontSize:12,color:"var(--blue)"}} onClick={()=>onGoToPart(r.part_sku)}>
+            📦 Open Part {r.part_sku}
+          </button>
+        )}
         {isAdmin&&r.vin&&(
           <a href={`https://www.vindecoderz.com/EN/check-lookup/${r.vin}`} target="_blank" rel="noopener noreferrer"
             className="btn btn-ghost btn-sm" style={{fontSize:12,color:"var(--blue)",textDecoration:"none"}}>
@@ -12612,7 +12627,9 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
         <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
           {!isRejecting&&(
             <div style={{display:"flex",gap:8}}>
-              <button className="btn btn-primary btn-sm" onClick={approve} disabled={busy}>{busy?"...":"Approve & Add Vehicle"}</button>
+              <button className="btn btn-primary btn-sm" onClick={approve} disabled={busy}>
+                {busy?"...":(r.part_id?"Approve, Add Vehicle & Link":"Approve & Add Vehicle")}
+              </button>
               <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setIsRejecting(true);setRejectReason("");}}>Reject</button>
             </div>
           )}
@@ -12633,7 +12650,7 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
   );
 }
 
-export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],user,role,currentBranch,onRefresh,onApprove,onGoToVehicles,t={}}) {
+export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],user,role,currentBranch,onRefresh,onApprove,onLinkFitment,onGoToVehicles,onGoToPart,t={}}) {
   const isAdmin = role==="admin";
   const myReqs  = isAdmin ? vehicleRequests : vehicleRequests.filter(r=>r.branch_id===currentBranch?.id);
   const pending = myReqs.filter(r=>r.status==="pending");
@@ -12880,7 +12897,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       {pending.length>0&&(
         <>
           <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,marginBottom:8}}>Pending ({pending.length})</div>
-          {pending.map(r=><VehicleRequestCard key={r.id} r={r} isAdmin={isAdmin} vehicles={vehicles} branches={branches} user={user} onApprove={onApprove} onGoToVehicles={onGoToVehicles} onRefresh={onRefresh}/>)}
+          {pending.map(r=><VehicleRequestCard key={r.id} r={r} isAdmin={isAdmin} vehicles={vehicles} branches={branches} user={user} onApprove={onApprove} onLinkFitment={onLinkFitment} onGoToVehicles={onGoToVehicles} onGoToPart={onGoToPart} onRefresh={onRefresh}/>)}
         </>
       )}
       {pending.length===0&&done.length===0&&(
@@ -12892,7 +12909,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       {done.length>0&&(
         <>
           <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,margin:"16px 0 8px"}}>Completed ({done.length})</div>
-          {done.map(r=><VehicleRequestCard key={r.id} r={r} isAdmin={isAdmin} vehicles={vehicles} branches={branches} user={user} onApprove={onApprove} onGoToVehicles={onGoToVehicles} onRefresh={onRefresh}/>)}
+          {done.map(r=><VehicleRequestCard key={r.id} r={r} isAdmin={isAdmin} vehicles={vehicles} branches={branches} user={user} onApprove={onApprove} onLinkFitment={onLinkFitment} onGoToVehicles={onGoToVehicles} onGoToPart={onGoToPart} onRefresh={onRefresh}/>)}
         </>
       )}
       {lightbox&&<ImgLightbox urls={lightbox.urls} startIdx={lightbox.idx} labels={lightbox.labels} onClose={()=>setLightbox(null)}/>}

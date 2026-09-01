@@ -2442,6 +2442,30 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setPartFitments(prev=>prev.filter(f=>String(f.id)!==String(id)));
     showToast("Removed","err");
   };
+  // Auto-logged (not user-initiated) when a Vehicle Fits search comes up empty —
+  // parks the missing model in the existing Vehicle Requests review queue (tagged
+  // source:"fitment_search", carrying part_id/part_sku) so it can be reviewed and
+  // approved from one central place instead of created inline per-part. Silent
+  // best-effort: never surfaces an error to the user, this is background telemetry.
+  const logVehicleFitmentMiss=async(partId,partSku,make,model)=>{
+    const modelTrim=(model||"").trim();
+    if(!modelTrim||!partId) return;
+    const dup=vehicleRequests.some(r=>
+      r.source==="fitment_search" && r.status==="pending" &&
+      String(r.part_id)===String(partId) &&
+      (r.model||"").trim().toUpperCase()===modelTrim.toUpperCase());
+    if(dup) return;
+    try{
+      const res=await api.insert("vehicle_requests",{
+        source:"fitment_search", part_id:partId, part_sku:partSku||null,
+        make:(make||"").trim()||null, model:modelTrim,
+        status:"pending", requested_by:user.id,
+        branch_id: currentBranch?.id||user.branch_id||null,
+      });
+      const row=Array.isArray(res)&&res[0]?res[0]:null;
+      if(row) setVehicleRequests(prev=>[row,...prev]);
+    }catch{/* best-effort background log, don't disrupt the user's search */}
+  };
   // Same as saveFitment but for a supplier's own self-added part (supplier_parts.id,
   // not a real parts.id) — links via part_fitments.supplier_part_id instead of
   // part_id so self-added parts can share the exact same Vehicle Fits UI/table as
@@ -2513,6 +2537,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
     if(codeChanged) await renameVehicleCodeInParts(oldCode,newCode);
     await refreshTables("vehicles"); showToast("Vehicle saved");
+    const saved = Array.isArray(res) ? res[0] : res;
+    return saved || (id ? {id, ...data} : null);
   };
   const deleteVehicle=async(id)=>{
     await api.delete("vehicles","id",id);
@@ -7309,7 +7335,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           <VehicleRequestsPage vehicleRequests={vehicleRequests} vehicles={vehicles} branches={branches} user={user} role={role}
             currentBranch={currentBranch}
             onApprove={saveVehicle}
+            onLinkFitment={saveFitment}
             onGoToVehicles={(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}}
+            onGoToPart={(sku)=>{
+              const target=parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase());
+              if(target){ setTab("inventory"); setTimeout(()=>openM("editPart",{...target,_tab:"fitment"}),0); }
+              else showToast(`Part SKU "${sku}" not found`,"err");
+            }}
             onRefresh={()=>refreshTables("vehicle_requests")} t={t}/>
         )}
 
@@ -7655,6 +7687,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           onRefreshVehicles={()=>refreshTables("vehicles")}
           onSaveVehicle={saveVehicle}
           onSaveFitment={saveFitment} onDeleteFitment={deleteFitment} onSave={savePart}
+          onLogVehicleMiss={logVehicleFitmentMiss}
           onDelete={ep&&canEditPart(ep)?async(p)=>{ if(p.id)releaseLock("part",p.id); await deletePart(p.id); closeM("editPart"); }:null}
           onCreateOpposite={createOpposite}
           onGoVehicles={()=>{

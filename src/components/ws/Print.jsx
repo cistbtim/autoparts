@@ -16,6 +16,7 @@ function resolveVehicleModel(job, vehicles=[]) {
 // list was missing brakes/engine/coolant that the UI already had).
 export const CHECKLIST_ITEMS=[
   {key:"windscreen",   label:"Windscreen",            icon:"🔲"},
+  {key:"roof",         label:"Roof",                  icon:"🔳"},
   {key:"body_front",    label:"Front Bumper / Body",   icon:"🚗"},
   {key:"lights_front", label:"Front Lights",          icon:"💡"},
   {key:"body_left",     label:"Left Side Body",        icon:"◀️"},

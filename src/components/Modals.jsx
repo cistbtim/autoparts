@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { removeBackground } from "@imgly/background-removal";
+import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
 import { C, curSym, getSettings, updateSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
@@ -11897,6 +11898,230 @@ function matchMakeModelFitment(make, model, vehicles) {
     (v.model?.toUpperCase() === modelU || (firstWord && v.model?.toUpperCase().startsWith(firstWord)) || v.code?.toUpperCase() === firstWord)
   );
   return [{ make: makeU, model: modelU, raw: modelU, vehicleIds: matched.map(v => v.id) }];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PART NUMBER OCR SCAN (test/proof-of-concept) — camera/photo → optional
+// crop → Tesseract → match the read text against parts.sku / parts.oe_number.
+// Reuses the same crop+enhance(3x scale, Otsu binarize, auto-invert)+Tesseract
+// pipeline already proven for VIN/plate OCR in Workshop.jsx's OcrCropModal,
+// just generalized (no field-specific length/whitelist rules) and pointed at
+// the parts catalogue instead of filling one form field.
+// ═══════════════════════════════════════════════════════════════
+function ocrEnhance(srcCanvas) {
+  const scale = 3;
+  const dst = document.createElement("canvas");
+  dst.width = srcCanvas.width * scale; dst.height = srcCanvas.height * scale;
+  const ctx = dst.getContext("2d");
+  ctx.drawImage(srcCanvas, 0, 0, dst.width, dst.height);
+  const id = ctx.getImageData(0, 0, dst.width, dst.height);
+  const d = id.data;
+  const n = d.length / 4;
+  const grays = new Float32Array(n);
+  const hist = new Int32Array(256);
+  for (let i = 0; i < n; i++) {
+    const j = i * 4;
+    const g = 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
+    grays[i] = g; hist[Math.round(g)]++;
+  }
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sumB = 0, wB = 0, maxVar = 0, thresh = 128;
+  for (let i = 0; i < 256; i++) {
+    wB += hist[i]; if (!wB) continue;
+    const wF = n - wB; if (!wF) break;
+    sumB += i * hist[i];
+    const mB = sumB / wB, mF = (sum - sumB) / wF;
+    const v = wB * wF * (mB - mF) * (mB - mF);
+    if (v > maxVar) { maxVar = v; thresh = i; }
+  }
+  let dark = 0;
+  for (let i = 0; i < n; i++) {
+    const b = grays[i] < thresh ? 0 : 255;
+    if (b === 0) dark++;
+    const j = i * 4; d[j] = d[j + 1] = d[j + 2] = b; d[j + 3] = 255;
+  }
+  if (dark / n > 0.55) { for (let i = 0; i < d.length; i += 4) d[i] = d[i + 1] = d[i + 2] = 255 - d[i]; }
+  ctx.putImageData(id, 0, 0);
+  return dst;
+}
+
+// Scores every part against the OCR'd text: exact SKU/OE-number token match
+// scores highest, a containment match (either direction, 5+ chars to avoid
+// noise) scores lower. Returns the top matches, best first.
+function matchPartsToOcrText(text, parts) {
+  const raw = (text || "").toUpperCase();
+  const wordTokens = raw.split(/[^A-Z0-9-]+/).filter(Boolean);
+  const strippedTokens = wordTokens.map(t => t.replace(/-/g, ""));
+  const candidates = [...new Set([...wordTokens, ...strippedTokens])].filter(t => t.length >= 4);
+  if (!candidates.length) return [];
+  const scores = new Map(); // part.id -> {part, score, matched:[]}
+  for (const p of parts) {
+    const sku = (p.sku || "").toUpperCase();
+    const oeToks = (p.oe_number || "").toUpperCase().split(/[\s,;]+/).filter(Boolean);
+    let best = 0; const matched = new Set();
+    for (const tok of candidates) {
+      if (sku && sku === tok) { best = Math.max(best, 3); matched.add(tok); }
+      else if (sku && tok.length >= 5 && (sku.includes(tok) || tok.includes(sku))) { best = Math.max(best, 2); matched.add(tok); }
+      for (const oe of oeToks) {
+        if (!oe) continue;
+        if (oe === tok) { best = Math.max(best, 3); matched.add(tok); }
+        else if (tok.length >= 5 && (oe.includes(tok) || tok.includes(oe))) { best = Math.max(best, 2); matched.add(tok); }
+      }
+    }
+    if (best > 0) scores.set(p.id, { part: p, score: best, matched: [...matched] });
+  }
+  return [...scores.values()].sort((a, b) => b.score - a.score).slice(0, 12);
+}
+
+export function PartOcrScanModal({ parts = [], onClose, onGoToPart }) {
+  const [imgSrc, setImgSrc] = useState(null);
+  const imgRef = useRef(null);
+  const canvasRef = useRef(null);
+  const dragRef = useRef(null);
+  const [sel, setSel] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [err, setErr] = useState(null);
+  const [rawText, setRawText] = useState("");
+  const [results, setResults] = useState(null); // null = not scanned yet
+  const fileRef = useRef(null);
+  const camRef = useRef(null);
+
+  const loadFile = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => { setImgSrc(e.target.result); setSel(null); setResults(null); setRawText(""); setErr(null); };
+    reader.readAsDataURL(file);
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!sel) return;
+    const x = Math.min(sel.x0, sel.x1), y = Math.min(sel.y0, sel.y1);
+    const w = Math.abs(sel.x1 - sel.x0), h = Math.abs(sel.y1 - sel.y0);
+    ctx.fillStyle = "rgba(249,115,22,.15)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "#f97316";
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([8, 4]);
+    ctx.strokeRect(x, y, w, h);
+  }, [sel]);
+
+  const getXY = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const pt = e.touches ? e.touches[0] : e;
+    return { x: pt.clientX - rect.left, y: pt.clientY - rect.top };
+  };
+  const onPD = (e) => { const p = getXY(e); dragRef.current = true; setSel({ x0: p.x, y0: p.y, x1: p.x, y1: p.y }); };
+  const onPM = (e) => { if (!dragRef.current) return; const p = getXY(e); setSel(s => s ? { ...s, x1: p.x, y1: p.y } : s); };
+  const onPU = () => { dragRef.current = false; };
+
+  const doScan = async () => {
+    setScanning(true); setErr(null); setResults(null);
+    try {
+      const img = imgRef.current, canvas = canvasRef.current;
+      let cropCanvas;
+      if (sel && Math.abs(sel.x1 - sel.x0) > 15 && Math.abs(sel.y1 - sel.y0) > 10) {
+        const sx = img.naturalWidth / canvas.width, sy = img.naturalHeight / canvas.height;
+        const x = Math.round(Math.min(sel.x0, sel.x1) * sx), y = Math.round(Math.min(sel.y0, sel.y1) * sy);
+        const w = Math.round(Math.abs(sel.x1 - sel.x0) * sx), h = Math.round(Math.abs(sel.y1 - sel.y0) * sy);
+        cropCanvas = document.createElement("canvas"); cropCanvas.width = w; cropCanvas.height = h;
+        cropCanvas.getContext("2d").drawImage(img, x, y, w, h, 0, 0, w, h);
+      } else {
+        cropCanvas = document.createElement("canvas");
+        cropCanvas.width = img.naturalWidth; cropCanvas.height = img.naturalHeight;
+        cropCanvas.getContext("2d").drawImage(img, 0, 0);
+      }
+      const enhanced = ocrEnhance(cropCanvas);
+      const worker = await createWorker("eng");
+      await worker.setParameters({
+        tessedit_pageseg_mode: "6",
+        tessedit_char_whitelist: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ- ",
+      });
+      const { data: { text } } = await worker.recognize(enhanced.toDataURL("image/png"));
+      await worker.terminate();
+      setRawText(text.trim());
+      setResults(matchPartsToOcrText(text, parts));
+    } catch (ex) { setErr(ex.message || String(ex)); }
+    finally { setScanning(false); }
+  };
+
+  return (
+    <Overlay onClose={onClose} maxWidth="640px">
+      <MHead title="📷 Scan Part Number (test)" sub="Take or upload a photo of the part's stamped/printed number" onClose={onClose} />
+
+      {!imgSrc && (
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", padding: "30px 0" }}>
+          <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => { loadFile(e.target.files[0]); e.target.value = ""; }} />
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { loadFile(e.target.files[0]); e.target.value = ""; }} />
+          <button className="btn btn-primary" onClick={() => camRef.current.click()}>📷 Take Photo</button>
+          <button className="btn btn-ghost" onClick={() => fileRef.current.click()}>📁 Choose File</button>
+        </div>
+      )}
+
+      {imgSrc && (
+        <>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>
+            Optional: drag a box around just the number for better accuracy — or scan the whole photo.
+          </div>
+          <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", marginBottom: 10 }}>
+            <img ref={imgRef} src={imgSrc} alt="" style={{ maxWidth: "100%", display: "block", borderRadius: 8 }}
+              onLoad={() => { const c = canvasRef.current; const im = imgRef.current; if (im && c) { c.width = im.offsetWidth; c.height = im.offsetHeight; } }} />
+            <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0, cursor: "crosshair", touchAction: "none" }}
+              onMouseDown={onPD} onMouseMove={onPM} onMouseUp={onPU} onMouseLeave={onPU}
+              onTouchStart={onPD} onTouchMove={onPM} onTouchEnd={onPU} />
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <button className="btn btn-primary btn-sm" onClick={doScan} disabled={scanning}>{scanning ? "⏳ Scanning..." : "🔍 Scan"}</button>
+            {sel && <button className="btn btn-ghost btn-sm" onClick={() => setSel(null)}>✕ Clear Selection</button>}
+            <button className="btn btn-ghost btn-sm" onClick={() => { setImgSrc(null); setSel(null); setResults(null); setRawText(""); setErr(null); }}>🔄 Retake</button>
+          </div>
+
+          {err && <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 10, padding: "8px 12px", background: "rgba(248,113,113,.08)", borderRadius: 8 }}>⚠ {err}</div>}
+
+          {rawText && (
+            <div style={{ marginBottom: 12, padding: "8px 12px", background: "var(--surface2)", borderRadius: 8, fontSize: 12, fontFamily: "DM Mono,monospace", color: "var(--text2)", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", marginBottom: 4 }}>Raw OCR Text</div>
+              {rawText}
+            </div>
+          )}
+
+          {results && results.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", marginBottom: 8 }}>
+                {results.length} possible match{results.length !== 1 ? "es" : ""}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {results.map(({ part, score }) => (
+                  <div key={part.id} onClick={() => onGoToPart && onGoToPart(part)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--border)", cursor: onGoToPart ? "pointer" : "default" }}>
+                    {toImgUrl(part.image_url) ?
+                      <img src={toImgUrl(part.image_url)} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} onError={e => e.target.style.display = "none"} />
+                      : <div style={{ width: 40, height: 40, borderRadius: 6, background: "var(--surface3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📦</div>}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{part.sku}</div>
+                      <div style={{ fontSize: 12, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{part.name}</div>
+                      {part.oe_number && <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "monospace" }}>OE: {part.oe_number}</div>}
+                    </div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: score >= 3 ? "var(--green)" : "var(--yellow)", background: score >= 3 ? "rgba(52,211,153,.12)" : "rgba(251,191,36,.12)", padding: "2px 7px", borderRadius: 6, flexShrink: 0 }}>
+                      {score >= 3 ? "Exact" : "Possible"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {results && results.length === 0 && (
+            <div style={{ textAlign: "center", padding: 20, color: "var(--text3)", fontSize: 13 }}>
+              No matching parts found for the text read from this photo. Try a tighter crop around just the number.
+            </div>
+          )}
+        </>
+      )}
+    </Overlay>
+  );
 }
 
 export function CatalogueImportModal({ suppliers, parts, vehicles=[], onClose, onImportDone }) {

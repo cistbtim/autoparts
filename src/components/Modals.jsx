@@ -12037,10 +12037,10 @@ export function PartOcrScanModal({ parts = [], onClose, onGoToPart }) {
       // (always "6") is exactly what produced garbage on tight single-line
       // crops during testing.
       const worker = await createWorker("eng");
-      await worker.setParameters({ tessedit_char_whitelist: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ- " });
-      await worker.setParameters({ tessedit_pageseg_mode: "7" });
+      const whitelist = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ- ";
+      await worker.setParameters({ tessedit_char_whitelist: whitelist, tessedit_pageseg_mode: "7" });
       const line = await worker.recognize(enhancedUrl);
-      await worker.setParameters({ tessedit_pageseg_mode: "6" });
+      await worker.setParameters({ tessedit_char_whitelist: whitelist, tessedit_pageseg_mode: "6" });
       const block = await worker.recognize(enhancedUrl);
       await worker.terminate();
       const lineText = (line.data.text || "").trim();

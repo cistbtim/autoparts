@@ -12052,59 +12052,64 @@ export function PartOcrScanModal({ parts = [], onClose, onGoToPart }) {
       <MHead title="📷 Scan Part Number (test)" sub="Take or upload a photo of the part's stamped/printed number" onClose={onClose} />
 
       {!imgSrc && (
-        <div style={{ display: "flex", gap: 10, justifyContent: "center", padding: "30px 0" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "24px 0" }}>
           <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => { loadFile(e.target.files[0]); e.target.value = ""; }} />
           <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { loadFile(e.target.files[0]); e.target.value = ""; }} />
-          <button className="btn btn-primary" onClick={() => camRef.current.click()}>📷 Take Photo</button>
-          <button className="btn btn-ghost" onClick={() => fileRef.current.click()}>📁 Choose File</button>
+          <button className="btn btn-primary" style={{ width: "100%", padding: "14px 0", fontSize: 15, fontWeight: 700 }} onClick={() => camRef.current.click()}>📷 Take Photo</button>
+          <button className="btn btn-ghost" style={{ width: "100%", padding: "14px 0", fontSize: 15 }} onClick={() => fileRef.current.click()}>📁 Choose File</button>
         </div>
       )}
 
       {imgSrc && (
         <>
-          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>
-            Optional: drag a box around just the number for better accuracy — or scan the whole photo.
+          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10, lineHeight: 1.5 }}>
+            Optional: drag a box around just the number for better accuracy — or tap Scan on the whole photo.
           </div>
-          <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", marginBottom: 10 }}>
-            <img ref={imgRef} src={imgSrc} alt="" style={{ maxWidth: "100%", display: "block", borderRadius: 8 }}
-              onLoad={() => { const c = canvasRef.current; const im = imgRef.current; if (im && c) { c.width = im.offsetWidth; c.height = im.offsetHeight; } }} />
-            <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0, cursor: "crosshair", touchAction: "none" }}
-              onMouseDown={onPD} onMouseMove={onPM} onMouseUp={onPU} onMouseLeave={onPU}
-              onTouchStart={onPD} onTouchMove={onPM} onTouchEnd={onPU} />
-          </div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            <button className="btn btn-primary btn-sm" onClick={doScan} disabled={scanning}>{scanning ? "⏳ Scanning..." : "🔍 Scan"}</button>
-            {sel && <button className="btn btn-ghost btn-sm" onClick={() => setSel(null)}>✕ Clear Selection</button>}
-            <button className="btn btn-ghost btn-sm" onClick={() => { setImgSrc(null); setSel(null); setResults(null); setRawText(""); setErr(null); }}>🔄 Retake</button>
+          <div style={{ display: "flex", justifyContent: "center", background: "var(--surface2)", borderRadius: 10, border: "1px solid var(--border)", padding: 4, marginBottom: 12 }}>
+            <div style={{ position: "relative", display: "inline-block", maxWidth: "100%" }}>
+              <img ref={imgRef} src={imgSrc} alt="" style={{ maxWidth: "100%", maxHeight: "38vh", width: "auto", height: "auto", display: "block", borderRadius: 7 }}
+                onLoad={() => { const c = canvasRef.current; const im = imgRef.current; if (im && c) { c.width = im.offsetWidth; c.height = im.offsetHeight; } }} />
+              <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0, cursor: "crosshair", touchAction: "none" }}
+                onMouseDown={onPD} onMouseMove={onPM} onMouseUp={onPU} onMouseLeave={onPU}
+                onTouchStart={onPD} onTouchMove={onPM} onTouchEnd={onPU} />
+            </div>
           </div>
 
-          {err && <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 10, padding: "8px 12px", background: "rgba(248,113,113,.08)", borderRadius: 8 }}>⚠ {err}</div>}
+          <button className="btn btn-primary" style={{ width: "100%", padding: "13px 0", fontSize: 15, fontWeight: 700, marginBottom: 8 }} onClick={doScan} disabled={scanning}>
+            {scanning ? "⏳ Scanning..." : "🔍 Scan for Match"}
+          </button>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {sel && <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => setSel(null)}>✕ Clear Selection</button>}
+            <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => { setImgSrc(null); setSel(null); setResults(null); setRawText(""); setErr(null); }}>🔄 Retake Photo</button>
+          </div>
+
+          {err && <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 12, padding: "10px 12px", background: "rgba(248,113,113,.08)", border: "1px solid rgba(248,113,113,.25)", borderRadius: 8 }}>⚠ {err}</div>}
 
           {rawText && (
-            <div style={{ marginBottom: 12, padding: "8px 12px", background: "var(--surface2)", borderRadius: 8, fontSize: 12, fontFamily: "DM Mono,monospace", color: "var(--text2)", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", marginBottom: 4 }}>Raw OCR Text</div>
+            <div style={{ marginBottom: 12, padding: "10px 12px", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, fontFamily: "DM Mono,monospace", color: "var(--text2)", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Raw OCR Text</div>
               {rawText}
             </div>
           )}
 
           {results && results.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
                 {results.length} possible match{results.length !== 1 ? "es" : ""}
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 {results.map(({ part, score }) => (
                   <div key={part.id} onClick={() => onGoToPart && onGoToPart(part)}
-                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--border)", cursor: onGoToPart ? "pointer" : "default" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "var(--surface2)", borderRadius: 9, border: "1px solid var(--border)", cursor: onGoToPart ? "pointer" : "default" }}>
                     {toImgUrl(part.image_url) ?
-                      <img src={toImgUrl(part.image_url)} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} onError={e => e.target.style.display = "none"} />
-                      : <div style={{ width: 40, height: 40, borderRadius: 6, background: "var(--surface3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📦</div>}
+                      <img src={toImgUrl(part.image_url)} alt="" style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 7, flexShrink: 0 }} onError={e => e.target.style.display = "none"} />
+                      : <div style={{ width: 44, height: 44, borderRadius: 7, background: "var(--surface3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>📦</div>}
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 13 }}>{part.sku}</div>
                       <div style={{ fontSize: 12, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{part.name}</div>
                       {part.oe_number && <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "monospace" }}>OE: {part.oe_number}</div>}
                     </div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: score >= 3 ? "var(--green)" : "var(--yellow)", background: score >= 3 ? "rgba(52,211,153,.12)" : "rgba(251,191,36,.12)", padding: "2px 7px", borderRadius: 6, flexShrink: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: score >= 3 ? "var(--green)" : "var(--yellow)", background: score >= 3 ? "rgba(52,211,153,.12)" : "rgba(251,191,36,.12)", padding: "3px 8px", borderRadius: 6, flexShrink: 0, whiteSpace: "nowrap" }}>
                       {score >= 3 ? "Exact" : "Possible"}
                     </div>
                   </div>
@@ -12114,7 +12119,7 @@ export function PartOcrScanModal({ parts = [], onClose, onGoToPart }) {
           )}
 
           {results && results.length === 0 && (
-            <div style={{ textAlign: "center", padding: 20, color: "var(--text3)", fontSize: 13 }}>
+            <div style={{ textAlign: "center", padding: "18px 10px", color: "var(--text3)", fontSize: 13, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 9 }}>
               No matching parts found for the text read from this photo. Try a tighter crop around just the number.
             </div>
           )}

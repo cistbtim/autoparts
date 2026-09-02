@@ -11903,44 +11903,39 @@ function matchMakeModelFitment(make, model, vehicles) {
 // ═══════════════════════════════════════════════════════════════
 // PART NUMBER OCR SCAN (test/proof-of-concept) — camera/photo → optional
 // crop → Tesseract → match the read text against parts.sku / parts.oe_number.
-// Reuses the same crop+enhance(3x scale, Otsu binarize, auto-invert)+Tesseract
-// pipeline already proven for VIN/plate OCR in Workshop.jsx's OcrCropModal,
-// just generalized (no field-specific length/whitelist rules) and pointed at
-// the parts catalogue instead of filling one form field.
+// Crop/select UI follows the same pattern as VIN/plate OCR in Workshop.jsx's
+// OcrCropModal, but the enhancement step is deliberately different: that one
+// hard-binarizes with Otsu, which works for high-contrast printed VIN/plate
+// text but destroys low-contrast embossed/foil part markings (silver-on-tan
+// stamped text etc.) by crushing them to near-random noise. This does a
+// gentler linear contrast stretch instead — boosts contrast without forcing
+// a binary black/white split, so faint embossed text survives.
 // ═══════════════════════════════════════════════════════════════
 function ocrEnhance(srcCanvas) {
   const scale = 3;
   const dst = document.createElement("canvas");
   dst.width = srcCanvas.width * scale; dst.height = srcCanvas.height * scale;
   const ctx = dst.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(srcCanvas, 0, 0, dst.width, dst.height);
   const id = ctx.getImageData(0, 0, dst.width, dst.height);
   const d = id.data;
   const n = d.length / 4;
   const grays = new Float32Array(n);
-  const hist = new Int32Array(256);
+  let min = 255, max = 0;
   for (let i = 0; i < n; i++) {
     const j = i * 4;
     const g = 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
-    grays[i] = g; hist[Math.round(g)]++;
+    grays[i] = g;
+    if (g < min) min = g;
+    if (g > max) max = g;
   }
-  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
-  let sumB = 0, wB = 0, maxVar = 0, thresh = 128;
-  for (let i = 0; i < 256; i++) {
-    wB += hist[i]; if (!wB) continue;
-    const wF = n - wB; if (!wF) break;
-    sumB += i * hist[i];
-    const mB = sumB / wB, mF = (sum - sumB) / wF;
-    const v = wB * wF * (mB - mF) * (mB - mF);
-    if (v > maxVar) { maxVar = v; thresh = i; }
-  }
-  let dark = 0;
+  const range = Math.max(1, max - min);
   for (let i = 0; i < n; i++) {
-    const b = grays[i] < thresh ? 0 : 255;
-    if (b === 0) dark++;
-    const j = i * 4; d[j] = d[j + 1] = d[j + 2] = b; d[j + 3] = 255;
+    const v = Math.min(255, Math.max(0, Math.round((grays[i] - min) * 255 / range)));
+    const j = i * 4; d[j] = d[j + 1] = d[j + 2] = v; d[j + 3] = 255;
   }
-  if (dark / n > 0.55) { for (let i = 0; i < d.length; i += 4) d[i] = d[i + 1] = d[i + 2] = 255 - d[i]; }
   ctx.putImageData(id, 0, 0);
   return dst;
 }
@@ -12034,14 +12029,25 @@ export function PartOcrScanModal({ parts = [], onClose, onGoToPart }) {
         cropCanvas.getContext("2d").drawImage(img, 0, 0);
       }
       const enhanced = ocrEnhance(cropCanvas);
+      const enhancedUrl = enhanced.toDataURL("image/png");
+      // Run two segmentation modes and keep whichever reads more usable
+      // characters — "7" (single text line) suits a tight crop around just
+      // the number, "6" (uniform block) suits scanning the whole photo when
+      // no crop was drawn. Cheap enough client-side, and picking blind
+      // (always "6") is exactly what produced garbage on tight single-line
+      // crops during testing.
       const worker = await createWorker("eng");
-      await worker.setParameters({
-        tessedit_pageseg_mode: "6",
-        tessedit_char_whitelist: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ- ",
-      });
-      const { data: { text } } = await worker.recognize(enhanced.toDataURL("image/png"));
+      await worker.setParameters({ tessedit_char_whitelist: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ- " });
+      await worker.setParameters({ tessedit_pageseg_mode: "7" });
+      const line = await worker.recognize(enhancedUrl);
+      await worker.setParameters({ tessedit_pageseg_mode: "6" });
+      const block = await worker.recognize(enhancedUrl);
       await worker.terminate();
-      setRawText(text.trim());
+      const lineText = (line.data.text || "").trim();
+      const blockText = (block.data.text || "").trim();
+      const cleanLen = (s) => s.replace(/[^A-Z0-9]/gi, "").length;
+      const text = cleanLen(lineText) >= cleanLen(blockText) ? lineText : blockText;
+      setRawText(text);
       setResults(matchPartsToOcrText(text, parts));
     } catch (ex) { setErr(ex.message || String(ex)); }
     finally { setScanning(false); }

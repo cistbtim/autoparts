@@ -4597,6 +4597,9 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   const [complaintEdit,  setComplaintEdit]  = useState(false);
   const [complaintVal,   setComplaintVal]   = useState(job.complaint||"");
   const [savingComplaint,setSavingComplaint]= useState(false);
+  const [mileageEdit,    setMileageEdit]    = useState(false);
+  const [mileageVal,     setMileageVal]     = useState(job.mileage||"");
+  const [savingMileage,  setSavingMileage]  = useState(false);
   useEffect(()=>{ setComplaintVal(job.complaint||""); },[job.complaint]);
   const [pendingPayModal, setPendingPayModal] = useState(false);
   const [showLabelModal,  setShowLabelModal]  = useState(false);
@@ -5162,9 +5165,26 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
             <div style={{flex:1,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",fontSize:12,fontWeight:600,color:"var(--text2)"}}>
-              {job.mileage&&<span>🛣️ {(+job.mileage).toLocaleString()} km</span>}
-              {job.mileage&&job.date_in&&<span style={{opacity:.35}}>·</span>}
-              {job.date_in&&<span>📅 {job.date_in}</span>}
+              {mileageEdit?(
+                <span style={{display:"flex",alignItems:"center",gap:4}}>
+                  <input type="number" min="0" autoFocus value={mileageVal} onChange={e=>setMileageVal(e.target.value)}
+                    style={{width:90,fontSize:12,padding:"2px 6px",borderRadius:5,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)"}}/>
+                  <button disabled={savingMileage} onClick={async()=>{setSavingMileage(true);await onSaveJob({...job,mileage:mileageVal?+mileageVal:null});setSavingMileage(false);setMileageEdit(false);}}
+                    style={{fontSize:11,padding:"2px 8px",background:"var(--accent)",color:"#fff",border:"none",borderRadius:5,cursor:"pointer",fontWeight:700}}>
+                    {savingMileage?"...":"💾"}
+                  </button>
+                  <button onClick={()=>{setMileageVal(job.mileage||"");setMileageEdit(false);}}
+                    style={{fontSize:11,padding:"2px 8px",background:"transparent",border:"1px solid var(--border)",borderRadius:5,cursor:"pointer",color:"var(--text3)"}}>
+                    ✕
+                  </button>
+                </span>
+              ):(<>
+                <span onClick={()=>{setMileageVal(job.mileage||"");setMileageEdit(true);}} style={{cursor:"pointer"}} title="Edit mileage">
+                  🛣️ {job.mileage?`${(+job.mileage).toLocaleString()} km`:"Add mileage"} ✎
+                </span>
+                {job.mileage&&job.date_in&&<span style={{opacity:.35}}>·</span>}
+              </>)}
+              {!mileageEdit&&job.date_in&&<span>📅 {job.date_in}</span>}
             </div>
             <button onClick={()=>setServiceHistModal(true)}
               style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,

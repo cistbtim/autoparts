@@ -43,6 +43,7 @@ export default function App() {
   const _sessionValid = ()=>{
     try{
       if(localStorage.getItem("ap_login_date")!==_today()) return false;
+      if(localStorage.getItem("ap_cowork_mode")==="1") return true; // automation session — no idle auto-logout
       const last=Number(localStorage.getItem("ap_last_activity")||0);
       if(last && Date.now()-last>IDLE_LIMIT) return false;
       return true;
@@ -55,8 +56,8 @@ export default function App() {
     }catch{return null;}
   });
   const [sessionExpiredMsg,setSessionExpiredMsg] = useState("");
-  const handleLogin=(u)=>{api.cacheClearAll();setUser(u);setSessionExpiredMsg("");try{localStorage.setItem("ap_user",JSON.stringify(u));localStorage.setItem("ap_login_date",_today());_touchActivity();}catch{}};
-  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");localStorage.removeItem("ap_last_activity");db.parts.clear().catch(()=>{});db.workshopJobs.clear().catch(()=>{});db.workshopJobItems.clear().catch(()=>{});};
+  const handleLogin=(u,opts={})=>{api.cacheClearAll();setUser(u);setSessionExpiredMsg("");try{localStorage.setItem("ap_user",JSON.stringify(u));localStorage.setItem("ap_login_date",_today());if(opts.coworkMode)localStorage.setItem("ap_cowork_mode","1");else localStorage.removeItem("ap_cowork_mode");_touchActivity();}catch{}};
+  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");localStorage.removeItem("ap_last_activity");localStorage.removeItem("ap_cowork_mode");db.parts.clear().catch(()=>{});db.workshopJobs.clear().catch(()=>{});db.workshopJobItems.clear().catch(()=>{});};
   const [settingsLoaded,setSettingsLoaded] = useState(false);
   const [availLangs,setAvailLangs] = useState(getLangs());
   useEffect(()=>{ document.documentElement.setAttribute("data-theme","light"); localStorage.removeItem("ap_theme"); },[]);
@@ -7397,6 +7398,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onDeleteWsShop={deleteWsShopRequest} onDeleteTransfer={deleteBranchStockRequest}
             onApproveVehicle={saveVehicle} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor}
             onGoToVehicles={(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}}
+            onGoToPart={(sku)=>{
+              const target=parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase());
+              if(target){ setTab("inventory"); setTimeout(()=>openM("editPart",{...target,_tab:"fitment"}),0); }
+              else showToast(`Part SKU "${sku}" not found`,"err");
+            }}
             rfqQuotes={rfqQuotes} rfqItems={rfqItems} onCreateRfqSession={createRfqSession}
             onGoToRfqSession={(sid)=>{setRfqJumpSessionId(sid);setTab("rfq");}}
             onRefresh={()=>refreshTables("ws_shop_requests","branch_stock_requests","vehicle_requests","part_requests","rfq_quotes","rfq_items")}/>

@@ -4789,6 +4789,76 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     deleteFromStorage(url);
   };
 
+  // ── Other Damage (freeform items found during inspection — as many as needed) ──
+  const [otherDamage,       setOtherDamage]       = useState([]); // [{id,description,note,photo_urls}]
+  const [otherDamageLoaded, setOtherDamageLoaded] = useState(false);
+  const [newOdDesc,         setNewOdDesc]         = useState("");
+  const [odUploading,       setOdUploading]       = useState({}); // {od_id: bool}
+  const [odPhotoView,       setOdPhotoView]       = useState(null); // {urls,startIdx} | null
+  const odCamRefs = useRef({});
+
+  useEffect(()=>{
+    if(otherDamageLoaded) return;
+    api.get("workshop_job_other_damage",`job_id=eq.${job.id}&order=created_at.asc`)
+      .then(rows=>{ setOtherDamage(Array.isArray(rows)?rows:[]); setOtherDamageLoaded(true); })
+      .catch(()=>setOtherDamageLoaded(true));
+  },[otherDamageLoaded,job.id]);
+
+  const addOtherDamage=async()=>{
+    const description=newOdDesc.trim();
+    if(!description) return;
+    const rec={id:makeId("OD"),job_id:job.id,description,note:"",photo_urls:[],created_at:new Date().toISOString()};
+    setOtherDamage(p=>[...p,rec]);
+    setNewOdDesc("");
+    try{ await api.upsert("workshop_job_other_damage",rec); }
+    catch(e){ console.error("Other damage save error:",e); alert("Save failed — make sure the workshop_job_other_damage table exists in Supabase."); }
+  };
+
+  const saveOtherDamageField=async(id,patch)=>{
+    setOtherDamage(p=>p.map(r=>r.id===id?{...r,...patch}:r));
+    try{ await api.patch("workshop_job_other_damage","id",id,patch); }
+    catch(e){ console.error("Other damage save error:",e); }
+  };
+
+  const deleteOtherDamage=async(od)=>{
+    if(!window.confirm(`Remove "${od.description}" from the list? This deletes its photos too.`)) return;
+    setOtherDamage(p=>p.filter(r=>r.id!==od.id));
+    try{ await api.delete("workshop_job_other_damage","id",od.id); }
+    catch(e){ console.error("Other damage delete error:",e); }
+    (od.photo_urls||[]).forEach(u=>deleteFromStorage(u));
+  };
+
+  const uploadOtherDamagePhoto=async(od,dataUrl)=>{
+    setOdUploading(p=>({...p,[od.id]:true}));
+    try{
+      const blob=await new Promise((res,rej)=>{
+        const img=new Image();
+        img.onload=()=>{
+          const MAX=1200; const canvas=document.createElement("canvas");
+          let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          canvas.width=w;canvas.height=h;
+          canvas.getContext("2d").drawImage(img,0,0,w,h);
+          canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
+        };
+        img.onerror=rej; img.src=dataUrl;
+      });
+      const now=new Date(); const pad2=n=>String(n).padStart(2,"0");
+      const ts=`${now.getFullYear()}${pad2(now.getMonth()+1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}_${Math.random().toString(36).slice(2,6)}`;
+      const reg=(job.vehicle_reg||"REG").replace(/[\s/\\]/g,"_").toUpperCase();
+      const path=`other-damage/${reg}/${ts}_${od.id}.jpg`;
+      const url=await uploadToStorage("cars_parts",path,blob);
+      await saveOtherDamageField(od.id,{photo_urls:[...(od.photo_urls||[]),url]});
+    }catch(e){ alert("Upload error: "+e.message); }
+    finally{ setOdUploading(p=>({...p,[od.id]:false})); }
+  };
+
+  const removeOtherDamagePhoto=(od,url)=>{
+    if(!window.confirm("Delete this photo?")) return;
+    saveOtherDamageField(od.id,{photo_urls:(od.photo_urls||[]).filter(u=>u!==url)});
+    deleteFromStorage(url);
+  };
+
   // ── Job documents ─────────────────────────────────────────────
   const [jobDocs,       setJobDocs]       = useState([]);
   const [docName,       setDocName]       = useState("");
@@ -6074,7 +6144,66 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 })}
                 <div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"var(--text3)",flexWrap:"wrap",gap:8}}>
                   <span>{CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="ok").length} OK · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="issue").length} Issues · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="na").length} N/A · {CHECKLIST_ITEMS.filter(i=>(checklist[i.key]?.status||"pending")==="pending").length} Pending</span>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>printChecklistReport(job,checklist,settings,removedParts)}>🖨️ Print Report</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>printChecklistReport(job,checklist,settings,removedParts,otherDamage)}>🖨️ Print Report</button>
+                </div>
+
+                {/* ══ Other Damage — freeform items found during inspection, add as many as needed ══ */}
+                <div style={{borderTop:"6px solid var(--bg)",padding:"12px 14px 14px"}}>
+                  <div style={{fontSize:13,fontWeight:700,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+                    🩹 Other Damage <span style={{fontWeight:400,color:"var(--text3)",fontSize:11}}>({otherDamage.length})</span>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginBottom:10}}>
+                    <input className="inp" placeholder="Damage description (e.g. Scratch on rear bumper)…" value={newOdDesc}
+                      onChange={e=>setNewOdDesc(e.target.value)}
+                      onKeyDown={e=>e.key==="Enter"&&addOtherDamage()}
+                      style={{fontSize:12,padding:"6px 8px",flex:1}}/>
+                    <button className="btn btn-primary btn-sm" disabled={!newOdDesc.trim()} onClick={addOtherDamage}>+ Add</button>
+                  </div>
+                  {!otherDamageLoaded?(
+                    <div style={{padding:12,textAlign:"center",color:"var(--text3)",fontSize:12}}>Loading…</div>
+                  ):otherDamage.length===0?(
+                    <div style={{padding:12,textAlign:"center",color:"var(--text3)",fontSize:12}}>No other damage recorded yet.</div>
+                  ):(
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {otherDamage.map(od=>{
+                        const photos=Array.isArray(od.photo_urls)?od.photo_urls:[];
+                        return (
+                          <div key={od.id} style={{padding:"8px 10px",borderRadius:8,background:"var(--surface2)",border:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:6}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                              <span style={{fontSize:13,fontWeight:600,flex:1,minWidth:120}}>{od.description}</span>
+                              <button onClick={()=>odCamRefs.current[od.id]?.click()} title="Add photo"
+                                style={{fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",
+                                  background:photos.length?"rgba(96,165,250,.15)":"transparent",
+                                  color:photos.length?"var(--blue)":"var(--text3)",
+                                  border:`1px solid ${photos.length?"rgba(96,165,250,.3)":"var(--border)"}`}}>
+                                {odUploading[od.id]?"⏳":photos.length?`📷 +${photos.length}`:"📷"}
+                              </button>
+                              <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+                                ref={el=>odCamRefs.current[od.id]=el}
+                                onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;const fr=new FileReader();fr.onload=ev=>uploadOtherDamagePhoto(od,ev.target.result);fr.readAsDataURL(file);}}/>
+                              {photos.map((url,pi)=>(
+                                <div key={url+pi} style={{position:"relative",flexShrink:0}}>
+                                  <img src={toImgUrl(url)} alt="damage" onClick={()=>setOdPhotoView({urls:photos,startIdx:pi})}
+                                    style={{width:34,height:34,objectFit:"cover",borderRadius:5,cursor:"pointer",border:"1px solid var(--border)",display:"block"}}
+                                    referrerPolicy="no-referrer"
+                                    onError={e=>{const m=url.match(/thumbnail[?]id=([^&]+)/)||url.match(/[?&]id=([^&]+)/)||url.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view")){e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;} else {e.target.style.display="none";}}}/>
+                                  <button title="Delete photo"
+                                    onClick={e=>{ e.stopPropagation(); removeOtherDamagePhoto(od,url); }}
+                                    style={{position:"absolute",top:-6,right:-6,width:16,height:16,borderRadius:"50%",border:"none",cursor:"pointer",background:"var(--red)",color:"#fff",fontSize:10,fontWeight:800,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0,boxShadow:"0 1px 4px rgba(0,0,0,.35)"}}>✕</button>
+                                </div>
+                              ))}
+                              <button title="Remove from list" onClick={()=>deleteOtherDamage(od)}
+                                style={{marginLeft:"auto",fontSize:11,padding:"3px 8px",borderRadius:5,cursor:"pointer",background:"transparent",color:"var(--red)",border:"1px solid rgba(239,68,68,.3)"}}>🗑</button>
+                            </div>
+                            <input className="inp" placeholder="Note (optional)…" value={od.note||""}
+                              onChange={e=>setOtherDamage(p=>p.map(r=>r.id===od.id?{...r,note:e.target.value}:r))}
+                              onBlur={e=>saveOtherDamageField(od.id,{note:e.target.value})}
+                              style={{fontSize:12,padding:"4px 8px"}}/>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* ══ Removed / Old Parts — photo + memo record of what came off the car ══ */}
@@ -6141,6 +6270,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
         </Overlay>
       )}
       {rpPhotoView&&<ImgLightbox urls={rpPhotoView.urls} startIdx={rpPhotoView.startIdx} onClose={()=>setRpPhotoView(null)}/>}
+      {odPhotoView&&<ImgLightbox urls={odPhotoView.urls} startIdx={odPhotoView.startIdx} onClose={()=>setOdPhotoView(null)}/>}
 
       {/* ══ PHOTO LIGHTBOX (global) ══ */}
       {viewPhoto&&(

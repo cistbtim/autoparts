@@ -166,7 +166,7 @@ export function RequestsKanbanPage({
   branches=[],parts=[],vehicles=[],suppliers=[],partSuppliers=[],inquiries=[],supplierInvoices=[],settings={},branchStock=[],
   user,role,currentBranch,t={},
   onReply,onEscalate,onMainReply,onDeleteWsShop,onDeleteTransfer,
-  onApproveVehicle,onGoToVehicles,onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,onRefresh,
+  onApproveVehicle,onGoToVehicles,onGoToPart,onSendInquiry,onManualQuote,onAcceptQuote,onCancelOrder,onEditPart,onRefresh,
   rfqQuotes=[],rfqItems=[],onCreateRfqSession,onGoToRfqSession,
 }) {
   const [activeTypes,setActiveTypes]=useState(()=>new Set(["ws","transfer","vehicle","part"]));
@@ -228,7 +228,7 @@ export function RequestsKanbanPage({
       <Overlay onClose={closeDetail}>
         <MHead title="🚗 Vehicle Request" sub={`${raw.make} ${raw.model}`} onClose={closeDetail}/>
         <VehicleRequestCard r={raw} isAdmin={isAdmin} vehicles={vehicles} branches={branches} user={user}
-          onApprove={onApproveVehicle} onGoToVehicles={onGoToVehicles} onRefresh={onRefresh}/>
+          onApprove={onApproveVehicle} onGoToVehicles={onGoToVehicles} onGoToPart={onGoToPart} onRefresh={onRefresh}/>
       </Overlay>
     );
     return(

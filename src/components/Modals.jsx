@@ -12741,7 +12741,9 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
   const approve = async () => {
     setBusy(true);
     try {
-      const saved = await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
+      // If a vehicle with this make+model already exists, link to it instead of
+      // inserting a duplicate — onApprove always does a plain insert when given no id.
+      const saved = matchV || await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
       await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
       if(r.part_id && saved?.id && onLinkFitment){
         try{ await onLinkFitment(r.part_id, saved.id); }catch{/* vehicle still saved+approved either way */}
@@ -12789,8 +12791,10 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
         <span style={{fontWeight:700,fontSize:14}}>{r.make} {r.model}</span>
         {statusBadge(r.status)}
         {r.source==="fitment_search"&&(
-          <span style={{fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:600,background:"rgba(96,165,250,.12)",color:"var(--blue)"}}
-            title="Auto-logged from a Vehicle Fits search that found no match">
+          <span style={{fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:600,background:"rgba(96,165,250,.12)",color:"var(--blue)",
+              cursor:r.part_sku&&onGoToPart?"pointer":"default",textDecoration:r.part_sku&&onGoToPart?"underline":"none"}}
+            title={r.part_sku&&onGoToPart?`Open ${r.part_sku} in inventory`:"Auto-logged from a Vehicle Fits search that found no match"}
+            onClick={()=>{if(r.part_sku&&onGoToPart)onGoToPart(r.part_sku);}}>
             🔗 Fitment search{r.part_sku?` · ${r.part_sku}`:""}
           </span>
         )}
@@ -12811,6 +12815,15 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
         <div style={{display:"flex",gap:16,marginTop:10,flexWrap:"wrap"}}>
           <VehiclePhotoRow urls={reqPhotos} startIdx={0} label="Branch Photos" onImageClick={openAt}/>
           <VehiclePhotoRow urls={dbPhotoUrls} startIdx={reqPhotos.length} label="Vehicle in Database" onImageClick={openAt}/>
+        </div>
+      )}
+
+      {/* Already-in-DB notice for pending requests — approve will link to this vehicle, not duplicate it */}
+      {r.status==="pending"&&matchV&&(
+        <div style={{marginTop:10,padding:"8px 12px",background:"rgba(34,197,94,.06)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{fontSize:11,fontWeight:700,color:"var(--green)"}}>✅ Already in Vehicle list:</span>
+          {matchV.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 7px",borderRadius:4}}>{matchV.code}</span>}
+          {onGoToVehicles&&<button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"2px 8px"}} onClick={()=>onGoToVehicles(r.make,r.model)}>View →</button>}
         </div>
       )}
 
@@ -12864,7 +12877,9 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
           {!isRejecting&&(
             <div style={{display:"flex",gap:8}}>
               <button className="btn btn-primary btn-sm" onClick={approve} disabled={busy}>
-                {busy?"...":(r.part_id?"Approve, Add Vehicle & Link":"Approve & Add Vehicle")}
+                {busy?"...":matchV
+                  ? (r.part_id?"Approve & Link (existing vehicle)":"Approve (existing vehicle)")
+                  : (r.part_id?"Approve, Add Vehicle & Link":"Approve & Add Vehicle")}
               </button>
               <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setIsRejecting(true);setRejectReason("");}}>Reject</button>
             </div>

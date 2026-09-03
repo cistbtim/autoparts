@@ -81,6 +81,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const [branchUser,setBranchUser] = useState(""); const [branchPass,setBranchPass] = useState("");
   // staff
   const [staffUser,setStaffUser] = useState(""); const [staffPass,setStaffPass] = useState("");
+  const [coworkMode,setCoworkMode] = useState(false);
   // supplier
   const [supplierUser,setSupplierUser] = useState(""); const [supplierPass,setSupplierPass] = useState("");
   // workshop
@@ -160,7 +161,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     if(Array.isArray(res)&&res.length>0){
       const accErr=checkAccess(res[0]);
       if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username});setLoading(false);return;}
-      logLogin(res[0]);onLogin(res[0]);
+      logLogin(res[0]);onLogin(res[0],{coworkMode});
     } else setErr(t.wrongPass);
     setLoading(false);
   };
@@ -740,6 +741,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               <Field label={t.password||"Password"}>
                 <InpIcon inp={<input style={inpStyle} type="password" value={staffPass} onChange={e=>setStaffPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doStaffLogin()}/>}><IcLock/></InpIcon>
               </Field>
+              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"var(--text2)",cursor:"pointer"}}>
+                <input type="checkbox" checked={coworkMode} onChange={e=>setCoworkMode(e.target.checked)}/>
+                🤖 Cowork / automation session (skip 1-hour inactivity logout)
+              </label>
               {err&&<ErrBox msg={err}/>}
               {waRenewLink}
               <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doStaffLogin} disabled={loading}>

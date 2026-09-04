@@ -12741,9 +12741,20 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
   const approve = async () => {
     setBusy(true);
     try {
+      // Re-check the server right before inserting — the `vehicles` prop can be
+      // stale (this app has no live cross-tab/cross-session sync), and a stale
+      // miss on `matches` here would silently create a duplicate vehicle even
+      // though one already exists in the DB. matchV covers the common case
+      // instantly; this is the fallback that catches what it missed.
+      let freshMatch = null;
+      if(!matchV && r.make){
+        const fresh = await api.fresh("vehicles", `make=ilike.${encodeURIComponent(r.make.trim())}`).catch(()=>[]);
+        freshMatch = (Array.isArray(fresh)?fresh:[]).find(v=>modelFuzzyMatch(v.model, r.model));
+      }
       // If a vehicle with this make+model already exists, link to it instead of
       // inserting a duplicate — onApprove always does a plain insert when given no id.
-      const saved = matchV || await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
+      // (Ambiguous multi-match cases are resolved via linkExisting below instead.)
+      const saved = matchV || freshMatch || await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
       await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
       if(r.part_id && saved?.id && onLinkFitment){
         try{ await onLinkFitment(r.part_id, saved.id); }catch{/* vehicle still saved+approved either way */}
@@ -12751,6 +12762,25 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
       await onRefresh();
       setBusy(false);
       onGoToVehicles&&onGoToVehicles(r.make, r.model);
+      return;
+    } catch{}
+    await onRefresh();
+    setBusy(false);
+  };
+
+  // Explicitly link to one of several ambiguous existing-vehicle matches (e.g. a
+  // chassis-code-only request like "U11" matching both "U11 X1" and "U11 iX1") —
+  // never inserts a new vehicle, just approves the request and links the fitment.
+  const linkExisting = async (v) => {
+    setBusy(true);
+    try {
+      await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
+      if(r.part_id && onLinkFitment){
+        try{ await onLinkFitment(r.part_id, v.id); }catch{/* request still approved either way */}
+      }
+      await onRefresh();
+      setBusy(false);
+      onGoToVehicles&&onGoToVehicles(r.make, v.model);
       return;
     } catch{}
     await onRefresh();
@@ -12774,10 +12804,17 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
     setBusy(false);
   };
 
-  const matchV = vehicles.find(v=>
-    v.make.toUpperCase()===r.make.toUpperCase() &&
-    v.model.toUpperCase()===r.model.toUpperCase()
+  // Fuzzy both-ways match — catches a chassis-code-only request like "U11" against
+  // fuller model names like "U11 X1" / "U11 iX1", not just an exact string match.
+  const modelFuzzyMatch = (a,b) => {
+    const A=(a||"").trim().toUpperCase(), B=(b||"").trim().toUpperCase();
+    if(!A||!B) return false;
+    return A===B || A.includes(B) || B.includes(A);
+  };
+  const matches = vehicles.filter(v=>
+    (v.make||"").toUpperCase()===r.make.toUpperCase() && modelFuzzyMatch(v.model, r.model)
   );
+  const matchV = matches[0];
   const dbPhotoUrls = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean).map(toImgUrl);
   const reqPhotos   = [r.photo1, r.photo2].filter(Boolean);
   const allUrls  = [...reqPhotos, ...dbPhotoUrls];
@@ -12819,11 +12856,24 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
       )}
 
       {/* Already-in-DB notice for pending requests — approve will link to this vehicle, not duplicate it */}
-      {r.status==="pending"&&matchV&&(
-        <div style={{marginTop:10,padding:"8px 12px",background:"rgba(34,197,94,.06)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
-          <span style={{fontSize:11,fontWeight:700,color:"var(--green)"}}>✅ Already in Vehicle list:</span>
-          {matchV.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 7px",borderRadius:4}}>{matchV.code}</span>}
-          {onGoToVehicles&&<button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"2px 8px"}} onClick={()=>onGoToVehicles(r.make,r.model)}>View →</button>}
+      {r.status==="pending"&&matches.length>0&&(
+        <div style={{marginTop:10,padding:"8px 12px",background:"rgba(34,197,94,.06)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+            <span style={{fontSize:11,fontWeight:700,color:"var(--green)"}}>
+              {matches.length>1?"✅ Multiple existing vehicles match — pick one to link:":"✅ Already in Vehicle list:"}
+            </span>
+            {matches.length===1&&matchV.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 7px",borderRadius:4}}>{matchV.code}</span>}
+            {onGoToVehicles&&<button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"2px 8px"}} onClick={()=>onGoToVehicles(r.make,r.model)}>View →</button>}
+          </div>
+          {matches.length>1&&(
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {matches.map(v=>(
+                <button key={v.id} className="btn btn-ghost btn-sm" style={{fontSize:11}} disabled={busy} onClick={()=>linkExisting(v)}>
+                  🔗 Link to {v.code?`${v.code} · `:""}{v.model}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -12876,11 +12926,13 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
         <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
           {!isRejecting&&(
             <div style={{display:"flex",gap:8}}>
-              <button className="btn btn-primary btn-sm" onClick={approve} disabled={busy}>
-                {busy?"...":matchV
-                  ? (r.part_id?"Approve & Link (existing vehicle)":"Approve (existing vehicle)")
-                  : (r.part_id?"Approve, Add Vehicle & Link":"Approve & Add Vehicle")}
-              </button>
+              {matches.length<=1&&(
+                <button className="btn btn-primary btn-sm" onClick={approve} disabled={busy}>
+                  {busy?"...":matchV
+                    ? (r.part_id?"Approve & Link (existing vehicle)":"Approve (existing vehicle)")
+                    : (r.part_id?"Approve, Add Vehicle & Link":"Approve & Add Vehicle")}
+                </button>
+              )}
               <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setIsRejecting(true);setRejectReason("");}}>Reject</button>
             </div>
           )}

@@ -7396,7 +7396,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             settings={settings} branchStock={branchStock} user={user} role={role} currentBranch={currentBranch} t={t}
             onReply={replyWsShopRequest} onEscalate={escalateWsShopRequest} onMainReply={mainReplyWsShopRequest}
             onDeleteWsShop={deleteWsShopRequest} onDeleteTransfer={deleteBranchStockRequest}
-            onApproveVehicle={saveVehicle} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor}
+            onApproveVehicle={saveVehicle} onLinkFitment={saveFitment} onSendInquiry={sendInquiry} onManualQuote={saveManualQuote} onAcceptQuote={acceptInquiry} onCancelOrder={cancelOrder} onEditPart={openPartEditor}
             onGoToVehicles={(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}}
             onGoToPart={(sku)=>{
               const target=parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase());

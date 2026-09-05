@@ -12709,6 +12709,72 @@ export function BulkImageImportModal({ parts, partSuppliers=[], onClose, onImage
 }
 
 // ─── Vehicle Requests Page ──────────────────────────────────────────────
+// Split-screen compare: vehicle photo(s) on the left, part photo(s) on the right —
+// each side pages independently so you can flip through both while eyeballing a match.
+const COMPARE_ZOOM_SCALE = 2.2;
+
+const VehiclePartCompare = ({vehicleImages, partImages, vehicleSubtitle, partSubtitle, initialSide, initialIdx, onClose}) => {
+  const [vIdx, setVIdx] = useState(initialSide==="vehicle"?initialIdx:0);
+  const [pIdx, setPIdx] = useState(initialSide==="part"?initialIdx:0);
+
+  const Pane = ({title, subtitle, images, idx, setIdx}) => {
+    const [zoomed, setZoomed] = useState(false);
+    const [natural, setNatural] = useState(null); // {w,h} of the loaded <img>, needed to zoom past its natural size
+    useEffect(()=>{ setZoomed(false); setNatural(null); }, [idx]);
+    // Small source photos render at native size under maxWidth/maxHeight alone (no upscale) —
+    // just dropping those caps on zoom does nothing visible. Force real enlargement instead by
+    // sizing explicitly off the loaded image's natural pixels, scaled up.
+    const zoomStyle = (zoomed && natural)
+      ? {width:natural.w*COMPARE_ZOOM_SCALE,height:natural.h*COMPARE_ZOOM_SCALE,maxWidth:"none",maxHeight:"none",borderRadius:8,cursor:"zoom-out",display:"block"}
+      : {maxWidth:"90%",maxHeight:"100%",objectFit:"contain",borderRadius:8,cursor:"zoom-in"};
+    return (
+    <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0,padding:"16px 20px"}}>
+      <div style={{textAlign:"center",marginBottom:10}}>
+        <div style={{color:"rgba(255,255,255,.9)",fontSize:13,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>
+          {title}{images.length>1?` (${idx+1}/${images.length})`:""}
+        </div>
+        {subtitle&&<div style={{color:"rgba(255,255,255,.65)",fontSize:13,marginTop:3}}>{subtitle}</div>}
+      </div>
+      <div style={zoomed
+        ?{flex:1,minHeight:0,position:"relative",overflow:"auto"}
+        :{flex:1,display:"flex",alignItems:"center",justifyContent:"center",minHeight:0,position:"relative",overflow:"hidden"}}>
+        {images.length===0?(
+          <div style={{color:"rgba(255,255,255,.4)",fontSize:14}}>No {title.toLowerCase()} photo</div>
+        ):(
+          <>
+            <img key={images[idx].url} src={images[idx].url} alt="" referrerPolicy="no-referrer"
+              style={zoomStyle}
+              onLoad={e=>setNatural({w:e.target.naturalWidth,h:e.target.naturalHeight})}
+              onClick={e=>{e.stopPropagation();setZoomed(z=>!z);}}/>
+            {!zoomed&&images[idx].label&&<div style={{position:"absolute",bottom:8,color:"rgba(255,255,255,.6)",fontSize:12}}>{images[idx].label}</div>}
+            {!zoomed&&images.length>1&&(
+              <>
+                <button onClick={e=>{e.stopPropagation();setIdx(i=>(i-1+images.length)%images.length);}}
+                  style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",width:36,height:36,cursor:"pointer",fontSize:18}}>‹</button>
+                <button onClick={e=>{e.stopPropagation();setIdx(i=>(i+1)%images.length);}}
+                  style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",width:36,height:36,cursor:"pointer",fontSize:18}}>›</button>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+    );
+  };
+
+  return createPortal(
+    <div onClick={onClose}
+      style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.96)",zIndex:99999,
+        display:"flex",alignItems:"stretch",justifyContent:"center"}}>
+      <Pane title="Vehicle" subtitle={vehicleSubtitle} images={vehicleImages} idx={vIdx} setIdx={setVIdx}/>
+      <div style={{width:1,background:"rgba(255,255,255,.15)"}}/>
+      <Pane title="Part" subtitle={partSubtitle} images={partImages} idx={pIdx} setIdx={setPIdx}/>
+      <button onClick={onClose} style={{position:"fixed",top:16,right:16,background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",width:36,height:36,cursor:"pointer",fontSize:18,zIndex:100000}}>✕</button>
+    </div>,
+    document.body
+  );
+};
+
 const VehiclePhotoRow = ({urls, startIdx, label, onImageClick}) => urls.length===0 ? null : (
   <div style={{marginTop:8}}>
     <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>{label}</div>
@@ -12722,11 +12788,11 @@ const VehiclePhotoRow = ({urls, startIdx, label, onImageClick}) => urls.length==
   </div>
 );
 
-export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApprove,onLinkFitment,onGoToVehicles,onGoToPart,onRefresh}) {
+export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],parts=[],user,onApprove,onLinkFitment,onGoToVehicles,onGoToPart,onRefresh}) {
   const [isRejecting,setIsRejecting] = useState(false);
   const [rejectReason,setRejectReason] = useState("");
   const [busy,setBusy] = useState(false);
-  const [lightbox,setLightbox] = useState(null); // {urls, idx, labels}
+  const [compare,setCompare] = useState(null); // {side:'vehicle'|'part', idx}
 
   const branchName = id => branches.find(b=>b.id===id)?.name||"Unknown Branch";
 
@@ -12817,9 +12883,20 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
   const matchV = matches[0];
   const dbPhotoUrls = [matchV?.photo_front, matchV?.photo_rear, matchV?.photo_side].filter(Boolean).map(toImgUrl);
   const reqPhotos   = [r.photo1, r.photo2].filter(Boolean);
-  const allUrls  = [...reqPhotos, ...dbPhotoUrls];
-  const allLabels= [...reqPhotos.map((_,i)=>`Branch Photo ${i+1}`), ...["Front","Rear","Side"].slice(0,dbPhotoUrls.length)];
-  const openAt = (i) => setLightbox({urls:allUrls, idx:i, labels:allLabels});
+  const linkedPart  = parts.find(p=>String(p.id)===String(r.part_id)) ||
+    (r.part_sku ? parts.find(p=>(p.sku||"").trim().toLowerCase()===r.part_sku.trim().toLowerCase()) : null);
+  const partExtraPhotos = Array.isArray(linkedPart?.photos) ? linkedPart.photos : (()=>{try{return JSON.parse(linkedPart?.photos||"[]");}catch{return[];}})();
+  const partPhotoUrls = linkedPart ? [linkedPart.image_url, ...partExtraPhotos].filter(Boolean).map(toImgUrl) : [];
+  const vehicleImages = [
+    ...reqPhotos.map((url,i)=>({url,label:`Branch Photo ${i+1}`})),
+    ...dbPhotoUrls.map((url,i)=>({url,label:["Front","Rear","Side"][i]||`Photo ${i+1}`})),
+  ];
+  const partImages = partPhotoUrls.map((url,i)=>({url,label:i===0?"Part Photo":`Part Photo ${i+1}`}));
+  const openVehicleAt = (i) => setCompare({side:"vehicle", idx:i});
+  const openPartAt    = (i) => setCompare({side:"part", idx:i});
+  const vehicleYearStr = matchV?`${matchV.year_from}–${matchV.year_to||"now"}`:(r.year_from||r.year_to)?`${r.year_from||"?"}–${r.year_to||"present"}`:null;
+  const vehicleSubtitle = [matchV?`${matchV.make} ${matchV.model}`:`${r.make} ${r.model}`, vehicleYearStr].filter(Boolean).join(" · ");
+  const partSubtitle = linkedPart ? [linkedPart.name, linkedPart.year_range||null].filter(Boolean).join(" · ") : null;
 
   return (
     <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:10}}>
@@ -12847,15 +12924,50 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
       )}
       {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2,fontStyle:"italic"}}>"{r.notes}"</div>}
 
-      {/* Two-column photo section */}
-      {(reqPhotos.length>0||dbPhotoUrls.length>0)&&(
-        <div style={{display:"flex",gap:16,marginTop:10,flexWrap:"wrap"}}>
-          <VehiclePhotoRow urls={reqPhotos} startIdx={0} label="Branch Photos" onImageClick={openAt}/>
-          <VehiclePhotoRow urls={dbPhotoUrls} startIdx={reqPhotos.length} label="Vehicle in Database" onImageClick={openAt}/>
+      {/* 1. Part photos */}
+      {partPhotoUrls.length>0&&(
+        <div style={{marginTop:10}}>
+          <VehiclePhotoRow urls={partPhotoUrls} startIdx={0} label={`Part Photos${linkedPart?.sku?` · ${linkedPart.sku}`:""}`} onImageClick={openPartAt}/>
         </div>
       )}
 
-      {/* Already-in-DB notice for pending requests — approve will link to this vehicle, not duplicate it */}
+      {/* 2. Full part description, with OE number */}
+      {linkedPart&&(
+        <div style={{marginTop:10,padding:"8px 12px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{linkedPart.name}{linkedPart.chinese_desc?` / ${linkedPart.chinese_desc}`:""}</div>
+          <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12,color:"var(--text2)"}}>
+            <span>SKU: <strong style={{fontFamily:"DM Mono,monospace",color:"var(--accent)"}}>{linkedPart.sku}</strong></span>
+            {linkedPart.oe_number&&<span>OE: <strong style={{fontFamily:"DM Mono,monospace"}}>{linkedPart.oe_number}</strong></span>}
+            {linkedPart.category&&<span>Category: {linkedPart.category}</span>}
+            {linkedPart.brand&&<span>Brand: {linkedPart.brand}</span>}
+            {linkedPart.bin_location&&<span>Bin: {linkedPart.bin_location}</span>}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Make / Model / Year strip — prefers the matched DB vehicle's fuller record over the raw request text */}
+      <div style={{display:"flex",gap:10,marginTop:10,flexWrap:"wrap"}}>
+        {[
+          ["Make",   matchV?.make||r.make||"—"],
+          ["Model",  matchV?.model||r.model||"—"],
+          ["Year",   matchV?`${matchV.year_from}–${matchV.year_to||"now"}`:(r.year_from||r.year_to)?`${r.year_from||"?"}–${r.year_to||"present"}`:"—"],
+        ].map(([label,val])=>(
+          <div key={label} style={{flex:"1 1 100px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 10px"}}>
+            <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.5,marginBottom:2}}>{label}</div>
+            <div style={{fontSize:13,fontWeight:600}}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 4. Vehicle in database (+ branch-submitted) photos */}
+      {(reqPhotos.length>0||dbPhotoUrls.length>0)&&(
+        <div style={{display:"flex",gap:16,marginTop:10,flexWrap:"wrap"}}>
+          <VehiclePhotoRow urls={reqPhotos} startIdx={0} label="Branch Photos" onImageClick={openVehicleAt}/>
+          <VehiclePhotoRow urls={dbPhotoUrls} startIdx={reqPhotos.length} label="Vehicle in Database" onImageClick={openVehicleAt}/>
+        </div>
+      )}
+
+      {/* 5. Already-in-DB notice for pending requests — approve will link to this vehicle, not duplicate it */}
       {r.status==="pending"&&matches.length>0&&(
         <div style={{marginTop:10,padding:"8px 12px",background:"rgba(34,197,94,.06)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,display:"flex",flexDirection:"column",gap:6}}>
           <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
@@ -12948,12 +13060,12 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],user,onApp
           )}
         </div>
       )}
-      {lightbox&&<ImgLightbox urls={lightbox.urls} startIdx={lightbox.idx} labels={lightbox.labels} onClose={()=>setLightbox(null)}/>}
+      {compare&&<VehiclePartCompare vehicleImages={vehicleImages} partImages={partImages} vehicleSubtitle={vehicleSubtitle} partSubtitle={partSubtitle} initialSide={compare.side} initialIdx={compare.idx} onClose={()=>setCompare(null)}/>}
     </div>
   );
 }
 
-export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],user,role,currentBranch,onRefresh,onApprove,onLinkFitment,onGoToVehicles,onGoToPart,t={}}) {
+export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],parts=[],user,role,currentBranch,onRefresh,onApprove,onLinkFitment,onGoToVehicles,onGoToPart,t={}}) {
   const isAdmin = role==="admin";
   const myReqs  = isAdmin ? vehicleRequests : vehicleRequests.filter(r=>r.branch_id===currentBranch?.id);
   const pending = myReqs.filter(r=>r.status==="pending");
@@ -13200,7 +13312,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       {pending.length>0&&(
         <>
           <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,marginBottom:8}}>Pending ({pending.length})</div>
-          {pending.map(r=><VehicleRequestCard key={r.id} r={r} isAdmin={isAdmin} vehicles={vehicles} branches={branches} user={user} onApprove={onApprove} onLinkFitment={onLinkFitment} onGoToVehicles={onGoToVehicles} onGoToPart={onGoToPart} onRefresh={onRefresh}/>)}
+          {pending.map(r=><VehicleRequestCard key={r.id} r={r} isAdmin={isAdmin} vehicles={vehicles} branches={branches} parts={parts} user={user} onApprove={onApprove} onLinkFitment={onLinkFitment} onGoToVehicles={onGoToVehicles} onGoToPart={onGoToPart} onRefresh={onRefresh}/>)}
         </>
       )}
       {pending.length===0&&done.length===0&&(
@@ -13212,7 +13324,7 @@ export function VehicleRequestsPage({vehicleRequests=[],vehicles=[],branches=[],
       {done.length>0&&(
         <>
           <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,margin:"16px 0 8px"}}>Completed ({done.length})</div>
-          {done.map(r=><VehicleRequestCard key={r.id} r={r} isAdmin={isAdmin} vehicles={vehicles} branches={branches} user={user} onApprove={onApprove} onLinkFitment={onLinkFitment} onGoToVehicles={onGoToVehicles} onGoToPart={onGoToPart} onRefresh={onRefresh}/>)}
+          {done.map(r=><VehicleRequestCard key={r.id} r={r} isAdmin={isAdmin} vehicles={vehicles} branches={branches} parts={parts} user={user} onApprove={onApprove} onLinkFitment={onLinkFitment} onGoToVehicles={onGoToVehicles} onGoToPart={onGoToPart} onRefresh={onRefresh}/>)}
         </>
       )}
       {lightbox&&<ImgLightbox urls={lightbox.urls} startIdx={lightbox.idx} labels={lightbox.labels} onClose={()=>setLightbox(null)}/>}

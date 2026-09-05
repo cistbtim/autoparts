@@ -7334,14 +7334,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         )}
 
         {tab==="vehicleRequests"&&(role==="admin"||role==="branch_admin")&&(
-          <VehicleRequestsPage vehicleRequests={vehicleRequests} vehicles={vehicles} branches={branches} user={user} role={role}
+          <VehicleRequestsPage vehicleRequests={vehicleRequests} vehicles={vehicles} branches={branches} parts={parts} user={user} role={role}
             currentBranch={currentBranch}
             onApprove={saveVehicle}
             onLinkFitment={saveFitment}
             onGoToVehicles={(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}}
             onGoToPart={(sku)=>{
               const target=parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase());
-              if(target){ setTab("inventory"); setTimeout(()=>openM("editPart",{...target,_tab:"fitment"}),0); }
+              // Stay on this tab — the Part editor renders as a global overlay on top
+              // regardless of tab, so this request stays put underneath when it closes.
+              if(target){ openM("editPart",{...target,_tab:"fitment"}); }
               else showToast(`Part SKU "${sku}" not found`,"err");
             }}
             onRefresh={()=>refreshTables("vehicle_requests")} t={t}/>
@@ -7400,7 +7402,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onGoToVehicles={(make,model)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setTab("vehicles");}}
             onGoToPart={(sku)=>{
               const target=parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase());
-              if(target){ setTab("inventory"); setTimeout(()=>openM("editPart",{...target,_tab:"fitment"}),0); }
+              // Stay on this tab (not setTab("inventory")) — the Part editor renders as a global
+              // overlay on top regardless of tab, so keeping the tab means the Vehicle Request
+              // detail underneath survives and is still there when the editor is closed.
+              if(target){ openM("editPart",{...target,_tab:"fitment"}); }
               else showToast(`Part SKU "${sku}" not found`,"err");
             }}
             rfqQuotes={rfqQuotes} rfqItems={rfqItems} onCreateRfqSession={createRfqSession}

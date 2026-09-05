@@ -227,7 +227,7 @@ export function RequestsKanbanPage({
     if(type==="vehicle")return(
       <Overlay onClose={closeDetail}>
         <MHead title="🚗 Vehicle Request" sub={`${raw.make} ${raw.model}`} onClose={closeDetail}/>
-        <VehicleRequestCard r={raw} isAdmin={isAdmin} vehicles={vehicles} branches={branches} user={user}
+        <VehicleRequestCard r={raw} isAdmin={isAdmin} vehicles={vehicles} branches={branches} parts={parts} user={user}
           onApprove={onApproveVehicle} onLinkFitment={onLinkFitment} onGoToVehicles={onGoToVehicles} onGoToPart={onGoToPart} onRefresh={onRefresh}/>
       </Overlay>
     );

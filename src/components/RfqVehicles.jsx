@@ -1928,15 +1928,29 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 
   // Auto-log a zero-result search to the Vehicle Requests review queue, debounced
   // so it only fires once the user has paused typing (not per keystroke) and the
-  // search still genuinely has no match. Skipped entirely once any match exists.
+  // search still genuinely has no match anywhere — checked against ALL vehicles,
+  // not `filtered`/`searchMatched` (which deliberately hide already-linked vehicles
+  // from the picker, since there's nothing left to add). Gating on `filtered` meant
+  // re-searching a model already fitted to this part — nothing left to pick, so
+  // filtered.length was 0 — logged a bogus duplicate "miss" for a fitment that
+  // already exists.
+  const anyMatch = (() => {
+    const term = search.trim();
+    if(!term) return true;
+    const tokens = term.toLowerCase().split(/\s+/).filter(Boolean);
+    return vehicles.some(v => {
+      const hay = `${v.make} ${v.model} ${v.variant||""} ${v.engine||""} ${v.year_from} ${v.year_to||""} ${v.code||""}`.toLowerCase();
+      return tokens.every(tok=>hay.includes(tok));
+    });
+  })();
   useEffect(() => {
     const term = search.trim();
-    if(!term || filtered.length > 0 || supplierMode || !onLogVehicleMiss) return;
+    if(!term || anyMatch || supplierMode || !onLogVehicleMiss) return;
     const timer = setTimeout(() => {
       onLogVehicleMiss(part.id, part.sku, part.make, term);
     }, 1200);
     return () => clearTimeout(timer);
-  }, [search, filtered.length, supplierMode, onLogVehicleMiss, part.id, part.sku, part.make]);
+  }, [search, anyMatch, supplierMode, onLogVehicleMiss, part.id, part.sku, part.make]);
 
   const toggle = (vid) => {
     setPending(p => {

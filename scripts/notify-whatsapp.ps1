@@ -45,6 +45,8 @@ public class WaWin32 {
     [DllImport("user32.dll")] public static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, int dwExtraInfo);
     [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
 }
 "@
@@ -79,10 +81,30 @@ function Save-FullScreenshot($path) {
 
 function Get-FocusedWaRect($waProc) {
     [WaWin32]::ShowWindow($waProc.MainWindowHandle, 9) | Out-Null
+    # Windows blocks SetForegroundWindow from a process that doesn't currently own
+    # the foreground (this PowerShell process is freshly spawned each run, so it
+    # never does) - the calls below silently no-op in that case, which is why the
+    # window sometimes never came to front even though every subsequent click
+    # coordinate was correct. A synthetic ALT tap resets that lockout (documented
+    # Windows behavior), and a real mouse click is never subject to it at all -
+    # do both as belt-and-braces instead of trusting SetForegroundWindow alone.
+    [WaWin32]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero) # ALT down
+    [WaWin32]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero) # ALT up (KEYEVENTF_KEYUP)
     [WaWin32]::SetForegroundWindow($waProc.MainWindowHandle) | Out-Null
-    Start-Sleep -Milliseconds 1200
+    Start-Sleep -Milliseconds 500
     $rect = New-Object WaWin32+RECT
     [WaWin32]::GetWindowRect($waProc.MainWindowHandle, [ref]$rect) | Out-Null
+    if ([WaWin32]::GetForegroundWindow() -ne $waProc.MainWindowHandle) {
+        # Still not foreground - a real mouse click on the window is never subject
+        # to the foreground-lock restriction, so use one on its title bar as a
+        # guaranteed fallback.
+        [WaWin32]::SetCursorPos($rect.Left + 150, $rect.Top + 10) | Out-Null
+        Start-Sleep -Milliseconds 150
+        [WaWin32]::mouse_event(0x0002, 0, 0, 0, 0)
+        Start-Sleep -Milliseconds 100
+        [WaWin32]::mouse_event(0x0004, 0, 0, 0, 0)
+        Start-Sleep -Milliseconds 500
+    }
     return $rect
 }
 

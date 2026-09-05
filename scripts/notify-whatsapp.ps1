@@ -142,17 +142,29 @@ if ($Phase -eq 'Open') {
     $winW = $rect.Right - $rect.Left
     $winH = $rect.Bottom - $rect.Top
 
-    # Click search box, clear it, search for the contact
-    Click-At ($rect.Left + [int]($winW * 0.236)) ($rect.Top + [int]($winH * 0.168))
-    [System.Windows.Forms.SendKeys]::SendWait("^a")
-    Start-Sleep -Milliseconds 150
-    [System.Windows.Forms.SendKeys]::SendWait("{DEL}")
-    Start-Sleep -Milliseconds 150
-    [System.Windows.Forms.SendKeys]::SendWait("tim mtn unlimit")
-    Start-Sleep -Milliseconds ($(if ($coldLaunch) { 3000 } else { 2000 }))
+    # Coordinates below are fractions of the WhatsApp window measured directly against a
+    # live screenshot (window was 2560x1032, maximized) - the old 0.236/0.168/0.376 values
+    # were guesses that landed inside the chat list, never the search box, which is why
+    # every earlier run opened no chat at all (confirmed via wa-verify-open.png showing
+    # the default unfiltered "Chats" list with nothing selected).
+    #
+    # Click search box twice (a single click sometimes failed to grab focus in testing -
+    # this app is a UWP shell hosting a webview, and its foreground/focus handoff on the
+    # first click is flaky) then, instead of typing the contact name and hoping the
+    # results list renders (unreliable / never reproduced cleanly in testing), just open
+    # it from "Recent searches" - reliable because this script is what puts "tim mtn
+    # unlimit" there in the first place, so it's pinned at position 1 after every run.
+    $searchBoxX  = $rect.Left + [int]($winW * 0.080)
+    $searchBoxY  = $rect.Top  + [int]($winH * 0.097)
+    $recentX     = $rect.Left + [int]($winW * 0.031)
+    $recentY     = $rect.Top  + [int]($winH * 0.185)
+    Click-At $searchBoxX $searchBoxY
+    Start-Sleep -Milliseconds 300
+    Click-At $searchBoxX $searchBoxY
+    Start-Sleep -Milliseconds ($(if ($coldLaunch) { 1200 } else { 700 }))
 
-    # Click the first search result (the known "Tim mtn New Unlimit" chat)
-    Click-At ($rect.Left + [int]($winW * 0.236)) ($rect.Top + [int]($winH * 0.376))
+    # Click the first "Recent searches" entry (the known "Tim mtn New Unlimit" chat)
+    Click-At $recentX $recentY
     Start-Sleep -Milliseconds ($(if ($coldLaunch) { 2000 } else { 1200 }))
 
     Save-FullScreenshot $VerifyOpenPath

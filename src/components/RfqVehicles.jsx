@@ -3163,6 +3163,16 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
     const num = parseInt(last.slice(2,-1),10)||1;
     return prefix + String(num+1).padStart(3,'0') + 'A';
   };
+  // "Save & Add Next" continues the SAME chassis-number cluster (e.g. BM011C → BM011D),
+  // not the make's next number overall — the common bulk-add case is entering several
+  // trims/variants of the model you just saved, one after another.
+  const nextCodeLetter = (code) => {
+    const c = (code||'').toUpperCase();
+    const m = c.match(/^([A-Z]+\d+)([A-Z])$/);
+    if (!m) return c;
+    const [, base, letter] = m;
+    return letter < 'Z' ? base + String.fromCharCode(letter.charCodeAt(0)+1) : c;
+  };
   // When search is active, base the new code on the visible filtered group.
   // When a model is provided, try each word of it against existing models
   // (e.g. "G02 X4 LCI" → no G02 group, but "X4" matches the X4 group → BM074D).
@@ -3491,7 +3501,15 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
 
     {editV&&(
       <ErrorBoundary name="VehicleModal">
-        <VehicleModal vehicle={editV} parts={parts} onSave={async(data)=>{ await onSave(data); setEditV(null); }}
+        {/* key forces a clean remount on "Save & Add Next" — editV keeps the same shape
+            (no id) between blank forms otherwise, so React would reuse the old instance
+            and leave stale field values sitting in it. */}
+        <VehicleModal key={editV.id||editV._key||"new"} vehicle={editV} parts={parts}
+          onSave={async(data)=>{ await onSave(data); setEditV(null); }}
+          onSaveAndNext={async(data)=>{
+            await onSave(data);
+            setEditV({make:data.make, model:"", code:nextCodeLetter(data.code)||nextCodeForMake(data.make), year_from:"", year_to:"", engine:"", variant:"", _key:Date.now()+Math.random()});
+          }}
           onClose={()=>setEditV(null)} t={t} nextCodeForMake={nextCodeForMake} wikiForModel={wikiForModel}/>
       </ErrorBoundary>
     )}
@@ -3602,7 +3620,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
 }
 
 // ── Vehicle Add/Edit Modal ──
-function VehicleModal({vehicle, parts=[], onSave, onClose, t, nextCodeForMake, wikiForModel}) {
+function VehicleModal({vehicle, parts=[], onSave, onSaveAndNext, onClose, t, nextCodeForMake, wikiForModel}) {
   const isNew = !vehicle.id;
   const [f, setF] = useState({
     id:          vehicle.id||null,
@@ -3653,6 +3671,19 @@ function VehicleModal({vehicle, parts=[], onSave, onClose, t, nextCodeForMake, w
     if(!f.year_from) e.year_from="Year from required";
     setErr(e);
     return Object.keys(e).length===0;
+  };
+
+  // Shared by Save and Save & Add Next — same validation/confirm/error handling,
+  // just a different save function (one closes, the other resets for the next model).
+  const attemptSave = async (saveFn) => {
+    if(!validate()) return;
+    if(codeChanged && affectedParts.length>0 &&
+       !window.confirm(`This will rename ${affectedParts.length} part SKU${affectedParts.length>1?"s":""} from ${oldCode} to ${newCodeTrim}. Continue?`)) return;
+    try{ await saveFn(f); setDirty(false); }
+    catch(e){
+      if(e.message==="code_exists") setCodeErr("Code already exists in database");
+      else if(e.message==="sku_conflict") setCodeErr(`Parts already exist under ${newCodeTrim} — choose a different code`);
+    }
   };
 
   return (
@@ -3779,16 +3810,12 @@ function VehicleModal({vehicle, parts=[], onSave, onClose, t, nextCodeForMake, w
 
       <div style={{display:"flex",gap:10,marginTop:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{t.cancel}</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={async()=>{
-          if(!validate()) return;
-          if(codeChanged && affectedParts.length>0 &&
-             !window.confirm(`This will rename ${affectedParts.length} part SKU${affectedParts.length>1?"s":""} from ${oldCode} to ${newCodeTrim}. Continue?`)) return;
-          try{ await onSave(f); setDirty(false); }
-          catch(e){
-            if(e.message==="code_exists") setCodeErr("Code already exists in database");
-            else if(e.message==="sku_conflict") setCodeErr(`Parts already exist under ${newCodeTrim} — choose a different code`);
-          }
-        }}>
+        {onSaveAndNext&&(
+          <button className="btn btn-ghost" style={{flex:1,whiteSpace:"nowrap"}} onClick={()=>attemptSave(onSaveAndNext)}>
+            ➕ Save &amp; Add Next
+          </button>
+        )}
+        <button className="btn btn-primary" style={{flex:2}} onClick={()=>attemptSave(onSave)}>
           💾 {t.save}
         </button>
       </div>

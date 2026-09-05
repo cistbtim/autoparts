@@ -12975,7 +12975,12 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],parts=[],u
               {matches.length>1?"✅ Multiple existing vehicles match — pick one to link:":"✅ Already in Vehicle list:"}
             </span>
             {matches.length===1&&matchV.code&&<span style={{fontFamily:"DM Mono,monospace",fontSize:12,fontWeight:700,color:"var(--accent)",background:"var(--surface2)",padding:"2px 7px",borderRadius:4}}>{matchV.code}</span>}
-            {onGoToVehicles&&<button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"2px 8px"}} onClick={()=>onGoToVehicles(r.make,r.model)}>View →</button>}
+            {matches.length===1&&onGoToVehicles&&(
+              // Jump using matchV's own make/model (not the raw request text) — VehiclesPage
+              // opens the vehicle editor on an exact case-insensitive match, and a chassis-code-only
+              // request like "G31" won't exact-match the DB's fuller "G31 5 SERIES TOURING".
+              <button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"2px 8px"}} onClick={()=>onGoToVehicles(matchV.make,matchV.model)}>View →</button>
+            )}
           </div>
           {matches.length>1&&(
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -13002,7 +13007,7 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],parts=[],u
       {r.status==="rejected"&&r.rejection_reason&&<div style={{marginTop:8,padding:"6px 10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",borderRadius:7,fontSize:12}}>Reason: {r.rejection_reason}</div>}
       <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
         {isAdmin&&r.status==="approved"&&onGoToVehicles&&(
-          <button className="btn btn-ghost btn-sm" style={{fontSize:12}} onClick={()=>onGoToVehicles(r.make, r.model)}>
+          <button className="btn btn-ghost btn-sm" style={{fontSize:12}} onClick={()=>onGoToVehicles(matchV?.make||r.make, matchV?.model||r.model)}>
             Edit in Vehicles →
           </button>
         )}

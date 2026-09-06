@@ -357,9 +357,36 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
     </div>`;
   }).join("");
 
+  // Fixed font sizes (bumped up earlier for readability) truncate with "..." once
+  // a SKU/name is too long to fit — shrink each label's own text independently
+  // instead, so the full SKU/name/bin always actually prints, same auto-fit trick
+  // openShelfLabelWindow already uses for its bin name.
+  const fitScript = `
+    (function(){
+      function fit(el, maxW, minSize){
+        if(!el) return;
+        var sz = parseFloat(getComputedStyle(el).fontSize);
+        while(sz>minSize && el.scrollWidth>maxW){
+          sz -= 1;
+          el.style.fontSize = sz+'px';
+        }
+      }
+      document.querySelectorAll('.label').forEach(function(label){
+        var r = label.querySelector('.r');
+        if(!r) return;
+        var maxW = r.clientWidth - 4;
+        fit(label.querySelector('.sku'), maxW, 14);
+        fit(label.querySelector('.pn'), maxW, 9);
+        fit(label.querySelector('.bin'), maxW, 14);
+        fit(label.querySelector('.sup'), maxW, 9);
+      });
+    })();
+  `;
+
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Part Labels</title><style>${css}</style></head><body>
     <button class="print-btn" onclick="window.print()">&#128424; Print ${labels.length} Label${labels.length>1?"s":""}</button>
     ${labelsHtml}
+    <script>${fitScript}<\/script>
   </body></html>`;
 
   const win = window.open("", "_blank", `width=${Math.max(W+100,480)},height=${Math.max(H*3+200,500)}`);

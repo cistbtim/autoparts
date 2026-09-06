@@ -2,7 +2,7 @@
 import { api, setDemoMode } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
-import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag } from "./lib/helpers.js";
+import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag, openPartLabelsWindow } from "./lib/helpers.js";
 import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess, CITY_PROVINCE } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
 import { CSS } from "./styles.js";
@@ -18,7 +18,7 @@ import { SupplierImportModal } from "./components/SupplierImport.jsx";
 import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
-import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage } from "./components/SupplierPortal.jsx";
+import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage } from "./pages/PublicPages.jsx";
 
@@ -196,6 +196,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [supplierOrders,setSupplierOrders]=useState([]); // orders placed by this supplier's scoped customers
   const [supplierCustomers,setSupplierCustomers]=useState([]); // customers registered through this supplier's ?catalog= link
   const [supplierQueries,setSupplierQueries]=useState([]); // customer_queries against this supplier's own self-added parts
+  const [supplierStockLogs,setSupplierStockLogs]=useState([]); // supplier_stock_logs — this supplier's own stock movement ledger
+  const [supplierStockTakes,setSupplierStockTakes]=useState([]); // supplier_stock_takes — this supplier's own stock-take headers
+  const [supplierStockTakeItems,setSupplierStockTakeItems]=useState([]); // supplier_stock_take_items for the currently-open stock take
+  const [supplierBookings,setSupplierBookings]=useState([]); // supplier_bookings — confirmed/invoiced orders + manual bookings, this supplier only
+  const [supplierBookingItems,setSupplierBookingItems]=useState([]); // supplier_booking_items for supplierBookings above
+  const [supplierPurchaseInvoices,setSupplierPurchaseInvoices]=useState([]); // supplier_purchase_invoices — stock this supplier received onto their own shelf
+  const [supplierPurchaseInvoiceItems,setSupplierPurchaseInvoiceItems]=useState([]); // supplier_purchase_invoice_items for supplierPurchaseInvoices above
   const [supplierMarginOptions,setSupplierMarginOptions]=useState(null); // this supplier's own custom quick-margin %s (suppliers.margin_options), null = using shop default
   const [supplierDiscountPct,setSupplierDiscountPct]=useState(0); // % this supplier offers customers scoped to their own ?catalog= link (suppliers.customer_discount_pct)
   const [supplierMaxDiscountPct,setSupplierMaxDiscountPct]=useState(0); // this supplier's own self-set ceiling for their discount (suppliers.max_discount_pct) — scoped to just their catalogue, doesn't touch other suppliers
@@ -953,7 +960,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const existingRaw=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=*`):[];
     const existing=(Array.isArray(existingRaw)?existingRaw:[]).map(p=>{
       const link=linksArr.find(l=>String(l.part_id)===String(p.id));
-      return {...p, _linkId:link?.id, _supplierPrice:link?.supplier_price, _suggestedPrice:link?.suggested_price};
+      return {...p, _linkId:link?.id, _supplierPrice:link?.supplier_price, _suggestedPrice:link?.suggested_price,
+        _supplierStock:link?.stock??0, _supplierBinLocation:link?.bin_location||""};
     });
     setSupplierExistingParts(existing);
     // Vehicle fitments — the supplier login skips loadAll() entirely (see loadAll's
@@ -969,13 +977,52 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     ]);
     setVehicles(Array.isArray(vehRows)?vehRows:[]);
     setPartFitments([...(Array.isArray(fitRowsExisting)?fitRowsExisting:[]),...(Array.isArray(fitRowsSelf)?fitRowsSelf:[])]);
-    // Orders placed by customers scoped to this supplier's catalogue (stamped at checkout).
-    const ord=await api.fresh("orders",`supplier_scope_id=eq.${user.supplier_id}&select=*&order=created_at.desc`);
-    setSupplierOrders(Array.isArray(ord)?ord:[]);
+    // Orders that touch this supplier — either the customer logged in via this
+    // supplier's own ?catalog= link (supplier_scope_id), OR a regular shop order
+    // contains a line item attributed to this supplier at checkout (partSuppliersId
+    // for an existing-catalogue part, or a self-added "sp_" item). No JSONB
+    // containment query available here, so this pulls all orders (same unbounded
+    // fetch the admin Orders tab already does) and filters client-side — fine at
+    // this app's scale.
+    const linkIdSet=new Set(linksArr.map(l=>String(l.id)));
+    const ownPartIdSet=new Set(partIds.map(String));
+    const allOrdersRaw=await api.fresh("orders","select=*&order=created_at.desc");
+    const relevantOrders=(Array.isArray(allOrdersRaw)?allOrdersRaw:[]).filter(o=>{
+      if(String(o.supplier_scope_id)===String(user.supplier_id)) return true;
+      const items=Array.isArray(o.items)?o.items:[];
+      return items.some(it=>
+        (it.partSuppliersId&&linkIdSet.has(String(it.partSuppliersId)))||
+        (String(it.partId||"").startsWith("sp_")&&ownPartIdSet.has(String(it.partId).slice(3)))
+      );
+    });
+    setSupplierOrders(relevantOrders);
     // Customers who registered through this supplier's own ?catalog= link — lets
     // them set an individual discount % per customer (capped by settings.max_customer_discount_pct).
     const custs=await api.fresh("customers",`supplier_scope_id=eq.${user.supplier_id}&select=*&order=name.asc`);
     setSupplierCustomers(Array.isArray(custs)?custs:[]);
+    // Stock movement ledger + manual/confirmed bookings — this supplier only.
+    const [stockLogs,bookings]=await Promise.all([
+      api.fresh("supplier_stock_logs",`supplier_id=eq.${user.supplier_id}&select=*&order=created_at.desc&limit=300`).catch(()=>[]),
+      api.fresh("supplier_bookings",`supplier_id=eq.${user.supplier_id}&select=*&order=created_at.desc`).catch(()=>[]),
+    ]);
+    setSupplierStockLogs(Array.isArray(stockLogs)?stockLogs:[]);
+    const bookingsArr=Array.isArray(bookings)?bookings:[];
+    setSupplierBookings(bookingsArr);
+    const bookingIds=bookingsArr.map(b=>b.id);
+    const bookingItems=bookingIds.length?await api.fresh("supplier_booking_items",`booking_id=in.(${bookingIds.join(",")})&select=*`).catch(()=>[]):[];
+    setSupplierBookingItems(Array.isArray(bookingItems)?bookingItems:[]);
+    // Stock takes — headers only here; items are loaded on-demand when one is opened
+    // (startSupplierStockTake / openSupplierStockTake below), same lazy pattern the
+    // main StockTakePage uses.
+    const takes=await api.fresh("supplier_stock_takes",`supplier_id=eq.${user.supplier_id}&select=*&order=created_at.desc`).catch(()=>[]);
+    setSupplierStockTakes(Array.isArray(takes)?takes:[]);
+    // Purchase invoices — stock this supplier received onto their own shelf.
+    const purchInvs=await api.fresh("supplier_purchase_invoices",`supplier_id=eq.${user.supplier_id}&select=*&order=created_at.desc`).catch(()=>[]);
+    const purchInvsArr=Array.isArray(purchInvs)?purchInvs:[];
+    setSupplierPurchaseInvoices(purchInvsArr);
+    const purchInvIds=purchInvsArr.map(i=>i.id);
+    const purchItems=purchInvIds.length?await api.fresh("supplier_purchase_invoice_items",`invoice_id=in.(${purchInvIds.join(",")})&select=*`).catch(()=>[]):[];
+    setSupplierPurchaseInvoiceItems(Array.isArray(purchItems)?purchItems:[]);
   },[role,user.supplier_id]);
   useEffect(()=>{ reloadSupplierParts(); },[reloadSupplierParts]);
 
@@ -1314,9 +1361,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // checked separately rather than joined into one id=in.(...) query against parts.
     const realIds=cart.filter(i=>!i._isSupplierPart).map(i=>i.id);
     const supIds=cart.filter(i=>i._isSupplierPart).map(i=>i._supplierPartId);
-    const [freshParts,freshSupParts]=await Promise.all([
+    const [freshParts,freshSupParts,supplierLinks]=await Promise.all([
       realIds.length?api.getFirst("parts",`id=in.(${realIds.join(",")})&select=id,name,price,stock`,500):Promise.resolve([]),
       supIds.length?api.fresh("supplier_parts",`id=in.(${supIds.join(",")})&select=id,price,stock`):Promise.resolve([]),
+      // Attribute a catalogue item to a specific supplier's own stock only when
+      // unambiguous (exactly one supplier lists this part) — a part with multiple
+      // suppliers falls back to MotorDesk's own parts.stock, same as today, since
+      // choosing which supplier's stock a multi-supplier purchase draws from is a
+      // checkout-UI question of its own, not solved here.
+      realIds.length?api.get("part_suppliers",`part_id=in.(${realIds.join(",")})&select=id,part_id,supplier_id`):Promise.resolve([]),
     ]);
     {
       const stockIssues=[];
@@ -1338,12 +1391,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
 
     const oid=makeId("ORD");
+    // A catalogue part with exactly one supplier link gets that link's id stamped on
+    // as partSuppliersId — this is what routes fulfillment to the supplier's own stock
+    // instead of parts.stock (see updateOrderStatus). Grouped by part_id first since
+    // supplierLinks can carry multiple suppliers per part.
+    const linksByPart={};
+    for(const l of (Array.isArray(supplierLinks)?supplierLinks:[])) (linksByPart[l.part_id]=linksByPart[l.part_id]||[]).push(l);
     // Item price is the discounted unit price actually charged; orig_price/discount_pct
     // kept alongside for an audit trail even after the supplier changes their %. total/
     // discount_total on the order likewise reflect what was actually charged, not the
     // pre-discount cartTotal (that's what customers.total_spent should track too).
     const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",
-      items:cart.map(i=>({partId:i.id,sku:i.sku||"",qty:i.qty,name:i.name,price:discountPrice(i.price),...(customerDiscountPct>0?{orig_price:i.price,discount_pct:customerDiscountPct}:{})})),
+      items:cart.map(i=>{
+        const base={partId:i.id,sku:i.sku||"",qty:i.qty,name:i.name,price:discountPrice(i.price),...(customerDiscountPct>0?{orig_price:i.price,discount_pct:customerDiscountPct}:{})};
+        if(i._isSupplierPart) return base; // already identifiable via the "sp_" id prefix
+        const links=linksByPart[i.id];
+        return links?.length===1 ? {...base,partSuppliersId:links[0].id,supplierId:links[0].supplier_id} : base;
+      }),
       total:cartDiscountedTotal,discount_total:cartSaved||0,branch_id:currentBranch?.id||null,supplier_scope_id:user.supplier_scope_id||null};
     await api.upsert("orders",orderObj);
     // NO stock deduction on order — stock deducted when shipper sets 待出貨
@@ -1355,6 +1419,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setTab(role==="customer"?"myorders":"orders");
   };
 
+  // A line item attributed to a supplier (either partSuppliersId for a catalogue
+  // part, or the "sp_" id prefix for a self-added one) owns its own stock — the
+  // supplier deducts it themselves via confirmSupplierOrderItem, never this admin
+  // fulfillment step. Skipping here (rather than falling through to a no-op
+  // parts.find() miss) also fixes the old bug where self-added items were silently
+  // never deducted anywhere at all.
+  const isSupplierOwnedItem=(item)=>!!item.partSuppliersId||String(item.partId||"").startsWith("sp_");
+
   const updateOrderStatus=async(id,ns)=>{
     const o=orders.find(o=>o.id===id);if(!o)return;
     const prev=o.status;
@@ -1362,6 +1434,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // 處理中 → 待出貨 : DEDUCT stock (picker confirmed items)
     if(prev!=="Ready to Ship"&&ns==="Ready to Ship"&&Array.isArray(o.items)){
       for(const item of o.items){
+        if(isSupplierOwnedItem(item)) continue;
         const p=parts.find(p=>p.id===item.partId);
         if(p){const ns2=Math.max(0,p.stock-item.qty);await api.patch("parts","id",item.partId,{stock:ns2});await logInv(p,p.stock,ns2,"Picked",id);await checkAutoReorder(item.partId,ns2);}
         // Branch: also deduct branch_stock and check branch reorder
@@ -1375,6 +1448,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // → 已取消 : RESTORE stock (only if was already deducted i.e. was 待出貨 or 已完成)
     else if(ns==="Cancelled"&&(prev==="Ready to Ship"||prev==="Completed")&&Array.isArray(o.items)){
       for(const item of o.items){
+        if(isSupplierOwnedItem(item)) continue;
         const p=parts.find(p=>p.id===item.partId);
         if(p){await api.patch("parts","id",item.partId,{stock:p.stock+item.qty});await logInv(p,p.stock,p.stock+item.qty,"Cancel Restore",id);}
       }
@@ -1383,6 +1457,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // 已取消 → restore back to active (re-deduct)
     else if(prev==="Cancelled"&&ns==="Ready to Ship"&&Array.isArray(o.items)){
       for(const item of o.items){
+        if(isSupplierOwnedItem(item)) continue;
         const p=parts.find(p=>p.id===item.partId);
         if(p){const ns2=Math.max(0,p.stock-item.qty);await api.patch("parts","id",item.partId,{stock:ns2});await logInv(p,p.stock,ns2,"Re-Picked",id);await checkAutoReorder(item.partId,ns2);}
         if(_bId){
@@ -2611,6 +2686,38 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     showToast(data.id?"✅ Part updated":"✅ Part added");
     return true;
   };
+  // Fixing name/OE/fitment on a catalogue-linked part (parts table) right from
+  // Receive Stock — unlike supplier_parts, this record is shared with admin and
+  // every other supplier of the same part, so a save here updates what everyone
+  // sees, not just this supplier's own listing (stock/bin_location/cost stay on
+  // their own part_suppliers link row and are untouched by this).
+  const updateCatalogPartDetails=async({id,name,oe_number,make,model,year_range})=>{
+    const payload={name,oe_number:oe_number||null,make:make||null,model:model||null,year_range:year_range||null};
+    const res=await api.patch("parts","id",id,payload);
+    if(res&&!Array.isArray(res)&&(res.code||res.message)){
+      showToast(`❌ Update failed: ${res.message||res.code}`,"err");
+      return false;
+    }
+    setSupplierExistingParts(prev=>prev.map(p=>p.id===id?{...p,...payload}:p));
+    showToast("✅ Part details updated");
+    return true;
+  };
+  // Minimal add-a-part, used inline from Receive Stock when the item being
+  // unpacked isn't in the catalogue yet — unlike saveSupplierPart (used by the
+  // full My Parts form), this returns the created row itself so the invoice form
+  // can immediately use its id as a line item, without a second round trip.
+  const quickAddSupplierPart=async({partCode,name,costPrice,suggestedPrice,oeNumber,make,model,yearRange})=>{
+    const res=await api.upsert("supplier_parts",{
+      part_code:partCode.trim().toUpperCase(),name:name.trim(),
+      cost_price:costPrice===""?null:+costPrice,suggested_price:suggestedPrice?+suggestedPrice:null,stock:0,supplier_id:user.supplier_id,
+      oe_number:oeNumber?.trim()||null,make:make?.trim()||null,model:model?.trim()||null,year_range:yearRange?.trim()||null,
+    });
+    const row=Array.isArray(res)&&res[0];
+    if(!row){showToast("Failed to add part","err");return null;}
+    await reloadSupplierParts();
+    showToast("✅ New part added");
+    return row;
+  };
   const deleteSupplierPart=async(id)=>{
     await api.delete("supplier_parts","id",id);
     await reloadSupplierParts();
@@ -2772,6 +2879,351 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await api.patch("suppliers","id",user.supplier_id,data);
     setSupplierProfile(prev=>({...prev,...data}));
     showToast("✅ Business info updated");
+  };
+
+  // ═══ SUPPLIER-OWNED STOCK ═══
+  // Suppliers hold their own stock (qty + location) for both kinds of parts they sell:
+  // catalogue-linked (stock/bin_location live on their part_suppliers link row) and
+  // self-added (stock/bin_location live on supplier_parts directly). MotorDesk's own
+  // parts.stock is never touched by any of this — see updateOrderStatus, which now
+  // skips any line item attributed to a supplier.
+  const saveSupplierStockField=async(sourceType,id,{stock,binLocation})=>{
+    const table=sourceType==="catalogue"?"part_suppliers":"supplier_parts";
+    const patch={};
+    if(stock!=null) patch.stock=Math.max(0,+stock||0);
+    if(binLocation!=null) patch.bin_location=binLocation;
+    await api.patch(table,"id",id,patch);
+    if(sourceType==="catalogue"){
+      setSupplierExistingParts(prev=>prev.map(p=>p._linkId===id?{...p,...(stock!=null?{_supplierStock:patch.stock}:{}),...(binLocation!=null?{_supplierBinLocation:binLocation}:{})}:p));
+    } else {
+      setSupplierParts(prev=>prev.map(p=>p.id===id?{...p,...patch}:p));
+    }
+  };
+
+  // One-time cleanup: now that this supplier tracks their own stock (part_suppliers.
+  // stock), the old parts.stock number still showing on their catalogue-linked cards
+  // is MotorDesk's own (shared) inventory field — leaving it non-zero would make it
+  // look like MotorDesk also physically holds these units. Zeroes just this
+  // supplier's linked parts, not the main parts table wholesale, and only the ones
+  // that actually still show a nonzero count (skips needless writes).
+  const zeroOutSupplierMainStock=async()=>{
+    // Scoped strictly by this supplier's own SKU prefix (e.g. "MCK-"), not just the
+    // part_suppliers link — belt-and-braces so this can never touch a part that
+    // merely happens to also be linked to this supplier without actually being one
+    // of their own SKUs. Detects the prefix from the actual SKUs (always accurate)
+    // rather than trusting user.supplier_code, which falls back to the full company
+    // name (not the short SKU prefix) whenever suppliers.code is blank.
+    const prefixCounts={};
+    for(const p of supplierExistingParts){
+      const m=(p.sku||"").match(/^([A-Z0-9]+)-/i);
+      if(m) prefixCounts[m[1].toUpperCase()]=(prefixCounts[m[1].toUpperCase()]||0)+1;
+    }
+    const detectedPrefix=Object.entries(prefixCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
+    const codePrefix=detectedPrefix||(user.supplier_code||user.supplier_name||"").trim().toUpperCase();
+    const toZero=supplierExistingParts.filter(p=>+p.stock>0&&codePrefix&&(p.sku||"").toUpperCase().startsWith(codePrefix+"-"));
+    if(!toZero.length){showToast("Already zero","err");return;}
+    for(const p of toZero){
+      await api.patch("parts","id",p.id,{stock:0});
+      await logInv(p,p.stock,0,"Moved to Supplier Stock",user.supplier_name||user.supplier_code||"");
+    }
+    await reloadSupplierParts();
+    showToast(`✅ Zeroed MotorDesk inventory for ${toZero.length} part${toZero.length>1?"s":""}`);
+  };
+
+  // Shared by order confirmation, manual bookings, and stock-take completion — the
+  // one place that actually moves a supplier's own stock number and logs it, so the
+  // ledger (My Stock Records) always has a complete picture regardless of trigger.
+  const deductSupplierStock=async({sourceType,targetId,qty,reason,sourceRefType,sourceRefId,itemName,sku})=>{
+    const table=sourceType==="catalogue"?"part_suppliers":"supplier_parts";
+    const fresh=await api.fresh(table,`id=eq.${targetId}&select=id,stock`);
+    const row=Array.isArray(fresh)&&fresh[0];
+    const before=+(row?.stock)||0;
+    const after=Math.max(0,before-qty);
+    await api.patch(table,"id",targetId,{stock:after});
+    await api.insert("supplier_stock_logs",{
+      // item_name/sku are captured here (not looked up later) so the ledger stays
+      // readable even if the part is later removed or renamed.
+      id:makeId("SSL"),supplier_id:user.supplier_id,source_type:sourceType,
+      part_suppliers_id:sourceType==="catalogue"?targetId:null,
+      supplier_part_id:sourceType==="own"?targetId:null,
+      item_name:itemName||"",sku:sku||"",
+      change_qty:-qty,before_qty:before,after_qty:after,
+      reason,ref_type:sourceRefType||null,ref_id:sourceRefId||null,
+      created_by:user.name||user.username,created_at:new Date().toISOString(),
+    });
+    return after;
+  };
+
+  // Supplier confirms one line item from a real Spare Shop order (identified in
+  // reloadSupplierParts via partSuppliersId / the "sp_" id prefix) — creates their
+  // own booking record (their receipt of the sale) and deducts their stock. Deliberately
+  // NOT triggered by admin's Ready-to-Ship click (see updateOrderStatus) — the supplier
+  // decides when their own stock actually moves.
+  const confirmSupplierOrderItem=async(order,item)=>{
+    const isOwn=String(item.partId||"").startsWith("sp_");
+    const sourceType=isOwn?"own":"catalogue";
+    const targetId=isOwn?item.partId.slice(3):item.partSuppliersId;
+    if(!targetId){showToast("Can't identify which of your items this is","err");return;}
+    // item.price is already the discounted per-unit price actually charged at checkout
+    // (see placeOrder); orig_price/discount_pct only exist on the item when that
+    // customer had a discount applied — fall back to price/0 when they didn't.
+    const lineTotal=item.price*item.qty;
+    const lineSubtotal=(item.orig_price??item.price)*item.qty;
+    const bookingRes=await api.insert("supplier_bookings",{
+      id:makeId("SB"),supplier_id:user.supplier_id,source_order_id:order.id,
+      customer_name:order.customer_name||"",customer_phone:order.customer_phone||"",
+      status:"confirmed",created_by:user.name||user.username,
+      discount_pct:item.discount_pct||0,subtotal:lineSubtotal,total:lineTotal,
+      created_at:new Date().toISOString(),confirmed_at:new Date().toISOString(),
+    });
+    const bookingRow=Array.isArray(bookingRes)&&bookingRes[0];
+    if(!bookingRow){showToast("Failed to confirm","err");return;}
+    await api.insert("supplier_booking_items",{
+      id:makeId("SBI"),booking_id:bookingRow.id,source_type:sourceType,
+      part_id:sourceType==="catalogue"?item.partId:null,supplier_part_id:sourceType==="own"?targetId:null,
+      part_suppliers_id:sourceType==="catalogue"?targetId:null, // the actual stock row — needed to restore stock if this booking is later deleted
+      part_name:item.name,sku:item.sku||"",qty:item.qty,unit_price:item.price,unit_cost:0,
+    });
+    await deductSupplierStock({sourceType,targetId,qty:item.qty,reason:"sale",sourceRefType:"order",sourceRefId:order.id,itemName:item.name,sku:item.sku});
+    await reloadSupplierParts();
+    showToast("✅ Confirmed — stock deducted");
+  };
+
+  const convertSupplierBookingToInvoice=async(bookingId)=>{
+    await api.patch("supplier_bookings","id",bookingId,{status:"invoiced",invoiced_at:new Date().toISOString()});
+    await reloadSupplierParts();
+    showToast("🧾 Converted to invoice");
+  };
+
+  // Deleting a booking (confirmed or already invoiced) restores whatever stock it
+  // deducted first — same "undo" as cancelling a regular order restores parts.stock
+  // — logging the reversal so My Stock Records doesn't just silently lose a movement.
+  const deleteSupplierBooking=async(bookingId)=>{
+    const items=await api.fresh("supplier_booking_items",`booking_id=eq.${bookingId}&select=*`);
+    for(const it of (Array.isArray(items)?items:[])){
+      const targetId=it.source_type==="catalogue"?it.part_suppliers_id:it.supplier_part_id;
+      if(!targetId) continue;
+      const table=it.source_type==="catalogue"?"part_suppliers":"supplier_parts";
+      const fresh=await api.fresh(table,`id=eq.${targetId}&select=id,stock`);
+      const row=Array.isArray(fresh)&&fresh[0];
+      const before=+(row?.stock)||0;
+      const after=before+it.qty;
+      await api.patch(table,"id",targetId,{stock:after});
+      await api.insert("supplier_stock_logs",{
+        id:makeId("SSL"),supplier_id:user.supplier_id,source_type:it.source_type,
+        part_suppliers_id:it.source_type==="catalogue"?targetId:null,
+        supplier_part_id:it.source_type==="own"?targetId:null,
+        item_name:it.part_name||"",sku:it.sku||"",
+        change_qty:it.qty,before_qty:before,after_qty:after,
+        reason:"booking_deleted",ref_type:"booking",ref_id:bookingId,
+        created_by:user.name||user.username,created_at:new Date().toISOString(),
+      });
+    }
+    await api.delete("supplier_booking_items","booking_id",bookingId);
+    await api.delete("supplier_bookings","id",bookingId);
+    await reloadSupplierParts();
+    showToast("Booking deleted — stock restored","err");
+  };
+
+  // Supplier creates a booking directly (no underlying Spare Shop order) — a phone/
+  // walk-in sale they're recording themselves. items: [{sourceType,targetId,partId?,name,sku,qty,unitPrice}]
+  const createManualSupplierBooking=async({customerName,customerPhone,items,discountPct,subtotal,total})=>{
+    if(!customerName?.trim()||!items?.length){showToast("Add a customer name and at least one item","err");return;}
+    const bookingRes=await api.insert("supplier_bookings",{
+      id:makeId("SB"),supplier_id:user.supplier_id,source_order_id:null,
+      customer_name:customerName.trim(),customer_phone:customerPhone||"",
+      status:"confirmed",created_by:user.name||user.username,
+      discount_pct:discountPct||0,subtotal:subtotal??null,total:total??null,
+      created_at:new Date().toISOString(),confirmed_at:new Date().toISOString(),
+    });
+    const bookingRow=Array.isArray(bookingRes)&&bookingRes[0];
+    if(!bookingRow){showToast("Failed to create booking","err");return;}
+    for(const it of items){
+      await api.insert("supplier_booking_items",{
+        id:makeId("SBI"),booking_id:bookingRow.id,source_type:it.sourceType,
+        part_id:it.sourceType==="catalogue"?(it.partId||null):null,supplier_part_id:it.sourceType==="own"?it.targetId:null,
+        part_suppliers_id:it.sourceType==="catalogue"?it.targetId:null,
+        part_name:it.name,sku:it.sku||"",qty:it.qty,unit_price:it.unitPrice,unit_cost:0,
+      });
+      await deductSupplierStock({sourceType:it.sourceType,targetId:it.targetId,qty:it.qty,reason:"manual_booking",sourceRefType:"booking",sourceRefId:bookingRow.id,itemName:it.name,sku:it.sku});
+    }
+    await reloadSupplierParts();
+    showToast("✅ Booking created — stock deducted");
+  };
+
+  // Supplier-side stock take — same start/count/complete shape as the main StockTakePage
+  // (startStockTake/saveCountedQty/completeStockTake above), scoped to this supplier's
+  // own items across both catalogue links and self-added parts.
+  const startSupplierStockTake=async(name)=>{
+    const stId=makeId("SST");
+    await api.insert("supplier_stock_takes",{
+      id:stId,supplier_id:user.supplier_id,name:name||`Stock Take ${today()}`,status:"open",
+      created_by:user.name||user.username,created_at:new Date().toISOString(),
+    });
+    const catalogueItems=supplierExistingParts.map(p=>({
+      id:makeId("SSTI"),stock_take_id:stId,source_type:"catalogue",
+      part_suppliers_id:p._linkId,supplier_part_id:null,
+      item_name:p.name||"",sku:p.sku||"",bin_location:p._supplierBinLocation||"",
+      system_qty:+(p._supplierStock)||0,counted_qty:null,variance:null,counted_at:null,
+    }));
+    const ownItems=supplierParts.map(p=>({
+      id:makeId("SSTI"),stock_take_id:stId,source_type:"own",
+      part_suppliers_id:null,supplier_part_id:p.id,
+      item_name:p.name||"",sku:p.part_code||"",bin_location:p.bin_location||"",
+      system_qty:+(p.stock)||0,counted_qty:null,variance:null,counted_at:null,
+    }));
+    for(const item of [...catalogueItems,...ownItems]) await api.insert("supplier_stock_take_items",item).catch(()=>{});
+    await reloadSupplierParts();
+    showToast(`✅ Stock take started — ${catalogueItems.length+ownItems.length} items`);
+    return stId;
+  };
+
+  const loadSupplierStockTakeItems=async(stId)=>{
+    const items=await api.fresh("supplier_stock_take_items",`stock_take_id=eq.${stId}&select=*&order=item_name.asc`).catch(()=>[]);
+    setSupplierStockTakeItems(Array.isArray(items)?items:[]);
+  };
+
+  const saveSupplierCountedQty=async(itemId,countedQty,systemQty)=>{
+    const variance=countedQty-systemQty;
+    await api.patch("supplier_stock_take_items","id",itemId,{counted_qty:countedQty,variance,counted_at:new Date().toISOString()});
+    setSupplierStockTakeItems(prev=>prev.map(i=>i.id===itemId?{...i,counted_qty:countedQty,variance}:i));
+  };
+
+  const completeSupplierStockTake=async(stId)=>{
+    const items=await api.fresh("supplier_stock_take_items",`stock_take_id=eq.${stId}&counted_qty=not.is.null&select=*`);
+    if(Array.isArray(items)){
+      for(const item of items){
+        if(item.variance){
+          const table=item.source_type==="catalogue"?"part_suppliers":"supplier_parts";
+          const targetId=item.source_type==="catalogue"?item.part_suppliers_id:item.supplier_part_id;
+          await api.patch(table,"id",targetId,{stock:item.counted_qty});
+          await api.insert("supplier_stock_logs",{
+            id:makeId("SSL"),supplier_id:user.supplier_id,source_type:item.source_type,
+            part_suppliers_id:item.source_type==="catalogue"?targetId:null,
+            supplier_part_id:item.source_type==="own"?targetId:null,
+            item_name:item.item_name||"",sku:item.sku||"",
+            change_qty:item.variance,before_qty:item.system_qty,after_qty:item.counted_qty,
+            reason:"stock_take",ref_type:"stock_take",ref_id:stId,
+            created_by:user.name||user.username,created_at:new Date().toISOString(),
+          });
+        }
+      }
+    }
+    await api.patch("supplier_stock_takes","id",stId,{status:"completed",completed_at:new Date().toISOString()});
+    await reloadSupplierParts();
+    showToast("✅ Stock take completed — stock updated");
+  };
+
+  // Supplier receiving stock onto their own shelf (their own purchase invoice, not
+  // one MotorDesk issues) — adds qty to whichever stock row each item belongs to
+  // (part_suppliers for catalogue items, supplier_parts for self-added ones),
+  // records the bin location they typed (only where given, so leaving it blank
+  // never wipes out a location already on file), logs the movement, then prints
+  // one label per physical unit with a 1/N.."N/N sequence — same seq convention
+  // openPartLabelsWindow already uses for multi-copy admin labels.
+  // items: [{sourceType,targetId,partId?,name,sku,qty,unitCost,binLocation}]
+  const saveSupplierPurchaseInvoice=async({invoiceId,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items})=>{
+    if(!items?.length){showToast("Add at least one item","err");return;}
+    // Landed cost = the items themselves + shipping + customs (paid in USD,
+    // converted at the given rate) — shown as one Total so the real cost of this
+    // shipment is clear, even though per-item unit_cost stays exactly what was typed
+    // (this doesn't redistribute shipping/customs back into each line's unit cost).
+    // invoice_total is typed from the actual paper invoice, kept alongside so a
+    // mismatch against the computed total is easy to spot later (e.g. a missed line
+    // or a wrong unit cost).
+    const itemsTotal=items.reduce((s,it)=>s+it.qty*(+it.unitCost||0),0);
+    const totalQty=items.reduce((s,it)=>s+it.qty,0);
+    const shipping=+shippingCost||0;
+    const customsLocal=(+customsCostUsd||0)*(+exchangeRate||0);
+    const total=itemsTotal+shipping+customsLocal;
+    const headerFields={
+      invoice_no:invoiceNo||"",invoice_date:invoiceDate||null,from_name:fromName||"",notes:notes||"",
+      shipping_cost:shipping,customs_cost_usd:+customsCostUsd||0,exchange_rate:exchangeRate===""?null:+exchangeRate,
+      invoice_total:invoiceTotal===""||invoiceTotal==null?null:+invoiceTotal,
+      total,total_qty:totalQty,
+    };
+    // Recording the invoice and printing labels does NOT touch stock — that's a
+    // separate, deliberate step (applySupplierPurchaseInvoiceStock, triggered by
+    // "Add Stock to System" once the physical count is actually verified against
+    // what's on the labels), so a shipment can be logged and labelled before you've
+    // finished checking it without inflating stock counts prematurely.
+    let invRow;
+    if(invoiceId){
+      // Continuing a previously-saved pending invoice — replace its line items
+      // wholesale (simplest way to support both editing existing lines and adding
+      // new ones) rather than trying to diff old vs new. Safe here specifically
+      // because a pending invoice's items have no stock/log side effects yet.
+      await api.patch("supplier_purchase_invoices","id",invoiceId,headerFields);
+      await api.delete("supplier_purchase_invoice_items","invoice_id",invoiceId);
+      invRow={id:invoiceId};
+    } else {
+      const invRes=await api.insert("supplier_purchase_invoices",{
+        id:makeId("SPI"),supplier_id:user.supplier_id,...headerFields,
+        status:"pending",created_by:user.name||user.username,created_at:new Date().toISOString(),
+      });
+      invRow=Array.isArray(invRes)&&invRes[0];
+      if(!invRow){showToast("Failed to save invoice","err");return;}
+    }
+
+    const labelBatches=[];
+    for(const it of items){
+      await api.insert("supplier_purchase_invoice_items",{
+        id:makeId("SPII"),invoice_id:invRow.id,source_type:it.sourceType,
+        part_id:it.sourceType==="catalogue"?(it.partId||null):null,
+        part_suppliers_id:it.sourceType==="catalogue"?it.targetId:null,
+        supplier_part_id:it.sourceType==="own"?it.targetId:null,
+        part_name:it.name,sku:it.sku||"",qty:it.qty,unit_cost:+it.unitCost||0,bin_location:it.binLocation?.trim()||null,
+      });
+      labelBatches.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",qty:it.qty});
+    }
+
+    // One label per physical unit, sequenced within its own item (1/3, 2/3, 3/3),
+    // all items printed together in one batch/window.
+    const labels=[];
+    for(const b of labelBatches){
+      for(let i=1;i<=b.qty;i++){
+        labels.push({sku:b.sku,name:b.name,binLocation:b.binLocation,invoiceNo:invoiceNo||"",seq:b.qty>1?`${i}/${b.qty}`:""});
+      }
+    }
+    if(printLabels!==false&&labels.length) openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:user.supplier_name||""});
+
+    await reloadSupplierParts();
+    showToast(printLabels!==false?"✅ Invoice saved — labels ready to print. Add to System once counted.":"✅ Invoice saved — Add to System once counted.");
+  };
+
+  // The actual stock commit — separate from saveSupplierPurchaseInvoice above so
+  // recording + labelling a shipment never happens at the same moment as trusting
+  // its count. Only runs once, guarded by status: a 'received' invoice can't be
+  // applied again (double-adding the same stock).
+  const applySupplierPurchaseInvoiceStock=async(invoiceId)=>{
+    const inv=supplierPurchaseInvoices.find(i=>i.id===invoiceId);
+    if(!inv){showToast("Invoice not found","err");return;}
+    if(inv.status==="received"){showToast("Already added to system","err");return;}
+    const items=await api.fresh("supplier_purchase_invoice_items",`invoice_id=eq.${invoiceId}&select=*`);
+    for(const it of (Array.isArray(items)?items:[])){
+      const table=it.source_type==="catalogue"?"part_suppliers":"supplier_parts";
+      const targetId=it.source_type==="catalogue"?it.part_suppliers_id:it.supplier_part_id;
+      if(!targetId) continue;
+      const fresh=await api.fresh(table,`id=eq.${targetId}&select=id,stock`);
+      const row=Array.isArray(fresh)&&fresh[0];
+      const before=+(row?.stock)||0;
+      const after=before+it.qty;
+      const patch={stock:after};
+      if(it.bin_location) patch.bin_location=it.bin_location;
+      await api.patch(table,"id",targetId,patch);
+      await api.insert("supplier_stock_logs",{
+        id:makeId("SSL"),supplier_id:user.supplier_id,source_type:it.source_type,
+        part_suppliers_id:it.source_type==="catalogue"?targetId:null,
+        supplier_part_id:it.source_type==="own"?targetId:null,
+        item_name:it.part_name||"",sku:it.sku||"",
+        change_qty:it.qty,before_qty:before,after_qty:after,
+        reason:"purchase_invoice",ref_type:"purchase_invoice",ref_id:invoiceId,
+        created_by:user.name||user.username,created_at:new Date().toISOString(),
+      });
+    }
+    await api.patch("supplier_purchase_invoices","id",invoiceId,{status:"received",received_at:new Date().toISOString()});
+    await reloadSupplierParts();
+    showToast("✅ Stock added to system");
   };
   // Supplier customizing their own quick-margin % buttons (suppliers.margin_options).
   // opts=null clears the customization back to the shop-wide default.
@@ -4073,7 +4525,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       id:"grp_supplier", icon:"🏭", label:"My Catalogue", roles:["supplier"],
       children:[
         {id:"supplierParts",  icon:"📦",label:"My Parts",   roles:["supplier"]},
-        {id:"supplierOrders", icon:"📋",label:"My Orders",  roles:["supplier"]},
+        {id:"supplierStock",  icon:"📊",label:"My Stock",   roles:["supplier"]},
+        {id:"supplierPurchaseInvoices",icon:"📥",label:"Purchase Invoices", roles:["supplier"],badge:supplierPurchaseInvoices.filter(i=>i.status!=="received").length||0},
+        {id:"supplierStockTake",icon:"🔢",label:"My Stock Take", roles:["supplier"]},
+        {id:"supplierStockLogs",icon:"📜",label:"My Stock Records", roles:["supplier"]},
+        {id:"supplierOrders", icon:"📋",label:"My Orders",  roles:["supplier"],badge:supplierBookings.filter(b=>b.status==="pending").length||0},
         {id:"supplierQueries",icon:"💬",label:"My Queries", roles:["supplier"],badge:supplierQueries.filter(q=>q.status==="pending").length||0},
         {id:"supplierCustomers",icon:"🎁",label:"My Customers", roles:["supplier"]},
       ]
@@ -4151,6 +4607,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     ];
     if(role==="supplier") return [
       {id:"supplierParts",  icon:"📦",label:"My Parts"},
+      {id:"supplierStock",  icon:"📊",label:"My Stock"},
       {id:"supplierOrders", icon:"📋",label:"My Orders"},
       {id:"supplierQueries",icon:"💬",label:"My Queries"},
       {id:"supplierCustomers",icon:"🎁",label:"My Customers"},
@@ -5835,18 +6292,40 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── SUPPLIER PORTAL: MY ORDERS ── */}
         {tab==="supplierOrders"&&role==="supplier"&&(
-          <div className="fu">
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <div>
-                <h1 style={{fontSize:20,fontWeight:700}}>📋 My Orders</h1>
-                <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{supplierOrders.length} order{supplierOrders.length!==1?"s":""} from your catalogue</p>
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={reloadSupplierParts}>↺ Refresh</button>
-            </div>
-            {supplierOrders.length===0
-              ? <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No orders yet.</div>
-              : <OrdersTable orders={supplierOrders} canEdit={false} onCreateInvoice={()=>{}}/>}
-          </div>
+          <SupplierOrdersPage orders={supplierOrders} bookings={supplierBookings} bookingItems={supplierBookingItems}
+            existingParts={supplierExistingParts} ownParts={supplierParts} customers={supplierCustomers}
+            vehicles={vehicles} partFitments={partFitments}
+            supplierName={user.supplier_name||""} supplierContactPerson={supplierProfile.contact_person} supplierPhone={supplierProfile.phone}
+            supplierFullName={supplierProfile.full_name} supplierAddress={supplierProfile.address}
+            onConfirmItem={confirmSupplierOrderItem} onConvertToInvoice={convertSupplierBookingToInvoice}
+            onDeleteBooking={deleteSupplierBooking}
+            onCreateManualBooking={createManualSupplierBooking} onRefresh={reloadSupplierParts}/>
+        )}
+
+        {/* ── SUPPLIER PORTAL: MY STOCK ── */}
+        {tab==="supplierStock"&&role==="supplier"&&(
+          <SupplierStockPage existingParts={supplierExistingParts} ownParts={supplierParts} supplierCode={user.supplier_code||user.supplier_name||""}
+            onSaveField={saveSupplierStockField} onZeroMainStock={zeroOutSupplierMainStock} onRefresh={reloadSupplierParts}/>
+        )}
+
+        {/* ── SUPPLIER PORTAL: PURCHASE INVOICES ── */}
+        {tab==="supplierPurchaseInvoices"&&role==="supplier"&&(
+          <SupplierPurchaseInvoicesPage existingParts={supplierExistingParts} ownParts={supplierParts} supplierCode={user.supplier_code||user.supplier_name||""}
+            purchaseInvoices={supplierPurchaseInvoices} purchaseInvoiceItems={supplierPurchaseInvoiceItems} marginOptions={supplierMarginOptions}
+            onSavePurchaseInvoice={saveSupplierPurchaseInvoice} onQuickAddPart={quickAddSupplierPart} onUpdatePart={saveSupplierPart} onUpdateCatalogPart={updateCatalogPartDetails}
+            onApplyPurchaseInvoiceStock={applySupplierPurchaseInvoiceStock} onRefresh={reloadSupplierParts}/>
+        )}
+
+        {/* ── SUPPLIER PORTAL: MY STOCK TAKE ── */}
+        {tab==="supplierStockTake"&&role==="supplier"&&(
+          <SupplierStockTakePage stockTakes={supplierStockTakes} items={supplierStockTakeItems}
+            onStart={startSupplierStockTake} onOpen={loadSupplierStockTakeItems}
+            onSaveCount={saveSupplierCountedQty} onComplete={completeSupplierStockTake} onRefresh={reloadSupplierParts}/>
+        )}
+
+        {/* ── SUPPLIER PORTAL: MY STOCK RECORDS ── */}
+        {tab==="supplierStockLogs"&&role==="supplier"&&(
+          <SupplierStockLogPage logs={supplierStockLogs} onRefresh={reloadSupplierParts}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY QUERIES ── */}
@@ -7248,7 +7727,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             wsDocs={workshopDocuments}
             onSaveWsDoc={saveWsDocument}
             onDeleteWsDoc={deleteWsDocument}
-            parts={parts}
             wsRole={wsRole}
             wsId={wsId}
             role={role}

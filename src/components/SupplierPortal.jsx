@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../lib/api.js";
 import { getSettings, C } from "../lib/settings.js";
 import { toImgUrl, toFullUrl, fmtAmt, fmtDT, waLink } from "../lib/helpers.js";
@@ -137,6 +138,88 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
   </body></html>`;
   const w=window.open("","_blank","width=1000,height=800");
   if(!w){ alert("Please allow pop-ups for this site to export the PDF"); return; }
+  w.document.write(html);
+  w.document.close();
+};
+
+// The actual invoice document behind "Convert to Invoice" — same print-window
+// approach as the PDF export above (browser's own print-to-PDF, no library).
+// Without this, "Convert to Invoice" was just flipping a status flag with
+// nothing for the supplier to actually hand the customer.
+const openSupplierBookingInvoice=(booking, items, supplierLabel, contactPerson, phone, fullName, address)=>{
+  const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const cur=C();
+  const dateStr=new Date(booking.invoiced_at||booking.confirmed_at||booking.created_at).toLocaleDateString();
+  const contactLine=[contactPerson,phone].filter(Boolean).join(" · ");
+  const subtotal=booking.subtotal??items.reduce((s,it)=>s+it.qty*it.unit_price,0);
+  const discountPct=booking.discount_pct||0;
+  const total=booking.total??subtotal;
+  const rowsHtml=items.map(it=>`<tr>
+    <td>${esc(it.part_name)}</td>
+    <td class="num" style="font-family:monospace">${esc(it.sku||"—")}</td>
+    <td class="num">${it.qty}</td>
+    <td class="num">${cur}${(+it.unit_price).toFixed(2)}</td>
+    <td class="num">${cur}${(it.qty*it.unit_price).toFixed(2)}</td>
+  </tr>`).join("");
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ${esc(booking.id)}</title>
+  <style>
+    @page{margin:20mm 14mm}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:32px;max-width:800px;margin:0 auto}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #111}
+    .shop{font-size:22px;font-weight:900;color:#f97316}
+    .fullname{font-size:13px;font-weight:600;color:#333;margin-top:3px}
+    .meta{font-size:11px;color:#666;margin-top:4px}
+    .inv-title{font-size:20px;font-weight:800;text-align:right}
+    .inv-meta{font-size:12px;color:#666;text-align:right;margin-top:4px}
+    .billto{margin:20px 0;padding:14px;background:#f9f9f9;border-radius:8px}
+    .billto-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#888;font-weight:700;margin-bottom:4px}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    thead tr{background:#111;color:#fff}
+    thead th{padding:9px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+    thead th.num{text-align:right}
+    tbody td{padding:9px 10px;border-bottom:1px solid #e5e5e5}
+    .num{text-align:right;font-family:monospace}
+    .totals{margin-top:16px;margin-left:auto;width:280px}
+    .totals-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px}
+    .totals-row.grand{font-size:17px;font-weight:900;border-top:2px solid #111;margin-top:4px;padding-top:8px}
+    .discount{color:#dc2626}
+    .print-btn{display:flex;gap:10px;align-items:center;margin-bottom:20px}
+    .btn{padding:8px 20px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer}
+    .btn-print{background:#1d4ed8;color:#fff}
+    @media print{.print-btn{display:none!important}body{padding:16px}}
+  </style></head><body>
+  <div class="print-btn"><button class="btn btn-print" onclick="window.print()">🖨 Print / Save as PDF</button></div>
+  <div class="header">
+    <div>
+      <div class="shop">${esc(supplierLabel)}</div>
+      ${fullName?`<div class="fullname">${esc(fullName)}</div>`:""}
+      ${contactLine?`<div class="meta">${esc(contactLine)}</div>`:""}
+      ${address?`<div class="meta">${esc(address)}</div>`:""}
+    </div>
+    <div>
+      <div class="inv-title">INVOICE</div>
+      <div class="inv-meta">${esc(booking.id)}</div>
+      <div class="inv-meta">${dateStr}</div>
+    </div>
+  </div>
+  <div class="billto">
+    <div class="billto-label">Bill To</div>
+    <div style="font-weight:700">${esc(booking.customer_name)}</div>
+    ${booking.customer_phone?`<div class="meta">${esc(booking.customer_phone)}</div>`:""}
+  </div>
+  <table>
+    <thead><tr><th>Item</th><th class="num">SKU</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Line Total</th></tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+  <div class="totals">
+    <div class="totals-row"><span>Subtotal</span><span>${cur}${(+subtotal).toFixed(2)}</span></div>
+    ${discountPct>0?`<div class="totals-row discount"><span>Discount (${discountPct}%)</span><span>-${cur}${(subtotal-total).toFixed(2)}</span></div>`:""}
+    <div class="totals-row grand"><span>Total</span><span>${cur}${(+total).toFixed(2)}</span></div>
+  </div>
+  </body></html>`;
+  const w=window.open("","_blank","width=850,height=900");
+  if(!w){ alert("Please allow pop-ups for this site to view the invoice"); return; }
   w.document.write(html);
   w.document.close();
 };
@@ -1251,5 +1334,1208 @@ function SupplierQueryReplyModal({query, part, onReply, onClose}) {
         <button className="btn btn-primary" style={{flex:2}} disabled={saving} onClick={handle}>{saving?"Sending…":"Send Reply"}</button>
       </div>
     </Overlay>
+  );
+}
+
+// Editing name/OE/fitment on a catalogue-linked (shared parts table) line from
+// Receive Stock — unlike a self-added part, this record is shared with admin and
+// every other supplier of the same part, so it's called out clearly here. Cost/
+// price/stock/photos aren't included: those stay on this supplier's own
+// part_suppliers link row / the dedicated Cost Price flow, untouched by this.
+function CatalogFitmentEditModal({part, onSave, onClose}) {
+  const [name, setName] = useState(part.name||"");
+  const [oe, setOe] = useState(part.oe_number||"");
+  const [make, setMake] = useState(part.make||"");
+  const [model, setModel] = useState(part.model||"");
+  const [yearRange, setYearRange] = useState(part.year_range||"");
+  const [saving, setSaving] = useState(false);
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="Edit Catalogue Part" sub={part.sku} onClose={onClose}/>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:14,padding:"8px 12px",borderRadius:8,background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.3)"}}>
+        ⚠️ This is a shared MotorDesk catalogue part — saving here updates the master listing that admin and every supplier of this part see, not just your own copy.
+      </div>
+      <FD><FL label="Name *"/><input className="inp" value={name} onChange={e=>setName(e.target.value)} autoFocus/></FD>
+      <FD><FL label="OE Number"/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={oe} onChange={e=>setOe(e.target.value.toUpperCase())}/></FD>
+      <FG cols="1fr 1fr 1fr">
+        <div><FL label="Make"/><input className="inp" value={make} onChange={e=>setMake(e.target.value.toUpperCase())} placeholder="BMW, TOYOTA…"/></div>
+        <div><FL label="Model"/><input className="inp" value={model} onChange={e=>setModel(e.target.value.toUpperCase())} placeholder="G30, HILUX…"/></div>
+        <div><FL label="Year Range"/><input className="inp" value={yearRange} onChange={e=>setYearRange(e.target.value)} placeholder="2018-2023"/></div>
+      </FG>
+      <div style={{display:"flex",gap:10}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={saving||!name.trim()}
+          onClick={async()=>{setSaving(true);const ok=await onSave({id:part.id,name,oe_number:oe,make,model,year_range:yearRange});setSaving(false);if(ok)onClose();}}>
+          {saving?"Saving…":"Save"}
+        </button>
+      </div>
+    </Overlay>
+  );
+}
+
+// Supplier receiving stock onto their own shelf (their own purchase invoice —
+// separate from admin's supplier_invoices, which is MotorDesk stocking parts IN
+// from a supplier, the opposite direction). Each line gets its own bin location
+// (defaulting to whatever's already on file for that part) and, on save, one
+// printed label per physical unit sequenced 1/N..N/N (see saveSupplierPurchaseInvoice).
+function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="", marginOptions=null, editingInvoice=null, editingItems=[], onSave, onQuickAddPart, onUpdatePart, onUpdateCatalogPart, onCancel}) {
+  // Resolves a thumbnail for a continued invoice's already-saved lines, by
+  // matching back to the same stock row (part_suppliers/supplier_parts) they were
+  // added from — invoice_items itself doesn't store an image.
+  // supplier_part_id round-trips through a text column in the invoice-items table,
+  // so a continued invoice's targetId comes back as a string while supplier_parts.id
+  // is numeric — compare as strings everywhere they're matched against ownParts.
+  const fullRecordFor=(sourceType,targetId)=>sourceType==="catalogue"
+    ? existingParts.find(p=>p._linkId===targetId)
+    : ownParts.find(p=>String(p.id)===String(targetId));
+  const imageFor=(sourceType,targetId)=>fullRecordFor(sourceType,targetId)?.image_url;
+  const extraPhotosFor=(sourceType,targetId)=>parseJsonArray(fullRecordFor(sourceType,targetId)?.photos);
+
+  const [invoiceNo, setInvoiceNo] = useState(editingInvoice?.invoice_no||"");
+  const [invoiceDate, setInvoiceDate] = useState(()=>editingInvoice?.invoice_date||new Date().toISOString().slice(0,10));
+  const [fromName, setFromName] = useState(editingInvoice?.from_name||"");
+  const [shippingCost, setShippingCost] = useState(editingInvoice?.shipping_cost?String(editingInvoice.shipping_cost):"");
+  const [customsCostUsd, setCustomsCostUsd] = useState(editingInvoice?.customs_cost_usd?String(editingInvoice.customs_cost_usd):"");
+  const [exchangeRate, setExchangeRate] = useState(editingInvoice?.exchange_rate!=null?String(editingInvoice.exchange_rate):"");
+  const [invoiceTotal, setInvoiceTotal] = useState(editingInvoice?.invoice_total!=null?String(editingInvoice.invoice_total):"");
+  // Default OFF when continuing an existing invoice — the original items were most
+  // likely already labelled once; check the box back on to reprint everything.
+  const [printLabels, setPrintLabels] = useState(!editingInvoice);
+  const [notes, setNotes] = useState(editingInvoice?.notes||"");
+  const [search, setSearch] = useState("");
+  const [items, setItems] = useState(()=>editingItems.map(it=>{
+    const targetId=it.source_type==="catalogue"?it.part_suppliers_id:it.supplier_part_id;
+    return {sourceType:it.source_type, targetId, partId:it.part_id||null, name:it.part_name, sku:it.sku||"",
+      image:imageFor(it.source_type,targetId), extraPhotos:extraPhotosFor(it.source_type,targetId),
+      qty:it.qty, unitCost:+it.unit_cost||0, binLocation:it.bin_location||""};
+  })); // {sourceType,targetId,partId?,name,sku,image,extraPhotos,qty,unitCost,binLocation}
+  const [zoomImage, setZoomImage] = useState(null); // {images,title}
+  const imagesFor=(it)=>[it.image,...(it.extraPhotos||[])].filter(Boolean).map(toImgUrl);
+  const [saving, setSaving] = useState(false);
+  const [addingNew, setAddingNew] = useState(false);
+  const [newPartCode, setNewPartCode] = useState("");
+  const [newPartName, setNewPartName] = useState("");
+  const [newPartCost, setNewPartCost] = useState("");
+  const [newPartSuggestedPrice, setNewPartSuggestedPrice] = useState("");
+  const [newPartOe, setNewPartOe] = useState("");
+  const [newPartMake, setNewPartMake] = useState("");
+  const [newPartModel, setNewPartModel] = useState("");
+  const [newPartYearRange, setNewPartYearRange] = useState("");
+  const [addingNewSaving, setAddingNewSaving] = useState(false);
+  const [editingItemIdx, setEditingItemIdx] = useState(null); // index into items[] whose full Edit Part modal is open, or null
+
+  const pool = [
+    ...existingParts.map(p=>({sourceType:"catalogue", targetId:p._linkId, partId:p.id, name:p.name, sku:p.sku, image:p.image_url, extraPhotos:parseJsonArray(p.photos), currentBin:p._supplierBinLocation||"",
+      blob:searchBlob(p,p.sku)})),
+    ...ownParts.map(p=>({sourceType:"own", targetId:p.id, partId:null, name:p.name, sku:supplierCode?`${supplierCode}-${p.part_code}`:p.part_code, image:p.image_url, extraPhotos:parseJsonArray(p.photos), currentBin:p.bin_location||"",
+      blob:searchBlob(p,p.part_code)})),
+  ];
+  const keywords=search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const filtered=keywords.length?pool.filter(p=>matchesSearch(p.blob,keywords)):[];
+
+  const addItem=(p)=>{
+    setItems(prev=>{
+      const ex=prev.find(i=>i.sourceType===p.sourceType&&i.targetId===p.targetId);
+      if(ex) return prev.map(i=>i===ex?{...i,qty:i.qty+1}:i);
+      return [...prev,{sourceType:p.sourceType,targetId:p.targetId,partId:p.partId,name:p.name,sku:p.sku,image:p.image,extraPhotos:p.extraPhotos,qty:1,unitCost:0,binLocation:p.currentBin}];
+    });
+    setSearch("");
+  };
+  const updateItem=(idx,patch)=>setItems(prev=>prev.map((it,i)=>i===idx?{...it,...patch}:it));
+  const removeItem=(idx)=>setItems(prev=>prev.filter((_,i)=>i!==idx));
+  const totalQty=items.reduce((s,it)=>s+it.qty,0);
+  const itemsTotal=items.reduce((s,it)=>s+it.qty*(+it.unitCost||0),0);
+  const shippingNum=+shippingCost||0;
+  const customsLocal=(+customsCostUsd||0)*(+exchangeRate||0);
+  const total=itemsTotal+shippingNum+customsLocal;
+
+  // Unpacking a shipment often turns up something not in the catalogue yet —
+  // this lets the supplier add it right here (a minimal supplier_parts row) and
+  // drop straight into this invoice as a line, instead of a separate trip to My
+  // Parts first and then back here to actually receive the stock.
+  const openAddNew=()=>{
+    setNewPartCode(search.toUpperCase()); setNewPartName(""); setNewPartCost(""); setNewPartSuggestedPrice("");
+    setNewPartOe(""); setNewPartMake(""); setNewPartModel(""); setNewPartYearRange("");
+    setAddingNew(true);
+  };
+  // Same quick-markup-% pattern as the full My Parts add form (resolveMarginOptions
+  // + suggestPriceAt, top of file) — lets a sell price be set right here instead of
+  // needing a separate trip to My Parts afterward.
+  const newPartMarginOptions=resolveMarginOptions({supplierOptions:marginOptions});
+  const submitNewPart=async()=>{
+    if(!newPartCode.trim()||!newPartName.trim()||!onQuickAddPart) return;
+    setAddingNewSaving(true);
+    const row=await onQuickAddPart({partCode:newPartCode,name:newPartName,costPrice:newPartCost,suggestedPrice:newPartSuggestedPrice,
+      oeNumber:newPartOe,make:newPartMake,model:newPartModel,yearRange:newPartYearRange});
+    setAddingNewSaving(false);
+    if(row){
+      setItems(prev=>[...prev,{sourceType:"own",targetId:row.id,partId:null,name:row.name,sku:supplierCode?`${supplierCode}-${row.part_code}`:row.part_code,image:row.image_url,qty:1,unitCost:+newPartCost||0,binLocation:""}]);
+      setAddingNew(false); setSearch("");
+    }
+  };
+
+  const submit=async()=>{
+    setSaving(true);
+    await onSave({invoiceId:editingInvoice?.id||null,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items});
+    setSaving(false);
+  };
+
+  // Editing a self-added part's own details right from its line here — opens the
+  // exact same full Edit Part modal as My Parts (photo tools, extra photos, OE/
+  // fitment, cost + markup-%), so it's one consistent place to manage a part's
+  // record instead of a second, thinner form. Only self-added ("own") lines are
+  // editable this way; catalogue parts are admin-owned.
+  const openEditItem=(idx)=>{
+    if(items[idx].sourceType!=="own") return;
+    setEditingItemIdx(idx);
+  };
+  const editingFullPart=(()=>{
+    if(editingItemIdx==null) return null;
+    const it=items[editingItemIdx];
+    // Best-effort fallback if a part added moments ago hasn't round-tripped back
+    // through the parent's reload yet — still opens, just mostly blank.
+    return ownParts.find(p=>String(p.id)===String(it.targetId))
+      || {id:it.targetId, part_code:it.sku?.replace(new RegExp(`^${supplierCode}-`,"i"),"")||"", name:it.name, photos:"[]"};
+  })();
+
+  // Catalogue-linked lines: a lighter fitment-only edit, since the record is
+  // shared with admin and every other supplier — see CatalogFitmentEditModal.
+  const [editingCatalogIdx, setEditingCatalogIdx] = useState(null);
+  const editingCatalogPart=editingCatalogIdx==null ? null
+    : existingParts.find(p=>p._linkId===items[editingCatalogIdx].targetId)
+      || {id:items[editingCatalogIdx].partId, sku:items[editingCatalogIdx].sku, name:items[editingCatalogIdx].name};
+
+  return (
+    <Overlay onClose={onCancel}>
+      <MHead title={editingInvoice?"📥 Continue Invoice":"📥 Receive Stock"} sub={editingInvoice?`Add more items to ${editingInvoice.invoice_no||editingInvoice.id}`:"Record a purchase invoice into your own stock"} onClose={onCancel}/>
+      <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 14px 4px",marginBottom:16}}>
+        <FG cols="1fr 1fr">
+          <div><FL label="Invoice No"/><input className="inp" value={invoiceNo} onChange={e=>setInvoiceNo(e.target.value)}/></div>
+          <div><FL label="Invoice Date"/><input className="inp" type="date" value={invoiceDate} onChange={e=>setInvoiceDate(e.target.value)}/></div>
+        </FG>
+        <FD><FL label="From (supplier)"/><input className="inp" value={fromName} onChange={e=>setFromName(e.target.value)}/></FD>
+        <FG cols="1fr 1fr 1fr">
+          <div><FL label="Shipping Cost"/><input className="inp" type="number" min="0" value={shippingCost} onChange={e=>setShippingCost(e.target.value)} placeholder="0"/></div>
+          <div><FL label="Customs Cost (USD)"/><input className="inp" type="number" min="0" value={customsCostUsd} onChange={e=>setCustomsCostUsd(e.target.value)} placeholder="0"/></div>
+          <div><FL label="Exchange Rate"/><input className="inp" type="number" min="0" step="0.0001" value={exchangeRate} onChange={e=>setExchangeRate(e.target.value)} placeholder="e.g. 18.50"/></div>
+        </FG>
+      </div>
+      <div style={{background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+        <FL label="➕ Add Item"/>
+        <input className="inp" style={{marginTop:6}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your parts by name, SKU, OE…"/>
+        {keywords.length>0&&(
+          filtered.length>0 ? (
+            <div style={{border:"1px solid var(--border)",borderRadius:8,marginTop:6,maxHeight:200,overflowY:"auto"}}>
+              {filtered.slice(0,30).map(p=>(
+                <div key={`${p.sourceType}-${p.targetId}`} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",cursor:"pointer",fontSize:13,borderBottom:"1px solid var(--border)"}}
+                  onClick={()=>addItem(p)}>
+                  <div style={{width:36,height:36,flexShrink:0,borderRadius:5,overflow:"hidden",background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                    {p.image
+                      ? <img src={toImgUrl(p.image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                      : <span style={{fontSize:14,opacity:.3}}>🖼</span>}
+                    {p.image&&(
+                      <button type="button" title="Enlarge photo" onClick={e=>{e.stopPropagation();setZoomImage({images:imagesFor(p),title:p.name});}}
+                        style={{position:"absolute",top:1,right:1,width:16,height:16,borderRadius:"50%",background:"rgba(0,0,0,.65)",border:"none",cursor:"zoom-in",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
+                        <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><circle cx="10" cy="10" r="6"/><line x1="15" y1="15" x2="20" y2="20"/></svg>
+                      </button>
+                    )}
+                    {p.extraPhotos?.length>0&&(
+                      <div title={`${p.extraPhotos.length} extra photo${p.extraPhotos.length>1?"s":""}`}
+                        style={{position:"absolute",bottom:0,left:0,background:"rgba(0,0,0,.65)",color:"#fff",fontSize:8,fontWeight:700,padding:"0 3px",borderRadius:4}}>
+                        +{p.extraPhotos.length}
+                      </div>
+                    )}
+                  </div>
+                  <div><strong>{p.name}</strong> <span style={{color:"var(--text3)"}}>({p.sku})</span></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{marginTop:6}}>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>No parts match "{search}".</div>
+              {onQuickAddPart&&!addingNew&&<button type="button" className="btn btn-ghost btn-sm" onClick={openAddNew}>➕ Add "{search}" as a new part</button>}
+            </div>
+          )
+        )}
+        {addingNew&&(
+          <div style={{border:"1px solid var(--accent)",borderRadius:8,padding:10,marginTop:8}}>
+            <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>➕ New Part</div>
+            <FG cols="1fr 1fr">
+              <div><FL label={`Part Code * — will show as ${supplierCode||"SUP"}-${newPartCode.trim()||"…"}`}/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={newPartCode} onChange={e=>setNewPartCode(e.target.value.toUpperCase())}/></div>
+              <div>
+                <FL label="Cost Price"/>
+                <input className="inp" type="number" min="0" value={newPartCost} onChange={e=>setNewPartCost(e.target.value)}/>
+                {+newPartCost>0&&(
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
+                    {newPartMarginOptions.map(m=>{
+                      const suggested=suggestPriceAt(newPartCost,m);
+                      const active=+newPartSuggestedPrice===suggested;
+                      return (
+                        <button key={m} type="button" onClick={()=>setNewPartSuggestedPrice(suggested)}
+                          style={{fontSize:11,padding:"3px 9px",borderRadius:99,cursor:"pointer",fontWeight:600,
+                            background:active?"var(--accent)":"var(--surface2)",
+                            color:active?"#fff":"var(--text2)",
+                            border:`1px solid ${active?"var(--accent)":"var(--border)"}`}}>
+                          {m}%: {C()}{suggested.toLocaleString()}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </FG>
+            {+newPartSuggestedPrice>0&&(
+              <div style={{marginBottom:14,padding:"8px 12px",borderRadius:8,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:11,fontWeight:600,color:"var(--text2)"}}>Suggested sell price for admin to review</span>
+                <span style={{fontSize:16,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{C()}{(+newPartSuggestedPrice).toLocaleString()}</span>
+              </div>
+            )}
+            <FD><FL label="Name *"/><input className="inp" value={newPartName} onChange={e=>setNewPartName(e.target.value)} autoFocus/></FD>
+            <FD><FL label="OE Number"/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={newPartOe} onChange={e=>setNewPartOe(e.target.value.toUpperCase())} placeholder="OE number / OEM reference"/></FD>
+            <FG cols="1fr 1fr 1fr">
+              <div><FL label="Make"/><input className="inp" value={newPartMake} onChange={e=>setNewPartMake(e.target.value.toUpperCase())} placeholder="BMW, TOYOTA…"/></div>
+              <div><FL label="Model"/><input className="inp" value={newPartModel} onChange={e=>setNewPartModel(e.target.value.toUpperCase())} placeholder="G30, HILUX…"/></div>
+              <div><FL label="Year Range"/><input className="inp" value={newPartYearRange} onChange={e=>setNewPartYearRange(e.target.value)} placeholder="2018-2023"/></div>
+            </FG>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-ghost btn-xs" onClick={()=>setAddingNew(false)}>Cancel</button>
+              <button className="btn btn-primary btn-xs" onClick={submitNewPart} disabled={addingNewSaving||!newPartCode.trim()||!newPartName.trim()}>{addingNewSaving?"Adding…":"✅ Add & Insert"}</button>
+            </div>
+          </div>
+        )}
+      </div>
+      {items.length>0&&(
+        <div style={{marginBottom:14,display:"flex",flexDirection:"column",gap:8}}>
+          {items.map((it,idx)=>(
+            <div key={idx} style={{border:"1px solid var(--border)",borderRadius:8,padding:10}}>
+              <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-end"}}>
+                {editingItemIdx!==idx&&<button className="btn btn-ghost btn-xs" onClick={()=>{if(window.confirm(`Remove ${it.name} from this invoice?`)) removeItem(idx);}}>✕</button>}
+                <div style={{width:44,height:44,flexShrink:0,borderRadius:6,overflow:"hidden",background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",cursor:it.image?"zoom-in":"default"}}
+                  onClick={()=>it.image&&setZoomImage({images:imagesFor(it),title:it.name})}>
+                  {it.image
+                    ? <img src={toImgUrl(it.image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                    : <span style={{fontSize:16,opacity:.3}}>🖼</span>}
+                  {it.image&&(
+                    <div style={{position:"absolute",bottom:0,right:0,width:16,height:16,borderRadius:"50% 0 0 0",background:"rgba(0,0,0,.65)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><circle cx="10" cy="10" r="6"/><line x1="15" y1="15" x2="20" y2="20"/></svg>
+                    </div>
+                  )}
+                  {it.extraPhotos?.length>0&&(
+                    <div title={`${it.extraPhotos.length} extra photo${it.extraPhotos.length>1?"s":""}`}
+                      style={{position:"absolute",top:0,left:0,background:"rgba(0,0,0,.65)",color:"#fff",fontSize:8,fontWeight:700,padding:"0 3px",borderRadius:"0 0 4px 0"}}>
+                      +{it.extraPhotos.length}
+                    </div>
+                  )}
+                </div>
+                <div style={{flex:"1 1 160px",alignSelf:"center"}}>
+                  <div style={{fontSize:13,fontWeight:600}}>{it.name}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:"var(--red)",fontFamily:"DM Mono,monospace",marginTop:2}}>{it.sku}</div>
+                </div>
+                <div><FL label="Qty"/><input className="inp" type="number" min="1" style={{width:70}} value={it.qty} onChange={e=>updateItem(idx,{qty:Math.max(1,+e.target.value||1)})}/></div>
+                <div><FL label="Unit Cost"/><input className="inp" type="number" min="0" style={{width:90}} value={it.unitCost} onChange={e=>updateItem(idx,{unitCost:+e.target.value||0})}/></div>
+                <div><FL label="Bin Location"/><input className="inp" style={{width:110}} value={it.binLocation} onChange={e=>updateItem(idx,{binLocation:e.target.value})} placeholder="e.g. A1-02"/></div>
+                {it.sourceType==="own"&&onUpdatePart&&(
+                  <button className="btn btn-ghost btn-xs" onClick={()=>openEditItem(idx)}>✏️ Edit</button>
+                )}
+                {it.sourceType==="catalogue"&&onUpdateCatalogPart&&(
+                  <button className="btn btn-ghost btn-xs" onClick={()=>setEditingCatalogIdx(idx)}>✏️ Edit</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {editingItemIdx!=null&&(
+        <SupplierPartModal part={editingFullPart} supplierCode={supplierCode} supplierMarginOptions={marginOptions}
+          onSave={async(data)=>{
+            const ok=await onUpdatePart(data);
+            if(ok){
+              updateItem(editingItemIdx,{name:data.name, sku:supplierCode?`${supplierCode}-${data.part_code}`:data.part_code, image:data.image_url, extraPhotos:data.photos});
+              setEditingItemIdx(null);
+            }
+            return ok;
+          }}
+          onClose={()=>setEditingItemIdx(null)}/>
+      )}
+      {editingCatalogIdx!=null&&(
+        <CatalogFitmentEditModal part={editingCatalogPart}
+          onSave={async(data)=>{
+            const ok=await onUpdateCatalogPart(data);
+            if(ok){ updateItem(editingCatalogIdx,{name:data.name}); setEditingCatalogIdx(null); }
+            return ok;
+          }}
+          onClose={()=>setEditingCatalogIdx(null)}/>
+      )}
+      <FD><FL label="Notes"/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)}/></FD>
+      {items.length>0&&(()=>{
+        const diff=+invoiceTotal===0||invoiceTotal===""?null:total-(+invoiceTotal||0);
+        return (
+        <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",marginBottom:14,display:"flex",flexDirection:"column",gap:4,fontSize:13}}>
+          <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>Total Qty</span><span style={{fontWeight:700}}>{totalQty}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>Items</span><span>{fmtAmt(itemsTotal)}</span></div>
+          {shippingNum>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>Shipping</span><span>{fmtAmt(shippingNum)}</span></div>}
+          {customsLocal>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>Customs ({customsCostUsd} USD × {exchangeRate})</span><span>{fmtAmt(customsLocal)}</span></div>}
+          <div style={{display:"flex",justifyContent:"space-between",fontWeight:800,fontSize:15,paddingTop:6,borderTop:"1px solid var(--border)"}}>
+            <span>Total Landed Cost</span><span>{fmtAmt(total)}</span>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:6,borderTop:"1px solid var(--border)"}}>
+            <span style={{color:"var(--text3)"}}>Invoice Total (from paper invoice)</span>
+            <input className="inp" type="number" min="0" style={{width:110,textAlign:"right"}} value={invoiceTotal} onChange={e=>setInvoiceTotal(e.target.value)} placeholder="0"/>
+          </div>
+          {diff!==null&&(
+            <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,color:Math.abs(diff)<0.01?"var(--green)":"var(--red)"}}>
+              <span>Difference</span><span>{Math.abs(diff)<0.01?"✅ Matches":`${diff>0?"+":""}${fmtAmt(diff)}`}</span>
+            </div>
+          )}
+        </div>
+        );
+      })()}
+      <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginBottom:6,cursor:"pointer"}}>
+        <input type="checkbox" checked={printLabels} onChange={e=>setPrintLabels(e.target.checked)}/>
+        🖨️ Print labels after saving
+      </label>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
+        This only records the invoice{printLabels?" and prints labels":""} — your stock stays unchanged until you count everything and click "Add Stock to System" on it back in Purchase Invoices.
+      </div>
+      <div style={{display:"flex",gap:10}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={submit} disabled={saving||items.length===0}>{saving?"Saving…":printLabels?"✅ Save & Print Labels":"✅ Save Invoice"}</button>
+      </div>
+      {zoomImage&&<PartImageZoom images={zoomImage.images} title={zoomImage.title} onClose={()=>setZoomImage(null)}/>}
+    </Overlay>
+  );
+}
+
+// ═══ SUPPLIER-OWNED STOCK PAGES ═══
+// Suppliers hold their own stock (qty + location) for both catalogue-linked parts
+// (stock/bin_location on their part_suppliers link row, keyed by _linkId) and their
+// own self-added parts (stock/bin_location directly on supplier_parts). Combined
+// into one editable list here since a supplier doesn't care which table a part
+// technically lives in — it's all "my stock" to them.
+export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="", onSaveField, onZeroMainStock, onRefresh}) {
+  const [editing, setEditing] = useState(null); // {sourceType,id}
+  const [stockVal, setStockVal] = useState("");
+  const [binVal, setBinVal] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [zeroing, setZeroing] = useState(false);
+
+  // Detects this supplier's own SKU prefix (e.g. "MCK-") straight from their
+  // catalogue SKUs — always accurate, unlike trusting supplierCode/user.supplier_code
+  // alone, which falls back to the full company name (not the short prefix) whenever
+  // suppliers.code is blank. Used both to prefix self-added parts' SKUs for display
+  // (matching how My Parts already shows them) and to scope "Zero MotorDesk Stock".
+  const detectedPrefix=(()=>{
+    const counts={};
+    for(const p of existingParts){
+      const m=(p.sku||"").match(/^([A-Z0-9]+)-/i);
+      if(m) counts[m[1].toUpperCase()]=(counts[m[1].toUpperCase()]||0)+1;
+    }
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
+  })();
+  const codePrefix=detectedPrefix||(supplierCode||"").trim().toUpperCase();
+
+  const rows = [
+    ...existingParts.map(p=>({sourceType:"catalogue", id:p._linkId, sku:p.sku, name:p.name, stock:p._supplierStock??0, bin:p._supplierBinLocation||""})),
+    ...ownParts.map(p=>({sourceType:"own", id:p.id, sku:codePrefix?`${codePrefix}-${p.part_code}`:p.part_code, name:p.name, stock:p.stock??0, bin:p.bin_location||""})),
+  ].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  const staleMainStockCount = existingParts.filter(p=>+p.stock>0&&codePrefix&&(p.sku||"").toUpperCase().startsWith(codePrefix+"-")).length;
+
+  const startEdit=(row)=>{setEditing({sourceType:row.sourceType,id:row.id});setStockVal(String(row.stock));setBinVal(row.bin);};
+  const save=async()=>{
+    setSaving(true);
+    await onSaveField(editing.sourceType, editing.id, {stock:+stockVal||0, binLocation:binVal});
+    setSaving(false); setEditing(null);
+  };
+  const runZeroMainStock=async()=>{
+    if(!window.confirm(`Zero MotorDesk's own inventory count for ${staleMainStockCount} of your "${codePrefix}-" catalogue part${staleMainStockCount>1?"s":""}? This only affects the old shared stock number on parts whose SKU starts with "${codePrefix}-" — your own stock (shown above) is untouched, and no other supplier's parts are touched. Do this once your own stock is set correctly, so MotorDesk doesn't also show these as held in-house.`)) return;
+    setZeroing(true);
+    await onZeroMainStock();
+    setZeroing(false);
+  };
+
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>📊 My Stock</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{rows.length} parts — your own qty & location</p>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+          {onZeroMainStock&&staleMainStockCount>0&&(
+            <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} disabled={zeroing} onClick={runZeroMainStock}>
+              {zeroing?"…":`🧹 Zero MotorDesk Stock (${staleMainStockCount})`}
+            </button>
+          )}
+        </div>
+      </div>
+      {onZeroMainStock&&staleMainStockCount>0&&(
+        <div style={{fontSize:12,color:"var(--text3)",marginTop:-12,marginBottom:16}}>
+          {staleMainStockCount} catalogue part{staleMainStockCount>1?"s":""} still show{staleMainStockCount>1?"":"s"} a nonzero MotorDesk-side stock count from before you took over your own stock — the "Zero MotorDesk Stock" button clears just that old number, not your own.
+        </div>
+      )}
+      {rows.length===0 ? (
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No parts yet.</div>
+      ) : (
+        <div className="card" style={{overflow:"hidden"}}>
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead><tr><th>SKU</th><th>Name</th><th>Source</th><th>Stock</th><th>Location</th><th>Actions</th></tr></thead>
+              <tbody>
+                {rows.map(row=>{
+                  const isEditing=editing&&editing.sourceType===row.sourceType&&editing.id===row.id;
+                  return (
+                    <tr key={`${row.sourceType}-${row.id}`}>
+                      <td style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{row.sku||"—"}</td>
+                      <td>{row.name}</td>
+                      <td><span className="badge" style={{fontSize:11,background:row.sourceType==="catalogue"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:row.sourceType==="catalogue"?"var(--blue)":"var(--green)"}}>{row.sourceType==="catalogue"?"Catalogue":"My Part"}</span></td>
+                      {isEditing ? (
+                        <>
+                          <td><input className="inp" type="number" min="0" style={{width:80}} value={stockVal} onChange={e=>setStockVal(e.target.value)}/></td>
+                          <td><input className="inp" style={{width:110}} value={binVal} onChange={e=>setBinVal(e.target.value)} placeholder="e.g. A1-02"/></td>
+                          <td>
+                            <div style={{display:"flex",gap:5}}>
+                              <button className="btn btn-ghost btn-xs" onClick={()=>setEditing(null)} disabled={saving}>Cancel</button>
+                              <button className="btn btn-primary btn-xs" onClick={save} disabled={saving}>{saving?"…":"💾 Save"}</button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td style={{fontWeight:700,color:row.stock>0?"var(--green)":"var(--red)"}}>{row.stock}</td>
+                          <td style={{color:"var(--text3)"}}>{row.bin||"—"}</td>
+                          <td><button className="btn btn-ghost btn-xs" onClick={()=>startEdit(row)}>✏️ Edit</button></td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// Own top-level tab (previously buried at the bottom of My Stock, which made it
+// hard to find) — receive/record purchase invoices and, separately, commit their
+// stock into the system once the physical count is verified.
+export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], supplierCode="", purchaseInvoices=[], purchaseInvoiceItems=[], marginOptions=null,
+  onSavePurchaseInvoice, onQuickAddPart, onUpdatePart, onUpdateCatalogPart, onApplyPurchaseInvoiceStock, onRefresh}) {
+  const [showReceive, setShowReceive] = useState(false);
+  const [continuingInvoice, setContinuingInvoice] = useState(null); // the pending invoice row being resumed, or null for a fresh one
+  const [applyingId, setApplyingId] = useState(null);
+
+  // Same SKU-prefix detection as My Stock (from real catalogue SKUs, not
+  // supplierCode, which can be the full company name when suppliers.code is blank).
+  const codePrefix=(()=>{
+    const counts={};
+    for(const p of existingParts){
+      const m=(p.sku||"").match(/^([A-Z0-9]+)-/i);
+      if(m) counts[m[1].toUpperCase()]=(counts[m[1].toUpperCase()]||0)+1;
+    }
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0]||(supplierCode||"").trim().toUpperCase();
+  })();
+
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>📥 Purchase Invoices</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{purchaseInvoices.length} invoice{purchaseInvoices.length!==1?"s":""} — record stock coming onto your own shelf</p>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+          <button className="btn btn-primary btn-sm" onClick={()=>setShowReceive(true)}>📥 Receive Stock</button>
+        </div>
+      </div>
+      {(showReceive||continuingInvoice)&&(
+        <SupplierPurchaseInvoiceModal existingParts={existingParts} ownParts={ownParts} supplierCode={codePrefix} marginOptions={marginOptions} onQuickAddPart={onQuickAddPart} onUpdatePart={onUpdatePart} onUpdateCatalogPart={onUpdateCatalogPart}
+          editingInvoice={continuingInvoice} editingItems={continuingInvoice?purchaseInvoiceItems.filter(it=>it.invoice_id===continuingInvoice.id):[]}
+          onCancel={()=>{setShowReceive(false);setContinuingInvoice(null);}}
+          onSave={async(data)=>{await onSavePurchaseInvoice(data);setShowReceive(false);setContinuingInvoice(null);}}/>
+      )}
+      {purchaseInvoices.length===0 ? (
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No purchase invoices yet — click "Receive Stock" to record one.</div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {purchaseInvoices.map(inv=>{
+            const its=purchaseInvoiceItems.filter(it=>it.invoice_id===inv.id);
+            const pending=inv.status!=="received";
+            return (
+              <div key={inv.id} className="card" style={{padding:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:13}}>{inv.invoice_no||inv.id}{inv.from_name?` · ${inv.from_name}`:""}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{inv.invoice_date||fmtDT(inv.created_at)} · {inv.total_qty||its.reduce((s,it)=>s+it.qty,0)} units · {fmtAmt(inv.total)}</div>
+                  </div>
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <span className="badge" style={{fontSize:11,
+                      background:pending?"rgba(251,191,36,.15)":"rgba(52,211,153,.12)",
+                      color:pending?"var(--yellow)":"var(--green)"}}>{pending?"⏳ Not yet in system":"✅ In system"}</span>
+                    {pending&&<button className="btn btn-ghost btn-xs" onClick={()=>setContinuingInvoice(inv)}>✏️ Continue</button>}
+                    {pending&&onApplyPurchaseInvoiceStock&&(
+                      <button className="btn btn-primary btn-xs" disabled={applyingId===inv.id}
+                        onClick={async()=>{
+                          if(!window.confirm(`Add ${inv.total_qty||its.reduce((s,it)=>s+it.qty,0)} units from this invoice to your stock? Do this once you've verified the physical count.`)) return;
+                          setApplyingId(inv.id);
+                          await onApplyPurchaseInvoiceStock(inv.id);
+                          setApplyingId(null);
+                        }}>
+                        {applyingId===inv.id?"Adding…":"✅ Add Stock to System"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Same start -> count -> complete shape as the main app's admin StockTakePage,
+// scoped to this supplier's own items (both sources) instead of branch inventory.
+export function SupplierStockTakePage({stockTakes=[], items=[], onStart, onOpen, onSaveCount, onComplete, onRefresh}) {
+  const [openId, setOpenId] = useState(null);
+  const [starting, setStarting] = useState(false);
+  const [name, setName] = useState("");
+  const [counts, setCounts] = useState({}); // itemId -> value while typing, before it's saved on blur
+
+  const openTake=async(stId)=>{ setOpenId(stId); await onOpen(stId); };
+  const start=async()=>{
+    setStarting(true);
+    const stId=await onStart(name);
+    setStarting(false); setName("");
+    if(stId) openTake(stId);
+  };
+  const saveOne=async(item)=>{
+    const v=counts[item.id];
+    if(v==null||v==="") return;
+    await onSaveCount(item.id, +v, item.system_qty);
+  };
+  const currentTake=stockTakes.find(st=>st.id===openId);
+
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>🔢 My Stock Take</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>Count your own stock — catalogue parts and your own parts together</p>
+        </div>
+        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+      </div>
+
+      <div className="card" style={{padding:14,marginBottom:16,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+        <input className="inp" style={{flex:1,minWidth:180}} placeholder={`Stock Take ${new Date().toLocaleDateString()}`} value={name} onChange={e=>setName(e.target.value)}/>
+        <button className="btn btn-primary btn-sm" onClick={start} disabled={starting}>{starting?"Starting…":"+ Start New Stock Take"}</button>
+      </div>
+
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
+        {stockTakes.length===0
+          ? <div className="card" style={{padding:30,textAlign:"center",color:"var(--text3)"}}>No stock takes yet.</div>
+          : stockTakes.map(st=>(
+            <div key={st.id} className="card" style={{padding:12,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",border:openId===st.id?"1px solid var(--accent)":undefined}} onClick={()=>openTake(st.id)}>
+              <div>
+                <div style={{fontWeight:700,fontSize:13}}>{st.name}</div>
+                <div style={{fontSize:11,color:"var(--text3)"}}>{st.created_at?new Date(st.created_at).toLocaleString():""}</div>
+              </div>
+              <span className="badge" style={{fontSize:11,background:st.status==="completed"?"rgba(52,211,153,.12)":"rgba(251,191,36,.15)",color:st.status==="completed"?"var(--green)":"var(--yellow)"}}>{st.status==="completed"?"✅ Completed":"🔓 Open"}</span>
+            </div>
+          ))}
+      </div>
+
+      {currentTake&&(
+        <div className="card" style={{overflow:"hidden"}}>
+          <div style={{padding:"10px 14px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{fontWeight:700}}>{currentTake.name}</div>
+            {currentTake.status==="open"&&<button className="btn btn-primary btn-sm" onClick={()=>onComplete(currentTake.id)}>✅ Complete & Apply</button>}
+          </div>
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead><tr><th>SKU</th><th>Item</th><th>Location</th><th>System Qty</th><th>Counted Qty</th><th>Variance</th></tr></thead>
+              <tbody>
+                {items.filter(i=>i.stock_take_id===currentTake.id).map(item=>(
+                  <tr key={item.id}>
+                    <td style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{item.sku||"—"}</td>
+                    <td>{item.item_name}</td>
+                    <td style={{color:"var(--text3)"}}>{item.bin_location||"—"}</td>
+                    <td>{item.system_qty}</td>
+                    <td>
+                      {currentTake.status==="open" ? (
+                        <input className="inp" type="number" style={{width:80}}
+                          value={counts[item.id]??(item.counted_qty??"")}
+                          onChange={e=>setCounts(p=>({...p,[item.id]:e.target.value}))}
+                          onBlur={()=>saveOne(item)}/>
+                      ) : (item.counted_qty??"—")}
+                    </td>
+                    <td style={{fontWeight:700,color:item.variance>0?"var(--green)":item.variance<0?"var(--red)":"var(--text3)"}}>{item.variance??"—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Read-only ledger of every stock movement — item_name/sku/before/after are all
+// captured at the moment of the change (see deductSupplierStock in App.jsx), so
+// this stays accurate even if a part is later renamed or removed.
+export function SupplierStockLogPage({logs=[], onRefresh}) {
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>📜 My Stock Records</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{logs.length} stock movements</p>
+        </div>
+        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+      </div>
+      {logs.length===0 ? (
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No stock movements yet.</div>
+      ) : (
+        <div className="card" style={{overflow:"hidden"}}>
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead><tr><th>Date</th><th>Item</th><th>Reason</th><th>Change</th><th>Before → After</th></tr></thead>
+              <tbody>
+                {logs.map(l=>(
+                  <tr key={l.id}>
+                    <td style={{color:"var(--text3)",fontSize:12}}>{fmtDT(l.created_at)}</td>
+                    <td>
+                      <div style={{fontWeight:600}}>{l.item_name||"—"}</div>
+                      {l.sku&&<div style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{l.sku}</div>}
+                    </td>
+                    <td style={{textTransform:"capitalize"}}>{(l.reason||"").replace(/_/g," ")}</td>
+                    <td style={{fontWeight:700,color:l.change_qty<0?"var(--red)":"var(--green)"}}>{l.change_qty>0?"+":""}{l.change_qty}</td>
+                    <td style={{color:"var(--text3)",fontSize:12}}>{l.before_qty} → {l.after_qty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Full-screen zoom for a single part photo, with every vehicle it fits listed
+// underneath — a lighter, purpose-built alternative to shared ImgLightbox, which
+// only ever shows its caption in multi-image mode (never for a lone photo).
+// Split-screen compare: the fitted vehicle's own photos on the left, the part's
+// photos on the right — each side paging independently, so you can flip through
+// both while eyeballing a match (same pattern as the Vehicle Request compare view).
+const COMPARE_ZOOM_SCALE = 2.2;
+
+function PartVehicleCompareZoom({vehicleImages=[], vehicleTitle, partImages=[], partTitle, onClose}) {
+  const [vIdx,setVIdx]=useState(0);
+  const [pIdx,setPIdx]=useState(0);
+  const Pane=({title,images,idx,setIdx})=>{
+    const [zoomed,setZoomed]=useState(false);
+    const [natural,setNatural]=useState(null); // {w,h} of the loaded <img> — small source photos
+    // render at native size under maxWidth/maxHeight alone (no upscale), so just
+    // dropping those caps on zoom does nothing visible. Force real enlargement
+    // instead by sizing explicitly off the loaded image's natural pixels, scaled up.
+    useEffect(()=>{ setZoomed(false); setNatural(null); },[idx]);
+    const zoomStyle=(zoomed&&natural)
+      ?{width:natural.w*COMPARE_ZOOM_SCALE,height:natural.h*COMPARE_ZOOM_SCALE,maxWidth:"none",maxHeight:"none",borderRadius:8,cursor:"zoom-out",display:"block"}
+      :{maxWidth:"100%",maxHeight:"60vh",objectFit:"contain",borderRadius:8,cursor:"zoom-in"};
+    return (
+    <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0,padding:"0 16px"}}>
+      <div style={{color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",marginBottom:8}}>
+        {title}{images.length>1?` (${idx+1}/${images.length})`:""}
+      </div>
+      <div style={zoomed
+        ?{flex:1,minHeight:0,position:"relative",overflow:"auto"}
+        :{flex:1,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",minHeight:0,overflow:"hidden"}}>
+        {images.length===0?(
+          <div style={{color:"rgba(255,255,255,.4)",fontSize:13}}>No photo</div>
+        ):(
+          <>
+            <img key={images[idx]} src={images[idx]} alt="" style={zoomStyle}
+              onLoad={e=>setNatural({w:e.target.naturalWidth,h:e.target.naturalHeight})}
+              onClick={e=>{e.stopPropagation();setZoomed(z=>!z);}}/>
+            {!zoomed&&images.length>1&&(
+              <>
+                <button onClick={e=>{e.stopPropagation();setIdx(i=>(i-1+images.length)%images.length);}}
+                  style={{position:"absolute",left:4,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:16}}>‹</button>
+                <button onClick={e=>{e.stopPropagation();setIdx(i=>(i+1)%images.length);}}
+                  style={{position:"absolute",right:4,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:16}}>›</button>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+    );
+  };
+  return createPortal(
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.94)",zIndex:100000,display:"flex",alignItems:"stretch",justifyContent:"center",padding:"40px 8px"}}>
+      <Pane title={vehicleTitle||"Vehicle"} images={vehicleImages} idx={vIdx} setIdx={setVIdx}/>
+      <div style={{width:1,background:"rgba(255,255,255,.15)"}}/>
+      <Pane title={partTitle||"Part"} images={partImages} idx={pIdx} setIdx={setPIdx}/>
+      <button onClick={onClose} style={{position:"fixed",top:16,right:16,background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",width:38,height:38,cursor:"pointer",fontSize:18,zIndex:100001}}>✕</button>
+    </div>,
+    document.body
+  );
+}
+
+function PartImageZoom({images=[], title, fits=[], onClose, onOpenVehicle}) {
+  const [idx,setIdx]=useState(0);
+  const src=images[idx];
+  return createPortal(
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:99999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",maxWidth:"90vw"}}>
+        {images.length>1&&(
+          <button onClick={e=>{e.stopPropagation();setIdx(i=>(i-1+images.length)%images.length);}}
+            style={{position:"absolute",left:-8,transform:"translateX(-100%)",background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",width:38,height:38,cursor:"pointer",fontSize:20}}>‹</button>
+        )}
+        <img src={src} alt="" style={{maxWidth:"90vw",maxHeight:"70vh",objectFit:"contain",borderRadius:8}} onClick={e=>e.stopPropagation()}/>
+        {images.length>1&&(
+          <button onClick={e=>{e.stopPropagation();setIdx(i=>(i+1)%images.length);}}
+            style={{position:"absolute",right:-8,transform:"translateX(100%)",background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",width:38,height:38,cursor:"pointer",fontSize:20}}>›</button>
+        )}
+      </div>
+      {images.length>1&&<div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginTop:10}}>{idx+1} / {images.length}</div>}
+      <div style={{color:"#fff",marginTop:14,textAlign:"center",maxWidth:520}}>
+        <div style={{fontWeight:700,fontSize:15}}>{title}</div>
+        {fits.length>0&&(
+          <div style={{marginTop:10,fontSize:13,color:"rgba(255,255,255,.75)"}}>
+            <div style={{textTransform:"uppercase",fontSize:10,letterSpacing:.6,fontWeight:700,color:"rgba(255,255,255,.5)",marginBottom:6}}>Fits</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {fits.map((f,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center"}}>
+                  {f.photo&&(
+                    <img src={toImgUrl(f.photo)} alt="" title={f.photos?.length?"Click to compare with the part":undefined}
+                      onClick={e=>{
+                        if(!f.photos?.length||!onOpenVehicle) return;
+                        e.stopPropagation();
+                        onOpenVehicle({vehicleImages:f.photos.map(toImgUrl),vehicleTitle:f.vehicleTitle,partImages:images,partTitle:title});
+                      }}
+                      style={{width:64,height:48,objectFit:"contain",borderRadius:6,background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",cursor:f.photos?.length?"zoom-in":"default",flexShrink:0}}
+                      onError={e=>e.target.style.display="none"}/>
+                  )}
+                  <span>{f.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <button onClick={onClose} style={{position:"fixed",top:16,right:16,background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",width:38,height:38,cursor:"pointer",fontSize:18}}>✕</button>
+    </div>,
+    document.body
+  );
+}
+
+// Picker form for a manual booking — pulled out of SupplierOrdersPage since it's
+// its own self-contained flow (search own stock -> add lines -> customer details).
+function NewBookingForm({existingParts, ownParts, supplierCode="", customers=[], vehicles=[], partFitments=[], onCreate, onCancel}) {
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [custDropdown, setCustDropdown] = useState(false);
+  const [search, setSearch] = useState("");
+  const [vMake, setVMake] = useState("");
+  const [vModel, setVModel] = useState("");
+  const [vModelInput, setVModelInput] = useState(""); // display text for the Model combobox — vModel is the actual filter value (code||model)
+  const [vModelDropdown, setVModelDropdown] = useState(false);
+  const [items, setItems] = useState([]); // {sourceType,targetId,partId?,name,sku,qty,unitPrice}
+  const [discountPct, setDiscountPct] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [zoomImage, setZoomImage] = useState(null); // {images,title,fits}
+  const [vehicleZoom, setVehicleZoom] = useState(null); // {vehicleImages,vehicleTitle,partImages,partTitle} — compare view opened from inside the part zoom
+
+  // A part's own make/model/year_range fields (what searchBlob alone covers) are
+  // often blank on catalogue parts — the real "what vehicle does this fit" data
+  // lives in part_fitments -> vehicles instead, same table the admin Inventory
+  // Vehicle Fits tab uses. Fold that in too so searching "G31" or "5 series" finds
+  // a part that fits it even when the part row itself has no make/model set.
+  const vehiclesById=Object.fromEntries(vehicles.map(v=>[String(v.id),v]));
+  const fitsFor=(fitKey,matchId)=>partFitments.filter(f=>String(f[fitKey])===String(matchId))
+    .map(f=>vehiclesById[String(f.vehicle_id)]).filter(Boolean);
+  const fitTextFor=(fitKey,matchId)=>fitsFor(fitKey,matchId).map(v=>`${v.make} ${v.model} ${v.year_from||""} ${v.year_to||""}`).join(" ");
+  // Card display: prefer the actual fitted vehicle(s) over the part's own make/model/
+  // year_range fields (often blank on catalogue parts) — falls back to those only
+  // when there's no fitment record at all.
+  const fitLabelFor=(fitKey,matchId,p)=>{
+    const fits=fitsFor(fitKey,matchId);
+    if(fits.length) return {main:`${fits[0].make} ${fits[0].model}`, year:`${fits[0].year_from||"?"}–${fits[0].year_to||"present"}`, extra:fits.length-1,
+      allFits:fits.map(v=>({text:`${v.make} ${v.model} (${v.year_from||"?"}–${v.year_to||"present"})`,
+        photo:v.photo_front||v.photo_rear||v.photo_side||null,
+        photos:[v.photo_front,v.photo_rear,v.photo_side].filter(Boolean),
+        vehicleTitle:`${v.make} ${v.model}`}))};
+    if(p.make||p.model) return {main:[p.make,p.model].filter(Boolean).join(" "), year:p.year_range||"", extra:0,
+      allFits:[{text:`${[p.make,p.model].filter(Boolean).join(" ")}${p.year_range?` (${p.year_range})`:""}`, photo:null, photos:[], vehicleTitle:""}]};
+    return null;
+  };
+  // Cover photo + any extra photos (parts.photos / supplier_parts.photos — same
+  // JSON-array convention as the main Inventory PartModal), for the zoom gallery.
+  const imagesFor=(p)=>[p.image,...(p.extraPhotos||[])].filter(Boolean).map(toImgUrl);
+
+  const pool = [
+    ...existingParts.map(p=>({sourceType:"catalogue", targetId:p._linkId, partId:p.id, name:p.name, sku:p.sku, price:p.price, stock:p._supplierStock??0, image:p.image_url, extraPhotos:parseJsonArray(p.photos),
+      fit:fitLabelFor("part_id",p.id,p),
+      blob:`${searchBlob(p,p.sku)} ${fitTextFor("part_id",p.id)}`.toLowerCase()})),
+    ...ownParts.map(p=>({sourceType:"own", targetId:p.id, partId:null, name:p.name, sku:supplierCode?`${supplierCode}-${p.part_code}`:p.part_code, price:p.price, stock:p.stock??0, image:p.image_url, extraPhotos:parseJsonArray(p.photos),
+      fit:fitLabelFor("supplier_part_id",p.id,p),
+      blob:`${searchBlob(p,p.part_code)} ${fitTextFor("supplier_part_id",p.id)}`.toLowerCase()})),
+  ];
+  // Same multi-keyword matcher as My Parts (searchBlob/matchesSearch, top of file) —
+  // matching only name+sku (the original version here) missed anything searched by
+  // make/model/OE number/etc., which looked exactly like "nothing happens".
+  const keywords=search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+
+  // Typing a guess at fitment text (e.g. "bmw f32") only works if that exact string
+  // appears somewhere in the blob — real fitment data doesn't always read that way
+  // (e.g. "3 SERIES F30/F31/F32"). A proper Make/Model picker, matched against the
+  // actual part_fitments records (same approach as the admin Inventory Vehicle Fits
+  // tab / VehicleSearchBar), is reliable regardless of how the fitment text reads.
+  const vMakes=[...new Set(vehicles.map(v=>v.make))].filter(Boolean).sort();
+  const vModelsForMake=vMake?[...new Map(vehicles.filter(v=>v.make===vMake).map(v=>[v.code||v.model,v])).values()].sort((a,b)=>(a.code||a.model).localeCompare(b.code||b.model)):[];
+  const fittedPoolFor=(vehicleIds)=>{
+    const fittedPartIds=new Set(partFitments.filter(f=>vehicleIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)).filter(Boolean));
+    const fittedSupplierPartIds=new Set(partFitments.filter(f=>vehicleIds.has(String(f.vehicle_id))).map(f=>String(f.supplier_part_id)).filter(Boolean));
+    return pool.filter(p=>p.sourceType==="catalogue"?fittedPartIds.has(String(p.partId)):fittedSupplierPartIds.has(String(p.targetId)));
+  };
+  // Model-specific match first; if that's empty, narrow only as far back as the
+  // Make (not the whole pool — a Model with no exact fitment shouldn't dump every
+  // unrelated part into the list, just the ones that at least share the Make).
+  const vehicleFilterResult=(()=>{
+    if(!vMake) return null;
+    const makePool=fittedPoolFor(new Set(vehicles.filter(v=>v.make===vMake).map(v=>String(v.id))));
+    if(!vModel) return {items:makePool, mode:"make"};
+    const byCode=vehicles.filter(v=>v.make===vMake&&v.code===vModel);
+    const modelVehicles=byCode.length?byCode:vehicles.filter(v=>v.make===vMake&&v.model===vModel);
+    const modelPool=fittedPoolFor(new Set(modelVehicles.map(v=>String(v.id))));
+    return modelPool.length ? {items:modelPool, mode:"model"} : {items:makePool, mode:makePool.length?"make-fallback":"none"};
+  })();
+
+  const sortedPool=[...pool].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  const usingMakeFallback = vehicleFilterResult?.mode==="make-fallback";
+  const noneFitMake = vehicleFilterResult?.mode==="none";
+  // Never a dead end when browsing with no filter at all — but a vehicle-specific
+  // search with genuinely nothing fitted should say so, not silently show unrelated parts.
+  const filtered = keywords.length
+    ? pool.filter(p=>matchesSearch(p.blob,keywords))
+    : vMake
+      ? (vehicleFilterResult?.items||[])
+      : sortedPool;
+
+  const addItem=(p)=>{
+    setItems(prev=>{
+      const ex=prev.find(i=>i.sourceType===p.sourceType&&i.targetId===p.targetId);
+      if(ex) return prev.map(i=>i===ex?{...i,qty:i.qty+1}:i);
+      return [...prev,{sourceType:p.sourceType,targetId:p.targetId,partId:p.partId,name:p.name,sku:p.sku,image:p.image,extraPhotos:p.extraPhotos,fit:p.fit,qty:1,unitPrice:p.price}];
+    });
+    setSearch("");
+  };
+  const updateQty=(idx,qty)=>setItems(prev=>prev.map((it,i)=>i===idx?{...it,qty:Math.max(1,qty)}:it));
+  const updatePrice=(idx,price)=>setItems(prev=>prev.map((it,i)=>i===idx?{...it,unitPrice:price}:it));
+  const removeItem=(idx)=>setItems(prev=>prev.filter((_,i)=>i!==idx));
+
+  const subtotal=items.reduce((s,it)=>s+it.qty*it.unitPrice,0);
+  const pct=Math.min(100,Math.max(0,+discountPct||0));
+  const discountAmt=subtotal*pct/100;
+  const total=subtotal-discountAmt;
+
+  const submit=async()=>{
+    setSaving(true);
+    await onCreate({customerName,customerPhone,items,discountPct:pct,subtotal,total});
+    setSaving(false);
+  };
+
+  // Pick an existing customer (registered through this supplier's own catalogue
+  // link) instead of retyping their details, or just keep typing to add a new one.
+  const custMatches=customerName.trim().length>=2
+    ? customers.filter(c=>`${c.name} ${c.phone}`.toLowerCase().includes(customerName.toLowerCase())).slice(0,6)
+    : [];
+
+  return (
+    <Overlay onClose={onCancel}>
+      <MHead title="➕ New Booking" sub="Record a sale from your own stock" onClose={onCancel}/>
+      <FG cols="1fr 1fr">
+        <div style={{position:"relative"}}>
+          <FL label="Customer Name *"/>
+          <input className="inp" value={customerName}
+            onChange={e=>{setCustomerName(e.target.value);setCustDropdown(true);}}
+            onFocus={()=>setCustDropdown(true)} onBlur={()=>setTimeout(()=>setCustDropdown(false),150)}
+            placeholder="Type to search or add new"/>
+          {custDropdown&&custMatches.length>0&&(
+            <div style={{position:"absolute",zIndex:10,left:0,right:0,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,marginTop:2,maxHeight:160,overflowY:"auto",boxShadow:"0 4px 12px rgba(0,0,0,.15)"}}>
+              {custMatches.map(c=>(
+                <div key={c.id} style={{padding:"7px 10px",cursor:"pointer",fontSize:13,borderBottom:"1px solid var(--border)"}}
+                  onMouseDown={()=>{setCustomerName(c.name);setCustomerPhone(c.phone||"");setCustDropdown(false);}}>
+                  <strong>{c.name}</strong> <span style={{color:"var(--text3)"}}>· {c.phone}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div><FL label="Customer Phone"/><input className="inp" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)}/></div>
+      </FG>
+      <FD>
+        <FL label="Add item"/>
+        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your parts by name, SKU, make, model, OE…"/>
+        <div style={{display:"flex",gap:8,marginTop:6}}>
+          <select className="inp" style={{flex:1}} value={vMake} onChange={e=>{setVMake(e.target.value);setVModel("");setVModelInput("");}} disabled={!!keywords.length}>
+            <option value="">Or pick a vehicle: Make…</option>
+            {vMakes.map(m=><option key={m} value={m}>{m}</option>)}
+          </select>
+          <div style={{position:"relative",flex:1}}>
+            <input className="inp" style={{width:"100%"}} value={vModelInput}
+              onChange={e=>{setVModelInput(e.target.value);setVModel("");setVModelDropdown(true);}}
+              onFocus={()=>setVModelDropdown(true)} onBlur={()=>setTimeout(()=>setVModelDropdown(false),150)}
+              disabled={!vMake||!!keywords.length} placeholder={vMake?"All Models — type to search":"Pick a Make first"}/>
+            {vModelDropdown&&vMake&&!keywords.length&&(
+              <div style={{position:"absolute",zIndex:10,left:0,right:0,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,marginTop:2,maxHeight:180,overflowY:"auto",boxShadow:"0 4px 12px rgba(0,0,0,.15)"}}>
+                {vModelsForMake
+                  .filter(v=>!vModelInput.trim()||`${v.code||""} ${v.model}`.toLowerCase().includes(vModelInput.toLowerCase()))
+                  .slice(0,30)
+                  .map(v=>(
+                    <div key={v.code||v.model} style={{padding:"7px 10px",cursor:"pointer",fontSize:13,borderBottom:"1px solid var(--border)"}}
+                      onMouseDown={()=>{const val=v.code||v.model;setVModel(val);setVModelInput(v.code?`${v.code} — ${v.model}`:v.model);setVModelDropdown(false);}}>
+                      {v.code?<strong>{v.code}</strong>:null} {v.model}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+          {vMake&&!keywords.length&&<button type="button" className="btn btn-ghost btn-xs" onClick={()=>{setVMake("");setVModel("");setVModelInput("");}}>✕</button>}
+        </div>
+        {usingMakeFallback&&(
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>No exact fitment match for {vMake} {vModel} — showing other {vMake} parts instead:</div>
+        )}
+        {noneFitMake&&(
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>No parts in your stock fit any {vMake} — check My Stock, or the fitment may need adding there first.</div>
+        )}
+        {filtered.length>0 ? (
+          <div style={{marginTop:6,maxHeight:320,overflowY:"auto",border:"1px solid var(--border)",borderRadius:8,padding:8}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))",gap:8}}>
+              {filtered.slice(0,50).map(p=>(
+                <div key={`${p.sourceType}-${p.targetId}`}
+                  style={{border:"1px solid var(--border)",borderRadius:8,padding:8,cursor:"pointer",display:"flex",flexDirection:"column",gap:4,background:"var(--surface)"}}
+                  onClick={()=>addItem(p)}>
+                  <div style={{width:"100%",aspectRatio:"1",borderRadius:6,overflow:"hidden",background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                    {p.image
+                      ? <img src={toImgUrl(p.image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                      : <span style={{fontSize:22,opacity:.3}}>🖼</span>}
+                    {p.image&&(
+                      <button type="button" title="Enlarge photo" onClick={e=>{e.stopPropagation();setZoomImage({images:imagesFor(p),title:p.name,fits:p.fit?.allFits||[]});}}
+                        style={{position:"absolute",top:4,right:4,width:24,height:24,borderRadius:"50%",background:"rgba(0,0,0,.65)",border:"none",cursor:"zoom-in",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><circle cx="10" cy="10" r="6"/><line x1="15" y1="15" x2="20" y2="20"/></svg>
+                      </button>
+                    )}
+                    {p.extraPhotos?.length>0&&(
+                      <div title={`${p.extraPhotos.length} extra photo${p.extraPhotos.length>1?"s":""}`}
+                        style={{position:"absolute",bottom:4,left:4,background:"rgba(0,0,0,.65)",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:10}}>
+                        📷 +{p.extraPhotos.length}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{fontSize:12,fontWeight:700,lineHeight:1.25,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.name}</div>
+                  <div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{p.sku}</div>
+                  {p.fit&&(
+                    <div style={{fontSize:11,color:"var(--blue)"}}>
+                      {p.fit.main}{p.fit.extra>0?` +${p.fit.extra}`:""}
+                      {p.fit.year&&<div style={{color:"var(--text3)"}}>{p.fit.year}</div>}
+                    </div>
+                  )}
+                  <div style={{fontSize:11,fontWeight:700,color:p.stock>0?"var(--green)":"var(--red)"}}>Stock: {p.stock}</div>
+                </div>
+              ))}
+            </div>
+            {filtered.length>50&&<div style={{padding:"6px 10px",fontSize:11,color:"var(--text3)",textAlign:"center"}}>+{filtered.length-50} more — type to narrow it down</div>}
+          </div>
+        ) : keywords.length>0 ? (
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>No parts match "{search}" — check My Stock, or try a different keyword (make/model/OE number all work too).</div>
+        ) : !vMake ? (
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>No parts in your stock yet — add some in My Stock first.</div>
+        ) : null}
+      </FD>
+      {items.length>0&&(
+        <div style={{marginBottom:14}}>
+          {items.map((it,idx)=>(
+            <div key={idx} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 0",borderBottom:"1px solid var(--border)"}}>
+              <div style={{width:32,height:32,flexShrink:0,borderRadius:5,overflow:"hidden",background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",cursor:it.image?"zoom-in":"default"}}
+                onClick={()=>it.image&&setZoomImage({images:imagesFor(it),title:it.name,fits:it.fit?.allFits||[]})}>
+                {it.image
+                  ? <img src={toImgUrl(it.image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                  : <span style={{fontSize:14,opacity:.3}}>🖼</span>}
+              </div>
+              <div style={{flex:1,fontSize:13,minWidth:0}}>{it.name} <span style={{color:"var(--text3)"}}>({it.sku})</span></div>
+              <input className="inp" type="number" min="1" style={{width:60}} value={it.qty} onChange={e=>updateQty(idx,+e.target.value||1)}/>
+              <input className="inp" type="number" min="0" style={{width:90}} value={it.unitPrice} onChange={e=>updatePrice(idx,+e.target.value||0)}/>
+              <button className="btn btn-ghost btn-xs" onClick={()=>removeItem(idx)}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {items.length>0&&(
+        <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",marginBottom:14,display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13}}>
+            <span style={{color:"var(--text3)"}}>Subtotal</span><span>{fmtAmt(subtotal)}</span>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+            <FL label="Discount %"/>
+            <input className="inp" type="number" min="0" max="100" style={{width:80}} value={discountPct} onChange={e=>setDiscountPct(e.target.value)} placeholder="0"/>
+          </div>
+          {pct>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13,color:"var(--red)"}}>
+              <span>Discount ({pct}%)</span><span>-{fmtAmt(discountAmt)}</span>
+            </div>
+          )}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:15,fontWeight:800,borderTop:"1px solid var(--border)",paddingTop:6}}>
+            <span>Total</span><span>{fmtAmt(total)}</span>
+          </div>
+        </div>
+      )}
+      <div style={{display:"flex",gap:10,marginTop:4}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={submit} disabled={saving||!customerName.trim()||items.length===0}>{saving?"Saving…":"✅ Confirm Booking"}</button>
+      </div>
+      {zoomImage&&<PartImageZoom images={zoomImage.images} title={zoomImage.title} fits={zoomImage.fits} onClose={()=>setZoomImage(null)} onOpenVehicle={setVehicleZoom}/>}
+      {vehicleZoom&&<PartVehicleCompareZoom vehicleImages={vehicleZoom.vehicleImages} vehicleTitle={vehicleZoom.vehicleTitle}
+        partImages={vehicleZoom.partImages} partTitle={vehicleZoom.partTitle} onClose={()=>setVehicleZoom(null)}/>}
+    </Overlay>
+  );
+}
+
+// "My Orders" — incoming Spare Shop orders that contain a line item attributed to
+// this supplier (see reloadSupplierParts in App.jsx for how that's matched), each
+// with a per-item Confirm button (an order can mix items from several suppliers,
+// so confirmation is per-item, not per-order) that deducts this supplier's own
+// stock and creates a booking record. Below that, every booking (confirmed orders
+// plus manual entries) with a Convert to Invoice action once confirmed.
+export function SupplierOrdersPage({orders=[], bookings=[], bookingItems=[], existingParts=[], ownParts=[], customers=[], vehicles=[], partFitments=[],
+  supplierName="", supplierContactPerson="", supplierPhone="", supplierFullName="", supplierAddress="",
+  onConfirmItem, onConvertToInvoice, onDeleteBooking, onCreateManualBooking, onRefresh}) {
+  const [showNewBooking, setShowNewBooking] = useState(false);
+  // Same SKU-prefix detection as My Stock/Receive Stock (from real catalogue SKUs,
+  // not user.supplier_code, which can be the full company name) — used so self-added
+  // parts show their proper "MCK-XXXX" SKU here too, matching My Parts.
+  const codePrefix=(()=>{
+    const counts={};
+    for(const p of existingParts){
+      const m=(p.sku||"").match(/^([A-Z0-9]+)-/i);
+      if(m) counts[m[1].toUpperCase()]=(counts[m[1].toUpperCase()]||0)+1;
+    }
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0]||(supplierName||"").trim().toUpperCase();
+  })();
+  const linkIds = new Set(existingParts.map(p=>String(p._linkId)));
+  const ownIds = new Set(ownParts.map(p=>String(p.id)));
+  const isMine = (item) => (item.partSuppliersId && linkIds.has(String(item.partSuppliersId))) || (String(item.partId||"").startsWith("sp_") && ownIds.has(String(item.partId).slice(3)));
+  const confirmedOrderIds = new Set(bookings.filter(b=>b.source_order_id).map(b=>b.source_order_id));
+
+  return (
+    <div className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>📋 My Orders</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>Confirm incoming orders, or book a sale yourself</p>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+          <button className="btn btn-primary btn-sm" onClick={()=>setShowNewBooking(true)}>➕ New Booking</button>
+        </div>
+      </div>
+
+      <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,margin:"4px 0 8px"}}>Incoming Orders</div>
+      {orders.filter(o=>(o.items||[]).some(isMine)).length===0 ? (
+        <div className="card" style={{padding:30,textAlign:"center",color:"var(--text3)",marginBottom:24}}>No orders yet.</div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
+          {orders.map(o=>{
+            const mine=(o.items||[]).filter(isMine);
+            if(mine.length===0) return null;
+            const confirmed=confirmedOrderIds.has(o.id);
+            return (
+              <div key={o.id} className="card" style={{padding:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:8}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:13}}>{o.customer_name} <span style={{color:"var(--text3)",fontWeight:400}}>· {o.customer_phone}</span></div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{o.date} · Order {o.id}</div>
+                  </div>
+                  {confirmed
+                    ? <span className="badge" style={{fontSize:11,background:"rgba(52,211,153,.12)",color:"var(--green)"}}>✅ Confirmed</span>
+                    : <StatusBadge status={o.status}/>}
+                </div>
+                {mine.map((item,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderTop:"1px solid var(--border)",fontSize:13}}>
+                    <div>{item.name} <span style={{color:"var(--text3)"}}>× {item.qty} @ {fmtAmt(item.price)}</span></div>
+                    {!confirmed&&<button className="btn btn-primary btn-xs" onClick={()=>onConfirmItem(o,item)}>✅ Confirm</button>}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,margin:"4px 0 8px"}}>Bookings</div>
+      {bookings.length===0 ? (
+        <div className="card" style={{padding:30,textAlign:"center",color:"var(--text3)"}}>No confirmed bookings yet.</div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {bookings.map(b=>{
+            const its=bookingItems.filter(bi=>bi.booking_id===b.id);
+            return (
+              <div key={b.id} className="card" style={{padding:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:8}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:13}}>{b.customer_name}{b.customer_phone?` · ${b.customer_phone}`:""}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{b.source_order_id?`From order ${b.source_order_id}`:"Manual booking"} · {fmtDT(b.created_at)}</div>
+                  </div>
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <span className="badge" style={{fontSize:11,
+                      background:b.status==="invoiced"?"rgba(52,211,153,.12)":"rgba(96,165,250,.12)",
+                      color:b.status==="invoiced"?"var(--green)":"var(--blue)"}}>{b.status==="invoiced"?"🧾 Invoiced":"✅ Confirmed"}</span>
+                    {b.status==="confirmed"&&(
+                      <button className="btn btn-ghost btn-xs" onClick={async()=>{
+                        await onConvertToInvoice(b.id);
+                        openSupplierBookingInvoice({...b,status:"invoiced",invoiced_at:new Date().toISOString()},its,
+                          supplierName,supplierContactPerson,supplierPhone,supplierFullName,supplierAddress);
+                      }}>🧾 Convert to Invoice</button>
+                    )}
+                    {b.status==="invoiced"&&(
+                      <button className="btn btn-ghost btn-xs" onClick={()=>openSupplierBookingInvoice(b,its,supplierName,supplierContactPerson,supplierPhone,supplierFullName,supplierAddress)}>👁 View Invoice</button>
+                    )}
+                    {onDeleteBooking&&(
+                      <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
+                        onClick={()=>{if(window.confirm(`Delete this booking${b.status==="invoiced"?" and its invoice":""}? The ${its.reduce((s,it)=>s+it.qty,0)} unit(s) of stock it deducted will be restored.`)) onDeleteBooking(b.id);}}>
+                        🗑 Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {its.map(it=>(
+                  <div key={it.id} style={{fontSize:12,color:"var(--text2)",padding:"3px 0"}}>{it.part_name} × {it.qty} @ {fmtAmt(it.unit_price)}</div>
+                ))}
+                {b.total!=null&&(
+                  <div style={{display:"flex",justifyContent:"flex-end",gap:8,fontSize:12,marginTop:6,paddingTop:6,borderTop:"1px solid var(--border)"}}>
+                    {b.discount_pct>0&&<span style={{color:"var(--red)"}}>-{b.discount_pct}%</span>}
+                    <span style={{fontWeight:700}}>{fmtAmt(b.total)}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showNewBooking&&(
+        <NewBookingForm existingParts={existingParts} ownParts={ownParts} supplierCode={codePrefix} customers={customers} vehicles={vehicles} partFitments={partFitments}
+          onCancel={()=>setShowNewBooking(false)}
+          onCreate={async(data)=>{await onCreateManualBooking(data);setShowNewBooking(false);}}/>
+      )}
+    </div>
   );
 }

@@ -914,17 +914,22 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
               {label:"Google",color:"var(--blue)",url:v=>`https://www.google.com/search?q=${encodeURIComponent(v)}`},
             ];
             return (
-              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",marginTop:6,padding:"8px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8}}>
+                <span style={{fontSize:11,fontWeight:700,color:"var(--text3)",flexShrink:0}}>🔍 Search</span>
                 {oeTokens.length>1&&(
-                  <select className="cp-btn" style={{fontWeight:700}}
+                  <select className="inp" style={{width:"auto",fontSize:11,fontWeight:700,padding:"4px 8px"}}
                     value={activeTok} onChange={e=>setSelectedOeTok(e.target.value)}>
                     {oeTokens.map((tok,i)=>(<option key={i} value={tok}>{tok}</option>))}
                   </select>
                 )}
+                <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>on:</span>
                 {sites.map(site=>(
-                  <button key={site.label} type="button" className="cp-btn" style={{color:site.color}}
-                    onClick={()=>window.open(site.url(activeTok),"_blank","noopener,noreferrer")}>
-                    🔍 {site.label}
+                  <button key={site.label} type="button"
+                    onClick={()=>window.open(site.url(activeTok),"_blank","noopener,noreferrer")}
+                    style={{fontSize:11,fontWeight:700,padding:"4px 11px",borderRadius:99,cursor:"pointer",
+                      background:`color-mix(in srgb, ${site.color} 14%, transparent)`,
+                      color:site.color, border:`1px solid color-mix(in srgb, ${site.color} 35%, transparent)`}}>
+                    {site.label}
                   </button>
                 ))}
               </div>

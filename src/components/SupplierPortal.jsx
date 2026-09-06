@@ -1386,7 +1386,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   // so a continued invoice's targetId comes back as a string while supplier_parts.id
   // is numeric — compare as strings everywhere they're matched against ownParts.
   const fullRecordFor=(sourceType,targetId)=>sourceType==="catalogue"
-    ? existingParts.find(p=>p._linkId===targetId)
+    ? existingParts.find(p=>String(p._linkId)===String(targetId))
     : ownParts.find(p=>String(p.id)===String(targetId));
   const imageFor=(sourceType,targetId)=>fullRecordFor(sourceType,targetId)?.image_url;
   const extraPhotosFor=(sourceType,targetId)=>parseJsonArray(fullRecordFor(sourceType,targetId)?.photos);
@@ -1502,7 +1502,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   // shared with admin and every other supplier — see CatalogFitmentEditModal.
   const [editingCatalogIdx, setEditingCatalogIdx] = useState(null);
   const editingCatalogPart=editingCatalogIdx==null ? null
-    : existingParts.find(p=>p._linkId===items[editingCatalogIdx].targetId)
+    : existingParts.find(p=>String(p._linkId)===String(items[editingCatalogIdx].targetId))
       || {id:items[editingCatalogIdx].partId, sku:items[editingCatalogIdx].sku, name:items[editingCatalogIdx].name};
 
   return (

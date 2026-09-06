@@ -1521,6 +1521,17 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   const customsLocal=(+customsCostUsd||0)*(+exchangeRate||0);
   const total=itemsTotal+shippingNum+customsLocal;
 
+  const exportCsv=()=>{
+    const header=["SKU","Name","Qty","Unit Cost","Bin Location"];
+    const rows=items.map(it=>[it.sku,it.name,it.qty,it.unitCost,it.binLocation]);
+    const csv=[header,...rows].map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob=new Blob([csv],{type:"text/csv"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`${(invoiceNo||"invoice").replace(/[^a-z0-9-_]+/gi,"_")}-items.csv`;
+    a.click();
+  };
+
   // Unpacking a shipment often turns up something not in the catalogue yet —
   // this lets the supplier add it right here (a minimal supplier_parts row) and
   // drop straight into this invoice as a line, instead of a separate trip to My
@@ -1722,6 +1733,11 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
           </div>
         );
       })()}
+      {items.length>0&&(
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={exportCsv}>📊 Export Excel</button>
+        </div>
+      )}
       {items.length>0&&(
         <div style={{marginBottom:14,display:"flex",flexDirection:"column",gap:8}}>
           {items.map((it,idx)=>{

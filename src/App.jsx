@@ -5511,7 +5511,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               {fp.length===0&&<span style={{color:"var(--red)",marginLeft:8}}>— try fewer words</span>}
             </div>}
             {/* ── MOBILE INVENTORY CARDS ── */}
-            <div className="mob-cards" style={{zoom:invZoom}}>
+            {/* invZoom is a desktop table-density control (see comment above the
+                🔍 buttons) — a leftover zoom<1 from desktop otherwise shrinks
+                these cards and leaves the rest of the phone screen blank. */}
+            <div className="mob-cards">
               {invSortedFp.slice(invPage*PAGE_SIZE,(invPage+1)*PAGE_SIZE).map(p=>{
                 const img=toImgUrl(p.image_url);
                 const ps=getPartSupps(p.id);

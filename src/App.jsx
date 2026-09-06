@@ -2675,9 +2675,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const {id,...rest}=data;
     const payload={...rest,supplier_id:user.supplier_id,cost_price:data.cost_price===""?null:+data.cost_price,
       suggested_price:data.suggested_price===""||data.suggested_price==null?null:+data.suggested_price};
-    const res=id?await api.patch("supplier_parts","id",id,payload):await api.upsert("supplier_parts",payload);
+    let res;
+    try{
+      res=id?await api.patch("supplier_parts","id",id,payload):await api.upsert("supplier_parts",payload);
+    }catch(err){
+      // A thrown network/fetch error (not a structured Supabase error object)
+      // never hit the check below, so it failed with literally nothing shown —
+      // this is that missing feedback.
+      showToast(`❌ Save failed: ${err.message||"network error"}`,"err");
+      return false;
+    }
     if(res&&!Array.isArray(res)&&(res.code||res.message)){
       showToast(`❌ Save failed: ${res.message||res.code}`,"err");
+      return false;
+    }
+    // A successful PATCH that matches zero rows still returns [] (not an error) —
+    // e.g. this part's id no longer exists — so an empty result on an update is
+    // itself a failure, not silently "nothing to report".
+    if(id&&Array.isArray(res)&&res.length===0){
+      showToast("❌ Save failed: no matching part found — it may have been deleted or recreated with a different id","err");
       return false;
     }
     await reloadSupplierParts();

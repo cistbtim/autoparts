@@ -1739,6 +1739,11 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                 <div style={{flex:"1 1 160px",alignSelf:"center"}}>
                   <div style={{fontSize:13,fontWeight:600}}>{it.name}</div>
                   <div style={{fontSize:15,fontWeight:700,color:"var(--red)",fontFamily:"DM Mono,monospace",marginTop:2}}>{it.sku}</div>
+                  {(()=>{
+                    const full=fullRecordFor(it.sourceType,it.targetId);
+                    const fit=[[full?.make,full?.model].filter(Boolean).join(" "),full?.year_range].filter(Boolean).join(" · ");
+                    return fit?<div style={{fontSize:11,color:"var(--blue)",marginTop:2}}>🚗 {fit}</div>:null;
+                  })()}
                 </div>
                 <div><FL label="Qty"/><input className="inp" type="number" min="1" style={{width:70}} value={it.qty} onChange={e=>updateItem(idx,{qty:Math.max(1,+e.target.value||1)})}/></div>
                 <div><FL label="Unit Cost"/><input className="inp" type="number" min="0" style={{width:90}} value={it.unitCost} onChange={e=>updateItem(idx,{unitCost:+e.target.value||0})}/></div>

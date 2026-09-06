@@ -1550,11 +1550,12 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
       const full=fullRecordFor(it.sourceType,it.targetId);
       const fitment=[[full?.make,full?.model].filter(Boolean).join(" "),full?.year_range].filter(Boolean).join(" · ");
       const img=it.image?toImgUrl(it.image):"";
+      const imgFull=it.image?(toFullUrl(it.image)||it.image):"";
       const priceCell=mode==="sell"
         ? (sellPriceFor(it)?fmtAmt(sellPriceFor(it)):"—")
         : fmtAmt(it.unitCost);
       return `<tr>
-        <td class="img-cell">${img?`<img src="${esc(img)}" onerror="this.style.display='none'"/>`:""}</td>
+        <td class="img-cell">${img?`<a href="${esc(imgFull)}" target="_blank" rel="noopener"><img src="${esc(img)}" onerror="this.style.display='none'"/></a>`:""}</td>
         <td><div class="pname">${esc(it.name)}</div><div class="psku">${esc(it.sku)}</div>${fitment?`<div class="pfit">🚗 ${esc(fitment)}</div>`:""}</td>
         <td class="num">${it.qty}</td>
         <td class="num">${priceCell}</td>
@@ -1572,7 +1573,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
       table{width:100%;border-collapse:collapse}
       th{background:#f3f4f6;text-align:left;font-size:11px;text-transform:uppercase;padding:8px;border:1px solid #ddd}
       td{padding:8px;border:1px solid #ddd;font-size:13px;vertical-align:middle}
-      .img-cell{width:60px}.img-cell img{width:50px;height:50px;object-fit:contain}
+      .img-cell{width:60px}.img-cell img{width:50px;height:50px;object-fit:contain;cursor:zoom-in}
       .pname{font-weight:700}.psku{color:#dc2626;font-family:monospace;font-weight:700}.pfit{color:#2563eb;font-size:11px;margin-top:2px}
       .num{text-align:right;font-weight:700}
       @media print{.print-btn{display:none}}

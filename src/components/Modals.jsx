@@ -3836,7 +3836,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
       )}
 
       {/* ── ALWAYS VISIBLE: Info + Photo ── */}
-      <div style={{display:"flex",gap:18,marginBottom:18,alignItems:"flex-start"}}>
+      <div className="pm-info-photo" style={{display:"flex",gap:18,marginBottom:18,alignItems:"flex-start"}}>
         {/* LEFT: Info fields */}
         <div style={{flex:"1 1 0",minWidth:0}}>
           <FG>
@@ -4049,7 +4049,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
           </div>
         </div>
         {/* RIGHT: Photo */}
-        <div style={{flexShrink:0,width:210}}>
+        <div className="pm-photo-col" style={{flexShrink:0,width:210}}>
           {part&&<div style={{fontSize:11,color:"var(--green)",marginBottom:8,background:"rgba(34,197,94,.08)",borderRadius:7,padding:"5px 9px"}}>✅ {t.phuAutoSave}</div>}
           <PartPhotoUploader imageUrl={f.image_url} onChange={handlePhotoChange} sku={f.sku} t={t} bucket="cars_parts"/>
           <ExtraPhotosStrip photos={f.photos} onChange={handlePhotosChange} sku={f.sku}

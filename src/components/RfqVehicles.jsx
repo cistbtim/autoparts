@@ -936,9 +936,6 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
   const SCRIPT_URL = (typeof window._VEHICLE_SCRIPT_URL==="string"&&window._VEHICLE_SCRIPT_URL)
     || (typeof window._APPS_SCRIPT_URL==="string"&&window._APPS_SCRIPT_URL)
     || "";
-  // Debug - log what URL is being used
-  if(!SCRIPT_URL) console.warn("No vehicle script URL configured");
-  else console.log("Vehicle upload URL:", SCRIPT_URL.slice(0,60)+"...");
 
   const _processImage = async (file, skipBgRemoval=false) => {
     // Step 1: AI background removal
@@ -2727,7 +2724,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 
 
   // Always derive makes/models from the vehicles table (clean data with codes)
-  const makes = [...new Set(vehicles.map(v => v.make))].sort();
+  const makes = [...new Set(vehicles.map(v => v.make).filter(Boolean))].sort();
   const models = (() => {
     const filtered = vehicles.filter(v => !selMake || v.make === selMake);
     // Deduplicate by code (if present) or model name — keeps each generation separate

@@ -1209,11 +1209,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   },[scrapId]);
 
   // Sync Apps Script URL to window whenever settings changes
-  useEffect(()=>{ window._APPS_SCRIPT_URL = settings?.apps_script_url || ""; },[settings?.apps_script_url]);
   useEffect(()=>{
     window._APPS_SCRIPT_URL    = settings?.apps_script_url    || "";
     window._VEHICLE_SCRIPT_URL = settings?.vehicle_script_url || "";
-    console.log("Scripts synced - Parts:", (settings?.apps_script_url||"").slice(0,40), "Vehicle:", (settings?.vehicle_script_url||"").slice(0,40));
   },[settings?.apps_script_url, settings?.vehicle_script_url]);
 
   // Track if any modal is open — pause refresh when busy

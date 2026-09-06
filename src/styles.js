@@ -91,6 +91,10 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .ws-toolbar>button.btn-primary{flex:1 1 auto;min-height:40px;padding:8px 10px!important}
   .ws-subnav-m{margin-bottom:10px!important}
   .ws-subnav-m select{padding:9px 12px;font-size:14px}
+  /* Edit Part modal: info fields + photo side-by-side on desktop squeezed the
+     photo column's buttons into ~210px on phones — stack instead */
+  .pm-info-photo{flex-direction:column!important}
+  .pm-photo-col{width:100%!important}
 }
 .mob-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;border-radius:8px;transition:all .18s;position:relative}
 .mob-nav-btn.on{color:var(--accent)}.mob-nav-btn .mi{font-size:18px;line-height:1}

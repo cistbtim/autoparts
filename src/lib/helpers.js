@@ -375,10 +375,10 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
         var r = label.querySelector('.r');
         if(!r) return;
         var maxW = r.clientWidth - 4;
-        fit(label.querySelector('.sku'), maxW, 14);
-        fit(label.querySelector('.pn'), maxW, 9);
-        fit(label.querySelector('.bin'), maxW, 14);
-        fit(label.querySelector('.sup'), maxW, 9);
+        fit(label.querySelector('.sku'), maxW, 7);
+        fit(label.querySelector('.pn'), maxW, 7);
+        fit(label.querySelector('.bin'), maxW, 8);
+        fit(label.querySelector('.sup'), maxW, 7);
       });
     })();
   `;

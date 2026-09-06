@@ -1532,6 +1532,49 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
     a.click();
   };
 
+  // A printable PDF (via the browser's own print-to-PDF, same trick the label
+  // printer uses) with each part's photo alongside its fitment/qty/cost/bin —
+  // useful as a physical packing-list/receiving sheet, unlike the plain CSV.
+  const exportPdf=()=>{
+    const win=window.open("","_blank","width=900,height=700");
+    if(!win) return;
+    const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    const rows=items.map(it=>{
+      const full=fullRecordFor(it.sourceType,it.targetId);
+      const fitment=[[full?.make,full?.model].filter(Boolean).join(" "),full?.year_range].filter(Boolean).join(" · ");
+      const img=it.image?toImgUrl(it.image):"";
+      return `<tr>
+        <td class="img-cell">${img?`<img src="${esc(img)}" onerror="this.style.display='none'"/>`:""}</td>
+        <td><div class="pname">${esc(it.name)}</div><div class="psku">${esc(it.sku)}</div>${fitment?`<div class="pfit">🚗 ${esc(fitment)}</div>`:""}</td>
+        <td class="num">${it.qty}</td>
+        <td class="num">${fmtAmt(it.unitCost)}</td>
+        <td>${esc(it.binLocation)||"—"}</td>
+      </tr>`;
+    }).join("");
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(invoiceNo||"Purchase Invoice")}</title><style>
+      *{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:24px;color:#111}
+      .print-btn{padding:9px 24px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:16px}
+      h1{font-size:18px;margin-bottom:2px}.sub{color:#666;font-size:12px;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse}
+      th{background:#f3f4f6;text-align:left;font-size:11px;text-transform:uppercase;padding:8px;border:1px solid #ddd}
+      td{padding:8px;border:1px solid #ddd;font-size:13px;vertical-align:middle}
+      .img-cell{width:60px}.img-cell img{width:50px;height:50px;object-fit:contain}
+      .pname{font-weight:700}.psku{color:#dc2626;font-family:monospace;font-weight:700}.pfit{color:#2563eb;font-size:11px;margin-top:2px}
+      .num{text-align:right;font-weight:700}
+      @media print{.print-btn{display:none}}
+    </style></head><body>
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+      <h1>${esc(invoiceNo||"Purchase Invoice")}${fromName?` — ${esc(fromName)}`:""}</h1>
+      <div class="sub">${esc(invoiceDate)} · ${items.reduce((s,it)=>s+it.qty,0)} units · ${fmtAmt(itemsTotal)}</div>
+      <table>
+        <thead><tr><th></th><th>Part</th><th>Qty</th><th>Unit Cost</th><th>Bin Location</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </body></html>`;
+    win.document.write(html);
+    win.document.close();
+  };
+
   // Unpacking a shipment often turns up something not in the catalogue yet —
   // this lets the supplier add it right here (a minimal supplier_parts row) and
   // drop straight into this invoice as a line, instead of a separate trip to My
@@ -1734,7 +1777,8 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
         );
       })()}
       {items.length>0&&(
-        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
+        <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:8}}>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={exportPdf}>📄 Export PDF</button>
           <button type="button" className="btn btn-ghost btn-xs" onClick={exportCsv}>📊 Export Excel</button>
         </div>
       )}

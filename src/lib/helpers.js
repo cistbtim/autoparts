@@ -377,9 +377,14 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
         // A wider monospace font on some device/OS can still overflow even at the
         // smallest readable size — as a last resort, squeeze it horizontally by
         // the exact measured ratio so it is GUARANTEED to fit completely, never
-        // truncates, regardless of font metrics.
+        // truncates, regardless of font metrics. text-overflow:ellipsis is a
+        // LAYOUT-time decision (computed before any transform is even applied),
+        // so scaling alone can't undo it — it must be turned off here too, or the
+        // text gets truncated to "…" first and THEN scaled, still incomplete.
         if(el.scrollWidth>el.clientWidth){
           var ratio=(el.clientWidth/el.scrollWidth)*0.97;
+          el.style.overflow='visible';
+          el.style.textOverflow='clip';
           el.style.transformOrigin='left center';
           el.style.transform='scaleX('+ratio+')';
         }

@@ -1741,8 +1741,14 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                   <div style={{fontSize:15,fontWeight:700,color:"var(--red)",fontFamily:"DM Mono,monospace",marginTop:2}}>{it.sku}</div>
                   {(()=>{
                     const full=fullRecordFor(it.sourceType,it.targetId);
-                    const fit=[[full?.make,full?.model].filter(Boolean).join(" "),full?.year_range].filter(Boolean).join(" · ");
-                    return fit?<div style={{fontSize:11,color:"var(--blue)",marginTop:2}}>🚗 {fit}</div>:null;
+                    if(!full?.make&&!full?.model&&!full?.year_range) return null;
+                    return (
+                      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:3}}>
+                        {full?.make&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:99,padding:"1px 7px"}}>🚗 {full.make}</span>}
+                        {full?.model&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:99,padding:"1px 7px"}}>{full.model}</span>}
+                        {full?.year_range&&<span style={{fontSize:10,fontWeight:700,color:"var(--text3)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:99,padding:"1px 7px"}}>{full.year_range}</span>}
+                      </div>
+                    );
                   })()}
                 </div>
                 <div><FL label="Qty"/><input className="inp" type="number" min="1" style={{width:70}} value={it.qty} onChange={e=>updateItem(idx,{qty:Math.max(1,+e.target.value||1)})}/></div>

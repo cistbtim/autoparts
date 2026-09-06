@@ -872,6 +872,7 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
   const canSave=f.part_code.trim()&&f.name.trim();
   const [lightbox,setLightbox]=useState(null); // {idx} — urls built from f.image_url + f.photos
   const [saving,setSaving]=useState(false);
+  const [selectedOeTok,setSelectedOeTok]=useState("");
   const marginOptions=resolveMarginOptions({supplierOptions:supplierMarginOptions,category:f.category});
 
   return (
@@ -902,15 +903,33 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
         <div>
           <FL label="OE Number"/>
           <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)}/>
-          {f.oe_number&&(
-            <select className="inp" style={{fontSize:11,color:"#1d4ed8",marginTop:6}}
-              value="" onChange={e=>{if(e.target.value)window.open(`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(e.target.value)}`,"_blank","noopener,noreferrer");}}>
-              <option value="">🔍 Search on Alibaba…</option>
-              {f.oe_number.split(/[\s,;]+/).filter(Boolean).map((tok,i)=>(
-                <option key={i} value={tok}>{tok}</option>
-              ))}
-            </select>
-          )}
+          {f.oe_number&&(()=>{
+            const oeTokens=f.oe_number.split(/[\s,;]+/).filter(Boolean);
+            const activeTok=oeTokens.includes(selectedOeTok)?selectedOeTok:oeTokens[0];
+            const sites=[
+              {label:"SpareTO",color:"#e65c00",url:v=>`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(v)}`},
+              {label:"Alibaba",color:"#1d4ed8",url:v=>`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(v)}`},
+              {label:"RRR.lt",color:"#059669",url:v=>`https://rrr.lt/en/search?exact=1&q=${encodeURIComponent(v)}`},
+              {label:"eBay",color:"#e53238",url:v=>`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(v)}`},
+              {label:"Google",color:"var(--blue)",url:v=>`https://www.google.com/search?q=${encodeURIComponent(v)}`},
+            ];
+            return (
+              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
+                {oeTokens.length>1&&(
+                  <select className="cp-btn" style={{fontWeight:700}}
+                    value={activeTok} onChange={e=>setSelectedOeTok(e.target.value)}>
+                    {oeTokens.map((tok,i)=>(<option key={i} value={tok}>{tok}</option>))}
+                  </select>
+                )}
+                {sites.map(site=>(
+                  <button key={site.label} type="button" className="cp-btn" style={{color:site.color}}
+                    onClick={()=>window.open(site.url(activeTok),"_blank","noopener,noreferrer")}>
+                    🔍 {site.label}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
         </div>
         <div>
           <FL label="Category"/>

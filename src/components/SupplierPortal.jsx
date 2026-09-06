@@ -1423,6 +1423,13 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   const [newPartYearRange, setNewPartYearRange] = useState("");
   const [addingNewSaving, setAddingNewSaving] = useState(false);
   const [editingItemIdx, setEditingItemIdx] = useState(null); // index into items[] whose full Edit Part modal is open, or null
+  // A big shipment can add dozens of lines — page the rendered rows so the modal
+  // doesn't turn into one giant scroll. Totals below always sum the FULL items
+  // array regardless of which page is showing.
+  const ITEMS_PAGE_SIZE=8;
+  const [itemsPage, setItemsPage] = useState(0);
+  const itemsTotalPages=Math.max(1,Math.ceil(items.length/ITEMS_PAGE_SIZE));
+  const itemsCurPage=Math.min(itemsPage,itemsTotalPages-1);
 
   const pool = [
     ...existingParts.map(p=>({sourceType:"catalogue", targetId:p._linkId, partId:p.id, name:p.name, sku:p.sku, image:p.image_url, extraPhotos:parseJsonArray(p.photos), currentBin:p._supplierBinLocation||"",
@@ -1437,7 +1444,9 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
     setItems(prev=>{
       const ex=prev.find(i=>i.sourceType===p.sourceType&&i.targetId===p.targetId);
       if(ex) return prev.map(i=>i===ex?{...i,qty:i.qty+1}:i);
-      return [...prev,{sourceType:p.sourceType,targetId:p.targetId,partId:p.partId,name:p.name,sku:p.sku,image:p.image,extraPhotos:p.extraPhotos,qty:1,unitCost:0,binLocation:p.currentBin}];
+      const next=[...prev,{sourceType:p.sourceType,targetId:p.targetId,partId:p.partId,name:p.name,sku:p.sku,image:p.image,extraPhotos:p.extraPhotos,qty:1,unitCost:0,binLocation:p.currentBin}];
+      setItemsPage(Math.max(0,Math.ceil(next.length/ITEMS_PAGE_SIZE)-1)); // jump to the page holding the new line so it's visible
+      return next;
     });
     setSearch("");
   };
@@ -1469,7 +1478,11 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
       oeNumber:newPartOe,make:newPartMake,model:newPartModel,yearRange:newPartYearRange});
     setAddingNewSaving(false);
     if(row){
-      setItems(prev=>[...prev,{sourceType:"own",targetId:row.id,partId:null,name:row.name,sku:supplierCode?`${supplierCode}-${row.part_code}`:row.part_code,image:row.image_url,qty:1,unitCost:+newPartCost||0,binLocation:""}]);
+      setItems(prev=>{
+        const next=[...prev,{sourceType:"own",targetId:row.id,partId:null,name:row.name,sku:supplierCode?`${supplierCode}-${row.part_code}`:row.part_code,image:row.image_url,qty:1,unitCost:+newPartCost||0,binLocation:""}];
+        setItemsPage(Math.max(0,Math.ceil(next.length/ITEMS_PAGE_SIZE)-1));
+        return next;
+      });
       setAddingNew(false); setSearch("");
     }
   };
@@ -1478,6 +1491,15 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
     setSaving(true);
     await onSave({invoiceId:editingInvoice?.id||null,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items});
     setSaving(false);
+  };
+
+  // Guard every way out of this modal (backdrop click, ✕, Cancel) once there's
+  // anything worth losing — an accidental tap on the edge shouldn't silently
+  // discard a shipment that's half-typed in.
+  const hasUnsavedWork=items.length>0||invoiceNo.trim()||fromName.trim()||notes.trim();
+  const handleClose=()=>{
+    if(hasUnsavedWork&&!window.confirm("You have unsaved items on this invoice. Close without saving?")) return;
+    onCancel();
   };
 
   // Editing a self-added part's own details right from its line here — opens the
@@ -1506,8 +1528,8 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
       || {id:items[editingCatalogIdx].partId, sku:items[editingCatalogIdx].sku, name:items[editingCatalogIdx].name};
 
   return (
-    <Overlay onClose={onCancel}>
-      <MHead title={editingInvoice?"📥 Continue Invoice":"📥 Receive Stock"} sub={editingInvoice?`Add more items to ${editingInvoice.invoice_no||editingInvoice.id}`:"Record a purchase invoice into your own stock"} onClose={onCancel}/>
+    <Overlay onClose={handleClose}>
+      <MHead title={editingInvoice?"📥 Continue Invoice":"📥 Receive Stock"} sub={editingInvoice?`Add more items to ${editingInvoice.invoice_no||editingInvoice.id}`:"Record a purchase invoice into your own stock"} onClose={handleClose}/>
       <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 14px 4px",marginBottom:16}}>
         <FG cols="1fr 1fr">
           <div><FL label="Invoice No"/><input className="inp" value={invoiceNo} onChange={e=>setInvoiceNo(e.target.value)}/></div>
@@ -1606,7 +1628,9 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
       </div>
       {items.length>0&&(
         <div style={{marginBottom:14,display:"flex",flexDirection:"column",gap:8}}>
-          {items.map((it,idx)=>(
+          {items.map((it,idx)=>{
+            if(idx<itemsCurPage*ITEMS_PAGE_SIZE||idx>=(itemsCurPage+1)*ITEMS_PAGE_SIZE) return null;
+            return (
             <div key={idx} style={{border:"1px solid var(--border)",borderRadius:8,padding:10}}>
               <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-end"}}>
                 {editingItemIdx!==idx&&<button className="btn btn-ghost btn-xs" onClick={()=>{if(window.confirm(`Remove ${it.name} from this invoice?`)) removeItem(idx);}}>✕</button>}
@@ -1642,7 +1666,15 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
+          {itemsTotalPages>1&&(
+            <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:10,paddingTop:4}}>
+              <button className="btn btn-ghost btn-xs" disabled={itemsCurPage===0} onClick={()=>setItemsPage(p=>Math.max(0,p-1))}>‹ Prev</button>
+              <span style={{fontSize:12,color:"var(--text3)"}}>Page {itemsCurPage+1} of {itemsTotalPages} ({items.length} items)</span>
+              <button className="btn btn-ghost btn-xs" disabled={itemsCurPage>=itemsTotalPages-1} onClick={()=>setItemsPage(p=>Math.min(itemsTotalPages-1,p+1))}>Next ›</button>
+            </div>
+          )}
         </div>
       )}
       {editingItemIdx!=null&&(
@@ -1698,7 +1730,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
         This only records the invoice{printLabels?" and prints labels":""} — your stock stays unchanged until you count everything and click "Add Stock to System" on it back in Purchase Invoices.
       </div>
       <div style={{display:"flex",gap:10}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onCancel}>Cancel</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={submit} disabled={saving||items.length===0}>{saving?"Saving…":printLabels?"✅ Save & Print Labels":"✅ Save Invoice"}</button>
       </div>
       {zoomImage&&<PartImageZoom images={zoomImage.images} title={zoomImage.title} onClose={()=>setZoomImage(null)}/>}

@@ -317,7 +317,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
 
   return (
     <div className="fu">
-      {editing&&<SupplierPartModal part={editing} supplierCode={supplierCode} supplierMarginOptions={marginOptions}
+      {editing&&<SupplierPartModal part={editing} supplierCode={supplierCode} supplierMarginOptions={marginOptions} ownParts={parts}
         onSave={async(data)=>{ if(await onSave(data)!==false) setEditing(null); }}
         onDelete={editing.id?async()=>{await onDelete(editing.id);setEditing(null);}:null}
         onClose={()=>setEditing(null)}/>}
@@ -859,7 +859,7 @@ function SupplierCostPriceModal({part, supplierMarginOptions=null, onSave, onClo
   );
 }
 
-function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSave, onDelete, onClose}) {
+function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownParts=[], onSave, onDelete, onClose}) {
   const isEdit=!!part?.id;
   const [f,setF]=useState(isEdit?{
     id:part.id, part_code:part.part_code||"", name:part.name||"", chinese_desc:part.chinese_desc||"",
@@ -874,6 +874,12 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
   const [saving,setSaving]=useState(false);
   const [selectedOeTok,setSelectedOeTok]=useState("");
   const marginOptions=resolveMarginOptions({supplierOptions:supplierMarginOptions,category:f.category});
+  // Same OE number typed onto two different part codes usually means an
+  // accidental duplicate listing — catch it as soon as the modal opens/changes,
+  // not after it's already been saved and is sitting in stock twice.
+  const oeDuplicates=f.oe_number.trim()
+    ? ownParts.filter(p=>p.id!==f.id && (p.oe_number||"").trim().toUpperCase()===f.oe_number.trim().toUpperCase())
+    : [];
 
   return (
     <Overlay onClose={onClose}>
@@ -903,6 +909,12 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, onSa
         <div>
           <FL label="OE Number"/>
           <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)}/>
+          {oeDuplicates.length>0&&(
+            <div style={{marginTop:6,padding:"8px 10px",borderRadius:8,background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.35)",fontSize:12,color:"var(--red)"}}>
+              ⚠️ This OE Number is already on {oeDuplicates.length} other part{oeDuplicates.length>1?"s":""} in your inventory:
+              {oeDuplicates.map(p=><div key={p.id} style={{marginTop:3,fontWeight:600}}>{p.name} <span style={{fontFamily:"DM Mono,monospace",fontWeight:400}}>({supplierCode}-{p.part_code})</span></div>)}
+            </div>
+          )}
           {f.oe_number&&(()=>{
             const oeTokens=f.oe_number.split(/[\s,;]+/).filter(Boolean);
             const activeTok=oeTokens.includes(selectedOeTok)?selectedOeTok:oeTokens[0];
@@ -1774,7 +1786,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
         </div>
       )}
       {editingItemIdx!=null&&(
-        <SupplierPartModal part={editingFullPart} supplierCode={supplierCode} supplierMarginOptions={marginOptions}
+        <SupplierPartModal part={editingFullPart} supplierCode={supplierCode} supplierMarginOptions={marginOptions} ownParts={ownParts}
           onSave={async(data)=>{
             const ok=await onUpdatePart(data);
             if(ok){

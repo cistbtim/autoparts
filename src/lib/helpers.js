@@ -333,6 +333,7 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
     ".sku{font-size:39px;font-weight:900;font-family:monospace;letter-spacing:.8px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
     ".pn{font-size:18px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#333}",
     ".bin{font-size:33px;font-weight:900;color:#1d4ed8;background:#dbeafe;border-radius:3px;padding:1px 5px;display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}",
+    ".bin-blank{height:38px;border:1.5px solid #999;border-radius:3px;background:#fff;margin-top:2px}",
     ".sup{font-size:18px;font-weight:bold;color:#7c3aed;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
     ".inv-row{display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #ccc;margin-top:2px;padding-top:2px}",
     ".invno{font-size:8px;color:#555;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
@@ -350,7 +351,7 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
         <div class="sn">${e(shopName)}</div>
         <div class="sku">${e(lbl.sku||lbl.name)}</div>
         ${lbl.name&&lbl.sku?`<div class="pn">${e(lbl.name)}</div>`:""}
-        ${lbl.binLocation?`<div class="bin">📦 ${e(lbl.binLocation)}</div>`:"<div class=\"bin\" style=\"background:#fee2e2;color:#dc2626\">📦 NO BIN SET</div>"}
+        ${lbl.binLocation?`<div class="bin">📦 ${e(lbl.binLocation)}</div>`:"<div class=\"bin-blank\"></div>"}
         ${lbl.supplierCode?`<div class="sup">🏭 ${e(lbl.supplierCode)}</div>`:""}
         ${(lbl.invoiceNo||lbl.seq)?`<div class="inv-row"><span class="invno">${lbl.invoiceNo?e(lbl.invoiceNo):""}</span><span class="seq">${lbl.seq?e(lbl.seq):""}</span></div>`:""}
       </div>

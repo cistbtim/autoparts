@@ -1514,10 +1514,18 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
     }
   };
 
-  const submit=async()=>{
-    setSaving(true);
-    await onSave({invoiceId:editingInvoice?.id||null,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items});
-    setSaving(false);
+  const submit=()=>{
+    // A big invoice saves one line at a time (awaited sequentially) before labels
+    // are ready — by then the browser no longer treats window.open() as tied to
+    // this click, and silently blocks it. Reserve the tab HERE, still inside the
+    // synchronous click handler, and hand it to onSave to fill in once it's done.
+    const labelWin=printLabels?window.open("","_blank","width=600,height=500"):null;
+    if(labelWin) labelWin.document.write("<title>Preparing labels…</title><body style='font-family:sans-serif;padding:24px;color:#666'>Preparing labels…</body>");
+    (async()=>{
+      setSaving(true);
+      await onSave({invoiceId:editingInvoice?.id||null,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items,labelWin});
+      setSaving(false);
+    })();
   };
 
   // Guard every way out of this modal (backdrop click, ✕, Cancel) once there's

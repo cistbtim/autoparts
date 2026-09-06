@@ -3120,8 +3120,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // one label per physical unit with a 1/N.."N/N sequence — same seq convention
   // openPartLabelsWindow already uses for multi-copy admin labels.
   // items: [{sourceType,targetId,partId?,name,sku,qty,unitCost,binLocation}]
-  const saveSupplierPurchaseInvoice=async({invoiceId,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items})=>{
-    if(!items?.length){showToast("Add at least one item","err");return;}
+  const saveSupplierPurchaseInvoice=async({invoiceId,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items,labelWin})=>{
+    if(!items?.length){showToast("Add at least one item","err");labelWin?.close();return;}
     // Landed cost = the items themselves + shipping + customs (paid in USD,
     // converted at the given rate) — shown as one Total so the real cost of this
     // shipment is clear, even though per-item unit_cost stays exactly what was typed
@@ -3160,7 +3160,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         status:"pending",created_by:user.name||user.username,created_at:new Date().toISOString(),
       });
       invRow=Array.isArray(invRes)&&invRes[0];
-      if(!invRow){showToast("Failed to save invoice","err");return;}
+      if(!invRow){showToast("Failed to save invoice","err");labelWin?.close();return;}
     }
 
     const labelBatches=[];
@@ -3183,7 +3183,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         labels.push({sku:b.sku,name:b.name,binLocation:b.binLocation,invoiceNo:invoiceNo||"",seq:b.qty>1?`${i}/${b.qty}`:""});
       }
     }
-    if(printLabels!==false&&labels.length) openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:user.supplier_name||""});
+    if(printLabels!==false&&labels.length) openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:user.supplier_name||"",win:labelWin});
+    else labelWin?.close(); // e.g. printLabels was on when the tab was opened but got turned off, or saving failed before labels existed
 
     await reloadSupplierParts();
     showToast(printLabels!==false?"✅ Invoice saved — labels ready to print. Add to System once counted.":"✅ Invoice saved — Add to System once counted.");

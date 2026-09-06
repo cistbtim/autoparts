@@ -313,8 +313,8 @@ export function openLabelWindow(data) {
 // ── PART LABEL PRINTER ─────────────────────────────────────────
 // labels: [{sku, name, binLocation, supplierCode, invoiceNo, seq, total}]
 // Options: widthMm, heightMm, shopName
-export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shopName = "" } = {}) {
-  if (!labels?.length) return;
+export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shopName = "", win = null } = {}) {
+  if (!labels?.length) { win?.close(); return; }
   const e = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const px = (mm) => Math.round(mm * 3.78);
   const W = px(widthMm); const H = px(heightMm);
@@ -389,10 +389,14 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
     <script>${fitScript}<\/script>
   </body></html>`;
 
-  const win = window.open("", "_blank", `width=${Math.max(W+100,480)},height=${Math.max(H*3+200,500)}`);
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
+  // A caller with a long await chain before this point (e.g. saving dozens of
+  // line items one at a time) can pass in a window already opened synchronously
+  // at click-time — window.open() itself is what browsers gate on user-gesture
+  // freshness, but writing into an already-open window isn't restricted.
+  const w = win || window.open("", "_blank", `width=${Math.max(W+100,480)},height=${Math.max(H*3+200,500)}`);
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
 }
 
 // ── SHELF / BIN LABEL PRINTER ──────────────────────────────────

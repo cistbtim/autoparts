@@ -361,24 +361,25 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
   // a SKU/name is too long to fit — shrink each label's own text independently
   // instead, so the full SKU/name/bin always actually prints, same auto-fit trick
   // openShelfLabelWindow already uses for its bin name.
+  // Compare the element against ITS OWN clientWidth (its fixed layout box), not a
+  // width computed from the parent's padding — that math was off by the parent's
+  // own 7px-each-side padding, so the loop stopped a few px too early and text
+  // still overflowed into the ellipsis.
   const fitScript = `
     (function(){
-      function fit(el, maxW, minSize){
+      function fit(el, minSize){
         if(!el) return;
         var sz = parseFloat(getComputedStyle(el).fontSize);
-        while(sz>minSize && el.scrollWidth>maxW){
-          sz -= 1;
+        while(sz>minSize && el.scrollWidth>el.clientWidth){
+          sz -= 0.5;
           el.style.fontSize = sz+'px';
         }
       }
       document.querySelectorAll('.label').forEach(function(label){
-        var r = label.querySelector('.r');
-        if(!r) return;
-        var maxW = r.clientWidth - 4;
-        fit(label.querySelector('.sku'), maxW, 7);
-        fit(label.querySelector('.pn'), maxW, 7);
-        fit(label.querySelector('.bin'), maxW, 8);
-        fit(label.querySelector('.sup'), maxW, 7);
+        fit(label.querySelector('.sku'), 6);
+        fit(label.querySelector('.pn'), 6);
+        fit(label.querySelector('.bin'), 7);
+        fit(label.querySelector('.sup'), 6);
       });
     })();
   `;

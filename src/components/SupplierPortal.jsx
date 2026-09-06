@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api.js";
 import { getSettings, C } from "../lib/settings.js";
-import { toImgUrl, toFullUrl, fmtAmt, fmtDT, waLink } from "../lib/helpers.js";
+import { toImgUrl, toFullUrl, fmtAmt, fmtDT, waLink, openPartLabelsWindow } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 import { PrintPartLabelModal, ExtraPhotosStrip, resolveMarginOptions } from "./Modals.jsx";
@@ -1515,6 +1515,18 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   };
   const updateItem=(idx,patch)=>setItems(prev=>prev.map((it,i)=>i===idx?{...it,...patch}:it));
   const removeItem=(idx)=>setItems(prev=>prev.filter((_,i)=>i!==idx));
+  // Print just this one line's labels right now, using whatever qty/bin is
+  // currently typed — doesn't touch the invoice save/stock flow at all, so a
+  // supplier can reprint or print-as-they-go without saving the whole invoice.
+  const printItemLabel=(it)=>{
+    const qty=Math.max(1,+it.qty||1);
+    const labels=[];
+    for(let i=1;i<=qty;i++){
+      labels.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",invoiceNo:invoiceNo||"",seq:qty>1?`${i}/${qty}`:""});
+    }
+    const settings=getSettings();
+    openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:settings?.shop_name||""});
+  };
   const totalQty=items.reduce((s,it)=>s+it.qty,0);
   const itemsTotal=items.reduce((s,it)=>s+it.qty*(+it.unitCost||0),0);
   const shippingNum=+shippingCost||0;
@@ -1842,6 +1854,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                 <div><FL label="Qty"/><input className="inp" type="number" min="1" style={{width:70}} value={it.qty} onChange={e=>updateItem(idx,{qty:Math.max(1,+e.target.value||1)})}/></div>
                 <div><FL label="Unit Cost"/><input className="inp" type="number" min="0" style={{width:90}} value={it.unitCost} onChange={e=>updateItem(idx,{unitCost:+e.target.value||0})}/></div>
                 <div><FL label="Bin Location"/><input className="inp" style={{width:110}} value={it.binLocation} onChange={e=>updateItem(idx,{binLocation:e.target.value})} placeholder="e.g. A1-02"/></div>
+                <button className="btn btn-ghost btn-xs" title="Print label(s) for this item now" onClick={()=>printItemLabel(it)}>🖨️ Print</button>
                 {it.sourceType==="own"&&onUpdatePart&&(
                   <button className="btn btn-ghost btn-xs" onClick={()=>openEditItem(idx)}>✏️ Edit</button>
                 )}

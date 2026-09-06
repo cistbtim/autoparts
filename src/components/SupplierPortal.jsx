@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api.js";
 import { getSettings, C } from "../lib/settings.js";
@@ -1440,10 +1440,32 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   const keywords=search.toLowerCase().trim().split(/\s+/).filter(Boolean);
   const filtered=keywords.length?pool.filter(p=>matchesSearch(p.blob,keywords)):[];
 
-  const addItem=(p)=>{
+  // Picking a part already on this invoice doesn't silently merge OR silently
+  // duplicate — jump to the existing line and ask, since a second unit at a
+  // different cost (a new box in the same shipment, priced differently) is a
+  // real separate line, not the same qty.
+  const [dupPrompt, setDupPrompt] = useState(null); // {idx, p} — p is the just-picked search result
+  const [flashIdx, setFlashIdx] = useState(null);
+  const itemRefs = useRef({});
+  useEffect(()=>{
+    if(flashIdx==null) return;
+    itemRefs.current[flashIdx]?.scrollIntoView({behavior:"smooth",block:"center"});
+    const t=setTimeout(()=>setFlashIdx(f=>f===flashIdx?null:f),1800);
+    return ()=>clearTimeout(t);
+  },[flashIdx,itemsCurPage]);
+
+  const addItem=(p, {forceNew=false}={})=>{
+    if(!forceNew){
+      const exIdx=items.findIndex(i=>i.sourceType===p.sourceType&&i.targetId===p.targetId);
+      if(exIdx!==-1){
+        setItemsPage(Math.floor(exIdx/ITEMS_PAGE_SIZE));
+        setDupPrompt({idx:exIdx, p});
+        setFlashIdx(exIdx);
+        setSearch("");
+        return;
+      }
+    }
     setItems(prev=>{
-      const ex=prev.find(i=>i.sourceType===p.sourceType&&i.targetId===p.targetId);
-      if(ex) return prev.map(i=>i===ex?{...i,qty:i.qty+1}:i);
       const next=[...prev,{sourceType:p.sourceType,targetId:p.targetId,partId:p.partId,name:p.name,sku:p.sku,image:p.image,extraPhotos:p.extraPhotos,qty:1,unitCost:0,binLocation:p.currentBin}];
       setItemsPage(Math.max(0,Math.ceil(next.length/ITEMS_PAGE_SIZE)-1)); // jump to the page holding the new line so it's visible
       return next;
@@ -1626,12 +1648,33 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
           </div>
         )}
       </div>
+      {dupPrompt&&(()=>{
+        const ex=items[dupPrompt.idx];
+        if(!ex) return null;
+        return (
+          <div style={{background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.35)",borderRadius:10,padding:"12px 14px",marginBottom:14,display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{fontSize:13}}>
+              <strong>{ex.name}</strong> <span style={{color:"var(--text3)"}}>({ex.sku})</span> is already on this invoice — {ex.qty} × {C()}{ex.unitCost} unit cost.
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button className="btn btn-primary btn-xs" onClick={()=>{updateItem(dupPrompt.idx,{qty:ex.qty+1});setFlashIdx(dupPrompt.idx);setDupPrompt(null);}}>
+                +1 Qty — same cost ({C()}{ex.unitCost})
+              </button>
+              <button className="btn btn-ghost btn-xs" onClick={()=>{addItem(dupPrompt.p,{forceNew:true});setDupPrompt(null);}}>
+                ➕ Add as separate line — different cost this time
+              </button>
+              <button className="btn btn-ghost btn-xs" onClick={()=>setDupPrompt(null)}>Cancel</button>
+            </div>
+          </div>
+        );
+      })()}
       {items.length>0&&(
         <div style={{marginBottom:14,display:"flex",flexDirection:"column",gap:8}}>
           {items.map((it,idx)=>{
             if(idx<itemsCurPage*ITEMS_PAGE_SIZE||idx>=(itemsCurPage+1)*ITEMS_PAGE_SIZE) return null;
             return (
-            <div key={idx} style={{border:"1px solid var(--border)",borderRadius:8,padding:10}}>
+            <div key={idx} ref={el=>itemRefs.current[idx]=el} style={{border:`1px solid ${flashIdx===idx?"var(--accent)":"var(--border)"}`,borderRadius:8,padding:10,
+              background:flashIdx===idx?"rgba(249,115,22,.08)":undefined,transition:"background .3s, border-color .3s"}}>
               <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-end"}}>
                 {editingItemIdx!==idx&&<button className="btn btn-ghost btn-xs" onClick={()=>{if(window.confirm(`Remove ${it.name} from this invoice?`)) removeItem(idx);}}>✕</button>}
                 <div style={{width:44,height:44,flexShrink:0,borderRadius:6,overflow:"hidden",background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",cursor:it.image?"zoom-in":"default"}}

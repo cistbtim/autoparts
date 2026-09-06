@@ -374,6 +374,15 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
           sz -= 0.5;
           el.style.fontSize = sz+'px';
         }
+        // A wider monospace font on some device/OS can still overflow even at the
+        // smallest readable size — as a last resort, squeeze it horizontally by
+        // the exact measured ratio so it is GUARANTEED to fit completely, never
+        // truncates, regardless of font metrics.
+        if(el.scrollWidth>el.clientWidth){
+          var ratio=(el.clientWidth/el.scrollWidth)*0.97;
+          el.style.transformOrigin='left center';
+          el.style.transform='scaleX('+ratio+')';
+        }
       }
       document.querySelectorAll('.label').forEach(function(label){
         fit(label.querySelector('.sku'), 6);

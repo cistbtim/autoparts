@@ -367,13 +367,7 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
   // still overflowed into the ellipsis.
   const fitScript = `
     (function(){
-      function fit(el, minSize){
-        if(!el) return;
-        var sz = parseFloat(getComputedStyle(el).fontSize);
-        while(sz>minSize && el.scrollWidth>el.clientWidth){
-          sz -= 0.5;
-          el.style.fontSize = sz+'px';
-        }
+      function squeeze(el){
         // A wider monospace font on some device/OS can still overflow even at the
         // smallest readable size — as a last resort, squeeze it horizontally by
         // the exact measured ratio so it is GUARANTEED to fit completely, never
@@ -389,12 +383,44 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
           el.style.transform='scaleX('+ratio+')';
         }
       }
-      document.querySelectorAll('.label').forEach(function(label){
-        fit(label.querySelector('.sku'), 6);
-        fit(label.querySelector('.pn'), 6);
-        fit(label.querySelector('.bin'), 7);
-        fit(label.querySelector('.sup'), 6);
-      });
+      function fit(el, minSize){
+        if(!el) return minSize;
+        var sz = parseFloat(getComputedStyle(el).fontSize);
+        while(sz>minSize && el.scrollWidth>el.clientWidth){
+          sz -= 0.5;
+          el.style.fontSize = sz+'px';
+        }
+        squeeze(el);
+        return sz;
+      }
+      // Fitting each label independently made a batch look inconsistent — a short
+      // SKU stays big while a long one shrinks small. Fit every label's own worst
+      // case first, then re-apply the SMALLEST resulting size to all of them, so
+      // the whole batch prints at one uniform size (still guaranteed to fit,
+      // since every other label already fit fine at its own larger size, so it
+      // fits even better at this smaller shared one).
+      function fitUniform(selector, minSize){
+        var els = [];
+        document.querySelectorAll('.label').forEach(function(label){
+          var el = label.querySelector(selector);
+          if(el) els.push(el);
+        });
+        if(!els.length) return;
+        var uniform = null;
+        els.forEach(function(el){
+          var sz = fit(el, minSize);
+          if(uniform===null || sz<uniform) uniform = sz;
+        });
+        els.forEach(function(el){
+          el.style.transform=''; el.style.overflow=''; el.style.textOverflow='';
+          el.style.fontSize = uniform+'px';
+          squeeze(el); // safety net only — shouldn't trigger, every label already fit at >= uniform
+        });
+      }
+      fitUniform('.sku', 6);
+      fitUniform('.pn', 6);
+      fitUniform('.bin', 7);
+      fitUniform('.sup', 6);
     })();
   `;
 

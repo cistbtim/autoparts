@@ -1533,25 +1533,39 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   };
 
   // A printable PDF (via the browser's own print-to-PDF, same trick the label
-  // printer uses) with each part's photo alongside its fitment/qty/cost/bin —
-  // useful as a physical packing-list/receiving sheet, unlike the plain CSV.
-  const exportPdf=()=>{
+  // printer uses) with each part's photo alongside its fitment/bin/price — useful
+  // as a physical sheet. Two modes share the same layout: "cost" is the internal
+  // receiving/packing-list view (unit cost + bin location); "sell" is the
+  // customer/admin-facing price list (suggested retail price, no cost, no bin —
+  // that's warehouse-internal info that shouldn't go out with a price sheet).
+  const exportPdf=(mode="cost")=>{
     const win=window.open("","_blank","width=900,height=700");
     if(!win) return;
     const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    const sellPriceFor=it=>{
+      const full=fullRecordFor(it.sourceType,it.targetId);
+      return it.sourceType==="catalogue"?full?._suggestedPrice:full?.suggested_price;
+    };
     const rows=items.map(it=>{
       const full=fullRecordFor(it.sourceType,it.targetId);
       const fitment=[[full?.make,full?.model].filter(Boolean).join(" "),full?.year_range].filter(Boolean).join(" · ");
       const img=it.image?toImgUrl(it.image):"";
+      const priceCell=mode==="sell"
+        ? (sellPriceFor(it)?fmtAmt(sellPriceFor(it)):"—")
+        : fmtAmt(it.unitCost);
       return `<tr>
         <td class="img-cell">${img?`<img src="${esc(img)}" onerror="this.style.display='none'"/>`:""}</td>
         <td><div class="pname">${esc(it.name)}</div><div class="psku">${esc(it.sku)}</div>${fitment?`<div class="pfit">🚗 ${esc(fitment)}</div>`:""}</td>
         <td class="num">${it.qty}</td>
-        <td class="num">${fmtAmt(it.unitCost)}</td>
-        <td>${esc(it.binLocation)||"—"}</td>
+        <td class="num">${priceCell}</td>
+        ${mode==="cost"?`<td>${esc(it.binLocation)||"—"}</td>`:""}
       </tr>`;
     }).join("");
-    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(invoiceNo||"Purchase Invoice")}</title><style>
+    const priceHeader=mode==="sell"?"Sell Price":"Unit Cost";
+    const grandTotal=mode==="sell"
+      ? items.reduce((s,it)=>s+it.qty*(+sellPriceFor(it)||0),0)
+      : itemsTotal;
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(invoiceNo||"Purchase Invoice")}${mode==="sell"?" - Price List":""}</title><style>
       *{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:24px;color:#111}
       .print-btn{padding:9px 24px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:16px}
       h1{font-size:18px;margin-bottom:2px}.sub{color:#666;font-size:12px;margin-bottom:16px}
@@ -1564,10 +1578,10 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
       @media print{.print-btn{display:none}}
     </style></head><body>
       <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
-      <h1>${esc(invoiceNo||"Purchase Invoice")}${fromName?` — ${esc(fromName)}`:""}</h1>
-      <div class="sub">${esc(invoiceDate)} · ${items.reduce((s,it)=>s+it.qty,0)} units · ${fmtAmt(itemsTotal)}</div>
+      <h1>${esc(invoiceNo||"Purchase Invoice")}${mode==="sell"?" — Price List":""}${fromName?` — ${esc(fromName)}`:""}</h1>
+      <div class="sub">${esc(invoiceDate)} · ${items.reduce((s,it)=>s+it.qty,0)} units · ${fmtAmt(grandTotal)}</div>
       <table>
-        <thead><tr><th></th><th>Part</th><th>Qty</th><th>Unit Cost</th><th>Bin Location</th></tr></thead>
+        <thead><tr><th></th><th>Part</th><th>Qty</th><th>${priceHeader}</th>${mode==="cost"?"<th>Bin Location</th>":""}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </body></html>`;
@@ -1777,8 +1791,9 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
         );
       })()}
       {items.length>0&&(
-        <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:8}}>
-          <button type="button" className="btn btn-ghost btn-xs" onClick={exportPdf}>📄 Export PDF</button>
+        <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={()=>exportPdf("cost")}>📄 Export PDF</button>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={()=>exportPdf("sell")}>💰 Export PDF (Sell Price)</button>
           <button type="button" className="btn btn-ghost btn-xs" onClick={exportCsv}>📊 Export Excel</button>
         </div>
       )}

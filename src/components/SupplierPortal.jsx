@@ -2021,12 +2021,23 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
           {purchaseInvoices.map(inv=>{
             const its=purchaseInvoiceItems.filter(it=>it.invoice_id===inv.id);
             const pending=inv.status!=="received";
+            // Same reconciliation the Receive Stock form shows while typing — surface
+            // it here too, since this may be reopened well after that screen closed.
+            // A real mismatch blocks committing stock until it's fixed (via Continue),
+            // rather than letting a miscounted/mistyped invoice silently go onto shelf.
+            const diff=inv.invoice_total!=null?inv.total-inv.invoice_total:null;
+            const hasMismatch=diff!=null&&Math.abs(diff)>=1;
             return (
               <div key={inv.id} className="card" style={{padding:14}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:13}}>{inv.invoice_no||inv.id}{inv.from_name?` · ${inv.from_name}`:""}</div>
                     <div style={{fontSize:11,color:"var(--text3)"}}>{inv.invoice_date||fmtDT(inv.created_at)} · {inv.total_qty||its.reduce((s,it)=>s+it.qty,0)} units · {fmtAmt(inv.total)}</div>
+                    {diff!=null&&(
+                      <div style={{fontSize:11,fontWeight:700,marginTop:2,color:hasMismatch?"var(--red)":"var(--green)"}}>
+                        {hasMismatch?`⚠️ Difference: ${diff>0?"+":""}${fmtAmt(diff)} vs invoice total ${fmtAmt(inv.invoice_total)}`:"✅ Matches invoice total"}
+                      </div>
+                    )}
                   </div>
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
                     <span className="badge" style={{fontSize:11,
@@ -2034,14 +2045,15 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
                       color:pending?"var(--yellow)":"var(--green)"}}>{pending?"⏳ Not yet in system":"✅ In system"}</span>
                     {pending&&<button className="btn btn-ghost btn-xs" onClick={()=>setContinuingInvoice(inv)}>✏️ Continue</button>}
                     {pending&&onApplyPurchaseInvoiceStock&&(
-                      <button className="btn btn-primary btn-xs" disabled={applyingId===inv.id}
+                      <button className="btn btn-primary btn-xs" disabled={applyingId===inv.id||hasMismatch}
+                        title={hasMismatch?"Fix the difference (Continue → adjust items/costs) before adding stock":undefined}
                         onClick={async()=>{
                           if(!window.confirm(`Add ${inv.total_qty||its.reduce((s,it)=>s+it.qty,0)} units from this invoice to your stock? Do this once you've verified the physical count.`)) return;
                           setApplyingId(inv.id);
                           await onApplyPurchaseInvoiceStock(inv.id);
                           setApplyingId(null);
                         }}>
-                        {applyingId===inv.id?"Adding…":"✅ Add Stock to System"}
+                        {applyingId===inv.id?"Adding…":hasMismatch?"⚠️ Fix difference first":"✅ Add Stock to System"}
                       </button>
                     )}
                   </div>

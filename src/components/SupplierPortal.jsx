@@ -1456,7 +1456,12 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
 
   const addItem=(p, {forceNew=false}={})=>{
     if(!forceNew){
-      const exIdx=items.findIndex(i=>i.sourceType===p.sourceType&&i.targetId===p.targetId);
+      // Match by SKU, not sourceType+targetId — a part migrated from the shared
+      // catalogue into its own supplier_parts row (see the MCK cleanup) gets a
+      // brand-new id and "own" sourceType, but a pending invoice line saved
+      // before that migration still remembers the old catalogue identity. The
+      // SKU is the one thing that stays the same across that move.
+      const exIdx=items.findIndex(i=>i.sku&&p.sku&&i.sku.toUpperCase()===p.sku.toUpperCase());
       if(exIdx!==-1){
         setItemsPage(Math.floor(exIdx/ITEMS_PAGE_SIZE));
         setDupPrompt({idx:exIdx, p});

@@ -107,7 +107,7 @@ export const MHead = ({title,sub,actions,onClose}) => (
 );
 
 export const FL = ({label,req}) => <span className="lbl">{label}{req&&" *"}</span>;
-export const FG = ({children,cols="1fr 1fr"}) => <div style={{display:"grid",gridTemplateColumns:cols,gap:12,marginBottom:14}}>{children}</div>;
+export const FG = ({children,cols="1fr 1fr"}) => <div className="fg-grid" style={{display:"grid",gridTemplateColumns:cols,gap:12,marginBottom:14}}>{children}</div>;
 export const FD = ({children}) => <div style={{marginBottom:14}}>{children}</div>;
 
 // Reliable Google Drive image with multi-format fallback:

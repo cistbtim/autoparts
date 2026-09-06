@@ -95,6 +95,10 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
      photo column's buttons into ~210px on phones — stack instead */
   .pm-info-photo{flex-direction:column!important}
   .pm-photo-col{width:100%!important}
+  /* FG (shared 2/3-column field-group grid, used across every modal in the app)
+     doesn't fit multiple columns on a phone screen — fields overflow off the
+     right edge instead of wrapping. Stack to one column. */
+  .fg-grid{grid-template-columns:1fr!important}
 }
 .mob-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;border-radius:8px;transition:all .18s;position:relative}
 .mob-nav-btn.on{color:var(--accent)}.mob-nav-btn .mi{font-size:18px;line-height:1}

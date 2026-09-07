@@ -1522,9 +1522,11 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   // supplier can reprint or print-as-they-go without saving the whole invoice.
   const printItemLabel=(it)=>{
     const qty=Math.max(1,+it.qty||1);
+    const full=fullRecordFor(it.sourceType,it.targetId);
     const labels=[];
     for(let i=1;i<=qty;i++){
-      labels.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",invoiceNo:invoiceNo||"",seq:qty>1?`${i}/${qty}`:""});
+      labels.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",invoiceNo:invoiceNo||"",seq:qty>1?`${i}/${qty}`:"",
+        make:full?.make||"",model:full?.model||"",yearRange:full?.year_range||"",oeNumber:full?.oe_number||""});
     }
     const settings=getSettings();
     openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:settings?.shop_name||""});
@@ -2193,13 +2195,18 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
 
 // Same start -> count -> complete shape as the main app's admin StockTakePage,
 // scoped to this supplier's own items (both sources) instead of branch inventory.
-export function SupplierStockTakePage({stockTakes=[], items=[], onStart, onOpen, onSaveCount, onComplete, onRefresh}) {
+export function SupplierStockTakePage({stockTakes=[], items=[], onStart, onOpen, onSaveCount, onComplete, onDelete, onRefresh}) {
   const [openId, setOpenId] = useState(null);
   const [starting, setStarting] = useState(false);
   const [name, setName] = useState("");
   const [counts, setCounts] = useState({}); // itemId -> value while typing, before it's saved on blur
 
   const openTake=async(stId)=>{ setOpenId(stId); await onOpen(stId); };
+  const removeTake=async(e,stId)=>{
+    e.stopPropagation();
+    await onDelete(stId);
+    if(openId===stId) setOpenId(null);
+  };
   const start=async()=>{
     setStarting(true);
     const stId=await onStart(name);
@@ -2237,7 +2244,10 @@ export function SupplierStockTakePage({stockTakes=[], items=[], onStart, onOpen,
                 <div style={{fontWeight:700,fontSize:13}}>{st.name}</div>
                 <div style={{fontSize:11,color:"var(--text3)"}}>{st.created_at?new Date(st.created_at).toLocaleString():""}</div>
               </div>
-              <span className="badge" style={{fontSize:11,background:st.status==="completed"?"rgba(52,211,153,.12)":"rgba(251,191,36,.15)",color:st.status==="completed"?"var(--green)":"var(--yellow)"}}>{st.status==="completed"?"✅ Completed":"🔓 Open"}</span>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <span className="badge" style={{fontSize:11,background:st.status==="completed"?"rgba(52,211,153,.12)":"rgba(251,191,36,.15)",color:st.status==="completed"?"var(--green)":"var(--yellow)"}}>{st.status==="completed"?"✅ Completed":"🔓 Open"}</span>
+                {onDelete&&<button className="btn btn-ghost btn-xs" title="Delete this stock take" onClick={e=>removeTake(e,st.id)}>🗑</button>}
+              </div>
             </div>
           ))}
       </div>
@@ -2274,6 +2284,172 @@ export function SupplierStockTakePage({stockTakes=[], items=[], onStart, onOpen,
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Scan-driven stock-in: scan a shelf/bin QR (printed labels encode "#<binName>",
+// see openShelfLabelWindow) to set the active location, then scan part QR/labels
+// (encode the SKU, see openPartLabelsWindow) one at a time — each scan adds 1 unit
+// at that location. Same-SKU-different-location prompts before moving it. Writes
+// only ever land on this supplier's own rows (part_suppliers.stock/bin_location for
+// catalogue-linked parts, supplier_parts.stock/bin_location for self-added ones) —
+// never parts.stock/bin_location, so it can never touch the shared main inventory.
+export function SupplierScanStockPage({existingParts=[], ownParts=[], supplierCode="", onAdjust}) {
+  const [activeLocation, setActiveLocation] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [supported, setSupported] = useState(null);
+  const [err, setErr] = useState("");
+  const [log, setLog] = useState([]); // recent scan feedback, newest first
+  const [manualCode, setManualCode] = useState("");
+  const [pendingMove, setPendingMove] = useState(null); // {part, newLocation} awaiting confirm
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const timerRef = useRef(null);
+  const lastRef = useRef({code:"", ts:0}); // debounce: a held phone re-detects the same code every ~400ms
+
+  const pool = [
+    ...existingParts.map(p=>({sourceType:"catalogue", targetId:p._linkId, name:p.name, sku:p.sku, stock:+p._supplierStock||0, binLocation:p._supplierBinLocation||""})),
+    ...ownParts.map(p=>({sourceType:"own", targetId:p.id, name:p.name, sku:supplierCode?`${supplierCode}-${p.part_code}`:p.part_code, stock:+p.stock||0, binLocation:p.bin_location||""})),
+  ];
+
+  // The detection loop below is set up once (camera can't be restarted every render
+  // without flicker/permission re-prompts), so it closes over stale state forever —
+  // refs give it a way to always read the CURRENT location/pending-move/pool instead.
+  const activeLocationRef = useRef(activeLocation);
+  useEffect(()=>{ activeLocationRef.current = activeLocation; },[activeLocation]);
+  const pendingMoveRef = useRef(pendingMove);
+  useEffect(()=>{ pendingMoveRef.current = pendingMove; },[pendingMove]);
+  const poolRef = useRef(pool);
+  useEffect(()=>{ poolRef.current = pool; });
+
+  const pushLog=(msg,type="ok")=>setLog(prev=>[{msg,type,ts:Date.now()},...prev].slice(0,15));
+
+  const handleCode=async(raw)=>{
+    const code=(raw||"").trim();
+    if(!code) return;
+    if(lastRef.current.code===code && Date.now()-lastRef.current.ts<2200) return; // same code still in frame
+    lastRef.current={code,ts:Date.now()};
+    if(pendingMoveRef.current) return; // a move-confirm is already up — ignore scans until resolved
+
+    if(code.startsWith("#")){
+      const loc=code.slice(1).trim();
+      if(!loc) return;
+      setActiveLocation(loc);
+      pushLog(`📍 Location set: ${loc}`,"loc");
+      return;
+    }
+    if(!activeLocationRef.current){
+      pushLog(`⚠️ Scan a location QR first`,"err");
+      return;
+    }
+    const part=poolRef.current.find(p=>p.sku.trim().toUpperCase()===code.toUpperCase());
+    if(!part){
+      pushLog(`❌ Not found: ${code}`,"err");
+      return;
+    }
+    const curLoc=(part.binLocation||"").trim();
+    if(!curLoc || curLoc.toUpperCase()===activeLocationRef.current.toUpperCase()){
+      const newQty=part.stock+1;
+      await onAdjust({sourceType:part.sourceType,targetId:part.targetId,qty:newQty,binLocation:activeLocationRef.current,itemName:part.name,sku:part.sku});
+      pushLog(`✅ ${part.sku} → qty ${newQty} @ ${activeLocationRef.current}`,"ok");
+    } else {
+      setPendingMove({part,newLocation:activeLocationRef.current});
+    }
+  };
+
+  const confirmMove=async(doMove)=>{
+    const {part,newLocation}=pendingMove;
+    setPendingMove(null);
+    if(!doMove){ pushLog(`Skipped ${part.sku} — kept at ${part.binLocation}`,"skip"); return; }
+    const newQty=part.stock+1;
+    await onAdjust({sourceType:part.sourceType,targetId:part.targetId,qty:newQty,binLocation:newLocation,itemName:part.name,sku:part.sku});
+    pushLog(`✅ ${part.sku} moved ${part.binLocation||"(none)"} → ${newLocation}, qty ${newQty}`,"ok");
+  };
+
+  const stopCamera=()=>{
+    clearInterval(timerRef.current);
+    streamRef.current?.getTracks().forEach(t=>t.stop());
+    streamRef.current=null;
+    setScanning(false);
+  };
+
+  useEffect(()=>{
+    const ok=typeof BarcodeDetector!=="undefined";
+    setSupported(ok);
+    if(!ok) return;
+    (async()=>{
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+        streamRef.current=stream;
+        if(videoRef.current){ videoRef.current.srcObject=stream; await videoRef.current.play(); }
+        setScanning(true);
+        const detector=new BarcodeDetector({formats:["qr_code","code_128","code_39","ean_13"]});
+        timerRef.current=setInterval(async()=>{
+          if(!videoRef.current||videoRef.current.readyState<2) return;
+          try{ const codes=await detector.detect(videoRef.current); if(codes.length>0) handleCode(codes[0].rawValue); }catch{}
+        },400);
+      }catch(e){ setErr("Camera error: "+e.message); }
+    })();
+    return ()=>stopCamera();
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps -- camera starts once; refs keep it fed with fresh state
+
+  return (
+    <div className="fu">
+      <div style={{marginBottom:16}}>
+        <h1 style={{fontSize:20,fontWeight:700}}>📷 Scan Stock In</h1>
+        <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
+          Scan a shelf/bin label first, then scan parts one at a time — each scan adds 1 unit at that location.
+          Stays on your own stock counts, never touches the main MotorDesk inventory.
+        </p>
+      </div>
+
+      <div className="card" style={{padding:14,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+        <div style={{fontSize:13}}>📍 Active location: <strong style={{fontFamily:"DM Mono,monospace",color:activeLocation?"var(--accent)":"var(--text3)"}}>{activeLocation||"— scan a bin label —"}</strong></div>
+        {activeLocation&&<button className="btn btn-ghost btn-xs" onClick={()=>setActiveLocation("")}>Clear</button>}
+      </div>
+
+      {supported!==false ? (
+        <div style={{position:"relative",borderRadius:12,overflow:"hidden",background:"#000",aspectRatio:"4/3",marginBottom:14,maxWidth:420}}>
+          <video ref={videoRef} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} playsInline muted/>
+          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+            <div style={{width:200,height:140,border:"2.5px solid rgba(52,211,153,.9)",borderRadius:14,boxShadow:"0 0 0 9999px rgba(0,0,0,.38)"}}/>
+          </div>
+          <div style={{position:"absolute",bottom:8,left:0,right:0,textAlign:"center",color:"rgba(255,255,255,.8)",fontSize:11}}>
+            {scanning?"Point at a location or part label":"Starting camera…"}
+          </div>
+        </div>
+      ) : (
+        <div className="card" style={{padding:16,marginBottom:14,maxWidth:420}}>
+          <div style={{fontSize:13,marginBottom:8}}>Camera scanning isn't supported on this browser/device. Type a code manually:</div>
+          <div style={{display:"flex",gap:8}}>
+            <input className="inp" value={manualCode} onChange={e=>setManualCode(e.target.value)} placeholder="#A1-02 (location) or a SKU" onKeyDown={e=>{if(e.key==="Enter"){handleCode(manualCode);setManualCode("");}}}/>
+            <button className="btn btn-primary btn-sm" onClick={()=>{handleCode(manualCode);setManualCode("");}}>Go</button>
+          </div>
+        </div>
+      )}
+      {err&&<div style={{color:"var(--red)",fontSize:12,marginBottom:10}}>{err}</div>}
+
+      {pendingMove&&(
+        <div className="card" style={{padding:14,marginBottom:14,border:"1.5px solid var(--accent)",maxWidth:420}}>
+          <div style={{fontWeight:700,marginBottom:6}}>📦 {pendingMove.part.name} ({pendingMove.part.sku})</div>
+          <div style={{fontSize:13,marginBottom:10}}>Currently in <strong>{pendingMove.part.binLocation}</strong> — move to <strong style={{color:"var(--accent)"}}>{pendingMove.newLocation}</strong>?</div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>confirmMove(false)}>Keep at {pendingMove.part.binLocation}</button>
+            <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={()=>confirmMove(true)}>Move to {pendingMove.newLocation}</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:6,maxWidth:420}}>
+        {log.map((l,i)=>(
+          <div key={l.ts+"-"+i} style={{fontSize:12,padding:"6px 10px",borderRadius:6,
+            background:l.type==="err"?"rgba(248,113,113,.1)":l.type==="loc"?"rgba(96,165,250,.1)":l.type==="skip"?"var(--surface2)":"rgba(52,211,153,.1)",
+            color:l.type==="err"?"var(--red)":l.type==="loc"?"var(--blue)":l.type==="skip"?"var(--text3)":"var(--green)"}}>
+            {l.msg}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

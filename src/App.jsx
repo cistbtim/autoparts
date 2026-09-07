@@ -18,7 +18,7 @@ import { SupplierImportModal } from "./components/SupplierImport.jsx";
 import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
-import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
+import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierScanStockPage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage } from "./pages/PublicPages.jsx";
 
@@ -557,8 +557,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       // select=* (not just part_id) so supplier_part_no etc. is available for search,
       // same shape the old dedicated scoped-load effect used to fetch separately.
       const links=await api.fresh("part_suppliers",`supplier_id=eq.${user.supplier_scope_id}&select=*`);
-      const ids=Array.isArray(links)?links.map(l=>l.part_id):[];
-      const scopedParts=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=*`):[];
+      const linksArr=Array.isArray(links)?links:[];
+      const ids=linksArr.map(l=>l.part_id);
+      const scopedPartsRaw=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=*`):[];
+      // Stock/bin for a catalogue-linked part is this SUPPLIER's own count (part_suppliers.stock/
+      // bin_location, kept current by their own Scan Stock In), not the shared parts.stock — same
+      // rule the self-added ("own") parts below already follow.
+      const scopedParts=(Array.isArray(scopedPartsRaw)?scopedPartsRaw:[]).map(p=>{
+        const link=linksArr.find(l=>String(l.part_id)===String(p.id));
+        return {...p, stock:link?.stock??0, bin_location:link?.bin_location||""};
+      });
       // Priced (live) parts the supplier added themselves via their own portal —
       // merged in alongside the main-catalogue parts admin linked to them. Namespaced
       // "sp_" id keeps these from ever colliding with (or being patched as) a real
@@ -1339,6 +1347,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const customerDiscountPct=(role==="customer"&&user.supplier_scope_id)
     ? (user.discount_pct!=null ? +user.discount_pct : (+(suppliers.find(s=>String(s.id)===String(user.supplier_scope_id))?.customer_discount_pct)||0))
     : 0;
+  // Scoped-supplier customer login (see isScopedCustomer in loadAll) — a zero-stock
+  // part for these customers skips the in-app query form entirely and goes straight
+  // to WhatsApp with this supplier, since a reseller wants a live-in-chat answer, not
+  // a query sitting in the supplier's inbox.
+  const scopedSupplier=(role==="customer"&&user.supplier_scope_id)
+    ? suppliers.find(s=>String(s.id)===String(user.supplier_scope_id))
+    : null;
   const discountPrice=(price)=>customerDiscountPct>0?Math.round((+price||0)*(1-customerDiscountPct/100)*100)/100:(+price||0);
 
   // Cart
@@ -3131,6 +3146,38 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     showToast("✅ Stock take completed — stock updated");
   };
 
+  const deleteSupplierStockTake=async(stId)=>{
+    if(!window.confirm("Delete this stock take? This can't be undone.")) return;
+    await api.delete("supplier_stock_take_items","stock_take_id",stId);
+    await api.delete("supplier_stock_takes","id",stId);
+    setSupplierStockTakes(prev=>prev.filter(st=>st.id!==stId));
+    setSupplierStockTakeItems(prev=>prev.filter(i=>i.stock_take_id!==stId));
+    showToast("Deleted","err");
+  };
+
+  // Scan Stock In — writes only ever land on this supplier's own rows (part_suppliers
+  // for catalogue-linked parts, supplier_parts for self-added ones), never parts.stock/
+  // bin_location, so scanning can never touch the shared main inventory.
+  const scanStockAdjust=async({sourceType,targetId,qty,binLocation,itemName,sku})=>{
+    const table=sourceType==="catalogue"?"part_suppliers":"supplier_parts";
+    await api.patch(table,"id",targetId,{stock:qty,bin_location:binLocation});
+    await api.insert("supplier_stock_logs",{
+      id:makeId("SSL"),supplier_id:user.supplier_id,source_type:sourceType,
+      part_suppliers_id:sourceType==="catalogue"?targetId:null,
+      supplier_part_id:sourceType==="own"?targetId:null,
+      item_name:itemName||"",sku:sku||"",
+      change_qty:1,before_qty:qty-1,after_qty:qty,
+      reason:"scan_in",ref_type:"scan",ref_id:null,
+      created_by:user.name||user.username,created_at:new Date().toISOString(),
+    }).catch(()=>{});
+    if(sourceType==="catalogue"){
+      setPartSuppliers(prev=>prev.map(l=>String(l.id)===String(targetId)?{...l,stock:qty,bin_location:binLocation}:l));
+      setSupplierExistingParts(prev=>prev.map(p=>String(p._linkId)===String(targetId)?{...p,_supplierStock:qty,_supplierBinLocation:binLocation}:p));
+    } else {
+      setSupplierParts(prev=>prev.map(p=>String(p.id)===String(targetId)?{...p,stock:qty,bin_location:binLocation}:p));
+    }
+  };
+
   // Supplier receiving stock onto their own shelf (their own purchase invoice, not
   // one MotorDesk issues) — adds qty to whichever stock row each item belongs to
   // (part_suppliers for catalogue items, supplier_parts for self-added ones),
@@ -3191,7 +3238,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         supplier_part_id:it.sourceType==="own"?it.targetId:null,
         part_name:it.name,sku:it.sku||"",qty:it.qty,unit_cost:+it.unitCost||0,bin_location:it.binLocation?.trim()||null,
       });
-      labelBatches.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",qty:it.qty});
+      const full=it.sourceType==="catalogue"
+        ?supplierExistingParts.find(p=>String(p._linkId)===String(it.targetId))
+        :supplierParts.find(p=>String(p.id)===String(it.targetId));
+      labelBatches.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",qty:it.qty,
+        make:full?.make||"",model:full?.model||"",yearRange:full?.year_range||"",oeNumber:full?.oe_number||""});
     }
 
     // One label per physical unit, sequenced within its own item (1/3, 2/3, 3/3),
@@ -3199,7 +3250,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const labels=[];
     for(const b of labelBatches){
       for(let i=1;i<=b.qty;i++){
-        labels.push({sku:b.sku,name:b.name,binLocation:b.binLocation,invoiceNo:invoiceNo||"",seq:b.qty>1?`${i}/${b.qty}`:""});
+        labels.push({sku:b.sku,name:b.name,binLocation:b.binLocation,invoiceNo:invoiceNo||"",seq:b.qty>1?`${i}/${b.qty}`:"",
+          make:b.make,model:b.model,yearRange:b.yearRange,oeNumber:b.oeNumber});
       }
     }
     if(printLabels!==false&&labels.length) openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:user.supplier_name||"",win:labelWin});
@@ -4546,6 +4598,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"supplierStock",  icon:"📊",label:"My Stock",   roles:["supplier"]},
         {id:"supplierPurchaseInvoices",icon:"📥",label:"Purchase Invoices", roles:["supplier"],badge:supplierPurchaseInvoices.filter(i=>i.status!=="received").length||0},
         {id:"supplierStockTake",icon:"🔢",label:"My Stock Take", roles:["supplier"]},
+        {id:"supplierScanStock",icon:"📷",label:"Scan Stock In", roles:["supplier"]},
         {id:"supplierStockLogs",icon:"📜",label:"My Stock Records", roles:["supplier"]},
         {id:"supplierOrders", icon:"📋",label:"My Orders",  roles:["supplier"],badge:supplierBookings.filter(b=>b.status==="pending").length||0},
         {id:"supplierQueries",icon:"💬",label:"My Queries", roles:["supplier"],badge:supplierQueries.filter(q=>q.status==="pending").length||0},
@@ -6173,9 +6226,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     {/* Price + button always at bottom */}
                     <div style={{marginTop:8}}>
                       {(+p.price<=0||p.stock<=0)?(
-                        <div style={{marginBottom:4,cursor:"pointer"}} onClick={()=>openM("customerQuery",p)}>
-                          <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:12,fontWeight:700}}>🔍 Ask for Price &amp; Availability</span>
-                        </div>
+                        scopedSupplier&&p.stock<=0 ? (
+                          <a href={waLink(scopedSupplier.phone,`Hi, checking price & availability for:\n*${p.name}*\nSKU: ${p.sku}`)} target="_blank" rel="noopener noreferrer"
+                            style={{display:"inline-flex",alignItems:"center",gap:5,marginBottom:4,textDecoration:"none",background:"rgba(37,211,102,.12)",color:"#25D366",fontSize:12,fontWeight:700,padding:"4px 9px",borderRadius:99}}>
+                            📱 Query via WhatsApp
+                          </a>
+                        ) : (
+                          <div style={{marginBottom:4,cursor:"pointer"}} onClick={()=>openM("customerQuery",p)}>
+                            <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:12,fontWeight:700}}>🔍 Ask for Price &amp; Availability</span>
+                          </div>
+                        )
                       ):customerDiscountPct>0?(
                         <div style={{marginBottom:4}}>
                           <div style={{display:"flex",alignItems:"baseline",gap:7}}>
@@ -6193,9 +6253,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                         : inCart
                           ? <div style={{display:"flex",alignItems:"center",gap:7}}><button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty-1)}>−</button><span style={{flex:1,textAlign:"center",fontWeight:700,fontSize:16}}>{inCart.qty}</span><button className="btn btn-ghost btn-xs" style={{padding:"6px 12px"}} onClick={()=>qtyCart(p.id,inCart.qty+1)}>+</button><button className="btn btn-danger btn-xs" onClick={()=>removeFromCart(p.id)}>✕</button></div>
                           : <button className="btn btn-primary" style={{width:"100%"}} disabled={p.stock===0||+p.price<=0} onClick={()=>addToCart(p)}>{t.addToCart}</button>}
-                      <button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:6,fontSize:12,borderColor:"var(--blue)",color:"var(--blue)"}} onClick={()=>openM("customerQuery",p)}>
-                        🔍 {t.queryPriceQty}
-                      </button>
+                      {!(scopedSupplier&&p.stock<=0)&&(
+                        <button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:6,fontSize:12,borderColor:"var(--blue)",color:"var(--blue)"}} onClick={()=>openM("customerQuery",p)}>
+                          🔍 {t.queryPriceQty}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -6341,7 +6403,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {tab==="supplierStockTake"&&role==="supplier"&&(
           <SupplierStockTakePage stockTakes={supplierStockTakes} items={supplierStockTakeItems}
             onStart={startSupplierStockTake} onOpen={loadSupplierStockTakeItems}
-            onSaveCount={saveSupplierCountedQty} onComplete={completeSupplierStockTake} onRefresh={reloadSupplierParts}/>
+            onSaveCount={saveSupplierCountedQty} onComplete={completeSupplierStockTake} onDelete={deleteSupplierStockTake} onRefresh={reloadSupplierParts}/>
+        )}
+
+        {/* ── SUPPLIER PORTAL: SCAN STOCK IN ── */}
+        {tab==="supplierScanStock"&&role==="supplier"&&(
+          <SupplierScanStockPage existingParts={supplierExistingParts} ownParts={supplierParts} supplierCode={user.supplier_code||user.supplier_name||""}
+            onAdjust={scanStockAdjust}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY STOCK RECORDS ── */}

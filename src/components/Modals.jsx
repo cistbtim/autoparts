@@ -2622,15 +2622,18 @@ export function ViewSupplierInvoiceModal({inv,onClose,settings}) {
   const [items,setItems]=useState([]);
   const [showPrintSetup,setShowPrintSetup]=useState(false);
   const [binMap,setBinMap]=useState({});
+  const [fitMap,setFitMap]=useState({});
   useEffect(()=>{
     api.get("supplier_invoice_items",`invoice_id=eq.${inv.id}&select=*`).then(r=>{
       if(Array.isArray(r)){
         setItems(r);
-        // pre-fill bins from part records if available
+        // pre-fill bins + vehicle fitment from part records if available
         const ids=r.filter(i=>i.part_id).map(i=>i.part_id);
-        if(ids.length) api.get("parts",`id=in.(${ids.join(",")})&select=id,bin_location`).then(ps=>{
+        if(ids.length) api.get("parts",`id=in.(${ids.join(",")})&select=id,bin_location,make,model,year_range`).then(ps=>{
           if(!Array.isArray(ps))return;
-          const m={};ps.forEach(p=>{m[p.id]=p.bin_location||"";});setBinMap(m);
+          const bm={},fm={};
+          ps.forEach(p=>{ bm[p.id]=p.bin_location||""; fm[p.id]={make:p.make||"",model:p.model||"",yearRange:p.year_range||""}; });
+          setBinMap(bm); setFitMap(fm);
         });
       }
     });
@@ -2640,6 +2643,7 @@ export function ViewSupplierInvoiceModal({inv,onClose,settings}) {
     const labels=[];
     items.forEach(item=>{
       const bin=binMap[item.part_id]||"";
+      const fit=fitMap[item.part_id]||{};
       const total=+item.qty||1;
       for(let i=1;i<=total;i++){
         labels.push({
@@ -2649,6 +2653,7 @@ export function ViewSupplierInvoiceModal({inv,onClose,settings}) {
           supplierCode:item.supplier_part_id||"",
           invoiceNo:inv.id,
           seq:`${i}/${total}`,
+          make:fit.make,model:fit.model,yearRange:fit.yearRange,
         });
       }
     });
@@ -10558,6 +10563,7 @@ export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
         supplierCode,
         invoiceNo:"",
         seq:total>1?`${i}/${total}`:"",
+        make:part?.make||"",model:part?.model||"",yearRange:part?.year_range||"",
       });
     }
     openPartLabelsWindow(labels,{

@@ -1520,9 +1520,11 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   // supplier can reprint or print-as-they-go without saving the whole invoice.
   const printItemLabel=(it)=>{
     const qty=Math.max(1,+it.qty||1);
+    const full=fullRecordFor(it.sourceType,it.targetId);
+    const make=full?.make||"", model=full?.model||"", yearRange=full?.year_range||"";
     const labels=[];
     for(let i=1;i<=qty;i++){
-      labels.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",invoiceNo:invoiceNo||"",seq:qty>1?`${i}/${qty}`:""});
+      labels.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",invoiceNo:invoiceNo||"",seq:qty>1?`${i}/${qty}`:"",make,model,yearRange});
     }
     const settings=getSettings();
     openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:settings?.shop_name||""});
@@ -1643,9 +1645,16 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
     // made into this window.
     const labelWin=printLabels?window.open("","_blank","width=600,height=500"):null;
     if(labelWin) labelWin.document.title="Preparing labels…";
+    // Labels need the vehicle fitment printed alongside the SKU — items only carry
+    // sourceType/targetId, so look up each line's full catalogue/own-parts record
+    // here (fullRecordFor) right before it leaves this component.
+    const itemsWithFitment=items.map(it=>{
+      const full=fullRecordFor(it.sourceType,it.targetId);
+      return {...it,make:full?.make||"",model:full?.model||"",yearRange:full?.year_range||""};
+    });
     (async()=>{
       setSaving(true);
-      await onSave({invoiceId:editingInvoice?.id||null,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items,labelWin});
+      await onSave({invoiceId:editingInvoice?.id||null,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items:itemsWithFitment,labelWin});
       setSaving(false);
     })();
   };

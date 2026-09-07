@@ -3188,7 +3188,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         supplier_part_id:it.sourceType==="own"?it.targetId:null,
         part_name:it.name,sku:it.sku||"",qty:it.qty,unit_cost:+it.unitCost||0,bin_location:it.binLocation?.trim()||null,
       });
-      labelBatches.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",qty:it.qty});
+      labelBatches.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",qty:it.qty,make:it.make||"",model:it.model||"",yearRange:it.yearRange||""});
     }
 
     // One label per physical unit, sequenced within its own item (1/3, 2/3, 3/3),
@@ -3196,7 +3196,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const labels=[];
     for(const b of labelBatches){
       for(let i=1;i<=b.qty;i++){
-        labels.push({sku:b.sku,name:b.name,binLocation:b.binLocation,invoiceNo:invoiceNo||"",seq:b.qty>1?`${i}/${b.qty}`:""});
+        labels.push({sku:b.sku,name:b.name,binLocation:b.binLocation,invoiceNo:invoiceNo||"",seq:b.qty>1?`${i}/${b.qty}`:"",make:b.make,model:b.model,yearRange:b.yearRange});
       }
     }
     if(printLabels!==false&&labels.length) openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:user.supplier_name||"",win:labelWin});

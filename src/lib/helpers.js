@@ -311,7 +311,7 @@ export function openLabelWindow(data) {
 }
 
 // ── PART LABEL PRINTER ─────────────────────────────────────────
-// labels: [{sku, name, binLocation, supplierCode, invoiceNo, seq, total, make, model, yearRange}]
+// labels: [{sku, name, binLocation, supplierCode, invoiceNo, seq, total}]
 // Options: widthMm, heightMm, shopName
 export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shopName = "", win = null } = {}) {
   if (!labels?.length) { win?.close(); return; }
@@ -332,7 +332,6 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
     ".sn{font-size:7px;font-weight:bold;text-transform:uppercase;letter-spacing:.07em;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
     ".sku{font-size:39px;font-weight:900;font-family:monospace;letter-spacing:.8px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
     ".pn{font-size:18px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#333}",
-    ".veh{font-size:14px;font-weight:bold;color:#0d9488;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
     ".bin{font-size:33px;font-weight:900;color:#1d4ed8;background:#dbeafe;border-radius:3px;padding:1px 5px;display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}",
     ".bin-blank{height:38px;border:1.5px solid #999;border-radius:3px;background:#fff;margin-top:2px}",
     ".sup{font-size:18px;font-weight:bold;color:#7c3aed;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
@@ -352,7 +351,6 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
         <div class="sn">${e(shopName)}</div>
         <div class="sku">${e(lbl.sku||lbl.name)}</div>
         ${lbl.name&&lbl.sku?`<div class="pn">${e(lbl.name)}</div>`:""}
-        ${(lbl.make||lbl.model||lbl.yearRange)?`<div class="veh">🚗 ${e([lbl.make,lbl.model,lbl.yearRange].filter(Boolean).join(" "))}</div>`:""}
         ${lbl.binLocation?`<div class="bin">📦 ${e(lbl.binLocation)}</div>`:"<div class=\"bin-blank\"></div>"}
         ${lbl.supplierCode?`<div class="sup">🏭 ${e(lbl.supplierCode)}</div>`:""}
         ${(lbl.invoiceNo||lbl.seq)?`<div class="inv-row"><span class="invno">${lbl.invoiceNo?e(lbl.invoiceNo):""}</span><span class="seq">${lbl.seq?e(lbl.seq):""}</span></div>`:""}
@@ -422,7 +420,6 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
       }
       fitUniform('.sku', 6);
       fitUniform('.pn', 6);
-      fitUniform('.veh', 6);
       fitUniform('.bin', 7);
       fitUniform('.sup', 6);
     })();

@@ -2777,6 +2777,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       await Promise.all([
         api.patch("part_fitments","supplier_part_id",sp.id,{part_id:newPart.id,supplier_part_id:null}).catch(()=>{}),
         api.patch("customer_queries","supplier_part_id",sp.id,{part_id:newPart.id,supplier_part_id:null}).catch(()=>{}),
+        // Past purchase invoice lines recorded this part as source_type "own" — without this,
+        // deleting the supplier_parts row below orphans them (Edit opens on a near-empty record).
+        api.patch("supplier_purchase_invoice_items","supplier_part_id",sp.id,{source_type:"catalogue",part_id:newPart.id,part_suppliers_id:newLink?.id||null,supplier_part_id:null}).catch(()=>{}),
       ]);
       await api.delete("supplier_parts","id",sp.id);
       // parts/part_suppliers/part_fitments are large tables — update local state
@@ -3188,7 +3191,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         supplier_part_id:it.sourceType==="own"?it.targetId:null,
         part_name:it.name,sku:it.sku||"",qty:it.qty,unit_cost:+it.unitCost||0,bin_location:it.binLocation?.trim()||null,
       });
-      labelBatches.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",qty:it.qty,make:it.make||"",model:it.model||"",yearRange:it.yearRange||""});
+      labelBatches.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",qty:it.qty});
     }
 
     // One label per physical unit, sequenced within its own item (1/3, 2/3, 3/3),
@@ -3196,7 +3199,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const labels=[];
     for(const b of labelBatches){
       for(let i=1;i<=b.qty;i++){
-        labels.push({sku:b.sku,name:b.name,binLocation:b.binLocation,invoiceNo:invoiceNo||"",seq:b.qty>1?`${i}/${b.qty}`:"",make:b.make,model:b.model,yearRange:b.yearRange});
+        labels.push({sku:b.sku,name:b.name,binLocation:b.binLocation,invoiceNo:invoiceNo||"",seq:b.qty>1?`${i}/${b.qty}`:""});
       }
     }
     if(printLabels!==false&&labels.length) openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:user.supplier_name||"",win:labelWin});

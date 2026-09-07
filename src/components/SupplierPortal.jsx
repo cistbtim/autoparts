@@ -1469,8 +1469,10 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
 
   const pool = [
     ...existingParts.map(p=>({sourceType:"catalogue", targetId:p._linkId, partId:p.id, name:p.name, sku:p.sku, image:p.image_url, extraPhotos:parseJsonArray(p.photos), currentBin:p._supplierBinLocation||"",
+      make:p.make||"", model:p.model||"", year_range:p.year_range||"", oe_number:p.oe_number||"",
       blob:searchBlob(p,p.sku)})),
     ...ownParts.map(p=>({sourceType:"own", targetId:p.id, partId:null, name:p.name, sku:supplierCode?`${supplierCode}-${p.part_code}`:p.part_code, image:p.image_url, extraPhotos:parseJsonArray(p.photos), currentBin:p.bin_location||"",
+      make:p.make||"", model:p.model||"", year_range:p.year_range||"", oe_number:p.oe_number||"",
       blob:searchBlob(p,p.part_code)})),
   ];
   const keywords=search.toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -1520,11 +1522,9 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   // supplier can reprint or print-as-they-go without saving the whole invoice.
   const printItemLabel=(it)=>{
     const qty=Math.max(1,+it.qty||1);
-    const full=fullRecordFor(it.sourceType,it.targetId);
-    const make=full?.make||"", model=full?.model||"", yearRange=full?.year_range||"";
     const labels=[];
     for(let i=1;i<=qty;i++){
-      labels.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",invoiceNo:invoiceNo||"",seq:qty>1?`${i}/${qty}`:"",make,model,yearRange});
+      labels.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",invoiceNo:invoiceNo||"",seq:qty>1?`${i}/${qty}`:""});
     }
     const settings=getSettings();
     openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:settings?.shop_name||""});
@@ -1645,16 +1645,9 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
     // made into this window.
     const labelWin=printLabels?window.open("","_blank","width=600,height=500"):null;
     if(labelWin) labelWin.document.title="Preparing labels…";
-    // Labels need the vehicle fitment printed alongside the SKU — items only carry
-    // sourceType/targetId, so look up each line's full catalogue/own-parts record
-    // here (fullRecordFor) right before it leaves this component.
-    const itemsWithFitment=items.map(it=>{
-      const full=fullRecordFor(it.sourceType,it.targetId);
-      return {...it,make:full?.make||"",model:full?.model||"",yearRange:full?.year_range||""};
-    });
     (async()=>{
       setSaving(true);
-      await onSave({invoiceId:editingInvoice?.id||null,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items:itemsWithFitment,labelWin});
+      await onSave({invoiceId:editingInvoice?.id||null,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items,labelWin});
       setSaving(false);
     })();
   };
@@ -1673,25 +1666,58 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   // fitment, cost + markup-%), so it's one consistent place to manage a part's
   // record instead of a second, thinner form. Only self-added ("own") lines are
   // editable this way; catalogue parts are admin-owned.
-  const openEditItem=(idx)=>{
-    if(items[idx].sourceType!=="own") return;
-    setEditingItemIdx(idx);
-  };
-  const editingFullPart=(()=>{
-    if(editingItemIdx==null) return null;
-    const it=items[editingItemIdx];
-    // Best-effort fallback if a part added moments ago hasn't round-tripped back
-    // through the parent's reload yet — still opens, just mostly blank.
-    return ownParts.find(p=>String(p.id)===String(it.targetId))
-      || {id:it.targetId, part_code:it.sku?.replace(new RegExp(`^${supplierCode}-`,"i"),"")||"", name:it.name, photos:"[]"};
-  })();
-
   // Catalogue-linked lines: a lighter fitment-only edit, since the record is
   // shared with admin and every other supplier — see CatalogFitmentEditModal.
   const [editingCatalogIdx, setEditingCatalogIdx] = useState(null);
+
+  // A line stored as source_type "own" can have since been PROMOTED into the
+  // shared catalogue (admin links a supplier's self-added part into the main
+  // inventory when going live) — that deletes the original supplier_parts row
+  // but never rewrites the invoice item's source_type/supplier_part_id, so old
+  // invoice lines keep pointing at a supplier_parts id that no longer exists,
+  // even though the same SKU now lives in the shared catalogue instead. Route
+  // those to the catalogue editor (matched by SKU) instead of opening the full
+  // supplier editor on an empty record.
+  const openEditItem=(idx)=>{
+    const it=items[idx];
+    if(it.sourceType==="catalogue"){ setEditingCatalogIdx(idx); return; }
+    if(it.sourceType!=="own") return;
+    const stillOwn=ownParts.some(p=>String(p.id)===String(it.targetId));
+    if(!stillOwn){
+      const promoted=existingParts.find(p=>(p.sku||"").trim().toUpperCase()===(it.sku||"").trim().toUpperCase());
+      if(promoted){ setEditingCatalogIdx(idx); return; }
+    }
+    setEditingItemIdx(idx);
+  };
+  // The locally-loaded ownParts list can also just be momentarily stale (a part
+  // added seconds ago hasn't round-tripped back through the parent's reload yet)
+  // rather than genuinely gone — fetch fresh by id from the server whenever the
+  // local lookup misses, instead of silently opening the Edit modal with a near-
+  // empty record (blank make/model/year/cost/stock/photo).
+  const [editingFullPart,setEditingFullPart]=useState(null);
+  useEffect(()=>{
+    if(editingItemIdx==null){setEditingFullPart(null);return;}
+    const it=items[editingItemIdx];
+    const local=ownParts.find(p=>String(p.id)===String(it.targetId));
+    if(local){setEditingFullPart(local);return;}
+    let cancelled=false;
+    setEditingFullPart(null); // shows a brief loading state instead of a blank form
+    const fallback={id:it.targetId, part_code:it.sku?.replace(new RegExp(`^${supplierCode}-`,"i"),"")||"", name:it.name, photos:"[]"};
+    api.get("supplier_parts",`id=eq.${it.targetId}&select=*`).then(r=>{
+      if(cancelled) return;
+      const row=Array.isArray(r)&&r[0];
+      setEditingFullPart(row||fallback);
+    }).catch(()=>{ if(!cancelled) setEditingFullPart(fallback); });
+    return ()=>{cancelled=true;};
+  },[editingItemIdx]); // eslint-disable-line react-hooks/exhaustive-deps -- only re-run when which item is being edited changes
+
   const editingCatalogPart=editingCatalogIdx==null ? null
-    : existingParts.find(p=>String(p._linkId)===String(items[editingCatalogIdx].targetId))
-      || {id:items[editingCatalogIdx].partId, sku:items[editingCatalogIdx].sku, name:items[editingCatalogIdx].name};
+    : (()=>{
+        const it=items[editingCatalogIdx];
+        return existingParts.find(p=>String(p._linkId)===String(it.targetId))
+          || existingParts.find(p=>(p.sku||"").trim().toUpperCase()===(it.sku||"").trim().toUpperCase())
+          || {id:it.partId, sku:it.sku, name:it.name};
+      })();
 
   return (
     <Overlay onClose={handleClose}>
@@ -1734,7 +1760,17 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                       </div>
                     )}
                   </div>
-                  <div><strong>{p.name}</strong> <span style={{color:"var(--text3)"}}>({p.sku})</span></div>
+                  <div style={{minWidth:0}}>
+                    <div><strong>{p.name}</strong> <span style={{color:"var(--text3)"}}>({p.sku})</span></div>
+                    {(p.make||p.model||p.year_range||p.oe_number)&&(
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:2}}>
+                        {p.make&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:99,padding:"1px 7px"}}>🚗 {p.make}</span>}
+                        {p.model&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:99,padding:"1px 7px"}}>{p.model}</span>}
+                        {p.year_range&&<span style={{fontSize:10,fontWeight:700,color:"var(--text3)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:99,padding:"1px 7px"}}>{p.year_range}</span>}
+                        {p.oe_number&&<span style={{fontSize:10,fontWeight:700,color:"var(--purple)",background:"rgba(167,139,250,.12)",border:"1px solid rgba(167,139,250,.3)",borderRadius:99,padding:"1px 7px",fontFamily:"DM Mono,monospace"}}>OE {p.oe_number}</span>}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1850,12 +1886,13 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                   <div style={{fontSize:15,fontWeight:700,color:"var(--red)",fontFamily:"DM Mono,monospace",marginTop:2}}>{it.sku}</div>
                   {(()=>{
                     const full=fullRecordFor(it.sourceType,it.targetId);
-                    if(!full?.make&&!full?.model&&!full?.year_range) return null;
+                    if(!full?.make&&!full?.model&&!full?.year_range&&!full?.oe_number) return null;
                     return (
                       <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:3}}>
                         {full?.make&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:99,padding:"1px 7px"}}>🚗 {full.make}</span>}
                         {full?.model&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:99,padding:"1px 7px"}}>{full.model}</span>}
                         {full?.year_range&&<span style={{fontSize:10,fontWeight:700,color:"var(--text3)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:99,padding:"1px 7px"}}>{full.year_range}</span>}
+                        {full?.oe_number&&<span style={{fontSize:10,fontWeight:700,color:"var(--purple)",background:"rgba(167,139,250,.12)",border:"1px solid rgba(167,139,250,.3)",borderRadius:99,padding:"1px 7px",fontFamily:"DM Mono,monospace"}}>OE {full.oe_number}</span>}
                       </div>
                     );
                   })()}
@@ -1883,7 +1920,12 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
           )}
         </div>
       )}
-      {editingItemIdx!=null&&(
+      {editingItemIdx!=null&&!editingFullPart&&(
+        <Overlay onClose={()=>setEditingItemIdx(null)}>
+          <div style={{padding:30,textAlign:"center",color:"var(--text3)"}}>Loading part…</div>
+        </Overlay>
+      )}
+      {editingItemIdx!=null&&editingFullPart&&(
         <SupplierPartModal part={editingFullPart} supplierCode={supplierCode} supplierMarginOptions={marginOptions} ownParts={ownParts}
           onSave={async(data)=>{
             const ok=await onUpdatePart(data);

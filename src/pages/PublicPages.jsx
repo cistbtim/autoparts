@@ -1475,7 +1475,6 @@ export function WorkshopBookingPage({token}) {
   const card={background:CL.surf,borderRadius:12,padding:16,border:`1px solid ${CL.border}`,marginBottom:14};
   const lbl={fontSize:12,fontWeight:700,color:CL.text2,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6,display:"block"};
 
-  const NATIVE_LANG_NAME={zh:"中文",en:"English",th:"ไทย",pt:"Português",fr:"Français",es:"Español",vi:"Tiếng Việt",ar:"العربية"};
   const LangSwitch=()=>(
     langs.length>1 && (
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -1484,7 +1483,7 @@ export function WorkshopBookingPage({token}) {
             style={{padding:"4px 10px",borderRadius:20,border:`1px solid ${lang===l.lang?CL.accent:CL.border}`,
               background:lang===l.lang?"rgba(249,115,22,.15)":"transparent",
               color:lang===l.lang?CL.accent:CL.text2,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-            {l.flag?`${l.flag} `:""}{NATIVE_LANG_NAME[l.lang]||l.name||l.lang.toUpperCase()}
+            {l.flag?`${l.flag} `:""}{l.lang.toUpperCase()}
           </button>
         ))}
       </div>

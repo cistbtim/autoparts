@@ -1502,7 +1502,7 @@ export function WorkshopBookingPage({token}) {
   const Header=()=>(
     <div style={{background:CL.surf,borderBottom:`1px solid ${CL.border}`,paddingBottom:16,marginBottom:20}}>
       <div style={{maxWidth:460,margin:"0 auto",padding:"16px 16px 0",display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center"}}>
-        {shopLogo&&<img src={shopLogo} alt="" style={{width:"100%",height:140,borderRadius:14,objectFit:"contain",background:"#fff",marginBottom:14,display:"block"}} onError={e=>e.target.style.display="none"}/>}
+        {shopLogo&&<img src={shopLogo} alt="" style={{width:"100%",height:140,borderRadius:14,objectFit:"cover",marginBottom:14,display:"block"}} onError={e=>e.target.style.display="none"}/>}
         <div style={{fontWeight:700,fontSize:20,color:CL.text}}>{shopInfo?.name||"Workshop"}</div>
         <div style={{color:CL.text2,fontSize:13,marginTop:2}}>{t.wsbkOnlineBooking}</div>
 
@@ -1529,7 +1529,7 @@ export function WorkshopBookingPage({token}) {
             <span style={{color:CL.text2,fontSize:12}}>📍 {shopAddress}</span>
             <a href={directionsUrl} target="_blank" rel="noopener noreferrer"
               style={{...pillLink,color:CL.accent,border:`1px solid ${CL.accent}55`}}>
-              🧭 {t.wsbkGetDirections}
+              🗺️ {t.wsbkGetDirections}
             </a>
           </div>
         )}

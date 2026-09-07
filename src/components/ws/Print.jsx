@@ -497,8 +497,7 @@ export function printWorkshopInvoice(job, items, invoice, settings, photos={}, v
       <div class="card-label">🔧 Job Info</div>
       <div class="card-info">
         ${job.mechanic?`Mechanic: <strong>${job.mechanic}</strong><br/>`:""}
-        ${job.date_in?`Date In: ${job.date_in}<br/>`:""}
-        ${job.date_out?`Date Out: ${job.date_out}`:""}
+        Date In: ${invDate}
       </div>
     </div>
     <div class="card">

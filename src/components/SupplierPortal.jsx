@@ -2288,49 +2288,83 @@ export function SupplierStockTakePage({stockTakes=[], items=[], onStart, onOpen,
   );
 }
 
-// Scan-driven stock-in: scan a shelf/bin QR (printed labels encode "#<binName>",
-// see openShelfLabelWindow) to set the active location, then scan part QR/labels
-// (encode the SKU, see openPartLabelsWindow) one at a time — each scan adds 1 unit
-// at that location. Same-SKU-different-location prompts before moving it. Writes
-// only ever land on this supplier's own rows (part_suppliers.stock/bin_location for
-// catalogue-linked parts, supplier_parts.stock/bin_location for self-added ones) —
-// never parts.stock/bin_location, so it can never touch the shared main inventory.
-export function SupplierScanStockPage({existingParts=[], ownParts=[], supplierCode="", onAdjust}) {
+// Scan-driven stock TAKE (cycle count) — verifies location, not a raw stock-adder.
+// Uses the exact same supplier_stock_takes/supplier_stock_take_items tables as the
+// manually-typed "My Stock Take" page, so a scan session shows up there too and
+// Complete applies identically. Flow: scan a shelf/bin QR (printed labels encode
+// "#<binName>", see openShelfLabelWindow) to set the active location, then scan part
+// QR/labels (encode the SKU, see openPartLabelsWindow) one at a time — each scan
+// bumps that item's counted_qty by 1, green if it's at its recorded bin_location (or
+// has none on file yet), red with a keep/move prompt if it's scanned somewhere else.
+// Nothing touches live stock until "Finish & Update Stock" (onComplete) — same
+// staged-until-complete model the manual count already uses.
+export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="", onStart, onOpen, onScanCount, onManualSet, onComplete, onDelete}) {
+  const openTake = stockTakes.find(st=>st.status==="open");
+  const [activeTakeId, setActiveTakeId] = useState(openTake?.id||null);
+  const [loadingTake, setLoadingTake] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [name, setName] = useState("");
   const [activeLocation, setActiveLocation] = useState("");
   const [scanning, setScanning] = useState(false);
   const [supported, setSupported] = useState(null);
   const [err, setErr] = useState("");
   const [log, setLog] = useState([]); // recent scan feedback, newest first
   const [manualCode, setManualCode] = useState("");
-  const [pendingMove, setPendingMove] = useState(null); // {part, newLocation} awaiting confirm
+  const [pendingMismatch, setPendingMismatch] = useState(null); // {item, foundLocation} awaiting keep/move choice
+  const [editingId, setEditingId] = useState(null); // stock-take item id currently in manual-adjust mode
+  const [editQty, setEditQty] = useState("");
+  const [editLoc, setEditLoc] = useState("");
+  const [finishing, setFinishing] = useState(false);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const timerRef = useRef(null);
   const lastRef = useRef({code:"", ts:0}); // debounce: a held phone re-detects the same code every ~400ms
+  const openedRef = useRef(null); // last take id we've already called onOpen for
 
-  const pool = [
-    ...existingParts.map(p=>({sourceType:"catalogue", targetId:p._linkId, name:p.name, sku:p.sku, stock:+p._supplierStock||0, binLocation:p._supplierBinLocation||""})),
-    ...ownParts.map(p=>({sourceType:"own", targetId:p.id, name:p.name, sku:supplierCode?`${supplierCode}-${p.part_code}`:p.part_code, stock:+p.stock||0, binLocation:p.bin_location||""})),
-  ];
+  // Adopt whichever take is open server-side (e.g. after a refresh) and load its items once.
+  useEffect(()=>{
+    if(openTake && openTake.id!==activeTakeId) setActiveTakeId(openTake.id);
+    if(!openTake && activeTakeId) setActiveTakeId(null);
+  },[openTake?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{
+    if(activeTakeId && openedRef.current!==activeTakeId){
+      openedRef.current=activeTakeId;
+      setLoadingTake(true);
+      onOpen(activeTakeId).finally(()=>setLoadingTake(false));
+    }
+  },[activeTakeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const takeItems = activeTakeId ? items.filter(i=>i.stock_take_id===activeTakeId) : [];
 
   // The detection loop below is set up once (camera can't be restarted every render
   // without flicker/permission re-prompts), so it closes over stale state forever —
-  // refs give it a way to always read the CURRENT location/pending-move/pool instead.
+  // refs give it a way to always read the CURRENT location/pending-mismatch/items instead.
   const activeLocationRef = useRef(activeLocation);
   useEffect(()=>{ activeLocationRef.current = activeLocation; },[activeLocation]);
-  const pendingMoveRef = useRef(pendingMove);
-  useEffect(()=>{ pendingMoveRef.current = pendingMove; },[pendingMove]);
-  const poolRef = useRef(pool);
-  useEffect(()=>{ poolRef.current = pool; });
+  const pendingRef = useRef(pendingMismatch);
+  useEffect(()=>{ pendingRef.current = pendingMismatch; },[pendingMismatch]);
+  const itemsRef = useRef(takeItems);
+  useEffect(()=>{ itemsRef.current = takeItems; });
 
   const pushLog=(msg,type="ok")=>setLog(prev=>[{msg,type,ts:Date.now()},...prev].slice(0,15));
+
+  // Self-added ("own") parts print labels with the supplier-code prefix (see
+  // openPartLabelsWindow) but supplier_stock_take_items.sku stores the raw part_code
+  // (same as startSupplierStockTake) — normalize both ways so either scan matches.
+  const skuMatches = (item, code) => {
+    const raw=(item.sku||"").trim().toUpperCase();
+    const u=code.toUpperCase();
+    if(raw===u) return true;
+    if(item.source_type==="own" && supplierCode) return `${supplierCode}-${raw}`.toUpperCase()===u;
+    return false;
+  };
 
   const handleCode=async(raw)=>{
     const code=(raw||"").trim();
     if(!code) return;
     if(lastRef.current.code===code && Date.now()-lastRef.current.ts<2200) return; // same code still in frame
     lastRef.current={code,ts:Date.now()};
-    if(pendingMoveRef.current) return; // a move-confirm is already up — ignore scans until resolved
+    if(pendingRef.current) return; // a mismatch prompt is already up — ignore scans until resolved
 
     if(code.startsWith("#")){
       const loc=code.slice(1).trim();
@@ -2340,31 +2374,67 @@ export function SupplierScanStockPage({existingParts=[], ownParts=[], supplierCo
       return;
     }
     if(!activeLocationRef.current){
-      pushLog(`⚠️ Scan a location QR first`,"err");
+      pushLog(`⚠️ Scan a location label first`,"err");
       return;
     }
-    const part=poolRef.current.find(p=>p.sku.trim().toUpperCase()===code.toUpperCase());
-    if(!part){
-      pushLog(`❌ Not found: ${code}`,"err");
+    const item=itemsRef.current.find(i=>skuMatches(i,code));
+    if(!item){
+      pushLog(`❌ Not found in this stock take: ${code}`,"err");
       return;
     }
-    const curLoc=(part.binLocation||"").trim();
-    if(!curLoc || curLoc.toUpperCase()===activeLocationRef.current.toUpperCase()){
-      const newQty=part.stock+1;
-      await onAdjust({sourceType:part.sourceType,targetId:part.targetId,qty:newQty,binLocation:activeLocationRef.current,itemName:part.name,sku:part.sku});
-      pushLog(`✅ ${part.sku} → qty ${newQty} @ ${activeLocationRef.current}`,"ok");
+    const recordedLoc=(item.counted_location??item.bin_location??"").trim();
+    if(!recordedLoc || recordedLoc.toUpperCase()===activeLocationRef.current.toUpperCase()){
+      const setLocation = !recordedLoc; // first time this item's location is being established
+      await onScanCount(item.id, activeLocationRef.current, setLocation);
+      pushLog(`✅ ${item.sku} correct @ ${activeLocationRef.current} (now ${(+item.counted_qty||0)+1})`,"ok");
     } else {
-      setPendingMove({part,newLocation:activeLocationRef.current});
+      setPendingMismatch({item, foundLocation:activeLocationRef.current});
     }
   };
 
-  const confirmMove=async(doMove)=>{
-    const {part,newLocation}=pendingMove;
-    setPendingMove(null);
-    if(!doMove){ pushLog(`Skipped ${part.sku} — kept at ${part.binLocation}`,"skip"); return; }
-    const newQty=part.stock+1;
-    await onAdjust({sourceType:part.sourceType,targetId:part.targetId,qty:newQty,binLocation:newLocation,itemName:part.name,sku:part.sku});
-    pushLog(`✅ ${part.sku} moved ${part.binLocation||"(none)"} → ${newLocation}, qty ${newQty}`,"ok");
+  const resolveMismatch=async(doMove)=>{
+    const {item,foundLocation}=pendingMismatch;
+    setPendingMismatch(null);
+    await onScanCount(item.id, foundLocation, doMove);
+    const newCount=(+item.counted_qty||0)+1;
+    if(doMove) pushLog(`↔️ ${item.sku} moved ${item.bin_location||"(none)"} → ${foundLocation}, counted (now ${newCount})`,"ok");
+    else pushLog(`⚠️ ${item.sku} counted @ ${foundLocation} but kept recorded at ${item.bin_location||"(none)"} (now ${newCount})`,"err");
+  };
+
+  const startEdit=(item)=>{
+    setEditingId(item.id);
+    setEditQty(String(item.counted_qty??""));
+    setEditLoc(item.counted_location??item.bin_location??"");
+  };
+  const saveEdit=async(item)=>{
+    const qty=Math.max(0,Math.round(+editQty||0));
+    await onManualSet(item.id, qty, editLoc);
+    setEditingId(null);
+    pushLog(`✏️ ${item.sku} set to qty ${qty} @ ${editLoc||"(none)"}`,"loc");
+  };
+
+  const finish=async()=>{
+    if(!activeTakeId) return;
+    if(!window.confirm("Finish this stock take? Counted quantities and locations will be written to your live stock.")) return;
+    setFinishing(true);
+    await onComplete(activeTakeId);
+    setFinishing(false);
+    setActiveTakeId(null); openedRef.current=null;
+    setActiveLocation(""); setLog([]);
+  };
+
+  const startTake=async()=>{
+    setStarting(true);
+    const stId=await onStart(name);
+    setStarting(false); setName("");
+    if(stId) setActiveTakeId(stId);
+  };
+
+  const discardTake=async()=>{
+    if(!activeTakeId) return;
+    await onDelete(activeTakeId);
+    setActiveTakeId(null); openedRef.current=null;
+    setActiveLocation(""); setLog([]);
   };
 
   const stopCamera=()=>{
@@ -2394,19 +2464,45 @@ export function SupplierScanStockPage({existingParts=[], ownParts=[], supplierCo
     return ()=>stopCamera();
   },[]); // eslint-disable-line react-hooks/exhaustive-deps -- camera starts once; refs keep it fed with fresh state
 
+  // ── No open stock take yet — start one before scanning can begin ──
+  if(!activeTakeId){
+    return (
+      <div className="fu">
+        <div style={{marginBottom:16}}>
+          <h1 style={{fontSize:20,fontWeight:700}}>📷 Scan Stock Take</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
+            Scan a shelf/bin label, then scan parts one at a time to verify they're in the right place and tally what's found.
+          </p>
+        </div>
+        <div className="card" style={{padding:14,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",maxWidth:420}}>
+          <input className="inp" style={{flex:1,minWidth:180}} placeholder={`Stock Take ${new Date().toLocaleDateString()}`} value={name} onChange={e=>setName(e.target.value)}/>
+          <button className="btn btn-primary btn-sm" onClick={startTake} disabled={starting}>{starting?"Starting…":"▶ Start Stock Take"}</button>
+        </div>
+      </div>
+    );
+  }
+
+  const countedN = takeItems.filter(i=>i.counted_qty!=null).length;
+  const shortages = takeItems
+    .map(i=>({...i, short:(+i.system_qty||0)-(+i.counted_qty||0)}))
+    .filter(i=>i.short>0)
+    .sort((a,b)=>b.short-a.short);
+
   return (
     <div className="fu">
-      <div style={{marginBottom:16}}>
-        <h1 style={{fontSize:20,fontWeight:700}}>📷 Scan Stock In</h1>
-        <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
-          Scan a shelf/bin label first, then scan parts one at a time — each scan adds 1 unit at that location.
-          Stays on your own stock counts, never touches the main MotorDesk inventory.
-        </p>
+      <div style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>📷 Scan Stock Take</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
+            Scan a shelf/bin label first, then scan parts — green if they're where the system expects, red if not.
+          </p>
+        </div>
+        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={discardTake}>🗑 Discard</button>
       </div>
 
       <div className="card" style={{padding:14,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
         <div style={{fontSize:13}}>📍 Active location: <strong style={{fontFamily:"DM Mono,monospace",color:activeLocation?"var(--accent)":"var(--text3)"}}>{activeLocation||"— scan a bin label —"}</strong></div>
-        {activeLocation&&<button className="btn btn-ghost btn-xs" onClick={()=>setActiveLocation("")}>Clear</button>}
+        <button className="btn btn-primary btn-xs" onClick={()=>{setActiveLocation("");pushLog("📍 Ready — scan the next location","loc");}}>📍 Scan New Location</button>
       </div>
 
       {supported!==false ? (
@@ -2430,25 +2526,67 @@ export function SupplierScanStockPage({existingParts=[], ownParts=[], supplierCo
       )}
       {err&&<div style={{color:"var(--red)",fontSize:12,marginBottom:10}}>{err}</div>}
 
-      {pendingMove&&(
-        <div className="card" style={{padding:14,marginBottom:14,border:"1.5px solid var(--accent)",maxWidth:420}}>
-          <div style={{fontWeight:700,marginBottom:6}}>📦 {pendingMove.part.name} ({pendingMove.part.sku})</div>
-          <div style={{fontSize:13,marginBottom:10}}>Currently in <strong>{pendingMove.part.binLocation}</strong> — move to <strong style={{color:"var(--accent)"}}>{pendingMove.newLocation}</strong>?</div>
+      {pendingMismatch&&(
+        <div className="card" style={{padding:14,marginBottom:14,border:"1.5px solid var(--red)",maxWidth:420}}>
+          <div style={{fontWeight:700,marginBottom:6,color:"var(--red)"}}>⚠️ {pendingMismatch.item.item_name} ({pendingMismatch.item.sku})</div>
+          <div style={{fontSize:13,marginBottom:10}}>Should be at <strong>{pendingMismatch.item.counted_location??pendingMismatch.item.bin_location??"(no location on file)"}</strong> — found here at <strong style={{color:"var(--accent)"}}>{pendingMismatch.foundLocation}</strong>. Still counts either way.</div>
           <div style={{display:"flex",gap:8}}>
-            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>confirmMove(false)}>Keep at {pendingMove.part.binLocation}</button>
-            <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={()=>confirmMove(true)}>Move to {pendingMove.newLocation}</button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>resolveMismatch(false)}>Keep recorded at {pendingMismatch.item.bin_location||"(none)"}</button>
+            <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={()=>resolveMismatch(true)}>Move to {pendingMismatch.foundLocation}</button>
           </div>
         </div>
       )}
 
-      <div style={{display:"flex",flexDirection:"column",gap:6,maxWidth:420}}>
+      <div style={{display:"flex",flexDirection:"column",gap:6,maxWidth:420,marginBottom:20}}>
         {log.map((l,i)=>(
           <div key={l.ts+"-"+i} style={{fontSize:12,padding:"6px 10px",borderRadius:6,
-            background:l.type==="err"?"rgba(248,113,113,.1)":l.type==="loc"?"rgba(96,165,250,.1)":l.type==="skip"?"var(--surface2)":"rgba(52,211,153,.1)",
-            color:l.type==="err"?"var(--red)":l.type==="loc"?"var(--blue)":l.type==="skip"?"var(--text3)":"var(--green)"}}>
+            background:l.type==="err"?"rgba(248,113,113,.1)":l.type==="loc"?"rgba(96,165,250,.1)":"rgba(52,211,153,.1)",
+            color:l.type==="err"?"var(--red)":l.type==="loc"?"var(--blue)":"var(--green)"}}>
             {l.msg}
           </div>
         ))}
+      </div>
+
+      <div className="card" style={{overflow:"hidden"}}>
+        <div style={{padding:"10px 14px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+          <div style={{fontWeight:700}}>📋 Still Short {loadingTake?"":`— ${countedN}/${takeItems.length} items counted`}</div>
+          <button className="btn btn-primary btn-sm" onClick={finish} disabled={finishing}>{finishing?"Finishing…":"✅ Finish & Update Stock"}</button>
+        </div>
+        {loadingTake ? (
+          <div style={{padding:24,textAlign:"center",color:"var(--text3)"}}>Loading…</div>
+        ) : shortages.length===0 ? (
+          <div style={{padding:24,textAlign:"center",color:"var(--text3)"}}>No shortages — everything counted matches or exceeds system qty. 🎉</div>
+        ) : (
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead><tr><th>SKU</th><th>Item</th><th>Expected Location</th><th>System</th><th>Counted</th><th>Short</th><th></th></tr></thead>
+              <tbody>
+                {shortages.map(item=>(
+                  <tr key={item.id}>
+                    <td style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{item.sku||"—"}</td>
+                    <td>{item.item_name}</td>
+                    <td style={{color:"var(--text3)"}}>{item.counted_location??item.bin_location??"—"}</td>
+                    <td>{item.system_qty}</td>
+                    <td>{item.counted_qty??0}</td>
+                    <td style={{fontWeight:700,color:"var(--red)"}}>{item.short}</td>
+                    <td>
+                      {editingId===item.id ? (
+                        <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                          <input className="inp" type="number" min="0" style={{width:64}} value={editQty} onChange={e=>setEditQty(e.target.value)}/>
+                          <input className="inp" style={{width:90}} placeholder="Location" value={editLoc} onChange={e=>setEditLoc(e.target.value)}/>
+                          <button className="btn btn-primary btn-xs" onClick={()=>saveEdit(item)}>Save</button>
+                          <button className="btn btn-ghost btn-xs" onClick={()=>setEditingId(null)}>✕</button>
+                        </div>
+                      ) : (
+                        <button className="btn btn-ghost btn-xs" onClick={()=>startEdit(item)}>✏️ Adjust</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useCallback, useRef } from "react";
-import { api, setDemoMode } from "./lib/api.js";
+import { api, setDemoMode, SUPABASE_URL, SUPABASE_KEY } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
 import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag, openPartLabelsWindow } from "./lib/helpers.js";
@@ -561,7 +561,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       const ids=linksArr.map(l=>l.part_id);
       const scopedPartsRaw=ids.length?await api.fresh("parts",`id=in.(${ids.join(",")})&select=*`):[];
       // Stock/bin for a catalogue-linked part is this SUPPLIER's own count (part_suppliers.stock/
-      // bin_location, kept current by their own Scan Stock In), not the shared parts.stock — same
+      // bin_location, kept current by their own stock takes), not the shared parts.stock — same
       // rule the self-added ("own") parts below already follow.
       const scopedParts=(Array.isArray(scopedPartsRaw)?scopedPartsRaw:[]).map(p=>{
         const link=linksArr.find(l=>String(l.part_id)===String(p.id));
@@ -3121,14 +3121,48 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setSupplierStockTakeItems(prev=>prev.map(i=>i.id===itemId?{...i,counted_qty:countedQty,variance}:i));
   };
 
+  // Scan Stock Take: each physical unit scanned bumps counted_qty by 1 (same additive
+  // idea as the old Scan Stock In, but staged on the stock-take item instead of live
+  // stock — nothing touches part_suppliers/supplier_parts until Complete, same as a
+  // manually-typed count). counted_location is only set when the scan happened at a
+  // different bin than the item's system bin_location AND the user confirmed the move
+  // (see the red mismatch prompt in SupplierScanStockPage) — left null otherwise, so
+  // Complete falls back to the original system location.
+  const scanCountSupplierStockTakeItem=async(itemId,foundLocation,moveHere)=>{
+    const item=supplierStockTakeItems.find(i=>i.id===itemId);
+    if(!item) return;
+    const countedQty=(+item.counted_qty||0)+1;
+    const patch={counted_qty:countedQty,variance:countedQty-(+item.system_qty||0),counted_at:new Date().toISOString()};
+    if(moveHere) patch.counted_location=foundLocation;
+    await api.patch("supplier_stock_take_items","id",itemId,patch);
+    setSupplierStockTakeItems(prev=>prev.map(i=>i.id===itemId?{...i,...patch}:i));
+  };
+
+  // Manual override for a stock-take item (item 7 of the scan-take spec) — lets you
+  // type a corrected count/location directly when a label can't be scanned, using the
+  // same fields the scan path writes so Complete treats both identically.
+  const manualSetSupplierStockTakeItem=async(itemId,countedQty,location)=>{
+    const item=supplierStockTakeItems.find(i=>i.id===itemId);
+    if(!item) return;
+    const patch={counted_qty:countedQty,variance:countedQty-(+item.system_qty||0),counted_at:new Date().toISOString()};
+    if(location!=null) patch.counted_location=location.trim();
+    await api.patch("supplier_stock_take_items","id",itemId,patch);
+    setSupplierStockTakeItems(prev=>prev.map(i=>i.id===itemId?{...i,...patch}:i));
+  };
+
   const completeSupplierStockTake=async(stId)=>{
     const items=await api.fresh("supplier_stock_take_items",`stock_take_id=eq.${stId}&counted_qty=not.is.null&select=*`);
     if(Array.isArray(items)){
       for(const item of items){
-        if(item.variance){
+        // counted_location (set when a scan-mismatch move was confirmed, or via manual
+        // override) wins over the item's original system bin_location — that's the
+        // corrected location a stock take exists to establish.
+        const finalLocation=(item.counted_location??item.bin_location)||"";
+        const locationChanged=finalLocation!==(item.bin_location||"");
+        if(item.variance||locationChanged){
           const table=item.source_type==="catalogue"?"part_suppliers":"supplier_parts";
           const targetId=item.source_type==="catalogue"?item.part_suppliers_id:item.supplier_part_id;
-          await api.patch(table,"id",targetId,{stock:item.counted_qty});
+          await api.patch(table,"id",targetId,{stock:item.counted_qty,bin_location:finalLocation});
           await api.insert("supplier_stock_logs",{
             id:makeId("SSL"),supplier_id:user.supplier_id,source_type:item.source_type,
             part_suppliers_id:item.source_type==="catalogue"?targetId:null,
@@ -3141,7 +3175,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         }
       }
     }
-    await api.patch("supplier_stock_takes","id",stId,{status:"completed",completed_at:new Date().toISOString()});
+    const completedAt=new Date().toISOString();
+    await api.patch("supplier_stock_takes","id",stId,{status:"completed",completed_at:completedAt});
+    setSupplierStockTakes(prev=>prev.map(st=>st.id===stId?{...st,status:"completed",completed_at:completedAt}:st));
     await reloadSupplierParts();
     showToast("✅ Stock take completed — stock updated");
   };
@@ -3153,29 +3189,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setSupplierStockTakes(prev=>prev.filter(st=>st.id!==stId));
     setSupplierStockTakeItems(prev=>prev.filter(i=>i.stock_take_id!==stId));
     showToast("Deleted","err");
-  };
-
-  // Scan Stock In — writes only ever land on this supplier's own rows (part_suppliers
-  // for catalogue-linked parts, supplier_parts for self-added ones), never parts.stock/
-  // bin_location, so scanning can never touch the shared main inventory.
-  const scanStockAdjust=async({sourceType,targetId,qty,binLocation,itemName,sku})=>{
-    const table=sourceType==="catalogue"?"part_suppliers":"supplier_parts";
-    await api.patch(table,"id",targetId,{stock:qty,bin_location:binLocation});
-    await api.insert("supplier_stock_logs",{
-      id:makeId("SSL"),supplier_id:user.supplier_id,source_type:sourceType,
-      part_suppliers_id:sourceType==="catalogue"?targetId:null,
-      supplier_part_id:sourceType==="own"?targetId:null,
-      item_name:itemName||"",sku:sku||"",
-      change_qty:1,before_qty:qty-1,after_qty:qty,
-      reason:"scan_in",ref_type:"scan",ref_id:null,
-      created_by:user.name||user.username,created_at:new Date().toISOString(),
-    }).catch(()=>{});
-    if(sourceType==="catalogue"){
-      setPartSuppliers(prev=>prev.map(l=>String(l.id)===String(targetId)?{...l,stock:qty,bin_location:binLocation}:l));
-      setSupplierExistingParts(prev=>prev.map(p=>String(p._linkId)===String(targetId)?{...p,_supplierStock:qty,_supplierBinLocation:binLocation}:p));
-    } else {
-      setSupplierParts(prev=>prev.map(p=>String(p.id)===String(targetId)?{...p,stock:qty,bin_location:binLocation}:p));
-    }
   };
 
   // Supplier receiving stock onto their own shelf (their own purchase invoice, not
@@ -3269,6 +3282,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const inv=supplierPurchaseInvoices.find(i=>i.id===invoiceId);
     if(!inv){showToast("Invoice not found","err");return;}
     if(inv.status==="received"){showToast("Already added to system","err");return;}
+    // Claim the invoice FIRST, atomically, before touching any stock — checking
+    // inv.status above only reads stale local React state, which doesn't update
+    // until this whole function finishes and reloads. A double-click (or a
+    // duplicate network request — seen for real: 2026-09-08, one invoice's stock
+    // got added twice, doubling 35 part rows) could get two calls past that check
+    // before either completed. This dual-condition PATCH (id AND status=pending)
+    // only ever succeeds for one caller — a second one targets a row that's no
+    // longer status=pending and gets back zero rows, so it can bail out before
+    // looping over items at all.
+    const claimRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/supplier_purchase_invoices?id=eq.${invoiceId}&status=eq.pending`,
+      { method:"PATCH",
+        headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, "Content-Type":"application/json", Prefer:"return=representation" },
+        body: JSON.stringify({status:"received",received_at:new Date().toISOString()}) }
+    ).then(r=>r.json()).catch(()=>[]);
+    if(!Array.isArray(claimRes)||claimRes.length===0){
+      showToast("Already added to system","err");
+      await reloadSupplierParts();
+      return;
+    }
     const items=await api.fresh("supplier_purchase_invoice_items",`invoice_id=eq.${invoiceId}&select=*`);
     for(const it of (Array.isArray(items)?items:[])){
       const table=it.source_type==="catalogue"?"part_suppliers":"supplier_parts";
@@ -3291,7 +3324,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         created_by:user.name||user.username,created_at:new Date().toISOString(),
       });
     }
-    await api.patch("supplier_purchase_invoices","id",invoiceId,{status:"received",received_at:new Date().toISOString()});
     await reloadSupplierParts();
     showToast("✅ Stock added to system");
   };
@@ -4598,7 +4630,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"supplierStock",  icon:"📊",label:"My Stock",   roles:["supplier"]},
         {id:"supplierPurchaseInvoices",icon:"📥",label:"Purchase Invoices", roles:["supplier"],badge:supplierPurchaseInvoices.filter(i=>i.status!=="received").length||0},
         {id:"supplierStockTake",icon:"🔢",label:"My Stock Take", roles:["supplier"]},
-        {id:"supplierScanStock",icon:"📷",label:"Scan Stock In", roles:["supplier"]},
+        {id:"supplierScanStock",icon:"📷",label:"Scan Stock Take", roles:["supplier"]},
         {id:"supplierStockLogs",icon:"📜",label:"My Stock Records", roles:["supplier"]},
         {id:"supplierOrders", icon:"📋",label:"My Orders",  roles:["supplier"],badge:supplierBookings.filter(b=>b.status==="pending").length||0},
         {id:"supplierQueries",icon:"💬",label:"My Queries", roles:["supplier"],badge:supplierQueries.filter(q=>q.status==="pending").length||0},
@@ -6406,10 +6438,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onSaveCount={saveSupplierCountedQty} onComplete={completeSupplierStockTake} onDelete={deleteSupplierStockTake} onRefresh={reloadSupplierParts}/>
         )}
 
-        {/* ── SUPPLIER PORTAL: SCAN STOCK IN ── */}
+        {/* ── SUPPLIER PORTAL: SCAN STOCK TAKE ── */}
         {tab==="supplierScanStock"&&role==="supplier"&&(
-          <SupplierScanStockPage existingParts={supplierExistingParts} ownParts={supplierParts} supplierCode={user.supplier_code||user.supplier_name||""}
-            onAdjust={scanStockAdjust}/>
+          <SupplierScanStockPage stockTakes={supplierStockTakes} items={supplierStockTakeItems} supplierCode={user.supplier_code||user.supplier_name||""}
+            onStart={startSupplierStockTake} onOpen={loadSupplierStockTakeItems}
+            onScanCount={scanCountSupplierStockTakeItem} onManualSet={manualSetSupplierStockTakeItem}
+            onComplete={completeSupplierStockTake} onDelete={deleteSupplierStockTake} onRefresh={reloadSupplierParts}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY STOCK RECORDS ── */}

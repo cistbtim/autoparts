@@ -1414,7 +1414,7 @@ function CatalogFitmentEditModal({part, onSave, onClose}) {
 // from a supplier, the opposite direction). Each line gets its own bin location
 // (defaulting to whatever's already on file for that part) and, on save, one
 // printed label per physical unit sequenced 1/N..N/N (see saveSupplierPurchaseInvoice).
-function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="", marginOptions=null, editingInvoice=null, editingItems=[], onSave, onQuickAddPart, onUpdatePart, onUpdateCatalogPart, onCancel}) {
+function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="", marginOptions=null, editingInvoice=null, editingItems=[], alreadyStocked=false, onSave, onQuickAddPart, onUpdatePart, onUpdateCatalogPart, onCancel}) {
   // Resolves a thumbnail for a continued invoice's already-saved lines, by
   // matching back to the same stock row (part_suppliers/supplier_parts) they were
   // added from — invoice_items itself doesn't store an image.
@@ -1441,10 +1441,12 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   const [search, setSearch] = useState("");
   const [items, setItems] = useState(()=>editingItems.map(it=>{
     const targetId=it.source_type==="catalogue"?it.part_suppliers_id:it.supplier_part_id;
-    return {sourceType:it.source_type, targetId, partId:it.part_id||null, name:it.part_name, sku:it.sku||"",
+    return {id:it.id, sourceType:it.source_type, targetId, partId:it.part_id||null, name:it.part_name, sku:it.sku||"",
       image:imageFor(it.source_type,targetId), extraPhotos:extraPhotosFor(it.source_type,targetId),
       qty:it.qty, unitCost:+it.unit_cost||0, binLocation:it.bin_location||""};
-  })); // {sourceType,targetId,partId?,name,sku,image,extraPhotos,qty,unitCost,binLocation}
+  })); // {id?,sourceType,targetId,partId?,name,sku,image,extraPhotos,qty,unitCost,binLocation} — id is only set on
+  // lines that already existed in the DB before this edit; alreadyStocked reconciliation
+  // (App.jsx) uses its presence/absence to tell an existing line from a newly-added one.
   const [zoomImage, setZoomImage] = useState(null); // {images,title}
   const imagesFor=(it)=>[it.image,...(it.extraPhotos||[])].filter(Boolean).map(toImgUrl);
   const [saving, setSaving] = useState(false);
@@ -1636,6 +1638,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   };
 
   const submit=()=>{
+    if(alreadyStocked&&!window.confirm("This invoice's stock is already live. Saving will adjust your actual stock quantities to match these changes (only what changed — added, removed, or re-counted lines). Continue?")) return;
     // A big invoice saves one line at a time (awaited sequentially) before labels
     // are ready — by then the browser no longer treats window.open() as tied to
     // this click, and silently blocks it. Reserve the tab HERE, still inside the
@@ -1645,7 +1648,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
     // kind of thing that can silently misbehave; setting just the title needs no
     // write()/close() at all, so the one real write below is the only one ever
     // made into this window.
-    const labelWin=printLabels?window.open("","_blank","width=600,height=500"):null;
+    const labelWin=(printLabels&&!alreadyStocked)?window.open("","_blank","width=600,height=500"):null;
     if(labelWin) labelWin.document.title="Preparing labels…";
     (async()=>{
       setSaving(true);
@@ -1723,7 +1726,13 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
 
   return (
     <Overlay onClose={handleClose}>
-      <MHead title={editingInvoice?"📥 Continue Invoice":"📥 Receive Stock"} sub={editingInvoice?`Add more items to ${editingInvoice.invoice_no||editingInvoice.id}`:"Record a purchase invoice into your own stock"} onClose={handleClose}/>
+      <MHead title={alreadyStocked?"✏️ Edit Stocked Invoice":editingInvoice?"📥 Continue Invoice":"📥 Receive Stock"}
+        sub={alreadyStocked?`Stock from ${editingInvoice.invoice_no||editingInvoice.id} is already in your system`:editingInvoice?`Add more items to ${editingInvoice.invoice_no||editingInvoice.id}`:"Record a purchase invoice into your own stock"} onClose={handleClose}/>
+      {alreadyStocked&&(
+        <div style={{background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.4)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"var(--yellow)"}}>
+          ⚠️ This invoice's stock was already added to your system. Change a line's qty, remove one, or add a new one (e.g. splitting one part into left/right) — saving will adjust live stock by only what actually changed, and log it in My Stock Records.
+        </div>
+      )}
       <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 14px 4px",marginBottom:16}}>
         <FG cols="1fr 1fr">
           <div><FL label="Invoice No"/><input className="inp" value={invoiceNo} onChange={e=>setInvoiceNo(e.target.value)}/></div>
@@ -1972,16 +1981,18 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
         </div>
         );
       })()}
-      <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginBottom:6,cursor:"pointer"}}>
+      {!alreadyStocked&&<label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginBottom:6,cursor:"pointer"}}>
         <input type="checkbox" checked={printLabels} onChange={e=>setPrintLabels(e.target.checked)}/>
         🖨️ Print labels after saving
-      </label>
+      </label>}
       <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
-        This only records the invoice{printLabels?" and prints labels":""} — your stock stays unchanged until you count everything and click "Add Stock to System" on it back in Purchase Invoices.
+        {alreadyStocked
+          ? "Only lines you actually change (qty, add, or remove) will move live stock — everything else is left untouched."
+          : `This only records the invoice${printLabels?" and prints labels":""} — your stock stays unchanged until you count everything and click "Add Stock to System" on it back in Purchase Invoices.`}
       </div>
       <div style={{display:"flex",gap:10}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>Cancel</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={submit} disabled={saving||items.length===0}>{saving?"Saving…":printLabels?"✅ Save & Print Labels":"✅ Save Invoice"}</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={submit} disabled={saving||items.length===0}>{saving?"Saving…":alreadyStocked?"✅ Save & Adjust Stock":printLabels?"✅ Save & Print Labels":"✅ Save Invoice"}</button>
       </div>
       {zoomImage&&<PartImageZoom images={zoomImage.images} title={zoomImage.title} onClose={()=>setZoomImage(null)}/>}
     </Overlay>
@@ -2137,6 +2148,7 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
       {(showReceive||continuingInvoice)&&(
         <SupplierPurchaseInvoiceModal existingParts={existingParts} ownParts={ownParts} supplierCode={codePrefix} marginOptions={marginOptions} onQuickAddPart={onQuickAddPart} onUpdatePart={onUpdatePart} onUpdateCatalogPart={onUpdateCatalogPart}
           editingInvoice={continuingInvoice} editingItems={continuingInvoice?purchaseInvoiceItems.filter(it=>it.invoice_id===continuingInvoice.id):[]}
+          alreadyStocked={continuingInvoice?.status==="received"}
           onCancel={()=>{setShowReceive(false);setContinuingInvoice(null);}}
           onSave={async(data)=>{await onSavePurchaseInvoice(data);setShowReceive(false);setContinuingInvoice(null);}}/>
       )}
@@ -2169,7 +2181,7 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
                     <span className="badge" style={{fontSize:11,
                       background:pending?"rgba(251,191,36,.15)":"rgba(52,211,153,.12)",
                       color:pending?"var(--yellow)":"var(--green)"}}>{pending?"⏳ Not yet in system":"✅ In system"}</span>
-                    {pending&&<button className="btn btn-ghost btn-xs" onClick={()=>setContinuingInvoice(inv)}>✏️ Continue</button>}
+                    <button className="btn btn-ghost btn-xs" onClick={()=>setContinuingInvoice(inv)}>{pending?"✏️ Continue":"✏️ Edit Items"}</button>
                     {pending&&onApplyPurchaseInvoiceStock&&(
                       <button className="btn btn-primary btn-xs" disabled={applyingId===inv.id||hasMismatch}
                         title={hasMismatch?"Fix the difference (Continue → adjust items/costs) before adding stock":undefined}

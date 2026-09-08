@@ -291,6 +291,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [shopVehicleFilter,setShopVehicleFilter]=useState({make:"",model:""});
   const [workshopJobFilter,setWorkshopJobFilter]=useState(null); // {label,jobIds} — one-shot nav from Vehicle Management's job-card badge
   const [rfqJumpSessionId,setRfqJumpSessionId]=useState(null); // one-shot nav — jump straight into an RFQ session's quotes from a Branch Transfer Request card
+  const [stockingInId,setStockingInId]=useState(null); // supplier_invoices.id currently mid-"Stock In" — disables the button so a double-click can't double-apply stock
   const [vehiclesJumpMake,setVehiclesJumpMake]=useState(initialVehiclesMake||null);
   const [vehiclesJumpModel,setVehiclesJumpModel]=useState(null);
   const [vehiclesJumpSearch,setVehiclesJumpSearch]=useState("");
@@ -3199,8 +3200,110 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // one label per physical unit with a 1/N.."N/N sequence — same seq convention
   // openPartLabelsWindow already uses for multi-copy admin labels.
   // items: [{sourceType,targetId,partId?,name,sku,qty,unitCost,binLocation}]
+  // Shared by every stock adjustment the invoice-edit reconciliation below makes
+  // (line removed, qty changed, or a new line added) — floors at 0 rather than
+  // letting a correction push stock negative (possible if some of it was already
+  // sold/moved elsewhere since the original apply), and always logs so the ledger
+  // explains exactly what an edit did to live stock, not just to the invoice record.
+  const adjustSupplierStockForInvoiceLine=async({sourceType,targetId,deltaQty,itemName,sku,binLocation,reason,refId})=>{
+    if(!targetId||!deltaQty) return true;
+    const table=sourceType==="catalogue"?"part_suppliers":"supplier_parts";
+    const fresh=await api.fresh(table,`id=eq.${targetId}&select=id,stock`);
+    const row=Array.isArray(fresh)&&fresh[0];
+    const before=+(row?.stock)||0;
+    const after=Math.max(0,before+deltaQty);
+    const patch={stock:after};
+    if(binLocation) patch.bin_location=binLocation;
+    await api.patch(table,"id",targetId,patch);
+    await api.insert("supplier_stock_logs",{
+      id:makeId("SSL"),supplier_id:user.supplier_id,source_type:sourceType,
+      part_suppliers_id:sourceType==="catalogue"?targetId:null,
+      supplier_part_id:sourceType==="own"?targetId:null,
+      item_name:itemName||"",sku:sku||"",
+      change_qty:after-before,before_qty:before,after_qty:after,
+      reason,ref_type:"purchase_invoice",ref_id:refId,
+      created_by:user.name||user.username,created_at:new Date().toISOString(),
+    });
+    return before+deltaQty>=0; // false means the clamp actually kicked in
+  };
+
+  // Editing an invoice whose stock was already applied ("received") can't just
+  // rewrite its line items like the pending-invoice path does below — that would
+  // silently desync live stock from what the invoice now says. Diffs old vs new
+  // items by line id (present on every line already in the DB, absent on any line
+  // added fresh in this edit) and adjusts only what actually changed: a removed
+  // line reverses its full qty, a kept line with a different qty gets the delta,
+  // and a brand-new line (e.g. the other half of a part that turned out to be a
+  // left/right pair) adds its full qty — exactly what's needed to split "qty 2,
+  // one part" into "qty 1 + qty 1, two parts" without touching anything else.
+  const reconcileSupplierPurchaseInvoiceEdit=async({invoiceId,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,items})=>{
+    if(!items?.length){showToast("Add at least one item","err");return;}
+    const oldItems=await api.fresh("supplier_purchase_invoice_items",`invoice_id=eq.${invoiceId}&select=*`);
+    const oldItemsArr=Array.isArray(oldItems)?oldItems:[];
+    const oldById=new Map(oldItemsArr.map(it=>[it.id,it]));
+    const keptIds=new Set(items.filter(it=>it.id).map(it=>it.id));
+    let clamped=false;
+
+    for(const old of oldItemsArr){
+      if(keptIds.has(old.id)) continue; // line removed in this edit — reverse it fully
+      const ok=await adjustSupplierStockForInvoiceLine({sourceType:old.source_type,targetId:old.source_type==="catalogue"?old.part_suppliers_id:old.supplier_part_id,
+        deltaQty:-old.qty,itemName:old.part_name,sku:old.sku,reason:"invoice_edit_removed",refId:invoiceId});
+      if(!ok) clamped=true;
+    }
+    for(const it of items){
+      if(!it.id) continue; // handled in the "new line" pass below
+      const old=oldById.get(it.id);
+      const delta=it.qty-(old?.qty||0);
+      if(delta===0) continue;
+      const ok=await adjustSupplierStockForInvoiceLine({sourceType:it.sourceType,targetId:it.targetId,deltaQty:delta,
+        itemName:it.name,sku:it.sku,binLocation:it.binLocation?.trim(),reason:"invoice_edit_adjusted",refId:invoiceId});
+      if(!ok) clamped=true;
+    }
+    for(const it of items){
+      if(it.id) continue; // a genuinely new line added during this edit
+      const ok=await adjustSupplierStockForInvoiceLine({sourceType:it.sourceType,targetId:it.targetId,deltaQty:it.qty,
+        itemName:it.name,sku:it.sku,binLocation:it.binLocation?.trim(),reason:"invoice_edit_added",refId:invoiceId});
+      if(!ok) clamped=true;
+    }
+
+    const itemsTotal=items.reduce((s,it)=>s+it.qty*(+it.unitCost||0),0);
+    const totalQty=items.reduce((s,it)=>s+it.qty,0);
+    const shipping=+shippingCost||0;
+    const customsLocal=(+customsCostUsd||0)*(+exchangeRate||0);
+    const total=itemsTotal+shipping+customsLocal;
+    await api.patch("supplier_purchase_invoices","id",invoiceId,{
+      invoice_no:invoiceNo||"",invoice_date:invoiceDate||null,from_name:fromName||"",notes:notes||"",
+      shipping_cost:shipping,customs_cost_usd:+customsCostUsd||0,exchange_rate:exchangeRate===""?null:+exchangeRate,
+      invoice_total:invoiceTotal===""||invoiceTotal==null?null:+invoiceTotal,
+      total,total_qty:totalQty,
+    });
+    await api.delete("supplier_purchase_invoice_items","invoice_id",invoiceId);
+    for(const it of items){
+      await api.insert("supplier_purchase_invoice_items",{
+        id:makeId("SPII"),invoice_id:invoiceId,source_type:it.sourceType,
+        part_id:it.sourceType==="catalogue"?(it.partId||null):null,
+        part_suppliers_id:it.sourceType==="catalogue"?it.targetId:null,
+        supplier_part_id:it.sourceType==="own"?it.targetId:null,
+        part_name:it.name,sku:it.sku||"",qty:it.qty,unit_cost:+it.unitCost||0,bin_location:it.binLocation?.trim()||null,
+      });
+    }
+    await reloadSupplierParts();
+    showToast(clamped?"⚠️ Invoice updated — some stock couldn't fully reverse (already moved elsewhere), check My Stock Records":"✅ Invoice updated — stock adjusted to match");
+  };
+
   const saveSupplierPurchaseInvoice=async({invoiceId,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,printLabels,items,labelWin})=>{
     if(!items?.length){showToast("Add at least one item","err");labelWin?.close();return;}
+    if(invoiceId){
+      // A received invoice's stock is already live — editing it needs the diff-based
+      // reconciliation above, not the wholesale delete+reinsert this function does
+      // for a still-pending one. Check the CURRENT status fresh rather than trusting
+      // whatever the caller passed, same reasoning as the double-apply race fix.
+      const freshInv=await api.fresh("supplier_purchase_invoices",`id=eq.${invoiceId}&select=status`);
+      if((Array.isArray(freshInv)&&freshInv[0]?.status)==="received"){
+        labelWin?.close(); // labels don't apply to a post-hoc edit of an already-stocked invoice
+        return reconcileSupplierPurchaseInvoiceEdit({invoiceId,invoiceNo,invoiceDate,fromName,notes,shippingCost,customsCostUsd,exchangeRate,invoiceTotal,items});
+      }
+    }
     // Landed cost = the items themselves + shipping + customs (paid in USD,
     // converted at the given rate) — shown as one Total so the real cost of this
     // shipment is clear, even though per-item unit_cost stays exactly what was typed
@@ -3717,8 +3820,30 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     closeM("supplierInvoice");showToast(isNew?"Invoice saved":"Invoice updated");
   };
   const stockInInvoice=async(inv)=>{
+    // Claim atomically before touching any stock — same TOCTOU race the supplier
+    // portal's "Add Stock to System" had (fixed 2026-09-08, after a real double-
+    // apply doubled 35 part rows): the button below only disables once React
+    // re-renders, so a double-click can fire this twice before either finishes.
+    // This dual-condition PATCH only succeeds for whichever call gets there first
+    // — a second concurrent call finds zero rows still eligible and bails out.
+    const claimRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/supplier_invoices?id=eq.${inv.id}&or=(stocked_in.eq.false,stocked_in.is.null)`,
+      { method:"PATCH",
+        headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, "Content-Type":"application/json", Prefer:"return=representation" },
+        body: JSON.stringify({stocked_in:true}) }
+    ).then(r=>r.json()).catch(()=>[]);
+    if(!Array.isArray(claimRes)||claimRes.length===0){
+      showToast("Already stocked in","err");
+      await refreshTables("supplier_invoices");
+      return;
+    }
     const rows=await api.get("supplier_invoice_items",`invoice_id=eq.${encodeURIComponent(inv.id)}&select=*`);
-    if(!Array.isArray(rows)||rows.length===0){showToast("No line items found for this invoice","err");return;}
+    if(!Array.isArray(rows)||rows.length===0){
+      await api.patch("supplier_invoices","id",inv.id,{stocked_in:false}); // release the claim — nothing to stock
+      showToast("No line items found for this invoice","err");
+      await refreshTables("supplier_invoices");
+      return;
+    }
     let stocked=0,skipped=0;
     const stockedPartIds=[];
     // Determine effective branch — no + coercion (branch IDs are UUIDs)
@@ -3755,7 +3880,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       stockedPartIds.push(String(item.part_id));
       stocked++;
     }
-    if(stocked>0) await api.patch("supplier_invoices","id",inv.id,{stocked_in:true});
+    if(stocked===0) await api.patch("supplier_invoices","id",inv.id,{stocked_in:false}); // release the claim — nothing applied, so let this be retried once parts are linked
     await refreshTables("supplier_invoices","parts","branch_stock","inventory_logs");
     closeM("supplierInvoice");
     if(stocked>0){
@@ -6487,7 +6612,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                             <button className="btn btn-ghost btn-xs" onClick={()=>openM("supplierInvoice",inv)}>✏️ Edit</button>
                             <button className="btn btn-info btn-xs" onClick={()=>openM("pdfInvoice",{...inv,type:"supplier"})}>🖨 PDF</button>
                             {!inv.stocked_in
-                              ? <button className="btn btn-warning btn-xs" onClick={()=>stockInInvoice(inv)}>📦 Stock In</button>
+                              ? <button className="btn btn-warning btn-xs" disabled={stockingInId===inv.id}
+                                  onClick={async()=>{setStockingInId(inv.id);await stockInInvoice(inv);setStockingInId(null);}}>
+                                  {stockingInId===inv.id?"Stocking…":"📦 Stock In"}
+                                </button>
                               : <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:11}}>✅ Stocked</span>
                             }
                             {inv.status!=="paid"

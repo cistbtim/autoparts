@@ -10,6 +10,24 @@ function resolveVehicleModel(job, vehicles=[]) {
   return match?.model || job.vehicle_model;
 }
 
+// Printed quotes/invoices must group parts before labour (matching the on-screen
+// split in WorkshopJobDetail) while keeping whatever order the user set within each
+// group via the row ▲▼ sort buttons — never re-sort by anything else. Items without
+// a sort_order yet (not manually reordered) fall back to their incoming array
+// position, so unsorted jobs print exactly as before this feature existed.
+function sortForPrint(items) {
+  return [...items]
+    .map((it,idx)=>({it,idx}))
+    .sort((a,b)=>{
+      const td=(a.it.type==="part"?0:1)-(b.it.type==="part"?0:1);
+      if(td!==0) return td;
+      const ao=a.it.sort_order!=null?+a.it.sort_order:a.idx;
+      const bo=b.it.sort_order!=null?+b.it.sort_order:b.idx;
+      return ao-bo;
+    })
+    .map(x=>x.it);
+}
+
 // Single source of truth for the check-in inspection checklist — Workshop.jsx
 // imports this instead of keeping its own copy, so the live checklist UI and
 // the printed report can never drift apart again (they previously did: this
@@ -381,7 +399,8 @@ export function printJobCardLabel(job, settings) {
   w.document.close();
 }
 
-export function printWorkshopInvoice(job, items, invoice, settings, photos={}, vehicles=[]) {
+export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}, vehicles=[]) {
+  const items = sortForPrint(allItems);
   const dispModel = resolveVehicleModel(job, vehicles);
   const C = curSym(settings.currency||getSettings().currency);
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -568,12 +587,7 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
       </div>`).join("")}
     </div>` : "";
 
-  const PT_ORDER = {"New-Replacement":0,"Original Parts":1,"Used Parts":2};
-  const sortedItems = [...items].sort((a,b)=>{
-    const td = (a.type==="part"?0:1)-(b.type==="part"?0:1);
-    if(td!==0) return td;
-    return (PT_ORDER[a.part_type]??99)-(PT_ORDER[b.part_type]??99);
-  });
+  const sortedItems = sortForPrint(items);
 
   // Resolve a quote line back to its main-inventory part (by SKU) so the row can
   // show the real product photo, same lookup WorkshopJobDetail uses for the badge.

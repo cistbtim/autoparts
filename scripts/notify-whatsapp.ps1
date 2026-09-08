@@ -47,6 +47,8 @@ public class WaWin32 {
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern IntPtr PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", CharSet = CharSet.Auto)] public static extern IntPtr LoadKeyboardLayout(string pwszKLID, uint Flags);
     public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
 }
 "@
@@ -59,6 +61,18 @@ function Get-WaProcess {
     # matching on title alone is ambiguous and can silently grab the invisible frame.
     return Get-Process -Name msedgewebview2 -ErrorAction SilentlyContinue |
         Where-Object { $_.MainWindowTitle -like "*WhatsApp*" } | Select-Object -First 1
+}
+
+function Set-EnglishInput($waProc) {
+    # User keeps a Chinese IME active on this machine, which can intercept/garble
+    # SendKeys keystrokes before they reach the target field (confirmed 2026-09-01 and
+    # again 2026-09-08 - it swallowed a WhatsApp search and opened the wrong chat).
+    # WM_INPUTLANGCHANGEREQUEST forces the target window's thread to plain English
+    # (US) input regardless of whatever IME/layout the taskbar currently shows -
+    # more reliable than guessing the user's configured IME toggle hotkey.
+    $hkl = [WaWin32]::LoadKeyboardLayout("00000409", 0)
+    [WaWin32]::PostMessage($waProc.MainWindowHandle, 0x0050, [IntPtr]::Zero, $hkl) | Out-Null
+    Start-Sleep -Milliseconds 300
 }
 
 function Click-At($x, $y) {
@@ -160,33 +174,23 @@ if ($Phase -eq 'Open') {
         Start-Sleep -Seconds 6
     }
 
-    $rect = Get-FocusedWaRect $waProc
-    $winW = $rect.Right - $rect.Left
-    $winH = $rect.Bottom - $rect.Top
+    Get-FocusedWaRect $waProc | Out-Null
+    Set-EnglishInput $waProc
 
-    # Coordinates below are fractions of the WhatsApp window measured directly against a
-    # live screenshot (window was 2560x1032, maximized) - the old 0.236/0.168/0.376 values
-    # were guesses that landed inside the chat list, never the search box, which is why
-    # every earlier run opened no chat at all (confirmed via wa-verify-open.png showing
-    # the default unfiltered "Chats" list with nothing selected).
-    #
-    # Click search box twice (a single click sometimes failed to grab focus in testing -
-    # this app is a UWP shell hosting a webview, and its foreground/focus handoff on the
-    # first click is flaky) then, instead of typing the contact name and hoping the
-    # results list renders (unreliable / never reproduced cleanly in testing), just open
-    # it from "Recent searches" - reliable because this script is what puts "tim mtn
-    # unlimit" there in the first place, so it's pinned at position 1 after every run.
-    $searchBoxX  = $rect.Left + [int]($winW * 0.080)
-    $searchBoxY  = $rect.Top  + [int]($winH * 0.097)
-    $recentX     = $rect.Left + [int]($winW * 0.031)
-    $recentY     = $rect.Top  + [int]($winH * 0.185)
-    Click-At $searchBoxX $searchBoxY
-    Start-Sleep -Milliseconds 300
-    Click-At $searchBoxX $searchBoxY
+    # Keyboard-driven instead of coordinate-clicking the search box: Ctrl+F reliably
+    # focuses WhatsApp's search regardless of window geometry (mouse clicks depend on
+    # measuring the window rect correctly, which broke when WhatsApp was already open
+    # in a different state - two blind clicks on the search box landed on nothing and
+    # every subsequent step silently no-op'd). Down+Enter then selects the top search
+    # result instead of clicking a "Recent searches" position, which assumed the target
+    # chat was always pinned at slot 1.
+    [System.Windows.Forms.SendKeys]::SendWait("^f")
+    Start-Sleep -Milliseconds ($(if ($coldLaunch) { 800 } else { 400 }))
+    [System.Windows.Forms.SendKeys]::SendWait("tim mtn unlimit")
     Start-Sleep -Milliseconds ($(if ($coldLaunch) { 1200 } else { 700 }))
-
-    # Click the first "Recent searches" entry (the known "Tim mtn New Unlimit" chat)
-    Click-At $recentX $recentY
+    [System.Windows.Forms.SendKeys]::SendWait("{DOWN}")
+    Start-Sleep -Milliseconds 200
+    [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
     Start-Sleep -Milliseconds ($(if ($coldLaunch) { 2000 } else { 1200 }))
 
     Save-FullScreenshot $VerifyOpenPath
@@ -208,6 +212,7 @@ if ($Phase -eq 'Send') {
     $rect = Get-FocusedWaRect $waProc
     $winW = $rect.Right - $rect.Left
     $winH = $rect.Bottom - $rect.Top
+    Set-EnglishInput $waProc
 
     # Click message box, clear it, type the link, send
     Click-At ($rect.Left + [int]($winW * 0.702)) ($rect.Top + [int]($winH * 0.946))

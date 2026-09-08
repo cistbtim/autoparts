@@ -4405,6 +4405,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   const [editRemarkId,      setEditRemarkId]      = useState(null);
   const [editRemarkVal,     setEditRemarkVal]      = useState("");
   const [remarkOverrides,   setRemarkOverrides]   = useState({});
+  const [sortOverrides,     setSortOverrides]     = useState({}); // optimistic item.id -> sort_order, ahead of the save round-trip
   const [pricePopup,    setPricePopup]    = useState(null); // {item, costs, markup, selIdx}
   const [wsShopReqModal, setWsShopReqModal] = useState(false);
   const [wsShopPartView, setWsShopPartView] = useState(null); // spare shop part info popup
@@ -6870,11 +6871,32 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           <div style={{background:"var(--surface)"}}>
           {(()=>{
             if(items.length===0) return <div style={{textAlign:"center",padding:32,color:"var(--text3)",fontSize:14}}>{t.wsqtNoItems}</div>;
-            const partItems=items.filter(i=>i.type!=="labour");
-            const labourItems=items.filter(i=>i.type==="labour");
+            // Manual sort order: falls back to each item's original fetch position so
+            // existing jobs (no sort_order set yet) keep displaying exactly as before —
+            // only items the user has actually reordered get a real sort_order value.
+            const origIndexOf = new Map(items.map((it,i)=>[it.id,i]));
+            const effOrder = it => sortOverrides[it.id] ?? (it.sort_order!=null ? +it.sort_order : origIndexOf.get(it.id));
+            const orderedItems = [...items].sort((a,b)=>effOrder(a)-effOrder(b));
+            const partItems=orderedItems.filter(i=>i.type!=="labour");
+            const labourItems=orderedItems.filter(i=>i.type==="labour");
             const partTotal=partItems.reduce((s,i)=>s+(+i.total||0),0);
             const labourTotal=labourItems.reduce((s,i)=>s+(+i.total||0),0);
-            const mobileCard=(item,idx)=>{
+            // Swap this item with its neighbour within its own group (parts reorder
+            // only among parts, labour only among labour — matches the on-screen split
+            // and what printing groups into). Only the two swapped rows are persisted.
+            const moveItem = (item, dir) => {
+              if(itemsLocked) return;
+              const group = item.type==="labour" ? labourItems : partItems;
+              const idx = group.findIndex(g=>g.id===item.id);
+              const targetIdx = idx+dir;
+              if(idx<0||targetIdx<0||targetIdx>=group.length) return;
+              const other = group[targetIdx];
+              const a = effOrder(item), b = effOrder(other);
+              setSortOverrides(prev=>({...prev,[item.id]:b,[other.id]:a}));
+              onSaveItem({...item, sort_order:b}).catch(()=>{});
+              onSaveItem({...other, sort_order:a}).catch(()=>{});
+            };
+            const mobileCard=(item,idx,groupLen=1)=>{
               const supCosts=getSupCosts(item.description);
               const isEditingPrice=editPriceId===item.id;
               const isEditingQty=editQtyId===item.id;
@@ -6909,7 +6931,11 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       <div onClick={()=>{if(!itemsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":"1px dashed var(--text3)"}}>{descOverrides[item.id]??item.description}</div>
                       {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2,display:"block"}}>{item.part_sku}</code>}
                     </div>
-                    {!itemsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0,fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>}
+                    {!itemsLocked&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0}}>
+                      <button className="btn btn-ghost btn-xs" disabled={idx===0} style={{color:idx===0?"var(--text3)":"var(--text)",opacity:idx===0?.35:1,cursor:idx===0?"default":"pointer",lineHeight:1,padding:"2px 4px"}} title="Move up" onClick={()=>moveItem(item,-1)}>▲</button>
+                      <button className="btn btn-ghost btn-xs" disabled={idx===groupLen-1} style={{color:idx===groupLen-1?"var(--text3)":"var(--text)",opacity:idx===groupLen-1?.35:1,cursor:idx===groupLen-1?"default":"pointer",lineHeight:1,padding:"2px 4px"}} title="Move down" onClick={()=>moveItem(item,1)}>▼</button>
+                      <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
+                    </div>}
                   </div>
                   {!hideCosts&&supCosts.length>0&&(
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
@@ -6982,7 +7008,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 </div>
               );
             };
-            const desktopRow=(item)=>{
+            const desktopRow=(item,idx=0,groupLen=1)=>{
               const supCosts=getSupCosts(item.description);
               const isEditing=editPriceId===item.id;
               return (
@@ -7070,18 +7096,24 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                   )}
                 </td>
                 <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmtAmt(isEditing?(+editPriceVal||0)*(editQtyId===item.id?+editQtyVal||1:+item.qty||1):editQtyId===item.id?(+item.unit_price||0)*(+editQtyVal||1):item.total)}</td>
-                <td>{!itemsLocked&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button>}</td>
+                <td style={{whiteSpace:"nowrap"}}>
+                  {!itemsLocked&&<>
+                    <button className="btn btn-ghost btn-xs" disabled={idx===0} style={{color:idx===0?"var(--text3)":"var(--text)",opacity:idx===0?.35:1,cursor:idx===0?"default":"pointer",padding:"0 3px"}} title="Move up" onClick={()=>moveItem(item,-1)}>▲</button>
+                    <button className="btn btn-ghost btn-xs" disabled={idx===groupLen-1} style={{color:idx===groupLen-1?"var(--text3)":"var(--text)",opacity:idx===groupLen-1?.35:1,cursor:idx===groupLen-1?"default":"pointer",padding:"0 3px"}} title="Move down" onClick={()=>moveItem(item,1)}>▼</button>
+                    <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>onDeleteItem(item.id)}>✕</button>
+                  </>}
+                </td>
               </tr>
               );
             };
             if(isMobile) return (
               <div style={{display:"flex",flexDirection:"column"}}>
                 {partItems.length>0&&<div style={{padding:"6px 16px",background:"rgba(96,165,250,.07)",borderLeft:"3px solid var(--blue)",fontSize:11,fontWeight:700,color:"var(--blue)",letterSpacing:".04em"}}>🔩 {t.wsqtPart} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:4}}>{partItems.length} item{partItems.length!==1?"s":""}</span></div>}
-                {partItems.map((item,idx)=>mobileCard(item,idx))}
+                {partItems.map((item,idx)=>mobileCard(item,idx,partItems.length))}
                 {partItems.length>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 16px 5px 19px",background:"rgba(96,165,250,.04)",borderLeft:"3px solid rgba(96,165,250,.4)",fontSize:12,fontWeight:700,color:"var(--blue)"}}><span>Parts subtotal</span><span style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(partTotal)}</span></div>}
                 {partItems.length>0&&labourItems.length>0&&<div style={{height:6,background:"var(--surface3)"}}/>}
                 {labourItems.length>0&&<div style={{padding:"6px 16px",background:"rgba(52,211,153,.07)",borderLeft:"3px solid var(--green)",fontSize:11,fontWeight:700,color:"var(--green)",letterSpacing:".04em"}}>👷 {t.wsqtLabour} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:4}}>{labourItems.length} item{labourItems.length!==1?"s":""}</span></div>}
-                {labourItems.map((item,idx)=>mobileCard(item,idx))}
+                {labourItems.map((item,idx)=>mobileCard(item,idx,labourItems.length))}
                 {labourItems.length>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 16px 5px 19px",background:"rgba(52,211,153,.04)",borderLeft:"3px solid rgba(52,211,153,.4)",fontSize:12,fontWeight:700,color:"var(--green)"}}><span>Labour subtotal</span><span style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(labourTotal)}</span></div>}
                 <div style={{borderTop:"2px solid var(--border2)",padding:"10px 16px",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
                   {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:12,color:"var(--text3)"}}>{t.subtotal}: <strong style={{color:"var(--text)",fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(quoteSubtotal)}</strong></div>}
@@ -7106,11 +7138,11 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 </tr></thead>
                 <tbody>
                   {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.07)"}}><td colSpan={9} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--blue)",borderBottom:"1px solid rgba(96,165,250,.2)",letterSpacing:".04em"}}>🔩 {t.wsqtPart} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{partItems.length} item{partItems.length!==1?"s":""}</span></td></tr>}
-                  {partItems.map(desktopRow)}
+                  {partItems.map((it,idx)=>desktopRow(it,idx,partItems.length))}
                   {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.04)"}}><td colSpan={7} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Parts subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)",padding:"5px 8px"}}>{fmtAmt(partTotal)}</td><td/></tr>}
                   {partItems.length>0&&labourItems.length>0&&<tr><td colSpan={9} style={{height:6,background:"var(--surface3)",padding:0}}/></tr>}
                   {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.07)"}}><td colSpan={9} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--green)",borderBottom:"1px solid rgba(52,211,153,.2)",letterSpacing:".04em"}}>👷 {t.wsqtLabour} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{labourItems.length} item{labourItems.length!==1?"s":""}</span></td></tr>}
-                  {labourItems.map(desktopRow)}
+                  {labourItems.map((it,idx)=>desktopRow(it,idx,labourItems.length))}
                   {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.04)"}}><td colSpan={7} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Labour subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--green)",padding:"5px 8px"}}>{fmtAmt(labourTotal)}</td><td/></tr>}
                   <tr style={{borderTop:"2px solid var(--border2)"}}>
                     <td colSpan={7} style={{textAlign:"right",padding:"8px 12px",verticalAlign:"middle"}}>

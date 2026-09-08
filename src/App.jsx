@@ -6573,7 +6573,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── SUPPLIER PORTAL: MY STOCK RECORDS ── */}
         {tab==="supplierStockLogs"&&role==="supplier"&&(
-          <SupplierStockLogPage logs={supplierStockLogs} onRefresh={reloadSupplierParts}/>
+          <SupplierStockLogPage logs={supplierStockLogs} existingParts={supplierExistingParts} ownParts={supplierParts} supplierCode={user.supplier_code||user.supplier_name||""} onRefresh={reloadSupplierParts}/>
         )}
 
         {/* ── SUPPLIER PORTAL: MY QUERIES ── */}

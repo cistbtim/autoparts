@@ -2011,6 +2011,8 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
   const [binVal, setBinVal] = useState("");
   const [saving, setSaving] = useState(false);
   const [zeroing, setZeroing] = useState(false);
+  const [search, setSearch] = useState("");
+  const [zoomImg, setZoomImg] = useState(null);
 
   // Detects this supplier's own SKU prefix (e.g. "MCK-") straight from their
   // catalogue SKUs — always accurate, unlike trusting supplierCode/user.supplier_code
@@ -2028,10 +2030,15 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
   const codePrefix=detectedPrefix||(supplierCode||"").trim().toUpperCase();
 
   const rows = [
-    ...existingParts.map(p=>({sourceType:"catalogue", id:p._linkId, sku:p.sku, name:p.name, stock:p._supplierStock??0, bin:p._supplierBinLocation||""})),
-    ...ownParts.map(p=>({sourceType:"own", id:p.id, sku:codePrefix?`${codePrefix}-${p.part_code}`:p.part_code, name:p.name, stock:p.stock??0, bin:p.bin_location||""})),
+    ...existingParts.map(p=>({sourceType:"catalogue", id:p._linkId, sku:p.sku, name:p.name, stock:p._supplierStock??0, bin:p._supplierBinLocation||"", make:p.make||"", model:p.model||"", year_range:p.year_range||"", image:p.image_url||""})),
+    ...ownParts.map(p=>({sourceType:"own", id:p.id, sku:codePrefix?`${codePrefix}-${p.part_code}`:p.part_code, name:p.name, stock:p.stock??0, bin:p.bin_location||"", make:p.make||"", model:p.model||"", year_range:p.year_range||"", image:p.image_url||""})),
   ].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
   const staleMainStockCount = existingParts.filter(p=>+p.stock>0&&codePrefix&&(p.sku||"").toUpperCase().startsWith(codePrefix+"-")).length;
+
+  const searchKeywords=search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const visibleRows=searchKeywords.length
+    ? rows.filter(row=>matchesSearch(searchBlob(row,row.sku),searchKeywords))
+    : rows;
 
   const startEdit=(row)=>{setEditing({sourceType:row.sourceType,id:row.id});setStockVal(String(row.stock));setBinVal(row.bin);};
   const save=async()=>{
@@ -2051,7 +2058,7 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div>
           <h1 style={{fontSize:20,fontWeight:700}}>📊 My Stock</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{rows.length} parts — your own qty & location</p>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{searchKeywords.length?`${visibleRows.length} of ${rows.length}`:rows.length} parts — your own qty & location</p>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
@@ -2067,20 +2074,33 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
           {staleMainStockCount} catalogue part{staleMainStockCount>1?"s":""} still show{staleMainStockCount>1?"":"s"} a nonzero MotorDesk-side stock count from before you took over your own stock — the "Zero MotorDesk Stock" button clears just that old number, not your own.
         </div>
       )}
+      <input className="inp" style={{marginBottom:14,maxWidth:420,textTransform:"uppercase"}} value={search} onChange={e=>setSearch(e.target.value.toUpperCase())}
+        placeholder="🔍 Search by SKU, name, make, model…"/>
       {rows.length===0 ? (
         <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No parts yet.</div>
+      ) : visibleRows.length===0 ? (
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No parts match "{search}"</div>
       ) : (
         <div className="card" style={{overflow:"hidden"}}>
           <div className="tbl-wrap">
             <table className="tbl">
-              <thead><tr><th>SKU</th><th>Name</th><th>Source</th><th>Stock</th><th>Location</th><th>Actions</th></tr></thead>
+              <thead><tr><th></th><th>SKU</th><th>Name</th><th>Make / Model / Year</th><th>Source</th><th>Stock</th><th>Location</th><th>Actions</th></tr></thead>
               <tbody>
-                {rows.map(row=>{
+                {visibleRows.map(row=>{
                   const isEditing=editing&&editing.sourceType===row.sourceType&&editing.id===row.id;
                   return (
                     <tr key={`${row.sourceType}-${row.id}`}>
+                      <td style={{width:80}}>
+                        <div style={{width:72,height:72,borderRadius:8,overflow:"hidden",background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",cursor:row.image?"zoom-in":"default"}}
+                          onClick={()=>row.image&&setZoomImg(toImgUrl(row.image))}>
+                          {row.image
+                            ? <img src={toImgUrl(row.image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+                            : <span style={{fontSize:28,opacity:.3}}>🖼</span>}
+                        </div>
+                      </td>
                       <td style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{row.sku||"—"}</td>
                       <td>{row.name}</td>
+                      <td style={{fontSize:12,color:(row.make||row.model||row.year_range)?"var(--text)":"var(--text3)"}}>{[row.make,row.model,row.year_range].filter(Boolean).join(" · ")||"—"}</td>
                       <td><span className="badge" style={{fontSize:11,background:row.sourceType==="catalogue"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:row.sourceType==="catalogue"?"var(--blue)":"var(--green)"}}>{row.sourceType==="catalogue"?"Catalogue":"My Part"}</span></td>
                       {isEditing ? (
                         <>
@@ -2108,7 +2128,7 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
           </div>
         </div>
       )}
-
+      {zoomImg&&<ImgLightbox url={zoomImg} onClose={()=>setZoomImg(null)}/>}
     </div>
   );
 }
@@ -2606,8 +2626,21 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
 
 // Read-only ledger of every stock movement — item_name/sku/before/after are all
 // captured at the moment of the change (see deductSupplierStock in App.jsx), so
-// this stays accurate even if a part is later renamed or removed.
-export function SupplierStockLogPage({logs=[], onRefresh}) {
+// this stays accurate even if a part is later renamed or removed. Make/model/year
+// aren't stored on the log row itself (it only snapshots name+sku+qty), so they're
+// resolved live by matching sku back to the current catalogue/own-parts record —
+// same lookup the invoice modal's fullRecordFor uses, prefix-aware for own parts.
+export function SupplierStockLogPage({logs=[], existingParts=[], ownParts=[], supplierCode="", onRefresh}) {
+  const vehicleFor=(sku)=>{
+    if(!sku) return null;
+    const cat=existingParts.find(p=>p.sku&&p.sku.toUpperCase()===sku.toUpperCase());
+    if(cat) return {make:cat.make,model:cat.model,year_range:cat.year_range};
+    const own=ownParts.find(p=>{
+      const full=supplierCode?`${supplierCode}-${p.part_code}`:p.part_code;
+      return full&&full.toUpperCase()===sku.toUpperCase();
+    });
+    return own?{make:own.make,model:own.model,year_range:own.year_range}:null;
+  };
   return (
     <div className="fu">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -2623,20 +2656,24 @@ export function SupplierStockLogPage({logs=[], onRefresh}) {
         <div className="card" style={{overflow:"hidden"}}>
           <div className="tbl-wrap">
             <table className="tbl">
-              <thead><tr><th>Date</th><th>Item</th><th>Reason</th><th>Change</th><th>Before → After</th></tr></thead>
+              <thead><tr><th>Date</th><th>Item</th><th>Make / Model / Year</th><th>Reason</th><th>Change</th><th>Before → After</th></tr></thead>
               <tbody>
-                {logs.map(l=>(
+                {logs.map(l=>{
+                  const v=vehicleFor(l.sku);
+                  return (
                   <tr key={l.id}>
                     <td style={{color:"var(--text3)",fontSize:12}}>{fmtDT(l.created_at)}</td>
                     <td>
                       <div style={{fontWeight:600}}>{l.item_name||"—"}</div>
                       {l.sku&&<div style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{l.sku}</div>}
                     </td>
+                    <td style={{fontSize:12,color:v?"var(--text)":"var(--text3)"}}>{v?[v.make,v.model,v.year_range].filter(Boolean).join(" · ")||"—":"—"}</td>
                     <td style={{textTransform:"capitalize"}}>{(l.reason||"").replace(/_/g," ")}</td>
                     <td style={{fontWeight:700,color:l.change_qty<0?"var(--red)":"var(--green)"}}>{l.change_qty>0?"+":""}{l.change_qty}</td>
                     <td style={{color:"var(--text3)",fontSize:12}}>{l.before_qty} → {l.after_qty}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

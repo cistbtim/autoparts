@@ -9802,25 +9802,29 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
           </div>
           <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",marginBottom:12}}>
             {lines.map(l=>(
-              <div key={l.key} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderBottom:"1px solid var(--border)",background:l.checked?"var(--surface2)":"var(--surface)",opacity:l.checked?1:.5}}>
-                <input type="checkbox" checked={l.checked} onChange={e=>setLine(l.key,{checked:e.target.checked})} style={{width:17,height:17,cursor:"pointer",flexShrink:0,accentColor:l.type==="part"?"var(--blue)":"var(--green)"}}/>
-                <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,flexShrink:0,background:l.type==="part"?"rgba(96,165,250,.15)":"rgba(52,211,153,.15)",color:l.type==="part"?"var(--blue)":"var(--green)"}}>
-                  {l.type==="part"?"🔩":"👷"}
-                </span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.description}</div>
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <div key={l.key} style={{padding:"9px 12px",borderBottom:"1px solid var(--border)",background:l.checked?"var(--surface2)":"var(--surface)",opacity:l.checked?1:.5}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <input type="checkbox" checked={l.checked} onChange={e=>setLine(l.key,{checked:e.target.checked})} style={{width:17,height:17,cursor:"pointer",flexShrink:0,accentColor:l.type==="part"?"var(--blue)":"var(--green)"}}/>
+                  <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,flexShrink:0,background:l.type==="part"?"rgba(96,165,250,.15)":"rgba(52,211,153,.15)",color:l.type==="part"?"var(--blue)":"var(--green)"}}>
+                    {l.type==="part"?"🔩":"👷"}
+                  </span>
+                  <div style={{flex:1,minWidth:0,fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.description}</div>
+                  <span style={{fontWeight:800,fontSize:13,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",flexShrink:0}}>{fmtAmt((+l.qty||1)*(+l.unit_price||0))}</span>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginTop:6,paddingLeft:25}}>
+                  <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",flex:1,minWidth:0}}>
                     {l.part_sku&&<code style={{fontSize:10,color:"var(--text3)"}}>{l.part_sku}</code>}
                     {l.stockQty!==null&&<span style={{fontSize:10,fontWeight:700,color:l.stockQty<=0?"var(--red)":"var(--green)"}}>{l.stockQty<=0?"⛔ Out of stock":`${l.stockQty} in stock`}</span>}
                     {l.type==="part"&&+l.cost_price>0&&<span style={{fontSize:10,color:"#f59e0b",fontWeight:600}}>cost {fmtAmt(l.cost_price)} +{l.markup_pct}%</span>}
                   </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0,marginLeft:"auto"}}>
+                    <input type="number" min="1" step="1" value={l.qty} onChange={e=>setLine(l.key,{qty:e.target.value})}
+                      style={{width:48,textAlign:"center",fontSize:13,fontWeight:700,padding:"3px 4px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)",flexShrink:0}}/>
+                    <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>×</span>
+                    <input type="number" min="0" step="0.01" value={l.unit_price} onChange={e=>setLine(l.key,{unit_price:e.target.value})}
+                      style={{width:80,textAlign:"right",fontSize:13,fontWeight:700,fontFamily:"Rajdhani,sans-serif",padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)",flexShrink:0}}/>
+                  </div>
                 </div>
-                <input type="number" min="1" step="1" value={l.qty} onChange={e=>setLine(l.key,{qty:e.target.value})}
-                  style={{width:48,textAlign:"center",fontSize:13,fontWeight:700,padding:"3px 4px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)",flexShrink:0}}/>
-                <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>×</span>
-                <input type="number" min="0" step="0.01" value={l.unit_price} onChange={e=>setLine(l.key,{unit_price:e.target.value})}
-                  style={{width:80,textAlign:"right",fontSize:13,fontWeight:700,fontFamily:"Rajdhani,sans-serif",padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)",flexShrink:0}}/>
-                <span style={{fontWeight:800,fontSize:13,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",width:70,textAlign:"right",flexShrink:0}}>{fmtAmt((+l.qty||1)*(+l.unit_price||0))}</span>
               </div>
             ))}
             <div style={{display:"flex",justifyContent:"flex-end",gap:10,padding:"9px 12px",background:"rgba(251,191,36,.07)",fontWeight:800}}>

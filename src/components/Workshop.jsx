@@ -9757,33 +9757,37 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
               const ci=parseComboItems(s);
               const rate=+(s.default_price||s.price||s.rate||0);
               return (
-                <div key={s.id} onClick={()=>pickCombo(s)} style={{padding:"12px 14px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",gap:10,alignItems:"center"}}>
-                  <span style={{fontSize:18,flexShrink:0}}>⚡</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:700,fontSize:14}}>{s.name}</div>
-                    <div style={{fontSize:12,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                <div key={s.id} onClick={()=>pickCombo(s)} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid var(--border)",display:"flex",flexDirection:"column",gap:4}}>
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <span style={{fontSize:16,flexShrink:0}}>⚡</span>
+                    <div style={{flex:1,minWidth:0,fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>
+                    {rate>0&&<div style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",fontSize:13,flexShrink:0}}>{fmtAmt(rate)}</div>}
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center",paddingLeft:24}}>
+                    <span style={{fontSize:11,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{ci.length} part{ci.length>1?"s":""}{rate>0?" + labour":""}</span>
+                    <span style={{fontSize:12,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0}}>
                       {ci.map(c=>`${c.name}${+c.qty>1?` ×${c.qty}`:""}`).join(" + ")}
+                    </span>
+                  </div>
+                  {(onSaveService||onDeleteService)&&(
+                    <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                      {onSaveService&&(
+                        <button className="btn btn-ghost btn-xs" title="Edit combo" style={{fontSize:14}}
+                          onClick={e=>{e.stopPropagation();setEditor({item:s});}}>✏️</button>
+                      )}
+                      {onSaveService&&(
+                        <button className="btn btn-ghost btn-xs" title="Duplicate combo — copy it, then add extra items" style={{fontSize:14}}
+                          onClick={e=>{e.stopPropagation();setEditor({item:{...s,id:undefined,name:`${s.name} (Copy)`}});}}>📋</button>
+                      )}
+                      {onDeleteService&&(
+                        <button className="btn btn-ghost btn-xs" title="Delete combo" style={{fontSize:14,color:"var(--red)"}}
+                          onClick={async e=>{
+                            e.stopPropagation();
+                            if(!window.confirm(`Delete combo "${s.name}"?\n\nThis removes the service preset completely (it will also disappear from the Services tab).`)) return;
+                            try{ await onDeleteService(s.id); }catch(err){ alert("Delete failed: "+err.message); }
+                          }}>🗑</button>
+                      )}
                     </div>
-                  </div>
-                  <div style={{textAlign:"right",flexShrink:0}}>
-                    <div style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>{ci.length} part{ci.length>1?"s":""}{rate>0?" + labour":""}</div>
-                    {rate>0&&<div style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",fontSize:13}}>{fmtAmt(rate)} labour</div>}
-                  </div>
-                  {onSaveService&&(
-                    <button className="btn btn-ghost btn-xs" title="Edit combo" style={{flexShrink:0,fontSize:14}}
-                      onClick={e=>{e.stopPropagation();setEditor({item:s});}}>✏️</button>
-                  )}
-                  {onSaveService&&(
-                    <button className="btn btn-ghost btn-xs" title="Duplicate combo — copy it, then add extra items" style={{flexShrink:0,fontSize:14}}
-                      onClick={e=>{e.stopPropagation();setEditor({item:{...s,id:undefined,name:`${s.name} (Copy)`}});}}>📋</button>
-                  )}
-                  {onDeleteService&&(
-                    <button className="btn btn-ghost btn-xs" title="Delete combo" style={{flexShrink:0,fontSize:14,color:"var(--red)"}}
-                      onClick={async e=>{
-                        e.stopPropagation();
-                        if(!window.confirm(`Delete combo "${s.name}"?\n\nThis removes the service preset completely (it will also disappear from the Services tab).`)) return;
-                        try{ await onDeleteService(s.id); }catch(err){ alert("Delete failed: "+err.message); }
-                      }}>🗑</button>
                   )}
                 </div>
               );

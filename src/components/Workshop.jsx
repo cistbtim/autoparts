@@ -6328,7 +6328,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                         style={{width:16,height:16,marginLeft:-8,marginTop:-8,borderRadius:"50%",background:p.source==="ai"?"#f59e0b":"#e11d48",border:"2px solid #fff",boxShadow:p.source==="ai"?"0 0 0 2px rgba(245,158,11,.4)":"0 0 0 2px rgba(225,29,72,.4)",cursor:"pointer"}}/>
                       {vehOpenPinId===p.id&&(
                         <div onClick={e=>e.stopPropagation()}
-                          style={{position:"absolute",top:12,left:-8,background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:10,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)",zIndex:6}}>
+                          style={{position:"absolute",...(p.y>0.6?{bottom:12}:{top:12}),...(p.x>0.5?{right:-8}:{left:-8}),background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:10,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)",zIndex:6}}>
                           <div style={{fontSize:12,color:"#fff",marginBottom:8}}>{p.source==="ai"&&<span style={{color:"#f59e0b"}}>🤖 AI-detected: </span>}{p.note}</div>
                           <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
                             <button className="btn btn-ghost btn-xs" onClick={()=>deletePin(p,id=>{setVehPhotoPins(ps=>ps.filter(x=>x.id!==id));setVehOpenPinId(null);})}>🗑 Delete</button>
@@ -6342,7 +6342,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                     <div onClick={e=>e.stopPropagation()}
                       style={{position:"absolute",left:`${vehPinDraft.x*100}%`,top:`${vehPinDraft.y*100}%`,transform:"translate(-8px,-8px)",zIndex:5}}>
                       <div style={{width:16,height:16,borderRadius:"50%",background:"#facc15",border:"2px solid #fff"}}/>
-                      <div style={{position:"absolute",top:20,left:0,background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:8,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}>
+                      <div style={{position:"absolute",...(vehPinDraft.y>0.6?{bottom:20}:{top:20}),...(vehPinDraft.x>0.5?{right:0}:{left:0}),background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:8,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}>
                         <textarea autoFocus value={vehPinDraft.note} onChange={e=>setVehPinDraft(d=>({...d,note:e.target.value}))}
                           placeholder="What's needed here?" rows={2}
                           style={{width:"100%",fontSize:12,padding:6,borderRadius:6,border:"1px solid var(--border)",resize:"none",color:"black"}}/>
@@ -6581,7 +6581,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                   style={{width:16,height:16,marginLeft:-8,marginTop:-8,borderRadius:"50%",background:p.source==="ai"?"#f59e0b":"#e11d48",border:"2px solid #fff",boxShadow:p.source==="ai"?"0 0 0 2px rgba(245,158,11,.4)":"0 0 0 2px rgba(225,29,72,.4)",cursor:"pointer"}}/>
                 {jobOpenPinId===p.id&&(
                   <div onClick={e=>e.stopPropagation()}
-                    style={{position:"absolute",top:12,left:-8,background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:10,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)",zIndex:6}}>
+                    style={{position:"absolute",...(p.y>0.6?{bottom:12}:{top:12}),...(p.x>0.5?{right:-8}:{left:-8}),background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:10,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)",zIndex:6}}>
                     <div style={{fontSize:12,color:"#fff",marginBottom:8}}>{p.source==="ai"&&<span style={{color:"#f59e0b"}}>🤖 AI-detected: </span>}{p.note}</div>
                     <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
                       <button className="btn btn-ghost btn-xs" onClick={()=>deletePin(p,id=>{setJobPhotoPins(ps=>ps.filter(x=>x.id!==id));setJobOpenPinId(null);})}>🗑 Delete</button>
@@ -6594,7 +6594,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             {jobPinDraft&&(
               <div style={{position:"absolute",left:`${jobPinDraft.x*100}%`,top:`${jobPinDraft.y*100}%`,transform:"translate(-8px,-8px)",zIndex:5}}>
                 <div style={{width:16,height:16,borderRadius:"50%",background:"#facc15",border:"2px solid #fff"}}/>
-                <div style={{position:"absolute",top:20,left:0,background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:8,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}>
+                <div style={{position:"absolute",...(jobPinDraft.y>0.6?{bottom:20}:{top:20}),...(jobPinDraft.x>0.5?{right:0}:{left:0}),background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:8,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}>
                   <textarea autoFocus value={jobPinDraft.note} onChange={e=>setJobPinDraft(d=>({...d,note:e.target.value}))}
                     placeholder="What's needed here?" rows={2}
                     style={{width:"100%",fontSize:12,padding:6,borderRadius:6,border:"1px solid var(--border)",resize:"none",color:"black"}}/>

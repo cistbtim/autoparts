@@ -4636,6 +4636,116 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     side:  localPhotoOverrides.side !==undefined ? localPhotoOverrides.side  : (v.photo_side ||""),
   }:acc,{front:"",rear:"",side:""});
 
+  // ── Vehicle profile-photo AI damage check (front/rear/side) ──
+  const vehicleRec = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
+  const [localDamageOverrides, setLocalDamageOverrides] = useState({});
+  const vehDamageChecks = {...(vehicleRec?.photo_damage_checks||{}), ...localDamageOverrides};
+  const [vehDamageLoading, setVehDamageLoading] = useState(false);
+  const [vehDamageError,   setVehDamageError]   = useState(null);
+  useEffect(()=>{ setVehDamageLoading(false); setVehDamageError(null); },[photoLightbox]);
+
+  // Lifted out of the lightbox render block so the pin-fetch effect below can
+  // depend on the current photo's URL without calling a hook conditionally.
+  const vehVisiblePhotos = [
+    {url:vehiclePhotos.front,label:"Front"},
+    {url:vehiclePhotos.rear, label:"Rear"},
+    {url:vehiclePhotos.side, label:"Side"},
+  ].filter(p=>p.url);
+  const vehLightboxIdx = (photoLightbox!==null&&vehVisiblePhotos.length)
+    ? ((photoLightbox%vehVisiblePhotos.length)+vehVisiblePhotos.length)%vehVisiblePhotos.length : -1;
+  const vehLightboxPhoto = vehLightboxIdx>=0 ? vehVisiblePhotos[vehLightboxIdx] : null;
+
+  // ── Staff marks on the photo (click a spot, type what's needed) ──
+  const [vehPhotoPins, setVehPhotoPins] = useState([]);
+  const [vehPinDraft,  setVehPinDraft]  = useState(null); // {x,y,note} while composing
+  useEffect(()=>{
+    setVehPinDraft(null);
+    if(!vehLightboxPhoto?.url){ setVehPhotoPins([]); return; }
+    api.fresh("ai_damage_corrections",`photo_url=eq.${encodeURIComponent(vehLightboxPhoto.url)}&order=created_at.desc`)
+      .then(r=>setVehPhotoPins(Array.isArray(r)?r:[]))
+      .catch(()=>setVehPhotoPins([]));
+  },[vehLightboxPhoto?.url]);
+
+  const saveVehPin=async()=>{
+    if(!vehLightboxPhoto?.url||!vehPinDraft?.note?.trim()) return;
+    const rec={id:makeId("ADC"),photo_url:vehLightboxPhoto.url,x:vehPinDraft.x,y:vehPinDraft.y,note:vehPinDraft.note.trim(),created_at:new Date().toISOString()};
+    try{
+      await api.insert("ai_damage_corrections",rec);
+      setVehPhotoPins(p=>[rec,...p]);
+    }catch(e){ alert("Could not save mark: "+e.message); }
+    setVehPinDraft(null);
+  };
+  const [vehOpenPinId, setVehOpenPinId] = useState(null);
+
+  // Shared by both photo lightboxes: turn a mark's note into a draft job item,
+  // or delete the mark outright.
+  const [addedPinIds, setAddedPinIds] = useState(()=>new Set());
+  const isMarkAdded=pin=>!!pin.added_to_job||addedPinIds.has(pin.id);
+  const addPinToJobItems=async(pin)=>{
+    if(pin.added_to_job||addedPinIds.has(pin.id)) return;
+    try{
+      await onSaveItem?.({job_id:job.id, type:"part", description:pin.note, qty:1, unit_price:0, total:0});
+      await api.patch("ai_damage_corrections","id",pin.id,{added_to_job:true}).catch(()=>{});
+      setAddedPinIds(p=>new Set(p).add(pin.id));
+    }catch(e){
+      alert("Could not add to quote: "+e.message);
+    }
+  };
+  const deletePin=async(pin,onRemoved)=>{
+    if(!window.confirm("Delete this mark?")) return;
+    try{ await api.delete("ai_damage_corrections","id",pin.id); onRemoved(pin.id); }
+    catch(e){ alert("Could not delete mark: "+e.message); }
+  };
+
+  // Workers AI's shared GPU capacity occasionally queues/times out on this
+  // model size under no fault of the request - retry once with a fresh HTTP
+  // request (its own full timeout budget) before giving up.
+  const postDamageCheck=async(url)=>{
+    let lastErr;
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        const resp=await fetch("/api/photo-damage-check",{
+          method:"POST",
+          headers:{"Content-Type":"application/json","X-Shared-Secret":getSettings().worker_shared_secret||""},
+          body:JSON.stringify({photoUrl:url}),
+        });
+        const data=await resp.json().catch(()=>null);
+        if(!resp.ok||!data?.ok) throw new Error(data?.error||"Damage check failed");
+        return data;
+      }catch(e){ lastErr=e; }
+    }
+    throw lastErr;
+  };
+
+  // Auto-mark whatever the AI flagged as damaged, so its findings show up as
+  // pins too (tagged source:"ai" - kept out of the few-shot feedback loop,
+  // and drawn in a different color so staff can tell them apart from marks
+  // they placed themselves).
+  const createAiPins=async(url,panels,setPinsFn)=>{
+    const candidates=(panels||[]).filter(p=>p.damaged&&typeof p.x==="number"&&typeof p.y==="number");
+    for(const p of candidates){
+      const rec={id:makeId("ADC"),photo_url:url,x:p.x,y:p.y,note:`${p.panel}${p.note?` — ${p.note}`:""}`,source:"ai",created_at:new Date().toISOString()};
+      try{ await api.insert("ai_damage_corrections",rec); setPinsFn(prev=>[rec,...prev]); }catch{ /* non-critical, skip silently */ }
+    }
+  };
+
+  const checkVehiclePhotoDamage=async(slotKey,url,force=false)=>{
+    if(!url||!vehicleRec||(vehDamageChecks[slotKey]&&!force)) return;
+    setVehDamageLoading(true); setVehDamageError(null);
+    try{
+      const data=await postDamageCheck(url);
+      const entry={...data.result,checked_at:new Date().toISOString()};
+      const nextChecks={...vehDamageChecks,[slotKey]:entry};
+      await api.patch("workshop_vehicles","id",vehicleRec.id,{photo_damage_checks:nextChecks});
+      setLocalDamageOverrides(p=>({...p,[slotKey]:entry}));
+      createAiPins(url,data.result.panels,setVehPhotoPins);
+    }catch(e){
+      setVehDamageError(e.message||"Damage check failed");
+    }finally{
+      setVehDamageLoading(false);
+    }
+  };
+
   const handleVehiclePhotoChange = async (field, key, url) => {
     setLocalPhotoOverrides(p=>({...p,[key]:url}));
     const vehId = vehicleRecord?.id || job.workshop_vehicle_id;
@@ -4955,27 +5065,80 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   const jobPhotoGalRef = useRef(null);
   const jobPhotoCounter = useRef(0);
 
+  // ── All marks across this job's photos, for picking into a quotation ──
+  const [quoteMarks, setQuoteMarks] = useState([]);
+  const [selectedMarkIds, setSelectedMarkIds] = useState(()=>new Set());
+  useEffect(()=>{
+    // Refetch whenever the quote popup is open and no photo lightbox is
+    // currently up - i.e. on open, and again each time staff finish marking
+    // a photo and close it, so newly added marks show up without a manual
+    // refresh.
+    if(!quotePopup||photoLightbox!==null||viewPhoto) return;
+    const urls=[vehiclePhotos.front,vehiclePhotos.rear,vehiclePhotos.side,...savedPhotos.map(p=>p.url)].filter(Boolean);
+    if(!urls.length){ setQuoteMarks([]); return; }
+    // Percent-encode each URL individually (Drive photo URLs contain &/? that
+    // would otherwise be misread as query-string structure once embedded raw
+    // into the in.() list) - PostgREST decodes each value back before matching.
+    const inList=urls.map(u=>encodeURIComponent(u)).join(",");
+    api.fresh("ai_damage_corrections",`photo_url=in.(${inList})&order=created_at.desc`)
+      .then(r=>setQuoteMarks(Array.isArray(r)?r:[]))
+      .catch(()=>setQuoteMarks([]));
+  },[quotePopup,photoLightbox,viewPhoto]);
+
+  const toggleMarkSelected=(id)=>{
+    setSelectedMarkIds(p=>{ const n=new Set(p); if(n.has(id))n.delete(id);else n.add(id); return n; });
+  };
+  const addSelectedMarksToQuote=async()=>{
+    for(const m of quoteMarks.filter(m=>selectedMarkIds.has(m.id)&&!m.added_to_job&&!addedPinIds.has(m.id))){
+      try{
+        await onSaveItem?.({job_id:job.id, type:"part", description:m.note, qty:1, unit_price:0, total:0});
+        await api.patch("ai_damage_corrections","id",m.id,{added_to_job:true}).catch(()=>{});
+        setAddedPinIds(p=>new Set(p).add(m.id));
+      }catch(e){
+        alert("Could not add to quote: "+e.message);
+      }
+    }
+    setSelectedMarkIds(new Set());
+  };
+
   // Reset per-photo AI-check UI state whenever the open photo changes
   useEffect(()=>{
     setDamageCheckLoading(false);
     setDamageCheckError(null);
   },[viewPhoto?.id]);
 
-  const checkPhotoDamage=async(photo)=>{
-    if(!photo||photo.ai_damage_check) return;
+  // ── Staff marks on the job photo (click a spot, type what's needed) ──
+  const [jobPhotoPins, setJobPhotoPins] = useState([]);
+  const [jobPinDraft,  setJobPinDraft]  = useState(null); // {x,y,note} while composing
+  useEffect(()=>{
+    setJobPinDraft(null);
+    if(!viewPhoto?.url){ setJobPhotoPins([]); return; }
+    api.fresh("ai_damage_corrections",`photo_url=eq.${encodeURIComponent(viewPhoto.url)}&order=created_at.desc`)
+      .then(r=>setJobPhotoPins(Array.isArray(r)?r:[]))
+      .catch(()=>setJobPhotoPins([]));
+  },[viewPhoto?.url]);
+
+  const saveJobPin=async()=>{
+    if(!viewPhoto?.url||!jobPinDraft?.note?.trim()) return;
+    const rec={id:makeId("ADC"),photo_url:viewPhoto.url,x:jobPinDraft.x,y:jobPinDraft.y,note:jobPinDraft.note.trim(),created_at:new Date().toISOString()};
+    try{
+      await api.insert("ai_damage_corrections",rec);
+      setJobPhotoPins(p=>[rec,...p]);
+    }catch(e){ alert("Could not save mark: "+e.message); }
+    setJobPinDraft(null);
+  };
+  const [jobOpenPinId, setJobOpenPinId] = useState(null);
+
+  const checkPhotoDamage=async(photo,force=false)=>{
+    if(!photo||(photo.ai_damage_check&&!force)) return;
     setDamageCheckLoading(true); setDamageCheckError(null);
     try{
-      const resp=await fetch("/api/photo-damage-check",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","X-Shared-Secret":import.meta.env.VITE_WORKER_SHARED_SECRET||""},
-        body:JSON.stringify({photoUrl:photo.url}),
-      });
-      const data=await resp.json().catch(()=>null);
-      if(!resp.ok||!data?.ok) throw new Error(data?.error||"Damage check failed");
+      const data=await postDamageCheck(photo.url);
       const now=new Date().toISOString();
       await api.patch("workshop_job_photos","id",photo.id,{ai_damage_check:data.result,ai_damage_checked_at:now});
       setSavedPhotos(p=>p.map(x=>x.id===photo.id?{...x,ai_damage_check:data.result,ai_damage_checked_at:now}:x));
       setViewPhoto(prev=>prev&&prev.id===photo.id?{...prev,ai_damage_check:data.result,ai_damage_checked_at:now}:prev);
+      createAiPins(photo.url,data.result.panels,setJobPhotoPins);
     }catch(e){
       setDamageCheckError(e.message||"Damage check failed");
     }finally{
@@ -5917,6 +6080,9 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                     <div key={label} style={{position:"relative",borderRadius:10,overflow:"hidden",background:"var(--surface3)",aspectRatio:"4/3",cursor:"zoom-in",boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}
                       onClick={()=>setPhotoLightbox(allPhotos.filter(p=>p.url).findIndex(p=>p.label===label))}>
                       <DriveImg url={url} alt={label} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                      {vehDamageChecks[label.toLowerCase()]?.panels?.some(x=>x.damaged)&&(
+                        <div style={{position:"absolute",top:3,left:3,background:"rgba(200,0,0,.75)",color:"#fff",fontSize:9,borderRadius:4,padding:"1px 4px"}}>⚠️</div>
+                      )}
                       <div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(0,0,0,.6))",color:"#fff",textAlign:"center",fontSize:10,padding:"10px 0 4px",fontWeight:700,letterSpacing:".04em"}}>{label}</div>
                     </div>
                   ):(
@@ -6093,14 +6259,10 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
       )}
 
       {/* Photo lightbox */}
-      {photoLightbox!==null&&(()=>{
-        const visiblePhotos=[
-          {url:vehiclePhotos.front,label:"Front"},
-          {url:vehiclePhotos.rear, label:"Rear"},
-          {url:vehiclePhotos.side, label:"Side"},
-        ].filter(p=>p.url);
-        const idx=((photoLightbox%visiblePhotos.length)+visiblePhotos.length)%visiblePhotos.length;
-        const photo=visiblePhotos[idx];
+      {photoLightbox!==null&&vehLightboxPhoto&&(()=>{
+        const visiblePhotos=vehVisiblePhotos;
+        const idx=vehLightboxIdx;
+        const photo=vehLightboxPhoto;
         const canNav=visiblePhotos.length>1;
         return(
           <div onClick={()=>setPhotoLightbox(null)}
@@ -6111,10 +6273,82 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             {/* Prev arrow */}
             {canNav&&<button onClick={e=>{e.stopPropagation();setPhotoLightbox(idx-1);}}
               style={{position:"absolute",left:16,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",width:48,height:48,fontSize:24,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>}
-            {/* Image */}
-            <div onClick={e=>e.stopPropagation()} style={{maxWidth:"90vw",maxHeight:"85vh",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-              <img src={photo.url} alt={photo.label} style={{width:"90vw",height:"74vh",objectFit:"contain",borderRadius:8,boxShadow:"0 8px 40px rgba(0,0,0,.6)"}}/>
-              <div style={{color:"#fff",fontWeight:700,fontSize:14,letterSpacing:".05em"}}>{photo.label} <span style={{opacity:.5,fontWeight:400,fontSize:12}}>{idx+1} / {visiblePhotos.length}</span></div>
+            {/* Image + AI panel */}
+            <div onClick={e=>e.stopPropagation()} style={{maxWidth:"95vw",maxHeight:"85vh",display:"flex",flexDirection:"row",alignItems:"center",gap:16}}>
+              {(()=>{
+                const slotKey=photo.label.toLowerCase();
+                const result=vehDamageChecks[slotKey];
+                return (
+                  <div style={{width:"min(320px,32vw)",maxHeight:"80vh",overflowY:"auto",flexShrink:0,background:"rgba(20,20,20,.92)",borderRadius:12,padding:"14px 16px",color:"#fff",fontSize:12.5}}>
+                    {result?(<>
+                      <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🔍 AI damage read</div>
+                      {result.panels?.map((p,i)=>(
+                        <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"3px 0"}}>
+                          <span style={{flexShrink:0}}>{p.damaged?"🔴":"⚪"}</span>
+                          <div><b>{p.panel}</b>{p.note?` — ${p.note}`:""}</div>
+                        </div>
+                      ))}
+                      {result.overall_note&&<div style={{marginTop:6,color:"rgba(255,255,255,.7)",fontStyle:"italic"}}>{result.overall_note}</div>}
+                      <div style={{marginTop:6,fontSize:10,color:"rgba(255,255,255,.5)"}}>AI quoting assist, not a certified inspection · checked {result.checked_at?new Date(result.checked_at).toLocaleString():""}</div>
+                      <button className="btn btn-ghost btn-sm" style={{marginTop:8}} onClick={()=>checkVehiclePhotoDamage(slotKey,photo.url,true)}>🔄 Re-check</button>
+                    </>):vehDamageLoading?(
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{width:14,height:14,border:"2px solid rgba(255,255,255,.3)",borderTop:"2px solid #fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+                        Analyzing photo…
+                      </div>
+                    ):vehDamageError?(<>
+                      <div style={{color:"#ff8a8a",marginBottom:8}}>⚠️ {vehDamageError}</div>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>checkVehiclePhotoDamage(slotKey,photo.url)}>Retry</button>
+                    </>):(
+                      <button className="btn btn-primary btn-sm" onClick={()=>checkVehiclePhotoDamage(slotKey,photo.url)}>🔍 Check for damage</button>
+                    )}
+                  </div>
+                );
+              })()}
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,minWidth:0}}>
+                <div style={{position:"relative",display:"inline-block"}}>
+                  <img src={photo.url} alt={photo.label}
+                    onClick={e=>{
+                      e.stopPropagation();
+                      const rect=e.currentTarget.getBoundingClientRect();
+                      setVehPinDraft({x:(e.clientX-rect.left)/rect.width,y:(e.clientY-rect.top)/rect.height,note:""});
+                    }}
+                    style={{maxWidth:"58vw",maxHeight:"78vh",objectFit:"contain",borderRadius:8,boxShadow:"0 8px 40px rgba(0,0,0,.6)",cursor:"crosshair",display:"block"}}/>
+                  {vehPhotoPins.map(p=>(
+                    <div key={p.id} style={{position:"absolute",left:`${p.x*100}%`,top:`${p.y*100}%`}}>
+                      <div title={p.note} onClick={e=>{e.stopPropagation();setVehOpenPinId(id=>id===p.id?null:p.id);}}
+                        style={{width:16,height:16,marginLeft:-8,marginTop:-8,borderRadius:"50%",background:p.source==="ai"?"#f59e0b":"#e11d48",border:"2px solid #fff",boxShadow:p.source==="ai"?"0 0 0 2px rgba(245,158,11,.4)":"0 0 0 2px rgba(225,29,72,.4)",cursor:"pointer"}}/>
+                      {vehOpenPinId===p.id&&(
+                        <div onClick={e=>e.stopPropagation()}
+                          style={{position:"absolute",top:12,left:-8,background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:10,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)",zIndex:6}}>
+                          <div style={{fontSize:12,color:"#fff",marginBottom:8}}>{p.source==="ai"&&<span style={{color:"#f59e0b"}}>🤖 AI-detected: </span>}{p.note}</div>
+                          <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                            <button className="btn btn-ghost btn-xs" onClick={()=>deletePin(p,id=>{setVehPhotoPins(ps=>ps.filter(x=>x.id!==id));setVehOpenPinId(null);})}>🗑 Delete</button>
+                            <button className="btn btn-primary btn-xs" disabled={isMarkAdded(p)} onClick={()=>addPinToJobItems(p)}>{isMarkAdded(p)?"✓ Added":"➕ Add to job items"}</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {vehPinDraft&&(
+                    <div onClick={e=>e.stopPropagation()}
+                      style={{position:"absolute",left:`${vehPinDraft.x*100}%`,top:`${vehPinDraft.y*100}%`,transform:"translate(-8px,-8px)",zIndex:5}}>
+                      <div style={{width:16,height:16,borderRadius:"50%",background:"#facc15",border:"2px solid #fff"}}/>
+                      <div style={{position:"absolute",top:20,left:0,background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:8,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}>
+                        <textarea autoFocus value={vehPinDraft.note} onChange={e=>setVehPinDraft(d=>({...d,note:e.target.value}))}
+                          placeholder="What's needed here?" rows={2}
+                          style={{width:"100%",fontSize:12,padding:6,borderRadius:6,border:"1px solid var(--border)",resize:"none",color:"black"}}/>
+                        <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"flex-end"}}>
+                          <button className="btn btn-ghost btn-xs" onClick={()=>setVehPinDraft(null)}>Cancel</button>
+                          <button className="btn btn-primary btn-xs" onClick={saveVehPin} disabled={!vehPinDraft.note.trim()}>Save</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div style={{color:"#fff",fontWeight:700,fontSize:14,letterSpacing:".05em"}}>{photo.label} <span style={{opacity:.5,fontWeight:400,fontSize:12}}>{idx+1} / {visiblePhotos.length}</span></div>
+                <div style={{color:"rgba(255,255,255,.45)",fontSize:11}}>Click the photo to mark a spot</div>
+              </div>
             </div>
             {/* Next arrow */}
             {canNav&&<button onClick={e=>{e.stopPropagation();setPhotoLightbox(idx+1);}}
@@ -6326,7 +6560,44 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
       {/* ══ PHOTO LIGHTBOX (global) ══ */}
       {viewPhoto&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setViewPhoto(null)}>
-          <img src={toImgUrl(viewPhoto.url)} alt="preview" style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8}} referrerPolicy="no-referrer"/>
+          <div style={{position:"relative",display:"inline-block"}} onClick={e=>e.stopPropagation()}>
+            <img src={toImgUrl(viewPhoto.url)} alt="preview"
+              onClick={e=>{
+                const rect=e.currentTarget.getBoundingClientRect();
+                setJobPinDraft({x:(e.clientX-rect.left)/rect.width,y:(e.clientY-rect.top)/rect.height,note:""});
+              }}
+              style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8,cursor:"crosshair",display:"block"}} referrerPolicy="no-referrer"/>
+            {jobPhotoPins.map(p=>(
+              <div key={p.id} style={{position:"absolute",left:`${p.x*100}%`,top:`${p.y*100}%`}}>
+                <div title={p.note} onClick={e=>{e.stopPropagation();setJobOpenPinId(id=>id===p.id?null:p.id);}}
+                  style={{width:16,height:16,marginLeft:-8,marginTop:-8,borderRadius:"50%",background:p.source==="ai"?"#f59e0b":"#e11d48",border:"2px solid #fff",boxShadow:p.source==="ai"?"0 0 0 2px rgba(245,158,11,.4)":"0 0 0 2px rgba(225,29,72,.4)",cursor:"pointer"}}/>
+                {jobOpenPinId===p.id&&(
+                  <div onClick={e=>e.stopPropagation()}
+                    style={{position:"absolute",top:12,left:-8,background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:10,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)",zIndex:6}}>
+                    <div style={{fontSize:12,color:"#fff",marginBottom:8}}>{p.source==="ai"&&<span style={{color:"#f59e0b"}}>🤖 AI-detected: </span>}{p.note}</div>
+                    <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                      <button className="btn btn-ghost btn-xs" onClick={()=>deletePin(p,id=>{setJobPhotoPins(ps=>ps.filter(x=>x.id!==id));setJobOpenPinId(null);})}>🗑 Delete</button>
+                      <button className="btn btn-primary btn-xs" disabled={isMarkAdded(p)} onClick={()=>addPinToJobItems(p)}>{isMarkAdded(p)?"✓ Added":"➕ Add to job items"}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {jobPinDraft&&(
+              <div style={{position:"absolute",left:`${jobPinDraft.x*100}%`,top:`${jobPinDraft.y*100}%`,transform:"translate(-8px,-8px)",zIndex:5}}>
+                <div style={{width:16,height:16,borderRadius:"50%",background:"#facc15",border:"2px solid #fff"}}/>
+                <div style={{position:"absolute",top:20,left:0,background:"#1a1a1a",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:8,width:220,boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}>
+                  <textarea autoFocus value={jobPinDraft.note} onChange={e=>setJobPinDraft(d=>({...d,note:e.target.value}))}
+                    placeholder="What's needed here?" rows={2}
+                    style={{width:"100%",fontSize:12,padding:6,borderRadius:6,border:"1px solid var(--border)",resize:"none",color:"black"}}/>
+                  <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"flex-end"}}>
+                    <button className="btn btn-ghost btn-xs" onClick={()=>setJobPinDraft(null)}>Cancel</button>
+                    <button className="btn btn-primary btn-xs" onClick={saveJobPin} disabled={!jobPinDraft.note.trim()}>Save</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <button style={{position:"absolute",top:16,right:20,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:"50%",width:36,height:36,fontSize:18,cursor:"pointer"}} onClick={()=>setViewPhoto(null)}>✕</button>
           <a href={viewPhoto.url} target="_blank" rel="noreferrer" style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",background:"rgba(255,255,255,.15)",color:"#fff",padding:"8px 20px",borderRadius:20,fontSize:13,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>Open in Drive ↗</a>
           <div style={{position:"absolute",bottom:70,left:"50%",transform:"translateX(-50%)",width:"min(90vw,420px)",maxHeight:"40vh",overflowY:"auto",background:"rgba(20,20,20,.92)",borderRadius:12,padding:"14px 16px",color:"#fff",fontSize:12.5}} onClick={e=>e.stopPropagation()}>
@@ -6340,6 +6611,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               ))}
               {viewPhoto.ai_damage_check.overall_note&&<div style={{marginTop:8,color:"rgba(255,255,255,.7)",fontStyle:"italic"}}>{viewPhoto.ai_damage_check.overall_note}</div>}
               <div style={{marginTop:8,fontSize:10,color:"rgba(255,255,255,.5)"}}>AI quoting assist, not a certified inspection · checked {viewPhoto.ai_damage_checked_at?new Date(viewPhoto.ai_damage_checked_at).toLocaleString():""}</div>
+              <button className="btn btn-ghost btn-sm" style={{marginTop:8}} onClick={()=>checkPhotoDamage(viewPhoto,true)}>🔄 Re-check</button>
             </>):damageCheckLoading?(
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:14,height:14,border:"2px solid rgba(255,255,255,.3)",borderTop:"2px solid #fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
@@ -6551,6 +6823,30 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {quotePopupQuoteOnly&&(vehVisiblePhotos.length>0||savedPhotos.length>0)&&(
+          <div style={{marginBottom:12,padding:"12px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:8}}>
+              <div style={{fontWeight:700,fontSize:13}}>🩹 Damage marks ({quoteMarks.length})</div>
+              {vehVisiblePhotos.length>0&&<button className="btn btn-ghost btn-sm" onClick={()=>setPhotoLightbox(0)}>📷 View car photos</button>}
+            </div>
+            {quoteMarks.length===0?(
+              <div style={{fontSize:12,color:"var(--text3)"}}>No marks yet — open a photo above and click on it to mark damage.</div>
+            ):(<>
+              <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:180,overflowY:"auto"}}>
+                {quoteMarks.map(m=>{
+                  const added=isMarkAdded(m);
+                  return (
+                  <label key={m.id} style={{display:"flex",gap:8,alignItems:"flex-start",fontSize:12,cursor:added?"default":"pointer",opacity:added?.55:1}}>
+                    <input type="checkbox" checked={!added&&selectedMarkIds.has(m.id)} disabled={added} onChange={()=>toggleMarkSelected(m.id)} style={{marginTop:2}}/>
+                    <span style={{flex:1}}>{m.source==="ai"&&<span style={{color:"#f59e0b"}}>🤖 </span>}{m.note}{added&&<span style={{color:"var(--green)",marginLeft:6}}>✓ added</span>}</span>
+                  </label>
+                  );
+                })}
+              </div>
+              <button className="btn btn-primary btn-sm" style={{marginTop:8}} disabled={selectedMarkIds.size===0} onClick={addSelectedMarksToQuote}>➕ Add {selectedMarkIds.size||""} to quote</button>
+            </>)}
           </div>
         )}
         {/* Parts & Labour */}
@@ -7050,6 +7346,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       <option value="New-Replacement">New-Replacement</option>
                       <option value="Original Parts">Original Parts</option>
                       <option value="Used Parts">Used Parts</option>
+                      <option value="Repair">Repair</option>
+                      <option value="Repair & Paint">Repair & Paint</option>
                     </select>
                     {editRemarkId===item.id
                       ?<input autoFocus type="text" value={editRemarkVal} onChange={e=>setEditRemarkVal(e.target.value)}
@@ -7116,6 +7414,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                     <option value="New-Replacement">New-Replacement</option>
                     <option value="Original Parts">Original Parts</option>
                     <option value="Used Parts">Used Parts</option>
+                    <option value="Repair">Repair</option>
+                    <option value="Repair & Paint">Repair & Paint</option>
                   </select>
                 </td>
                 <td style={{width:130,verticalAlign:"middle"}}>

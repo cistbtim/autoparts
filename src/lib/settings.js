@@ -7,7 +7,7 @@ let _settings = {
   tax_rate: 0, vat_number: "",
   invoice_prefix: "INV", credit_note_prefix: "CN", apps_script_url: "", vehicle_script_url: "",
   licence_renewal_agent_name: "", licence_renewal_agent_phone: "",
-  pos_manager_pin: "",
+  pos_manager_pin: "", worker_shared_secret: "",
 };
 
 export const getSettings = () => _settings;

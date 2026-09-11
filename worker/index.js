@@ -5,14 +5,27 @@
 // a quoting-assist judgment call, not a certified inspection.
 
 const ALLOWED_HOSTS = ["drive.google.com", "lh3.googleusercontent.com"];
+const ALLOWED_HOST_SUFFIXES = [".supabase.co"];
+
+function isAllowedHost(hostname) {
+  return ALLOWED_HOSTS.includes(hostname) || ALLOWED_HOST_SUFFIXES.some((suf) => hostname.endsWith(suf));
+}
 const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
 
+// Same values already public in the built frontend bundle (VITE_SUPABASE_URL /
+// VITE_SUPABASE_KEY) - this is a publishable anon key, not a secret, so it's
+// fine to read here directly rather than plumbing it through as a Worker secret.
+const SUPABASE_URL = "https://lskouiyvdngdzaquurhk.supabase.co";
+const SUPABASE_KEY = "sb_publishable_De4neqOoFn1wFyiVzaNT0A_HzPAE3YW";
+
 const DAMAGE_CHECK_PROMPT = `You are assisting a car workshop's collision estimator. Look at this vehicle photo and identify each exterior body panel visible in the frame (e.g. bumper, headlight, grille, door, fender, mirror, hood, roof, trunk...). For each visible panel, say whether it looks damaged (dents, scratches, cracks, misalignment, missing pieces) and give a short note. Only list panels actually visible in the photo. This is a preliminary quoting-assist judgment call for staff to review, not a certified inspection. Keep notes brief (under ~20 words).
 
+For each panel, also give "x" and "y": your best-guess position of that panel in the photo, as a fraction from 0 to 1 (x = left to right, y = top to bottom). A rough estimate is fine - this is only used to place a marker near the right area, not for precise measurement.
+
 Respond with ONLY valid JSON, no other text, matching exactly this shape:
-{"panels":[{"panel":"front bumper","damaged":true,"note":"short note"}],"overall_note":"short overall note"}`;
+{"panels":[{"panel":"front bumper","damaged":true,"note":"short note","x":0.3,"y":0.75}],"overall_note":"short overall note"}`;
 
 export default {
   async fetch(request, env) {
@@ -26,7 +39,8 @@ export default {
 
 async function handleDamageCheck(request, env) {
   const sharedSecret = request.headers.get("X-Shared-Secret");
-  if (!env.WORKER_SHARED_SECRET || sharedSecret !== env.WORKER_SHARED_SECRET) {
+  const expectedSecret = await getWorkerSharedSecret();
+  if (!expectedSecret || sharedSecret !== expectedSecret) {
     return json({ ok: false, error: "Unauthorized" }, 401);
   }
   if (!env.AI) {
@@ -50,7 +64,7 @@ async function handleDamageCheck(request, env) {
   } catch {
     return json({ ok: false, error: "Invalid photoUrl" }, 400);
   }
-  if (!ALLOWED_HOSTS.includes(parsed.hostname)) {
+  if (!isAllowedHost(parsed.hostname)) {
     return json({ ok: false, error: "photoUrl host not allowed" }, 400);
   }
 
@@ -77,13 +91,17 @@ async function handleDamageCheck(request, env) {
     return json({ ok: false, error: "Image too large (>5MB)" }, 413);
   }
   const imageDataUri = `data:${contentType};base64,${arrayBufferToBase64(buf)}`;
+  const recentNotes = await getRecentCorrections();
+  const prompt = recentNotes.length
+    ? `${DAMAGE_CHECK_PROMPT}\n\nStaff have previously written these specific notes on similar photos - real-world feedback, take it into account when relevant to what you see here:\n${recentNotes.map((n) => `- ${n}`).join("\n")}`
+    : DAMAGE_CHECK_PROMPT;
 
   let aiResult;
   try {
     aiResult = await env.AI.run(VISION_MODEL, {
       messages: [
         { role: "system", content: "You are a helpful assistant that only responds with valid JSON." },
-        { role: "user", content: DAMAGE_CHECK_PROMPT },
+        { role: "user", content: prompt },
       ],
       image: imageDataUri,
       max_tokens: 1024,
@@ -92,12 +110,46 @@ async function handleDamageCheck(request, env) {
     return json({ ok: false, error: `Workers AI error: ${e.message || e}` }, 502);
   }
 
-  const rawText = aiResult?.response ?? aiResult?.result ?? "";
-  const parsedResult = extractJson(rawText);
+  // Workers AI returns `response` already parsed into an object for this
+  // model/prompt combination, not a JSON string - use it directly when so,
+  // and only fall back to text-parsing if it ever comes back as a string.
+  const responseField = aiResult?.response ?? aiResult?.result;
+  const parsedResult = responseField && typeof responseField === "object"
+    ? { ok: true, data: responseField }
+    : extractJson(responseField || "");
   if (!parsedResult.ok) {
     return json({ ok: false, error: parsedResult.error }, 502);
   }
   return json({ ok: true, result: parsedResult.data });
+}
+
+async function getRecentCorrections() {
+  try {
+    // Only genuine staff-written notes feed back into future prompts - marks
+    // the AI created for itself (source=ai) would otherwise reinforce its own
+    // guesses rather than learn from real corrections.
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/ai_damage_corrections?select=note&or=(source.eq.human,source.is.null)&order=created_at.desc&limit=5`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!resp.ok) return [];
+    const rows = await resp.json().catch(() => []);
+    return Array.isArray(rows) ? rows.map((r) => r.note).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function getWorkerSharedSecret() {
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1&select=worker_shared_secret`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!resp.ok) return null;
+    const rows = await resp.json().catch(() => null);
+    return rows?.[0]?.worker_shared_secret || null;
+  } catch {
+    return null;
+  }
 }
 
 function extractJson(text) {

@@ -4948,10 +4948,40 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   const [savedPhotos,   setSavedPhotos]   = useState([]);      // from DB
   const [loadingPhotos, setLoadingPhotos] = useState(true);
   const [uploadPhotos,  setUploadPhotos]  = useState([]);      // in-progress uploads
-  const [viewPhoto,     setViewPhoto]     = useState(null);    // full-screen preview
+  const [viewPhoto,     setViewPhoto]     = useState(null);    // full-screen preview (whole photo record)
+  const [damageCheckLoading, setDamageCheckLoading] = useState(false);
+  const [damageCheckError,   setDamageCheckError]   = useState(null);
   const jobPhotoCamRef = useRef(null);
   const jobPhotoGalRef = useRef(null);
   const jobPhotoCounter = useRef(0);
+
+  // Reset per-photo AI-check UI state whenever the open photo changes
+  useEffect(()=>{
+    setDamageCheckLoading(false);
+    setDamageCheckError(null);
+  },[viewPhoto?.id]);
+
+  const checkPhotoDamage=async(photo)=>{
+    if(!photo||photo.ai_damage_check) return;
+    setDamageCheckLoading(true); setDamageCheckError(null);
+    try{
+      const resp=await fetch("/api/photo-damage-check",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","X-Shared-Secret":import.meta.env.VITE_WORKER_SHARED_SECRET||""},
+        body:JSON.stringify({photoUrl:photo.url}),
+      });
+      const data=await resp.json().catch(()=>null);
+      if(!resp.ok||!data?.ok) throw new Error(data?.error||"Damage check failed");
+      const now=new Date().toISOString();
+      await api.patch("workshop_job_photos","id",photo.id,{ai_damage_check:data.result,ai_damage_checked_at:now});
+      setSavedPhotos(p=>p.map(x=>x.id===photo.id?{...x,ai_damage_check:data.result,ai_damage_checked_at:now}:x));
+      setViewPhoto(prev=>prev&&prev.id===photo.id?{...prev,ai_damage_check:data.result,ai_damage_checked_at:now}:prev);
+    }catch(e){
+      setDamageCheckError(e.message||"Damage check failed");
+    }finally{
+      setDamageCheckLoading(false);
+    }
+  };
 
   // Load saved photos from DB when job changes
   useEffect(()=>{
@@ -6296,9 +6326,32 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
       {/* ══ PHOTO LIGHTBOX (global) ══ */}
       {viewPhoto&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setViewPhoto(null)}>
-          <img src={toImgUrl(viewPhoto)} alt="preview" style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8}} referrerPolicy="no-referrer"/>
+          <img src={toImgUrl(viewPhoto.url)} alt="preview" style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8}} referrerPolicy="no-referrer"/>
           <button style={{position:"absolute",top:16,right:20,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:"50%",width:36,height:36,fontSize:18,cursor:"pointer"}} onClick={()=>setViewPhoto(null)}>✕</button>
-          <a href={viewPhoto} target="_blank" rel="noreferrer" style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",background:"rgba(255,255,255,.15)",color:"#fff",padding:"8px 20px",borderRadius:20,fontSize:13,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>Open in Drive ↗</a>
+          <a href={viewPhoto.url} target="_blank" rel="noreferrer" style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",background:"rgba(255,255,255,.15)",color:"#fff",padding:"8px 20px",borderRadius:20,fontSize:13,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>Open in Drive ↗</a>
+          <div style={{position:"absolute",bottom:70,left:"50%",transform:"translateX(-50%)",width:"min(90vw,420px)",maxHeight:"40vh",overflowY:"auto",background:"rgba(20,20,20,.92)",borderRadius:12,padding:"14px 16px",color:"#fff",fontSize:12.5}} onClick={e=>e.stopPropagation()}>
+            {viewPhoto.ai_damage_check?(<>
+              <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>🔍 AI damage read</div>
+              {viewPhoto.ai_damage_check.panels?.map((p,i)=>(
+                <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"4px 0",borderBottom:i<viewPhoto.ai_damage_check.panels.length-1?"1px solid rgba(255,255,255,.12)":"none"}}>
+                  <span style={{flexShrink:0}}>{p.damaged?"🔴":"⚪"}</span>
+                  <div><b>{p.panel}</b>{p.note?` — ${p.note}`:""}</div>
+                </div>
+              ))}
+              {viewPhoto.ai_damage_check.overall_note&&<div style={{marginTop:8,color:"rgba(255,255,255,.7)",fontStyle:"italic"}}>{viewPhoto.ai_damage_check.overall_note}</div>}
+              <div style={{marginTop:8,fontSize:10,color:"rgba(255,255,255,.5)"}}>AI quoting assist, not a certified inspection · checked {viewPhoto.ai_damage_checked_at?new Date(viewPhoto.ai_damage_checked_at).toLocaleString():""}</div>
+            </>):damageCheckLoading?(
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:14,height:14,border:"2px solid rgba(255,255,255,.3)",borderTop:"2px solid #fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+                Analyzing photo…
+              </div>
+            ):damageCheckError?(<>
+              <div style={{color:"#ff8a8a",marginBottom:8}}>⚠️ {damageCheckError}</div>
+              <button className="btn btn-ghost btn-sm" onClick={()=>checkPhotoDamage(viewPhoto)}>Retry</button>
+            </>):(
+              <button className="btn btn-primary btn-sm" onClick={()=>checkPhotoDamage(viewPhoto)}>🔍 Check for damage</button>
+            )}
+          </div>
         </div>
       )}
 
@@ -6344,9 +6397,12 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 {savedPhotos.map(p=>{
                   const src=p.url?.includes("thumbnail?id=")||p.url?.includes("uc?export=")?p.url:toImgUrl(p.url);
                   return (
-                    <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3",cursor:"pointer"}} onClick={()=>setViewPhoto(p.url)}>
+                    <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",background:"var(--surface2)",aspectRatio:"4/3",cursor:"pointer"}} onClick={()=>setViewPhoto(p)}>
                       <img src={src} alt="photo" style={{width:"100%",height:"100%",objectFit:"cover"}}
                         onError={e=>{const m=p.url?.match(/thumbnail[?]id=([^&]+)/)||p.url?.match(/[?&]id=([^&]+)/)||p.url?.match(/file\/d\/([^/?]+)/);if(m&&!e.target.src.includes("uc?export=view"))e.target.src=`https://drive.google.com/uc?export=view&id=${m[1]}`;}}/>
+                      {p.ai_damage_check?.panels?.some(x=>x.damaged)&&(
+                        <div style={{position:"absolute",top:3,left:3,background:"rgba(200,0,0,.75)",color:"#fff",fontSize:9,borderRadius:4,padding:"1px 4px"}}>⚠️</div>
+                      )}
                       <button onClick={e=>{e.stopPropagation();deleteJobPhoto(p.id);}}
                         style={{position:"absolute",top:3,right:3,background:"rgba(0,0,0,.55)",border:"none",borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff",fontSize:10}}>✕</button>
                     </div>

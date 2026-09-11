@@ -4720,8 +4720,16 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   // Auto-mark whatever the AI flagged as damaged, so its findings show up as
   // pins too (tagged source:"ai" - kept out of the few-shot feedback loop,
   // and drawn in a different color so staff can tell them apart from marks
-  // they placed themselves).
+  // they placed themselves). Clears this photo's previous AI pins first -
+  // otherwise every re-check/Check-for-damage run just piles more on top,
+  // since each run's per-panel position guesses aren't stable between calls.
   const createAiPins=async(url,panels,setPinsFn)=>{
+    try{
+      await fetch(`${SUPABASE_URL}/rest/v1/ai_damage_corrections?photo_url=eq.${encodeURIComponent(url)}&source=eq.ai`,
+        {method:"DELETE",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
+    }catch{ /* non-critical, continue */ }
+    setPinsFn(prev=>prev.filter(p=>p.source!=="ai"));
+
     const candidates=(panels||[]).filter(p=>p.damaged&&typeof p.x==="number"&&typeof p.y==="number");
     for(const p of candidates){
       const rec={id:makeId("ADC"),photo_url:url,x:p.x,y:p.y,note:`${p.panel}${p.note?` — ${p.note}`:""}`,source:"ai",created_at:new Date().toISOString()};

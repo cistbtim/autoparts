@@ -20,7 +20,9 @@ const VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
 const SUPABASE_URL = "https://lskouiyvdngdzaquurhk.supabase.co";
 const SUPABASE_KEY = "sb_publishable_De4neqOoFn1wFyiVzaNT0A_HzPAE3YW";
 
-const DAMAGE_CHECK_PROMPT = `You are assisting a car workshop's collision estimator. Look at this vehicle photo and identify each exterior body panel visible in the frame (e.g. bumper, headlight, grille, door, fender, mirror, hood, roof, trunk...). For each visible panel, say whether it looks damaged (dents, scratches, cracks, misalignment, missing pieces) and give a short note. Only list panels actually visible in the photo. This is a preliminary quoting-assist judgment call for staff to review, not a certified inspection. Keep notes brief (under ~20 words).
+const DAMAGE_CHECK_PROMPT = `You are assisting a car workshop's collision estimator. First work out which side of the car this photo shows (front, rear, left side, or right side) - then only list panels that would actually be visible from that angle. Do not list a panel from the opposite end of the car (e.g. a rear panel like a tail light, rear bumper, boot/trunk, or rear door/window in a photo that shows the front of the car, or vice versa) unless it is genuinely visible in this frame.
+
+For each panel actually visible, say whether it looks damaged (dents, scratches, cracks, misalignment, missing pieces) and give a short note. This is a preliminary quoting-assist judgment call for staff to review, not a certified inspection. Keep notes brief (under ~20 words).
 
 For each panel, also give "x" and "y": your best-guess position of that panel in the photo, as a fraction from 0 to 1 (x = left to right, y = top to bottom). A rough estimate is fine - this is only used to place a marker near the right area, not for precise measurement.
 

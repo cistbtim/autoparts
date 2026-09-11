@@ -174,17 +174,19 @@ if ($Phase -eq 'Open') {
         Start-Sleep -Seconds 6
     }
 
-    Get-FocusedWaRect $waProc | Out-Null
+    $rect = Get-FocusedWaRect $waProc
     Set-EnglishInput $waProc
+    $winW = $rect.Right - $rect.Left
+    $winH = $rect.Bottom - $rect.Top
 
-    # Keyboard-driven instead of coordinate-clicking the search box: Ctrl+F reliably
-    # focuses WhatsApp's search regardless of window geometry (mouse clicks depend on
-    # measuring the window rect correctly, which broke when WhatsApp was already open
-    # in a different state - two blind clicks on the search box landed on nothing and
-    # every subsequent step silently no-op'd). Down+Enter then selects the top search
-    # result instead of clicking a "Recent searches" position, which assumed the target
-    # chat was always pinned at slot 1.
-    [System.Windows.Forms.SendKeys]::SendWait("^f")
+    # Ctrl+F was tried here previously (assuming it focuses the sidebar chat/contact
+    # search) but it actually opens WhatsApp's in-chat message search - it searches
+    # inside whatever conversation is currently open, not the chat list. Confirmed
+    # 2026-09-10: it silently searched inside an unrelated already-open chat and never
+    # touched the sidebar search box, so no target chat was ever selected. Click the
+    # real sidebar search box directly instead (fractional coords - measured consistent
+    # across both a cold-launch window and an already-open docked window).
+    Click-At ($rect.Left + [int]($winW * 0.22)) ($rect.Top + [int]($winH * 0.17))
     Start-Sleep -Milliseconds ($(if ($coldLaunch) { 800 } else { 400 }))
     [System.Windows.Forms.SendKeys]::SendWait("tim mtn unlimit")
     Start-Sleep -Milliseconds ($(if ($coldLaunch) { 1200 } else { 700 }))

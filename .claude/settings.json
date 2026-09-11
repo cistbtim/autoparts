@@ -204,6 +204,7 @@
       "PowerShell(Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue)",
       "PowerShell(netsh interface ipv4 show excludedportrange protocol=tcp)",
       "PowerShell(npm run dev)",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File scripts\\notify-whatsapp.ps1 -Phase Open)",
       "Bash(command -v codex)",
       "Bash(curl -s http://localhost:3000/ -o /dev/null -w \"%{http_code}\\\\n\")",
       "Bash(jobs -l)",

@@ -6282,12 +6282,12 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             {canNav&&<button onClick={e=>{e.stopPropagation();setPhotoLightbox(idx-1);}}
               style={{position:"absolute",left:16,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",width:48,height:48,fontSize:24,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>}
             {/* Image + AI panel */}
-            <div onClick={e=>e.stopPropagation()} style={{maxWidth:"95vw",maxHeight:"85vh",display:"flex",flexDirection:"row",alignItems:"center",gap:16}}>
+            <div className="veh-lightbox-row" onClick={e=>e.stopPropagation()}>
               {(()=>{
                 const slotKey=photo.label.toLowerCase();
                 const result=vehDamageChecks[slotKey];
                 return (
-                  <div style={{width:"min(320px,32vw)",maxHeight:"80vh",overflowY:"auto",flexShrink:0,background:"rgba(20,20,20,.92)",borderRadius:12,padding:"14px 16px",color:"#fff",fontSize:12.5}}>
+                  <div className="veh-lightbox-panel">
                     {result?(<>
                       <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🔍 AI damage read</div>
                       {result.panels?.map((p,i)=>(
@@ -6314,14 +6314,14 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 );
               })()}
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,minWidth:0}}>
-                <div style={{position:"relative",display:"inline-block"}}>
+                <div className="veh-lightbox-imgwrap" style={{position:"relative",display:"inline-block"}}>
                   <img src={photo.url} alt={photo.label}
                     onClick={e=>{
                       e.stopPropagation();
                       const rect=e.currentTarget.getBoundingClientRect();
                       setVehPinDraft({x:(e.clientX-rect.left)/rect.width,y:(e.clientY-rect.top)/rect.height,note:""});
                     }}
-                    style={{maxWidth:"58vw",maxHeight:"78vh",objectFit:"contain",borderRadius:8,boxShadow:"0 8px 40px rgba(0,0,0,.6)",cursor:"crosshair",display:"block"}}/>
+                    style={{objectFit:"contain",borderRadius:8,boxShadow:"0 8px 40px rgba(0,0,0,.6)",cursor:"crosshair",display:"block"}}/>
                   {vehPhotoPins.map(p=>(
                     <div key={p.id} style={{position:"absolute",left:`${p.x*100}%`,top:`${p.y*100}%`}}>
                       <div title={p.note} onClick={e=>{e.stopPropagation();setVehOpenPinId(id=>id===p.id?null:p.id);}}

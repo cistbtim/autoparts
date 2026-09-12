@@ -4626,9 +4626,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   const [localPhotoOverrides, setLocalPhotoOverrides] = useState({});
   const [editPhotos, setEditPhotos] = useState(false);
   const [photoWarnOpen, setPhotoWarnOpen] = useState(false);
-  // 8-corner set used for panel-beater-grade damage estimates. "side" (photo_side)
-  // is kept read-only for old records but dropped from this list/the edit grid —
-  // it's ambiguous (left or right?) once Left/Right exist as their own slots.
+  // 8-corner set used for panel-beater-grade damage estimates, plus the original
+  // "Side" slot kept alongside so existing photos on old records stay visible.
   const VEH_PHOTO_ANGLES = [
     {field:"photo_front",       key:"front",      label:"Front"},
     {field:"photo_front_left",  key:"frontLeft",  label:"Front-Left"},
@@ -4638,17 +4637,18 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     {field:"photo_rear",        key:"rear",       label:"Rear"},
     {field:"photo_rear_left",   key:"rearLeft",   label:"Rear-Left"},
     {field:"photo_rear_right",  key:"rearRight",  label:"Rear-Right"},
+    {field:"photo_side",        key:"side",       label:"Side"},
   ];
   useEffect(()=>{
     const vr=wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
-    if(vr&&VEH_PHOTO_ANGLES.every(a=>!vr[a.field])&&!vr.photo_side) setPhotoWarnOpen(true);
+    if(vr&&VEH_PHOTO_ANGLES.every(a=>!vr[a.field])) setPhotoWarnOpen(true);
   },[job.workshop_vehicle_id]); // eslint-disable-line react-hooks/exhaustive-deps
   const vehiclePhotos = wsVehicles.reduce((acc,v)=>{
     if(v.id!==job.workshop_vehicle_id) return acc;
-    const out={side: localPhotoOverrides.side!==undefined ? localPhotoOverrides.side : (v.photo_side||"")};
+    const out={};
     for(const a of VEH_PHOTO_ANGLES) out[a.key]=localPhotoOverrides[a.key]!==undefined ? localPhotoOverrides[a.key] : (v[a.field]||"");
     return out;
-  },Object.fromEntries([["side",""],...VEH_PHOTO_ANGLES.map(a=>[a.key,""])]));
+  },Object.fromEntries(VEH_PHOTO_ANGLES.map(a=>[a.key,""])));
 
   // ── Vehicle profile-photo AI damage check (one per angle above) ──
   const vehicleRec = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;

@@ -41,10 +41,10 @@ if (-not $portInUse) {
     }
 }
 
-# Start a fresh cloudflared quick tunnel (always new, so we always get a URL to report)
+# Start a fresh cloudflared quick tunnel via npx (always new, so we always get a URL to report)
 Remove-Item $CloudflaredOut, $CloudflaredErr -ErrorAction SilentlyContinue
-Start-Process -FilePath "C:\Program Files (x86)\cloudflared\cloudflared.exe" `
-    -ArgumentList "tunnel --url http://localhost:$DevPort" `
+Start-Process -FilePath "npx.cmd" `
+    -ArgumentList "-y cloudflared tunnel --url http://localhost:$DevPort" `
     -WindowStyle Hidden `
     -RedirectStandardOutput $CloudflaredOut `
     -RedirectStandardError $CloudflaredErr

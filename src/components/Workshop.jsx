@@ -1466,7 +1466,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                                 {j&&q.status==="accepted"&&!invoices.find(i=>i.job_id===q.job_id)&&(
                                   <button className="btn btn-primary btn-xs" onClick={()=>{const its=jobItems.filter(i=>i.job_id===q.job_id);const sub=its.reduce((s,i)=>s+(+i.total||0),0);const tx=settings.vat_number?sub*(settings.tax_rate||0)/100:0;setQInvModal({job:j,items:its,quote:q,subtotal:sub,tax:tx,total:sub+tx});}}>🧾 Invoice</button>
                                 )}
-                                {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},false,vehicles,parts);}}>🖨️</button>}
+                                {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",frontLeft:vp?.photo_front_left||"",frontRight:vp?.photo_front_right||"",left:vp?.photo_left||"",right:vp?.photo_right||"",rear:vp?.photo_rear||"",rearLeft:vp?.photo_rear_left||"",rearRight:vp?.photo_rear_right||"",side:vp?.photo_side||""},false,vehicles,parts);}}>🖨️</button>}
                               </div>
                             </td>
                           </tr>
@@ -1510,7 +1510,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                           {j&&q.status==="accepted"&&!invoices.find(i=>i.job_id===q.job_id)&&(
                             <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={()=>{const its=jobItems.filter(i=>i.job_id===q.job_id);const sub=its.reduce((s,i)=>s+(+i.total||0),0);const tx=settings.vat_number?sub*(settings.tax_rate||0)/100:0;setQInvModal({job:j,items:its,quote:q,subtotal:sub,tax:tx,total:sub+tx});}}>🧾 Invoice</button>
                           )}
-                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},false,vehicles,parts);}}>🖨️</button>}
+                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopQuote(j,jobItems.filter(i=>i.job_id===j.id),q,settings,{front:vp?.photo_front||"",frontLeft:vp?.photo_front_left||"",frontRight:vp?.photo_front_right||"",left:vp?.photo_left||"",right:vp?.photo_right||"",rear:vp?.photo_rear||"",rearLeft:vp?.photo_rear_left||"",rearRight:vp?.photo_rear_right||"",side:vp?.photo_side||""},false,vehicles,parts);}}>🖨️</button>}
                         </div>
                       </div>
                     );
@@ -2024,7 +2024,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                             <td><span className="badge" style={{background:sb,color:sc,fontSize:11}}>{inv.status==="paid"?"✅ "+t.paid:inv.status==="partial"?"💛 "+t.partial:"⏳ "+t.unpaid}</span></td>
                             <td><div style={{display:"flex",gap:4}}>
                               {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{setActiveJob(j);setView("job");}}>{t.stOpen}</button>}
-                              {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},vehicles);}}>🖨️</button>}
+                              {j&&<button className="btn btn-ghost btn-xs" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",frontLeft:vp?.photo_front_left||"",frontRight:vp?.photo_front_right||"",left:vp?.photo_left||"",right:vp?.photo_right||"",rear:vp?.photo_rear||"",rearLeft:vp?.photo_rear_left||"",rearRight:vp?.photo_rear_right||"",side:vp?.photo_side||""},vehicles);}}>🖨️</button>}
                             </div></td>
                           </tr>
                         );
@@ -2066,7 +2066,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                         </div>
                         <div style={{display:"flex",gap:8,padding:"8px 12px 10px",borderTop:"1px solid var(--border2)"}}>
                           {j&&<button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{setActiveJob(j);setView("job");}}>🔧 {t.stOpen}</button>}
-                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",rear:vp?.photo_rear||"",side:vp?.photo_side||""},vehicles);}}>🖨️</button>}
+                          {j&&<button className="btn btn-ghost btn-sm" onClick={()=>{const vp=wsVehicles.find(x=>x.id===j.workshop_vehicle_id);printWorkshopInvoice(j,jobItems.filter(i=>i.job_id===j.id),inv,settings,{front:vp?.photo_front||"",frontLeft:vp?.photo_front_left||"",frontRight:vp?.photo_front_right||"",left:vp?.photo_left||"",right:vp?.photo_right||"",rear:vp?.photo_rear||"",rearLeft:vp?.photo_rear_left||"",rearRight:vp?.photo_rear_right||"",side:vp?.photo_side||""},vehicles);}}>🖨️</button>}
                         </div>
                       </div>
                     );
@@ -4626,17 +4626,31 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   const [localPhotoOverrides, setLocalPhotoOverrides] = useState({});
   const [editPhotos, setEditPhotos] = useState(false);
   const [photoWarnOpen, setPhotoWarnOpen] = useState(false);
+  // 8-corner set used for panel-beater-grade damage estimates. "side" (photo_side)
+  // is kept read-only for old records but dropped from this list/the edit grid —
+  // it's ambiguous (left or right?) once Left/Right exist as their own slots.
+  const VEH_PHOTO_ANGLES = [
+    {field:"photo_front",       key:"front",      label:"Front"},
+    {field:"photo_front_left",  key:"frontLeft",  label:"Front-Left"},
+    {field:"photo_front_right", key:"frontRight", label:"Front-Right"},
+    {field:"photo_left",        key:"left",       label:"Left"},
+    {field:"photo_right",       key:"right",      label:"Right"},
+    {field:"photo_rear",        key:"rear",       label:"Rear"},
+    {field:"photo_rear_left",   key:"rearLeft",   label:"Rear-Left"},
+    {field:"photo_rear_right",  key:"rearRight",  label:"Rear-Right"},
+  ];
   useEffect(()=>{
     const vr=wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
-    if(vr&&!vr.photo_front&&!vr.photo_rear&&!vr.photo_side) setPhotoWarnOpen(true);
-  },[job.workshop_vehicle_id]);
-  const vehiclePhotos = wsVehicles.reduce((acc,v)=>v.id===job.workshop_vehicle_id?{
-    front: localPhotoOverrides.front!==undefined ? localPhotoOverrides.front : (v.photo_front||""),
-    rear:  localPhotoOverrides.rear !==undefined ? localPhotoOverrides.rear  : (v.photo_rear ||""),
-    side:  localPhotoOverrides.side !==undefined ? localPhotoOverrides.side  : (v.photo_side ||""),
-  }:acc,{front:"",rear:"",side:""});
+    if(vr&&VEH_PHOTO_ANGLES.every(a=>!vr[a.field])&&!vr.photo_side) setPhotoWarnOpen(true);
+  },[job.workshop_vehicle_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const vehiclePhotos = wsVehicles.reduce((acc,v)=>{
+    if(v.id!==job.workshop_vehicle_id) return acc;
+    const out={side: localPhotoOverrides.side!==undefined ? localPhotoOverrides.side : (v.photo_side||"")};
+    for(const a of VEH_PHOTO_ANGLES) out[a.key]=localPhotoOverrides[a.key]!==undefined ? localPhotoOverrides[a.key] : (v[a.field]||"");
+    return out;
+  },Object.fromEntries([["side",""],...VEH_PHOTO_ANGLES.map(a=>[a.key,""])]));
 
-  // ── Vehicle profile-photo AI damage check (front/rear/side) ──
+  // ── Vehicle profile-photo AI damage check (one per angle above) ──
   const vehicleRec = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
   const [localDamageOverrides, setLocalDamageOverrides] = useState({});
   const vehDamageChecks = {...(vehicleRec?.photo_damage_checks||{}), ...localDamageOverrides};
@@ -4646,11 +4660,9 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
 
   // Lifted out of the lightbox render block so the pin-fetch effect below can
   // depend on the current photo's URL without calling a hook conditionally.
-  const vehVisiblePhotos = [
-    {url:vehiclePhotos.front,label:"Front"},
-    {url:vehiclePhotos.rear, label:"Rear"},
-    {url:vehiclePhotos.side, label:"Side"},
-  ].filter(p=>p.url);
+  const vehVisiblePhotos = VEH_PHOTO_ANGLES
+    .map(a=>({url:vehiclePhotos[a.key],label:a.label}))
+    .filter(p=>p.url);
   const vehLightboxIdx = (photoLightbox!==null&&vehVisiblePhotos.length)
     ? ((photoLightbox%vehVisiblePhotos.length)+vehVisiblePhotos.length)%vehVisiblePhotos.length : -1;
   const vehLightboxPhoto = vehLightboxIdx>=0 ? vehVisiblePhotos[vehLightboxIdx] : null;
@@ -5082,7 +5094,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     // a photo and close it, so newly added marks show up without a manual
     // refresh.
     if(!quotePopup||photoLightbox!==null||viewPhoto) return;
-    const urls=[vehiclePhotos.front,vehiclePhotos.rear,vehiclePhotos.side,...savedPhotos.map(p=>p.url)].filter(Boolean);
+    const urls=[...Object.values(vehiclePhotos),...savedPhotos.map(p=>p.url)].filter(Boolean);
     if(!urls.length){ setQuoteMarks([]); return; }
     // Percent-encode each URL individually (Drive photo URLs contain &/? that
     // would otherwise be misread as query-string structure once embedded raw
@@ -6066,12 +6078,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               )}
             </div>
             {editPhotos&&vehicleRecord?(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10,maxWidth:720}}>
-                {[
-                  {field:"photo_front",key:"front",label:"Front"},
-                  {field:"photo_rear", key:"rear", label:"Rear"},
-                  {field:"photo_side", key:"side", label:"Side"},
-                ].map(({field,key,label})=>(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:10,maxWidth:960}}>
+                {VEH_PHOTO_ANGLES.map(({field,key,label})=>(
                   <VehiclePhotoUploader key={field} label={label} url={vehiclePhotos[key]}
                     vehicleId={vehicleRecord.id} make={vehicleRecord.make||"vehicle"}
                     reg={vehicleRecord.reg||job.vehicle_reg} viewName={key}
@@ -6080,10 +6088,10 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 ))}
               </div>
             ):(()=>{
-              const allPhotos=[{url:vehiclePhotos.front,label:"Front"},{url:vehiclePhotos.rear,label:"Rear"},{url:vehiclePhotos.side,label:"Side"}];
+              const allPhotos=VEH_PHOTO_ANGLES.map(({key,label})=>({url:vehiclePhotos[key],label}));
               const hasAny=allPhotos.some(p=>p.url);
               return (
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:10}}>
                   {allPhotos.map(({url,label},i)=>url?(
                     <div key={label} style={{position:"relative",borderRadius:10,overflow:"hidden",background:"var(--surface3)",aspectRatio:"4/3",cursor:"zoom-in",boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}
                       onClick={()=>setPhotoLightbox(allPhotos.filter(p=>p.url).findIndex(p=>p.label===label))}>

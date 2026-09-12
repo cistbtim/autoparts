@@ -410,14 +410,26 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
   const shopName = settings.shop_name||"Auto Workshop";
   const logoSrc = settings.logo_data || settings.logo_url || "";
   const logoHtml = logoSrc ? `<img src="${logoSrc}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
-  const photoList = [{url:photos.front,label:"Front"},{url:photos.rear,label:"Rear"},{url:photos.side,label:"Side"}].filter(p=>p.url);
+  const photoList = [
+    {url:photos.front,label:"Front"},
+    {url:photos.frontLeft,label:"Front-Left"},
+    {url:photos.frontRight,label:"Front-Right"},
+    {url:photos.left,label:"Left"},
+    {url:photos.right,label:"Right"},
+    {url:photos.rear,label:"Rear"},
+    {url:photos.rearLeft,label:"Rear-Left"},
+    {url:photos.rearRight,label:"Rear-Right"},
+    {url:photos.side,label:"Side"},
+  ].filter(p=>p.url);
   const photosBlock = photoList.length ? `
     <div style="width:190px;flex-shrink:0">
       <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📸 Vehicle Photos</div>
-      ${photoList.map(p=>`<div style="margin-bottom:6px">
-        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:58px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
-        <div style="font-size:9px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.06em">${p.label}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${photoList.map(p=>`<div style="width:88px;margin-bottom:2px">
+        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
+        <div style="font-size:8px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.04em">${p.label}</div>
       </div>`).join("")}
+      </div>
     </div>` : "";
   const invId    = invoice?.id||"—";
   const invDate  = invoice?.invoice_date||new Date().toISOString().slice(0,10);
@@ -577,14 +589,26 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
   const waMsg = `📝 *Workshop Quotation ${quote.id}*\n👤 ${quote.quote_customer||job.customer_name||""}\n🚗 ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${dispModel||""}`:""}\n💰 Total: ${fmt(total)}\n\nPlease find the attached PDF quotation and confirm to proceed.\n\n${shopName}${settings.phone?`\n📞 ${settings.phone}`:""}`;
   const logoSrc = settings.logo_data || settings.logo_url || "";
   const logoHtml = logoSrc ? `<img src="${logoSrc}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
-  const photoList = [{url:photos.front,label:"Front"},{url:photos.rear,label:"Rear"},{url:photos.side,label:"Side"}].filter(p=>p.url);
+  const photoList = [
+    {url:photos.front,label:"Front"},
+    {url:photos.frontLeft,label:"Front-Left"},
+    {url:photos.frontRight,label:"Front-Right"},
+    {url:photos.left,label:"Left"},
+    {url:photos.right,label:"Right"},
+    {url:photos.rear,label:"Rear"},
+    {url:photos.rearLeft,label:"Rear-Left"},
+    {url:photos.rearRight,label:"Rear-Right"},
+    {url:photos.side,label:"Side"},
+  ].filter(p=>p.url);
   const photosBlock = photoList.length ? `
     <div style="width:190px;flex-shrink:0">
       <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📸 Vehicle Photos</div>
-      ${photoList.map(p=>`<div style="margin-bottom:6px">
-        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:58px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
-        <div style="font-size:9px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.06em">${p.label}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${photoList.map(p=>`<div style="width:88px;margin-bottom:2px">
+        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
+        <div style="font-size:8px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.04em">${p.label}</div>
       </div>`).join("")}
+      </div>
     </div>` : "";
 
   const sortedItems = sortForPrint(items);

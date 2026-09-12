@@ -169,4 +169,15 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .velg-scanline::after{content:"";position:absolute;top:-1px;left:-120px;width:120px;height:4px;background:linear-gradient(90deg,transparent,var(--accent),transparent);filter:blur(.5px);animation:velgSweep 3.6s ease-in-out infinite}
 @keyframes velgSweep{0%{left:-120px}50%{left:calc(100% - 0px)}100%{left:-120px}}
 @media(prefers-reduced-motion:reduce){.velg-scanline::after{animation:none;left:0}}
+.velg-mainstrip{position:sticky;top:0;z-index:30;background:var(--bg);display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.velg-mainstrip-icon{flex-shrink:0;width:60px;height:60px}
+.velg-mainstrip-text{text-align:left}
+.velg-mainstrip-word{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:45px;color:var(--text);letter-spacing:.2px;line-height:1.1}
+.velg-mainstrip-tag{font-size:16px;color:var(--text3);margin-top:2px}
+@media(max-width:640px){
+  .velg-mainstrip{gap:10px;margin-bottom:16px;padding-bottom:12px}
+  .velg-mainstrip-icon{width:30px;height:30px}
+  .velg-mainstrip-word{font-size:22px}
+  .velg-mainstrip-tag{font-size:11px}
+}
 `;

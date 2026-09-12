@@ -5351,14 +5351,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       <main className="main-content" style={{marginLeft:240,padding:26,minHeight:"100vh"}}>
 
         {/* ── Platform brand strip — shown above every module so it's always clear which platform this is ── */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:16,marginBottom:28,paddingBottom:18,borderBottom:"1px solid var(--border)"}}>
-          <svg width="60" height="60" viewBox="0 0 36 36" fill="none" style={{flexShrink:0}}>
+        <div className="velg-mainstrip">
+          <svg className="velg-mainstrip-icon" viewBox="0 0 36 36" fill="none">
             <path d="M18 3 L31 10.5 V25.5 L18 33 L5 25.5 V10.5 Z" stroke="#5D7A93" strokeWidth="2"/>
             <circle cx="18" cy="18" r="4.5" fill="none" stroke="var(--text)" strokeWidth="2"/>
             <path d="M4 18 H12 L15 12 L19 24 L22 18 H32" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <span style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:45,color:"var(--text)",letterSpacing:".2px"}}>VelGenius</span>
-          <span style={{fontSize:16,color:"var(--text3)",marginLeft:6}}>AI Automotive Operations Platform</span>
+          <div className="velg-mainstrip-text">
+            <div className="velg-mainstrip-word">VelGenius</div>
+            <div className="velg-mainstrip-tag">AI Automotive Operations Platform</div>
+          </div>
         </div>
 
         {/* ── DASHBOARD ── */}

@@ -87,7 +87,7 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:32px 32px 48px;max-width:1000px;margin:0 auto}
     .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #111}
-    .shop{font-size:22px;font-weight:900;color:#f97316}
+    .shop{font-size:22px;font-weight:900;color:#ff7a2e}
     .fullname{font-size:13px;font-weight:600;color:#333;margin-top:3px}
     .meta{font-size:11px;color:#666;margin-top:4px}
     .report-title{font-size:18px;font-weight:700;text-align:right}
@@ -101,7 +101,7 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
     tbody tr:nth-child(even){background:#f9f9f9}
     tbody td{padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:12px;vertical-align:middle}
     tbody tr.makegroup{background:#fdecdc;page-break-after:avoid}
-    tbody tr.makegroup td{padding:6px 10px;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#c2410c;border-top:1px solid #f97316;border-bottom:2px solid #f97316}
+    tbody tr.makegroup td{padding:6px 10px;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#c2410c;border-top:1px solid #ff7a2e;border-bottom:2px solid #ff7a2e}
     .num{text-align:right;font-family:monospace}
     .thumb{width:42px;height:42px;object-fit:contain;background:#fff;border:1px solid #e5e5e5;border-radius:4px;display:block;cursor:pointer}
     .print-btn{display:flex;gap:10px;align-items:center;margin-bottom:20px}
@@ -167,7 +167,7 @@ const openSupplierBookingInvoice=(booking, items, supplierLabel, contactPerson, 
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:32px;max-width:800px;margin:0 auto}
     .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #111}
-    .shop{font-size:22px;font-weight:900;color:#f97316}
+    .shop{font-size:22px;font-weight:900;color:#ff7a2e}
     .fullname{font-size:13px;font-weight:600;color:#333;margin-top:3px}
     .meta{font-size:11px;color:#666;margin-top:4px}
     .inv-title{font-size:20px;font-weight:800;text-align:right}
@@ -696,7 +696,7 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, 
     <div className={onClick?"card card-hover":"card"} style={{padding:14,display:"flex",flexDirection:"column",gap:10,
       cursor:onClick?"pointer":"default",opacity:bulkMode&&!selectable?.5:1,
       border:selected?"1.5px solid var(--accent)":(priceChanged?"1px solid rgba(96,165,250,.5)":undefined),
-      background:selected?"rgba(249,115,22,.06)":(priceChanged?"rgba(96,165,250,.05)":undefined)}}
+      background:selected?"rgba(255,122,46,.06)":(priceChanged?"rgba(96,165,250,.05)":undefined)}}
       onClick={onClick}>
       <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
         {bulkMode&&(
@@ -793,7 +793,7 @@ function SupplierCostPriceModal({part, supplierMarginOptions=null, onSave, onClo
           </div>
         )}
         {suggestedPrice!=null&&(
-          <div style={{marginTop:10,padding:"10px 14px",borderRadius:10,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+          <div style={{marginTop:10,padding:"10px 14px",borderRadius:10,background:"rgba(255,122,46,.08)",border:"1px solid rgba(255,122,46,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
             <span style={{fontSize:12,fontWeight:600,color:"var(--text2)"}}>Suggested retail price for admin to review</span>
             <span style={{fontSize:22,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{C()}{suggestedPrice.toLocaleString()}</span>
           </div>
@@ -982,7 +982,7 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
         <div><FL label="Stock"/><input className="inp" type="number" value={f.stock} onChange={e=>s("stock",+e.target.value||0)}/></div>
       </FG>
       {+f.suggested_price>0&&(
-        <div style={{marginTop:-4,marginBottom:14,padding:"10px 14px",borderRadius:10,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+        <div style={{marginTop:-4,marginBottom:14,padding:"10px 14px",borderRadius:10,background:"rgba(255,122,46,.08)",border:"1px solid rgba(255,122,46,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
           <span style={{fontSize:12,fontWeight:600,color:"var(--text2)"}}>Suggested retail price for admin to review</span>
           <span style={{fontSize:22,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{C()}{(+f.suggested_price).toLocaleString()}</span>
         </div>
@@ -1389,7 +1389,7 @@ function CatalogFitmentEditModal({part, onSave, onClose}) {
     <Overlay onClose={onClose}>
       <MHead title="Edit Catalogue Part" sub={part.sku} onClose={onClose}/>
       <div style={{fontSize:12,color:"var(--text3)",marginBottom:14,padding:"8px 12px",borderRadius:8,background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.3)"}}>
-        ⚠️ This is a shared MotorDesk catalogue part — saving here updates the master listing that admin and every supplier of this part see, not just your own copy.
+        ⚠️ This is a shared VelGenius catalogue part — saving here updates the master listing that admin and every supplier of this part see, not just your own copy.
       </div>
       <FD><FL label="Name *"/><input className="inp" value={name} onChange={e=>setName(e.target.value)} autoFocus/></FD>
       <FD><FL label="OE Number"/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={oe} onChange={e=>setOe(e.target.value.toUpperCase())}/></FD>
@@ -1410,7 +1410,7 @@ function CatalogFitmentEditModal({part, onSave, onClose}) {
 }
 
 // Supplier receiving stock onto their own shelf (their own purchase invoice —
-// separate from admin's supplier_invoices, which is MotorDesk stocking parts IN
+// separate from admin's supplier_invoices, which is VelGenius stocking parts IN
 // from a supplier, the opposite direction). Each line gets its own bin location
 // (defaulting to whatever's already on file for that part) and, on save, one
 // printed label per physical unit sequenced 1/N..N/N (see saveSupplierPurchaseInvoice).
@@ -1745,7 +1745,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
           <div><FL label="Exchange Rate"/><input className="inp" type="number" min="0" step="0.0001" value={exchangeRate} onChange={e=>setExchangeRate(e.target.value)} placeholder="e.g. 18.50"/></div>
         </FG>
       </div>
-      <div style={{background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+      <div style={{background:"rgba(255,122,46,.06)",border:"1px solid rgba(255,122,46,.25)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
         <FL label="➕ Add Item"/>
         <input className="inp" style={{marginTop:6}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your parts by name, SKU, OE…"/>
         {keywords.length>0&&(
@@ -1820,7 +1820,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
               </div>
             </FG>
             {+newPartSuggestedPrice>0&&(
-              <div style={{marginBottom:14,padding:"8px 12px",borderRadius:8,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <div style={{marginBottom:14,padding:"8px 12px",borderRadius:8,background:"rgba(255,122,46,.08)",border:"1px solid rgba(255,122,46,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                 <span style={{fontSize:11,fontWeight:600,color:"var(--text2)"}}>Suggested sell price for admin to review</span>
                 <span style={{fontSize:16,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{C()}{(+newPartSuggestedPrice).toLocaleString()}</span>
               </div>
@@ -1872,7 +1872,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
             if(idx<itemsCurPage*ITEMS_PAGE_SIZE||idx>=(itemsCurPage+1)*ITEMS_PAGE_SIZE) return null;
             return (
             <div key={idx} ref={el=>itemRefs.current[idx]=el} style={{border:`1px solid ${flashIdx===idx?"var(--accent)":"var(--border)"}`,borderRadius:8,padding:10,
-              background:flashIdx===idx?"rgba(249,115,22,.08)":undefined,transition:"background .3s, border-color .3s"}}>
+              background:flashIdx===idx?"rgba(255,122,46,.08)":undefined,transition:"background .3s, border-color .3s"}}>
               <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-end"}}>
                 {editingItemIdx!==idx&&<button className="btn btn-ghost btn-xs" onClick={()=>{if(window.confirm(`Remove ${it.name} from this invoice?`)) removeItem(idx);}}>✕</button>}
                 <div style={{width:44,height:44,flexShrink:0,borderRadius:6,overflow:"hidden",background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",cursor:it.image?"zoom-in":"default"}}
@@ -2018,7 +2018,7 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
   // catalogue SKUs — always accurate, unlike trusting supplierCode/user.supplier_code
   // alone, which falls back to the full company name (not the short prefix) whenever
   // suppliers.code is blank. Used both to prefix self-added parts' SKUs for display
-  // (matching how My Parts already shows them) and to scope "Zero MotorDesk Stock".
+  // (matching how My Parts already shows them) and to scope "Zero VelGenius Stock".
   const detectedPrefix=(()=>{
     const counts={};
     for(const p of existingParts){
@@ -2047,7 +2047,7 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
     setSaving(false); setEditing(null);
   };
   const runZeroMainStock=async()=>{
-    if(!window.confirm(`Zero MotorDesk's own inventory count for ${staleMainStockCount} of your "${codePrefix}-" catalogue part${staleMainStockCount>1?"s":""}? This only affects the old shared stock number on parts whose SKU starts with "${codePrefix}-" — your own stock (shown above) is untouched, and no other supplier's parts are touched. Do this once your own stock is set correctly, so MotorDesk doesn't also show these as held in-house.`)) return;
+    if(!window.confirm(`Zero VelGenius's own inventory count for ${staleMainStockCount} of your "${codePrefix}-" catalogue part${staleMainStockCount>1?"s":""}? This only affects the old shared stock number on parts whose SKU starts with "${codePrefix}-" — your own stock (shown above) is untouched, and no other supplier's parts are touched. Do this once your own stock is set correctly, so VelGenius doesn't also show these as held in-house.`)) return;
     setZeroing(true);
     await onZeroMainStock();
     setZeroing(false);
@@ -2064,14 +2064,14 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
           {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
           {onZeroMainStock&&staleMainStockCount>0&&(
             <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} disabled={zeroing} onClick={runZeroMainStock}>
-              {zeroing?"…":`🧹 Zero MotorDesk Stock (${staleMainStockCount})`}
+              {zeroing?"…":`🧹 Zero VelGenius Stock (${staleMainStockCount})`}
             </button>
           )}
         </div>
       </div>
       {onZeroMainStock&&staleMainStockCount>0&&(
         <div style={{fontSize:12,color:"var(--text3)",marginTop:-12,marginBottom:16}}>
-          {staleMainStockCount} catalogue part{staleMainStockCount>1?"s":""} still show{staleMainStockCount>1?"":"s"} a nonzero MotorDesk-side stock count from before you took over your own stock — the "Zero MotorDesk Stock" button clears just that old number, not your own.
+          {staleMainStockCount} catalogue part{staleMainStockCount>1?"s":""} still show{staleMainStockCount>1?"":"s"} a nonzero VelGenius-side stock count from before you took over your own stock — the "Zero VelGenius Stock" button clears just that old number, not your own.
         </div>
       )}
       <input className="inp" style={{marginBottom:14,maxWidth:420,textTransform:"uppercase"}} value={search} onChange={e=>setSearch(e.target.value.toUpperCase())}

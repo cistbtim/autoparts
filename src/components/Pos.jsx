@@ -118,10 +118,10 @@ function Combo({ value, options, placeholder, disabled, onChange, monoFont }) {
           {filtered.map(o => (
             <div key={o} onMouseDown={e => { e.preventDefault(); select(o); }}
               style={{ padding: "7px 12px", cursor: "pointer", fontSize: 13, fontFamily: monoFont ? "DM Mono,monospace" : undefined,
-                background: o === value ? "rgba(249,115,22,.12)" : "transparent",
+                background: o === value ? "rgba(255,122,46,.12)" : "transparent",
                 color: o === value ? "var(--accent)" : "var(--text)" }}
               onMouseEnter={e => e.currentTarget.style.background = "var(--surface3)"}
-              onMouseLeave={e => e.currentTarget.style.background = o === value ? "rgba(249,115,22,.12)" : "transparent"}>
+              onMouseLeave={e => e.currentTarget.style.background = o === value ? "rgba(255,122,46,.12)" : "transparent"}>
               {o}
             </div>
           ))}
@@ -999,7 +999,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                   const isEnquirableMob = p.stock <= 0 || !p.price || p.price === 0;
                   const handleMobClick = selectMode ? () => toggleSelect(p.id) : (p.stock <= 0 ? undefined : () => addToCart(p));
                   return (
-                    <div key={p.id} onClick={handleMobClick} style={{ display: "flex", gap: 10, padding: "10px 12px", borderBottom: "1px solid var(--border)", background: isSelected ? "rgba(96,165,250,.1)" : inCart ? "rgba(249,115,22,.08)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)", borderLeft: isSelected ? "3px solid var(--blue)" : inCart ? "3px solid var(--accent)" : "3px solid transparent", opacity: selectMode ? 1 : (p.stock <= 0 ? 0.5 : 1), cursor: selectMode ? "pointer" : (p.stock <= 0 ? "not-allowed" : "pointer") }}>
+                    <div key={p.id} onClick={handleMobClick} style={{ display: "flex", gap: 10, padding: "10px 12px", borderBottom: "1px solid var(--border)", background: isSelected ? "rgba(96,165,250,.1)" : inCart ? "rgba(255,122,46,.08)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)", borderLeft: isSelected ? "3px solid var(--blue)" : inCart ? "3px solid var(--accent)" : "3px solid transparent", opacity: selectMode ? 1 : (p.stock <= 0 ? 0.5 : 1), cursor: selectMode ? "pointer" : (p.stock <= 0 ? "not-allowed" : "pointer") }}>
                       {selectMode && (
                         <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.id)} onClick={e => e.stopPropagation()}
@@ -1165,7 +1165,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 13, color: "var(--text3)", flex: 1 }}>Discount</span>
                 {discLocked ? (
-                  <button className="btn btn-xs btn-ghost" style={{ fontSize: 12, borderColor: "rgba(251,146,60,.3)", color: "var(--accent)" }} onClick={() => setShowPin(true)}>🔒 PIN</button>
+                  <button className="btn btn-xs btn-ghost" style={{ fontSize: 12, borderColor: "rgba(255,154,92,.3)", color: "var(--accent)" }} onClick={() => setShowPin(true)}>🔒 PIN</button>
                 ) : (
                   <input className="inp" type="number" min={0} step="0.01" value={discount}
                     onChange={e => setDiscount(+e.target.value)}
@@ -1208,7 +1208,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               </div>
               {/* Action buttons */}
               <button onClick={completeSale} disabled={saving || cart.length === 0}
-                style={{ width: "100%", padding: "16px 0", borderRadius: 12, border: "none", background: saving || cart.length === 0 ? "var(--surface3)" : "linear-gradient(135deg,#f97316,#fb923c)", color: "#fff", fontWeight: 900, fontSize: 18, cursor: saving || cart.length === 0 ? "not-allowed" : "pointer", boxShadow: cart.length > 0 ? "0 4px 20px rgba(249,115,22,.4)" : "none" }}>
+                style={{ width: "100%", padding: "16px 0", borderRadius: 12, border: "none", background: saving || cart.length === 0 ? "var(--surface3)" : "linear-gradient(135deg,#ff7a2e,#ff9a5c)", color: "#fff", fontWeight: 900, fontSize: 18, cursor: saving || cart.length === 0 ? "not-allowed" : "pointer", boxShadow: cart.length > 0 ? "0 4px 20px rgba(255,122,46,.4)" : "none" }}>
                 {saving ? "Saving…" : "✅ Complete Sale"}
               </button>
               <div style={{ display: "flex", gap: 8 }}>
@@ -1260,7 +1260,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               {refreshing ? "⏳" : "🔄"}
             </button>
             <button onClick={() => { setPosSort(s => s === "sku" ? "default" : "sku"); setPage(0); }} title="Sort by SKU"
-              style={{ flexShrink: 0, background: posSort === "sku" ? "rgba(249,115,22,.12)" : "var(--surface)", border: `2px solid ${posSort === "sku" ? "var(--accent)" : "var(--border)"}`, borderRadius: 8, padding: "0 12px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: posSort === "sku" ? "var(--accent)" : "var(--text2)", height: 38, whiteSpace: "nowrap" }}>
+              style={{ flexShrink: 0, background: posSort === "sku" ? "rgba(255,122,46,.12)" : "var(--surface)", border: `2px solid ${posSort === "sku" ? "var(--accent)" : "var(--border)"}`, borderRadius: 8, padding: "0 12px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: posSort === "sku" ? "var(--accent)" : "var(--text2)", height: 38, whiteSpace: "nowrap" }}>
               Sort by SKU{posSort === "sku" ? " ↑" : ""}
             </button>
             <button onClick={toggleSelectMode} title={selectMode ? "Exit select mode" : "Select parts to enquire"}
@@ -1307,7 +1307,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                     return (
                       <tr key={p.id} onClick={selectMode ? () => toggleSelect(p.id) : undefined} style={{
                         opacity: selectMode ? 1 : (p.stock <= 0 ? 0.5 : 1),
-                        background: isSelected ? "rgba(96,165,250,.1)" : inCart ? "rgba(249,115,22,.07)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.018)",
+                        background: isSelected ? "rgba(96,165,250,.1)" : inCart ? "rgba(255,122,46,.07)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.018)",
                         borderLeft: isSelected ? "3px solid var(--blue)" : inCart ? "3px solid var(--accent)" : "3px solid transparent",
                         transition: "background .1s",
                         cursor: selectMode ? "pointer" : "default",
@@ -1505,7 +1505,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 13, color: "var(--text3)" }}>Discount</span>
               {discLocked ? (
-                <button className="btn btn-xs btn-ghost" style={{ fontSize: 11, borderColor: "rgba(251,146,60,.3)", color: "var(--accent)" }} onClick={() => setShowPin(true)}>🔒 Manager PIN</button>
+                <button className="btn btn-xs btn-ghost" style={{ fontSize: 11, borderColor: "rgba(255,154,92,.3)", color: "var(--accent)" }} onClick={() => setShowPin(true)}>🔒 Manager PIN</button>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <input className="inp" type="number" min={0} step="0.01" value={discount || ""}

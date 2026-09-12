@@ -282,7 +282,7 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
                     const isSel=vinPickSelected?.id===v.id;
                     return(
                       <button key={v.id} onClick={()=>setVinPickSelected(isSel?null:v)} style={{
-                        background:isSel?"rgba(249,115,22,.12)":"var(--surface2)",
+                        background:isSel?"rgba(255,122,46,.12)":"var(--surface2)",
                         border:`2px solid ${isSel?"var(--accent)":"var(--border)"}`,borderRadius:12,
                         padding:0,cursor:"pointer",overflow:"hidden",textAlign:"left",
                         transition:"border-color .15s,box-shadow .15s",

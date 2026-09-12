@@ -67,7 +67,7 @@ export const CHECKLIST_ITEMS=[
 
 export function printStockLabel(p, settings, labelType="shop") {
   const sym = curSym(settings?.currency||"R");
-  const shopName = settings?.shop_name||"MotorDesk";
+  const shopName = settings?.shop_name||"VelGenius";
   const isWs = labelType==="ws";
   const lw = (settings?.label_w||50)+"mm";
   const lh = (settings?.label_h||50)+"mm";
@@ -107,7 +107,7 @@ export function printStockLabel(p, settings, labelType="shop") {
 }
 
 export function printChecklistReport(job, checklist, settings, removedParts=[], otherDamage=[]) {
-  const shopName = settings?.shop_name||"MotorDesk";
+  const shopName = settings?.shop_name||"VelGenius";
   const now = new Date().toLocaleString();
   const statusIcon = s => s==="ok"?"✓":s==="issue"?"✗":s==="na"?"—":"·";
   const statusColor = s => s==="ok"?"#16a34a":s==="issue"?"#dc2626":s==="na"?"#6b7280":"#9ca3af";
@@ -356,7 +356,7 @@ export function printJobCardSheet(job, items=[], settings) {
 }
 
 export function printJobCardLabel(job, settings) {
-  const shopName = settings?.shop_name||"MotorDesk";
+  const shopName = settings?.shop_name||"VelGenius";
   const w = window.open("","_blank","width=480,height=360");
   if(!w) return;
   w.document.write(`<!DOCTYPE html><html><head><title>Job Card Label</title>
@@ -440,11 +440,11 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:36px;max-width:820px;margin:0 auto}
   .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;border-bottom:3px solid #111;margin-bottom:24px}
-  .shop-name{font-size:26px;font-weight:900;color:#f97316;letter-spacing:1px}
+  .shop-name{font-size:26px;font-weight:900;color:#ff7a2e;letter-spacing:1px}
   .shop-info{font-size:11px;color:#555;margin-top:5px;line-height:1.7}
   .inv-block{text-align:right}
   .inv-title{font-size:20px;font-weight:700}
-  .inv-no{font-size:15px;font-weight:700;color:#f97316;margin-top:4px}
+  .inv-no{font-size:15px;font-weight:700;color:#ff7a2e;margin-top:4px}
   .inv-meta{font-size:12px;color:#555;margin-top:4px;line-height:1.8}
   .status{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
@@ -458,7 +458,7 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
   thead th:nth-child(n+2){text-align:right}
   .totals{margin-left:auto;width:260px;margin-bottom:24px}
   .t-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #eee}
-  .t-total{display:flex;justify-content:space-between;padding:10px 0;font-size:17px;font-weight:800;color:#f97316;border-top:2px solid #111;margin-top:4px}
+  .t-total{display:flex;justify-content:space-between;padding:10px 0;font-size:17px;font-weight:800;color:#ff7a2e;border-top:2px solid #111;margin-top:4px}
   .notes{background:#fff8ed;border:1px solid #fcd34d;border-radius:8px;padding:12px;font-size:12px;margin-bottom:20px}
   .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
   @media print{body{padding:18px}}
@@ -625,11 +625,11 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:36px;max-width:820px;margin:0 auto}
   .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;border-bottom:3px solid #2563eb;margin-bottom:24px}
-  .shop-name{font-size:26px;font-weight:900;color:#f97316;letter-spacing:1px}
+  .shop-name{font-size:26px;font-weight:900;color:#ff7a2e;letter-spacing:1px}
   .shop-info{font-size:11px;color:#555;margin-top:5px;line-height:1.7}
   .inv-block{text-align:right}
   .inv-title{font-size:20px;font-weight:700;color:#2563eb}
-  .inv-no{font-size:15px;font-weight:700;color:#f97316;margin-top:4px}
+  .inv-no{font-size:15px;font-weight:700;color:#ff7a2e;margin-top:4px}
   .inv-meta{font-size:12px;color:#555;margin-top:4px;line-height:1.8}
   .watermark{display:inline-block;padding:3px 14px;border-radius:20px;font-size:11px;font-weight:700;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}

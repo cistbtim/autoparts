@@ -1,7 +1,7 @@
 import { getSettings } from "./settings.js";
 
 export const ROLES = {
-  admin:             { color: "#f97316", bg: "rgba(249,115,22,0.12)",   icon: "👑" },
+  admin:             { color: "#ff7a2e", bg: "rgba(255,122,46,0.12)",   icon: "👑" },
   branch_admin:      { color: "#0ea5e9", bg: "rgba(14,165,233,0.12)",   icon: "🏢" },
   branch_manager:    { color: "#06b6d4", bg: "rgba(6,182,212,0.12)",    icon: "👔" },
   branch_warehouse:  { color: "#84cc16", bg: "rgba(132,204,22,0.12)",   icon: "📦" },
@@ -32,7 +32,7 @@ export const CITY_PROVINCE = {
   "Tainan": "Tainan", "Tainan City": "Tainan", "Taoyuan": "Taoyuan", "Taoyuan City": "Taoyuan",
 };
 
-export const OC = { "Completed": "#34d399", "Ready to Ship": "#fbbf24", "Processing": "#60a5fa", "Cancelled": "#f87171", "Quoted": "#a855f7", "Invoiced": "#f97316", "Paid": "#10b981", "已完成": "#34d399", "待出貨": "#fbbf24", "處理中": "#60a5fa", "已取消": "#f87171" };
+export const OC = { "Completed": "#34d399", "Ready to Ship": "#fbbf24", "Processing": "#60a5fa", "Cancelled": "#f87171", "Quoted": "#a855f7", "Invoiced": "#ff7a2e", "Paid": "#10b981", "已完成": "#34d399", "待出貨": "#fbbf24", "處理中": "#60a5fa", "已取消": "#f87171" };
 
 export const CATS_EN = ["All", "Engine", "Brake", "Filter", "Electrical", "Suspension"];
 export const CATS_ZH = ["全部", "引擎", "煞車系統", "濾清系統", "電氣系統", "懸吊系統"];
@@ -134,7 +134,7 @@ export const getRecentLocations = () => {
 export const TRIAL_DAYS = 30;
 
 export const getSubInfo = (u) => {
-  if (!u || u.role === "admin") return { status: "admin", label: "Admin", color: "#f97316" };
+  if (!u || u.role === "admin") return { status: "admin", label: "Admin", color: "#ff7a2e" };
   if (u.role === "branch_admin")      return { status: "admin", label: "Branch Admin",     color: "#0ea5e9" };
   if (u.role === "scrapyard_admin")   return { status: "admin", label: "Scrapyard Admin",  color: "#a78bfa" };
   if (u.role === "branch_manager")    return { status: "admin", label: "Branch Manager",   color: "#06b6d4" };

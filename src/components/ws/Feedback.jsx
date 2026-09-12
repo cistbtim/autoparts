@@ -109,11 +109,11 @@ export function WorkshopFeedbackButton({page,userCtx,onSubmit}) {
         title="Send feedback — drag to move" className={pos?"":"ws-feedback-btn"}
         style={pos
           ?{position:"fixed",left:pos.x,top:pos.y,right:"auto",bottom:"auto",zIndex:500,width:BTN_SIZE,height:BTN_SIZE,borderRadius:"50%",
-            background:"linear-gradient(135deg,#f97316,#ea580c)",color:"#fff",border:"none",touchAction:"none",
+            background:"linear-gradient(135deg,#ff7a2e,#ea580c)",color:"#fff",border:"none",touchAction:"none",
             boxShadow:"0 4px 16px rgba(0,0,0,.3)",cursor:"grab",fontSize:22,
             display:"flex",alignItems:"center",justifyContent:"center"}
           :{position:"fixed",right:18,bottom:18,zIndex:500,width:BTN_SIZE,height:BTN_SIZE,borderRadius:"50%",
-            background:"linear-gradient(135deg,#f97316,#ea580c)",color:"#fff",border:"none",touchAction:"none",
+            background:"linear-gradient(135deg,#ff7a2e,#ea580c)",color:"#fff",border:"none",touchAction:"none",
             boxShadow:"0 4px 16px rgba(0,0,0,.3)",cursor:"grab",fontSize:22,
             display:"flex",alignItems:"center",justifyContent:"center"}}>
         💬

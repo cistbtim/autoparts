@@ -178,8 +178,8 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
                 <div style={{fontSize:12,color:"var(--text3)"}}>@{u.username}</div>
               </div>
               <span className="badge" style={{
-                background:u.ws_role==="manager"?"rgba(139,92,246,.12)":u.ws_role==="mechanic"?"rgba(96,165,250,.12)":"rgba(249,115,22,.12)",
-                color:u.ws_role==="manager"?"#8b5cf6":u.ws_role==="mechanic"?"var(--blue)":"#f97316",
+                background:u.ws_role==="manager"?"rgba(139,92,246,.12)":u.ws_role==="mechanic"?"rgba(96,165,250,.12)":"rgba(255,122,46,.12)",
+                color:u.ws_role==="manager"?"#8b5cf6":u.ws_role==="mechanic"?"var(--blue)":"#ff7a2e",
                 fontSize:12
               }}>
                 {u.ws_role==="manager"?"👔 Manager":u.ws_role==="mechanic"?"🔧 Mechanic":"👑 Main"}
@@ -232,7 +232,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
           <FL label="Workshop Logo"/>
           <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
           <div style={{border:`2px dashed ${dragOver?"var(--accent)":"var(--border)"}`,borderRadius:10,padding:16,textAlign:"center",
-            cursor:"pointer",transition:"all .15s",background:dragOver?"rgba(251,146,60,.06)":"var(--surface2)",marginBottom:8}}
+            cursor:"pointer",transition:"all .15s",background:dragOver?"rgba(255,154,92,.06)":"var(--surface2)",marginBottom:8}}
             onClick={()=>fileRef.current?.click()}
             onDragOver={e=>{e.preventDefault();setDragOver(true);}}
             onDragLeave={()=>setDragOver(false)}
@@ -469,7 +469,7 @@ export function ScrapyardProfilePage({profile, onSave}) {
           <FL label="Scrapyard Logo"/>
           <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
           <div style={{border:`2px dashed ${dragOver?"var(--accent)":"var(--border)"}`,borderRadius:10,padding:16,textAlign:"center",
-            cursor:"pointer",transition:"all .15s",background:dragOver?"rgba(251,146,60,.06)":"var(--surface2)",marginBottom:8}}
+            cursor:"pointer",transition:"all .15s",background:dragOver?"rgba(255,154,92,.06)":"var(--surface2)",marginBottom:8}}
             onClick={()=>fileRef.current?.click()}
             onDragOver={e=>{e.preventDefault();setDragOver(true);}}
             onDragLeave={()=>setDragOver(false)}
@@ -960,7 +960,7 @@ export function LogoUploader({f,s}) {
           border:`2px dashed ${dragOver?"var(--accent)":"var(--border)"}`,
           borderRadius:12, padding:"20px 16px", textAlign:"center",
           cursor:f.logo_url?"not-allowed":"pointer", transition:"all .15s",
-          background:dragOver?"rgba(251,146,60,.06)":f.logo_url?"var(--surface3)":"var(--surface2)",
+          background:dragOver?"rgba(255,154,92,.06)":f.logo_url?"var(--surface3)":"var(--surface2)",
           marginBottom:12, opacity:f.logo_url?0.5:1
         }}>
         <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
@@ -1370,7 +1370,7 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
           <div className="card" style={{padding:22}}>
             <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>🏪 Shop Info</h3>
-            <FD><FL label={t.shopName}/><input className="inp" value={f.shop_name||""} onChange={e=>s("shop_name",e.target.value)} placeholder="MotorDesk"/></FD>
+            <FD><FL label={t.shopName}/><input className="inp" value={f.shop_name||""} onChange={e=>s("shop_name",e.target.value)} placeholder="VelGenius"/></FD>
             <FD><FL label={t.shopPhone}/><input className="inp" type="tel" value={f.phone||""} onChange={e=>s("phone",e.target.value)} placeholder="+886..."/></FD>
             <FD><FL label={t.shopEmail}/><input className="inp" type="email" value={f.email||""} onChange={e=>s("email",e.target.value)} placeholder="shop@email.com"/></FD>
             <FD><FL label={t.whatsappNo}/><input className="inp" type="tel" value={f.whatsapp||""} onChange={e=>s("whatsapp",e.target.value)} placeholder="886912345678 (no + or spaces)"/></FD>
@@ -1672,7 +1672,7 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
       {/* ── TAB: ADS ── */}
       {sTab==="ads"&&(
         <div style={{maxWidth:720}}>
-          <div style={{marginBottom:20,padding:"12px 16px",background:"rgba(249,115,22,.07)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,fontSize:13,color:"var(--text2)"}}>
+          <div style={{marginBottom:20,padding:"12px 16px",background:"rgba(255,122,46,.07)",border:"1px solid rgba(255,122,46,.25)",borderRadius:10,fontSize:13,color:"var(--text2)"}}>
             📢 Ads appear in the <strong>Customer Shop</strong>, <strong>Workshop</strong>, <strong>Spare Shop</strong>, and <strong>Scrapyard</strong>. <strong>Banner</strong> ads show at the top of the page. <strong>Grid</strong> ads appear every 8 parts in the catalogue. Use <strong>🌦 Weather Target</strong> to show rain ads (wipers, bulbs) when it's raining, hot-weather ads (coolant, AC) when it's hot, and so on — weather-matched ads always appear first.
           </div>
 
@@ -1820,7 +1820,7 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
 }
 
 function WorkshopQRSection({settings, shopId=1}) {
-  const shopName = settings.shop_name || "MotorDesk";
+  const shopName = settings.shop_name || "VelGenius";
   const token = btoa(JSON.stringify({id:shopId, name:shopName}));
   const baseUrl = `${window.location.origin}${window.location.pathname}`;
   const regUrl  = `${baseUrl}?ws_register=${token}`;
@@ -1843,9 +1843,9 @@ function WorkshopQRSection({settings, shopId=1}) {
     win.document.write(`<!DOCTYPE html><html><head><title>Workshop QR — ${shopName}</title>
     <style>body{margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:'DM Sans',Arial,sans-serif;background:#fff;padding:24px;box-sizing:border-box}
     .shop{font-size:22px;font-weight:800;margin-bottom:6px;text-align:center}.sub{font-size:13px;color:#666;margin-bottom:20px;text-align:center}
-    .qr{border:3px solid #f97316;border-radius:14px;padding:10px;background:#fff;margin-bottom:18px}
+    .qr{border:3px solid #ff7a2e;border-radius:14px;padding:10px;background:#fff;margin-bottom:18px}
     .url{font-size:9px;color:#888;word-break:break-all;max-width:280px;text-align:center;margin-top:8px}
-    .badge{background:#fff7ed;border:1.5px solid #f97316;border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;color:#ea580c;margin-bottom:10px}</style>
+    .badge{background:#fff7ed;border:1.5px solid #ff7a2e;border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;color:#ea580c;margin-bottom:10px}</style>
     </head><body>
     <div class="badge">Workshop Registration</div>
     <div class="shop">${shopName}</div>
@@ -1864,7 +1864,7 @@ function WorkshopQRSection({settings, shopId=1}) {
         <p style={{fontSize:13,color:"var(--text3)",marginBottom:20}}>Share this QR code or link with workshops. When they scan it, they'll be sent to a registration page with your shop name pre-filled and locked — they cannot change it.</p>
 
         {/* Spare shop name badge */}
-        <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(249,115,22,.07)",border:"1px solid rgba(249,115,22,.2)",borderRadius:10,padding:"10px 14px",marginBottom:20}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(255,122,46,.07)",border:"1px solid rgba(255,122,46,.2)",borderRadius:10,padding:"10px 14px",marginBottom:20}}>
           <span style={{fontSize:18}}>🏪</span>
           <div>
             <div style={{fontSize:11,fontWeight:700,color:"var(--accent)",textTransform:"uppercase",letterSpacing:".06em"}}>Your Spare Shop Name (locked in QR)</div>
@@ -1972,7 +1972,7 @@ function LinkedWorkshopsList({shopName}) {
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {workshops.map(w => (
             <div key={w.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)"}}>
-              <div style={{width:36,height:36,borderRadius:"50%",background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>🔧</div>
+              <div style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>🔧</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:700,color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{w.name||w.username}</div>
                 <div style={{fontSize:11,color:"var(--text3)",display:"flex",gap:10,marginTop:2,flexWrap:"wrap"}}>
@@ -2395,7 +2395,7 @@ function SupplierInvoiceLineEditor({items,setItems,suppId,parts,role="admin",bra
                 </div>
               )}
               {_st==="sku_no_match"&&(
-                <div style={{marginTop:4,padding:"5px 10px",background:"rgba(249,115,22,.07)",border:"1px solid rgba(249,115,22,.25)",borderRadius:8,fontSize:11,color:"var(--orange)",fontWeight:600}}>
+                <div style={{marginTop:4,padding:"5px 10px",background:"rgba(255,122,46,.07)",border:"1px solid rgba(255,122,46,.25)",borderRadius:8,fontSize:11,color:"var(--orange)",fontWeight:600}}>
                   ⚠️ No part found with that SKU — try a different SKU or use the supplier part # field above
                 </div>
               )}
@@ -2573,7 +2573,7 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
 
       {/* Unlinked items warning — blocks Stock In */}
       {!isNew&&!isStocked&&unlinkedItems.length>0&&(
-        <div style={{marginTop:10,padding:"12px 14px",background:"rgba(249,115,22,.08)",border:"1.5px solid rgba(249,115,22,.4)",borderRadius:10,fontSize:13}}>
+        <div style={{marginTop:10,padding:"12px 14px",background:"rgba(255,122,46,.08)",border:"1.5px solid rgba(255,122,46,.4)",borderRadius:10,fontSize:13}}>
           <div style={{fontWeight:700,color:"var(--orange)",marginBottom:6}}>
             ⚠️ {unlinkedItems.length} line{unlinkedItems.length>1?"s":""} not linked — Stock In blocked
           </div>
@@ -2582,7 +2582,7 @@ export function SupplierInvoiceModal({data,suppliers,parts,onSave,onDelete,onSto
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:4}}>
             {unlinkedItems.map((it,i)=>(
-              <div key={it._k||i} style={{display:"flex",gap:8,alignItems:"center",fontSize:12,padding:"4px 8px",background:"rgba(249,115,22,.07)",borderRadius:6}}>
+              <div key={it._k||i} style={{display:"flex",gap:8,alignItems:"center",fontSize:12,padding:"4px 8px",background:"rgba(255,122,46,.07)",borderRadius:6}}>
                 <span style={{color:"var(--orange)",fontWeight:700}}>↳</span>
                 <span style={{fontFamily:"DM Mono,monospace",color:"var(--text2)"}}>{it.supplier_part_id||"—"}</span>
                 <span style={{color:"var(--text3)"}}>·</span>
@@ -3299,7 +3299,7 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
     setEditBusy(true); setEditError(null); setEditStatus("Adding watermark…");
     try {
       const img = await _fetchAsImage(editUrl);
-      const text = getSettings().shop_name || "MotorDesk";
+      const text = getSettings().shop_name || "VelGenius";
       const stamped = await _canvasBlob(img, (ctx, w, h) => {
         const fontSize = Math.max(14, Math.round(w*0.045));
         ctx.font = `700 ${fontSize}px DM Sans, sans-serif`;
@@ -3556,7 +3556,7 @@ export function ExtraPhotosStrip({photos, onChange, sku, onOpenLightbox, onMakeC
             <div style={{background:"var(--surface2)",borderRadius:10,padding:10,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",minHeight:160,position:"relative"}}>
               {editBusy?(
                 <div style={{textAlign:"center",color:"var(--accent)",padding:"0 12px"}}>
-                  <div style={{width:26,height:26,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 8px"}}/>
+                  <div style={{width:26,height:26,border:"3px solid rgba(255,154,92,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 8px"}}/>
                   <div style={{fontSize:12,fontWeight:600}}>{editStatus}</div>
                 </div>
               ):(
@@ -4334,7 +4334,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                 const statusColor=q.status==="quoted"||q.status==="selected"?"var(--green)":q.status==="pending"?"var(--yellow)":"var(--text3)";
                 const batchUrl=`${window.location.origin}${window.location.pathname}?rfq_batch=${q.token}`;
                 return (
-                  <div key={q.id} style={{background:"var(--surface2)",borderRadius:10,padding:13,border:`1px solid ${q.status==="selected"?"rgba(249,115,22,.35)":q.status==="quoted"?"rgba(52,211,153,.3)":"var(--border)"}`}}>
+                  <div key={q.id} style={{background:"var(--surface2)",borderRadius:10,padding:13,border:`1px solid ${q.status==="selected"?"rgba(255,122,46,.35)":q.status==="quoted"?"rgba(52,211,153,.3)":"var(--border)"}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
                       <div>
                         <div style={{fontWeight:700,fontSize:14}}>{q.supplier_name}</div>
@@ -4711,7 +4711,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
       {!saved&&(
         <>
           {dirty&&(
-            <div style={{fontSize:12,color:"var(--accent)",background:"rgba(251,146,60,.08)",borderRadius:8,padding:"6px 10px",marginTop:14,textAlign:"center"}}>
+            <div style={{fontSize:12,color:"var(--accent)",background:"rgba(255,154,92,.08)",borderRadius:8,padding:"6px 10px",marginTop:14,textAlign:"center"}}>
               ⚠️ Unsaved changes
             </div>
           )}
@@ -4751,7 +4751,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               </button>
             )}
             <button className="btn btn-primary" style={{flex:2,position:"relative",
-              boxShadow:dirty?"0 0 0 3px rgba(251,146,60,.4)":undefined,
+              boxShadow:dirty?"0 0 0 3px rgba(255,154,92,.4)":undefined,
               animation:dirty?"pulse-ring 1.5s ease infinite":undefined}}
               onClick={async()=>{
                 if(!validate()) return;
@@ -5484,7 +5484,7 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],rfqQuote
     lines.push("You can submit your quote via the link we will send (no login needed).");
     lines.push("");
     lines.push("Thank you,");
-    lines.push("MotorDesk Team");
+    lines.push("VelGenius Team");
     return lines.join("\n");
   };
 
@@ -5692,12 +5692,12 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],rfqQuote
             const isSelected=!!selectedSuppliers.find(x=>x.id===s.id);
             const inq=latestInqFor(s.id);
             return (
-              <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 10px",borderRadius:8,background:isSelected?"rgba(249,115,22,.1)":"transparent",border:isSelected?"1px solid rgba(249,115,22,.3)":"1px solid transparent"}} onClick={()=>toggleSupplier(s)}>
+              <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 10px",borderRadius:8,background:isSelected?"rgba(255,122,46,.1)":"transparent",border:isSelected?"1px solid rgba(255,122,46,.3)":"1px solid transparent"}} onClick={()=>toggleSupplier(s)}>
                 <input type="checkbox" className="chk" checked={isSelected} readOnly/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:13,fontWeight:700}}>{s.name}</span>
-                    {isLinked&&<span style={{fontSize:10,color:"var(--accent)",background:"rgba(249,115,22,.15)",borderRadius:4,padding:"1px 6px"}}>linked</span>}
+                    {isLinked&&<span style={{fontSize:10,color:"var(--accent)",background:"rgba(255,122,46,.15)",borderRadius:4,padding:"1px 6px"}}>linked</span>}
                     {/* Supplier Part No badge */}
                     {linkedPsMap[s.id]?.supplier_part_no
                       ? <span style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--green)",background:"rgba(52,211,153,.12)",borderRadius:4,padding:"1px 7px"}}>✓ {linkedPsMap[s.id].supplier_part_no}</span>
@@ -5746,7 +5746,7 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],rfqQuote
                           onClick={e=>{e.stopPropagation();acceptQuote(s,inq);}}
                           style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"5px 9px",borderRadius:7,whiteSpace:"nowrap",
                             cursor:acceptingId===s.id?"wait":"pointer",opacity:acceptingId===s.id?.7:1,
-                            border:"1px solid rgba(249,115,22,.4)",background:"rgba(249,115,22,.12)",color:"var(--accent)"}}>
+                            border:"1px solid rgba(255,122,46,.4)",background:"rgba(255,122,46,.12)",color:"var(--accent)"}}>
                           {acceptingId===s.id?"⏳ Creating…":"🛒 Create PO"}
                         </button>
                       )}
@@ -5932,7 +5932,7 @@ export function BulkInquiryModal({items=[],suppliers=[],partSuppliers=[],rfqQuot
     const batchToken=quotes[0]?.token;
     const batchUrl=batchToken?`${window.location.origin}${window.location.pathname}?rfq_batch=${batchToken}`:"";
     const itemsText=itemsList.map((it,i)=>`${i+1}. ${it.name} (${it.sku||"—"}) × ${it.qty}`).join("\n");
-    const defaultMsg=`Hi ${supplier.name},\n\nWe have an RFQ for ${itemsList.length} part${itemsList.length!==1?"s":""}. Please click the link below to view the list and submit all quotes at once:\n\n${batchUrl}\n\nParts:\n${itemsText}\n\nThank you,\n${settings?.shop_name||"MotorDesk"}`;
+    const defaultMsg=`Hi ${supplier.name},\n\nWe have an RFQ for ${itemsList.length} part${itemsList.length!==1?"s":""}. Please click the link below to view the list and submit all quotes at once:\n\n${batchUrl}\n\nParts:\n${itemsText}\n\nThank you,\n${settings?.shop_name||"VelGenius"}`;
     const waMsg=waMsgEdit??defaultMsg;
     return (
       <Overlay onClose={onClose} wide>
@@ -6008,8 +6008,8 @@ export function BulkInquiryModal({items=[],suppliers=[],partSuppliers=[],rfqQuot
             return (
               <div key={s.id} onClick={()=>setSelectedSupplierId(s.id)}
                 style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 10px",borderRadius:8,
-                  background:isSelected?"rgba(249,115,22,.1)":existing?"rgba(96,165,250,.06)":"transparent",
-                  border:isSelected?"1px solid rgba(249,115,22,.3)":existing?"1px solid rgba(96,165,250,.3)":"1px solid transparent"}}>
+                  background:isSelected?"rgba(255,122,46,.1)":existing?"rgba(96,165,250,.06)":"transparent",
+                  border:isSelected?"1px solid rgba(255,122,46,.3)":existing?"1px solid rgba(96,165,250,.3)":"1px solid transparent"}}>
                 <input type="radio" className="chk" checked={isSelected} readOnly/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
@@ -6142,7 +6142,7 @@ export function InquiryDetailModal({inquiry,onUpdate,onAccept,onClose}) {
 
       {/* Accept quote → Create PO */}
       {(inquiry.status==="replied"||(rp&&+rp>0))&&!isOrdered&&(
-        <div style={{background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)",borderRadius:10,padding:13,marginBottom:14}}>
+        <div style={{background:"rgba(255,122,46,.06)",border:"1px solid rgba(255,122,46,.2)",borderRadius:10,padding:13,marginBottom:14}}>
           <div style={{fontSize:12,color:"var(--accent)",fontWeight:700,marginBottom:6}}>✅ Accept This Quote</div>
           <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>Creates a Purchase Invoice for <strong>{inquiry.qty_requested} × {inquiry.part_name}</strong> @ <strong>{fmtAmt(inquiry.reply_price||rp)}</strong> from <strong>{inquiry.supplier_name}</strong> and updates stock.</div>
           <button className="btn btn-primary" style={{width:"100%"}} onClick={()=>onAccept({...inquiry,reply_price:rp||inquiry.reply_price,supplier_part_no:spn||inquiry.supplier_part_no})}>
@@ -6271,11 +6271,11 @@ export function PdfInvoiceModal({inv,settings,onClose}) {
       *{box-sizing:border-box;margin:0;padding:0}
       body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:40px;max-width:800px;margin:0 auto}
       .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid #111}
-      .shop-name{font-size:28px;font-weight:900;color:#f97316;letter-spacing:1px}
+      .shop-name{font-size:28px;font-weight:900;color:#ff7a2e;letter-spacing:1px}
       .shop-info{font-size:12px;color:#555;margin-top:6px;line-height:1.7}
       .inv-title{font-size:22px;font-weight:700;color:#111;text-align:right}
       .inv-meta{font-size:12px;color:#555;text-align:right;margin-top:6px;line-height:1.8}
-      .inv-no{font-size:14px;font-weight:700;color:#f97316}
+      .inv-no{font-size:14px;font-weight:700;color:#ff7a2e}
       .party{background:#f9f9f9;border-radius:8px;padding:14px 18px;margin-bottom:24px;border:1px solid #e5e5e5}
       .party-label{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
       .party-name{font-size:15px;font-weight:700}
@@ -6288,7 +6288,7 @@ export function PdfInvoiceModal({inv,settings,onClose}) {
       .amount{text-align:right;font-weight:600}
       .totals{margin-left:auto;width:280px}
       .totals-row{display:flex;justify-content:space-between;padding:7px 0;font-size:13px;border-bottom:1px solid #eee}
-      .totals-total{display:flex;justify-content:space-between;padding:12px 0;font-size:18px;font-weight:800;color:#f97316;border-top:2px solid #111;margin-top:4px}
+      .totals-total{display:flex;justify-content:space-between;padding:12px 0;font-size:18px;font-weight:800;color:#ff7a2e;border-top:2px solid #111;margin-top:4px}
       .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
       .status-badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;background:#fff3cd;color:#856404}
       .status-paid{background:#d1e7dd;color:#0a3622}
@@ -6302,7 +6302,7 @@ export function PdfInvoiceModal({inv,settings,onClose}) {
     const el=printRef.current;
     if(!el)return;
     const html=`<!DOCTYPE html><html><head><title>Invoice ${inv.id}</title>
-    <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:40px;max-width:800px;margin:0 auto}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid #111}.shop-name{font-size:28px;font-weight:900;color:#f97316}.shop-info{font-size:12px;color:#555;margin-top:6px;line-height:1.7}.inv-title{font-size:22px;font-weight:700;text-align:right}.inv-meta{font-size:12px;color:#555;text-align:right;margin-top:6px;line-height:1.8}.inv-no{font-size:14px;font-weight:700;color:#f97316}.party{background:#f9f9f9;border-radius:8px;padding:14px 18px;margin-bottom:24px;border:1px solid #e5e5e5}.party-label{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;margin-bottom:5px}.party-name{font-size:15px;font-weight:700}.party-info{font-size:12px;color:#555;margin-top:2px;line-height:1.6}table{width:100%;border-collapse:collapse;margin-bottom:24px}thead tr{background:#111;color:#fff}thead th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase}tbody tr:nth-child(even){background:#f9f9f9}tbody td{padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:13px}.amount{text-align:right;font-weight:600}.totals{margin-left:auto;width:280px}.totals-row{display:flex;justify-content:space-between;padding:7px 0;font-size:13px;border-bottom:1px solid #eee}.totals-total{display:flex;justify-content:space-between;padding:12px 0;font-size:18px;font-weight:800;color:#f97316;border-top:2px solid #111;margin-top:4px}.footer{margin-top:40px;padding-top:16px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}</style></head><body>${el.innerHTML}</body></html>`;
+    <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:40px;max-width:800px;margin:0 auto}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid #111}.shop-name{font-size:28px;font-weight:900;color:#ff7a2e}.shop-info{font-size:12px;color:#555;margin-top:6px;line-height:1.7}.inv-title{font-size:22px;font-weight:700;text-align:right}.inv-meta{font-size:12px;color:#555;text-align:right;margin-top:6px;line-height:1.8}.inv-no{font-size:14px;font-weight:700;color:#ff7a2e}.party{background:#f9f9f9;border-radius:8px;padding:14px 18px;margin-bottom:24px;border:1px solid #e5e5e5}.party-label{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;margin-bottom:5px}.party-name{font-size:15px;font-weight:700}.party-info{font-size:12px;color:#555;margin-top:2px;line-height:1.6}table{width:100%;border-collapse:collapse;margin-bottom:24px}thead tr{background:#111;color:#fff}thead th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase}tbody tr:nth-child(even){background:#f9f9f9}tbody td{padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:13px}.amount{text-align:right;font-weight:600}.totals{margin-left:auto;width:280px}.totals-row{display:flex;justify-content:space-between;padding:7px 0;font-size:13px;border-bottom:1px solid #eee}.totals-total{display:flex;justify-content:space-between;padding:12px 0;font-size:18px;font-weight:800;color:#ff7a2e;border-top:2px solid #111;margin-top:4px}.footer{margin-top:40px;padding-top:16px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}</style></head><body>${el.innerHTML}</body></html>`;
     const blob=new Blob([html],{type:"text/html"});
     const a=document.createElement("a");
     a.href=URL.createObjectURL(blob);
@@ -6332,7 +6332,7 @@ export function PdfInvoiceModal({inv,settings,onClose}) {
               {(settings.logo_data||settings.logo_url)
                 ? <img src={settings.logo_data||toLogoUrl(settings.logo_url)} alt={settings.shop_name||"Logo"}
                     style={{height:64,maxWidth:240,objectFit:"contain",display:"block",marginBottom:8}}/>
-                : <div className="shop-name" style={{fontSize:28,fontWeight:900,color:"#f97316",letterSpacing:1}}>{settings.shop_name||"MotorDesk"}</div>
+                : <div className="shop-name" style={{fontSize:28,fontWeight:900,color:"#ff7a2e",letterSpacing:1}}>{settings.shop_name||"VelGenius"}</div>
               }
               <div className="shop-info" style={{fontSize:12,color:"#555",marginTop:5,lineHeight:1.7}}>
                 {settings.phone&&<div>📞 {settings.phone}</div>}
@@ -6346,7 +6346,7 @@ export function PdfInvoiceModal({inv,settings,onClose}) {
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:20,fontWeight:700,color:"#111"}}>{isSupplier?"PURCHASE INVOICE":"SALES INVOICE"}</div>
-              <div className="inv-no" style={{fontSize:15,fontWeight:700,color:"#f97316",margin:"6px 0"}}>{inv.id}</div>
+              <div className="inv-no" style={{fontSize:15,fontWeight:700,color:"#ff7a2e",margin:"6px 0"}}>{inv.id}</div>
               <div style={{fontSize:12,color:"#555",lineHeight:1.8}}>
                 <div>Date: <strong>{inv.invoice_date}</strong></div>
                 {inv.due_date&&<div>Due: <strong>{inv.due_date}</strong></div>}
@@ -6395,19 +6395,19 @@ export function PdfInvoiceModal({inv,settings,onClose}) {
           <div style={{marginLeft:"auto",width:280}}>
             <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:13,borderBottom:"1px solid #eee"}}><span>Subtotal</span><span>{fmt(inv.subtotal||inv.total)}</span></div>
             {(inv.tax||0)>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:13,borderBottom:"1px solid #eee"}}><span>Tax ({settings.tax_rate||0}%)</span><span>{fmt(inv.tax)}</span></div>}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",fontSize:18,fontWeight:800,color:"#f97316",borderTop:"2px solid #111",marginTop:4}}>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",fontSize:18,fontWeight:800,color:"#ff7a2e",borderTop:"2px solid #111",marginTop:4}}>
               <span>TOTAL</span><span>{fmt(inv.total)}</span>
             </div>
           </div>
 
           {/* Notes */}
-          {inv.notes&&<div style={{marginTop:20,padding:"10px 14px",background:"#f9f9f9",borderRadius:6,fontSize:12,color:"#555",borderLeft:"3px solid #f97316"}}><strong>Notes:</strong> {inv.notes}</div>}
+          {inv.notes&&<div style={{marginTop:20,padding:"10px 14px",background:"#f9f9f9",borderRadius:6,fontSize:12,color:"#555",borderLeft:"3px solid #ff7a2e"}}><strong>Notes:</strong> {inv.notes}</div>}
 
           {/* Footer */}
           <div style={{marginTop:36,paddingTop:14,borderTop:"1px solid #e5e5e5",fontSize:11,color:"#999",textAlign:"center",lineHeight:1.8}}>
             <div>Thank you for your business!</div>
             {settings.phone&&<div>Contact: {settings.phone} {settings.email&&`· ${settings.email}`}</div>}
-            <div style={{marginTop:4,fontSize:10}}>Generated by {settings.shop_name||"MotorDesk"} · Powered by MotorDesk</div>
+            <div style={{marginTop:4,fontSize:10}}>Generated by {settings.shop_name||"VelGenius"} · Powered by VelGenius</div>
           </div>
         </div>
       </div>
@@ -7720,7 +7720,7 @@ Current: ${item.system_qty}`,item.system_qty));if(!isNaN(n)&&n>=0){onAdjustItem(
                 display:"flex",alignItems:"center",gap:10,padding:"9px 14px",
                 borderBottom:"1px solid var(--border)",
                 cursor:filterMode==="manual"?"pointer":"default",
-                background:filterMode==="manual"&&manualSelected.has(p.id)?"rgba(251,146,60,.08)":"transparent"
+                background:filterMode==="manual"&&manualSelected.has(p.id)?"rgba(255,154,92,.08)":"transparent"
               }}>
               {filterMode==="manual"&&(
                 <input type="checkbox" checked={manualSelected.has(p.id)} onChange={()=>toggleManual(p.id)}
@@ -10216,7 +10216,7 @@ export function TransferRequestCard({r,branches=[],role,currentBranch,settings,b
             onClick={()=>onGoToRfqSession(bulkRfqSessionId)}>🛒 View &amp; Order via RFQ</button>
         )}
         {onCreateRfqSession&&items.length>1&&items.some(i=>i.partId&&parts.find(p=>String(p.id)===String(i.partId)))&&(
-          <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}}
+          <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",border:"1px solid rgba(255,122,46,.3)"}}
             title="Pick one supplier and request quotes for all items in this list at once"
             onClick={()=>setBulkRfq(true)}>📩 Ask Suppliers — All Items</button>
         )}
@@ -10503,7 +10503,7 @@ export function BranchTransferRequestsPage({branchStockRequests=[],branches=[],r
       <div style={{marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:6,flexWrap:"wrap"}}>
           <div style={{fontSize:18,fontWeight:800}}>🔄 Branch Transfer Requests</div>
-          {pendingCount>0&&<span style={{fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:99,background:"rgba(251,146,60,.2)",color:"var(--orange)"}}>{pendingCount} pending</span>}
+          {pendingCount>0&&<span style={{fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:99,background:"rgba(255,154,92,.2)",color:"var(--orange)"}}>{pendingCount} pending</span>}
           {quotedCount>0&&<span style={{fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:99,background:"rgba(167,139,250,.2)",color:"var(--purple)"}}>{quotedCount} quoted</span>}
           <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} disabled={refreshing} onClick={handleRefresh}>
             <span style={refreshing?{display:"inline-block",animation:"spin 1s linear infinite"}:{}}>{refreshing?"⟳":"↻"}</span>{refreshing?" Refreshing…":" Refresh"}
@@ -10627,7 +10627,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},sup
   const doRefresh=async()=>{setRefreshing(true);try{await onRefresh();}finally{setRefreshing(false);}};
 
   const statusMeta={
-    pending:     {icon:"⏳",label:"Pending",     bg:"rgba(251,146,60,.15)",  color:"var(--orange)"},
+    pending:     {icon:"⏳",label:"Pending",     bg:"rgba(255,154,92,.15)",  color:"var(--orange)"},
     escalated:   {icon:"⬆️",label:"Escalated",   bg:"rgba(96,165,250,.15)",  color:"var(--blue)"},
     main_replied:{icon:"📦",label:"Main Replied", bg:"rgba(52,211,153,.15)",  color:"var(--green)"},
     replied:     {icon:"✅",label:"Replied",      bg:"rgba(52,211,153,.15)",  color:"var(--green)"},
@@ -10663,7 +10663,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},sup
       {/* Detail panel (shown when a request is selected) */}
       {selected&&(
         <div style={{marginBottom:20,border:"2px solid var(--accent)",borderRadius:14,overflow:"hidden"}}>
-          <div style={{padding:"10px 16px",background:"rgba(251,146,60,.08)",display:"flex",alignItems:"center",gap:8}}>
+          <div style={{padding:"10px 16px",background:"rgba(255,154,92,.08)",display:"flex",alignItems:"center",gap:8}}>
             <span style={{fontWeight:700,flex:1}}>Reviewing: {selected.workshop_name} — {selected.job_car||"—"}</span>
             {onDelete&&<button onClick={async()=>{if(!window.confirm("Delete this request?"))return;await onDelete(selected.id);setSelId(null);}}
               style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",color:"#ef4444",borderRadius:7,padding:"3px 10px",cursor:"pointer",fontSize:12,fontWeight:600}}>🗑️ Delete</button>}
@@ -10687,7 +10687,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},sup
                 <div key={req.id}
                   style={{padding:"14px 16px",borderRadius:12,cursor:"pointer",
                     border:`2px solid ${isSel?"var(--accent)":"var(--border)"}`,
-                    background:isSel?"rgba(251,146,60,.06)":"var(--surface2)",transition:"all .15s"}}
+                    background:isSel?"rgba(255,154,92,.06)":"var(--surface2)",transition:"all .15s"}}
                   onClick={()=>setSelId(isSel?null:req.id)}>
                   <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     <div style={{flex:1,minWidth:200}}>
@@ -10902,7 +10902,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
               style={{padding:"6px 12px",borderRadius:8,background:"#25D366",color:"#fff",fontWeight:700,fontSize:12,textDecoration:"none"}}>
               💬 WhatsApp Workshop</a>}
             <span style={{padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:600,
-              background:req.status==="pending"?"rgba(251,146,60,.15)":"rgba(52,211,153,.15)",
+              background:req.status==="pending"?"rgba(255,154,92,.15)":"rgba(52,211,153,.15)",
               color:req.status==="pending"?"#f59e0b":"#34d399"}}>
               {req.status==="pending"?"⏳ Pending Reply":"✅ Replied"}
             </span>
@@ -10925,7 +10925,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
             {req.vin&&(
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                 {[
-                  {label:"CatCar",    icon:"🐱", color:"#f97316", bg:"rgba(249,115,22,.13)", href:`https://catcar.info/?lang=en&vin=${encodeURIComponent(req.vin)}`},
+                  {label:"CatCar",    icon:"🐱", color:"#ff7a2e", bg:"rgba(255,122,46,.13)", href:`https://catcar.info/?lang=en&vin=${encodeURIComponent(req.vin)}`},
                   {label:"7zap",      icon:"🔩", color:"#60a5fa", bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/", copyVin:true},
                   {label:"RealOEM",   icon:"🚗", color:"#34d399", bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(req.vin)}`},
                   {label:"VIN Decode",icon:"🔎", color:"#fbbf24", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(req.vin)}`},
@@ -10936,7 +10936,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
                   {label:"Safeline",  icon:"🛑", color:"#dc2626", bg:"rgba(220,38,38,.09)",   href:"https://safelinebrakes.co.za/"},
                   {label:"AutoZone",  icon:"🔴", color:"#dc2626", bg:"rgba(220,38,38,.12)",   href:`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(req.vin)}`},
                   {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)",  href:`https://www.amayama.com/search/?q=${encodeURIComponent(req.vin)}`},
-                  {label:"WolfOil",   icon:"🛢️", color:"#f97316", bg:"rgba(249,115,22,.12)",  href:"https://za.wolfoil.com/en-us/oil-finder"},
+                  {label:"WolfOil",   icon:"🛢️", color:"#ff7a2e", bg:"rgba(255,122,46,.12)",  href:"https://za.wolfoil.com/en-us/oil-finder"},
                 ].map(lk=>(
                   <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
                     onClick={lk.copyVin?()=>navigator.clipboard.writeText(req.vin):undefined}
@@ -12005,9 +12005,9 @@ export function PartOcrScanModal({ parts = [], onClose, onGoToPart }) {
     if (!sel) return;
     const x = Math.min(sel.x0, sel.x1), y = Math.min(sel.y0, sel.y1);
     const w = Math.abs(sel.x1 - sel.x0), h = Math.abs(sel.y1 - sel.y0);
-    ctx.fillStyle = "rgba(249,115,22,.15)";
+    ctx.fillStyle = "rgba(255,122,46,.15)";
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = "#f97316";
+    ctx.strokeStyle = "#ff7a2e";
     ctx.lineWidth = 2.5;
     ctx.setLineDash([8, 4]);
     ctx.strokeRect(x, y, w, h);
@@ -12464,7 +12464,7 @@ export function CatalogueImportModal({ suppliers, parts, vehicles=[], onClose, o
                         ? <span style={{color:"var(--text3)"}}>—</span>
                         : row.fitments.map((f,fi)=>(
                           <span key={fi} style={{display:"inline-block",margin:"1px 2px",padding:"1px 6px",borderRadius:4,fontSize:10,
-                            background:f.vehicleIds.length>0?"rgba(96,165,250,.15)":"rgba(251,146,60,.15)",
+                            background:f.vehicleIds.length>0?"rgba(96,165,250,.15)":"rgba(255,154,92,.15)",
                             color:f.vehicleIds.length>0?"var(--blue)":"var(--orange)"}}>
                             {f.make} {f.model}{f.vehicleIds.length===0?" ⚠":f.vehicleIds.length>1?` ×${f.vehicleIds.length}`:""}
                           </span>
@@ -12607,7 +12607,7 @@ export function BulkImageImportModal({ parts, partSuppliers=[], onClose, onImage
           Select images named after the part SKU or supplier part number (e.g. <strong>AH02001.jpg</strong>). Each matched image will be uploaded and linked to the correct part.
         </p>
 
-        {!SCRIPT_URL&&<div style={{background:"rgba(251,146,60,.1)",border:"1px solid var(--orange)",borderRadius:8,padding:"10px 14px",fontSize:12,color:"var(--orange)",marginBottom:14}}>
+        {!SCRIPT_URL&&<div style={{background:"rgba(255,154,92,.1)",border:"1px solid var(--orange)",borderRadius:8,padding:"10px 14px",fontSize:12,color:"var(--orange)",marginBottom:14}}>
           ⚠ Apps Script URL not set — uploads will fail. Go to Settings → System first.
         </div>}
 

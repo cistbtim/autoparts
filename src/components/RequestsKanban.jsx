@@ -8,7 +8,7 @@ const partPhotoUrl=(part)=>part?.image_url||"";
 const COLUMNS = [
   {id:"new",         label:"New",          color:"#a78bfa"},
   {id:"inprogress",  label:"In Progress",  color:"#fbbf24"},
-  {id:"finishorder", label:"Finish Order", color:"#fb923c"},
+  {id:"finishorder", label:"Finish Order", color:"#ff9a5c"},
   {id:"arrived",     label:"Order Arrived",color:"#38bdf8"},
   {id:"fulfilled",   label:"Fulfilled",    color:"#34d399"},
   {id:"closed",      label:"Closed",       color:"#f87171"},

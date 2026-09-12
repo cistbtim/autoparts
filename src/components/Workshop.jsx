@@ -211,7 +211,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     if (job.is_cancelled)                        return {label:"🚫 Cancelled",         color:"#ef4444", bg:"rgba(239,68,68,.15)"};
     const inv = jobInvoice(job.id);
     if (inv?.status==="paid")                    return {label:"💚 Payment Received",   color:"#10b981", bg:"rgba(16,185,129,.15)"};
-    if (inv)                                     return {label:"🧾 Invoiced",           color:"#f97316", bg:"rgba(249,115,22,.15)"};
+    if (inv)                                     return {label:"🧾 Invoiced",           color:"#ff7a2e", bg:"rgba(255,122,46,.15)"};
     if (job.status==="Pending")                  return {label:"⏳ Pending",            color:"#a78bfa", bg:"rgba(167,139,250,.15)"};
     if (job.status==="In Progress")              return {label:"⚙️ In Progress",        color:"#fbbf24", bg:"rgba(251,191,36,.15)"};
     if (job.status==="Done")                     return {label:"✅ Done",               color:"#34d399", bg:"rgba(52,211,153,.15)"};
@@ -466,9 +466,9 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
       )}
       {!wsLocked&&wsExpiresAt&&wsDaysLeft!==null&&(()=>{
         const d=wsDaysLeft;
-        const col=d<=3?"#ef4444":d<=7?"#f97316":d<=14?"#eab308":"#22c55e";
-        const bg=d<=3?"rgba(239,68,68,.08)":d<=7?"rgba(249,115,22,.08)":d<=14?"rgba(234,179,8,.08)":"rgba(34,197,94,.08)";
-        const bdr=d<=3?"rgba(239,68,68,.3)":d<=7?"rgba(249,115,22,.3)":d<=14?"rgba(234,179,8,.3)":"rgba(34,197,94,.3)";
+        const col=d<=3?"#ef4444":d<=7?"#ff7a2e":d<=14?"#eab308":"#22c55e";
+        const bg=d<=3?"rgba(239,68,68,.08)":d<=7?"rgba(255,122,46,.08)":d<=14?"rgba(234,179,8,.08)":"rgba(34,197,94,.08)";
+        const bdr=d<=3?"rgba(239,68,68,.3)":d<=7?"rgba(255,122,46,.3)":d<=14?"rgba(234,179,8,.3)":"rgba(34,197,94,.3)";
         return (
           <div className={d<=7?"wsFlash":undefined} style={{marginBottom:8,padding:"5px 12px",background:bg,border:`1px solid ${bdr}`,borderRadius:8,display:"flex",alignItems:"center",gap:10}}>
             <div style={{flex:1,fontSize:12,fontWeight:600,color:col}}>{wsSubStatus==="trial"?"Free Trial":"Subscription"} · {wsExpiresAt}</div>
@@ -489,7 +489,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         </div>
         <div className="ws-head-side" style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
           {wsDaysLeft!==null&&!wsExpiresAt&&!wsLocked&&(()=>{
-            const col=wsDaysLeft<=3?"#ef4444":wsDaysLeft<=7?"#f97316":"#22c55e";
+            const col=wsDaysLeft<=3?"#ef4444":wsDaysLeft<=7?"#ff7a2e":"#22c55e";
             const label=wsDaysLeft<=0?"⚠️ Today":`✅ ${wsDaysLeft}d left`;
             return <span className={wsDaysLeft<=7?"wsFlash":undefined} style={{background:col+"22",border:`1px solid ${col}66`,borderRadius:99,padding:"3px 12px",fontSize:12,color:col,fontWeight:700,whiteSpace:"nowrap"}}>{label}</span>;
           })()}
@@ -501,7 +501,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                 title="Switch into a specific workshop's account to view/edit as them — no separate login needed"
                 style={{flex:"0 0 auto",width:"auto",minWidth:170,fontSize:12,padding:"6px 10px",
                   borderColor:actingAsWsId?"var(--accent)":undefined,
-                  background:actingAsWsId?"rgba(249,115,22,.08)":undefined,
+                  background:actingAsWsId?"rgba(255,122,46,.08)":undefined,
                   fontWeight:actingAsWsId?700:400}}>
                 <option value="__all__">🏪 All Workshops (aggregate view)</option>
                 {wsProfiles.map(p=>(
@@ -597,7 +597,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
 
       {/* ── Resume Job banner (navigated away via Go to Stock / View POs) ── */}
       {activeJob&&view==="list"&&(
-        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",marginBottom:14,background:"rgba(249,115,22,.1)",border:"1px solid rgba(249,115,22,.35)",borderRadius:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",marginBottom:14,background:"rgba(255,122,46,.1)",border:"1px solid rgba(255,122,46,.35)",borderRadius:10}}>
           <span style={{fontSize:22,flexShrink:0}}>📋</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:700,fontSize:13,marginBottom:1}}>Job in progress</div>
@@ -706,7 +706,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                   {j.complaint&&<div style={{fontSize:13,fontWeight:700,color:"#fff",marginBottom:6,lineHeight:1.5,background:"#ef4444",borderRadius:7,padding:"6px 10px"}}>⚠️ {j.complaint}</div>}
                   {!wsId&&j.workshop_id&&(
                     <div style={{fontSize:11,color:"var(--text3)",marginBottom:5,display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{background:"rgba(251,146,60,.12)",color:"#f97316",borderRadius:6,padding:"2px 7px",fontWeight:600,fontSize:11}}>🏪 {wsProfileMap[j.workshop_id]||j.workshop_id}</span>
+                      <span style={{background:"rgba(255,154,92,.12)",color:"#ff7a2e",borderRadius:6,padding:"2px 7px",fontWeight:600,fontSize:11}}>🏪 {wsProfileMap[j.workshop_id]||j.workshop_id}</span>
                     </div>
                   )}
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid var(--border)",paddingTop:7,marginTop:"auto"}}>
@@ -840,7 +840,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             {id:"quoting",  label:"Quoting",           hint:"Waiting on supplier prices", color:"#a78bfa", items:quotingCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
             {id:"ordered",  label:"Ordered",           hint:"Parts on order",         color:"#818cf8", items:orderedCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
             {id:"done",     label:"Done",              hint:"Create invoice",          color:"#34d399", items:doneCol, type:"job"},
-            {id:"invoiced", label:"Invoiced",          hint:"Collect payment",         color:"#f97316", items:invCol,  type:"job"},
+            {id:"invoiced", label:"Invoiced",          hint:"Collect payment",         color:"#ff7a2e", items:invCol,  type:"job"},
             {id:"paid",     label:"Payment Received",  hint:"Job complete ✓",          color:"#10b981", items:paidCol, type:"job"},
             {id:"problem",  label:"Problem Job",       hint:"Needs attention",         color:"#f87171", items:probCol, type:"job"},
             {id:"cancelled",label:"Cancelled",         hint:"Customer didn't proceed", color:"#ef4444", items:cancelCol, type:"job"},
@@ -1028,7 +1028,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   {/* workshop badge — admin viewing all workshops */}
                   {!wsId&&job.workshop_id&&(
                     <div style={{textAlign:"center",marginBottom:5}}>
-                      <span style={{display:"inline-block",fontSize:9,fontWeight:700,color:"#f97316",background:"rgba(251,146,60,.12)",border:"1px solid rgba(251,146,60,.25)",borderRadius:99,padding:"1px 9px",letterSpacing:".03em",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      <span style={{display:"inline-block",fontSize:9,fontWeight:700,color:"#ff7a2e",background:"rgba(255,154,92,.12)",border:"1px solid rgba(255,154,92,.25)",borderRadius:99,padding:"1px 9px",letterSpacing:".03em",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                         🏪 {wsProfileMap[job.workshop_id]||job.workshop_id}
                       </span>
                     </div>
@@ -1687,7 +1687,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   <button className="btn btn-ghost btn-sm" onClick={()=>navigator.clipboard?.writeText(refUrl).then(()=>alert("Link copied!"))}>📋 Copy</button>
                   {navigator.share&&(
                     <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}}
-                      onClick={()=>navigator.share({title:"Try MotorDesk for your workshop",text:"I've been using this to run my workshop — worth a look.",url:refUrl}).catch(()=>{})}>
+                      onClick={()=>navigator.share({title:"Try VelGenius for your workshop",text:"I've been using this to run my workshop — worth a look.",url:refUrl}).catch(()=>{})}>
                       📤 Share
                     </button>
                   )}
@@ -3898,7 +3898,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
         )}
       </div>
       {addingSup&&(
-        <div style={{border:"1px solid var(--accent)",borderRadius:10,padding:"12px 14px",marginBottom:10,background:"rgba(249,115,22,.04)"}}>
+        <div style={{border:"1px solid var(--accent)",borderRadius:10,padding:"12px 14px",marginBottom:10,background:"rgba(255,122,46,.04)"}}>
           <div style={{fontWeight:700,fontSize:12,marginBottom:10,color:"var(--accent)"}}>➕ New Supplier</div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
             <input className="inp" style={{flex:"2 1 160px"}} value={supName} onChange={e=>setSupName(e.target.value)} placeholder="Supplier name *" autoFocus
@@ -5294,7 +5294,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
         : `https://catcar.info/?lang=en&vin=${encodeURIComponent(job.vin)}`)
     : null;
   const vinSearchLinks = job.vin ? [
-    ...(catcarHref?[{label:"CatCar ⚡", icon:"🐱", color:"#f97316",       bg:"rgba(249,115,22,.13)",  href:catcarHref}]:[]),
+    ...(catcarHref?[{label:"CatCar ⚡", icon:"🐱", color:"#ff7a2e",       bg:"rgba(255,122,46,.13)",  href:catcarHref}]:[]),
     {label:"7zap",      icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/", copyVin:true},
     {label:"RealOEM",   icon:"🚗", color:"var(--green)",  bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`},
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},
@@ -5343,7 +5343,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               )}
               {!wsId&&job.workshop_id&&(
                 <div style={{marginTop:2}}>
-                  <span style={{display:"inline-block",fontSize:10,fontWeight:700,color:"#f97316",background:"rgba(251,146,60,.12)",border:"1px solid rgba(251,146,60,.25)",borderRadius:99,padding:"1px 8px",letterSpacing:".02em"}}>
+                  <span style={{display:"inline-block",fontSize:10,fontWeight:700,color:"#ff7a2e",background:"rgba(255,154,92,.12)",border:"1px solid rgba(255,154,92,.25)",borderRadius:99,padding:"1px 8px",letterSpacing:".02em"}}>
                     🏪 {wsProfiles.find(p=>p.id===job.workshop_id)?.name||job.workshop_id}
                   </span>
                 </div>
@@ -5354,7 +5354,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:6,flexWrap:"wrap",rowGap:4}}>
             <div>
               <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>🚗 Plate</div>
-              <div style={{fontFamily:"DM Mono,monospace",fontWeight:800,fontSize:20,color:"#f97316",letterSpacing:".04em",lineHeight:1.1}}>{job.vehicle_reg||"—"}</div>
+              <div style={{fontFamily:"DM Mono,monospace",fontWeight:800,fontSize:20,color:"#ff7a2e",letterSpacing:".04em",lineHeight:1.1}}>{job.vehicle_reg||"—"}</div>
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:9,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".08em",marginBottom:1}}>Job #</div>
@@ -5446,10 +5446,10 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
         )}
         {!job.is_cancelled&&invoice?.status==="partial"&&(
           <div style={{position:"absolute",top:16,right:16,transform:"rotate(-10deg)",
-            border:"3px solid #f97316",borderRadius:7,padding:"7px 16px",
-            color:"#f97316",fontWeight:900,fontSize:20,letterSpacing:".18em",
+            border:"3px solid #ff7a2e",borderRadius:7,padding:"7px 16px",
+            color:"#ff7a2e",fontWeight:900,fontSize:20,letterSpacing:".18em",
             opacity:.75,fontFamily:"DM Mono,monospace",textTransform:"uppercase",
-            lineHeight:1,background:"rgba(249,115,22,.05)",pointerEvents:"none",userSelect:"none"}}>
+            lineHeight:1,background:"rgba(255,122,46,.05)",pointerEvents:"none",userSelect:"none"}}>
             PARTIAL
           </div>
         )}
@@ -5568,7 +5568,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           {key:"Quoting",         label:"💬 "+(t.quoting||"Quoting"),              color:"#a78bfa", bg:"rgba(167,139,250,.18)", mechanic:false},
           {key:"Ordered",         label:"📦 "+(t.ordered||"Ordered"),              color:"#818cf8", bg:"rgba(129,140,248,.18)", mechanic:false},
           {key:"Done",            label:"✅ "+(t.done||"Done"),                    color:"#34d399", bg:"rgba(52,211,153,.18)",  mechanic:false},
-          {key:"Invoiced",        label:"🧾 "+(t.wsStInvoiced||"Invoiced"),         color:"#f97316", bg:"rgba(249,115,22,.18)",  mechanic:false, derived:true},
+          {key:"Invoiced",        label:"🧾 "+(t.wsStInvoiced||"Invoiced"),         color:"#ff7a2e", bg:"rgba(255,122,46,.18)",  mechanic:false, derived:true},
           {key:"Payment Received",label:"💚 "+(t.wsStPaid||"Paid"),                color:"#10b981", bg:"rgba(16,185,129,.18)",  mechanic:false, derived:true},
         ];
         const activeKey = isPaid?"Payment Received":isInvoiced?"Invoiced":job.status;
@@ -5803,8 +5803,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             </button>
             <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert("VIN copied!\n\nPaste it into WolfOil's VIN field.");window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
               style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 4px",
-                background:"rgba(249,115,22,.1)",border:"1px solid rgba(249,115,22,.3)",borderRadius:10,
-                color:"#f97316",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                background:"rgba(255,122,46,.1)",border:"1px solid rgba(255,122,46,.3)",borderRadius:10,
+                color:"#ff7a2e",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
               <span style={{fontSize:22}}>🛢️</span><span>WolfOil</span>
             </button>
           </div>
@@ -5900,13 +5900,13 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       )}
                     </button>
                   : <button onClick={()=>setMatchModelOpen(true)}
-                      style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"1px dashed rgba(251,146,60,.6)",cursor:"pointer",
-                        background:"rgba(251,146,60,.08)",color:"#f97316",
+                      style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"1px dashed rgba(255,154,92,.6)",cursor:"pointer",
+                        background:"rgba(255,154,92,.08)",color:"#ff7a2e",
                         textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
                       <span style={{fontSize:24,lineHeight:1}}>🔗</span>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:800,letterSpacing:".02em",marginBottom:2}}>Link vehicle to browse spare parts</div>
-                        <div style={{fontSize:12,color:"rgba(249,115,22,.7)"}}>
+                        <div style={{fontSize:12,color:"rgba(255,122,46,.7)"}}>
                           {job.vehicle_make&&job.vehicle_model?`${job.vehicle_make} ${resolvedVehicleModel} — tap to match vehicle code`:"Tap to match this car to a vehicle code"}
                         </div>
                       </div>
@@ -5962,7 +5962,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           <div style={{padding:16}}>
           {/* Action buttons */}
           <div style={{position:"relative",display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
-            {wsRole!=="mechanic"&&!wsLocked&&<button className="btn" onClick={()=>setEditJob(true)} style={{flex:1,background:"linear-gradient(135deg,#fbbf24 0%,#f97316 55%,#ef4444 100%)",color:"#fff",padding:"13px 20px",fontSize:15,fontWeight:700,letterSpacing:"0.4px",borderRadius:12,boxShadow:"0 4px 24px rgba(249,115,22,0.55),inset 0 1px 0 rgba(255,255,255,0.18)",textShadow:"0 1px 3px rgba(0,0,0,0.25)",border:"none"}}>✏️ {t.edit}</button>}
+            {wsRole!=="mechanic"&&!wsLocked&&<button className="btn" onClick={()=>setEditJob(true)} style={{flex:1,background:"linear-gradient(135deg,#fbbf24 0%,#ff7a2e 55%,#ef4444 100%)",color:"#fff",padding:"13px 20px",fontSize:15,fontWeight:700,letterSpacing:"0.4px",borderRadius:12,boxShadow:"0 4px 24px rgba(255,122,46,0.55),inset 0 1px 0 rgba(255,255,255,0.18)",textShadow:"0 1px 3px rgba(0,0,0,0.25)",border:"none"}}>✏️ {t.edit}</button>}
             {/* Print dropdown */}
             <div style={{position:"relative"}}>
               <button className="btn" onClick={()=>{setShowPrintMenu(p=>!p);setShowJobMenu(false);}} style={{background:"linear-gradient(135deg,#1d4ed8,#7c3aed)",color:"#fff",padding:"13px 16px",fontSize:15,fontWeight:700,borderRadius:12,boxShadow:"0 4px 20px rgba(99,102,241,0.45),inset 0 1px 0 rgba(255,255,255,0.15)",border:"none",gap:6,display:"flex",alignItems:"center"}}>🖨️ Print <span style={{fontSize:12}}>▾</span></button>
@@ -6245,8 +6245,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                   </button>
                   <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert(`VIN copied!\n\nPaste it into WolfOil's VIN field.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
                     style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px",
-                      background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:10,
-                      color:"#f97316",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
+                      background:"rgba(255,122,46,.12)",border:"1px solid rgba(255,122,46,.3)",borderRadius:10,
+                      color:"#ff7a2e",cursor:"pointer",fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.3}}>
                     <span style={{fontSize:20}}>🛢️</span>
                     <span>WolfOil</span>
                   </button>
@@ -6827,7 +6827,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                   <button onClick={()=>window.open(`https://www.amayama.com/search/?q=${encodeURIComponent(job.vin)}`,"_blank")}
                     style={{fontSize:10,fontWeight:600,color:"#0ea5e9",background:"rgba(14,165,233,.12)",border:"1px solid rgba(14,165,233,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🔧 Amayama</button>
                   <button onClick={()=>{navigator.clipboard.writeText(job.vin);alert("VIN copied!\n\nPaste it into WolfOil's VIN field.");window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
-                    style={{fontSize:10,fontWeight:600,color:"#f97316",background:"rgba(249,115,22,.12)",border:"1px solid rgba(249,115,22,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🛢️ WolfOil</button>
+                    style={{fontSize:10,fontWeight:600,color:"#ff7a2e",background:"rgba(255,122,46,.12)",border:"1px solid rgba(255,122,46,.3)",borderRadius:99,padding:"2px 9px",cursor:"pointer",whiteSpace:"nowrap"}}>🛢️ WolfOil</button>
                 </div>
               </div>
             )}
@@ -7630,7 +7630,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 </button>
               )}
               {wsRole!=="mechanic"&&(wsSupplierQuotes.filter(q=>q.job_id===job.id).length>0||sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id)).length>0)&&(
-                <button onClick={()=>setCreatePoOpen(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(251,146,60,.3)",background:"rgba(251,146,60,.1)",color:"var(--accent)",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                <button onClick={()=>setCreatePoOpen(true)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:10,border:"1px solid rgba(255,154,92,.3)",background:"rgba(255,154,92,.1)",color:"var(--accent)",fontWeight:700,fontSize:12,cursor:"pointer"}}>
                   📦 {t.wsqtCreateOrder}
                 </button>
               )}
@@ -7647,7 +7647,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               <button key={q.id} onClick={()=>setActiveQuoteId(q.id)}
                 style={{fontSize:11,fontWeight:700,padding:"5px 10px",borderRadius:8,cursor:"pointer",
                   border:`1px solid ${q.id===quote?.id?"var(--accent)":"var(--border)"}`,
-                  background:q.id===quote?.id?"rgba(251,146,60,.15)":"var(--surface2)",
+                  background:q.id===quote?.id?"rgba(255,154,92,.15)":"var(--surface2)",
                   color:q.id===quote?.id?"var(--accent)":"var(--text3)"}}>
                 📝 Quote {qi+1} · {q.status.charAt(0).toUpperCase()+q.status.slice(1)}
               </button>
@@ -8309,7 +8309,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                         {[...vinSearchLinks,
                           {label:"AutoZone",  icon:"🔴", color:"#dc2626", bg:"rgba(220,38,38,.12)",  href:`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(job.vin)}`},
                           {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)", href:`https://www.amayama.com/search/?q=${encodeURIComponent(job.vin)}`},
-                          {label:"WolfOil",   icon:"🛢️", color:"#f97316", bg:"rgba(249,115,22,.12)", href:"https://za.wolfoil.com/en-us/oil-finder"},
+                          {label:"WolfOil",   icon:"🛢️", color:"#ff7a2e", bg:"rgba(255,122,46,.12)", href:"https://za.wolfoil.com/en-us/oil-finder"},
                         ].map(lk=>(
                           <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
                             onClick={lk.copyVin?()=>navigator.clipboard.writeText(job.vin):undefined}
@@ -8361,7 +8361,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                     const pct=v._score||0;
                     const isTopMatch=isSel&&pct>=30;
                     const borderColor=isSel?(isTopMatch?"var(--green)":"var(--accent)"):isCurrent?"rgba(52,211,153,.4)":"var(--border)";
-                    const bgColor=isSel?(isTopMatch?"rgba(52,211,153,.1)":"rgba(249,115,22,.12)"):isCurrent?"rgba(52,211,153,.06)":"var(--surface2)";
+                    const bgColor=isSel?(isTopMatch?"rgba(52,211,153,.1)":"rgba(255,122,46,.12)"):isCurrent?"rgba(52,211,153,.06)":"var(--surface2)";
                     return(
                       <button key={v.id} onClick={()=>setMatchModelSelected(isSel?null:v)} style={{
                         background:bgColor,
@@ -9118,7 +9118,7 @@ function MoveJobModal({job,wsId,wsProfiles=[],wsFriends=[],onAddFriend,onRemoveF
                 style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"8px 12px",
                   borderRadius:8,cursor:"pointer",
                   border:`1.5px solid ${targetId.trim()===String(f.friend_workshop_id)?"var(--accent)":"var(--border)"}`,
-                  background:targetId.trim()===String(f.friend_workshop_id)?"rgba(249,115,22,.08)":"var(--surface)"}}>
+                  background:targetId.trim()===String(f.friend_workshop_id)?"rgba(255,122,46,.08)":"var(--surface)"}}>
                 <div style={{minWidth:0}}>
                   <div style={{fontWeight:700,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.profile.name||f.profile.id}</div>
                   <div style={{fontSize:11,color:"var(--text3)"}}>{[f.profile.city,f.profile.country].filter(Boolean).join(", ")||"—"}</div>
@@ -9279,9 +9279,9 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
     if(!sel) return;
     const x=Math.min(sel.x0,sel.x1),y=Math.min(sel.y0,sel.y1);
     const w=Math.abs(sel.x1-sel.x0),h=Math.abs(sel.y1-sel.y0);
-    ctx.fillStyle="rgba(249,115,22,.15)";
+    ctx.fillStyle="rgba(255,122,46,.15)";
     ctx.fillRect(x,y,w,h);
-    ctx.strokeStyle="#f97316";
+    ctx.strokeStyle="#ff7a2e";
     ctx.lineWidth=2.5;
     ctx.setLineDash([8,4]);
     ctx.strokeRect(x,y,w,h);
@@ -9400,11 +9400,11 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
             style={{width:32,height:32,borderRadius:8,border:"1px solid rgba(255,255,255,.25)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:15,cursor:"pointer"}}>↺</button>
           <input type="range" min={-45} max={45} step={1} value={rotation}
             onChange={e=>setRotation(+e.target.value)}
-            style={{flex:1,accentColor:"#f97316",height:4,cursor:"pointer"}}/>
+            style={{flex:1,accentColor:"#ff7a2e",height:4,cursor:"pointer"}}/>
           <button onClick={()=>setRotation(r=>r+90)} title="+90°"
             style={{width:32,height:32,borderRadius:8,border:"1px solid rgba(255,255,255,.25)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:15,cursor:"pointer"}}>↻</button>
           <button onClick={()=>setRotation(0)}
-            style={{minWidth:46,height:32,borderRadius:8,border:`1px solid ${rotation!==0?"rgba(249,115,22,.5)":"rgba(255,255,255,.15)"}`,background:rotation!==0?"rgba(249,115,22,.15)":"rgba(255,255,255,.06)",color:rotation!==0?"#f97316":"rgba(255,255,255,.5)",fontSize:11,cursor:"pointer"}}>
+            style={{minWidth:46,height:32,borderRadius:8,border:`1px solid ${rotation!==0?"rgba(255,122,46,.5)":"rgba(255,255,255,.15)"}`,background:rotation!==0?"rgba(255,122,46,.15)":"rgba(255,255,255,.06)",color:rotation!==0?"#ff7a2e":"rgba(255,255,255,.5)",fontSize:11,cursor:"pointer"}}>
             {rotation!==0?`${rotation}°`:"0°"}</button>
         </div>
         {/* Zoom toolbar */}
@@ -9419,7 +9419,7 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
           {zoom>1&&(
             <button onClick={()=>setPanMode(p=>!p)}
               title={panMode?"Switch to draw mode — drag to select area":"Switch to pan mode — scroll the zoomed image"}
-              style={{height:32,padding:"0 10px",borderRadius:8,border:`1px solid ${panMode?"#f97316":"rgba(255,255,255,.25)"}`,background:panMode?"rgba(249,115,22,.2)":"rgba(255,255,255,.06)",color:panMode?"#f97316":"rgba(255,255,255,.6)",fontSize:12,cursor:"pointer"}}>
+              style={{height:32,padding:"0 10px",borderRadius:8,border:`1px solid ${panMode?"#ff7a2e":"rgba(255,255,255,.25)"}`,background:panMode?"rgba(255,122,46,.2)":"rgba(255,255,255,.06)",color:panMode?"#ff7a2e":"rgba(255,255,255,.6)",fontSize:12,cursor:"pointer"}}>
               {panMode?"✋ Pan":"✏ Draw"}</button>
           )}
         </div>
@@ -9444,7 +9444,7 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
             {autoFixes.length>0&&memSuggestion&&(
               <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"stretch"}}>
                 <button onClick={()=>{setOcrResult(memSuggestion);setAutoFixes([]);setMemSuggestion("");}}
-                  style={{flex:1,padding:"7px 12px",borderRadius:8,border:"1px solid rgba(249,115,22,.5)",background:"rgba(249,115,22,.12)",color:"rgba(249,115,22,1)",fontSize:12,cursor:"pointer",textAlign:"center"}}>
+                  style={{flex:1,padding:"7px 12px",borderRadius:8,border:"1px solid rgba(255,122,46,.5)",background:"rgba(255,122,46,.12)",color:"rgba(255,122,46,1)",fontSize:12,cursor:"pointer",textAlign:"center"}}>
                   🧠 Memory suggests: <strong style={{fontFamily:"DM Mono,monospace",letterSpacing:1}}>{memSuggestion}</strong> ({autoFixes.map(f=>`${f.from}→${f.to}`).join(", ")}, {Math.min(...autoFixes.map(f=>f.count))}× seen) — tap to apply
                 </button>
                 <button onClick={clearFieldMem} title="Clear stored corrections for this field"
@@ -9453,12 +9453,12 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
             )}
             <input value={ocrResult} onChange={e=>setOcrResult(e.target.value.toUpperCase())}
               style={{width:"100%",padding:"12px 16px",fontSize:24,fontWeight:700,fontFamily:"DM Mono,monospace",
-                textAlign:"center",background:"rgba(255,255,255,.1)",border:"2px solid #f97316",
+                textAlign:"center",background:"rgba(255,255,255,.1)",border:"2px solid #ff7a2e",
                 borderRadius:10,color:"#fff",letterSpacing:3,boxSizing:"border-box"}}/>
             <div style={{display:"flex",gap:10,marginTop:10}}>
               <button style={{...btnBase,flex:1,border:"1px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",color:"#fff"}}
                 onClick={()=>{setOcrResult(null);setOcrRaw("");setAutoFixes([]);setMemSuggestion("");setSel(null);setErr(null);}}>🔄 Re-scan</button>
-              <button style={{...btnBase,flex:2,border:"none",background:"#f97316",color:"#fff",fontWeight:700,fontSize:16}}
+              <button style={{...btnBase,flex:2,border:"none",background:"#ff7a2e",color:"#fff",fontWeight:700,fontSize:16}}
                 onClick={()=>{recordMem(ocrRaw,ocrResult);onResult(ocrResult);}} disabled={!ocrResult.trim()}>✅ Use This</button>
             </div>
           </div>
@@ -9466,7 +9466,7 @@ function OcrCropModal({imgSrc, field, wsId, onResult, onClose}) {
           <div style={{display:"flex",gap:10,marginTop:14}}>
             <button style={{...btnBase,flex:1,border:"1px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",color:"#fff"}}
               onClick={onClose}>✕ Cancel</button>
-            <button style={{...btnBase,flex:2,border:"none",background:sel?"#f97316":"rgba(249,115,22,.35)",color:"#fff",fontWeight:700,fontSize:15,cursor:sel?"pointer":"not-allowed"}}
+            <button style={{...btnBase,flex:2,border:"none",background:sel?"#ff7a2e":"rgba(255,122,46,.35)",color:"#fff",fontWeight:700,fontSize:15,cursor:sel?"pointer":"not-allowed"}}
               disabled={!sel||scanning} onClick={doScan}>
               {scanning?"⏳ Reading...":"📷 Read Text"}
             </button>
@@ -9753,7 +9753,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], wsId=nul
                     DecodeThis
                   </a>
                   <button onClick={()=>{navigator.clipboard.writeText(f.vin);alert(`VIN copied to clipboard:\n\n${f.vin}\n\nPaste it into the VIN field on WolfOil.`);window.open("https://za.wolfoil.com/en-us/oil-finder","_blank");}}
-                    style={{fontSize:11,padding:"2px 8px",background:"rgba(249,115,22,.12)",color:"#f97316",border:"1px solid rgba(249,115,22,.3)",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap"}}>
+                    style={{fontSize:11,padding:"2px 8px",background:"rgba(255,122,46,.12)",color:"#ff7a2e",border:"1px solid rgba(255,122,46,.3)",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap"}}>
                     WolfOil 📋
                   </button>
                   <a href="https://willard.co.za/battery-selection-tool/" target="_blank" rel="noopener noreferrer"
@@ -10729,7 +10729,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
 
         {/* Create-new mini form */}
         {creating&&(
-          <div style={{border:"1px solid var(--accent)",borderRadius:10,padding:"14px 16px",marginBottom:12,background:"rgba(249,115,22,.04)"}}>
+          <div style={{border:"1px solid var(--accent)",borderRadius:10,padding:"14px 16px",marginBottom:12,background:"rgba(255,122,46,.04)"}}>
             <div style={{fontWeight:700,fontSize:13,marginBottom:12,color:"var(--accent)"}}>
               {editingItem?`✏️ Edit ${type==="part"?"Stock Item":"Service"}`:`➕ New ${type==="part"?"Stock Item":"Service"}`}
             </div>
@@ -10931,7 +10931,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
           <div style={{fontWeight:700,fontSize:14,color:"var(--accent)",marginBottom:6}}>📦 Out of Stock — Request from Branch</div>
           <div style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>These items are currently out of stock. The branch will be notified to restock or source them.</div>
           {requestCart.map(i=>(
-            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(249,115,22,.06)",border:"1px solid rgba(249,115,22,.2)",borderRadius:8,marginBottom:6}}>
+            <div key={i.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(255,122,46,.06)",border:"1px solid rgba(255,122,46,.2)",borderRadius:8,marginBottom:6}}>
               <WsShopCartThumb item={i}/>
               <div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:13}}>{i.name}</div>{i.sku&&<div style={{fontSize:11,color:"var(--text3)"}}>{i.sku}</div>}</div>
               <div style={{fontSize:13,color:"var(--text2)",flexShrink:0}}>×{i.qty}</div>
@@ -11588,8 +11588,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       {/* Cross-car search toggle — find parts listed under other models that also fit */}
       {jobMode&&q&&(
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:12,padding:"8px 12px",borderRadius:10,fontSize:12,
-          background:allCarsSearch?"rgba(249,115,22,.08)":"var(--surface2)",
-          border:`1px solid ${allCarsSearch?"rgba(249,115,22,.35)":"var(--border)"}`}}>
+          background:allCarsSearch?"rgba(255,122,46,.08)":"var(--surface2)",
+          border:`1px solid ${allCarsSearch?"rgba(255,122,46,.35)":"var(--border)"}`}}>
           {allCarsSearch?(
             <>
               <span style={{fontWeight:700,color:"var(--accent)"}}>🌍 Searching all cars</span>
@@ -11601,7 +11601,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
           ):(
             <>
               <span style={{color:"var(--text3)"}}>Only searching parts fitted to this car.</span>
-              <button className="btn btn-ghost btn-xs" style={{marginLeft:"auto",flexShrink:0,color:"var(--accent)",border:"1px solid rgba(249,115,22,.35)",fontWeight:700}}
+              <button className="btn btn-ghost btn-xs" style={{marginLeft:"auto",flexShrink:0,color:"var(--accent)",border:"1px solid rgba(255,122,46,.35)",fontWeight:700}}
                 onClick={()=>setAllCarsSearch(true)}>🌍 Search all cars for "{search.trim()}"</button>
             </>
           )}
@@ -11664,7 +11664,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                         color:p._source==="local"?"var(--green)":"var(--blue)"}}>
                         {p._source==="local"?"🏬 Local Stock":"🏭 Head Office"}
                       </span>
-                      {p._otherCar&&<span title="Listed under another car — check fitment before ordering" style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(249,115,22,.15)",color:"var(--accent)"}}>🔀 Other car</span>}
+                      {p._otherCar&&<span title="Listed under another car — check fitment before ordering" style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(255,122,46,.15)",color:"var(--accent)"}}>🔀 Other car</span>}
                     </div>
                     {showSku&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2,fontFamily:"DM Mono,monospace"}}>{p.sku}{p.brand?` · ${p.brand}`:""}</div>}
                     {!showSku&&p.brand&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{p.brand}</div>}
@@ -11695,7 +11695,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                       : p._source!=="local"
                       ? <button className="btn btn-sm" style={{width:"100%",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.4)"}} onClick={()=>addToCart(p)}>+ Request from Main</button>
                       : p.stock===0
-                      ? <button className="btn btn-sm" style={{width:"100%",background:"rgba(249,115,22,.12)",color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}} onClick={()=>addToCart({...p,_source:"request"})}>📦 Request Stock</button>
+                      ? <button className="btn btn-sm" style={{width:"100%",background:"rgba(255,122,46,.12)",color:"var(--accent)",border:"1px solid rgba(255,122,46,.3)"}} onClick={()=>addToCart({...p,_source:"request"})}>📦 Request Stock</button>
                       : <button className="btn btn-primary" style={{width:"100%"}} onClick={()=>addToCart(p)}>Add to Cart</button>}
                     {onEditPart&&adminUnlocked&&<button className="btn btn-ghost btn-xs" style={{width:"100%",marginTop:6,fontSize:11}} onClick={()=>onEditPart(p)}>✏️ Edit / Add Photo</button>}
                     {onDeletePart&&adminUnlocked&&p.name?.startsWith("=")&&<button className="btn btn-danger btn-xs" style={{width:"100%",marginTop:6,fontSize:11}} onClick={()=>{if(window.confirm(`Delete "${p.name}" (${p.sku})? This cannot be undone.`))onDeletePart(p);}}>🗑️ Delete</button>}
@@ -11834,9 +11834,9 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
         <span style={{flex:1}}>✅ Spare shop has replied — click the 🏪 green chip on a part then tap &ldquo;Order from Spare Shop&rdquo;</span>
         {onRefresh&&<button onClick={handleRefresh} disabled={refreshing} style={{padding:"2px 10px",borderRadius:6,border:"1px solid rgba(52,211,153,.4)",background:"none",color:"#34d399",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}}>{refreshing?"…":"↻ Refresh"}</button>}
       </div>}
-      {hasPending&&!hasEscalated&&!hasMainReplied&&!hasReplied&&!hasOrdered&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(251,146,60,.12)",border:"1px solid rgba(251,146,60,.3)",fontSize:12,color:"#f59e0b",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+      {hasPending&&!hasEscalated&&!hasMainReplied&&!hasReplied&&!hasOrdered&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(255,154,92,.12)",border:"1px solid rgba(255,154,92,.3)",fontSize:12,color:"#f59e0b",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
         <span style={{flex:1}}>⏳ Request sent — waiting for spare shop to reply</span>
-        {onRefresh&&<button onClick={handleRefresh} disabled={refreshing} style={{padding:"2px 10px",borderRadius:6,border:"1px solid rgba(251,146,60,.4)",background:"none",color:"#f59e0b",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}}>{refreshing?"…":"↻ Check"}</button>}
+        {onRefresh&&<button onClick={handleRefresh} disabled={refreshing} style={{padding:"2px 10px",borderRadius:6,border:"1px solid rgba(255,154,92,.4)",background:"none",color:"#f59e0b",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}}>{refreshing?"…":"↻ Check"}</button>}
       </div>}
       {hasEscalated&&!hasMainReplied&&!hasReplied&&!hasOrdered&&<div style={{padding:"8px 14px",marginBottom:8,borderRadius:8,background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",fontSize:12,color:"var(--blue)",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
         <span style={{flex:1}}>⬆️ Spare shop is checking with Main Stock — reply coming soon</span>

@@ -126,7 +126,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
               return (
                 <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",
                   borderBottom:"1px solid var(--border)",
-                  background:sel?"rgba(251,146,60,.06)":"transparent",cursor:"pointer"}}
+                  background:sel?"rgba(255,154,92,.06)":"transparent",cursor:"pointer"}}
                   onClick={()=>togglePart(p)}>
                   <input type="checkbox" checked={!!sel} onChange={()=>togglePart(p)}
                     style={{accentColor:"var(--accent)",width:16,height:16,flexShrink:0}} onClick={e=>e.stopPropagation()}/>
@@ -168,7 +168,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
               const sel=wSuppliers.find(x=>x.id===s.id);
               return (
                 <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",
-                  borderBottom:"1px solid var(--border)",background:sel?"rgba(251,146,60,.06)":"transparent",cursor:"pointer"}}
+                  borderBottom:"1px solid var(--border)",background:sel?"rgba(255,154,92,.06)":"transparent",cursor:"pointer"}}
                   onClick={()=>toggleSupplier(s)}>
                   <input type="checkbox" checked={!!sel} onChange={()=>toggleSupplier(s)}
                     style={{accentColor:"var(--accent)",width:16,height:16,flexShrink:0}} onClick={e=>e.stopPropagation()}/>
@@ -221,7 +221,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                 ))}
               </div>
             </div>
-            <div style={{marginTop:10,padding:"8px 12px",background:"rgba(251,146,60,.08)",borderRadius:8,fontSize:13,color:"var(--text2)"}}>
+            <div style={{marginTop:10,padding:"8px 12px",background:"rgba(255,154,92,.08)",borderRadius:8,fontSize:13,color:"var(--text2)"}}>
               📬 {wParts.length * wSuppliers.length} quote requests will be created
             </div>
           </div>
@@ -293,7 +293,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
             const quotedCount=suppQuotes.filter(q=>q.status==="quoted"||q.status==="selected").length;
             const suppData=suppliers.find(x=>String(x.id)===String(s.id));
             const itemsList=sessionItems.map((item,i)=>`${i+1}. ${item.part_name} (${item.part_sku||"—"}) × ${item.qty_needed}`).join("\n");
-            const waMsg=`Hi ${s.name},\n\nWe have an RFQ for ${sessionItems.length} parts. Please click the link below to view the list and submit all quotes at once:\n\n${batchUrl}\n\nParts:\n${itemsList}\n\nDeadline: ${activeSession.deadline||"ASAP"}\nThank you,\n${settings?.shop_name||"MotorDesk"}`;
+            const waMsg=`Hi ${s.name},\n\nWe have an RFQ for ${sessionItems.length} parts. Please click the link below to view the list and submit all quotes at once:\n\n${batchUrl}\n\nParts:\n${itemsList}\n\nDeadline: ${activeSession.deadline||"ASAP"}\nThank you,\n${settings?.shop_name||"VelGenius"}`;
             return (
               <div key={s.id} style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",border:`1px solid ${quotedCount===suppQuotes.length&&suppQuotes.length>0?"rgba(52,211,153,.35)":"var(--border)"}`,flex:"1 1 240px",minWidth:220}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -359,7 +359,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                         <div key={s.id} style={{
                           borderRadius:8,padding:"10px 12px",
                           background:isSelected?"rgba(52,211,153,.07)":"var(--surface2)",
-                          border:`1px solid ${isSelected?"rgba(52,211,153,.4)":isBest?"rgba(251,146,60,.3)":"var(--border)"}`
+                          border:`1px solid ${isSelected?"rgba(52,211,153,.4)":isBest?"rgba(255,154,92,.3)":"var(--border)"}`
                         }}>
                           {/* Supplier name row */}
                           <div style={{fontWeight:700,fontSize:13,marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
@@ -405,7 +405,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                               {q.notes&&<div style={{fontSize:12,color:"var(--text3)",fontStyle:"italic",marginBottom:8,padding:"4px 8px",background:"var(--surface3)",borderRadius:6}}>{q.notes}</div>}
                               {/* Action */}
                               {!isSelected
-                                ? <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(251,146,60,.3)",width:"100%",marginTop:2}}
+                                ? <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(255,154,92,.3)",width:"100%",marginTop:2}}
                                     onClick={()=>handleSelect(q.id,item.id)}>Select this quote</button>
                                 : <button className="cp-btn" style={{fontSize:11,padding:"3px 10px",color:"var(--red)",borderColor:"rgba(239,68,68,.3)",width:"100%",marginTop:2}}
                                     onClick={()=>handleUnselect(q.id)}>Unselect</button>
@@ -481,7 +481,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                                 {q.lead_days!=null&&<div style={{fontSize:11,color:"var(--text3)"}}>Lead: {q.lead_days}d</div>}
                                 {q.notes&&<div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic",maxWidth:140,margin:"2px auto"}}>{q.notes}</div>}
                                 {q.status!=="selected"
-                                  ? <button className="cp-btn" style={{fontSize:11,marginTop:6,color:"var(--accent)",borderColor:"rgba(251,146,60,.3)"}}
+                                  ? <button className="cp-btn" style={{fontSize:11,marginTop:6,color:"var(--accent)",borderColor:"rgba(255,154,92,.3)"}}
                                       onClick={()=>handleSelect(q.id,item.id)}>Select</button>
                                   : <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,marginTop:4}}>
                                       <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:11}}>✓ Selected</span>
@@ -531,14 +531,14 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
               const statusColor={draft:"var(--text3)",sent:"var(--blue)",comparing:"var(--yellow)",ordered:"var(--green)"}[s.status]||"var(--text3)";
               const isOverdue=s.is_auto&&s.status==="pending"&&s.reply_deadline&&new Date(s.reply_deadline)<new Date();
               return (
-                <tr key={s.id} style={isOverdue?{background:"rgba(251,146,60,.08)",outline:"1px solid rgba(251,146,60,.3)"}:{}}>
+                <tr key={s.id} style={isOverdue?{background:"rgba(255,154,92,.08)",outline:"1px solid rgba(255,154,92,.3)"}:{}}>
                   <td style={{fontWeight:600}}>
                     {s.name}
                     {s.is_auto&&<span style={{marginLeft:6,fontSize:11,color:"var(--text3)",fontWeight:400}}>auto</span>}
                   </td>
                   <td>
                     {isOverdue
-                      ? <span className="badge" style={{background:"rgba(251,146,60,.2)",color:"#f97316",fontWeight:700}}>⚠️ Overdue</span>
+                      ? <span className="badge" style={{background:"rgba(255,154,92,.2)",color:"#ff7a2e",fontWeight:700}}>⚠️ Overdue</span>
                       : <span className="badge" style={{background:statusColor+"20",color:statusColor,textTransform:"capitalize"}}>{tSt(s.status)}</span>
                     }
                   </td>
@@ -550,7 +550,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                   <td style={{color:"var(--text3)",fontSize:13}}>{s.created_at?.slice(0,10)}</td>
                   <td style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                     <button className="btn btn-info btn-xs" onClick={()=>openSession(s)}>{t.rfqView}</button>
-                    {isOverdue&&onResendStale&&<button className="btn btn-xs" style={{background:"#f97316",color:"#fff",border:"none"}} onClick={async()=>{await onResendStale();onRefresh();}}>Resend</button>}
+                    {isOverdue&&onResendStale&&<button className="btn btn-xs" style={{background:"#ff7a2e",color:"#fff",border:"none"}} onClick={async()=>{await onResendStale();onRefresh();}}>Resend</button>}
                     {onDeleteSession&&(
                       <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
                         onClick={()=>{if(window.confirm(`Delete RFQ session "${s.name}" and its ${sItems.length} item${sItems.length!==1?"s":""}/${sQuotes.length} quote${sQuotes.length!==1?"s":""}? This can't be undone.`)) onDeleteSession(s.id);}}>
@@ -810,7 +810,7 @@ export function PickingPage({orders=[], parts=[], onComplete, onDelete, onRefres
             <button className="btn btn-ghost" style={{flex:1,color:"#fff",borderColor:"rgba(255,255,255,.3)"}} onClick={stopCamera}>✕ Cancel</button>
           </div>
           <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",
-            width:220,height:140,border:"2px solid rgba(251,146,60,.8)",borderRadius:8,pointerEvents:"none"}}/>
+            width:220,height:140,border:"2px solid rgba(255,154,92,.8)",borderRadius:8,pointerEvents:"none"}}/>
         </div>
       )}
 
@@ -1289,7 +1289,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
     setUploading(true); setError(null); setUploadStatus("Adding watermark…");
     try {
       const img = await _fetchCurrentAsImage();
-      const text = getSettings().shop_name || "MotorDesk";
+      const text = getSettings().shop_name || "VelGenius";
       const stamped = await _canvasBlob(img, (ctx, w, h) => {
         const fontSize = Math.max(14, Math.round(w*0.045));
         ctx.font = `700 ${fontSize}px DM Sans, sans-serif`;
@@ -1471,14 +1471,14 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
           height: 150,
           display: "flex", alignItems: "center", justifyContent: "center",
           cursor: uploading ? "wait" : preview ? "default" : "pointer",
-          background: dragOver ? "rgba(251,146,60,.07)" : "var(--surface2)",
+          background: dragOver ? "rgba(255,154,92,.07)" : "var(--surface2)",
           border: `2px dashed ${dragOver ? "var(--accent)" : preview ? "transparent" : "var(--border)"}`,
           position: "relative", overflow: "hidden", marginBottom: 8,
           transition: "border-color .15s, background .15s",
         }}>
         {uploading ? (
           <div style={{textAlign:"center",color:"var(--accent)",padding:"0 12px"}}>
-            <div style={{width:26,height:26,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 8px"}}/>
+            <div style={{width:26,height:26,border:"3px solid rgba(255,154,92,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 8px"}}/>
             <div style={{fontSize:12,fontWeight:600}}>{uploadStatus||t.phuUploading}</div>
             {uploadStatus.startsWith("Removing")&&<div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>First use downloads AI model (~50MB)</div>}
           </div>
@@ -1671,7 +1671,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
               </div>
               <div style={{flex:"1 1 320px",minWidth:0}}>
                 <div style={{fontSize:11,color:"var(--accent)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",textAlign:"center",marginBottom:6}}>New (pasted)</div>
-                <div style={{background:"var(--surface2)",borderRadius:10,padding:10,display:"flex",alignItems:"center",justifyContent:"center",height:"56vh",minHeight:280,border:"1px solid rgba(249,115,22,.35)"}}>
+                <div style={{background:"var(--surface2)",borderRadius:10,padding:10,display:"flex",alignItems:"center",justifyContent:"center",height:"56vh",minHeight:280,border:"1px solid rgba(255,122,46,.35)"}}>
                   <img src={pasteCompare.previewUrl} alt="new" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",display:"block"}}/>
                 </div>
               </div>
@@ -2412,7 +2412,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
           {!expanded&&(
-            <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(251,146,60,.35)",whiteSpace:"nowrap"}}
+            <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(255,154,92,.35)",whiteSpace:"nowrap"}}
               onClick={()=>setExpanded(true)} title="Open in full screen">
               ⛶ Full Screen
             </button>
@@ -2424,7 +2424,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             </button>
           )}
           {!supplierMode&&linked.length>0&&(
-            <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(251,146,60,.35)",whiteSpace:"nowrap"}}
+            <button className="btn btn-ghost btn-sm" style={{color:"var(--accent)",borderColor:"rgba(255,154,92,.35)",whiteSpace:"nowrap"}}
               disabled={hasChanges} title={hasChanges?"Save pending changes to this part's fitments first":"Copy this part's linked vehicles onto other parts"}
               onClick={()=>{setCopyOpen(true);setCopyDone(null);}}>
               📋 Copy Fits to Parts
@@ -2514,7 +2514,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             <div key={`p-${vid}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
               padding:"8px 12px",borderRadius:expanded?10:8,
               boxShadow: expanded?"0 1px 3px rgba(0,0,0,.12)":"none",
-              background:"rgba(251,146,60,.08)",border:"1px solid rgba(251,146,60,.3)"}}>
+              background:"rgba(255,154,92,.08)",border:"1px solid rgba(255,154,92,.3)"}}>
               <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
                 <VehicleThumb v={v}/>
                 <div style={{minWidth:0}}>
@@ -3418,7 +3418,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
             return (
             <div key={v.id} style={{display:"flex",flexDirection:"column"}}>
             <div className="card" style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",
-              ...(needsEdit?{border:"2px solid var(--accent)",background:"rgba(249,115,22,.04)"}:{})}}>
+              ...(needsEdit?{border:"2px solid var(--accent)",background:"rgba(255,122,46,.04)"}:{})}}>
               {/* Photo thumbnails — front/rear/side all at once */}
               <div style={{flexShrink:0,display:"flex",gap:4}}>
                 {[["photo_front","Front"],["photo_rear","Rear"],["photo_side","Side"]].map(([field,label])=>{
@@ -3440,7 +3440,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
               <div style={{flex:1,minWidth:140}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                   <span style={{fontWeight:700,fontSize:14}}>{v.model}</span>
-                  {needsEdit&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:"rgba(249,115,22,.15)",color:"var(--accent)",fontWeight:700}}>Needs editing</span>}
+                  {needsEdit&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:"rgba(255,122,46,.15)",color:"var(--accent)",fontWeight:700}}>Needs editing</span>}
                 </div>
                 {v.code&&<div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--accent)",fontWeight:700,marginTop:1}}>{v.code}</div>}
                 <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
@@ -3745,7 +3745,7 @@ function VehicleModal({vehicle, parts=[], onSave, onSaveAndNext, onClose, t, nex
               Suggested:
               <button type="button" onClick={()=>{s("code",sugg);codeUserEdited.current=true;}}
                 style={{fontFamily:"DM Mono,monospace",fontSize:11,fontWeight:700,color:"var(--accent)",
-                  background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.3)",
+                  background:"rgba(255,122,46,.08)",border:"1px solid rgba(255,122,46,.3)",
                   borderRadius:5,padding:"1px 8px",cursor:"pointer"}}>
                 {sugg}
               </button>
@@ -4016,14 +4016,14 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
         style={{
           border: `2px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`,
           borderRadius: 10, cursor: uploading ? "wait" : "pointer",
-          background: dragOver ? "rgba(251,146,60,.06)" : "var(--surface2)",
+          background: dragOver ? "rgba(255,154,92,.06)" : "var(--surface2)",
           aspectRatio: "4/3", overflow: "hidden", position: "relative",
           display: "flex", alignItems: "center", justifyContent: "center",
           transition: "all .15s",
         }}>
         {uploading ? (
           <div style={{textAlign:"center",color:"var(--accent)",padding:8}}>
-            <div style={{width:24,height:24,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",
+            <div style={{width:24,height:24,border:"3px solid rgba(255,154,92,.2)",borderTop:"3px solid var(--accent)",
               borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 6px"}}/>
             <div style={{fontSize:11,maxWidth:120,margin:"0 auto",lineHeight:1.4}}>{status||"Uploading..."}</div>
           </div>

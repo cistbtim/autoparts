@@ -46,47 +46,39 @@ export const ShopLogo = ({settings, size="md", style={}}) => {
   return null;
 };
 
-export const MotorDeskBanner = () => (
-  <div style={{position:"relative",background:"linear-gradient(135deg,#080d14 0%,#111827 55%,#0c1420 100%)",borderRadius:12,padding:"16px 20px 12px",overflow:"hidden",textAlign:"center"}}>
-    {/* Ambient glow circles */}
-    <div style={{position:"absolute",top:-40,right:-40,width:180,height:180,borderRadius:"50%",background:"rgba(249,115,22,0.07)",pointerEvents:"none"}}/>
-    <div style={{position:"absolute",bottom:-50,left:-50,width:200,height:200,borderRadius:"50%",background:"rgba(249,115,22,0.04)",pointerEvents:"none"}}/>
-    {/* Icon + name row */}
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:14,marginBottom:6,position:"relative"}}>
-      <svg width="38" height="38" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0,filter:"drop-shadow(0 0 10px rgba(249,115,22,0.5))"}}>
-        <circle cx="32" cy="32" r="30" fill="rgba(249,115,22,0.12)"/>
-        <g transform="translate(32,32)">
-          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316"/>
-          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(45)"/>
-          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(90)"/>
-          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(135)"/>
-          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(180)"/>
-          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(225)"/>
-          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(270)"/>
-          <rect x="-4" y="-22" width="8" height="10" rx="2" fill="#f97316" transform="rotate(315)"/>
-          <circle r="14" fill="#f97316"/>
-          <circle r="5.5" fill="#0f172a"/>
-        </g>
-        <g transform="translate(32,32) rotate(-45)">
-          <rect x="-13" y="-27" width="8" height="22" rx="3" fill="white" opacity="0.9"/>
-          <rect x="5" y="-27" width="8" height="22" rx="3" fill="white" opacity="0.9"/>
-          <rect x="-13" y="-8" width="26" height="9" fill="white" opacity="0.9"/>
-          <rect x="-5" y="-1" width="10" height="30" rx="5" fill="white" opacity="0.9"/>
-        </g>
-      </svg>
-      <div style={{textAlign:"left"}}>
-        <div style={{fontSize:32,fontWeight:900,fontFamily:"Rajdhani,sans-serif",letterSpacing:"1px",lineHeight:1,background:"linear-gradient(90deg,#f97316 0%,#fb923c 60%,#fdba74 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>MotorDesk</div>
-        <div style={{fontSize:9,color:"rgba(255,255,255,0.4)",letterSpacing:".16em",textTransform:"uppercase",fontWeight:700,marginTop:2}}>Automotive Workshop Management</div>
+const VELG_TABS = [
+  {label:"Booking", on:true, path:<><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></>},
+  {label:"AI estimate", path:<path d="M4 20l6-6M14.5 4.5a3.5 3.5 0 104.9 4.9L21 8l-5-5-1.4 1.4z"/>},
+  {label:"Supplier quotes", path:<path d="M9 12l2 2 4-4M4 6h16v14H4z"/>},
+  {label:"Parts & scrap", path:<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>},
+  {label:"Catalogue", path:<path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/>},
+];
+
+export const VelGeniusBanner = () => (
+  <div className="velg-banner">
+    <div className="velg-row">
+      <div className="velg-brand">
+        {/* Diagnostic connector reading a pulse - the mark is about what the product does, not a generic AI glow */}
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style={{flexShrink:0}}>
+          <path d="M18 3 L31 10.5 V25.5 L18 33 L5 25.5 V10.5 Z" stroke="#5D7A93" strokeWidth="1.6"/>
+          <circle cx="18" cy="18" r="4.5" fill="none" stroke="#F2F1ED" strokeWidth="1.6"/>
+          <path d="M4 18 H12 L15 12 L19 24 L22 18 H32" stroke="#ff7a2e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        <div>
+          <div className="velg-wordmark">VelGenius</div>
+          <div className="velg-tagline">AI automotive operations platform</div>
+        </div>
       </div>
+      <nav className="velg-tabs">
+        {VELG_TABS.map(tab=>(
+          <span key={tab.label} className={`velg-tab${tab.on?" on":""}`}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{tab.path}</svg>
+            {tab.label}
+          </span>
+        ))}
+      </nav>
     </div>
-    {/* Divider */}
-    <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(249,115,22,0.5),transparent)",margin:"8px 0 8px",position:"relative"}}/>
-    {/* Feature badges */}
-    <div style={{display:"flex",justifyContent:"center",gap:16,flexWrap:"wrap",position:"relative"}}>
-      {["BOOK IN","QUOTATION","INVOICE","REPORTS"].map(b=>(
-        <span key={b} style={{fontSize:9,fontWeight:800,color:"rgba(255,255,255,0.35)",letterSpacing:".14em"}}>{b}</span>
-      ))}
-    </div>
+    <div className="velg-scanline"/>
   </div>
 );
 
@@ -546,7 +538,7 @@ const adOpen=(url)=>{if(!url)return;const h=url.match(/^https?:\/\//)?url:"https
 export function AdGridCard({ad}) {
   if(!ad) return null;
   return (
-    <div style={{position:"relative",borderRadius:12,overflow:"hidden",border:"2px solid rgba(249,115,22,.35)",
+    <div style={{position:"relative",borderRadius:12,overflow:"hidden",border:"2px solid rgba(255,122,46,.35)",
       background:"var(--surface)",cursor:ad.link_url?"pointer":"default",display:"flex",flexDirection:"column"}}
       onClick={()=>adOpen(ad.link_url)}>
       {ad.image_url&&(

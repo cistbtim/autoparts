@@ -6,7 +6,7 @@ const SW       = 94;   // sub-node pill width
 const SH       = 26;   // sub-node pill height
 
 const MAP_DATA = {
-  label:"MotorDesk", icon:"🚗",
+  label:"VelGenius", icon:"🚗",
   desc:"All-in-one motor parts & workshop management system",
   children:[
     {
@@ -337,7 +337,7 @@ export function SystemMapPage({ onNavigate, role }) {
 
       {/* Toolbar */}
       <div style={{ position:"absolute", top:0, left:0, right:0, height:44, display:"flex", alignItems:"center", padding:"0 16px", gap:10, zIndex:10, background:"var(--surface)", borderBottom:"1px solid var(--border)" }}>
-        <span style={{ fontWeight:800, fontSize:16, whiteSpace:"nowrap" }}>🗺️ MotorDesk System Map</span>
+        <span style={{ fontWeight:800, fontSize:16, whiteSpace:"nowrap" }}>🗺️ VelGenius System Map</span>
         <span className="hide-mobile" style={{ fontSize:10.5, color:"var(--text3)", flex:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
           Drag nodes to rearrange · Click module to expand · Hover for details · Drag canvas to pan · Scroll to zoom
         </span>
@@ -373,7 +373,7 @@ export function SystemMapPage({ onNavigate, role }) {
             <feDropShadow dx="0" dy="2" stdDeviation="5" floodOpacity="0.22"/>
           </filter>
           <radialGradient id="sm-root" cx="40%" cy="30%">
-            <stop offset="0%" stopColor="#fb923c"/>
+            <stop offset="0%" stopColor="#ff9a5c"/>
             <stop offset="100%" stopColor="#c2410c"/>
           </radialGradient>
           {visibleChildren.map(b => (
@@ -454,15 +454,15 @@ export function SystemMapPage({ onNavigate, role }) {
           {/* Center node — draggable too */}
           <g
             style={{ cursor:"move" }}
-            onMouseEnter={e => showTip(e, "🚗 MotorDesk", MAP_DATA.desc)}
+            onMouseEnter={e => showTip(e, "🚗 VelGenius", MAP_DATA.desc)}
             onMouseLeave={() => setTip(null)}
             onMouseDown={e => { e.stopPropagation(); e.preventDefault(); }}
           >
-            <circle cx={0} cy={0} r={CR + 14} fill="#f97316" opacity={0.1}/>
-            <circle cx={0} cy={0} r={CR + 6}  fill="#f97316" opacity={0.08}/>
+            <circle cx={0} cy={0} r={CR + 14} fill="#ff7a2e" opacity={0.1}/>
+            <circle cx={0} cy={0} r={CR + 6}  fill="#ff7a2e" opacity={0.08}/>
             <circle cx={0} cy={0} r={CR} fill="url(#sm-root)" filter="url(#sm-sh)"/>
             <text x={0} y={-14} textAnchor="middle" style={{ fontSize:24, pointerEvents:"none" }}>🚗</text>
-            <text x={0} y={7}   textAnchor="middle" style={{ fontSize:11.5, fontWeight:800, fill:"#fff", pointerEvents:"none" }}>MotorDesk</text>
+            <text x={0} y={7}   textAnchor="middle" style={{ fontSize:11.5, fontWeight:800, fill:"#fff", pointerEvents:"none" }}>VelGenius</text>
             <text x={0} y={21}  textAnchor="middle" style={{ fontSize:8, fill:"rgba(255,255,255,0.7)", pointerEvents:"none" }}>
               {visibleChildren.length} modules
             </text>

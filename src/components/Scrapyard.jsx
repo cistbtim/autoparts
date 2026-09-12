@@ -235,7 +235,7 @@ function ScrapVehiclePhotoSlot({label, url, vehicleId, vin, photoKey, onSaved}) 
         style={{
           border:`2px dashed ${dragOver?"var(--accent)":"var(--border)"}`,
           borderRadius:10, cursor:uploading?"wait":"pointer",
-          background:dragOver?"rgba(251,146,60,.06)":"var(--surface2)",
+          background:dragOver?"rgba(255,154,92,.06)":"var(--surface2)",
           aspectRatio:"4/3", overflow:"hidden", position:"relative",
           display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s",
         }}>
@@ -246,7 +246,7 @@ function ScrapVehiclePhotoSlot({label, url, vehicleId, vin, photoKey, onSaved}) 
 
         {uploading ? (
           <div style={{textAlign:"center",color:"var(--accent)",padding:8}}>
-            <div style={{width:24,height:24,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 6px"}}/>
+            <div style={{width:24,height:24,border:"3px solid rgba(255,154,92,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 6px"}}/>
             <div style={{fontSize:11,maxWidth:120,margin:"0 auto",lineHeight:1.4}}>{status||"Uploading…"}</div>
           </div>
         ) : url ? (
@@ -339,7 +339,7 @@ function ScrapPartPhotoSlot({label, url, partId, vin, photoKey, onChange}) {
         style={{
           border:`2px dashed ${dragOver?"var(--accent)":"var(--border)"}`,
           borderRadius:10, cursor:uploading?"wait":"pointer",
-          background:dragOver?"rgba(251,146,60,.06)":"var(--surface2)",
+          background:dragOver?"rgba(255,154,92,.06)":"var(--surface2)",
           aspectRatio:"1/1", overflow:"hidden", position:"relative",
           display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s",
         }}>
@@ -347,7 +347,7 @@ function ScrapPartPhotoSlot({label, url, partId, vin, photoKey, onChange}) {
         <input ref={camRef}  type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{upload(e.target.files[0]);e.target.value="";}}/>
         {uploading ? (
           <div style={{textAlign:"center",color:"var(--accent)",padding:8}}>
-            <div style={{width:20,height:20,border:"3px solid rgba(251,146,60,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 4px"}}/>
+            <div style={{width:20,height:20,border:"3px solid rgba(255,154,92,.2)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 4px"}}/>
             <div style={{fontSize:10,lineHeight:1.3}}>{status||"Uploading…"}</div>
           </div>
         ) : url ? (

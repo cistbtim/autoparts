@@ -1380,7 +1380,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       supIds.length?api.fresh("supplier_parts",`id=in.(${supIds.join(",")})&select=id,price,stock`):Promise.resolve([]),
       // Attribute a catalogue item to a specific supplier's own stock only when
       // unambiguous (exactly one supplier lists this part) — a part with multiple
-      // suppliers falls back to MotorDesk's own parts.stock, same as today, since
+      // suppliers falls back to VelGenius's own parts.stock, same as today, since
       // choosing which supplier's stock a multi-supplier purchase draws from is a
       // checkout-UI question of its own, not solved here.
       realIds.length?api.get("part_suppliers",`part_id=in.(${realIds.join(",")})&select=id,part_id,supplier_id`):Promise.resolve([]),
@@ -1569,7 +1569,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         closeM("editPart");
         setTimeout(()=>{
           const el=document.getElementById(`part-row-${ep.id}`);
-          if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); el.style.transition="background .5s"; el.style.background="rgba(251,146,60,.15)"; setTimeout(()=>el.style.background="",1500); }
+          if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); el.style.transition="background .5s"; el.style.background="rgba(255,154,92,.15)"; setTimeout(()=>el.style.background="",1500); }
         },300);
       }
     } else {
@@ -2917,7 +2917,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // ═══ SUPPLIER-OWNED STOCK ═══
   // Suppliers hold their own stock (qty + location) for both kinds of parts they sell:
   // catalogue-linked (stock/bin_location live on their part_suppliers link row) and
-  // self-added (stock/bin_location live on supplier_parts directly). MotorDesk's own
+  // self-added (stock/bin_location live on supplier_parts directly). VelGenius's own
   // parts.stock is never touched by any of this — see updateOrderStatus, which now
   // skips any line item attributed to a supplier.
   const saveSupplierStockField=async(sourceType,id,{stock,binLocation})=>{
@@ -2935,8 +2935,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
   // One-time cleanup: now that this supplier tracks their own stock (part_suppliers.
   // stock), the old parts.stock number still showing on their catalogue-linked cards
-  // is MotorDesk's own (shared) inventory field — leaving it non-zero would make it
-  // look like MotorDesk also physically holds these units. Zeroes just this
+  // is VelGenius's own (shared) inventory field — leaving it non-zero would make it
+  // look like VelGenius also physically holds these units. Zeroes just this
   // supplier's linked parts, not the main parts table wholesale, and only the ones
   // that actually still show a nonzero count (skips needless writes).
   const zeroOutSupplierMainStock=async()=>{
@@ -2960,7 +2960,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       await logInv(p,p.stock,0,"Moved to Supplier Stock",user.supplier_name||user.supplier_code||"");
     }
     await reloadSupplierParts();
-    showToast(`✅ Zeroed MotorDesk inventory for ${toZero.length} part${toZero.length>1?"s":""}`);
+    showToast(`✅ Zeroed VelGenius inventory for ${toZero.length} part${toZero.length>1?"s":""}`);
   };
 
   // Shared by order confirmation, manual bookings, and stock-take completion — the
@@ -3193,7 +3193,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   };
 
   // Supplier receiving stock onto their own shelf (their own purchase invoice, not
-  // one MotorDesk issues) — adds qty to whichever stock row each item belongs to
+  // one VelGenius issues) — adds qty to whichever stock row each item belongs to
   // (part_suppliers for catalogue items, supplier_parts for self-added ones),
   // records the bin location they typed (only where given, so leaving it blank
   // never wipes out a location already on file), logs the movement, then prints
@@ -4973,9 +4973,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           {/* Outer ring */}
           <div style={{position:"absolute",inset:0,borderRadius:"50%",border:"3px solid transparent",borderTopColor:"var(--accent)",borderRightColor:"var(--accent)",animation:"spinOuter 1.1s linear infinite"}}/>
           {/* Middle ring */}
-          <div style={{position:"absolute",inset:14,borderRadius:"50%",border:"3px solid transparent",borderBottomColor:"rgba(249,115,22,.6)",borderLeftColor:"rgba(249,115,22,.6)",animation:"spinInner .8s linear infinite"}}/>
+          <div style={{position:"absolute",inset:14,borderRadius:"50%",border:"3px solid transparent",borderBottomColor:"rgba(255,122,46,.6)",borderLeftColor:"rgba(255,122,46,.6)",animation:"spinInner .8s linear infinite"}}/>
           {/* Inner pulsing core */}
-          <div style={{position:"absolute",inset:30,borderRadius:"50%",background:"radial-gradient(circle,rgba(249,115,22,.25) 0%,transparent 70%)",animation:"pulseGlow 1.4s ease-in-out infinite",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{position:"absolute",inset:30,borderRadius:"50%",background:"radial-gradient(circle,rgba(255,122,46,.25) 0%,transparent 70%)",animation:"pulseGlow 1.4s ease-in-out infinite",display:"flex",alignItems:"center",justifyContent:"center"}}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"/>
               <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
@@ -4987,7 +4987,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         <div style={{fontSize:12,color:"#475569",marginBottom:24,letterSpacing:".06em",textTransform:"uppercase"}}>Loading your workspace</div>
         {/* Progress bar */}
         <div style={{width:220,margin:"0 auto 14px",background:"rgba(255,255,255,.06)",borderRadius:999,height:5,overflow:"hidden"}}>
-          <div style={{height:"100%",background:"linear-gradient(90deg,var(--accent),#fb923c)",borderRadius:999,
+          <div style={{height:"100%",background:"linear-gradient(90deg,var(--accent),#ff9a5c)",borderRadius:999,
             width:loadingItems.length?`${Math.min(100,Math.round(loadingItems.filter(x=>x.status!=="loading").length/Math.max(loadingItems.length,1)*100))}%`:"30%",
             transition:"width .4s ease",animation:loadingItems.length===0?"ldFill 2s ease-in-out infinite":undefined}}/>
         </div>
@@ -5062,9 +5062,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginTop:1}}>{t[role]||role}</div>
             </div>
           </div>
-          <div style={{maxWidth:"100%",overflow:"hidden",marginBottom:8}}>
+          <div style={{maxWidth:"100%",overflow:"hidden",marginBottom:4}}>
             <ShopLogo settings={wsDisplaySettings} size="sm"/>
           </div>
+          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:8}}>Powered by <span style={{color:"var(--accent)",fontWeight:700}}>VelGenius</span></div>
           <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8}}>
             <span style={{width:6,height:6,borderRadius:"50%",background:"var(--green)",display:"inline-block",flexShrink:0}}/>
             <span style={{fontSize:10,color:"var(--text3)",letterSpacing:".03em"}}>{t.connected||"Connected"}</span>
@@ -5079,7 +5080,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             </div>
           )}
         </div>
-        {role!=="admin"&&sub?.label&&<div className={sub.daysLeft!=null&&sub.daysLeft<=7?"wsFlash":undefined} style={{margin:"0 12px 8px",background:"rgba(249,115,22,.15)",borderRadius:7,padding:"3px 9px",fontSize:11,color:"var(--accent)",fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
+        {role!=="admin"&&sub?.label&&<div className={sub.daysLeft!=null&&sub.daysLeft<=7?"wsFlash":undefined} style={{margin:"0 12px 8px",background:"rgba(255,122,46,.15)",borderRadius:7,padding:"3px 9px",fontSize:11,color:"var(--accent)",fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
 
         {branches.length>0&&(
           <div style={{margin:"0 12px 8px"}}>
@@ -5148,10 +5149,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       <div className={`drawer${drawerOpen?" open":""}`}>
         {/* Drawer header */}
         <div style={{padding:"16px 16px 10px",borderBottom:"1px solid var(--border)"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
             <ShopLogo settings={wsDisplaySettings} size="md"/>
             <button onClick={()=>setDrawerOpen(false)} style={{background:"none",border:"none",color:"var(--text3)",fontSize:20,cursor:"pointer",padding:4}}>✕</button>
           </div>
+          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:10}}>Powered by <span style={{color:"var(--accent)",fontWeight:700}}>VelGenius</span></div>
           <div style={{background:"var(--surface2)",borderRadius:9,padding:"8px 10px",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <div style={{width:30,height:30,borderRadius:"50%",background:ROLES[role]?.bg,border:`1.5px solid ${ROLES[role]?.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{ROLES[role]?.icon}</div>
@@ -5169,7 +5171,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               </button>
             ))}
           </div>
-          {role!=="admin"&&sub?.label&&<div className={sub.daysLeft!=null&&sub.daysLeft<=7?"wsFlash":undefined} style={{marginTop:8,background:"rgba(249,115,22,.15)",borderRadius:7,padding:"4px 10px",fontSize:12,color:"var(--accent)",fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
+          {role!=="admin"&&sub?.label&&<div className={sub.daysLeft!=null&&sub.daysLeft<=7?"wsFlash":undefined} style={{marginTop:8,background:"rgba(255,122,46,.15)",borderRadius:7,padding:"4px 10px",fontSize:12,color:"var(--accent)",fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
         </div>
         {/* Drawer nav groups */}
         <nav style={{flex:1,padding:"8px 6px",overflowY:"auto"}}>
@@ -5347,6 +5349,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
       {/* MAIN CONTENT */}
       <main className="main-content" style={{marginLeft:240,padding:26,minHeight:"100vh"}}>
+
+        {/* ── Platform brand strip — shown above every module so it's always clear which platform this is ── */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:16,marginBottom:28,paddingBottom:18,borderBottom:"1px solid var(--border)"}}>
+          <svg width="60" height="60" viewBox="0 0 36 36" fill="none" style={{flexShrink:0}}>
+            <path d="M18 3 L31 10.5 V25.5 L18 33 L5 25.5 V10.5 Z" stroke="#5D7A93" strokeWidth="2"/>
+            <circle cx="18" cy="18" r="4.5" fill="none" stroke="var(--text)" strokeWidth="2"/>
+            <path d="M4 18 H12 L15 12 L19 24 L22 18 H32" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:45,color:"var(--text)",letterSpacing:".2px"}}>VelGenius</span>
+          <span style={{fontSize:16,color:"var(--text3)",marginLeft:6}}>AI Automotive Operations Platform</span>
+        </div>
 
         {/* ── DASHBOARD ── */}
         {tab==="dashboard"&&role==="admin"&&(
@@ -5546,8 +5559,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             {(quantumStockValue>0||hiaceStockValue>0||othersStockValue>0)&&(
               <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
                 {quantumStockValue>0&&(
-                  <div onClick={()=>setInvReport("quantum")} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.25)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px",cursor:"pointer",transition:"background .15s"}}
-                    onMouseEnter={e=>e.currentTarget.style.background="rgba(249,115,22,.16)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(249,115,22,.08)"}>
+                  <div onClick={()=>setInvReport("quantum")} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,122,46,.08)",border:"1px solid rgba(255,122,46,.25)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px",cursor:"pointer",transition:"background .15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="rgba(255,122,46,.16)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(255,122,46,.08)"}>
                     <span style={{fontSize:18}}>🚐</span>
                     <div>
                       <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text3)"}}>Quantum Parts</div>
@@ -5681,18 +5694,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               {(role==="branch_admin"&&filterBranch===String(branchId))&&(
                 <button className="btn btn-sm" onClick={()=>setBranchMatchedOnly(v=>v==="matched"?"own":v==="own"?"all":"matched")}
                   style={{whiteSpace:"nowrap",fontWeight:700,
-                    background:branchMatchedOnly==="matched"?"rgba(59,130,246,.15)":branchMatchedOnly==="own"?"rgba(249,115,22,.15)":"rgba(52,211,153,.12)",
+                    background:branchMatchedOnly==="matched"?"rgba(59,130,246,.15)":branchMatchedOnly==="own"?"rgba(255,122,46,.15)":"rgba(52,211,153,.12)",
                     color:branchMatchedOnly==="matched"?"var(--blue)":branchMatchedOnly==="own"?"var(--accent)":"var(--green)",
                     border:branchMatchedOnly==="matched"?"1.5px solid var(--blue)":branchMatchedOnly==="own"?"1.5px solid var(--accent)":"1.5px solid rgba(52,211,153,.4)"}}>
                   {branchMatchedOnly==="matched"?"✓ My Stock":branchMatchedOnly==="own"?"🏢 Own Parts":"📋 All catalog"}
                 </button>
               )}
-              <button className="btn btn-sm" onClick={()=>setFilterQuantum(v=>!v)} style={{whiteSpace:"nowrap",background:filterQuantum?"rgba(249,115,22,.18)":"var(--surface2)",color:filterQuantum?"var(--accent)":"var(--text2)",border:filterQuantum?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:filterQuantum?700:400}}>🚐 Quantum{filterQuantum?" ✓":""}</button>
+              <button className="btn btn-sm" onClick={()=>setFilterQuantum(v=>!v)} style={{whiteSpace:"nowrap",background:filterQuantum?"rgba(255,122,46,.18)":"var(--surface2)",color:filterQuantum?"var(--accent)":"var(--text2)",border:filterQuantum?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:filterQuantum?700:400}}>🚐 Quantum{filterQuantum?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterHiace(v=>!v)} style={{whiteSpace:"nowrap",background:filterHiace?"rgba(59,130,246,.18)":"var(--surface2)",color:filterHiace?"var(--blue)":"var(--text2)",border:filterHiace?"1.5px solid var(--blue)":"1px solid var(--border)",fontWeight:filterHiace?700:400}}>🚐 Hiace{filterHiace?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterInStock(v=>!v)} style={{whiteSpace:"nowrap",background:filterInStock?"rgba(52,211,153,.18)":"var(--surface2)",color:filterInStock?"var(--green)":"var(--text2)",border:filterInStock?"1.5px solid var(--green)":"1px solid var(--border)",fontWeight:filterInStock?700:400}}>✅ In Stock{filterInStock?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterNoPhoto(v=>!v)} style={{whiteSpace:"nowrap",background:filterNoPhoto?"rgba(248,113,113,.18)":"var(--surface2)",color:filterNoPhoto?"var(--red)":"var(--text2)",border:filterNoPhoto?"1.5px solid var(--red)":"1px solid var(--border)",fontWeight:filterNoPhoto?700:400}}>📷 No Photo{filterNoPhoto?" ✓":""}</button>
               <button className="btn btn-sm" onClick={()=>setFilterNeedsReview(v=>!v)} style={{whiteSpace:"nowrap",background:filterNeedsReview?"rgba(167,139,250,.18)":"var(--surface2)",color:filterNeedsReview?"var(--purple)":"var(--text2)",border:filterNeedsReview?"1.5px solid var(--purple)":"1px solid var(--border)",fontWeight:filterNeedsReview?700:400}}>🔍 Needs Review{filterNeedsReview?" ✓":""}</button>
-              <button className="btn btn-sm" onClick={()=>{setInvSort(s=>s==="sku"?"default":"sku");setInvPage(0);}} style={{whiteSpace:"nowrap",background:invSort==="sku"?"rgba(249,115,22,.12)":"var(--surface2)",color:invSort==="sku"?"var(--accent)":"var(--text2)",border:invSort==="sku"?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:invSort==="sku"?700:400}}>Sort by SKU{invSort==="sku"?" ↑":""}</button>
+              <button className="btn btn-sm" onClick={()=>{setInvSort(s=>s==="sku"?"default":"sku");setInvPage(0);}} style={{whiteSpace:"nowrap",background:invSort==="sku"?"rgba(255,122,46,.12)":"var(--surface2)",color:invSort==="sku"?"var(--accent)":"var(--text2)",border:invSort==="sku"?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:invSort==="sku"?700:400}}>Sort by SKU{invSort==="sku"?" ↑":""}</button>
               <select className="inp" value={filterSupplier} onChange={e=>setFilterSupplier(e.target.value)}
                 style={{minWidth:130,maxWidth:200,borderColor:filterSupplier!=="__all__"?"var(--purple)":undefined,color:filterSupplier!=="__all__"?"var(--purple)":undefined}}>
                 <option value="__all__">🏭 All Suppliers</option>
@@ -5715,7 +5728,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 </button>
               </div>
               {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace||filterInStock||filterNoPhoto||filterNeedsReview||filterSupplier!=="__all__")&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterPendingReview(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setFilterInStock(false);setFilterNoPhoto(false);setFilterNeedsReview(false);setFilterSupplier("__all__");setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear all</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");setFilterLow(false);setFilterPendingReview(false);setFilterFits("__all__");setFilterBranch("__all__");setFilterQuantum(false);setFilterHiace(false);setFilterInStock(false);setFilterNoPhoto(false);setFilterNeedsReview(false);setFilterSupplier("__all__");setBranchMatchedOnly("matched");}} style={{color:"var(--accent)",whiteSpace:"nowrap",border:"1px solid rgba(255,122,46,.3)"}}>✕ Clear all</button>
               )}
             </div>
             {/* ── Top pagination bar (between search and table) ── */}
@@ -5750,7 +5763,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 const ps=getPartSupps(p.id);
                 return (
                   <div key={p.id} id={`part-row-${p.id}`} className="card" style={{padding:14,position:"relative",
-                    background:bulkPriceSelected.has(p.id)?"rgba(249,115,22,.06)":undefined,
+                    background:bulkPriceSelected.has(p.id)?"rgba(255,122,46,.06)":undefined,
                     borderLeft:`3px solid ${(role==="branch_admin"&&!p._bsSet)?"var(--border)":p.stock===0?"var(--red)":p.stock<=p.min_stock?"var(--yellow)":"var(--border)"}`}}>
                     {bulkPriceMode&&(
                       <input type="checkbox" checked={bulkPriceSelected.has(p.id)} disabled={!(+p.cost_price>0)}
@@ -5780,7 +5793,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                           {p.category&&<span className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:10}}>{p.category}</span>}
                           {p.review_status==="pending"&&<span className="badge" style={{background:"rgba(251,191,36,.18)",color:"#fbbf24",fontSize:10,border:"1px solid rgba(251,191,36,.4)"}}>⏳ Pending Review</span>}
                           {p.needs_review&&<span className="badge" style={{background:"rgba(167,139,250,.18)",color:"var(--purple)",fontSize:10,border:"1px solid rgba(167,139,250,.4)"}}>🔍 Needs Review</span>}
-                          {p.is_quantum&&<span className="badge" style={{background:"rgba(249,115,22,.12)",color:"var(--accent)",fontSize:10}}>🚐 Quantum</span>}
+                          {p.is_quantum&&<span className="badge" style={{background:"rgba(255,122,46,.12)",color:"var(--accent)",fontSize:10}}>🚐 Quantum</span>}
                           {p.is_hiace&&<span className="badge" style={{background:"rgba(59,130,246,.12)",color:"var(--blue)",fontSize:10}}>🚐 Hiace</span>}
                         </div>
                         {showSupplierCodes&&(()=>{const ps=getPartSupps(p.id);return ps.length>0?(
@@ -5867,7 +5880,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                       const img=toImgUrl(p.image_url);
                       const ps=getPartSupps(p.id);
                       return (
-                        <tr key={p.id} id={`part-row-${p.id}`} style={bulkPriceSelected.has(p.id)?{background:"rgba(249,115,22,.06)"}:undefined}>
+                        <tr key={p.id} id={`part-row-${p.id}`} style={bulkPriceSelected.has(p.id)?{background:"rgba(255,122,46,.06)"}:undefined}>
                           {bulkPriceMode&&(
                             <td style={{width:32,padding:"10px 4px",textAlign:"center"}}>
                               <input type="checkbox" checked={bulkPriceSelected.has(p.id)} disabled={!(+p.cost_price>0)}
@@ -6301,7 +6314,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                   {getCategories().map(c=><option key={c} value={c}>{c}</option>)}
                 </select>
                 {(searchPart||filterCat!=="__all__")&&(
-                  <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");}} style={{color:"var(--accent)",border:"1px solid rgba(249,115,22,.3)"}}>✕ Clear</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>{setSearchPart("");setFilterCat("__all__");}} style={{color:"var(--accent)",border:"1px solid rgba(255,122,46,.3)"}}>✕ Clear</button>
                 )}
                 <button className="btn btn-ghost btn-sm" onClick={()=>{ api.cacheClearAll(); loadAll(); }} title="Refresh stock & prices" style={{flexShrink:0}}>↺ Refresh</button>
                 <button className="btn btn-ghost btn-sm" onClick={()=>{setShopSort(s=>s==="sku"?"default":"sku");setShopPage(0);}} style={{flexShrink:0,borderColor:shopSort==="sku"?"var(--accent)":"var(--border)",color:shopSort==="sku"?"var(--accent)":undefined}} title="Sort by SKU">
@@ -6966,7 +6979,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               {fc.map(c=>(
                 <div key={c.id} className="card card-hover" style={{padding:20}}>
                   <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:12}}>
-                    <div style={{width:42,height:42,borderRadius:"50%",background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,fontWeight:700,flexShrink:0,boxShadow:"0 4px 12px rgba(249,115,22,.3)"}}>{c.name?.[0]}</div>
+                    <div style={{width:42,height:42,borderRadius:"50%",background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,fontWeight:700,flexShrink:0,boxShadow:"0 4px 12px rgba(255,122,46,.3)"}}>{c.name?.[0]}</div>
                     <div><div style={{fontSize:14,fontWeight:700}}>{c.name}</div><div style={{fontSize:12,color:"var(--text3)"}}>{c.phone}</div></div>
                   </div>
                   {c.email&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:3}}>✉ {c.email}</div>}
@@ -7385,7 +7398,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 const ll=ctData[cn]?.ll;if(!ll)return`0 0 ${MW} ${MH}`;
                 const vbW=MW/4,vbH=MH/4;return`${(mX(ll[1])-vbW/2).toFixed(1)} ${(mY(ll[0])-vbH/2).toFixed(1)} ${vbW} ${vbH}`;
               };
-              const dtCfg={"Android":{icon:"🤖",color:"#4ade80"},"Apple iOS":{icon:"🍎",color:"#a78bfa"},"Desktop":{icon:"🖥",color:"#60a5fa"},"Other Mobile":{icon:"📱",color:"#fb923c"}};
+              const dtCfg={"Android":{icon:"🤖",color:"#4ade80"},"Apple iOS":{icon:"🍎",color:"#a78bfa"},"Desktop":{icon:"🖥",color:"#60a5fa"},"Other Mobile":{icon:"📱",color:"#ff9a5c"}};
               const SVG_DEFS=(
                 <defs>
                   <radialGradient id="oceanGrad" cx="50%" cy="50%" r="70%"><stop offset="0%" stopColor="#0f2744"/><stop offset="100%" stopColor="#060e1a"/></radialGradient>
@@ -7596,7 +7609,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 {key:"Android",   icon:"🤖", color:"#4ade80", bg:"rgba(74,222,128,.12)"},
                 {key:"Apple iOS", icon:"🍎", color:"#a78bfa", bg:"rgba(167,139,250,.12)"},
                 {key:"Desktop",   icon:"🖥",  color:"#60a5fa", bg:"rgba(96,165,250,.12)"},
-                {key:"Other Mobile",icon:"📱",color:"#fb923c", bg:"rgba(251,146,60,.12)"},
+                {key:"Other Mobile",icon:"📱",color:"#ff9a5c", bg:"rgba(255,154,92,.12)"},
               ];
               const filteredLogs=loginLogs.filter(l=>l.user_role!=="admin"&&l.user_role!=="demo");
               const counts=filteredLogs.reduce((a,l)=>{
@@ -7649,7 +7662,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                             "Android":     {icon:"🤖",bg:"rgba(74,222,128,.12)",  color:"#4ade80"},
                             "Apple iOS":   {icon:"🍎",bg:"rgba(167,139,250,.12)", color:"#a78bfa"},
                             "Desktop":     {icon:"🖥", bg:"rgba(96,165,250,.12)",  color:"#60a5fa"},
-                            "Other Mobile":{icon:"📱",bg:"rgba(251,146,60,.12)",  color:"#fb923c"},
+                            "Other Mobile":{icon:"📱",bg:"rgba(255,154,92,.12)",  color:"#ff9a5c"},
                           };
                           const dt=l.device_type||(()=>{return /Android/i.test(d)?"Android":/iPhone|iPad/i.test(d)?"Apple iOS":/Mobile/i.test(d)?"Other Mobile":d?"Desktop":null;})();
                           if(!dt&&!d)return "—";
@@ -8265,7 +8278,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                               </div>
                             )}
                             {q.deposit_amount&&(
-                              <div style={{marginTop:8,background:"rgba(249,115,22,.08)",borderRadius:8,padding:"8px 12px",fontSize:13,border:"1px solid var(--accent)"}}>
+                              <div style={{marginTop:8,background:"rgba(255,122,46,.08)",borderRadius:8,padding:"8px 12px",fontSize:13,border:"1px solid var(--accent)"}}>
                                 <div style={{fontWeight:600,marginBottom:4,color:"var(--accent)"}}>💰 Deposit Required: <strong>{fmtAmt(q.deposit_amount)}</strong></div>
                                 {q.deposit_note&&<div style={{color:"var(--text2)",fontSize:12}}>{q.deposit_note}</div>}
                               </div>
@@ -8389,7 +8402,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                             </div>
                           )}
                           {q.deposit_amount&&(
-                            <div style={{marginTop:8,background:"rgba(249,115,22,.1)",borderRadius:8,padding:"12px 14px",border:"1px solid var(--accent)"}}>
+                            <div style={{marginTop:8,background:"rgba(255,122,46,.1)",borderRadius:8,padding:"12px 14px",border:"1px solid var(--accent)"}}>
                               <div style={{fontWeight:700,color:"var(--accent)",marginBottom:4}}>💰 {lang==="zh"?"訂金要求":"Deposit Required"}: {fmtAmt(q.deposit_amount)}</div>
                               {q.deposit_note&&<div style={{fontSize:13,color:"var(--text2)",lineHeight:1.6}}>{q.deposit_note}</div>}
                               {q.status==="deposit_paid"&&<div style={{marginTop:6,color:"var(--green)",fontWeight:600}}>✅ {lang==="zh"?"訂金已收到":"Deposit received — order confirmed!"}</div>}
@@ -8773,7 +8786,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             *{box-sizing:border-box;margin:0;padding:0}
             body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:32px;max-width:900px;margin:0 auto}
             .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #111}
-            .shop{font-size:22px;font-weight:900;color:#f97316}
+            .shop{font-size:22px;font-weight:900;color:#ff7a2e}
             .meta{font-size:11px;color:#666;margin-top:4px}
             .report-title{font-size:18px;font-weight:700;text-align:right}
             .report-date{font-size:11px;color:#666;text-align:right;margin-top:4px}
@@ -8920,16 +8933,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         </div>
       </div>}
 
-      {isDemo&&<div className="demo-banner" style={{position:"fixed",bottom:0,left:0,right:0,zIndex:90,background:"linear-gradient(90deg,#f59e0b,#f97316)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
+      {isDemo&&<div className="demo-banner" style={{position:"fixed",bottom:0,left:0,right:0,zIndex:90,background:"linear-gradient(90deg,#f59e0b,#ff7a2e)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
         🔒 Demo Mode — all data is read-only. Contact us to get your own account.
       </div>}
       {role==="workshop"&&subStatus&&!subStatus.expired&&subStatus.daysLeft<=7&&(
-        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9998,background:"linear-gradient(90deg,#f97316,#ef4444)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
+        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9998,background:"linear-gradient(90deg,#ff7a2e,#ef4444)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
           ⚠️ {subStatus.status==="trial"?"Free trial":"Subscription"} expires in <strong>{subStatus.daysLeft<=0?"today":subStatus.daysLeft===1?"1 day":`${subStatus.daysLeft} days`}</strong> ({subStatus.expiresAt}) — Contact admin to renew
         </div>
       )}
       {role!=="workshop"&&role!=="admin"&&(()=>{const si=getSubInfo(user);return si.status==="active"&&si.daysLeft!=null&&si.daysLeft<=7&&(
-        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9998,background:"linear-gradient(90deg,#f97316,#ef4444)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
+        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9998,background:"linear-gradient(90deg,#ff7a2e,#ef4444)",color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,letterSpacing:.3}}>
           ⚠️ Subscription expires in <strong>{si.daysLeft<=0?"today":si.daysLeft===1?"1 day":`${si.daysLeft} days`}</strong> ({si.expiresAt}) — Contact admin to renew
         </div>
       );})()}

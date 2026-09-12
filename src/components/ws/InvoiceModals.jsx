@@ -143,7 +143,7 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],parts=[],w
                               onClick={()=>applyPrice(i.id,c.price)}
                               style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:6,
                                 border:`1px solid ${active?"var(--accent)":"var(--border)"}`,
-                                background:active?"rgba(251,146,60,.12)":"var(--surface2)",
+                                background:active?"rgba(255,154,92,.12)":"var(--surface2)",
                                 color:active?"var(--accent)":"var(--text3)",cursor:"pointer",whiteSpace:"nowrap"}}>
                               {c.source==="reply"?"💬":"🏪"} {c.label} · {fmt(c.price)}
                             </button>

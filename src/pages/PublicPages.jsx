@@ -201,7 +201,7 @@ export function RfqQuoteReplyPage({token}) {
   if(loading) return (
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
       <style>{CSS}</style>
-      <div style={{color:"#f97316",fontSize:15}}>⏳ Loading...</div>
+      <div style={{color:"#ff7a2e",fontSize:15}}>⏳ Loading...</div>
     </div>
   );
 
@@ -224,7 +224,7 @@ export function RfqQuoteReplyPage({token}) {
           <ShopLogo settings={getSettings()} size="md" style={{width:"100%",maxWidth:"100%",maxHeight:100,objectFit:"contain",height:"auto",margin:"0 auto"}}/>
           <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:26,fontWeight:700,color:"var(--accent)",marginTop:10}}>📋 RFQ Quote Request</div>
           <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>From: {quote.supplier_name||"Supplier"}</div>
-          {session?.reply_deadline&&(()=>{const dl=new Date(session.reply_deadline);const hrs=Math.max(0,Math.round((dl-Date.now())/3600000));return <div style={{marginTop:8,padding:"6px 14px",borderRadius:20,display:"inline-block",background:hrs<6?"rgba(248,113,113,.15)":"rgba(251,146,60,.12)",color:hrs<6?"#f87171":"#f97316",fontSize:13,fontWeight:600}}>⏰ Reply by: {dl.toLocaleString()} {hrs>0?`(${hrs}h left)`:""}</div>;})()}
+          {session?.reply_deadline&&(()=>{const dl=new Date(session.reply_deadline);const hrs=Math.max(0,Math.round((dl-Date.now())/3600000));return <div style={{marginTop:8,padding:"6px 14px",borderRadius:20,display:"inline-block",background:hrs<6?"rgba(248,113,113,.15)":"rgba(255,154,92,.12)",color:hrs<6?"#f87171":"#ff7a2e",fontSize:13,fontWeight:600}}>⏰ Reply by: {dl.toLocaleString()} {hrs>0?`(${hrs}h left)`:""}</div>;})()}
         </div>
 
         {/* Part info */}
@@ -237,7 +237,7 @@ export function RfqQuoteReplyPage({token}) {
               {item.part_chinese_desc&&<div style={{gridColumn:"1/-1"}}><span style={{color:"var(--text3)"}}>中文: </span>{item.part_chinese_desc}</div>}
               {item.oe_number&&<div><span style={{color:"var(--text3)"}}>OE#: </span>{item.oe_number}</div>}
               {item.make&&<div><span style={{color:"var(--text3)"}}>Vehicle: </span>{item.make} {item.model}</div>}
-              <div style={{gridColumn:"1/-1",background:"rgba(251,146,60,.1)",borderRadius:8,padding:"8px 12px",marginTop:4}}>
+              <div style={{gridColumn:"1/-1",background:"rgba(255,154,92,.1)",borderRadius:8,padding:"8px 12px",marginTop:4}}>
                 <span style={{color:"var(--text3)"}}>Qty Needed: </span>
                 <strong style={{color:"var(--accent)",fontSize:18,fontFamily:"Rajdhani,sans-serif"}}>{item.qty_needed}</strong>
               </div>
@@ -394,7 +394,7 @@ export function RfqBatchReplyPage({token}) {
   if(loading) return (
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
       <style>{CSS}</style>
-      <div style={{color:"#f97316",fontSize:15}}>⏳ Loading RFQ...</div>
+      <div style={{color:"#ff7a2e",fontSize:15}}>⏳ Loading RFQ...</div>
     </div>
   );
   if(err&&!rows.length) return (
@@ -415,7 +415,7 @@ export function RfqBatchReplyPage({token}) {
           <div style={{color:"var(--text3)",fontSize:13,marginTop:4}}>
             {session?.name&&<span style={{fontWeight:600,color:"var(--text)"}}>{session.name} · </span>}
             {supplierName} · {rows.length} item{rows.length!==1?"s":""}
-            {session?.reply_deadline&&(()=>{const dl=new Date(session.reply_deadline);const hrs=Math.max(0,Math.round((dl-Date.now())/3600000));return <span style={{marginLeft:10,padding:"3px 10px",borderRadius:12,background:hrs<6?"rgba(248,113,113,.15)":"rgba(251,146,60,.12)",color:hrs<6?"#f87171":"#f97316",fontWeight:600}}>⏰ {dl.toLocaleString()} {hrs>0?`(${hrs}h left)`:""}</span>;})()}
+            {session?.reply_deadline&&(()=>{const dl=new Date(session.reply_deadline);const hrs=Math.max(0,Math.round((dl-Date.now())/3600000));return <span style={{marginLeft:10,padding:"3px 10px",borderRadius:12,background:hrs<6?"rgba(248,113,113,.15)":"rgba(255,154,92,.12)",color:hrs<6?"#f87171":"#ff7a2e",fontWeight:600}}>⏰ {dl.toLocaleString()} {hrs>0?`(${hrs}h left)`:""}</span>;})()}
             {session?.deadline&&<span style={{color:"var(--yellow)",marginLeft:8}}>⏰ Deadline: {session.deadline}</span>}
           </div>
         </div>
@@ -665,11 +665,11 @@ export function QuoteConfirmPage({token}) {
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:36px;max-width:820px;margin:0 auto}
   .hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;border-bottom:3px solid #2563eb;margin-bottom:24px}
-  .shop{font-size:24px;font-weight:900;color:#f97316}
+  .shop{font-size:24px;font-weight:900;color:#ff7a2e}
   .shop-info{font-size:11px;color:#555;margin-top:5px;line-height:1.8}
   .qblock{text-align:right}
   .qtitle{font-size:18px;font-weight:700;color:#2563eb}
-  .qno{font-size:14px;font-weight:700;color:#f97316;margin-top:4px}
+  .qno{font-size:14px;font-weight:700;color:#ff7a2e;margin-top:4px}
   .qmeta{font-size:12px;color:#555;margin-top:4px;line-height:1.8}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
   .card{background:#f9f9f9;border:1px solid #e5e5e5;border-radius:8px;padding:14px}
@@ -682,7 +682,7 @@ export function QuoteConfirmPage({token}) {
   thead th:nth-child(n+2){text-align:right}
   .totals{margin-left:auto;width:260px;margin-bottom:24px}
   .t-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #eee}
-  .t-total{display:flex;justify-content:space-between;align-items:center;padding:14px 12px;font-size:22px;font-weight:900;color:#f97316;background:#fff7ed;border-top:3px solid #f97316;border-radius:0 0 6px 6px;margin-top:4px}
+  .t-total{display:flex;justify-content:space-between;align-items:center;padding:14px 12px;font-size:22px;font-weight:900;color:#ff7a2e;background:#fff7ed;border-top:3px solid #ff7a2e;border-radius:0 0 6px 6px;margin-top:4px}
   .notes-box{background:#fff8ed;border:1px solid #fcd34d;border-radius:8px;padding:12px;font-size:12px;margin-bottom:20px}
   .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
   @media print{body{padding:18px}}
@@ -750,7 +750,7 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
   if(loading) return (
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
       <style>{CSS}</style>
-      <div style={{color:"#f97316",fontSize:15}}>⏳ Loading quotation...</div>
+      <div style={{color:"#ff7a2e",fontSize:15}}>⏳ Loading quotation...</div>
     </div>
   );
 
@@ -855,7 +855,7 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
                     );
                   })()
               }
-              <div style={{padding:"16px 18px",borderTop:"3px solid var(--accent)",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(249,115,22,.1)"}}>
+              <div style={{padding:"16px 18px",borderTop:"3px solid var(--accent)",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,122,46,.1)"}}>
                 <span style={{fontWeight:800,fontSize:16,textTransform:"uppercase",letterSpacing:".05em"}}>Total</span>
                 <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:28,color:"var(--accent)"}}>{fmt(quote.total)}</span>
               </div>
@@ -879,7 +879,7 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
             {/* Read & agree checkbox */}
             <label style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 18px",marginBottom:14,background:"#fffbeb",border:"2px solid #f59e0b",borderRadius:12,cursor:"pointer"}}>
               <input type="checkbox" checked={agreed} onChange={e=>setAgreed(e.target.checked)}
-                style={{width:22,height:22,marginTop:2,accentColor:"#f97316",flexShrink:0,cursor:"pointer"}}/>
+                style={{width:22,height:22,marginTop:2,accentColor:"#ff7a2e",flexShrink:0,cursor:"pointer"}}/>
               <span style={{fontSize:15,fontWeight:600,color:"#1a1a1a",lineHeight:1.5}}>
                 I have read and understood the quotation and agree to the terms stated above.
               </span>
@@ -1162,7 +1162,7 @@ export function WsSupplierQuoteReplyPage({token}) {
             <div style={{fontSize:32,marginBottom:8}}>🎉</div>
             <div style={{fontWeight:800,fontSize:16,color:"#fff",marginBottom:6}}>Registration Received!</div>
             <div style={{fontSize:13,color:"#bbf7d0",lineHeight:1.6}}>Thank you! Our team will contact you shortly to set up your free 2-month trial account.</div>
-            <div style={{fontSize:11,color:"#4ade80",marginTop:12}}>Powered by <strong style={{color:"#fff"}}>MotorDesk</strong></div>
+            <div style={{fontSize:11,color:"#4ade80",marginTop:12}}>Powered by <strong style={{color:"#fff"}}>VelGenius</strong></div>
           </div>
         ) : (
           <div style={{marginTop:20,borderRadius:14,background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0ea5e9 100%)",padding:"18px 20px",boxShadow:"0 4px 24px rgba(14,165,233,.25)"}}>
@@ -1175,10 +1175,10 @@ export function WsSupplierQuoteReplyPage({token}) {
                   Manage inventory, quotes, invoices &amp; customers — all in one place.
                 </div>
                 <button onClick={()=>setRegOpen(true)}
-                  style={{display:"inline-block",background:"#f97316",color:"#fff",fontWeight:700,fontSize:13,borderRadius:8,padding:"10px 24px",marginBottom:10,border:"none",cursor:"pointer",letterSpacing:".3px"}}>
+                  style={{display:"inline-block",background:"#ff7a2e",color:"#fff",fontWeight:700,fontSize:13,borderRadius:8,padding:"10px 24px",marginBottom:10,border:"none",cursor:"pointer",letterSpacing:".3px"}}>
                   🎁 2-Month Free Trial — Register Now
                 </button>
-                <div style={{fontSize:11,color:"#7dd3fc"}}>Powered by <strong style={{color:"#fff"}}>MotorDesk</strong></div>
+                <div style={{fontSize:11,color:"#7dd3fc"}}>Powered by <strong style={{color:"#fff"}}>VelGenius</strong></div>
               </div>
             ) : (
               <div>
@@ -1190,8 +1190,8 @@ export function WsSupplierQuoteReplyPage({token}) {
                     {[["spare_shop","🏪 Spare Shop"],["scrapyard","♻️ Scrapyard"]].map(([val,lbl])=>(
                       <label key={val} onClick={()=>setRegForm(p=>({...p,type:val}))}
                         style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 10px",borderRadius:8,
-                          border:`1.5px solid ${regForm.type===val?"#f97316":"rgba(255,255,255,.2)"}`,
-                          background:regForm.type===val?"rgba(249,115,22,.18)":"rgba(255,255,255,.05)",
+                          border:`1.5px solid ${regForm.type===val?"#ff7a2e":"rgba(255,255,255,.2)"}`,
+                          background:regForm.type===val?"rgba(255,122,46,.18)":"rgba(255,255,255,.05)",
                           cursor:"pointer",color:"#fff",fontSize:12,fontWeight:700}}>
                         {lbl}
                       </label>
@@ -1225,7 +1225,7 @@ export function WsSupplierQuoteReplyPage({token}) {
                     }catch(e){setRegErr("Submit failed, please try again.");}
                     finally{setRegSaving(false);}
                   }}
-                  style={{width:"100%",padding:"12px 0",borderRadius:8,border:"none",background:regSaving?"#475569":"#f97316",color:"#fff",fontSize:14,fontWeight:700,cursor:regSaving?"not-allowed":"pointer",marginTop:4,marginBottom:8}}>
+                  style={{width:"100%",padding:"12px 0",borderRadius:8,border:"none",background:regSaving?"#475569":"#ff7a2e",color:"#fff",fontSize:14,fontWeight:700,cursor:regSaving?"not-allowed":"pointer",marginTop:4,marginBottom:8}}>
                   {regSaving?"Submitting…":"✅ Submit Registration"}
                 </button>
                 <div style={{textAlign:"center"}}>
@@ -1466,7 +1466,7 @@ export function WorkshopBookingPage({token}) {
     setSubmitting(false);
   };
 
-  const CL={bg:"#0f172a",surf:"#1e293b",border:"#334155",accent:"#f97316",
+  const CL={bg:"#0f172a",surf:"#1e293b",border:"#334155",accent:"#ff7a2e",
             text:"#f1f5f9",text2:"#94a3b8",text3:"#475569",
             green:"#34d399",red:"#f87171",blue:"#38bdf8",yellow:"#fbbf24"};
   const inp={width:"100%",background:"#0f172a",border:"1px solid #334155",borderRadius:8,
@@ -1481,7 +1481,7 @@ export function WorkshopBookingPage({token}) {
         {langs.map(l=>(
           <button key={l.lang} onClick={()=>chooseLang(l.lang)} title={l.name}
             style={{padding:"4px 10px",borderRadius:20,border:`1px solid ${lang===l.lang?CL.accent:CL.border}`,
-              background:lang===l.lang?"rgba(249,115,22,.15)":"transparent",
+              background:lang===l.lang?"rgba(255,122,46,.15)":"transparent",
               color:lang===l.lang?CL.accent:CL.text2,fontSize:12,fontWeight:700,cursor:"pointer"}}>
             {l.flag?`${l.flag} `:""}{l.lang.toUpperCase()}
           </button>
@@ -1633,7 +1633,7 @@ export function WorkshopBookingPage({token}) {
       <Header/>
       <div style={{maxWidth:460,margin:"0 auto",padding:"0 16px"}}>
 
-        <div style={{...card,borderColor:"rgba(249,115,22,.35)"}}>
+        <div style={{...card,borderColor:"rgba(255,122,46,.35)"}}>
           <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
             <span style={{fontSize:30}}>🚗</span>
             <div style={{flex:1}}>

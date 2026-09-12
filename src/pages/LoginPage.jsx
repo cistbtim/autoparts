@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { api, SUPABASE_URL } from "../lib/api.js";
 import { getSettings } from "../lib/settings.js";
 import { CSS } from "../styles.js";
-import { ShopLogo, FL, MotorDeskBanner } from "../components/shared.jsx";
+import { ShopLogo, FL, VelGeniusBanner } from "../components/shared.jsx";
 import { makeId, detectGeoLocation, fetchWeather, waLink } from "../lib/helpers.js";
 import { getSubInfo } from "../lib/constants.js";
 
@@ -368,7 +368,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
         {/* Logo card */}
         <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:14,padding:"12px",textAlign:"center",marginBottom:10,boxShadow:"var(--shadow)"}}>
-          <MotorDeskBanner/>
+          <VelGeniusBanner/>
           <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:10,marginTop:8,flexWrap:"wrap"}}>
             {langs.length>1&&langs.map(l=>(
               <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
@@ -387,17 +387,20 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:10}}>
           {TAB_BTNS.map(({id,Icon,label})=>(
             <button key={id} onClick={()=>switchTab(id)} style={{
-              padding:"7px 4px 6px",borderRadius:10,
-              border:`1.5px solid ${authTab===id?"var(--accent)":"var(--border2)"}`,
+              position:"relative",
+              padding:"7px 4px 8px",borderRadius:10,
+              border:`1.5px solid ${authTab===id?"var(--accent)":"rgba(93,122,147,.35)"}`,
               cursor:"pointer",
-              background:authTab===id?"var(--accent)":"var(--surface)",
-              color:authTab===id?"#fff":"var(--text3)",
+              background:authTab===id?"#0B0D10":"var(--surface)",
+              color:authTab===id?"var(--accent)":"#5D7A93",
               fontWeight:authTab===id?700:500,
               fontSize:10,letterSpacing:".06em",textTransform:"uppercase",
               display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-              boxShadow:authTab===id?"0 4px 14px rgba(249,115,22,.25)":"none",
+              boxShadow:authTab===id?"0 4px 14px rgba(255,122,46,.18)":"none",
               transition:"all .15s",
+              overflow:"hidden",
             }}>
+              {authTab===id&&<span style={{position:"absolute",bottom:0,left:0,right:0,height:2,background:"var(--accent)"}}/>}
               <Icon/>
               <span>{label}</span>
             </button>
@@ -412,7 +415,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
           {authTab==="branch"&&(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:0}}>
-                <div style={{width:32,height:32,borderRadius:9,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcBox/></div>
+                <div style={{width:32,height:32,borderRadius:9,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcBox/></div>
                 <div>
                   <div style={{fontSize:15,fontWeight:700,color:"var(--text)"}}>{t.loginSpareShop||"Spare Shop"} {t.signIn||"Login"}</div>
                   <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginSpareShopSub||"Sign in to your spare parts shop"}</div>
@@ -445,7 +448,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               {wsTab==="login"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:13}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
-                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcWrench/></div>
+                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcWrench/></div>
                     <div>
                       <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginWorkshop||"Workshop"} {t.signIn||"Login"}</div>
                       <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Sign in to your workshop account</div>
@@ -540,7 +543,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               {scrapTab==="login"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:13}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
-                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcCar/></div>
+                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcCar/></div>
                     <div>
                       <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginScrapyard||"Scrapyard"} {t.signIn||"Login"}</div>
                       <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Sign in to your scrapyard account</div>
@@ -627,7 +630,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
           {authTab==="customer"&&(
             <div style={{display:"flex",flexDirection:"column",gap:0}}>
               {catalogName&&(
-                <div style={{background:"rgba(249,115,22,.08)",border:"1px solid rgba(249,115,22,.25)",borderRadius:9,padding:"9px 12px",marginBottom:14,fontSize:12,color:"var(--text2)"}}>
+                <div style={{background:"rgba(255,122,46,.08)",border:"1px solid rgba(255,122,46,.25)",borderRadius:9,padding:"9px 12px",marginBottom:14,fontSize:12,color:"var(--text2)"}}>
                   📦 Signing in to the <strong>{catalogName}</strong> parts catalogue
                 </div>
               )}
@@ -640,7 +643,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               {custTab==="login"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:13}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
-                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcCart/></div>
+                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcCart/></div>
                     <div>
                       <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginShop||"Parts Shop"} {t.signIn||"Login"}</div>
                       <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Browse and order parts</div>
@@ -729,7 +732,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
           {authTab==="staff"&&(
             <div style={{display:"flex",flexDirection:"column",gap:13}}>
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
-                <div style={{width:38,height:38,borderRadius:10,background:"rgba(249,115,22,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcStaff/></div>
+                <div style={{width:38,height:38,borderRadius:10,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcStaff/></div>
                 <div>
                   <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginStaff||"Staff"} {t.signIn||"Login"}</div>
                   <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Admin, manager and fulfilment access</div>

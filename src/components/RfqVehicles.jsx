@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { removeBackground } from "@imgly/background-removal";
-import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
+import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
 import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, extractDriveId } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
@@ -3965,7 +3965,9 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
       const resultUrl = bucket
         ? await uploadToSupabase(file)
         : await uploadToGoogleDrive(file);
+      const oldUrl = url;
       onChange(resultUrl);
+      if (oldUrl) deleteFromStorage(oldUrl); // best-effort cleanup of the replaced file
       setStatus(""); setError(null);
     } catch(e) {
       setError("❌ " + e.message);
@@ -4095,7 +4097,7 @@ export function VehiclePhotoUploader({label, url, vehicleId, make, reg, viewName
             {url && (
               <button className="btn btn-ghost"
                 style={{width:"100%",padding:"12px 8px",fontSize:13,fontWeight:600,color:"var(--red)"}}
-                onClick={()=>{ setActionSheet(false); onChange(""); }}>
+                onClick={()=>{ setActionSheet(false); onChange(""); if(url) deleteFromStorage(url); }}>
                 🗑️ Remove Photo
               </button>
             )}

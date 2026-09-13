@@ -242,7 +242,7 @@ export function RequestsKanbanPage({
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,flexWrap:"wrap"}}>
-        <div style={{fontWeight:800,fontSize:20}}>🗂️ Requests</div>
+        <h1 style={{fontWeight:800,fontSize:20,margin:0}}>🗂️ Requests</h1>
         <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={onRefresh}>↻ Refresh</button>
       </div>
 

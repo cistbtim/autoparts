@@ -10638,7 +10638,7 @@ export function WorkshopRequestsPage({wsShopRequests=[],parts=[],settings={},sup
     <div>
       {/* Header */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18,flexWrap:"wrap"}}>
-        <div style={{fontWeight:800,fontSize:20,flex:1}}>🏪 Workshop Parts Requests</div>
+        <h1 style={{fontWeight:800,fontSize:20,flex:1,margin:0}}>🏪 Workshop Parts Requests</h1>
         <button className="btn btn-ghost btn-sm" disabled={refreshing} onClick={doRefresh}>↻ Refresh</button>
       </div>
 

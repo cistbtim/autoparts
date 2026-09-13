@@ -270,6 +270,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [filterSupplier,setFilterSupplier]=useState("__all__");
   const [invVehicleFilterIds,setInvVehicleFilterIds]=useState(null);
   const [invRefreshing,setInvRefreshing]=useState(false);
+  const [clearingReview,setClearingReview]=useState(false);
   const [filterHiace,setFilterHiace]=useState(false);
   const [branchMatchedOnly,setBranchMatchedOnly]=useState("matched"); // "matched"|"own"|"all"
   const [invPage,setInvPage]=useState(0);   // inventory page
@@ -5477,6 +5478,25 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                   padding:"3px 10px",borderRadius:99,border:`1px solid ${filterNeedsReview?"rgba(167,139,250,.5)":"var(--border)"}`}}>
                   {filterNeedsReview?"✓ Showing flagged":"Review"}
                 </span>
+                {(role==="admin"||role==="manager")&&(
+                  <button disabled={clearingReview}
+                    onClick={async(e)=>{
+                      e.stopPropagation();
+                      if(!window.confirm(`Clear "Needs Review" on all ${needsReviewCount} part${needsReviewCount!==1?"s":""}? This cannot be undone in bulk.`))return;
+                      setClearingReview(true);
+                      const res=await api.patch("parts","needs_review",true,{needs_review:false}).catch(e=>({message:e.message}));
+                      setClearingReview(false);
+                      if(res?.code||res?.message){showToast(`DB error: ${res.message||res.code}`,"err");console.error("clear needs_review failed",res);return;}
+                      setParts(prev=>prev.map(p=>p.needs_review?{...p,needs_review:false}:p));
+                      setFilterNeedsReview(false);
+                      showToast(`Cleared "Needs Review" on ${needsReviewCount} part${needsReviewCount!==1?"s":""}`);
+                    }}
+                    style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",cursor:clearingReview?"wait":"pointer",
+                      color:"var(--purple)",background:"var(--surface)",
+                      padding:"3px 10px",borderRadius:99,border:"1px solid rgba(167,139,250,.5)"}}>
+                    {clearingReview?"Clearing…":"✓ Clear All"}
+                  </button>
+                )}
               </div>
             )}
             <PH title={t.inventory} subtitle={`${parts.length} parts · ${lowStock.length} low`}

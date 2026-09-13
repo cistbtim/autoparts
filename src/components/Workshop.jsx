@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL } from "../lib/helpers.js";
+import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL, nemigaVinUrl } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner } from "../components/shared.jsx";
@@ -4211,7 +4211,7 @@ const SEVENZAP_BOOKMARKLET = `javascript:(async function(){try{const v=(await na
 // ═══════════════════════════════════════════════════════════════
 // VIN DECODER
 // ═══════════════════════════════════════════════════════════════
-function decodeVin(vin) {
+export function decodeVin(vin) {
   if (!vin || vin.length < 11) return null;
   const v = vin.toUpperCase();
 
@@ -5307,8 +5307,10 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
         ? `https://catcar.info/${catcarSlug(job.vehicle_make)}/?lang=en&vin=${encodeURIComponent(job.vin)}`
         : `https://catcar.info/?lang=en&vin=${encodeURIComponent(job.vin)}`)
     : null;
+  const nemigaHref = job.vin ? nemigaVinUrl(job.vin, job.vehicle_make || decodeVin(job.vin)?.make) : null;
   const vinSearchLinks = job.vin ? [
     ...(catcarHref?[{label:"CatCar ⚡", icon:"🐱", color:"#ff7a2e",       bg:"rgba(255,122,46,.13)",  href:catcarHref}]:[]),
+    {label:"Nemiga",    icon:"🗂️", color:"#14b8a6",       bg:"rgba(20,184,166,.12)",  href:nemigaHref},
     {label:"7zap",      icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/", copyVin:true},
     {label:"RealOEM",   icon:"🚗", color:"var(--green)",  bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`},
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},

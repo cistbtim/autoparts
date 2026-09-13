@@ -101,6 +101,30 @@ export const justBrakesUrl = (make) => {
 // just the one search page.
 export const SAFELINE_BRAKES_URL = "https://safelinebrakes.co.za/part-finder/";
 
+// nemigaparts.com/cat_spares — a VAG ETKA / Mercedes EPC / Porsche PET catalog mirror.
+// Only these three systems have a real "search by VIN" form (confirmed by checking each
+// brand's page directly — the 60+ "Cross Doc" brands there, e.g. Toyota/Honda/Ford, only
+// have a part-number search, no VIN form), so only these get a deep VIN link; everything
+// else falls back to the brand-picker hub page. BMW/Mini are deliberately excluded here —
+// they're already covered by the existing RealOEM tile.
+const NEMIGA_VIN_BRANDS = {
+  AUDI: "etka/audi", VOLKSWAGEN: "etka/volkswagen", SEAT: "etka/seat", SKODA: "etka/skoda",
+  MERCEDES: "epc/mercedes", OPEL: "epc/opel", VAUXHALL: "epc/vauxhall", SMART: "epc/smart",
+  PORSCHE: "pet",
+};
+export const nemigaVinUrl = (vin, make) => {
+  // decodeVin()'s make strings carry a "(DE)"-style country suffix and sometimes a
+  // sub-model word (e.g. "Porsche Cayenne", "Mercedes-Benz Vans") — strip the suffix,
+  // then match on the first word so those still resolve to the right brand.
+  const norm = (make || "").replace(/\s*\([^)]*\)\s*$/, "").trim()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // Škoda → Skoda
+    .toUpperCase();
+  const brandKey = Object.keys(NEMIGA_VIN_BRANDS).find(k => norm.startsWith(k) || norm.includes(k));
+  if (!brandKey || !vin) return "https://nemigaparts.com/cat_spares/";
+  const path = NEMIGA_VIN_BRANDS[brandKey];
+  return `https://nemigaparts.com/cat_spares/${path}/vin/${encodeURIComponent(vin)}/`;
+};
+
 export const today = () => new Date().toISOString().slice(0, 10);
 export const fmtAmt = (n) => `${C()}${(n || 0).toLocaleString()}`;
 

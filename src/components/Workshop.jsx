@@ -368,6 +368,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     return (
       <>
       <WorkshopJobDetail
+        key={activeJob.id}
         job={activeJob} items={items} invoice={inv} quotes={quotesForJob}
         jobs={jobs} onChecklistSaved={onChecklistSaved}
         parts={parts} partFitments={partFitments} vehicles={vehicles} onRefreshVehicles={onRefreshVehicles} settings={settings}
@@ -419,6 +420,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         onRefresh={onRefresh}
         wsLocked={wsLocked}
         userCtx={userCtx}
+        onOpenJob={setActiveJob}
         t={t} lang={lang}/>
       <WorkshopFeedbackButton page={`Job Detail — ${activeJob.vehicle_reg||activeJob.id}`} userCtx={userCtx} onSubmit={onSubmitFeedback}/>
       </>
@@ -4320,7 +4322,7 @@ function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,t}) {
+function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -8812,7 +8814,10 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 <div style={{fontSize:12,color:"var(--text3)",marginBottom:10,fontWeight:600}}>{vehicleHistory.length} previous visit{vehicleHistory.length!==1?"s":""}</div>
                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
                   {vehicleHistory.map(j=>(
-                    <div key={j.id} style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden"}}>
+                    <div key={j.id} className={onOpenJob?"card-hover":undefined}
+                      onClick={onOpenJob?()=>{setServiceHistModal(false);onOpenJob(j);}:undefined}
+                      title={onOpenJob?"Open this job card":undefined}
+                      style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",cursor:onOpenJob?"pointer":"default"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"var(--surface2)",borderBottom:"1px solid var(--border)"}}>
                         <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
                           <code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)"}}>{j.id}</code>

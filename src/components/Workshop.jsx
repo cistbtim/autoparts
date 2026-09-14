@@ -6292,7 +6292,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",width:40,height:40,fontSize:20,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
             {/* Prev arrow */}
             {canNav&&<button onClick={e=>{e.stopPropagation();setPhotoLightbox(idx-1);}}
-              style={{position:"absolute",left:16,background:"rgba(255,255,255,.15)",border:"2px solid #ef4444",borderRadius:"50%",width:48,height:48,fontSize:24,fontWeight:900,cursor:"pointer",color:"#ef4444",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>}
+              style={{position:"absolute",left:16,background:"#555",border:"3px solid #ef4444",borderRadius:"50%",width:48,height:48,fontSize:24,fontWeight:900,cursor:"pointer",color:"#ef4444",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>}
             {/* Image + AI panel */}
             <div className="veh-lightbox-row" onClick={e=>e.stopPropagation()}>
               {(()=>{
@@ -6372,7 +6372,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             </div>
             {/* Next arrow */}
             {canNav&&<button onClick={e=>{e.stopPropagation();setPhotoLightbox(idx+1);}}
-              style={{position:"absolute",right:16,background:"rgba(255,255,255,.15)",border:"2px solid #ef4444",borderRadius:"50%",width:48,height:48,fontSize:24,fontWeight:900,cursor:"pointer",color:"#ef4444",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>}
+              style={{position:"absolute",right:16,background:"#555",border:"3px solid #ef4444",borderRadius:"50%",width:48,height:48,fontSize:24,fontWeight:900,cursor:"pointer",color:"#ef4444",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>}
           </div>
         );
       })()}

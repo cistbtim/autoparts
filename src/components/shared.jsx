@@ -205,7 +205,7 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
   const src = sizes[tryIdx] || currentUrl;
 
   const goTo = (newIdx) => {
-    setIdx(newIdx);
+    setIdx(((newIdx%list.length)+list.length)%list.length);
     setTryIdx(0);
     setStatus("loading");
   };
@@ -219,9 +219,9 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
   };
 
   const btnStyle = {position:"fixed",top:"50%",transform:"translateY(-50%)",
-    background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",
+    background:"rgba(255,255,255,.15)",border:"2px solid rgba(255,255,255,.6)",
     color:"#fff",borderRadius:"50%",width:44,height:44,display:"flex",
-    alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:22,
+    alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:22,fontWeight:900,
     zIndex:100000};
 
   const onTouchStart = (e) => { touchX.current = e.touches[0].clientX; };
@@ -230,8 +230,8 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
     const dx = e.changedTouches[0].clientX - touchX.current;
     touchX.current = null;
     if(Math.abs(dx) < 40) return;
-    if(dx < 0 && idx < list.length-1) goTo(idx+1);
-    if(dx > 0 && idx > 0)             goTo(idx-1);
+    if(dx < 0) goTo(idx+1);
+    if(dx > 0) goTo(idx-1);
   };
 
   // Portal to <body> — if this renders inside an ancestor with a CSS transform
@@ -271,10 +271,10 @@ export function ImgLightbox({url, urls, startIdx=0, labels, onClose}) {
         onClick={e=>e.stopPropagation()}/>
 
       {/* Prev / Next arrows */}
-      {list.length>1&&idx>0&&(
+      {list.length>1&&(
         <div style={{...btnStyle,left:14}} onClick={e=>{e.stopPropagation();goTo(idx-1);}}>‹</div>
       )}
-      {list.length>1&&idx<list.length-1&&(
+      {list.length>1&&(
         <div style={{...btnStyle,right:58}} onClick={e=>{e.stopPropagation();goTo(idx+1);}}>›</div>
       )}
 

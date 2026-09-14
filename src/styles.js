@@ -159,7 +159,8 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .velg-banner::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 1px,transparent 1px 5px);pointer-events:none}
 .velg-row{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .velg-brand{display:flex;align-items:center;gap:12px}
-.velg-wordmark{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;color:#F2F1ED;letter-spacing:.2px;line-height:1.1}
+.velg-wordmark{font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:22px;color:#F2F1ED;letter-spacing:.2px;line-height:1.1}
+.velg-wordmark .velg-vel{font-weight:700;color:#e85d04}
 .velg-tagline{margin-top:2px;font-size:11px;color:#8A9099;font-weight:500;font-family:'DM Sans',sans-serif}
 .velg-tabs{display:flex;gap:16px;padding-top:6px;flex-wrap:wrap}
 .velg-tab{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;color:#8A9099;white-space:nowrap;font-family:'DM Sans',sans-serif;padding-bottom:8px;border-bottom:2px solid transparent}
@@ -172,7 +173,8 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .velg-mainstrip{position:sticky;top:0;z-index:30;background:var(--bg);display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid var(--border)}
 .velg-mainstrip-icon{flex-shrink:0;width:60px;height:60px}
 .velg-mainstrip-text{text-align:left}
-.velg-mainstrip-word{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:45px;color:var(--text);letter-spacing:.2px;line-height:1.1}
+.velg-mainstrip-word{font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:45px;color:var(--text);letter-spacing:.2px;line-height:1.1}
+.velg-mainstrip-word .velg-vel{font-weight:700;color:#e85d04}
 .velg-mainstrip-tag{font-size:16px;color:var(--text3);margin-top:2px}
 @media(max-width:640px){
   .velg-mainstrip{gap:10px;margin-bottom:16px;padding-bottom:12px}

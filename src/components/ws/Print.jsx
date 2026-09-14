@@ -563,6 +563,15 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
   <div class="footer">
     ${shopName}${settings.phone?" · "+settings.phone:""}${settings.email?" · "+settings.email:""}<br/>
     Thank you for your business!
+    <div style="margin-top:16px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:20px;color:#bbb">
+      <span>Powered by</span>
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" style="flex-shrink:0">
+        <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="#aaa" stroke-width="4.4" stroke-linecap="round"/>
+        <path d="M24 24 36 14.5" stroke="#e85d04" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="24" cy="24" r="4" fill="#e85d04"/>
+      </svg>
+      <span><span style="font-weight:700;color:#e85d04">VEL</span><span style="font-weight:500;color:#999">GENIUS</span></span>
+    </div>
   </div>
 
 </body></html>`;
@@ -775,6 +784,15 @@ ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:
   <div class="footer">
     ${shopName}${settings.phone?" · "+settings.phone:""}${settings.email?" · "+settings.email:""}<br/>
     Thank you for considering us!
+    <div style="margin-top:16px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:20px;color:#bbb">
+      <span>Powered by</span>
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" style="flex-shrink:0">
+        <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="#aaa" stroke-width="4.4" stroke-linecap="round"/>
+        <path d="M24 24 36 14.5" stroke="#e85d04" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="24" cy="24" r="4" fill="#e85d04"/>
+      </svg>
+      <span><span style="font-weight:700;color:#e85d04">VEL</span><span style="font-weight:500;color:#999">GENIUS</span></span>
+    </div>
   </div>
 
 </body></html>`;

@@ -5066,7 +5066,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           <div style={{maxWidth:"100%",overflow:"hidden",marginBottom:4}}>
             <ShopLogo settings={wsDisplaySettings} size="sm"/>
           </div>
-          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:8}}>Powered by <span style={{color:"var(--accent)",fontWeight:700}}>VelGenius</span></div>
+          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:8}}>Powered by <span style={{fontWeight:700,color:"#e85d04"}}>VEL</span><span style={{fontWeight:500}}>GENIUS</span></div>
           <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8}}>
             <span style={{width:6,height:6,borderRadius:"50%",background:"var(--green)",display:"inline-block",flexShrink:0}}/>
             <span style={{fontSize:10,color:"var(--text3)",letterSpacing:".03em"}}>{t.connected||"Connected"}</span>
@@ -5154,7 +5154,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             <ShopLogo settings={wsDisplaySettings} size="md"/>
             <button onClick={()=>setDrawerOpen(false)} style={{background:"none",border:"none",color:"var(--text3)",fontSize:20,cursor:"pointer",padding:4}}>✕</button>
           </div>
-          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:10}}>Powered by <span style={{color:"var(--accent)",fontWeight:700}}>VelGenius</span></div>
+          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:10}}>Powered by <span style={{fontWeight:700,color:"#e85d04"}}>VEL</span><span style={{fontWeight:500}}>GENIUS</span></div>
           <div style={{background:"var(--surface2)",borderRadius:9,padding:"8px 10px",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <div style={{width:30,height:30,borderRadius:"50%",background:ROLES[role]?.bg,border:`1.5px solid ${ROLES[role]?.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{ROLES[role]?.icon}</div>
@@ -5353,13 +5353,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── Platform brand strip — shown above every module so it's always clear which platform this is ── */}
         <div className="velg-mainstrip">
-          <svg className="velg-mainstrip-icon" viewBox="0 0 36 36" fill="none">
-            <path d="M18 3 L31 10.5 V25.5 L18 33 L5 25.5 V10.5 Z" stroke="#5D7A93" strokeWidth="2"/>
-            <circle cx="18" cy="18" r="4.5" fill="none" stroke="var(--text)" strokeWidth="2"/>
-            <path d="M4 18 H12 L15 12 L19 24 L22 18 H32" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg className="velg-mainstrip-icon" viewBox="0 0 48 48" fill="none">
+            <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="var(--text3)" strokeWidth="3" strokeLinecap="round"/>
+            <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
+            <circle cx="24" cy="24" r="3.4" fill="#e85d04"/>
           </svg>
           <div className="velg-mainstrip-text">
-            <div className="velg-mainstrip-word">VelGenius</div>
+            <div className="velg-mainstrip-word"><span className="velg-vel">VEL</span>GENIUS</div>
             <div className="velg-mainstrip-tag">AI Automotive Operations Platform</div>
           </div>
         </div>

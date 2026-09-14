@@ -1,47 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <filter id="s" x="-40%" y="-40%" width="180%" height="180%">
-      <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#000" flood-opacity="0.45"/>
-    </filter>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#1e3a5f"/>
-      <stop offset="100%" stop-color="#0f172a"/>
-    </linearGradient>
-    <linearGradient id="gear" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#fb923c"/>
-      <stop offset="100%" stop-color="#ea580c"/>
-    </linearGradient>
-  </defs>
-
-  <!-- Background -->
-  <rect width="64" height="64" rx="13" fill="url(#bg)"/>
-
-  <!-- Orange gear centered at 32,32 -->
-  <g transform="translate(32,32)">
-    <!-- 8 teeth (rect rotated every 45deg) -->
-    <rect x="-4" y="-22" width="8" height="10" rx="2" fill="url(#gear)"/>
-    <rect x="-4" y="-22" width="8" height="10" rx="2" fill="url(#gear)" transform="rotate(45)"/>
-    <rect x="-4" y="-22" width="8" height="10" rx="2" fill="url(#gear)" transform="rotate(90)"/>
-    <rect x="-4" y="-22" width="8" height="10" rx="2" fill="url(#gear)" transform="rotate(135)"/>
-    <rect x="-4" y="-22" width="8" height="10" rx="2" fill="url(#gear)" transform="rotate(180)"/>
-    <rect x="-4" y="-22" width="8" height="10" rx="2" fill="url(#gear)" transform="rotate(225)"/>
-    <rect x="-4" y="-22" width="8" height="10" rx="2" fill="url(#gear)" transform="rotate(270)"/>
-    <rect x="-4" y="-22" width="8" height="10" rx="2" fill="url(#gear)" transform="rotate(315)"/>
-    <!-- Gear body -->
-    <circle r="14" fill="url(#gear)"/>
-    <!-- Center hole -->
-    <circle r="5.5" fill="#0f172a"/>
-  </g>
-
-  <!-- White wrench, rotated -45deg, with drop shadow -->
-  <g transform="translate(32,32) rotate(-45)" filter="url(#s)">
-    <!-- Left jaw -->
-    <rect x="-13" y="-27" width="8" height="22" rx="3" fill="white"/>
-    <!-- Right jaw -->
-    <rect x="5"   y="-27" width="8" height="22" rx="3" fill="white"/>
-    <!-- Jaw base connecting both jaws -->
-    <rect x="-13" y="-8"  width="26" height="9"  fill="white"/>
-    <!-- Handle -->
-    <rect x="-5"  y="-1"  width="10" height="30" rx="5" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="8" fill="#e85d04"/>
+  <g transform="translate(5.5 5.5) scale(0.4375)">
+    <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="#fff" stroke-width="5.6" stroke-linecap="round"/>
+    <path d="M24 24 34.5 16" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
   </g>
 </svg>

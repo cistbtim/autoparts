@@ -58,14 +58,14 @@ export const VelGeniusBanner = () => (
   <div className="velg-banner">
     <div className="velg-row">
       <div className="velg-brand">
-        {/* Diagnostic connector reading a pulse - the mark is about what the product does, not a generic AI glow */}
-        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style={{flexShrink:0}}>
-          <path d="M18 3 L31 10.5 V25.5 L18 33 L5 25.5 V10.5 Z" stroke="#5D7A93" strokeWidth="1.6"/>
-          <circle cx="18" cy="18" r="4.5" fill="none" stroke="#F2F1ED" strokeWidth="1.6"/>
-          <path d="M4 18 H12 L15 12 L19 24 L22 18 H32" stroke="#ff7a2e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        {/* VelGenius dial mark — see BRAND.md. Needle stays orange, never recoloured. */}
+        <svg width="36" height="36" viewBox="0 0 48 48" fill="none" style={{flexShrink:0}}>
+          <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="#3a4152" strokeWidth="3" strokeLinecap="round"/>
+          <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
+          <circle cx="24" cy="24" r="3.4" fill="#e85d04"/>
         </svg>
         <div>
-          <div className="velg-wordmark">VelGenius</div>
+          <div className="velg-wordmark"><span className="velg-vel">VEL</span>GENIUS</div>
           <div className="velg-tagline">AI automotive operations platform</div>
         </div>
       </div>

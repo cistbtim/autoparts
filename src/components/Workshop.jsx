@@ -3706,9 +3706,15 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
     vehicle_color: jobVehicle?.color || job.vehicle_color || "",
     vin:           jobVehicle?.vin   || job.vin           || "",
     engine_no:     jobVehicle?.engine_no || job.engine_no || "",
-    photo_front:   jobVehicle?.photo_front || "",
-    photo_rear:    jobVehicle?.photo_rear  || "",
-    photo_side:    jobVehicle?.photo_side  || "",
+    photo_front:       jobVehicle?.photo_front       || "",
+    photo_front_left:  jobVehicle?.photo_front_left  || "",
+    photo_front_right: jobVehicle?.photo_front_right || "",
+    photo_left:        jobVehicle?.photo_left        || "",
+    photo_right:       jobVehicle?.photo_right       || "",
+    photo_rear:        jobVehicle?.photo_rear        || "",
+    photo_rear_left:   jobVehicle?.photo_rear_left   || "",
+    photo_rear_right:  jobVehicle?.photo_rear_right  || "",
+    photo_side:        jobVehicle?.photo_side        || "",
   };
 
   // Pre-generate the supplier quote link in the background as soon as we have a

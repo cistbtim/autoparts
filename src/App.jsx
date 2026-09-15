@@ -2225,7 +2225,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       supplier_vat_inclusive:info.supplier_vat_inclusive||false,
       vehicle_make:info.vehicle_make||"",vehicle_model:info.vehicle_model||"",vehicle_year:info.vehicle_year||"",
       vehicle_color:info.vehicle_color||"",vin:info.vin||"",engine_no:info.engine_no||"",
-      photo_front:info.photo_front||"",photo_rear:info.photo_rear||"",photo_side:info.photo_side||"",
+      photo_front:info.photo_front||"",photo_front_left:info.photo_front_left||"",photo_front_right:info.photo_front_right||"",
+      photo_left:info.photo_left||"",photo_right:info.photo_right||"",
+      photo_rear:info.photo_rear||"",photo_rear_left:info.photo_rear_left||"",photo_rear_right:info.photo_rear_right||"",
+      photo_side:info.photo_side||"",
       parts_list:JSON.stringify(items.map(i=>i.label||i.description||"")),message:"",token,
       items_json:JSON.stringify(items),sent_at:now};
     await api.insert("ws_supplier_requests",rec).catch(e=>console.warn("Link gen failed:",e));
@@ -5066,7 +5069,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           <div style={{maxWidth:"100%",overflow:"hidden",marginBottom:4}}>
             <ShopLogo settings={wsDisplaySettings} size="sm"/>
           </div>
-          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:8}}>Powered by <span style={{fontWeight:700,color:"#e85d04"}}>VEL</span><span style={{fontWeight:500}}>GENIUS</span></div>
+          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:8}}>Powered by <span style={{color:"var(--accent)",fontWeight:700}}>VelGenius</span></div>
           <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8}}>
             <span style={{width:6,height:6,borderRadius:"50%",background:"var(--green)",display:"inline-block",flexShrink:0}}/>
             <span style={{fontSize:10,color:"var(--text3)",letterSpacing:".03em"}}>{t.connected||"Connected"}</span>
@@ -5154,7 +5157,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             <ShopLogo settings={wsDisplaySettings} size="md"/>
             <button onClick={()=>setDrawerOpen(false)} style={{background:"none",border:"none",color:"var(--text3)",fontSize:20,cursor:"pointer",padding:4}}>✕</button>
           </div>
-          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:10}}>Powered by <span style={{fontWeight:700,color:"#e85d04"}}>VEL</span><span style={{fontWeight:500}}>GENIUS</span></div>
+          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:10}}>Powered by <span style={{color:"var(--accent)",fontWeight:700}}>VelGenius</span></div>
           <div style={{background:"var(--surface2)",borderRadius:9,padding:"8px 10px",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <div style={{width:30,height:30,borderRadius:"50%",background:ROLES[role]?.bg,border:`1.5px solid ${ROLES[role]?.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{ROLES[role]?.icon}</div>

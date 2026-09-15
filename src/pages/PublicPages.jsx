@@ -928,7 +928,12 @@ export function WsSupplierQuoteReplyPage({token}) {
   const [regSaving,setRegSaving]= useState(false);
   const [regDone,  setRegDone]  = useState(false);
   const [regErr,   setRegErr]   = useState("");
+  const [wsProfile,setWsProfile]= useState(null);
   const shopSettings = getSettings();
+  const bizSettings = wsProfile ? {...shopSettings,
+    shop_name: wsProfile.name||shopSettings.shop_name,
+    logo_url:  wsProfile.logo_url||"",
+    logo_data: wsProfile.logo_data||""} : shopSettings;
 
   useEffect(()=>{
     api.get("ws_supplier_requests",`token=eq.${encodeURIComponent(token)}&select=*`)
@@ -936,6 +941,11 @@ export function WsSupplierQuoteReplyPage({token}) {
         if(!Array.isArray(r)||!r[0]){setErr("Quote request not found or link has expired.");setLoading(false);return;}
         const request=r[0];
         setReq(request);
+        // Show the specific workshop's own banner logo/name, not just the platform default
+        if(request.workshop_id){
+          const wp=await api.get("workshop_profiles",`id=eq.${request.workshop_id}&select=*`).catch(()=>[]);
+          if(Array.isArray(wp)&&wp[0]) setWsProfile(wp[0]);
+        }
         // Check if already replied
         const reps=await api.get("ws_sq_replies",`request_id=eq.${request.id}&select=*`).catch(()=>[]);
         if(Array.isArray(reps)&&reps[0]){
@@ -987,7 +997,7 @@ export function WsSupplierQuoteReplyPage({token}) {
       <div style={{maxWidth:440,width:"100%",textAlign:"center"}}>
         <div style={{fontSize:56,marginBottom:12}}>✅</div>
         <h2 style={{fontSize:20,fontWeight:700,color:"#34d399",marginBottom:8}}>Quote Submitted!</h2>
-        <p style={{color:"#94a3b8",fontSize:14}}>Thank you — {shopSettings.shop_name||"the workshop"} will review your prices and be in touch.</p>
+        <p style={{color:"#94a3b8",fontSize:14}}>Thank you — {bizSettings.shop_name||"the workshop"} will review your prices and be in touch.</p>
         {err&&<p style={{color:"#f87171",marginTop:8,fontSize:13}}>{err}</p>}
       </div>
     </div>
@@ -1040,8 +1050,10 @@ export function WsSupplierQuoteReplyPage({token}) {
       <div style={{maxWidth:520,margin:"0 auto",padding:"20px 12px 40px"}}>
         {/* Header */}
         <div style={{textAlign:"center",marginBottom:20}}>
-          <div style={{fontSize:28,marginBottom:6}}>🔧</div>
-          <h1 style={{fontSize:18,fontWeight:800,color:"#f8fafc",marginBottom:4}}>{shopSettings.shop_name||"Workshop"}</h1>
+          {(bizSettings.logo_url||bizSettings.logo_data)
+            ? <ShopLogo settings={bizSettings} size="md" style={{maxHeight:64,maxWidth:220,margin:"0 auto 8px",objectFit:"contain"}}/>
+            : <div style={{fontSize:28,marginBottom:6}}>🔧</div>}
+          <h1 style={{fontSize:18,fontWeight:800,color:"#f8fafc",marginBottom:4}}>{bizSettings.shop_name||"Workshop"}</h1>
           <div style={{fontSize:13,color:"#94a3b8"}}>Parts quote request</div>
           <div style={{display:"inline-block",marginTop:6,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700,
             background:vatInclusive?"rgba(251,191,36,.15)":"rgba(148,163,184,.12)",
@@ -1072,10 +1084,15 @@ export function WsSupplierQuoteReplyPage({token}) {
                 {req.engine_no&&<span>Eng: <strong style={{color:"#cbd5e1"}}>{req.engine_no}</strong></span>}
               </div>
             )}
-            {/* Vehicle photos */}
-            {(req.photo_front||req.photo_rear||req.photo_side)&&(
+            {/* Vehicle photos — all angles the workshop has on file, not just front/side/rear */}
+            {[req.photo_front,req.photo_front_left,req.photo_front_right,req.photo_left,req.photo_right,
+              req.photo_rear,req.photo_rear_left,req.photo_rear_right,req.photo_side].some(Boolean)&&(
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
-                {[{url:req.photo_front,label:"Front"},{url:req.photo_side,label:"Side"},{url:req.photo_rear,label:"Rear"}].filter(p=>p.url).map(p=>(
+                {[{url:req.photo_front,label:"Front"},{url:req.photo_front_left,label:"Front-Left"},
+                  {url:req.photo_front_right,label:"Front-Right"},{url:req.photo_left,label:"Left"},
+                  {url:req.photo_right,label:"Right"},{url:req.photo_side,label:"Side"},
+                  {url:req.photo_rear,label:"Rear"},{url:req.photo_rear_left,label:"Rear-Left"},
+                  {url:req.photo_rear_right,label:"Rear-Right"}].filter(p=>p.url).map(p=>(
                   <div key={p.label} style={{flex:"1 1 140px",cursor:"pointer"}} onClick={()=>setLightbox(p.url)}>
                     <img src={toImgUrl(p.url)} alt={p.label}
                       style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:10,border:"1px solid #334155",display:"block"}}/>

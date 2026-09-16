@@ -165,6 +165,14 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .velg-scanline{position:relative;height:2px;background:linear-gradient(90deg,transparent,#262B32 8%,#262B32 92%,transparent);margin-top:16px;overflow:hidden}
 .velg-scanline::after{content:"";position:absolute;top:-1px;left:-120px;width:120px;height:4px;background:linear-gradient(90deg,transparent,var(--accent),transparent);filter:blur(.5px);animation:velgSweep 3.6s ease-in-out infinite}
 @keyframes velgSweep{0%{left:-120px}50%{left:calc(100% - 0px)}100%{left:-120px}}
+@media(max-width:480px){
+  .velg-banner{padding:18px 16px 14px;border-radius:12px}
+  .velg-brand{gap:11px}
+  .velg-mark{width:34px;height:34px}
+  .velg-wordmark{font-size:22px}
+  .velg-tagline{font-size:11px;margin-top:2px}
+  .velg-scanline{margin-top:10px}
+}
 @media(prefers-reduced-motion:reduce){.velg-scanline::after{animation:none;left:0}}
 .velg-mainstrip{position:sticky;top:0;z-index:30;background:var(--bg);display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid var(--border)}
 .velg-mainstrip-icon{flex-shrink:0;width:60px;height:60px}

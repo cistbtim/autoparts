@@ -51,7 +51,7 @@ export const VelGeniusBanner = () => (
     <div className="velg-row">
       <div className="velg-brand">
         {/* VelGenius dial mark — see BRAND.md. Needle stays orange, never recoloured. */}
-        <svg width="56" height="56" viewBox="0 0 48 48" fill="none" style={{flexShrink:0}}>
+        <svg className="velg-mark" width="56" height="56" viewBox="0 0 48 48" fill="none" style={{flexShrink:0}}>
           <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="#3a4152" strokeWidth="3" strokeLinecap="round"/>
           <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
           <circle cx="24" cy="24" r="3.4" fill="#e85d04"/>

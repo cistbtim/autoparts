@@ -8661,7 +8661,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         const notifyEmail=scopedSupplier?scopedSupplier.email:settings.email;
         return (
           <div className="overlay" onClick={()=>closeM("orderConfirm")}>
-            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:420}}>
+            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:420,position:"relative"}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>closeM("orderConfirm")} style={{position:"absolute",top:14,right:14}}>✕</button>
               <div style={{textAlign:"center",marginBottom:18}}><div style={{fontSize:42,marginBottom:10}}>🎉</div><h2 style={{fontSize:19,fontWeight:700}}>Order Placed!</h2><p style={{color:"var(--text3)",fontSize:13,marginTop:5}}>{order?.id}</p></div>
               <div style={{background:"var(--surface2)",borderRadius:11,padding:13,marginBottom:18,fontSize:13,color:"var(--text2)",whiteSpace:"pre-line",lineHeight:1.7,maxHeight:150,overflowY:"auto"}}>{shopMsg}</div>
               <p style={{fontSize:13,color:"var(--text3)",marginBottom:12,textAlign:"center",fontWeight:600}}>📬 Notify {notifyName} about your order:</p>

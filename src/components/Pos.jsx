@@ -452,7 +452,7 @@ function PosDone({ sale, onNewSale }) {
 
 // ── Multi-part supplier enquiry modal ─────────────────────────────────────────
 function AskMultiOverlay({ parts, suppliers, partSuppliers, selectedIds, sym, settings, onToggle, onClose }) {
-  const shopName = settings?.shop_name || "AutoParts";
+  const shopName = settings?.shop_name || "VelGenius";
   const selectedParts = parts.filter(p => selectedIds.has(p.id));
 
   const linkedSupIds = new Set(
@@ -862,7 +862,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       .filter(ps => String(ps.part_id) === String(askPart.id))
       .map(ps => ({ ...ps, sup: suppliers.find(s => String(s.id) === String(ps.supplier_id)) }))
       .filter(ps => ps.sup);
-    const shopName = settings?.shop_name || "AutoParts";
+    const shopName = settings?.shop_name || "VelGenius";
     const msg = (ps) => {
       const supName = ps.sup.name;
       const lines = [`Hi ${supName},`, "", "Could you please check stock and your best price for:"];

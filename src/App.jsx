@@ -1379,13 +1379,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const [freshParts,freshSupParts,supplierLinks]=await Promise.all([
       realIds.length?api.getFirst("parts",`id=in.(${realIds.join(",")})&select=id,name,price,stock`,500):Promise.resolve([]),
       supIds.length?api.fresh("supplier_parts",`id=in.(${supIds.join(",")})&select=id,price,stock`):Promise.resolve([]),
-      // Attribute a catalogue item to a specific supplier's own stock only when
-      // unambiguous (exactly one supplier lists this part) — a part with multiple
-      // suppliers falls back to VelGenius's own parts.stock, same as today, since
-      // choosing which supplier's stock a multi-supplier purchase draws from is a
-      // checkout-UI question of its own, not solved here.
-      realIds.length?api.get("part_suppliers",`part_id=in.(${realIds.join(",")})&select=id,part_id,supplier_id`):Promise.resolve([]),
+      // A catalogue part fulfilled by exactly one supplier draws its availability from
+      // that supplier's own count (part_suppliers.stock), not the shared parts.stock —
+      // same rule the supplier's own scoped catalogue view already follows. A part with
+      // multiple suppliers still falls back to parts.stock, since choosing which
+      // supplier a multi-supplier purchase draws from is a checkout-UI question of its
+      // own, not solved here.
+      realIds.length?api.get("part_suppliers",`part_id=in.(${realIds.join(",")})&select=id,part_id,supplier_id,stock`):Promise.resolve([]),
     ]);
+    const linksByPart={};
+    for(const l of (Array.isArray(supplierLinks)?supplierLinks:[])) (linksByPart[l.part_id]=linksByPart[l.part_id]||[]).push(l);
+    // Sync the just-fetched real stock/price back into the catalogue so the part's
+    // card stops showing the stale number this check just caught — independent of
+    // whether checkout itself succeeds this attempt.
+    if(Array.isArray(freshParts)&&freshParts.length) setParts(prev=>prev.map(p=>{const fp=freshParts.find(f=>String(f.id)===String(p.id));return fp?{...p,stock:fp.stock,price:fp.price}:p;}));
+    if(Array.isArray(freshSupParts)&&freshSupParts.length) setSupplierParts(prev=>prev.map(p=>{const fp=freshSupParts.find(f=>String(f.id)===String(p.id));return fp?{...p,stock:fp.stock,price:fp.price}:p;}));
     {
       const stockIssues=[];
       const priceChanges=[];
@@ -1394,10 +1402,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           ?(Array.isArray(freshSupParts)?freshSupParts.find(p=>String(p.id)===String(item._supplierPartId)):null)
           :(Array.isArray(freshParts)?freshParts.find(p=>String(p.id)===String(item.id)):null);
         if(!fp) continue;
-        if((fp.stock??0)<item.qty) stockIssues.push(`${item.name} (only ${fp.stock??0} left)`);
+        const singleLink=!item._isSupplierPart&&linksByPart[item.id]?.length===1?linksByPart[item.id][0]:null;
+        const availableStock=singleLink?(singleLink.stock??0):(fp.stock??0);
+        if(availableStock<item.qty) stockIssues.push({id:item.id,name:item.name,available:availableStock});
         else if(fp.price!==item.price) priceChanges.push({id:item.id,newPrice:fp.price,name:item.name,oldPrice:item.price});
       }
-      if(stockIssues.length>0){showToast(`Not enough stock: ${stockIssues.join("; ")}`,"err");return;}
+      if(stockIssues.length>0){
+        // Correct the cart to what's actually available (drop to 0, clamp otherwise) so
+        // the customer isn't stuck retrying "Place Order" against the same stale stock —
+        // matches the priceChanges handling just below, which already does this for price.
+        setCart(prev=>prev
+          .filter(i=>!stockIssues.some(s=>String(s.id)===String(i.id)&&s.available===0))
+          .map(i=>{const iss=stockIssues.find(s=>String(s.id)===String(i.id));return iss?{...i,qty:iss.available}:i;}));
+        showToast(`Cart updated — not enough stock: ${stockIssues.map(s=>`${s.name} (only ${s.available} left)`).join("; ")}`,"err");
+        return;
+      }
       if(priceChanges.length>0){
         setCart(prev=>prev.map(i=>{const ch=priceChanges.find(c=>String(c.id)===String(i.id));return ch?{...i,price:ch.newPrice}:i;}));
         showToast(`Prices updated — please review and confirm`,"err");
@@ -1406,12 +1425,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
 
     const oid=makeId("ORD");
-    // A catalogue part with exactly one supplier link gets that link's id stamped on
-    // as partSuppliersId — this is what routes fulfillment to the supplier's own stock
-    // instead of parts.stock (see updateOrderStatus). Grouped by part_id first since
-    // supplierLinks can carry multiple suppliers per part.
-    const linksByPart={};
-    for(const l of (Array.isArray(supplierLinks)?supplierLinks:[])) (linksByPart[l.part_id]=linksByPart[l.part_id]||[]).push(l);
+    // linksByPart (built above, alongside the stock check) also drives which items get
+    // partSuppliersId stamped on — this is what routes fulfillment to the supplier's own
+    // stock instead of parts.stock (see updateOrderStatus).
     // Item price is the discounted unit price actually charged; orig_price/discount_pct
     // kept alongside for an audit trail even after the supplier changes their %. total/
     // discount_total on the order likewise reflect what was actually charged, not the

@@ -4965,29 +4965,27 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   if(loading) return (
     <div style={{background:"#0a0f1a",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>
       <style>{CSS}{`
-        @keyframes spinOuter{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-        @keyframes spinInner{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}
+        @keyframes needleSweep{0%,100%{transform:rotate(-30deg)}50%{transform:rotate(30deg)}}
         @keyframes pulseGlow{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
         @keyframes ldFill{from{width:0%}to{width:100%}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
       `}</style>
       <div style={{textAlign:"center",animation:"fadeUp .5s ease"}}>
-        {/* Gear rings */}
-        <div style={{position:"relative",width:110,height:110,margin:"0 auto 28px"}}>
-          {/* Outer ring */}
-          <div style={{position:"absolute",inset:0,borderRadius:"50%",border:"3px solid transparent",borderTopColor:"var(--accent)",borderRightColor:"var(--accent)",animation:"spinOuter 1.1s linear infinite"}}/>
-          {/* Middle ring */}
-          <div style={{position:"absolute",inset:14,borderRadius:"50%",border:"3px solid transparent",borderBottomColor:"rgba(255,122,46,.6)",borderLeftColor:"rgba(255,122,46,.6)",animation:"spinInner .8s linear infinite"}}/>
-          {/* Inner pulsing core */}
-          <div style={{position:"absolute",inset:30,borderRadius:"50%",background:"radial-gradient(circle,rgba(255,122,46,.25) 0%,transparent 70%)",animation:"pulseGlow 1.4s ease-in-out infinite",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-            </svg>
-          </div>
+        {/* VelGenius dial mark, needle sweeping like a running meter */}
+        <div style={{position:"relative",width:110,height:110,margin:"0 auto 28px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{position:"absolute",inset:14,borderRadius:"50%",background:"radial-gradient(circle,rgba(232,93,4,.25) 0%,transparent 70%)",animation:"pulseGlow 1.4s ease-in-out infinite"}}/>
+          <svg width="96" height="96" viewBox="0 0 48 48" fill="none" style={{position:"relative"}}>
+            <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="#3a4152" strokeWidth="3" strokeLinecap="round"/>
+            <g style={{transformOrigin:"24px 24px",animation:"needleSweep 1.3s ease-in-out infinite"}}>
+              <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
+            </g>
+            <circle cx="24" cy="24" r="3.4" fill="#e85d04"/>
+          </svg>
         </div>
         {/* App name */}
-        <div style={{fontSize:22,fontWeight:800,color:"#f1f5f9",letterSpacing:".02em",marginBottom:4}}>AutoParts</div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:500,color:"#f1f5f9",letterSpacing:".02em",marginBottom:4}}>
+          <span style={{fontWeight:700,color:"#e85d04"}}>VEL</span>GENIUS
+        </div>
         <div style={{fontSize:12,color:"#475569",marginBottom:24,letterSpacing:".06em",textTransform:"uppercase"}}>Loading your workspace</div>
         {/* Progress bar */}
         <div style={{width:220,margin:"0 auto 14px",background:"rgba(255,255,255,.06)",borderRadius:999,height:5,overflow:"hidden"}}>

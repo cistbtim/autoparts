@@ -46,20 +46,12 @@ export const ShopLogo = ({settings, size="md", style={}}) => {
   return null;
 };
 
-const VELG_TABS = [
-  {label:"Booking", on:true, path:<><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></>},
-  {label:"AI estimate", path:<path d="M4 20l6-6M14.5 4.5a3.5 3.5 0 104.9 4.9L21 8l-5-5-1.4 1.4z"/>},
-  {label:"Supplier quotes", path:<path d="M9 12l2 2 4-4M4 6h16v14H4z"/>},
-  {label:"Parts & scrap", path:<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>},
-  {label:"Catalogue", path:<path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/>},
-];
-
 export const VelGeniusBanner = () => (
   <div className="velg-banner">
     <div className="velg-row">
       <div className="velg-brand">
         {/* VelGenius dial mark — see BRAND.md. Needle stays orange, never recoloured. */}
-        <svg width="36" height="36" viewBox="0 0 48 48" fill="none" style={{flexShrink:0}}>
+        <svg width="56" height="56" viewBox="0 0 48 48" fill="none" style={{flexShrink:0}}>
           <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="#3a4152" strokeWidth="3" strokeLinecap="round"/>
           <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
           <circle cx="24" cy="24" r="3.4" fill="#e85d04"/>
@@ -69,14 +61,6 @@ export const VelGeniusBanner = () => (
           <div className="velg-tagline">AI automotive operations platform</div>
         </div>
       </div>
-      <nav className="velg-tabs">
-        {VELG_TABS.map(tab=>(
-          <span key={tab.label} className={`velg-tab${tab.on?" on":""}`}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{tab.path}</svg>
-            {tab.label}
-          </span>
-        ))}
-      </nav>
     </div>
     <div className="velg-scanline"/>
   </div>

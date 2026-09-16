@@ -155,17 +155,13 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .veh-lightbox-panel{width:92vw;max-width:none}
   .veh-lightbox-imgwrap img{max-width:92vw;max-height:45vh}
 }
-.velg-banner{position:relative;background:#0B0D10;padding:22px 24px 18px;border-radius:12px;overflow:hidden}
+.velg-banner{position:relative;background:#0B0D10;padding:34px 36px 28px;border-radius:14px;overflow:hidden}
 .velg-banner::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 1px,transparent 1px 5px);pointer-events:none}
 .velg-row{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.velg-brand{display:flex;align-items:center;gap:12px}
-.velg-wordmark{font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:22px;color:#F2F1ED;letter-spacing:.2px;line-height:1.1}
+.velg-brand{display:flex;align-items:center;gap:18px}
+.velg-wordmark{font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:36px;color:#F2F1ED;letter-spacing:.2px;line-height:1.1}
 .velg-wordmark .velg-vel{font-weight:700;color:#e85d04}
-.velg-tagline{margin-top:2px;font-size:11px;color:#8A9099;font-weight:500;font-family:'DM Sans',sans-serif}
-.velg-tabs{display:flex;gap:16px;padding-top:6px;flex-wrap:wrap}
-.velg-tab{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;color:#8A9099;white-space:nowrap;font-family:'DM Sans',sans-serif;padding-bottom:8px;border-bottom:2px solid transparent}
-.velg-tab svg{width:13px;height:13px;opacity:.8;flex-shrink:0}
-.velg-tab.on{color:#F2F1ED;border-bottom-color:var(--accent)}
+.velg-tagline{margin-top:4px;font-size:15px;color:#8A9099;font-weight:500;font-family:'DM Sans',sans-serif}
 .velg-scanline{position:relative;height:2px;background:linear-gradient(90deg,transparent,#262B32 8%,#262B32 92%,transparent);margin-top:16px;overflow:hidden}
 .velg-scanline::after{content:"";position:absolute;top:-1px;left:-120px;width:120px;height:4px;background:linear-gradient(90deg,transparent,var(--accent),transparent);filter:blur(.5px);animation:velgSweep 3.6s ease-in-out infinite}
 @keyframes velgSweep{0%{left:-120px}50%{left:calc(100% - 0px)}100%{left:-120px}}

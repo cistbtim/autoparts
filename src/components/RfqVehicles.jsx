@@ -2,7 +2,7 @@
 import { removeBackground } from "@imgly/background-removal";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, extractDriveId } from "../lib/helpers.js";
+import { fmtAmt, makeId, today, toImgUrl, toFullUrl, toSaveUrl, extractDriveId, waLink } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
@@ -304,7 +304,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   <button className="btn btn-ghost btn-xs" onClick={()=>{navigator.clipboard.writeText(batchUrl);}}>📋 Copy</button>
                   <a href={batchUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}>↗ Open</button></a>
-                  {suppData?.phone&&<a href={`https://wa.me/${(suppData.phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none",fontSize:11,padding:"3px 10px"}}>📲 WhatsApp</button></a>}
+                  {suppData?.phone&&<a href={waLink(suppData.phone,waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none",fontSize:11,padding:"3px 10px"}}>📲 WhatsApp</button></a>}
                   {suppData?.email&&<a href={`mailto:${suppData.email}?subject=RFQ: ${activeSession.name}&body=${encodeURIComponent(waMsg)}`} style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs">✉ Email</button></a>}
                 </div>
               </div>
@@ -372,7 +372,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                             <>
                               <div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>⏳ Awaiting quote</div>
                               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                                {s.phone&&<a href={`https://wa.me/${s.phone}?text=${encodeURIComponent(`Hi, please quote for: ${item.part_name} (${item.part_sku})\nQty: ${displayQty}\n\nSubmit quote: ${replyUrl}`)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                                {s.phone&&<a href={waLink(s.phone,`Hi, please quote for: ${item.part_name} (${item.part_sku})\nQty: ${displayQty}\n\nSubmit quote: ${replyUrl}`)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
                                   <button className="cp-btn" style={{fontSize:11,padding:"3px 10px",color:"#25D366",borderColor:"rgba(37,211,102,.3)"}}>📲 WhatsApp</button>
                                 </a>}
                                 {s.email&&<a href={`mailto:${s.email}?subject=RFQ: ${item.part_name}&body=${encodeURIComponent(`Please quote for:\n${item.part_name} (${item.part_sku})\nQty: ${displayQty}\n\nSubmit quote here: ${replyUrl}`)}`} style={{textDecoration:"none"}}>
@@ -459,7 +459,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                               <div>
                                 <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>⏳ Awaiting</div>
                                 <div style={{display:"flex",gap:4,justifyContent:"center",flexWrap:"wrap"}}>
-                                  {s.phone&&<a href={`https://wa.me/${s.phone}?text=${encodeURIComponent(`Hi, please quote for: ${item.part_name} (${item.part_sku})\nQty: ${item.qty_needed}\n\nSubmit quote: ${replyUrl}`)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                                  {s.phone&&<a href={waLink(s.phone,`Hi, please quote for: ${item.part_name} (${item.part_sku})\nQty: ${item.qty_needed}\n\nSubmit quote: ${replyUrl}`)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
                                     <button className="cp-btn" style={{fontSize:10,padding:"2px 8px",color:"#25D366",borderColor:"rgba(37,211,102,.3)"}}>📲 WA</button>
                                   </a>}
                                   {s.email&&<a href={`mailto:${s.email}?subject=RFQ: ${item.part_name}&body=${encodeURIComponent(`Please quote for:\n${item.part_name} (${item.part_sku})\nQty: ${item.qty_needed}\n\nSubmit quote here: ${replyUrl}`)}`} style={{textDecoration:"none"}}>

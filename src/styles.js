@@ -71,6 +71,14 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 /* landscape hint removed — app works in portrait mode */
 .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:6px 4px;z-index:100;gap:1px}
 .show-mobile{display:none}
+@media(min-width:768px) and (max-width:1024px){
+  /* Tablets (e.g. 10.1" Android in portrait, ~800-962px CSS width) land just above the
+     767px cutoff so they get the full desktop sidebar — but the fixed 240px width leaves
+     everything cramped on a touch device. Widen it a bit in this range only; true desktop
+     widths are untouched. */
+  .sidebar{width:280px!important}
+  .main-content{margin-left:280px!important}
+}
 @media(max-width:767px){
   .mobile-nav{display:flex}.sidebar{display:none!important}
   .main-content{margin-left:0!important;padding:12px!important;padding-bottom:76px!important}

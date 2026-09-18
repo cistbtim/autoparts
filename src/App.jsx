@@ -485,6 +485,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     country:    workshopProfile.country   || "",
     licence_renewal_agent_name:  workshopProfile.licence_renewal_agent_name  || settings.licence_renewal_agent_name  || "",
     licence_renewal_agent_phone: workshopProfile.licence_renewal_agent_phone || settings.licence_renewal_agent_phone || "",
+    whatsapp_country_code: workshopProfile.whatsapp_country_code || settings.whatsapp_country_code || "",
     label_width_mm:  workshopProfile.label_width_mm  || 98,
     label_height_mm: workshopProfile.label_height_mm || 45,
   } : isBranchUser&&currentBranch ? {
@@ -6980,7 +6981,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                         <td>
                           <div style={{fontWeight:600,fontSize:13}}>{inq.supplier_name}</div>
                           <div style={{display:"flex",gap:4,marginTop:2,flexWrap:"wrap"}}>
-                            {inq.supplier_phone&&<a href={`https://wa.me/${(inq.supplier_phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer"><span style={{fontSize:10,color:"#25D366",background:"rgba(37,211,102,.1)",borderRadius:4,padding:"1px 5px"}}>📲 WA</span></a>}
+                            {inq.supplier_phone&&<a href={waLink(inq.supplier_phone,waMsg)} target="_blank" rel="noopener noreferrer"><span style={{fontSize:10,color:"#25D366",background:"rgba(37,211,102,.1)",borderRadius:4,padding:"1px 5px"}}>📲 WA</span></a>}
                             {inq.supplier_email&&<a href={`mailto:${inq.supplier_email}?subject=RFQ - ${inq.part_name}&body=${encodeURIComponent(waMsg)}`}><span style={{fontSize:10,color:"var(--blue)",background:"rgba(96,165,250,.1)",borderRadius:4,padding:"1px 5px"}}>✉ Email</span></a>}
                           </div>
                         </td>

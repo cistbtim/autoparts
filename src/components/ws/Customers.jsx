@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "../../lib/api.js";
 import { getSettings, curSym } from "../../lib/settings.js";
-import { makeId } from "../../lib/helpers.js";
+import { makeId, waLink } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, DriveImg } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 
@@ -437,7 +437,7 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
         f.owner_phone ? `Phone: ${f.owner_phone}` : null,
         f.notes       ? `Notes: ${f.notes}` : null,
       ].filter(Boolean).join("\n");
-      window.open(`https://wa.me/${agentPhone}?text=${encodeURIComponent(msg)}`, "_blank");
+      window.open(waLink(agentPhone,msg), "_blank");
     }
     setSaving(false);
     onClose();
@@ -605,7 +605,7 @@ export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUp
                     <td style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>{(r.submitted_at||"").slice(0,10)}</td>
                     <td>
                       {r.owner_phone&&(
-                        <a href={`https://wa.me/${r.owner_phone.replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer">
+                        <a href={waLink(r.owner_phone,"")} target="_blank" rel="noopener noreferrer">
                           <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲</button>
                         </a>
                       )}

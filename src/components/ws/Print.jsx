@@ -1,5 +1,5 @@
 import { getSettings, curSym } from "../../lib/settings.js";
-import { toImgUrl } from "../../lib/helpers.js";
+import { toImgUrl, waLink } from "../../lib/helpers.js";
 
 // job.vehicle_model is often stored as the catalog code (e.g. "VV42B") rather
 // than the human-readable model name — resolve the display name from the
@@ -594,7 +594,7 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
   const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
   const total    = subtotal+taxAmt;
   const shopName = settings.shop_name||"Auto Workshop";
-  const phone = (quote.quote_phone||job.customer_phone||"").replace(/\D/g,"");
+  const phone = quote.quote_phone||job.customer_phone||"";
   const waMsg = `📝 *Workshop Quotation ${quote.id}*\n👤 ${quote.quote_customer||job.customer_name||""}\n🚗 ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${dispModel||""}`:""}\n💰 Total: ${fmt(total)}\n\nPlease find the attached PDF quotation and confirm to proceed.\n\n${shopName}${settings.phone?`\n📞 ${settings.phone}`:""}`;
   const logoSrc = settings.logo_data || settings.logo_url || "";
   const logoHtml = logoSrc ? `<img src="${logoSrc}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
@@ -686,7 +686,7 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
 </style></head><body>
 ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:0;background:#1a1a2e;padding:11px 20px;display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 2px 12px rgba(0,0,0,.35)">
   <span style="color:#fff;font-weight:700;font-size:13px;flex:1">📄 ${shopName} — Quotation ${quote.id}</span>
-  ${phone?`<a href="https://wa.me/${phone}?text=${encodeURIComponent(waMsg)}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;background:#25D366;color:#fff;border-radius:7px;font-size:13px;font-weight:700;text-decoration:none">📱 Send via WhatsApp</a>`:""}
+  ${phone?`<a href="${waLink(phone,waMsg)}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;background:#25D366;color:#fff;border-radius:7px;font-size:13px;font-weight:700;text-decoration:none">📱 Send via WhatsApp</a>`:""}
   <button onclick="window.print()" style="padding:8px 18px;background:#2563eb;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Save as PDF</button>
 </div><div style="height:58px"></div>`:`<div class="no-print" style="margin-bottom:16px"><button onclick="window.print()" style="padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Print / Save PDF</button></div>`}
 

@@ -67,7 +67,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
   const [f,setF]=useState({
     name:"", vat_number:"", tax_rate:0, phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
-    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", default_markup_pct:0, move_pin:"",
+    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", whatsapp_country_code:"", default_markup_pct:0, move_pin:"",
     label_width_mm:98, label_height_mm:45, linked_branch_id:"",
     part_label_w:98, part_label_h:45, shelf_label_w:70, shelf_label_h:45,
     ...profile
@@ -363,6 +363,16 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             <input className="inp" value={f.licence_renewal_agent_phone||""} onChange={e=>s("licence_renewal_agent_phone",e.target.value)} placeholder="27821234567"/>
             <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Country code, no + or spaces</div>
           </div>
+        </div>
+
+        {/* WhatsApp country code — customer numbers typed at Book-In (e.g. 0833927725) are
+            normalized to this before opening any WhatsApp link (e.g. 27833927725). */}
+        <div>
+          <FL label="📱 WhatsApp Country Code"/>
+          <input className="inp" style={{maxWidth:200}} value={f.whatsapp_country_code||""}
+            onChange={e=>s("whatsapp_country_code",e.target.value.replace(/\D/g,""))}
+            placeholder="e.g. 27 (South Africa)"/>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Digits only, no + — applied to every customer/supplier number typed as a local number (e.g. 0833927725 → 27833927725) before opening WhatsApp</div>
         </div>
 
         {/* Subscription info card */}
@@ -1380,6 +1390,11 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
               <div><FL label="City"/><input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)} placeholder="e.g. Cape Town"/></div>
               <div><FL label="Country"/><input className="inp" value={f.country||""} onChange={e=>s("country",e.target.value)} placeholder="e.g. South Africa"/></div>
             </FG>
+            <FD>
+              <FL label="WhatsApp Country Code"/>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:-3,marginBottom:6}}>Digits only, no + — turns locally-typed numbers (e.g. 0833927725) into what WhatsApp needs (e.g. 27833927725) everywhere in the app</div>
+              <input className="inp" value={f.whatsapp_country_code||""} onChange={e=>s("whatsapp_country_code",e.target.value.replace(/\D/g,""))} placeholder="e.g. 27 (South Africa), 886 (Taiwan), 1 (USA)"/>
+            </FD>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:20}}>
             <div className="card" style={{padding:22}}>
@@ -4326,7 +4341,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                     )}
                     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                       {inq.status==="pending"&&<><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}} onClick={()=>navigator.clipboard.writeText(replyUrl)}>📋 Copy Link</button><a href={replyUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}>↗ Open</button></a></>}
-                      {inq.supplier_phone&&inq.status==="pending"&&<a href={`https://wa.me/${(inq.supplier_phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(inq.message||"")}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none",fontSize:11,padding:"3px 8px"}}>📲 WA</button></a>}
+                      {inq.supplier_phone&&inq.status==="pending"&&<a href={waLink(inq.supplier_phone,inq.message||"")} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none",fontSize:11,padding:"3px 8px"}}>📲 WA</button></a>}
                       {inq.status==="replied"&&inq.reply_price&&<button className="btn btn-success btn-xs" onClick={onClose}>✅ Accept → Go to Inquiries</button>}
                     </div>
                   </div>
@@ -6129,7 +6144,7 @@ export function InquiryDetailModal({inquiry,onUpdate,onAccept,onClose}) {
           <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
             <button className="btn btn-ghost btn-xs" onClick={()=>{navigator.clipboard.writeText(replyUrl);}}>📋 Copy Link</button>
             <a href={replyUrl} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}>↗ Open</button></a>
-            {inquiry.supplier_phone&&<a href={`https://wa.me/${(inquiry.supplier_phone||"").replace(/[^0-9]/g,"")}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none"}}>📲 WhatsApp</button></a>}
+            {inquiry.supplier_phone&&<a href={waLink(inquiry.supplier_phone,waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-xs" style={{background:"#25D366",color:"#fff",border:"none"}}>📲 WhatsApp</button></a>}
             {inquiry.supplier_email&&<a href={`mailto:${inquiry.supplier_email}?subject=RFQ - ${inquiry.part_name}&body=${encodeURIComponent(waMsg)}`} style={{textDecoration:"none"}}><button className="btn btn-ghost btn-xs">✉ Email</button></a>}
           </div>
         </div>
@@ -6328,7 +6343,7 @@ export function PdfInvoiceModal({inv,settings,onClose}) {
         <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
           <button className="btn btn-primary" onClick={handlePrint}>🖨 Print / Save PDF</button>
           <button className="btn btn-ghost" onClick={handleDownloadHtml}>📥 Download HTML</button>
-          {settings.whatsapp&&<a href={`https://wa.me/${settings.whatsapp}?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{background:"#25D366",color:"#fff",border:"none"}}>📲 WhatsApp</button></a>}
+          {settings.whatsapp&&<a href={waLink(settings.whatsapp,waText)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{background:"#25D366",color:"#fff",border:"none"}}>📲 WhatsApp</button></a>}
           {settings.email&&<a href={`mailto:${isSupplier?inv.supplier_email||settings.email:inv.customer_email||settings.email}?subject=Invoice ${inv.id}&body=${encodeURIComponent(waText)}`} style={{textDecoration:"none"}}><button className="btn btn-ghost">✉ Email</button></a>}
           <button className="btn btn-ghost" style={{marginLeft:"auto"}} onClick={onClose}>✕ Close</button>
         </div>
@@ -10916,7 +10931,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
             <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Received: {fmtDT(req.created_at,"—")}</div>
           </div>
           <div style={{display:"flex",gap:6,flexShrink:0}}>
-            {workshopPhone&&<a href={`https://wa.me/${workshopPhone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer"
+            {workshopPhone&&<a href={waLink(workshopPhone,"")} target="_blank" rel="noreferrer"
               style={{padding:"6px 12px",borderRadius:8,background:"#25D366",color:"#fff",fontWeight:700,fontSize:12,textDecoration:"none"}}>
               💬 WhatsApp Workshop</a>}
             <span style={{padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:600,
@@ -11028,7 +11043,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
                 <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Send a WhatsApp to the workshop confirming the parts are on their way.</div>
                 <div style={{display:"flex",gap:8}}>
                   {workshopPhone?(
-                    <a href={`https://wa.me/${workshopPhone}?text=${encodeURIComponent(dispatchMsg)}`} target="_blank" rel="noreferrer"
+                    <a href={waLink(workshopPhone,dispatchMsg)} target="_blank" rel="noreferrer"
                       style={{flex:1,padding:"10px",borderRadius:9,background:"#25D366",color:"#fff",fontWeight:700,fontSize:13,textDecoration:"none",textAlign:"center"}}>
                       💬 WhatsApp Workshop
                     </a>
@@ -11112,7 +11127,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
                       <button onClick={()=>{setShowSupplier(false);setChosenSupplier(null);setSupplierSearch("");}}
                         style={{flex:1,padding:"9px",borderRadius:8,border:"1px solid var(--border)",background:"none",cursor:"pointer",fontSize:12}}>Cancel</button>
                       {supPhone?(
-                        <a href={`https://wa.me/${supPhone}?text=${encodeURIComponent(supplierMsg)}`} target="_blank" rel="noreferrer"
+                        <a href={waLink(supPhone,supplierMsg)} target="_blank" rel="noreferrer"
                           style={{flex:2,padding:"9px",borderRadius:8,background:"#25D366",color:"#fff",fontWeight:700,fontSize:13,textDecoration:"none",textAlign:"center"}}>
                           💬 WhatsApp {chosenSupplier?.name}
                         </a>
@@ -11294,7 +11309,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
           placeholder="Overall notes for workshop…" style={{width:"100%",resize:"vertical",marginBottom:12}}/>
         <div style={{display:"flex",gap:8}}>
           {workshopPhone&&(
-            <a href={`https://wa.me/${workshopPhone.replace(/\D/g,"")}?text=${encodeURIComponent(waMsg)}`}
+            <a href={waLink(workshopPhone,waMsg)}
               target="_blank" rel="noreferrer"
               style={{padding:"10px 16px",borderRadius:10,background:"#25D366",color:"#fff",fontWeight:700,fontSize:13,textDecoration:"none",display:"flex",alignItems:"center",gap:6}}>
               💬 Send via WhatsApp

@@ -1,4 +1,4 @@
-import { C } from "./settings.js";
+import { C, getSettings } from "./settings.js";
 
 // Return a Supabase Storage thumbnail URL via the render/image transform API
 const _supThumb = (url, w = 400, q = 75) => {
@@ -235,7 +235,26 @@ export const classifyWeather = (code, temp) => {
   return "any";
 };
 
-export const waLink = (phone, msg) => `https://wa.me/${(phone || "").replace(/[^0-9+]/g, "")}?text=${encodeURIComponent(msg)}`;
+// Turn a locally-typed number (e.g. "0833927725") into what WhatsApp actually needs
+// (country code + number, no leading trunk zero — e.g. "27833927725"), using the
+// deployment's configured dialing code (Settings → whatsapp_country_code). Numbers
+// already typed with a country code (or a leading +) are left as-is.
+export const toWaPhone = (phone, countryCode) => {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  const cc = (countryCode || "").replace(/\D/g, "");
+  if (!cc || digits.startsWith(cc)) return digits;
+  return cc + digits.replace(/^0+/, "");
+};
+// countryCode override lets callers pass a more specific code (e.g. a workshop's own
+// wsProfile.whatsapp_country_code) than the global Settings one — falls back to that
+// global setting when omitted.
+// Compare vehicle "make" strings ignoring case, spacing and punctuation — a job's
+// vehicle_make often comes from a licence-disc scan ("Mercedes benz") that won't
+// exact-match the vehicles catalog's own spelling ("MERCEDES-BENZ") even after
+// lowercasing alone, silently breaking every make-based lookup against it.
+export const normMake = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+export const waLink = (phone, msg, countryCode) => `https://wa.me/${toWaPhone(phone, countryCode || getSettings().whatsapp_country_code)}?text=${encodeURIComponent(msg)}`;
 export const mailLink = (to, subj, body) => `mailto:${to || ""}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 
 // ── Shared label print window ─────────────────────────────────────────────────

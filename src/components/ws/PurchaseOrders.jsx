@@ -158,7 +158,7 @@ export function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierReques
                 </div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                   {phone&&(
-                    <a href={`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer"
+                    <a href={waLink(phone,msg)} target="_blank" rel="noreferrer"
                       className="btn btn-sm" style={{background:"rgba(37,211,102,.15)",color:"#25d366",border:"1px solid rgba(37,211,102,.3)",textDecoration:"none",flex:1,textAlign:"center"}}>
                       📤 Send via WhatsApp
                     </a>

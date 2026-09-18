@@ -4,6 +4,10 @@ let _settings = {
   shop_name: "VelGenius", logo_url: "", logo_data: "", logo_h_login: 140,
   logo_h_sidebar: 36, logo_h_pdf: 70, logo_blend: "normal", currency: "TWD NT$",
   whatsapp: "", email: "", phone: "", address: "", city: "", country: "",
+  // Dialing code (digits only, no +) for this deployment's country, e.g. "27" (South
+  // Africa), "886" (Taiwan), "1" (USA). Used to turn a locally-typed number like
+  // "0833927725" into the "27833927725" WhatsApp actually needs — see toWaPhone().
+  whatsapp_country_code: "",
   tax_rate: 0, vat_number: "",
   invoice_prefix: "INV", credit_note_prefix: "CN", apps_script_url: "", vehicle_script_url: "",
   licence_renewal_agent_name: "", licence_renewal_agent_phone: "",

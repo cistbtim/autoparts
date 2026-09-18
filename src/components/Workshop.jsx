@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL, nemigaVinUrl } from "../lib/helpers.js";
+import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, normMake, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL, nemigaVinUrl } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner } from "../components/shared.jsx";
@@ -308,7 +308,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   };
 
   const bkWaLink = (booking, type, reason="", overrideDate="") => {
-    const phone = (booking.customer_phone||"").replace(/\D/g,"");
+    const phone = booking.customer_phone||"";
     if(!phone) return "#";
     const shop = wsProfile?.name||"Workshop";
     const n = (booking.customer_name||"").split(" ")[0]||"there";
@@ -322,7 +322,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     if(type==="closure")  msg=`Hi ${n}, we regret to inform you that we will be closed on ${dt||"that date"}${reason?` (${reason})`:""}. Your booking for ${reg} will need to be rescheduled. Please contact us. — ${shop}`;
     if(type==="reschedule") msg=`Hi ${n}, your booking for ${reg} has been moved${dtStr?` to${dtStr}`:""}. Please let us know if this works for you. — ${shop}`;
     if(type==="contact")  msg=`Hi ${n}, regarding your ${reg} booking${dtStr} — `;
-    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    return waLink(phone, msg);
   };
 
   const saveAvailability = async () => {
@@ -749,7 +749,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
           // human-readable text ("F48 X1") shown on the card — resolve it the same way the
           // card badge does so a search for what's actually displayed finds a match.
           const resolvedModelOf = j => {
-            const v = j.vehicle_model&&j.vehicle_make ? vehicles.find(v=>(v.code===j.vehicle_model||v.model===j.vehicle_model)&&v.make?.toLowerCase()===j.vehicle_make?.toLowerCase()) : null;
+            const v = j.vehicle_model&&j.vehicle_make ? vehicles.find(v=>(v.code===j.vehicle_model||v.model===j.vehicle_model)&&normMake(v.make)===normMake(j.vehicle_make)) : null;
             return v ? v.model : j.vehicle_model;
           };
           const matchesSearch = j => matchesWs(j) && (!kq || [j.customer_name,j.vehicle_reg,j.vehicle_make,j.vehicle_model,resolvedModelOf(j),j.complaint,j.notes,j.assigned_to].some(f=>(f||"").toLowerCase().includes(kq)));
@@ -1054,7 +1054,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
                   {/* vehicle make/model */}
                   {(job.vehicle_make||job.vehicle_model||job.vehicle_year)&&(()=>{
-                    const _jv=job.vehicle_model&&job.vehicle_make?vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase()):null;
+                    const _jv=job.vehicle_model&&job.vehicle_make?vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&normMake(v.make)===normMake(job.vehicle_make)):null;
                     const dispModel=_jv?_jv.model:job.vehicle_model;
                     return(
                     <div style={{textAlign:"center",marginBottom:5}}>
@@ -3670,7 +3670,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
   const selectedItems = allItems.filter(i => selected.includes(i.id));
 
   const chosenSupplier = supplierList.find(s => String(s.id) === String(supplierId));
-  const phone = (chosenSupplier?.phone || manualPhone || "").replace(/\D/g, "");
+  const phone = chosenSupplier?.phone || manualPhone || "";
   const jobVehicle = wsVehicles.find(v => v.id === job.workshop_vehicle_id);
 
   // Resolve display model name: catalog lookup first (code→name), then workshop vehicle record, then raw job field
@@ -3697,7 +3697,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
   ].filter(l => l !== null).join("\n");
 
   const msgLines = buildMsg(generatedLink);
-  const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msgLines)}` : null;
+  const waUrl = phone ? waLink(phone, msgLines) : null;
 
   const vehiclePayload = {
     vehicle_make:  jobVehicle?.make  || job.vehicle_make  || "",
@@ -4024,7 +4024,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
               // onGenerateLink already inserted the DB record — only log manually if it failed
               if(linkFailed) logSend(false);
               const fullMsg=buildMsg(link||"");
-              const url=`https://wa.me/${phone}?text=${encodeURIComponent(fullMsg)}`;
+              const url=waLink(phone,fullMsg);
               if(win) win.location=url; else window.open(url,"_blank");
             }}>
             {generatingLink?"⏳ Generating link…":"📲 Send via WhatsApp"}
@@ -4344,7 +4344,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     if(targetIdx>curIdx) onSaveJob({...job, status:targetStatus});
   };
   // Resolve catalog vehicle code to display model name (e.g. "FD57E" → "RANGER S-CAB DRL-H.LAMP")
-  const resolvedVehicleModel = vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase())?.model||job.vehicle_model;
+  const resolvedVehicleModel = vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&normMake(v.make)===normMake(job.vehicle_make))?.model||job.vehicle_model;
   // Reschedule the customer's requested date — lives only on the source
   // workshop_bookings row (jobs don't keep their own copy), patched via
   // onPatchWsBooking so it's picked up next time sourceBooking is derived.
@@ -4353,8 +4353,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     await onPatchWsBooking(sourceBooking.id,{preferred_date:newDate||null});
   };
   const bookingWaLink = (msg) => {
-    const phone=(sourceBooking?.customer_phone||"").replace(/\D/g,"");
-    return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : "#";
+    const phone=sourceBooking?.customer_phone||"";
+    return phone ? waLink(phone, msg) : "#";
   };
   // "New Booking for this Vehicle" — vehicle/customer are already known from the job,
   // so unlike the public booking link (which requires scanning a licence disc to
@@ -4537,9 +4537,9 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   useEffect(()=>{
     const linkedBranchId=wsProfile?.linked_branch_id;
     if(!linkedBranchId||!onGoToSpareShop||!job.vehicle_make){setSpareShopPartsCount(null);return;}
-    const _jMake=job.vehicle_make?.toLowerCase();
+    const _jMake=normMake(job.vehicle_make);
     const _jModel=(job.vehicle_model||"").toLowerCase();
-    const _byMake=vehicles.filter(v=>(v.make||"").toLowerCase()===_jMake);
+    const _byMake=vehicles.filter(v=>normMake(v.make)===_jMake);
     let matchV=_byMake;
     if(_jModel){
       matchV=_byMake.filter(v=>(v.code||"").toLowerCase()===_jModel);
@@ -5495,7 +5495,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.35)",borderRadius:7,textDecoration:"none",color:"var(--blue)",fontSize:11,fontWeight:700}}>
                 📞
               </a>
-              <a href={`https://wa.me/${ph}?text=${encodeURIComponent(`Hi ${(job.customer_name||"").split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}`}
+              <a href={waLink(ph,`Hi ${(job.customer_name||"").split(" ")[0]||"there"}, regarding your ${job.vehicle_reg||"vehicle"} — `)}
                 target="_blank" rel="noreferrer"
                 style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.35)",borderRadius:7,textDecoration:"none",color:"#25d366",fontSize:11,fontWeight:700}}>
                 💬
@@ -5595,7 +5595,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
         ];
         const activeKey = isPaid?"Payment Received":isInvoiced?"Invoiced":job.status;
         const visibleStages = wsRole==="mechanic" ? STAGES.filter(s=>s.mechanic) : STAGES;
-        const phone=(job.customer_phone||"").replace(/\D/g,"");
+        const phone=job.customer_phone||"";
         const showWa=(job.status==="Done"||job.status==="Delivered")&&phone;
         return (
           <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"8px 12px",marginBottom:8}}>
@@ -5678,7 +5678,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                   const shopPhone=wsProfile?.phone||settings?.phone||"";
                   const msg=`Hi ${name}! 🎉 Great news — ${reg} is ready for collection at *${shopName}*.\n\nPlease contact us to arrange collection${shopPhone?` on ${shopPhone}`:""}.`;
                   return (
-                    <a href={`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer"
+                    <a href={waLink(phone,msg)} target="_blank" rel="noreferrer"
                       style={{display:"flex",alignItems:"center",gap:3,padding:"3px 8px",border:"1px solid rgba(37,211,102,.35)",borderRadius:12,textDecoration:"none",color:"#25D366",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>
                       📱 Ready
                     </a>
@@ -5894,7 +5894,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           );
           const hasSpareShop = !!wsProfile?.linked_branch_id && !!onGoToSpareShop;
           const _linkedV = job.vehicle_make&&job.vehicle_model
-            ? vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase())
+            ? vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&normMake(v.make)===normMake(job.vehicle_make))
             : null;
           const isCodeLinked = !!_linkedV;
           return (
@@ -6048,7 +6048,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                         </a>
                       )}
                       {sourceBooking.customer_phone&&(
-                        <a href={`https://wa.me/${sourceBooking.customer_phone.replace(/\D/g,"")}?text=${encodeURIComponent(`Hi ${(sourceBooking.customer_name||"").split(" ")[0]||"there"}, regarding your ${sourceBooking.vehicle_reg||job.vehicle_reg||"vehicle"} booking — `)}`}
+                        <a href={waLink(sourceBooking.customer_phone,`Hi ${(sourceBooking.customer_name||"").split(" ")[0]||"there"}, regarding your ${sourceBooking.vehicle_reg||job.vehicle_reg||"vehicle"} booking — `)}
                           target="_blank" rel="noreferrer"
                           style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,textDecoration:"none",color:"#25D366",fontWeight:600,fontSize:13}}>
                           📱 WhatsApp
@@ -7047,7 +7047,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             const wsSku=item.part_sku||"";
             const skuLine=shopSku?` [SKU: ${shopSku}]`:wsSku?` (${wsSku})`:"";
             const msg=`🔧 *Order — ${wsProfile?.name||"Workshop"}*\n\n🚗 ${jobCar||job.complaint||""}\nJob: ${job.id}\n\n*Ordering:*\n• ${item.description}${skuLine} ×${+item.qty||1} @ ${fmtAmt(sc.price)}\n\nPlease confirm and advise delivery time.`;
-            window.open(`https://wa.me/${shopPhone}?text=${encodeURIComponent(msg)}`,"_blank");
+            window.open(waLink(shopPhone,msg),"_blank");
             setPricePopup(null);
           };
           // ────────────────────────────────────────────────────────────
@@ -7632,7 +7632,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>Actions</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))",gap:8}}>
               {wsProfile?.linked_branch_id&&job.vehicle_make&&onGoToSpareShop&&(()=>{
-                const mv=vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&v.make?.toLowerCase()===job.vehicle_make?.toLowerCase());
+                const mv=vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&normMake(v.make)===normMake(job.vehicle_make));
                 const displayCode=mv?.code||job.vehicle_model||"";
                 const shopMake=job.vehicle_make;
                 const shopModel=mv?.model||job.vehicle_model||"";
@@ -7758,7 +7758,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             {(quote.quote_phone||job.customer_phone||quote.quote_email||job.customer_email)&&quote.status!=="converted"&&(
               <button className="btn btn-sm" style={{background:"#0f766e",color:"#fff",border:"none",fontWeight:700,flex:1,minWidth:160}}
                 onClick={()=>{
-                  const phone=(quote.quote_phone||job.customer_phone||"").replace(/\D/g,"");
+                  const phone=quote.quote_phone||job.customer_phone||"";
                   const email=quote.quote_email||job.customer_email||"";
                   const name=quote.quote_customer||job.customer_name||"";
                   const C=curSym(settings.currency||getSettings().currency);
@@ -7770,7 +7770,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       `📅 Date: ${quote.quote_date}${quote.valid_until?`\n⏳ Valid Until: ${quote.valid_until}`:""}\n\n`+
                       `*Parts:*\n${lines}\n\n💰 *Total: ${fmt(quote.total)}*\n\n`+
                       `Please confirm to proceed.\n\n${settings.shop_name||"Workshop"}${settings.phone?`\n📞 ${settings.phone}`:""}`;
-                    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,"_blank");
+                    window.open(waLink(phone,msg),"_blank");
                   } else if(email){
                     const subj=`Parts Quotation ${quote.id} — ${name}`;
                     const body=`Dear ${name},\n\nPlease find your parts quotation below.\n\n`+
@@ -7788,7 +7788,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             )}
             {(quote.quote_phone||job.customer_phone)&&(
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
-                const phone=(quote.quote_phone||job.customer_phone||"").replace(/\D/g,"");
+                const phone=quote.quote_phone||job.customer_phone||"";
                 const name=quote.quote_customer||job.customer_name||"";
                 const C=curSym(settings.currency||getSettings().currency);
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -7798,7 +7798,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                   `📅 Date: ${quote.quote_date}${quote.valid_until?`\n⏳ Valid Until: ${quote.valid_until}`:""}\n\n`+
                   `*Items:*\n${lines}\n\n💰 *Total: ${fmt(quote.total)}*\n\n`+
                   `Please confirm to proceed.\n\n${settings.shop_name||"Workshop"}${settings.phone?`\n📞 ${settings.phone}`:""}`;
-                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,"_blank");
+                window.open(waLink(phone,msg),"_blank");
               }}>💬 WA</button>
             )}
             {(quote.quote_email||job.customer_email)&&(
@@ -7955,7 +7955,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             <button className="btn btn-ghost btn-sm" onClick={()=>printWorkshopInvoice(job,items,invoice,settings,vehiclePhotos,vehicles)}>🖨️ Print</button>
             {(invoice.inv_phone||job.customer_phone)&&(
               <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>{
-                const phone=(invoice.inv_phone||job.customer_phone||"").replace(/\D/g,"");
+                const phone=invoice.inv_phone||job.customer_phone||"";
                 const name=invoice.invoice_customer||job.customer_name||"";
                 const C=curSym(settings.currency||getSettings().currency);
                 const fmt=v=>`${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -7968,7 +7968,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                   ((+invoice.paid_amount||0)>0?`✅ Paid: ${fmt(invoice.paid_amount)}\n⚠️ Balance: ${fmt(balance)}\n`:"")+
                   `Status: ${invoice.status==="paid"?"✅ PAID":invoice.status==="partial"?"💛 PARTIAL":"⏳ UNPAID"}\n\n`+
                   `${settings.shop_name||"Workshop"}${settings.phone?`\n📞 ${settings.phone}`:""}`;
-                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,"_blank");
+                window.open(waLink(phone,msg),"_blank");
               }}>💬 WA</button>
             )}
             {(invoice.inv_email||job.customer_email)&&(
@@ -8998,7 +8998,7 @@ function QuoteApprovalModal({quote,job,items,settings,onSend,onClose}) {
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {phone&&(
-              <a href={waLink(phone,waMsg)} target="_blank" rel="noreferrer"
+              <a href={waLink(phone,waMsg,settings.whatsapp_country_code)} target="_blank" rel="noreferrer"
                 style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"11px 14px",
                   background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,
                   color:"#25D366",fontWeight:700,fontSize:13,textDecoration:"none",minWidth:120}}>
@@ -10947,7 +10947,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
         {result.bsrId&&<div style={{marginBottom:12,padding:"12px 16px",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",borderRadius:10}}>
           <div style={{fontWeight:700,color:"var(--blue)",marginBottom:4}}>🏭 Head Office Request Sent</div>
           <div style={{fontSize:13,color:"var(--text2)",marginBottom:10}}>The main branch will confirm stock and contact you at {wsProfile.phone||wsProfile.whatsapp||"your saved number"}.</div>
-          {(wsProfile.phone||wsProfile.whatsapp)&&<a href={waLink(wsProfile.phone||wsProfile.whatsapp,"")} target="_blank" rel="noreferrer"
+          {(wsProfile.phone||wsProfile.whatsapp)&&<a href={waLink(wsProfile.phone||wsProfile.whatsapp,"",wsProfile.whatsapp_country_code)} target="_blank" rel="noreferrer"
             style={{display:"inline-block",padding:"8px 16px",background:"#25D366",color:"#fff",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none"}}>💬 Open WhatsApp</a>}
         </div>}
         <button className="btn btn-primary" style={{width:"100%",marginTop:10}} onClick={onClose}>Close</button>
@@ -11133,11 +11133,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     // otherwise stay invisible here until a full app reload.
     const getFitments=async()=>{
       if(!initialMake||vehicles.length===0) return partFitments;
-      // Case-insensitive make match — job.vehicle_make (scanned/typed) doesn't always match
-      // the vehicles table's stored casing exactly, unlike the badge count which already
-      // accounts for this (was causing the "N parts" badge to disagree with 0 results here).
-      const _im=initialMake.toLowerCase();
-      const matchV=(!initialModel?vehicles.filter(v=>v.make?.toLowerCase()===_im):initialCode?vehicles.filter(v=>v.make?.toLowerCase()===_im&&v.code===initialCode):((bc=vehicles.filter(v=>v.make?.toLowerCase()===_im&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make?.toLowerCase()===_im&&v.model===initialModel))());
+      const _im=normMake(initialMake);
+      const matchV=(!initialModel?vehicles.filter(v=>normMake(v.make)===_im):initialCode?vehicles.filter(v=>normMake(v.make)===_im&&v.code===initialCode):((bc=vehicles.filter(v=>normMake(v.make)===_im&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>normMake(v.make)===_im&&v.model===initialModel))());
       if(!matchV.length) return partFitments;
       const vIds=matchV.map(v=>String(v.id));
       const FC=50;const fchunks=[];for(let i=0;i<vIds.length;i+=FC)fchunks.push(vIds.slice(i,i+FC));
@@ -11148,8 +11145,8 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     let idFilter=null;
     let jobModeMatchV=[];
     if(initialMake&&vehicles.length>0){
-      const _im2=initialMake.toLowerCase();
-      jobModeMatchV=(!initialModel?vehicles.filter(v=>v.make?.toLowerCase()===_im2):initialCode?vehicles.filter(v=>v.make?.toLowerCase()===_im2&&v.code===initialCode):((bc=vehicles.filter(v=>v.make?.toLowerCase()===_im2&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>v.make?.toLowerCase()===_im2&&v.model===initialModel))());
+      const _im2=normMake(initialMake);
+      jobModeMatchV=(!initialModel?vehicles.filter(v=>normMake(v.make)===_im2):initialCode?vehicles.filter(v=>normMake(v.make)===_im2&&v.code===initialCode):((bc=vehicles.filter(v=>normMake(v.make)===_im2&&v.code===initialModel))=>bc.length>0?bc:vehicles.filter(v=>normMake(v.make)===_im2&&v.model===initialModel))());
       if(currentFitments.length>0&&jobModeMatchV.length>0){
         const vIds=new Set(jobModeMatchV.map(v=>String(v.id)));
         const fitIds=[...new Set(currentFitments.filter(f=>vIds.has(String(f.vehicle_id))).map(f=>String(f.part_id)))];
@@ -11227,9 +11224,9 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
   // No text/model matching — that risks showing parts for the wrong variant.
   useEffect(()=>{
     if(!jobMode||!initialMake) return;
-    const _imLower=initialMake.toLowerCase();
+    const _imLower=normMake(initialMake);
     const matchV=vehicles.filter(v=>
-      v.make?.toLowerCase()===_imLower&&(!initialModel||(initialCode?v.code===initialCode:(v.code===initialModel||v.model===initialModel)))
+      normMake(v.make)===_imLower&&(!initialModel||(initialCode?v.code===initialCode:(v.code===initialModel||v.model===initialModel)))
     );
     const vIds=[...new Set(matchV.map(v=>String(v.id)))];
     if(!vIds.length){ setVehicleFilterIds(new Set(["__none__"])); return; }
@@ -11249,7 +11246,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
     return()=>{cancelled=true;};
   },[jobMode,initialMake,initialModel,initialCode,vehicles,refreshKey]);
 
-  const _dispV=initialCode?vehicles.find(v=>v.make?.toLowerCase()===initialMake?.toLowerCase()&&v.code===initialCode):null;
+  const _dispV=initialCode?vehicles.find(v=>normMake(v.make)===normMake(initialMake)&&v.code===initialCode):null;
   const _dispYear=_dispV?((_dispV.year_from||"")+(_dispV.year_to&&_dispV.year_to!==_dispV.year_from?`–${_dispV.year_to}`:"")).trim():"";
 
   // "Search all cars" — server-side catalog search that ignores the vehicle filter,
@@ -11575,7 +11572,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
       {/* Vehicle filter */}
       {jobMode&&initialMake?(()=>{
         const matchV=vehicles.filter(v=>
-          v.make?.toLowerCase()===initialMake?.toLowerCase()&&(!initialModel||v.code===initialModel||v.model===initialModel)
+          normMake(v.make)===normMake(initialMake)&&(!initialModel||v.code===initialModel||v.model===initialModel)
         );
         const photos=matchV.find(v=>v.photo_front||v.photo_rear||v.photo_side)||matchV[0];
         const photoList=[
@@ -11858,7 +11855,7 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
       if(phone.trim()){
         const parts=chosenItems.map((i,idx)=>`${idx+1}. ${i.description}${i.part_sku?` (${i.part_sku})`:""}  ×${i.qty}`).join("\n");
         const msg=`🔧 *Workshop Parts Request*\n\nWorkshop: *${wsProfile.name||"Workshop"}*\n🚗 ${jobCar||job.complaint||""}\n\nParts needed:\n${parts}${notes?`\n\nNote: ${notes}`:""}\n\nPlease check your parts system to reply.`;
-        window.open(`https://wa.me/${phone.replace(/\D/g,"")}?text=${encodeURIComponent(msg)}`,"_blank");
+        window.open(waLink(phone,msg),"_blank");
       }
     }finally{setSaving(false);}
   };

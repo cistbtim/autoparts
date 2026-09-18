@@ -12,6 +12,7 @@ import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocat
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { SystemMapPage } from "./components/SystemMap.jsx";
+import { AgentOfficePage } from "./components/AgentOffice.jsx";
 import { RequestsKanbanPage } from "./components/RequestsKanban.jsx";
 import db from "./lib/db.js";
 import { SupplierImportModal } from "./components/SupplierImport.jsx";
@@ -4803,6 +4804,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       id:"grp_reports", icon:"📊", label:t.grpReports, roles:["admin","manager"],
       children:[
         {id:"reports",icon:"📊",label:t.reports,roles:["admin","manager"]},
+        {id:"agents",icon:"🏢",label:"AI Agent Office",roles:["admin","manager"]},
         {id:"payments",icon:"💳",label:t.payments,roles:["admin"]},
       ]
     },
@@ -7219,6 +7221,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── SYSTEM MAP ── */}
         {tab==="systemMap"&&(role==="admin"||role==="branch_admin")&&(
           <SystemMapPage onNavigate={setTab} role={role}/>
+        )}
+
+        {/* ── AI AGENT OFFICE ── */}
+        {tab==="agents"&&(role==="admin"||role==="manager")&&(
+          <AgentOfficePage showToast={showToast}/>
         )}
 
         {/* ── LOGIN LOGS ── */}

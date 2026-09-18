@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { api, uploadToStorage } from "../../lib/api.js";
 import { makeId, toImgUrl } from "../../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../../lib/barcode.js";
 import { Overlay, MHead, FL, ImgLightbox } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
+import { printJobCardLabel } from "./Print.jsx";
 
 // Sample framing guidance per angle — shown before capture so the job-car photo
 // matches the same angle/ratio as the reference photos stored on the vehicle model.
@@ -14,7 +15,16 @@ const VIEW_INFO = {
 };
 const REQUIRED_VIEWS = ["Front","Rear","Side"];
 
-export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],onSaveJob,onReopenJob,onClose,onManual=null,userCtx=null}) {
+// Cheap Android phones often get their backgrounded browser tab killed by the OS
+// while the native camera app (triggered by <input capture>) is in the foreground,
+// especially under low RAM. Chrome silently reloads the tab on return, wiping all
+// in-memory React state. sessionStorage survives that reload (same tab/session),
+// so we checkpoint just enough here to resume the photo step and re-pull any
+// photos whose upload had already completed (and so is already safe in the DB)
+// before the kill — instead of the whole book-in silently resetting to scratch.
+const BOOKIN_CHECKPOINT_KEY = "ws_bookin_photo_checkpoint";
+
+export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],settings={},onSaveJob,onReopenJob,onClose,onManual=null,userCtx=null}) {
   const [step,setStep]=useState("scan");
   const [plate,setPlate]=useState("");
   const [scanLoading,setScanLoading]=useState(false);
@@ -58,6 +68,32 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
   const cameraRef=useRef(null);  // capture="environment" → opens native camera app
   const galleryRef=useRef(null); // no capture → opens file picker / gallery
   const [vinPopup,setVinPopup]=useState(false);
+
+  // Restore an in-progress photo session if the tab got reloaded out from under us
+  // (see BOOKIN_CHECKPOINT_KEY above). Runs once on mount, before the user has a
+  // chance to start a fresh scan over an already-saved job.
+  useEffect(()=>{
+    let raw;
+    try{ raw=sessionStorage.getItem(BOOKIN_CHECKPOINT_KEY); }catch{ return; }
+    if(!raw) return;
+    let saved;
+    try{ saved=JSON.parse(raw); }catch{ sessionStorage.removeItem(BOOKIN_CHECKPOINT_KEY); return; }
+    if(!saved?.bookInJobId) return;
+    setPlate(saved.plate||"");
+    setJobPrefill(saved.jobPrefill||null);
+    setPhotoSession(saved.photoSession||null);
+    setBookInJobId(saved.bookInJobId);
+    setStep("photos");
+    api.get("workshop_job_photos",`job_id=eq.${saved.bookInJobId}&order=created_at.asc`)
+      .then(rows=>{
+        const restored=(rows||[]).map(r=>{
+          photoCounter.current+=1;
+          return {id:photoCounter.current,dataUrl:toImgUrl(r.url),status:"done",url:r.url,error:null,view:r.view||null};
+        });
+        setPhotoList(restored);
+      })
+      .catch(()=>{});
+  },[]);
 
   // ── Upload one photo to Supabase Storage + save URL to DB ──────
   const uploadBookInPhoto=async(photoId,dataUrl,session,reg,jobId,view)=>{
@@ -433,10 +469,12 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
         const jobId=await onSaveJob(jobPrefill);
         const now=new Date();
         const pad2=n=>String(n).padStart(2,"0");
+        const session={date:`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`,time:`${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`};
         setBookInJobId(jobId||null);
-        setPhotoSession({date:`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`,time:`${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`});
+        setPhotoSession(session);
         setPhotoList([]); photoCounter.current=0; setSkippedViews([]);
         setStep("photos");
+        try{ sessionStorage.setItem(BOOKIN_CHECKPOINT_KEY,JSON.stringify({bookInJobId:jobId||null,plate,photoSession:session,jobPrefill})); }catch{/* private browsing / storage disabled — resume just won't work */}
       }catch(e){alert("Save failed: "+e.message);}
       setSavingIntake(false);
     };
@@ -498,9 +536,13 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
       : null;
     const sampleUrl=nextView?matchedVehicle?.[`photo_${nextView.toLowerCase()}`]:null;
 
+    // Clear the resume checkpoint once the user leaves this step deliberately —
+    // by then the job and any finished photo uploads are already durably saved.
+    const finishPhotos=()=>{ try{ sessionStorage.removeItem(BOOKIN_CHECKPOINT_KEY); }catch{/* ignore storage errors */} onClose(); };
+
     return (
-      <Overlay onClose={onClose} wide>
-        <MHead title={`📷 Vehicle Photos — ${reg}`} onClose={onClose}/>
+      <Overlay onClose={finishPhotos} wide>
+        <MHead title={`📷 Vehicle Photos — ${reg}`} onClose={finishPhotos}/>
 
         {/* Job saved banner */}
         <div style={{marginBottom:14,padding:10,background:"rgba(52,211,153,.1)",border:"1px solid rgba(52,211,153,.25)",borderRadius:10,fontSize:13}}>
@@ -621,7 +663,7 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],on
         )}
 
         <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,fontWeight:700,marginTop:4}}
-          onClick={onClose} disabled={uploading>0}>
+          onClick={finishPhotos} disabled={uploading>0}>
           {uploading>0?`⏳ Uploading ${uploading} photo${uploading!==1?"s":""}...`:`✅ Done${done>0?` (${done} photo${done!==1?"s":""} saved)`:""}`}
         </button>
       </Overlay>

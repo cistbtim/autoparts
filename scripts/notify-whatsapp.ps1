@@ -186,13 +186,21 @@ if ($Phase -eq 'Open') {
     # touched the sidebar search box, so no target chat was ever selected. Click the
     # real sidebar search box directly instead (fractional coords - measured consistent
     # across both a cold-launch window and an already-open docked window).
+    #
+    # Also confirmed 2026-09-17: searching the lowercase saved contact-book name
+    # "tim mtn unlimit" matches a DIFFERENT, reassigned WhatsApp Business account
+    # (+27 62 334 9790) that now also carries that label - a real mis-send risk.
+    # The correct target has the display name "Tim mtn New Unlimit" and is a distinct
+    # contact. Search that exact string, wait for the filtered single-result list, and
+    # click the result row explicitly instead of blindly Down+Enter (search ordering
+    # is not guaranteed to put the right match first for ambiguous queries).
     Click-At ($rect.Left + [int]($winW * 0.22)) ($rect.Top + [int]($winH * 0.17))
     Start-Sleep -Milliseconds ($(if ($coldLaunch) { 800 } else { 400 }))
-    [System.Windows.Forms.SendKeys]::SendWait("tim mtn unlimit")
-    Start-Sleep -Milliseconds ($(if ($coldLaunch) { 1200 } else { 700 }))
-    [System.Windows.Forms.SendKeys]::SendWait("{DOWN}")
-    Start-Sleep -Milliseconds 200
-    [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+    [System.Windows.Forms.SendKeys]::SendWait("Tim mtn New Unlimit")
+    Start-Sleep -Milliseconds ($(if ($coldLaunch) { 1500 } else { 900 }))
+    # Click the filtered result row (below the "Chats" section label, first entry).
+    # Fraction measured directly against the live window rect on 2026-09-17.
+    Click-At ($rect.Left + [int]($winW * 0.185)) ($rect.Top + [int]($winH * 0.215))
     Start-Sleep -Milliseconds ($(if ($coldLaunch) { 2000 } else { 1200 }))
 
     Save-FullScreenshot $VerifyOpenPath

@@ -67,7 +67,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
   const [f,setF]=useState({
     name:"", vat_number:"", tax_rate:0, phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
-    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", whatsapp_country_code:"", default_markup_pct:0, move_pin:"",
+    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", whatsapp_country_code:"", hide_ads:false, default_markup_pct:0, move_pin:"",
     label_width_mm:98, label_height_mm:45, linked_branch_id:"",
     part_label_w:98, part_label_h:45, shelf_label_w:70, shelf_label_h:45,
     ...profile
@@ -374,6 +374,20 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             placeholder="e.g. 27 (South Africa)"/>
           <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Digits only, no + — applied to every customer/supplier number typed as a local number (e.g. 0833927725 → 27833927725) before opening WhatsApp</div>
         </div>
+
+        <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+          <div onClick={()=>s("hide_ads",!f.hide_ads)} style={{
+            width:38,height:22,borderRadius:11,background:f.hide_ads?"var(--accent)":"var(--surface3)",
+            border:`1.5px solid ${f.hide_ads?"var(--accent)":"var(--border)"}`,
+            position:"relative",transition:"background .18s,border-color .18s",flexShrink:0,cursor:"pointer"
+          }}>
+            <div style={{position:"absolute",top:2,left:f.hide_ads?18:2,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left .18s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/>
+          </div>
+          <div>
+            <div style={{fontWeight:600,fontSize:13}}>🚫 Hide Ads Banner</div>
+            <div style={{fontSize:11,color:"var(--text3)"}}>Turn off the rotating ad banner shown above the job board</div>
+          </div>
+        </label>
 
         {/* Subscription info card */}
         {(profile?.trial_start||profile?.subscription_status||profile?.subscription_expires_at)&&(()=>{

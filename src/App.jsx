@@ -35,6 +35,11 @@ window.addEventListener("popstate",()=>{
 const APP_VERSION = "2.0.0.1";
 const APP_UPDATE_DATE = __BUILD_DATE__;
 
+// Every tab id rendered by <WorkshopPage> — shared between the tab gate below and
+// the tablet-only compact-header logic (hides the big global brand strip and lets
+// WorkshopPage show its own combined logo+ad row instead, see .ws-compact-header).
+const WS_TAB_IDS = ["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop"];
+
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
   const [lang,setLang] = useState(localStorage.getItem("ap_lang")||"en");
@@ -5371,8 +5376,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {/* MAIN CONTENT */}
       <main className="main-content" style={{marginLeft:240,padding:26,minHeight:"100vh"}}>
 
-        {/* ── Platform brand strip — shown above every module so it's always clear which platform this is ── */}
-        <div className="velg-mainstrip">
+        {/* ── Platform brand strip — shown above every module so it's always clear which platform this is ──
+             On tablet widths, the Workshop module instead shows its own compact version merged into one
+             row with the ad banner (see .ws-compact-header in Workshop.jsx) — this one hides there via
+             the velg-mainstrip--ws-tab CSS modifier so the two aren't both taking up vertical space. ── */}
+        <div className={`velg-mainstrip${WS_TAB_IDS.includes(tab)?" velg-mainstrip--ws-tab":""}`}>
           <svg className="velg-mainstrip-icon" viewBox="0 0 48 48" fill="none">
             <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="var(--text3)" strokeWidth="3" strokeLinecap="round"/>
             <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
@@ -7968,7 +7976,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           <WsSubscriptionsPage settings={settings}/>
         )}
 
-        {["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop"].includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
+        {WS_TAB_IDS.includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
           <WorkshopPage
             key={tab}
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":"report"}

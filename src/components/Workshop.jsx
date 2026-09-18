@@ -604,7 +604,17 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         </select>
       </div>
 
-      {wsTab!=="spareshop"&&<AdBanner ads={ads} page="workshop" userCtx={userCtx} height={140} mobileHeight={112} tabletHeight={90}/>}
+      {wsTab!=="spareshop"&&(
+        <div className="ws-compact-header">
+          <svg className="ws-compact-header-icon" viewBox="0 0 48 48" fill="none">
+            <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="var(--text3)" strokeWidth="3" strokeLinecap="round"/>
+            <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
+            <circle cx="24" cy="24" r="3.4" fill="#e85d04"/>
+          </svg>
+          <div className="ws-compact-header-word"><span className="velg-vel">VEL</span>GENIUS</div>
+          <AdBanner ads={ads} page="workshop" userCtx={userCtx} height={140} mobileHeight={112} tabletHeight={90}/>
+        </div>
+      )}
 
       {/* ── Resume Job banner (navigated away via Go to Stock / View POs) ── */}
       {activeJob&&view==="list"&&(

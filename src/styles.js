@@ -204,5 +204,22 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .velg-mainstrip-icon{width:38px;height:38px}
   .velg-mainstrip-word{font-size:28px}
   .velg-mainstrip-tag{font-size:12px}
+  /* On Workshop tabs specifically, replace the big brand strip with the compact
+     logo+ad row rendered inside Workshop.jsx (.ws-compact-header) so the two
+     don't both take up space — see WS_TAB_IDS in App.jsx. Outside this range
+     .ws-compact-header is a plain wrapper (its logo bits hidden) so the ad banner
+     it contains renders exactly as it always did, full-width and alone. */
+  .velg-mainstrip--ws-tab{display:none}
+  .ws-compact-header{display:flex;align-items:center;gap:12px}
+  .ws-compact-header-icon{display:block}
+  .ws-compact-header-word{display:block}
+  /* AdBanner's root <div> has no className of its own — target it positionally
+     as the last child so it fills the remaining row width next to the logo. */
+  .ws-compact-header>div:last-child{flex:1;min-width:0}
+  .ws-compact-header>div:last-child>div{margin:0 auto}
 }
+.ws-compact-header{margin-bottom:2px}
+.ws-compact-header-icon{display:none;flex-shrink:0;width:30px;height:30px}
+.ws-compact-header-word{display:none;font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:20px;color:var(--text);letter-spacing:.2px;line-height:1;white-space:nowrap}
+.ws-compact-header-word .velg-vel{font-weight:700;color:#e85d04}
 `;

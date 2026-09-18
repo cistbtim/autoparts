@@ -194,4 +194,15 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .velg-mainstrip-word{font-size:22px}
   .velg-mainstrip-tag{font-size:11px}
 }
+@media(min-width:641px) and (max-width:1024px){
+  /* Tablets (e.g. 10.1" in portrait) sat between the phone and desktop breakpoints
+     and got the full desktop-size brand strip (60px icon, 45px wordmark, 28px
+     margin) stacked above a 140px ad banner — well over 250px of chrome before any
+     real content. Shrink both here; see Workshop.jsx's tabletHeight prop on its
+     AdBanner for the matching ad-height reduction. */
+  .velg-mainstrip{gap:12px;margin-bottom:14px;padding-bottom:10px}
+  .velg-mainstrip-icon{width:38px;height:38px}
+  .velg-mainstrip-word{font-size:28px}
+  .velg-mainstrip-tag{font-size:12px}
+}
 `;

@@ -394,7 +394,7 @@ const getEnvCtx = () => {
   return _envCtxPromise;
 };
 
-export function AdBanner({ads=[], page="shop", userCtx=null, height=220, mobileHeight=null, staticSlides=[]}) {
+export function AdBanner({ads=[], page="shop", userCtx=null, height=220, mobileHeight=null, tabletHeight=null, staticSlides=[]}) {
   const [idx, setIdx] = useState(0);
   const [envCtx, setEnvCtx] = useState(null);
   const [timerKey, setTimerKey] = useState(0);
@@ -449,7 +449,10 @@ export function AdBanner({ads=[], page="shop", userCtx=null, height=220, mobileH
 
   if(!active.length) return null;
   const ad = active[idx % active.length];
-  const effectiveHeight = mobileHeight && typeof window!=="undefined" && window.innerWidth<=600 ? mobileHeight : height;
+  const _w = typeof window!=="undefined" ? window.innerWidth : 9999;
+  const effectiveHeight = mobileHeight && _w<=600 ? mobileHeight
+    : tabletHeight && _w>600 && _w<=1024 ? tabletHeight
+    : height;
   const openLink=async(url)=>{
     if(!url) return;
     const href=url.match(/^https?:\/\//)?url:"https://"+url;

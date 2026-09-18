@@ -152,6 +152,15 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const kanbanInvPanelRef = useRef(null);
   const [kanbanPayJob,    setKanbanPayJob]    = useState(null);
   const [dragOverColId,   setDragOverColId]   = useState(null);
+  // Kanban columns used to mount every single job as a full JobCard regardless of
+  // how many there were — fine for a new account, but a mature workshop (hundreds
+  // of jobs across columns) was mounting 300+ complex card components at once on
+  // every login. overflow:auto only clips them visually; React still builds and
+  // holds all of them in memory. Cap what's rendered per column, "Load more" reveals
+  // the rest — this was the leading suspect for the tablet running out of memory
+  // and having its tab killed by Android right after logging into a large account.
+  const KANBAN_PAGE_SIZE = 25;
+  const [colVisibleCount, setColVisibleCount] = useState({});
   const dragJobRef = useRef(null);
   const kanbanScrollRef = useRef(null);
   const kDrag = useRef({on:false, x:0, sl:0, moved:false});
@@ -595,7 +604,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         </select>
       </div>
 
-      {wsTab!=="spareshop"&&<AdBanner ads={ads} page="workshop" userCtx={userCtx} height={140} mobileHeight={112}/>}
+      {wsTab!=="spareshop"&&<AdBanner ads={ads} page="workshop" userCtx={userCtx} height={140} mobileHeight={112} tabletHeight={90}/>}
 
       {/* ── Resume Job banner (navigated away via Go to Stock / View POs) ── */}
       {activeJob&&view==="list"&&(
@@ -1339,7 +1348,19 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                           </div>
                       )}
                       {col.type==="booking"&&col.items.map(b=><BkCard key={b.id} b={b}/>)}
-                      {col.type==="job"&&col.items.map(j=><JobCard key={j.id} job={j} col={col}/>)}
+                      {col.type==="job"&&(()=>{
+                        const shown=colVisibleCount[col.id]||KANBAN_PAGE_SIZE;
+                        const remaining=col.items.length-shown;
+                        return (<>
+                          {col.items.slice(0,shown).map(j=><JobCard key={j.id} job={j} col={col}/>)}
+                          {remaining>0&&(
+                            <button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:4}}
+                              onClick={()=>setColVisibleCount(p=>({...p,[col.id]:shown+KANBAN_PAGE_SIZE}))}>
+                              ↓ Load {Math.min(remaining,KANBAN_PAGE_SIZE)} more ({remaining} left)
+                            </button>
+                          )}
+                        </>);
+                      })()}
                     </div>
                   </div>
                 );

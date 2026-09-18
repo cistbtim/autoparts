@@ -7416,6 +7416,27 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 <td style={{fontWeight:500}}>
                   <span onClick={()=>{if(!itemsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":"1px dashed var(--text3)",paddingBottom:1}}>{descOverrides[item.id]??item.description}</span>
                   {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:11,color:"var(--text3)",marginLeft:8}}>{item.part_sku}</code>}
+                  <button title="Search this part on Google"
+                    onClick={()=>{
+                      // vehicle_model/engine_no on SA eNaTIS-scanned jobs are often the
+                      // manufacturer's own internal disc codes (e.g. "BZ071H"), not a real
+                      // model name or engine code — useless for search. VIN is the one
+                      // internationally standard identifier we can trust here.
+                      const q=[descOverrides[item.id]??item.description,job.vehicle_year,job.vehicle_make,job.vin].filter(Boolean).join(" ");
+                      window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`,"_blank","noopener,noreferrer");
+                    }}
+                    style={{marginLeft:6,background:"none",border:"none",cursor:"pointer",fontSize:12,padding:2,verticalAlign:"middle"}}>🔍</button>
+                  {job.vin&&/MERCEDES/i.test(job.vehicle_make||"")&&(
+                    <button title={`Copy VIN (${job.vin}) and open Mercedes-Benz USA parts catalog — paste it into the VIN search there`}
+                      onClick={()=>{
+                        // mbparts.mbusa.com has no VIN query-param we can prefill — it's a
+                        // JS-driven search box on the homepage — so copy the VIN and hand
+                        // off, rather than open a stale/blank deep link.
+                        try{ navigator.clipboard.writeText(job.vin); }catch{/* clipboard unavailable */}
+                        window.open("https://mbparts.mbusa.com/","_blank","noopener,noreferrer");
+                      }}
+                      style={{marginLeft:4,background:"none",border:"none",cursor:"pointer",fontSize:12,padding:2,verticalAlign:"middle"}}>🚚</button>
+                  )}
                   {!hideCosts&&supCosts.length>0&&(
                     <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:4}}>
                       {supCosts.map((sc,i)=>{

@@ -3970,9 +3970,16 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               <FL label={t.oeNumber}/>
               {f.oe_number&&<button className="cp-btn" onClick={()=>navigator.clipboard.writeText(f.oe_number)}>📋 Copy OE</button>}
             </div>
-            {f.oe_number&&(()=>{
-              const oeTokens=f.oe_number.split(/[\s,;]+/).filter(Boolean);
-              const activeTok=oeTokens.includes(selectedOeTok)?selectedOeTok:oeTokens[0];
+            {(f.oe_number||f.name)&&(()=>{
+              const oeTokens=f.oe_number?f.oe_number.split(/[\s,;]+/).filter(Boolean):[];
+              // No OE number yet (common — most parts aren't catalogued with one) — fall
+              // back to name + vehicle info so there's still something to search with,
+              // instead of the search bar just disappearing.
+              const vehicleBit=[f.make,f.model,f.year_range].filter(Boolean).join(" ")
+                ||[f.is_quantum&&"Toyota Quantum",f.is_hiace&&"Toyota Hiace"].filter(Boolean).join(" ");
+              const fallbackTerm=[f.name,vehicleBit].filter(Boolean).join(" ");
+              const activeTok=oeTokens.length?(oeTokens.includes(selectedOeTok)?selectedOeTok:oeTokens[0]):fallbackTerm;
+              if(!activeTok) return null;
               const sites=[
                 {label:"SpareTO",color:"#e65c00",url:v=>`https://spareto.com/products?utf8=%E2%9C%93&keywords=${encodeURIComponent(v)}`},
                 {label:"Alibaba",color:"#1d4ed8",url:v=>`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(v)}`},
@@ -3989,6 +3996,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                       {oeTokens.map((tok,i)=>(<option key={i} value={tok}>{tok}</option>))}
                     </select>
                   )}
+                  {!oeTokens.length&&<span style={{fontSize:11,color:"var(--text3)",fontStyle:"italic",flexShrink:0}}>by name+vehicle (no OE #):</span>}
                   <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>on:</span>
                   {sites.map(site=>(
                     <button key={site.label} type="button"

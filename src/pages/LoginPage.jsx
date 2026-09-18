@@ -237,6 +237,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
   const doWsSignup = async () => {
     if(!wsRegName||!wsRegUser||!wsRegPass||!wsRegCity||!wsRegCountry){setErr("Workshop name, username, password, city and country are required");return;}
+    if(!wsRegPhone||!wsRegPhone.trim()){setErr("Phone number is required");return;}
     if(wsRegPass!==wsRegPass2){setErr("Passwords don't match");return;}
     if(wsRegPass.length<4){setErr("Password must be at least 4 characters");return;}
     setLoading(true);setErr("");

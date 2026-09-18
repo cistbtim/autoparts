@@ -1,10 +1,11 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
-import { toImgUrl, waLink } from "../lib/helpers.js";
+import { toImgUrl, waLink, makeId } from "../lib/helpers.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { T } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ShopLogo, MHead, FG, FD, FL } from "../components/shared.jsx";
+import { LogoUploader } from "../components/Modals.jsx";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
 // Match the browser/device's preferred language against a list of configured
@@ -2040,7 +2041,8 @@ export function WorkshopRegisterPage({ token }) {
 
   const [f, setF] = useState({
     workshop_name: "", username: "", password: "", password2: "",
-    phone: "", email: "", city: "", country: "",
+    phone: "", email: "", city: "", country: "", address: "",
+    whatsapp_country_code: "", logo_url: "", logo_data: "",
   });
   const [step, setStep] = useState("form"); // form | submitting | done
   const [errMsg, setErrMsg] = useState("");
@@ -2054,6 +2056,7 @@ export function WorkshopRegisterPage({ token }) {
 
   const submit = async () => {
     if (!f.workshop_name.trim()) return setErrMsg("Workshop name is required");
+    if (!f.phone.trim())         return setErrMsg("Phone number is required");
     if (!f.username.trim())      return setErrMsg("Username is required");
     if (!f.password)             return setErrMsg("Password is required");
     if (f.password.length < 4)  return setErrMsg("Password must be at least 4 characters");
@@ -2064,11 +2067,16 @@ export function WorkshopRegisterPage({ token }) {
       if (Array.isArray(ex) && ex.length > 0) {
         setErrMsg("Username already taken — choose another"); setStep("form"); return;
       }
-      // Don't set id — let DB auto-generate
+      // Generate the id ourselves (rather than letting the DB auto-generate) so the
+      // same id can be reused for the workshop_profiles row below — mirrors the
+      // pattern already used by the direct "Register Workshop" signup on the login
+      // page (LoginPage.jsx doWsSignup).
+      const wsId = makeId("WS");
       const r1 = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
         method: "POST",
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
         body: JSON.stringify({
+          id: wsId,
           username: f.username.trim(), password: f.password,
           name: f.workshop_name.trim(), role: "workshop",
           phone: f.phone.trim() || "", email: f.email.trim() || "",
@@ -2078,6 +2086,24 @@ export function WorkshopRegisterPage({ token }) {
         }),
       });
       if (!r1.ok) { const txt = await r1.text(); throw new Error(txt); }
+      // Provision the full workshop profile immediately (address, banner, WhatsApp
+      // country code) instead of leaving it blank until the workshop happens to open
+      // WS Settings — best-effort: a failure here shouldn't block account creation,
+      // the workshop can still fill these in later via WS Settings.
+      const today = new Date().toISOString().slice(0, 10);
+      const trialEnd = new Date(Date.now() + 30*24*60*60*1000).toISOString().slice(0, 10);
+      await fetch(`${SUPABASE_URL}/rest/v1/workshop_profiles`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal,resolution=merge-duplicates" },
+        body: JSON.stringify({
+          id: wsId, name: f.workshop_name.trim(),
+          phone: f.phone.trim() || "", email: f.email.trim() || "",
+          city: f.city || "", country: f.country || "", address: f.address.trim() || "",
+          whatsapp_country_code: f.whatsapp_country_code || "",
+          logo_url: f.logo_url || "", logo_data: f.logo_data || "",
+          trial_start: today, subscription_status: "trial", subscription_expires_at: trialEnd,
+        }),
+      }).catch(() => {});
       // Save spare shop info to localStorage so login can apply it even if DB column isn't migrated yet
       try { localStorage.setItem("ap_pending_spare_shop", JSON.stringify({name: shopName, branch_id: shopId !== 1 ? String(shopId) : null})); } catch {}
       setStep("done");
@@ -2128,8 +2154,18 @@ export function WorkshopRegisterPage({ token }) {
           <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:"24px 20px"}}>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div><Lbl label="Workshop Name *"/><input style={inp} value={f.workshop_name} onChange={e=>upd("workshop_name",e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
-              <div><Lbl label="Phone"/><input style={inp} type="tel" value={f.phone} onChange={e=>upd("phone",e.target.value)} placeholder="+27 82 000 0000"/></div>
+              <div><Lbl label="Phone *"/><input style={inp} type="tel" value={f.phone} onChange={e=>upd("phone",e.target.value)} placeholder="+27 82 000 0000"/></div>
               <div><Lbl label="Email"/><input style={inp} type="email" value={f.email} onChange={e=>upd("email",e.target.value)} placeholder="workshop@email.com"/></div>
+              <div><Lbl label="Address"/><textarea style={{...inp,minHeight:64,resize:"vertical",fontFamily:"inherit"}} value={f.address} onChange={e=>upd("address",e.target.value)} placeholder="Workshop street address"/></div>
+              <div>
+                <Lbl label="WhatsApp Country Code"/>
+                <input style={inp} value={f.whatsapp_country_code} onChange={e=>upd("whatsapp_country_code",e.target.value.replace(/\D/g,""))} placeholder="e.g. 27 (South Africa)"/>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:5}}>Digits only, no + — used so customer numbers typed locally (e.g. 0821234567) work correctly on WhatsApp</div>
+              </div>
+              <div>
+                <Lbl label="Banner / Logo"/>
+                <LogoUploader f={f} s={upd}/>
+              </div>
               <div style={{borderTop:"1px solid var(--border)",paddingTop:14,marginTop:2}}>
                 <div style={{fontSize:12,fontWeight:700,color:"var(--text2)",marginBottom:12}}>Login Credentials</div>
                 <div style={{display:"flex",flexDirection:"column",gap:12}}>

@@ -477,6 +477,16 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
       )}
       {!wsLocked&&wsExpiresAt&&wsDaysLeft!==null&&(()=>{
         const d=wsDaysLeft;
+        // Stay out of the way while there's no real urgency — only grow into the
+        // full colored/bold banner once it's actually worth a workshop user's
+        // attention (≤30 days). Otherwise it was a full-width colored bar with a
+        // 20px bold countdown even at 104 days left, which read as "urgent" when
+        // it wasn't.
+        if(d>30) return (
+          <div style={{marginBottom:6,fontSize:11,color:"var(--text3)"}}>
+            {wsSubStatus==="trial"?"Free Trial":"Subscription"} until {wsExpiresAt} · {d}d left
+          </div>
+        );
         const col=d<=3?"#ef4444":d<=7?"#ff7a2e":d<=14?"#eab308":"#22c55e";
         const bg=d<=3?"rgba(239,68,68,.08)":d<=7?"rgba(255,122,46,.08)":d<=14?"rgba(234,179,8,.08)":"rgba(34,197,94,.08)";
         const bdr=d<=3?"rgba(239,68,68,.3)":d<=7?"rgba(255,122,46,.3)":d<=14?"rgba(234,179,8,.3)":"rgba(34,197,94,.3)";
@@ -565,13 +575,20 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                     onClick={()=>{const z=Math.min(4,kanbanZoom+1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>＋</button>
                 </div>
                 <button title={showKanbanPhotos?"Hide car photos":"Show car photos"}
-                  style={{padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:showKanbanPhotos?"var(--surface2)":"transparent",cursor:"pointer",fontSize:13,lineHeight:1,marginLeft:4}}
+                  style={{display:"flex",alignItems:"center",gap:5,padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:showKanbanPhotos?"var(--surface2)":"transparent",cursor:"pointer",fontSize:12,fontWeight:600,color:"var(--text2)",lineHeight:1,marginLeft:4,whiteSpace:"nowrap"}}
                   onClick={()=>{const v=!showKanbanPhotos;setShowKanbanPhotos(v);try{localStorage.setItem("ws_kanban_photos",v?"1":"0");}catch{}}}>
-                  {showKanbanPhotos?"🚗":"🚫"}
+                  <span style={{fontSize:14}}>{showKanbanPhotos?"🚗":"🚫"}</span>
+                  <span className="hide-mobile">Photos</span>
                 </button>
-                <div style={{position:"relative",marginLeft:4}}>
+                {/* Was a 140px box tucked at the end of the toolbar next to a bunch of
+                    icon buttons — nothing signaled it was the search field. Flex:1 so
+                    it grows to take the remaining row width (reads as "the" search
+                    box, not just another small control), plus an explicit 🔍 icon
+                    since a bare placeholder wasn't enough for people to notice it. */}
+                <div style={{position:"relative",marginLeft:4,flex:1,minWidth:160,maxWidth:420}}>
+                  <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--text3)",pointerEvents:"none"}}>🔍</span>
                   <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
-                    placeholder="Search board…" style={{padding:"7px 28px 7px 10px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:12,width:140,outline:"none"}}/>
+                    placeholder="Search board…" style={{width:"100%",padding:"9px 30px 9px 32px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
                   {kanbanSearch&&<button onClick={()=>setKanbanSearch("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,lineHeight:1}}>✕</button>}
                 </div>
               </div>
@@ -581,21 +598,17 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         </div>
       </div>
 
-      {/* ── Sub-navigation (desktop) — single scrollable row, never wraps ── */}
-      <div className="hide-mobile ws-tabs" style={{display:"flex",gap:4,flexWrap:"nowrap",overflowX:"auto",marginBottom:18,borderBottom:"1px solid var(--border)",paddingBottom:0}}>
-        {WS_TABS.map(([v,label,cnt])=>(
-          <button key={v} onClick={()=>{ setWsTab(v); if(v==="spareshop") setSpareShopFilter({make:"",model:""}); }} style={{
-            padding:"8px 14px",border:"none",background:"none",cursor:"pointer",
-            fontSize:13,fontWeight:wsTab===v?700:400,
-            color:wsTab===v?"var(--accent)":"var(--text2)",
-            borderBottom:wsTab===v?"2px solid var(--accent)":"2px solid transparent",
-            marginBottom:-1,whiteSpace:"nowrap",
-          }}>
-            {label}{cnt!==null&&<span style={{marginLeft:5,opacity:.55,fontSize:11,fontWeight:400}}>{cnt}</span>}
-          </button>
-        ))}
-      </div>
-      {/* ── Sub-navigation (mobile dropdown) ── */}
+      {/* ── Sub-navigation (desktop) — REMOVED. Every WS_TABS destination now has its
+           own sidebar item (see WS_TAB_IDS / grp_workshop / grp_ws_jobs in App.jsx),
+           so this horizontal pill row was pure duplication — customer feedback was
+           that it (and the ad banner above it) ate too much space and most of the
+           tabs went unused. wsTab is still driven by App.jsx's `tab` (via
+           WorkshopPage's initialTab prop + key remount), and by the handful of
+           in-page buttons that call setWsTab() directly (e.g. the Kanban "Jobs →"
+           shortcut) — this block only removed the always-visible pill duplicate. ── */}
+      {/* ── Sub-navigation (mobile dropdown) — kept: the sidebar is hidden below
+           768px in favour of the bottom mobile-nav bar, so this remains the only
+           way to reach these sub-sections on an actual phone. ── */}
       <div className="show-mobile ws-subnav-m" style={{marginBottom:14}}>
         <select className="inp" value={wsTab} onChange={e=>{ const v=e.target.value; setWsTab(v); if(v==="spareshop") setSpareShopFilter({make:"",model:""}); }} style={{width:"100%",fontWeight:600}}>
           {WS_TABS.map(([v,label,cnt])=>(
@@ -8244,7 +8257,16 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           const dedupKey=v.code?`code:${v.code}`:`model:${v.model}`;
           if(seen.has(dedupKey)) return false;
           seen.add(dedupKey);
-          if(sq&&!`${v.model} ${v.make} ${v.code||""} ${v.variant||""}`.toLowerCase().includes(sq)) return false;
+          // Match ANY word of the search, not the whole string as one substring —
+          // the box is pre-filled with the job's full stored model text (e.g.
+          // "W203 C240"), and requiring "C240" to literally appear in the vehicle
+          // record (it never will — that's an engine variant, not a catalog code)
+          // silently zeroed out every result, even the obviously-correct W203 ones.
+          if(sq){
+            const hay=`${v.model} ${v.make} ${v.code||""} ${v.variant||""}`.toLowerCase();
+            const tokens=sq.split(/\s+/).filter(Boolean);
+            if(tokens.length&&!tokens.some(tok=>hay.includes(tok))) return false;
+          }
           return true;
         }).map(v=>({...v,_score:_scoreCard(v)})).sort((a,b)=>b._score-a._score);
         const pickModel=async(model)=>{

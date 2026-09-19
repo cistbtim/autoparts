@@ -38,7 +38,7 @@ const APP_UPDATE_DATE = __BUILD_DATE__;
 // Every tab id rendered by <WorkshopPage> — shared between the tab gate below and
 // the tablet-only compact-header logic (hides the big global brand strip and lets
 // WorkshopPage show its own combined logo+ad row instead, see .ws-compact-header).
-const WS_TAB_IDS = ["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop"];
+const WS_TAB_IDS = ["workshop","wscustomers","wsbookings","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop","wsdocs","wslicencerenewal"];
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -4723,6 +4723,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       children:[
         {id:"workshop",    icon:"🔧",label:t.wsJobs,                      roles:["admin","manager"]},
         {id:"wscustomers", icon:"👥",label:t.wsCustomers,                 roles:["admin","manager"]},
+        {id:"wsbookings",  icon:"🗓️",label:"Bookings",                    roles:["admin","manager"]},
         {id:"wsquotations",icon:"📝",label:t.wsQuotations,                roles:["admin","manager"]},
         {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,                  roles:["admin","manager"]},
         {id:"wspayments",  icon:"💳",label:t.wsPayments,                  roles:["admin","manager"]},
@@ -4732,6 +4733,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"wsstock",     icon:"📦",label:t.wsStock,                     roles:["admin","manager"]},
         {id:"wstransfer",  icon:"🔄",label:t.wsTransfer,                  roles:["admin","manager"]},
         {id:"wsservices",  icon:"🔧",label:t.wsServices,                  roles:["admin","manager"]},
+        {id:"wsdocs",      icon:"📎",label:"Documents",                   roles:["admin","manager"]},
+        {id:"wslicencerenewal",icon:"🪪",label:"Licence Renewals",        roles:["admin","manager"]},
         {id:"wsstatement", icon:"📄",label:t.wsStatement,                 roles:["admin","manager"]},
         {id:"wsreport",    icon:"📊",label:t.wsReport,                    roles:["admin","manager"]},
         {id:"wssubscriptions",icon:"💳",label:t.wsSubscriptions,          roles:["admin"]},
@@ -4744,6 +4747,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         children:[
           {id:"workshop",    icon:"🔧",label:t.wsJobs,       roles:["workshop"]},
           {id:"wscustomers", icon:"👥",label:t.wsCustomers,  roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wsbookings",  icon:"🗓️",label:"Bookings",     roles:["workshop"]},
           {id:"wsquotations",icon:"📝",label:t.wsQuotations, roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,   roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wspayments",  icon:"💳",label:t.wsPayments,   roles:["workshop"], wsRoles:["main","manager"]},
@@ -4769,6 +4773,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {
         id:"grp_ws_admin", icon:"📊", label:t.wsAdmin, roles:["workshop"],
         children:[
+          {id:"wsdocs",      icon:"📎",label:"Documents",     roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wslicencerenewal",icon:"🪪",label:"Licence Renewals",roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsstatement", icon:"📄",label:t.wsStatement,    roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsreport",    icon:"📊",label:t.wsReport,       roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsprofile",   icon:"⚙️",label:t.wsSettings,     roles:["workshop"], wsRoles:["main"]},
@@ -5163,9 +5169,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               {t.cart} {cartCount>0&&<span style={{background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 7px",fontSize:11}}>{cartCount}</span>}
             </button>
           )}
-          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>openM("changePassword")}>{t.changePassword||"Change Password"}</button>
-          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={clearAppCache} title="App looking out of date? Force a fresh reload">🧹 Clear Cache</button>
-          <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12,color:"rgba(248,113,113,.85)"}} onClick={onLogout}>{t.logout||"Sign Out"}</button>
+          <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={()=>openM("changePassword")} title={t.changePassword||"Change Password"}>🔑</button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={clearAppCache} title="Clear Cache — force a fresh reload if the app looks out of date">🧹</button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15,color:"rgba(248,113,113,.85)"}} onClick={onLogout} title={t.logout||"Sign Out"}>🚪</button>
+          </div>
           <div style={{fontSize:10,color:"var(--text3)",textAlign:"center",marginTop:2,letterSpacing:".03em"}}>v{APP_VERSION} · {APP_UPDATE_DATE}</div>
         </div>
       </aside>
@@ -7979,7 +7987,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {WS_TAB_IDS.includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
           <WorkshopPage
             key={tab}
-            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":"report"}
+            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsbookings"?"wsbookings":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":tab==="wsdocs"?"wsdocs":tab==="wslicencerenewal"?"wslicencerenewal":"report"}
             initialJobFilter={tab==="workshop"?workshopJobFilter:null}
             onConsumeInitialJobFilter={()=>setWorkshopJobFilter(null)}
             onReturnToVehicle={role==="admin"?(make,model,searchKw)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setVehiclesJumpSearch(searchKw||"");setTab("vehicles");}:null}

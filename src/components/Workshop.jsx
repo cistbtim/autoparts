@@ -140,6 +140,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [deleteWsBusy,   setDeleteWsBusy]   = useState(false);
   const [collapsedCols,   setCollapsedCols]   = useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("ws_kanban_collapsed")||"[]"));}catch{return new Set();}});
   const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
+  const [hideFinished,setHideFinished]= useState(()=>{try{return localStorage.getItem("ws_kanban_hidefinished")==="1";}catch{return false;}});
   const [kanbanSearch,    setKanbanSearch]    = useState("");
   const [kanbanNoteEdit,  setKanbanNoteEdit]  = useState(null);
   const [kanbanDueEdit,   setKanbanDueEdit]   = useState(null);
@@ -532,6 +533,14 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               </select>
             )}
             <button className="btn btn-primary" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
+            {/* Moved right after Book In Car — on mobile this used to sit after the
+                Search box, which greedily takes remaining row width and pushed this
+                toggle onto its own near-empty row by itself. Anchoring it here means
+                it wraps together with Book In Car instead of looking stranded. */}
+            <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+              <button title="List view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:!kanbanView?"var(--accent)":"transparent",color:!kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(false)}>≡</button>
+              <button title="Board view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:kanbanView?"var(--accent)":"transparent",color:kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(true)}>⬜</button>
+            </div>
             {kanbanView&&(
               <div style={{position:"relative",marginLeft:4,flex:1,minWidth:160,maxWidth:420}}>
                 <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--text3)",pointerEvents:"none"}}>🔍</span>
@@ -545,10 +554,6 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               style={{opacity:jobsRefreshing?.6:1}}>
               <span style={{display:"inline-block",animation:jobsRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
             </button>
-            <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
-              <button title="List view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:!kanbanView?"var(--accent)":"transparent",color:!kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(false)}>≡</button>
-              <button title="Board view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:kanbanView?"var(--accent)":"transparent",color:kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(true)}>⬜</button>
-            </div>
             {kanbanView&&(
               <div className="hide-mobile" style={{display:"contents"}}>
                 <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
@@ -569,6 +574,12 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                   <span style={{fontSize:14}}>{showKanbanPhotos?"🚗":"🚫"}</span>
                   <span className="hide-mobile">Photos</span>
                 </button>
+                <button title={hideFinished?"Show Payment Received & Cancelled columns":"Collapse Payment Received & Cancelled columns — focus on active work"}
+                  style={{display:"flex",alignItems:"center",gap:5,padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:hideFinished?"var(--surface2)":"transparent",cursor:"pointer",fontSize:12,fontWeight:600,color:"var(--text2)",lineHeight:1,marginLeft:4,whiteSpace:"nowrap"}}
+                  onClick={()=>{const v=!hideFinished;setHideFinished(v);try{localStorage.setItem("ws_kanban_hidefinished",v?"1":"0");}catch{}}}>
+                  <span style={{fontSize:14}}>{hideFinished?"🙈":"✅"}</span>
+                  <span className="hide-mobile">{hideFinished?"Finished Hidden":"Hide Finished"}</span>
+                </button>
               </div>
             )}
           </div>
@@ -587,8 +598,8 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
       {/* ── Sub-navigation (mobile dropdown) — kept: the sidebar is hidden below
            768px in favour of the bottom mobile-nav bar, so this remains the only
            way to reach these sub-sections on an actual phone. ── */}
-      <div className="show-mobile ws-subnav-m" style={{marginBottom:14}}>
-        <select className="inp" value={wsTab} onChange={e=>{ const v=e.target.value; setWsTab(v); if(v==="spareshop") setSpareShopFilter({make:"",model:""}); }} style={{width:"100%",fontWeight:600}}>
+      <div className="show-mobile ws-subnav-m" style={{marginBottom:8}}>
+        <select className="inp" value={wsTab} onChange={e=>{ const v=e.target.value; setWsTab(v); if(v==="spareshop") setSpareShopFilter({make:"",model:""}); }} style={{width:"100%",fontWeight:600,padding:"6px 10px",fontSize:13}}>
           {WS_TABS.map(([v,label,cnt])=>(
             <option key={v} value={v}>{label}{cnt!=null?` (${cnt})`:""}</option>
           ))}
@@ -1302,7 +1313,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 // Empty columns auto-collapse to a slim strip (except while the initial
                 // load skeletons are showing — collapsing then would hide the loading UI).
                 const showSkeletons=jobsLoading&&jobs.length===0;
-                const isCollapsed=!showSkeletons&&(collapsedCols.has(col.id)||col.items.length===0);
+                const isCollapsed=!showSkeletons&&(collapsedCols.has(col.id)||col.items.length===0||(hideFinished&&(col.id==="paid"||col.id==="cancelled")));
                 if(isCollapsed) return (
                   <div key={col.id} style={{minWidth:34,maxWidth:34,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",paddingTop:6,gap:8,borderRadius:8,background:dragOverColId===col.id?`${col.color}30`:"transparent",outline:dragOverColId===col.id?`2px dashed ${col.color}`:"none",transition:"background .15s"}}
                     title={`Expand ${col.label}`}

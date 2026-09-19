@@ -201,22 +201,27 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
      Let it wrap onto its own row below the logo+title instead, full width, with
      room on the right for that button (it's user-draggable so can't be avoided
      precisely, but it defaults near the top-right corner). */
-  /* Customer feedback (drawn on an actual phone screenshot): still too much going
-     on up here even wrapped — the VelGenius wordmark repeats on every single page
-     (the sidebar/bottom-nav already establishes that), and the jobs/invoices count
-     duplicates the "Jobs (271)" shown again just below in the section selector.
-     Drop both on mobile for ws-tab pages; keep just the compact page title. */
-  .velg-mainstrip--ws-tab{flex-wrap:wrap}
-  .velg-mainstrip--ws-tab .velg-mainstrip-icon{display:none}
-  .velg-mainstrip--ws-tab .velg-mainstrip-text{display:none}
+  /* Follow-up: user wanted the VelGenius logo/wordmark back on mobile (kept), but
+     the jobs/invoices count summary stays hidden — it duplicates "Jobs (271)"
+     shown again just below in the section selector. */
+  /* Follow-up: "Jobs" looked stranded far right of the wordmark — the tagline
+     ("AI Automotive Operations Platform") is wider than "VELGENIUS" itself, so the
+     pagetitle (sitting on the short top line, vertically centered) visually read as
+     disconnected from the longer line running underneath it. Give it its own full
+     line below instead of trying to share a row with the logo block. */
+  /* Follow-up: center both lines instead of left-aligned (which suited desktop's
+     side-by-side layout but looked off once logo and title were stacked). */
+  .velg-mainstrip--ws-tab{flex-wrap:wrap;justify-content:center;text-align:center}
+  .velg-mainstrip--ws-tab .velg-mainstrip-text{text-align:center}
   .velg-mainstrip-divider{display:none}
-  .velg-mainstrip-pagetitle{font-size:18px}
+  /* Follow-up: screen is too narrow for logo + title both — drop the page title
+     on mobile, it's redundant with the section selector shown right below. */
+  .velg-mainstrip-pagetitle{display:none}
   .velg-mainstrip-wsinfo{display:none}
-  .velg-mainstrip-wsinfo{flex-basis:100%;margin-left:0;text-align:left;padding-right:56px;font-size:11px}
   .velg-mainstrip{gap:10px;margin-bottom:16px;padding-bottom:12px}
-  .velg-mainstrip-icon{width:30px;height:30px}
-  .velg-mainstrip-word{font-size:22px}
-  .velg-mainstrip-tag{font-size:11px}
+  .velg-mainstrip-icon{width:39px;height:39px}
+  .velg-mainstrip-word{font-size:29px}
+  .velg-mainstrip-tag{font-size:14px}
 }
 @media(min-width:641px) and (max-width:1024px){
   /* Tablets (e.g. 10.1" in portrait) sat between the phone and desktop breakpoints

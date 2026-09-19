@@ -201,9 +201,17 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
      Let it wrap onto its own row below the logo+title instead, full width, with
      room on the right for that button (it's user-draggable so can't be avoided
      precisely, but it defaults near the top-right corner). */
+  /* Customer feedback (drawn on an actual phone screenshot): still too much going
+     on up here even wrapped — the VelGenius wordmark repeats on every single page
+     (the sidebar/bottom-nav already establishes that), and the jobs/invoices count
+     duplicates the "Jobs (271)" shown again just below in the section selector.
+     Drop both on mobile for ws-tab pages; keep just the compact page title. */
   .velg-mainstrip--ws-tab{flex-wrap:wrap}
+  .velg-mainstrip--ws-tab .velg-mainstrip-icon{display:none}
+  .velg-mainstrip--ws-tab .velg-mainstrip-text{display:none}
   .velg-mainstrip-divider{display:none}
-  .velg-mainstrip-pagetitle{font-size:16px}
+  .velg-mainstrip-pagetitle{font-size:18px}
+  .velg-mainstrip-wsinfo{display:none}
   .velg-mainstrip-wsinfo{flex-basis:100%;margin-left:0;text-align:left;padding-right:56px;font-size:11px}
   .velg-mainstrip{gap:10px;margin-bottom:16px;padding-bottom:12px}
   .velg-mainstrip-icon{width:30px;height:30px}

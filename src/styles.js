@@ -188,6 +188,12 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .velg-mainstrip-word{font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:45px;color:var(--text);letter-spacing:.2px;line-height:1.1}
 .velg-mainstrip-word .velg-vel{font-weight:700;color:#e85d04}
 .velg-mainstrip-tag{font-size:16px;color:var(--text3);margin-top:2px}
+/* Workshop tabs: left-aligned with the module title next to the logo, instead of
+   the default centered brand strip (kept centered everywhere else). */
+.velg-mainstrip--ws-tab{justify-content:flex-start}
+.velg-mainstrip-divider{width:1px;align-self:stretch;background:var(--border);margin:2px 2px}
+.velg-mainstrip-pagetitle{font-size:22px;font-weight:700;color:var(--text)}
+.velg-mainstrip-wsinfo{margin-left:auto;text-align:right;font-size:12px;color:var(--text3);line-height:1.5}
 @media(max-width:640px){
   .velg-mainstrip{gap:10px;margin-bottom:16px;padding-bottom:12px}
   .velg-mainstrip-icon{width:30px;height:30px}

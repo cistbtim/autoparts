@@ -5398,6 +5398,28 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             <div className="velg-mainstrip-word"><span className="velg-vel">VEL</span>GENIUS</div>
             <div className="velg-mainstrip-tag">AI Automotive Operations Platform</div>
           </div>
+          {/* Left-aligned (see .velg-mainstrip--ws-tab) with the module title right
+              next to the logo instead of centered — customer feedback was that the
+              centered brand strip + separate left-aligned "Workshop" page title below
+              it read as two disconnected rows rather than one page header. */}
+          {WS_TAB_IDS.includes(tab)&&(()=>{
+            const d=role==="workshop"?(subStatus?.daysLeft??sub?.daysLeft??null):null;
+            const exp=role==="workshop"?(subStatus?.expiresAt??sub?.expiresAt??null):null;
+            const st=role==="workshop"?(subStatus?.status??sub?.status??null):null;
+            const unpaidCnt=workshopInvoices.filter(i=>i.status!=="paid").length;
+            const inProgCnt=workshopJobs.filter(j=>j.status==="In Progress").length;
+            return(<>
+              <div className="velg-mainstrip-divider"/>
+              <div className="velg-mainstrip-pagetitle">🔧 Workshop</div>
+              {/* Subscription + job-count summary — was its own separate row inside
+                  Workshop.jsx directly below this header, reading as a second,
+                  disconnected header. Filling this row's empty right side instead. */}
+              <div className="velg-mainstrip-wsinfo">
+                {exp&&d!==null&&<div>{st==="trial"?"Free Trial":"Subscription"} until {exp} · {d}d left</div>}
+                <div>{workshopJobs.length} jobs · {inProgCnt} in progress · {unpaidCnt} unpaid invoices</div>
+              </div>
+            </>);
+          })()}
         </div>
 
         {/* ── DASHBOARD ── */}

@@ -475,38 +475,19 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
           <div style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>Book In &amp; Photos still work</div>
         </div>
       )}
-      {!wsLocked&&wsExpiresAt&&wsDaysLeft!==null&&(()=>{
-        const d=wsDaysLeft;
-        // Stay out of the way while there's no real urgency — only grow into the
-        // full colored/bold banner once it's actually worth a workshop user's
-        // attention (≤30 days). Otherwise it was a full-width colored bar with a
-        // 20px bold countdown even at 104 days left, which read as "urgent" when
-        // it wasn't.
-        if(d>30) return (
-          <div style={{marginBottom:6,fontSize:11,color:"var(--text3)"}}>
-            {wsSubStatus==="trial"?"Free Trial":"Subscription"} until {wsExpiresAt} · {d}d left
-          </div>
-        );
-        const col=d<=3?"#ef4444":d<=7?"#ff7a2e":d<=14?"#eab308":"#22c55e";
-        const bg=d<=3?"rgba(239,68,68,.08)":d<=7?"rgba(255,122,46,.08)":d<=14?"rgba(234,179,8,.08)":"rgba(34,197,94,.08)";
-        const bdr=d<=3?"rgba(239,68,68,.3)":d<=7?"rgba(255,122,46,.3)":d<=14?"rgba(234,179,8,.3)":"rgba(34,197,94,.3)";
-        return (
-          <div className={d<=7?"wsFlash":undefined} style={{marginBottom:8,padding:"5px 12px",background:bg,border:`1px solid ${bdr}`,borderRadius:8,display:"flex",alignItems:"center",gap:10}}>
-            <div style={{flex:1,fontSize:12,fontWeight:600,color:col}}>{wsSubStatus==="trial"?"Free Trial":"Subscription"} · {wsExpiresAt}</div>
-            <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:20,lineHeight:1,color:col}}>{d<=0?"Today":d}</div>
-            <div style={{fontSize:11,fontWeight:700,color:col}}>{d>0?"d left":"OVERDUE"}</div>
-          </div>
-        );
-      })()}
+      {/* Subscription banner + jobs/invoices summary now show inside the global
+          header row next to "VelGenius | Workshop" (App.jsx velg-mainstrip-wsinfo)
+          — this used to be its own separate row here, directly below that header,
+          reading as a second, disconnected header. Kept the loading spinner below
+          since the merged version can't react to jobsLoading. */}
       {/* ── Page header ── */}
       <div className="ws-head" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>🔧 {t.workshop||"Workshop"}</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:2}}>
-            {jobsLoading&&jobs.length===0
-              ? <span style={{color:"var(--accent)",fontWeight:600}}><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span> Loading jobs…</span>
-              : <>{jobs.length} jobs · {jobs.filter(j=>j.status==="In Progress").length} in progress · {invoices.filter(i=>i.status!=="paid").length} unpaid invoices</>}
-          </p>
+          {jobsLoading&&jobs.length===0&&(
+            <p style={{color:"var(--accent)",fontWeight:600,fontSize:13,marginTop:2}}>
+              <span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span> Loading jobs…
+            </p>
+          )}
         </div>
         <div className="ws-head-side" style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
           {wsDaysLeft!==null&&!wsExpiresAt&&!wsLocked&&(()=>{
@@ -551,6 +532,14 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               </select>
             )}
             <button className="btn btn-primary" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
+            {kanbanView&&(
+              <div style={{position:"relative",marginLeft:4,flex:1,minWidth:160,maxWidth:420}}>
+                <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--text3)",pointerEvents:"none"}}>🔍</span>
+                <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
+                  placeholder="Search board…" style={{width:"100%",padding:"9px 30px 9px 32px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+                {kanbanSearch&&<button onClick={()=>setKanbanSearch("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,lineHeight:1}}>✕</button>}
+              </div>
+            )}
             <button className="btn btn-ghost" title="Refresh jobs" disabled={jobsRefreshing}
               onClick={async()=>{if(!onRefresh)return;setJobsRefreshing(true);try{await onRefresh();}finally{setJobsRefreshing(false);}}}
               style={{opacity:jobsRefreshing?.6:1}}>
@@ -580,17 +569,6 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                   <span style={{fontSize:14}}>{showKanbanPhotos?"🚗":"🚫"}</span>
                   <span className="hide-mobile">Photos</span>
                 </button>
-                {/* Was a 140px box tucked at the end of the toolbar next to a bunch of
-                    icon buttons — nothing signaled it was the search field. Flex:1 so
-                    it grows to take the remaining row width (reads as "the" search
-                    box, not just another small control), plus an explicit 🔍 icon
-                    since a bare placeholder wasn't enough for people to notice it. */}
-                <div style={{position:"relative",marginLeft:4,flex:1,minWidth:160,maxWidth:420}}>
-                  <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--text3)",pointerEvents:"none"}}>🔍</span>
-                  <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
-                    placeholder="Search board…" style={{width:"100%",padding:"9px 30px 9px 32px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-                  {kanbanSearch&&<button onClick={()=>setKanbanSearch("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,lineHeight:1}}>✕</button>}
-                </div>
               </div>
             )}
           </div>

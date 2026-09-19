@@ -5408,9 +5408,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             const st=role==="workshop"?(subStatus?.status??sub?.status??null):null;
             const unpaidCnt=workshopInvoices.filter(i=>i.status!=="paid").length;
             const inProgCnt=workshopJobs.filter(j=>j.status==="In Progress").length;
+            // Was a hardcoded "Workshop" on every single sub-tab (Jobs, Customers,
+            // Bookings, Invoices...) — reuse the same labels already shown for these
+            // in the sidebar so the header actually reflects which page you're on.
+            const WS_PAGE_TITLES={
+              workshop:t.wsJobs||"Jobs", wscustomers:t.wsCustomers||"Customers", wsbookings:"Bookings",
+              wsquotations:t.wsQuotations||"Quotations", wsinvoices:t.wsInvoices||"Invoices", wspayments:t.wsPayments||"Payments",
+              wsstock:t.wsStock||"WS Stock", wsservices:t.wsServices||"Services", wssuppliers:t.wsSuppliers||"Suppliers",
+              wssuporders:t.wsPurchaseOrders||"Purchase Orders", wssupinv:t.wsSupInvoices||"Supplier Inv", wstransfer:t.wsTransfer||"Transfer",
+              wsstatement:t.wsStatement||"Statement", wsreport:t.wsReport||"Report", wsspareshop:"Spare Shop",
+              wsdocs:"Documents", wslicencerenewal:"Licence Renewals",
+            };
             return(<>
               <div className="velg-mainstrip-divider"/>
-              <div className="velg-mainstrip-pagetitle">🔧 Workshop</div>
+              <div className="velg-mainstrip-pagetitle">🔧 {WS_PAGE_TITLES[tab]||"Workshop"}</div>
               {/* Subscription + job-count summary — was its own separate row inside
                   Workshop.jsx directly below this header, reading as a second,
                   disconnected header. Filling this row's empty right side instead. */}

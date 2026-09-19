@@ -195,6 +195,16 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .velg-mainstrip-pagetitle{font-size:22px;font-weight:700;color:var(--text)}
 .velg-mainstrip-wsinfo{margin-left:auto;text-align:right;font-size:12px;color:var(--text3);line-height:1.5}
 @media(max-width:640px){
+  /* The ws-tab merged header (logo|title|subscription-info) was designed for
+     desktop/tablet width and simply overflowed on a phone — the wsinfo text ran
+     under the draggable feedback button and wrapped across 4 cramped lines.
+     Let it wrap onto its own row below the logo+title instead, full width, with
+     room on the right for that button (it's user-draggable so can't be avoided
+     precisely, but it defaults near the top-right corner). */
+  .velg-mainstrip--ws-tab{flex-wrap:wrap}
+  .velg-mainstrip-divider{display:none}
+  .velg-mainstrip-pagetitle{font-size:16px}
+  .velg-mainstrip-wsinfo{flex-basis:100%;margin-left:0;text-align:left;padding-right:56px;font-size:11px}
   .velg-mainstrip{gap:10px;margin-bottom:16px;padding-bottom:12px}
   .velg-mainstrip-icon{width:30px;height:30px}
   .velg-mainstrip-word{font-size:22px}

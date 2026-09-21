@@ -11,6 +11,7 @@ import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg,
 import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, PartPhotoCapturePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage, PartOcrScanModal, resolveMarginOptions } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
+import { WorkshopTour, tourSeenKey } from "./components/WorkshopTour.jsx";
 import { SystemMapPage } from "./components/SystemMap.jsx";
 import { AgentOfficePage } from "./components/AgentOffice.jsx";
 import { RequestsKanbanPage } from "./components/RequestsKanban.jsx";
@@ -4986,6 +4987,22 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     navGroups.forEach(g=>{if(g.children.find(c=>c.id===tab))setExpandedGroups(p=>({...p,[g.id]:true}));});
   },[tab]);
 
+  // Workshop onboarding tour — auto-run once per user on first login, replayable via the 🧭 sidebar button
+  const [tourActive,setTourActive]=useState(false);
+  useEffect(()=>{
+    if(role!=="workshop"||!user?.id) return;
+    try{
+      if(!localStorage.getItem(tourSeenKey(user.id))){
+        const t=setTimeout(()=>setTourActive(true),900);
+        return ()=>clearTimeout(t);
+      }
+    }catch{/* localStorage unavailable — skip auto-tour, manual 🧭 button still works */}
+  },[role,user?.id]);
+  const closeTour=()=>{
+    setTourActive(false);
+    try{ if(user?.id) localStorage.setItem(tourSeenKey(user.id),"1"); }catch{/* best-effort only */}
+  };
+
   // Demo: override nav to only inventory + shop
   if(isDemo){
     navGroups.length=0;
@@ -5167,7 +5184,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 {isExpanded&&(
                   <div style={{marginLeft:8,marginTop:1,borderLeft:"2px solid var(--surface3)",paddingLeft:8}}>
                     {g.children.map(n=>(
-                      <button key={n.id} onClick={()=>setTab(n.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:tab===n.id?"var(--accent)":"transparent",border:"none",borderRadius:7,color:tab===n.id?"#fff":"var(--text3)",cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:tab===n.id?600:400,marginBottom:1,textAlign:"left",transition:"all .18s"}}>
+                      <button key={n.id} data-tour-id={n.id} onClick={()=>setTab(n.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:tab===n.id?"var(--accent)":"transparent",border:"none",borderRadius:7,color:tab===n.id?"#fff":"var(--text3)",cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:tab===n.id?600:400,marginBottom:1,textAlign:"left",transition:"all .18s"}}>
                         <span style={{fontSize:13}}>{n.icon}</span>
                         <span style={{flex:1}}>{n.label}</span>
                         {n.badge>0&&<span style={{background:"var(--accent)",color:"#fff",borderRadius:99,minWidth:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,padding:"0 3px"}}>{n.badge}</span>}
@@ -5186,6 +5203,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             </button>
           )}
           <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+            {role==="workshop"&&(
+              <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={()=>setTourActive(true)} title="Take a Tour">🧭</button>
+            )}
             <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={()=>openM("changePassword")} title={t.changePassword||"Change Password"}>🔑</button>
             <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={clearAppCache} title="Clear Cache — force a fresh reload if the app looks out of date">🧹</button>
             <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15,color:"rgba(248,113,113,.85)"}} onClick={onLogout} title={t.logout||"Sign Out"}>🚪</button>
@@ -5231,7 +5251,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               <div key={g.id} style={{marginBottom:2}}>
                 <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",padding:"8px 10px 4px"}}>{g.icon} {g.label}</div>
                 {g.children.map(n=>(
-                  <button key={n.id} onClick={()=>{setTab(n.id);setDrawerOpen(false);}}
+                  <button key={n.id} data-tour-id={n.id} onClick={()=>{setTab(n.id);setDrawerOpen(false);}}
                     style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"10px 12px",background:tab===n.id?"var(--accent)":"none",border:"none",borderRadius:9,color:tab===n.id?"#fff":"var(--text2)",cursor:"pointer",fontSize:14,fontFamily:"inherit",fontWeight:tab===n.id?700:400,marginBottom:2,textAlign:"left",position:"relative"}}>
                     <span style={{fontSize:16}}>{n.icon}</span>
                     <span style={{flex:1}}>{n.label}</span>
@@ -5248,6 +5268,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               🛒 {t.cart} {cartCount>0&&<span style={{background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 7px",fontSize:11}}>{cartCount}</span>}
             </button>
           )}
+          {role==="workshop"&&(
+            <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>{setTourActive(true);setDrawerOpen(false);}}>🧭 Take a Tour</button>
+          )}
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>{openM("changePassword");setDrawerOpen(false);}}>🔑 Change Password</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={clearAppCache} title="App looking out of date? Force a fresh reload">🧹 Clear Cache</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12,color:"var(--red)"}} onClick={onLogout}>🚪 {t.logout}</button>
@@ -5257,6 +5280,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           </div>
         </div>
       </div>
+
+      {role==="workshop"&&(
+        <WorkshopTour active={tourActive} onClose={closeTour} tab={tab} setTab={setTab} navGroups={navGroups}
+          drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen}/>
+      )}
 
       {/* WS MORE SHEET — workshop mobile app style bottom sheet */}
       {role==="workshop"&&(()=>{

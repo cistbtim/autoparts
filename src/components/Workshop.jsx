@@ -607,7 +607,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         </select>
       </div>
 
-      {wsTab!=="spareshop"&&!wsProfile?.hide_ads&&(
+      {wsTab!=="spareshop"&&!(wsProfile?.hide_ads&&wsProfile?.subscription_status==="active")&&(
         <div className="ws-compact-header">
           <svg className="ws-compact-header-icon" viewBox="0 0 48 48" fill="none">
             <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="var(--text3)" strokeWidth="3" strokeLinecap="round"/>
@@ -11436,7 +11436,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
 
   return (
     <div>
-      {!wsProfile?.hide_ads&&<AdBanner ads={ads} page="spareshop" userCtx={userCtx}/>}
+      {!(wsProfile?.hide_ads&&wsProfile?.subscription_status==="active")&&<AdBanner ads={ads} page="spareshop" userCtx={userCtx}/>}
       {lightbox&&<ImgLightbox url={lightbox.url} urls={lightbox.urls} name={lightbox.name} onClose={()=>setLightbox(null)}/>}
       {showUnlock&&(
         <Overlay onClose={()=>{setShowUnlock(false);setUnlockPw("");setUnlockErr("");}}>

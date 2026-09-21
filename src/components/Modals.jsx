@@ -390,19 +390,45 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
           <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Digits only, no + — applied to every customer/supplier number typed as a local number (e.g. 0833927725 → 27833927725) before opening WhatsApp</div>
         </div>
 
-        <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
-          <div onClick={()=>s("hide_ads",!f.hide_ads)} style={{
-            width:38,height:22,borderRadius:11,background:f.hide_ads?"var(--accent)":"var(--surface3)",
-            border:`1.5px solid ${f.hide_ads?"var(--accent)":"var(--border)"}`,
-            position:"relative",transition:"background .18s,border-color .18s",flexShrink:0,cursor:"pointer"
-          }}>
-            <div style={{position:"absolute",top:2,left:f.hide_ads?18:2,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left .18s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/>
-          </div>
-          <div>
-            <div style={{fontWeight:600,fontSize:13}}>🚫 Hide Ads Banner</div>
-            <div style={{fontSize:11,color:"var(--text3)"}}>Turn off the rotating ad banner shown above the job board</div>
-          </div>
-        </label>
+        {(()=>{
+          const isActive = profile?.subscription_status==="active";
+          if(isActive){
+            return (
+              <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+                <div onClick={()=>s("hide_ads",!f.hide_ads)} style={{
+                  width:38,height:22,borderRadius:11,background:f.hide_ads?"var(--accent)":"var(--surface3)",
+                  border:`1.5px solid ${f.hide_ads?"var(--accent)":"var(--border)"}`,
+                  position:"relative",transition:"background .18s,border-color .18s",flexShrink:0,cursor:"pointer"
+                }}>
+                  <div style={{position:"absolute",top:2,left:f.hide_ads?18:2,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left .18s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/>
+                </div>
+                <div>
+                  <div style={{fontWeight:600,fontSize:13}}>🚫 Hide Ads Banner</div>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>Turn off the rotating ad banner shown above the job board</div>
+                </div>
+              </label>
+            );
+          }
+          // Trial / expired / suspended / unset accounts can't hide ads — prompt to activate instead.
+          const s2 = getSettings();
+          const adminContact = s2.email||"admin@autoparts.com";
+          const msg = `Hi, I'd like to activate my workshop subscription (${f.name||"my workshop"}) so I can hide the ads banner.`;
+          return (
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:10,background:"var(--surface2)",border:"1px solid var(--border)",opacity:.85}}>
+              <div style={{width:38,height:22,borderRadius:11,background:"var(--surface3)",border:"1.5px solid var(--border)",position:"relative",flexShrink:0}}>
+                <div style={{position:"absolute",top:2,left:2,width:14,height:14,borderRadius:"50%",background:"#888"}}/>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:13}}>🔒 Hide Ads Banner</div>
+                <div style={{fontSize:11,color:"var(--text3)"}}>Available on paid plans only — activate your subscription to unlock this.</div>
+                <a href={s2.phone?waLink(s2.phone,msg):mailLink(adminContact,"Activate my subscription",msg)} target="_blank" rel="noreferrer"
+                  style={{display:"inline-block",marginTop:6,fontSize:11,fontWeight:700,color:"var(--accent)",textDecoration:"none"}}>
+                  💬 Request Activation ({adminContact})
+                </a>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Subscription info card */}
         {(profile?.trial_start||profile?.subscription_status||profile?.subscription_expires_at)&&(()=>{

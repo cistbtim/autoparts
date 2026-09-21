@@ -35,10 +35,17 @@ function Log($msg) {
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
 Add-Type @"
 using System;
+using System.Text;
 using System.Runtime.InteropServices;
 public class WaWin32 {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -55,12 +62,32 @@ public class WaWin32 {
 [WaWin32]::SetProcessDPIAware() | Out-Null
 
 function Get-WaProcess {
-    # WhatsApp Desktop is a UWP shell (WhatsApp.Root, an invisible frame window titled
-    # "WhatsApp") hosting the real, visible, clickable content in msedgewebview2
-    # (titled "(1) WhatsApp" / "WhatsApp"). Must target msedgewebview2 specifically -
-    # matching on title alone is ambiguous and can silently grab the invisible frame.
-    return Get-Process -Name msedgewebview2 -ErrorAction SilentlyContinue |
-        Where-Object { $_.MainWindowTitle -like "*WhatsApp*" } | Select-Object -First 1
+    # WhatsApp's msedgewebview2 process can own MULTIPLE top-level windows at once -
+    # the real chat window AND transient link-preview tooltips (blank title, tiny
+    # rect like 257x25, left over from a mouse hover). Get-Process's MainWindowHandle
+    # uses an internal Windows heuristic that has been observed picking the tooltip
+    # instead of the real window (confirmed 2026-09-21) - every fractional-coordinate
+    # click in this script then computed against the wrong tiny rect and silently
+    # missed the search box entirely, leaving the chat list unfiltered. Enumerate
+    # top-level windows ourselves via EnumWindows and require both a "WhatsApp"
+    # title AND a real window size (>800x600) so a tooltip can never be picked.
+    $script:_waHandle = [IntPtr]::Zero
+    $cb = [WaWin32+EnumWindowsProc]{
+        param($h, $l)
+        $sb = New-Object System.Text.StringBuilder 256
+        [WaWin32]::GetWindowText($h, $sb, 256) | Out-Null
+        if ($sb.ToString() -like "*WhatsApp*" -and [WaWin32]::IsWindowVisible($h)) {
+            $r = New-Object WaWin32+RECT
+            [WaWin32]::GetWindowRect($h, [ref]$r) | Out-Null
+            if (($r.Right - $r.Left) -gt 800 -and ($r.Bottom - $r.Top) -gt 600) {
+                $script:_waHandle = $h
+            }
+        }
+        return $true
+    }
+    [WaWin32]::EnumWindows($cb, [IntPtr]::Zero) | Out-Null
+    if ($script:_waHandle -eq [IntPtr]::Zero) { return $null }
+    return [PSCustomObject]@{ MainWindowHandle = $script:_waHandle }
 }
 
 function Set-EnglishInput($waProc) {
@@ -122,6 +149,62 @@ function Get-FocusedWaRect($waProc) {
     return $rect
 }
 
+function Get-WaRoot($waProc) {
+    return [System.Windows.Automation.AutomationElement]::FromHandle($waProc.MainWindowHandle)
+}
+
+function Find-WaSearchBox($root) {
+    # Find the sidebar search box by its real accessibility Name instead of a
+    # fractional pixel guess - confirmed 2026-09-21 via UI Automation dump:
+    # ControlType.Edit, Name='Search or start a new chat'. This is immune to
+    # window size/maximize-state changes, unlike hardcoded coordinate fractions.
+    $cond = New-Object System.Windows.Automation.PropertyCondition(
+        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [System.Windows.Automation.ControlType]::Edit)
+    $edits = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $cond)
+    foreach ($e in $edits) {
+        if ($e.Current.Name -like "Search or start a new chat*" -or $e.Current.Name -like "*Search*") {
+            return $e
+        }
+    }
+    return $null
+}
+
+function Find-WaChatRow($root, $namePattern) {
+    # Find the target contact's row by its real Name text (UI Automation
+    # DataItem) rather than a fractional pixel guess at "the first filtered
+    # result" - immune to list position, row height, and window size changes.
+    # Multiple accessibility nodes can carry the same/overlapping Name (a full
+    # row container plus nested text sub-elements); prefer the one with the
+    # largest bounding-rect area since that is the actual clickable row.
+    $all = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+    $best = $null
+    $bestArea = -1
+    foreach ($e in $all) {
+        try {
+            $n = $e.Current.Name
+            if ($n -and $n -like $namePattern) {
+                $r = $e.Current.BoundingRectangle
+                if (-not $r.IsEmpty) {
+                    $area = $r.Width * $r.Height
+                    if ($area -gt $bestArea) {
+                        $bestArea = $area
+                        $best = $e
+                    }
+                }
+            }
+        } catch {}
+    }
+    return $best
+}
+
+function Click-Element($el) {
+    $r = $el.Current.BoundingRectangle
+    $cx = [int]($r.X + $r.Width / 2)
+    $cy = [int]($r.Y + $r.Height / 2)
+    Click-At $cx $cy
+}
+
 if ($Phase -eq 'Open') {
     # ---------- WiFi check ----------
     try {
@@ -176,31 +259,42 @@ if ($Phase -eq 'Open') {
 
     $rect = Get-FocusedWaRect $waProc
     Set-EnglishInput $waProc
-    $winW = $rect.Right - $rect.Left
-    $winH = $rect.Bottom - $rect.Top
 
     # Ctrl+F was tried here previously (assuming it focuses the sidebar chat/contact
     # search) but it actually opens WhatsApp's in-chat message search - it searches
     # inside whatever conversation is currently open, not the chat list. Confirmed
     # 2026-09-10: it silently searched inside an unrelated already-open chat and never
-    # touched the sidebar search box, so no target chat was ever selected. Click the
-    # real sidebar search box directly instead (fractional coords - measured consistent
-    # across both a cold-launch window and an already-open docked window).
+    # touched the sidebar search box, so no target chat was ever selected.
     #
+    # Fractional-pixel clicking (the previous approach here) was confirmed broken
+    # 2026-09-21: the fractions were tuned for a small windowed WhatsApp, but a
+    # maximized 2560x1032 window put the real search box at (273,99) while the old
+    # math clicked (563,175) - nowhere near it. Find controls by their real UI
+    # Automation Name/ControlType instead, which is immune to window size/state.
+    $root = Get-WaRoot $waProc
+    $searchBox = Find-WaSearchBox $root
+    if (-not $searchBox) {
+        Log "Could not find WhatsApp search box via UI Automation. Aborting before any click."
+        exit 1
+    }
+    Click-Element $searchBox
+    Start-Sleep -Milliseconds ($(if ($coldLaunch) { 800 } else { 400 }))
+
     # Also confirmed 2026-09-17: searching the lowercase saved contact-book name
     # "tim mtn unlimit" matches a DIFFERENT, reassigned WhatsApp Business account
     # (+27 62 334 9790) that now also carries that label - a real mis-send risk.
     # The correct target has the display name "Tim mtn New Unlimit" and is a distinct
-    # contact. Search that exact string, wait for the filtered single-result list, and
-    # click the result row explicitly instead of blindly Down+Enter (search ordering
-    # is not guaranteed to put the right match first for ambiguous queries).
-    Click-At ($rect.Left + [int]($winW * 0.22)) ($rect.Top + [int]($winH * 0.17))
-    Start-Sleep -Milliseconds ($(if ($coldLaunch) { 800 } else { 400 }))
+    # contact. Search that exact string, then find and click the result row by its
+    # real Name instead of guessing its pixel position in the filtered list (search
+    # ordering is not guaranteed to put the right match first for ambiguous queries).
     [System.Windows.Forms.SendKeys]::SendWait("Tim mtn New Unlimit")
     Start-Sleep -Milliseconds ($(if ($coldLaunch) { 1500 } else { 900 }))
-    # Click the filtered result row (below the "Chats" section label, first entry).
-    # Fraction measured directly against the live window rect on 2026-09-17.
-    Click-At ($rect.Left + [int]($winW * 0.185)) ($rect.Top + [int]($winH * 0.215))
+    $chatRow = Find-WaChatRow $root "Tim mtn New Unlimit*"
+    if (-not $chatRow) {
+        Log "Could not find 'Tim mtn New Unlimit' chat row via UI Automation after search. Aborting before any click."
+        exit 1
+    }
+    Click-Element $chatRow
     Start-Sleep -Milliseconds ($(if ($coldLaunch) { 2000 } else { 1200 }))
 
     Save-FullScreenshot $VerifyOpenPath

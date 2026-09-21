@@ -11829,7 +11829,13 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
                     {!showSku&&p.brand&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{p.brand}</div>}
                     <div style={{fontSize:14,fontWeight:700,marginBottom:2,lineHeight:1.3}}>{p.name}</div>
                     {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:2}}>{p.chinese_desc}</div>}
-                    {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>🚗 {[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
+                    {(p.make||p.model)&&(()=>{
+                      const fitmentStr=[p.make,p.model,p.year_range].filter(Boolean).join(" · ");
+                      return (
+                        <div style={{fontSize:11,color:"var(--text3)",marginBottom:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}
+                          title={fitmentStr}>🚗 {fitmentStr}</div>
+                      );
+                    })()}
                     {showSku&&p.oe_number&&(()=>{const codes=p.oe_number.split(",").map(s=>s.trim()).filter(Boolean);const more=codes.length-1;return(
                       <div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}
                         title={p.oe_number}>OE: {codes[0]}{more>0?` +${more}`:""}</div>

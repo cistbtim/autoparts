@@ -762,6 +762,21 @@ ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:
     ${!settings.vat_number?`<div style="font-size:10px;color:#aaa;text-align:right;margin-top:4px">Not VAT Registered — no VAT charged</div>`:""}
   </div>
 
+  ${quote.deposit_message?`
+  <div style="background:#eff6ff;border:2px solid #2563eb;border-radius:8px;padding:14px 16px;margin-bottom:20px">
+    <div style="font-size:11px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">💰 Deposit Required</div>
+    <div style="font-size:13px;font-weight:600;color:#1a1a1a;line-height:1.5;margin-bottom:${(settings.bank_name||settings.bank_account_number)?"10px":"0"}">${quote.deposit_message}</div>
+    ${(settings.bank_name||settings.bank_account_number)?`
+    <div style="background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:10px 12px">
+      <div style="font-size:10px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🏦 Pay Deposit To</div>
+      ${[["Bank",settings.bank_name],["Account Holder",settings.bank_account_holder],["Account Number",settings.bank_account_number],["Branch Code",settings.bank_branch_code],["SWIFT / IBAN",settings.bank_swift]]
+        .filter(([,v])=>v)
+        .map(([label,value])=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:12px"><span style="color:#64748b">${label}</span><span style="font-weight:700;font-family:monospace">${value}</span></div>`)
+        .join("")}
+      ${settings.bank_reference_note?`<div style="margin-top:6px;font-size:11px;color:#475569;font-style:italic">ℹ️ ${settings.bank_reference_note}</div>`:""}
+    </div>`:""}
+  </div>`:""}
+
   ${quote.notes?`<div class="notes"><strong>Notes:</strong> ${quote.notes}</div>`:""}
 
   <div class="notice">

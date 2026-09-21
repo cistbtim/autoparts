@@ -493,6 +493,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     whatsapp_country_code: workshopProfile.whatsapp_country_code || settings.whatsapp_country_code || "",
     label_width_mm:  workshopProfile.label_width_mm  || 98,
     label_height_mm: workshopProfile.label_height_mm || 45,
+    bank_name:            workshopProfile.bank_name            || "",
+    bank_account_holder:  workshopProfile.bank_account_holder  || "",
+    bank_account_number:  workshopProfile.bank_account_number  || "",
+    bank_branch_code:     workshopProfile.bank_branch_code     || "",
+    bank_swift:           workshopProfile.bank_swift           || "",
+    bank_reference_note:  workshopProfile.bank_reference_note  || "",
   } : isBranchUser&&currentBranch ? {
     ...settings,
     shop_name: currentBranch.shop_name || currentBranch.name || settings.shop_name,
@@ -2015,7 +2021,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await refreshTables("workshop_quotes");
     return savedId;
   };
-  const sendQuoteForApproval=async(quoteId)=>{
+  const sendQuoteForApproval=async(quoteId,depositMessage)=>{
     const token=makeToken();
     // Shrink base64 logo to ~150px JPEG so it's small enough to store reliably in the quote record
     const rawLogo=workshopProfile.logo_url||workshopProfile.logo_data||"";
@@ -2036,7 +2042,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         img.src=rawLogo;
       });
     }
-    await api.patch("workshop_quotes","id",quoteId,{
+    const patchPayload={
       confirm_token:token,confirm_status:"pending",
       ws_name:workshopProfile.name||"",
       ws_phone:workshopProfile.phone||workshopProfile.whatsapp||"",
@@ -2044,7 +2050,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       ws_address:workshopProfile.address||"",
       ws_logo_url:storedLogo,
       ws_vat:workshopProfile.vat_number||"",
-    });
+      deposit_message:depositMessage||null,
+    };
+    let res=await api.patch("workshop_quotes","id",quoteId,patchPayload);
+    if(res&&!Array.isArray(res)&&res.message){
+      // deposit_message column may not exist yet (SQL migration not run) — a
+      // rejected column makes PostgREST fail the WHOLE patch, which would
+      // otherwise silently break the confirm_token write too. Retry without
+      // it so the core approval-link flow still works either way.
+      const {deposit_message,...fallbackPayload}=patchPayload;
+      await api.patch("workshop_quotes","id",quoteId,fallbackPayload);
+    }
     await refreshTables("workshop_quotes");
     return token;
   };
@@ -8117,6 +8133,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onRefreshJobsBoard={refreshJobsBoard}
             onSubmitFeedback={submitWorkshopFeedback}
             wsProfile={workshopProfile}
+            onSaveWsProfile={saveWorkshopProfile}
             wsShopRequests={wsShopRequests}
             onSaveWsShopRequest={saveWsShopRequest}
             branches={branches}

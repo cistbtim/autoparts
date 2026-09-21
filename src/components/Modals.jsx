@@ -70,6 +70,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
     licence_renewal_agent_name:"", licence_renewal_agent_phone:"", whatsapp_country_code:"", hide_ads:false, default_markup_pct:0, move_pin:"",
     label_width_mm:98, label_height_mm:45, linked_branch_id:"",
     part_label_w:98, part_label_h:45, shelf_label_w:70, shelf_label_h:45,
+    bank_name:"", bank_account_holder:"", bank_account_number:"", bank_branch_code:"", bank_swift:"", bank_reference_note:"",
     ...profile
   });
   const [saving,setSaving]=useState(false);
@@ -302,6 +303,20 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             <FL label="🔒 Move Job PIN"/>
             <input className="inp" type="password" value={f.move_pin||""} onChange={e=>s("move_pin",e.target.value)} placeholder="Set a PIN to restrict Move"/>
             <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Only users who enter this PIN can move jobs between workshops. Leave blank to disable.</div>
+          </div>
+        </div>
+
+        {/* Bank Account Details — shown to customers on quote-approval pages when a deposit is required */}
+        <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🏦 Bank Account Details</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>Shown to customers on the quote-approval page when a deposit is requested, so they can pay directly.</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div><FL label="Bank Name"/><input className="inp" value={f.bank_name||""} onChange={e=>s("bank_name",e.target.value)} placeholder="e.g. Standard Bank"/></div>
+            <div><FL label="Account Holder"/><input className="inp" value={f.bank_account_holder||""} onChange={e=>s("bank_account_holder",e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
+            <div><FL label="Account Number"/><input className="inp" value={f.bank_account_number||""} onChange={e=>s("bank_account_number",e.target.value)}/></div>
+            <div><FL label="Branch Code"/><input className="inp" value={f.bank_branch_code||""} onChange={e=>s("bank_branch_code",e.target.value)}/></div>
+            <div><FL label="SWIFT / IBAN (optional)"/><input className="inp" value={f.bank_swift||""} onChange={e=>s("bank_swift",e.target.value)}/></div>
+            <div><FL label="Payment Reference Note (optional)"/><input className="inp" value={f.bank_reference_note||""} onChange={e=>s("bank_reference_note",e.target.value)} placeholder="e.g. Use vehicle reg as reference"/></div>
           </div>
         </div>
 

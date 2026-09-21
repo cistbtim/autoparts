@@ -28,7 +28,7 @@ import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle}) {
+export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -416,6 +416,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         onSaveWsBooking={onSaveWsBooking}
         wsId={wsId}
         wsProfile={wsProfile}
+        onSaveWsProfile={onSaveWsProfile}
         wsProfiles={wsProfiles}
         wsFriends={wsFriends}
         onAddWsFriend={onAddWsFriend}
@@ -4361,7 +4362,7 @@ export function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
+function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},onSaveWsProfile,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -7748,13 +7749,22 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               </div>
               <div style={{fontSize:13,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",marginTop:3}}>{fmtAmt(quote.total)}</div>
             </div>
-            <span className="badge" style={{
-              background:quote.status==="accepted"?"rgba(52,211,153,.15)":quote.status==="declined"?"rgba(248,113,113,.15)":quote.status==="converted"?"rgba(100,116,139,.15)":"rgba(96,165,250,.15)",
-              color:quote.status==="accepted"?"var(--green)":quote.status==="declined"?"var(--red)":quote.status==="converted"?"var(--text3)":"var(--blue)",
-              fontSize:12,padding:"4px 10px"
-            }}>
-              {quote.status==="accepted"?"✅ "+t.wsqtAccepted:quote.status==="declined"?"❌ "+t.wsqtDeclined:quote.status==="converted"?"📄 "+t.wsqtConverted:"📤 "+quote.status.charAt(0).toUpperCase()+quote.status.slice(1)}
-            </span>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              {onRefresh&&quote.confirm_status==="pending"&&(
+                <button className="btn btn-ghost btn-sm" disabled={quoteRefreshing}
+                  onClick={async()=>{ setQuoteRefreshing(true); try{await onRefresh();}finally{setQuoteRefreshing(false);} }}
+                  style={{padding:"4px 8px",minWidth:28}} title="Check for customer's approval response">
+                  <span style={{display:"inline-block",animation:quoteRefreshing?"spin 0.8s linear infinite":"none",fontSize:14,lineHeight:1}}>🔄</span>
+                </button>
+              )}
+              <span className="badge" style={{
+                background:quote.status==="accepted"?"rgba(52,211,153,.15)":quote.status==="declined"?"rgba(248,113,113,.15)":quote.status==="converted"?"rgba(100,116,139,.15)":"rgba(96,165,250,.15)",
+                color:quote.status==="accepted"?"var(--green)":quote.status==="declined"?"var(--red)":quote.status==="converted"?"var(--text3)":"var(--blue)",
+                fontSize:12,padding:"4px 10px"
+              }}>
+                {quote.status==="accepted"?"✅ "+t.wsqtAccepted:quote.status==="declined"?"❌ "+t.wsqtDeclined:quote.status==="converted"?"📄 "+t.wsqtConverted:"📤 "+quote.status.charAt(0).toUpperCase()+quote.status.slice(1)}
+              </span>
+            </div>
           </div>
           {/* Customer confirm status */}
           {quote.confirm_status&&quote.confirm_status!=="pending"&&(
@@ -7769,6 +7779,11 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 </div>
                 {quote.confirmed_at&&<div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{new Date(quote.confirmed_at).toLocaleString()}</div>}
                 {quote.customer_note&&<div style={{fontSize:12,color:"var(--text2)",marginTop:3}}>💬 "{quote.customer_note}"</div>}
+                {quote.deposit_proof_url&&(
+                  <a href={quote.deposit_proof_url} target="_blank" rel="noreferrer" style={{display:"inline-block",fontSize:12,color:"var(--blue)",marginTop:3,fontWeight:600}}>
+                    📎 View deposit proof of payment
+                  </a>
+                )}
               </div>
             </div>
           )}
@@ -8664,8 +8679,9 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             ? (()=>{ try{ const ids=new Set(JSON.parse(quote.selected_item_ids)); const f=items.filter(i=>ids.has(i.id)); return f.length>0?f:items; }catch{ return items; } })()
             : items} settings={settings}
           vehiclePhotos={vehiclePhotos}
-          onSend={async()=>{
-            const token = await onSendQuoteForApproval(quote.id);
+          wsProfile={wsProfile} onSaveWsProfile={onSaveWsProfile}
+          onSend={async(depositMsg)=>{
+            const token = await onSendQuoteForApproval(quote.id, depositMsg);
             return `${window.location.origin}${window.location.pathname}?wsq=${token}`;
           }}
           onClose={()=>setApprovalModal(false)}/>
@@ -8963,7 +8979,9 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
 // ═══════════════════════════════════════════════════════════════
 // QUOTE APPROVAL MODAL
 // ═══════════════════════════════════════════════════════════════
-function QuoteApprovalModal({quote,job,items,settings,onSend,onClose}) {
+const DEFAULT_DEPOSIT_MSG = "💰 A deposit is required before we start any work on your vehicle. Please arrange payment once you approve this quote, then send us proof of payment to confirm your job slot.";
+
+function QuoteApprovalModal({quote,job,items,settings,wsProfile={},onSaveWsProfile,onSend,onClose}) {
   const sym = curSym(settings.currency||getSettings().currency);
   const fmt = v=>`${sym}${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const [link, setLink] = useState(quote.confirm_token
@@ -8971,6 +8989,14 @@ function QuoteApprovalModal({quote,job,items,settings,onSend,onClose}) {
     : null);
   const [sending, setSending] = useState(false);
   const [copied,  setCopied]  = useState(false);
+  const initialDepositMsg = quote.deposit_message||wsProfile.deposit_message_template||DEFAULT_DEPOSIT_MSG;
+  const [depositMsg, setDepositMsg] = useState(initialDepositMsg);
+  const [savingTpl, setSavingTpl] = useState(false);
+  // Tracks the deposit text the currently-live link/PDF was actually generated
+  // with, so an unsaved edit can't be sent while the link still reflects the
+  // old wording — Send/Preview stay disabled until Update-or-Save catches up.
+  const [confirmedDepositMsg, setConfirmedDepositMsg] = useState(initialDepositMsg.trim());
+  const depositDirty = depositMsg.trim()!==confirmedDepositMsg;
 
   const phone = job?.customer_phone||"";
   const shopName = settings.shop_name||"Workshop";
@@ -8980,17 +9006,27 @@ function QuoteApprovalModal({quote,job,items,settings,onSend,onClose}) {
   const generate = async () => {
     setSending(true);
     try {
-      const url = await onSend();
+      const url = await onSend(depositMsg.trim());
       setLink(url);
+      setConfirmedDepositMsg(depositMsg.trim());
     } catch(e) { alert("Failed to generate link: "+e.message); }
     setSending(false);
+  };
+
+  const saveAsDefault = async () => {
+    if(!onSaveWsProfile) return;
+    setSavingTpl(true);
+    // saveWorkshopProfile already shows a success/failure toast — nothing more to do here.
+    await onSaveWsProfile({deposit_message_template:depositMsg.trim()});
+    setConfirmedDepositMsg(depositMsg.trim());
+    setSavingTpl(false);
   };
 
   const copy = () => {
     navigator.clipboard.writeText(link).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
   };
 
-  const waMsg = `Hi${job?.customer_name?" "+job.customer_name:""},\n\n${shopName} has sent you a quotation for ${reg?"your vehicle "+reg+" ":""}totalling *${total}*.\n\nOpen the link to:\n• View all work items\n• Download the PDF\n• Approve or decline\n\n${link}`;
+  const waMsg = `Hi${job?.customer_name?" "+job.customer_name:""},\n\n${shopName} has sent you a quotation for ${reg?"your vehicle "+reg+" ":""}totalling *${total}*.\n\n${depositMsg.trim()?depositMsg.trim()+"\n\n":""}Open the link to:\n• View all work items\n• Download the PDF\n• Approve or decline\n\n${link}`;
 
   const alreadySent = !!quote.confirm_token;
 
@@ -9030,31 +9066,73 @@ function QuoteApprovalModal({quote,job,items,settings,onSend,onClose}) {
         </div>
       )}
 
-      {/* Link area */}
+      {/* 1. Deposit / message to customer — sent alongside the quote PDF & link */}
+      <div style={{marginBottom:16}}>
+        <FL label="💰 Deposit / message to customer"/>
+        <textarea className="inp" rows={3} value={depositMsg} onChange={e=>setDepositMsg(e.target.value)}
+          placeholder="e.g. A 50% deposit is required before we start the job…"/>
+        <div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>Included in the WhatsApp message sent with the quote.</div>
+      </div>
+
+      {/* 2. Confirm the message: generate/update the link, and/or save it as the default */}
       {link ? (
+        <div style={{display:"flex",gap:8,marginBottom:16}}>
+          <button className="btn btn-ghost btn-sm" style={{flex:2}} onClick={generate} disabled={sending}>
+            {sending?"⏳ Updating…":"🔄 Update message & regenerate link"}
+          </button>
+          {onSaveWsProfile&&(
+            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={saveAsDefault} disabled={savingTpl}>
+              {savingTpl?"⏳ Saving…":"💾 Save as default"}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{marginBottom:16}}>
+          <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,fontWeight:700}} onClick={generate} disabled={sending}>
+            {sending?"⏳ Generating link…":"📤 Generate Approval Link"}
+          </button>
+          {onSaveWsProfile&&(
+            <button className="btn btn-ghost btn-sm" style={{width:"100%",marginTop:8}} onClick={saveAsDefault} disabled={savingTpl}>
+              {savingTpl?"⏳ Saving…":"💾 Save as default"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 3. Approval link — copy, send via WhatsApp, preview */}
+      {link && (
         <div>
           <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:6}}>🔗 Approval link</div>
           <div style={{display:"flex",gap:8,marginBottom:12}}>
             <input readOnly value={link} className="inp" style={{fontFamily:"DM Mono,monospace",fontSize:11,flex:1,cursor:"text"}} onClick={e=>e.target.select()}/>
             <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={copy}>{copied?"✅ Copied":"📋 Copy"}</button>
           </div>
+          {depositDirty&&(
+            <div style={{marginBottom:10,padding:"8px 12px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.3)",borderRadius:8,fontSize:12,color:"var(--yellow)"}}>
+              ⚠️ Deposit message edited — click "Update message & regenerate link" or "Save as default" before sending.
+            </div>
+          )}
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {phone&&(
-              <a href={waLink(phone,waMsg,settings.whatsapp_country_code)} target="_blank" rel="noreferrer"
-                style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"11px 14px",
-                  background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,
-                  color:"#25D366",fontWeight:700,fontSize:13,textDecoration:"none",minWidth:120}}>
-                <span style={{fontSize:18}}>📱</span> Send via WhatsApp
-              </a>
+            {phone&&(depositDirty
+              ? <span title="Update or save the deposit message first"
+                  style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"11px 14px",
+                    background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,
+                    color:"var(--text3)",fontWeight:700,fontSize:13,minWidth:120,opacity:.5,cursor:"not-allowed"}}>
+                  <span style={{fontSize:18}}>📱</span> Send via WhatsApp
+                </span>
+              : <a href={waLink(phone,waMsg,settings.whatsapp_country_code)} target="_blank" rel="noreferrer"
+                  style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"11px 14px",
+                    background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,
+                    color:"#25D366",fontWeight:700,fontSize:13,textDecoration:"none",minWidth:120}}>
+                  <span style={{fontSize:18}}>📱</span> Send via WhatsApp
+                </a>
             )}
-            <button className="btn btn-ghost" style={{flex:1,minWidth:100}} onClick={()=>window.open(link,"_blank")}>🔗 Preview link</button>
+            <button className="btn btn-ghost" style={{flex:1,minWidth:100,opacity:depositDirty?.5:1,cursor:depositDirty?"not-allowed":"pointer"}}
+              onClick={()=>window.open(link,"_blank")} disabled={depositDirty}
+              title={depositDirty?"Update or save the deposit message first":""}>🔗 Preview link</button>
           </div>
           <div style={{marginTop:10,fontSize:11,color:"var(--text3)",textAlign:"center"}}>Share this link with the customer. They can approve or decline without logging in.</div>
         </div>
-      ) : (
-        <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,fontWeight:700}} onClick={generate} disabled={sending}>
-          {sending?"⏳ Generating link…":"📤 Generate Approval Link"}
-        </button>
       )}
     </Overlay>
   );

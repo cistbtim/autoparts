@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from "react";
-import { api, SUPABASE_URL, SUPABASE_KEY } from "../lib/api.js";
+import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
 import { toImgUrl, waLink, makeId } from "../lib/helpers.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { T } from "../lib/i18n.js";
@@ -555,6 +555,11 @@ export function QuoteConfirmPage({token}) {
   const [done,setDone]=useState(null); // null | "confirmed" | "declined"
   const [saving,setSaving]=useState(false);
   const [agreed,setAgreed]=useState(false);
+  const [depositPaidAck,setDepositPaidAck]=useState(false);
+  const [depositProof,setDepositProof]=useState(null); // {url,name} | null
+  const [depositUploading,setDepositUploading]=useState(false);
+  const [depositUploadErr,setDepositUploadErr]=useState("");
+  const [copiedBankField,setCopiedBankField]=useState("");
   const [t,setT]=useState(T.en);
 
   useEffect(()=>{
@@ -572,7 +577,11 @@ export function QuoteConfirmPage({token}) {
           api.get("workshop_job_items",`job_id=eq.${q.job_id}&select=*`).catch(()=>[]),
           api.get("workshop_jobs",`id=eq.${q.job_id}&select=*`).catch(()=>[]),
           // Try to fetch workshop profile for logo — may be blocked by RLS, that's fine
-          q.workshop_id?api.get("workshop_profiles",`id=eq.${q.workshop_id}&select=name,phone,whatsapp,email,address,logo_url,logo_data,vat_number`).catch(()=>[]):Promise.resolve([]),
+          // select=* (not an explicit column list) so this keeps working even if an
+          // optional column like the bank_* fields hasn't been migrated in yet —
+          // an unknown column in an explicit list would 400 the whole request and
+          // silently drop name/phone/logo too.
+          q.workshop_id?api.get("workshop_profiles",`id=eq.${q.workshop_id}&select=*`).catch(()=>[]):Promise.resolve([]),
         ]);
         const allItems=Array.isArray(ji)?ji:[];
         // Only show the items actually selected for this quote, not every item on the job.
@@ -590,6 +599,12 @@ export function QuoteConfirmPage({token}) {
           address:  q.ws_address||prof?.address||"",
           logo_url: prof?.logo_url||prof?.logo_data||q.ws_logo_url||"",
           vat_number: q.ws_vat||prof?.vat_number||"",
+          bank_name: prof?.bank_name||"",
+          bank_account_holder: prof?.bank_account_holder||"",
+          bank_account_number: prof?.bank_account_number||"",
+          bank_branch_code: prof?.bank_branch_code||"",
+          bank_swift: prof?.bank_swift||"",
+          bank_reference_note: prof?.bank_reference_note||"",
         });
       }
       setShopSettings(shopSett);
@@ -603,14 +618,59 @@ export function QuoteConfirmPage({token}) {
     })();
   },[token]);
 
+  const copyBankField=(field,value)=>{
+    navigator.clipboard.writeText(value).then(()=>{ setCopiedBankField(field); setTimeout(()=>setCopiedBankField(""),1500); });
+  };
+
+  const handleDepositProof=async(e)=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    e.target.value="";
+    setDepositUploadErr(""); setDepositUploading(true);
+    try{
+      const isPdf=file.type==="application/pdf";
+      let blob,mimeType,ext;
+      if(isPdf){
+        blob=file; mimeType="application/pdf"; ext="pdf";
+      } else {
+        const dataUrl=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
+        blob=await new Promise((res,rej)=>{
+          const img=new Image();
+          img.onload=()=>{
+            const MAX=1600; const canvas=document.createElement("canvas");
+            let w=img.width,h=img.height;
+            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+            canvas.width=w;canvas.height=h;
+            canvas.getContext("2d").drawImage(img,0,0,w,h);
+            canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.88);
+          };
+          img.onerror=rej; img.src=dataUrl;
+        });
+        mimeType="image/jpeg"; ext="jpg";
+      }
+      const path=`deposit_proofs/${quote.id}/${Date.now()}.${ext}`;
+      const url=await uploadToStorage("cars_parts",path,blob,mimeType);
+      setDepositProof({url,name:file.name});
+    }catch(err){ setDepositUploadErr(err.message||"Upload failed"); }
+    finally{ setDepositUploading(false); }
+  };
+
   const respond=async(status)=>{
     setSaving(true);
     try{
-      await api.patch("workshop_quotes","confirm_token",token,{
+      const patchPayload={
         confirm_status:status,
         confirmed_at:new Date().toISOString(),
         customer_note:note.trim()||null,
-      });
+        deposit_proof_url:depositProof?.url||null,
+      };
+      let res=await api.patch("workshop_quotes","confirm_token",token,patchPayload);
+      if(res&&!Array.isArray(res)&&res.message){
+        // deposit_proof_url column may not exist yet — retry without it so the
+        // core approve/decline flow isn't blocked by the deposit-proof migration.
+        const {deposit_proof_url,...fallbackPayload}=patchPayload;
+        res=await api.patch("workshop_quotes","confirm_token",token,fallbackPayload);
+        if(res&&!Array.isArray(res)&&res.message) throw new Error(res.message);
+      }
       setDone(status);
     }catch(e){ alert("Failed to submit: "+e.message); }
     finally{ setSaving(false); }
@@ -685,6 +745,7 @@ export function QuoteConfirmPage({token}) {
   .t-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #eee}
   .t-total{display:flex;justify-content:space-between;align-items:center;padding:14px 12px;font-size:22px;font-weight:900;color:#ff7a2e;background:#fff7ed;border-top:3px solid #ff7a2e;border-radius:0 0 6px 6px;margin-top:4px}
   .notes-box{background:#fff8ed;border:1px solid #fcd34d;border-radius:8px;padding:12px;font-size:12px;margin-bottom:20px}
+  .deposit-box{background:#eff6ff;border:1px solid #2563eb;border-radius:8px;padding:12px;font-size:12px;margin-bottom:20px}
   .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
   @media print{body{padding:18px}}
 </style></head><body>
@@ -739,6 +800,7 @@ export function QuoteConfirmPage({token}) {
   ${taxRate>0?`<div class="t-row"><span>${t.wsqPdfVat} (${taxRate}%)</span><span>${fmt(taxAmt)}</span></div>`:""}
   <div class="t-total"><span>${t.wsqPdfTotal}</span><span>${fmt(total)}</span></div>
 </div>
+${quote.deposit_message?`<div class="deposit-box">💰 <strong>Deposit Required:</strong> ${quote.deposit_message}</div>`:""}
 ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote.notes}</div>`:""}
 <div class="footer">
   ${bizName}${bizPhone?` · 📞 ${bizPhone}`:""}${bizEmail?` · ✉️ ${bizEmail}`:""}
@@ -862,6 +924,68 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
               </div>
             </div>
 
+            {/* Deposit request from workshop */}
+            {quote.deposit_message&&(
+              <div style={{padding:"14px 18px",marginBottom:14,background:"#eff6ff",border:"2px solid #2563eb",borderRadius:12}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#1d4ed8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:6}}>💰 Deposit Required</div>
+                <div style={{fontSize:15,fontWeight:600,color:"#1a1a1a",lineHeight:1.5,marginBottom:12}}>{quote.deposit_message}</div>
+
+                {/* Bank account details to pay the deposit into */}
+                {(wsProfile.bank_name||wsProfile.bank_account_number)&&(
+                  <div style={{background:"#fff",border:"1px solid #bfdbfe",borderRadius:10,padding:"10px 12px",marginBottom:12}}>
+                    <div style={{fontSize:11,fontWeight:800,color:"#1d4ed8",textTransform:"uppercase",letterSpacing:".05em",marginBottom:8}}>🏦 Pay Deposit To</div>
+                    {[
+                      ["Bank",wsProfile.bank_name],
+                      ["Account Holder",wsProfile.bank_account_holder],
+                      ["Account Number",wsProfile.bank_account_number],
+                      ["Branch Code",wsProfile.bank_branch_code],
+                      ["SWIFT / IBAN",wsProfile.bank_swift],
+                    ].filter(([,v])=>v).map(([label,value])=>(
+                      <div key={label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #f1f5f9"}}>
+                        <div style={{minWidth:0}}>
+                          <div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:".04em"}}>{label}</div>
+                          <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a",fontFamily:"DM Mono,monospace",wordBreak:"break-all"}}>{value}</div>
+                        </div>
+                        <button type="button" onClick={()=>copyBankField(label,value)}
+                          style={{flexShrink:0,fontSize:11,fontWeight:600,padding:"5px 10px",borderRadius:6,border:"1px solid #bfdbfe",background:copiedBankField===label?"#dcfce7":"#eff6ff",color:copiedBankField===label?"#166534":"#1d4ed8",cursor:"pointer"}}>
+                          {copiedBankField===label?"✅ Copied":"📋 Copy"}
+                        </button>
+                      </div>
+                    ))}
+                    {wsProfile.bank_reference_note&&(
+                      <div style={{marginTop:8,fontSize:12,color:"#475569",fontStyle:"italic"}}>ℹ️ {wsProfile.bank_reference_note}</div>
+                    )}
+                  </div>
+                )}
+
+                {/* Proof of payment upload */}
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:"#1d4ed8",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>
+                  📎 Upload proof of payment
+                </label>
+                <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"12px 14px",
+                  background:"#fff",border:"2px dashed #93c5fd",borderRadius:10,cursor:depositUploading?"wait":"pointer",fontSize:13,fontWeight:600,color:"#1d4ed8"}}>
+                  <input type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleDepositProof} disabled={depositUploading}/>
+                  {depositUploading?"⏳ Uploading…":depositProof?`✅ ${depositProof.name}`:"📄 Choose PDF or photo"}
+                </label>
+                {depositUploadErr&&<div style={{marginTop:6,fontSize:12,color:"#dc2626"}}>❌ {depositUploadErr}</div>}
+                {depositProof&&(
+                  <a href={depositProof.url} target="_blank" rel="noreferrer" style={{display:"inline-block",marginTop:6,fontSize:12,color:"#2563eb"}}>
+                    🔗 View uploaded file
+                  </a>
+                )}
+
+                {/* Deposit-paid acknowledgement */}
+                <label style={{display:"flex",alignItems:"flex-start",gap:10,marginTop:12,cursor:depositProof?"pointer":"not-allowed",opacity:depositProof?1:.5}}>
+                  <input type="checkbox" checked={depositPaidAck} disabled={!depositProof}
+                    onChange={e=>setDepositPaidAck(e.target.checked)}
+                    style={{width:20,height:20,marginTop:1,accentColor:"#2563eb",flexShrink:0,cursor:depositProof?"pointer":"not-allowed"}}/>
+                  <span style={{fontSize:13,fontWeight:600,color:"#1a1a1a",lineHeight:1.5}}>
+                    I have paid the deposit and attached proof of payment above.
+                  </span>
+                </label>
+              </div>
+            )}
+
             {/* Notes from workshop */}
             {quote.notes&&(
               <div style={{padding:"14px 18px",marginBottom:14,background:"#fffbeb",border:"2px solid #f59e0b",borderRadius:12}}>
@@ -887,16 +1011,21 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
             </label>
 
             {/* Action buttons */}
-            <div style={{display:"flex",gap:12,marginBottom:24}}>
-              <button className="btn" style={{flex:1,padding:16,fontSize:15,fontWeight:700,background:"rgba(248,113,113,.15)",color:"var(--red)",border:"2px solid rgba(248,113,113,.4)",borderRadius:12}}
-                onClick={()=>respond("declined")} disabled={saving}>
-                ❌ {t.wsqDeclineBtn}
-              </button>
-              <button className="btn btn-primary" style={{flex:2,padding:16,fontSize:15,fontWeight:700,borderRadius:12,opacity:agreed?1:.4,cursor:agreed?"pointer":"not-allowed",transition:"opacity .2s"}}
-                onClick={()=>agreed&&respond("confirmed")} disabled={saving||!agreed}>
-                {saving?t.wsqSubmitting:`✅ ${t.wsqApproveBtn}`}
-              </button>
-            </div>
+            {(()=>{
+              const canApprove=agreed&&(!quote.deposit_message||depositPaidAck);
+              return (
+                <div style={{display:"flex",gap:12,marginBottom:24}}>
+                  <button className="btn" style={{flex:1,padding:16,fontSize:15,fontWeight:700,background:"rgba(248,113,113,.15)",color:"var(--red)",border:"2px solid rgba(248,113,113,.4)",borderRadius:12}}
+                    onClick={()=>respond("declined")} disabled={saving}>
+                    ❌ {t.wsqDeclineBtn}
+                  </button>
+                  <button className="btn btn-primary" style={{flex:2,padding:16,fontSize:15,fontWeight:700,borderRadius:12,opacity:canApprove?1:.4,cursor:canApprove?"pointer":"not-allowed",transition:"opacity .2s"}}
+                    onClick={()=>canApprove&&respond("confirmed")} disabled={saving||!canApprove}>
+                    {saving?t.wsqSubmitting:`✅ ${t.wsqApproveBtn}`}
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Workshop contact */}
             <div style={{textAlign:"center",color:"var(--text3)",fontSize:12}}>

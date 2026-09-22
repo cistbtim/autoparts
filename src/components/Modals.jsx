@@ -155,7 +155,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
   const logoSrc=f.logo_url||f.logo_data;
 
   return (
-    <div className="fu" style={{maxWidth:560}}>
+    <div className="fu" style={{maxWidth:960}}>
       <h1 style={{fontSize:20,fontWeight:700,marginBottom:16}}>⚙️ Workshop Settings</h1>
 
       {wsRole==="main"&&(
@@ -277,14 +277,14 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             <span style={{marginLeft:"auto",fontSize:12}}>🔒</span>
           </div>
         )}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
           <div style={{gridColumn:"1/-1"}}><FL label="Workshop Name *"/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
           <div><FL label="VAT / Tax Number"/><input className="inp" value={f.vat_number} onChange={e=>s("vat_number",e.target.value)}/></div>
           <div><FL label="Tax Rate (%)"/><input className="inp" type="number" value={f.tax_rate} onChange={e=>s("tax_rate",+e.target.value||0)} placeholder="15"/></div>
           <div><FL label="Website"/><input className="inp" value={f.website} onChange={e=>s("website",e.target.value)} placeholder="https://..."/></div>
           <div><FL label="Phone"/><input className="inp" value={f.phone} onChange={e=>s("phone",e.target.value)} placeholder="+27..."/></div>
           <div><FL label="WhatsApp"/><input className="inp" value={f.whatsapp} onChange={e=>s("whatsapp",e.target.value)} placeholder="+27..."/></div>
-          <div style={{gridColumn:"1/-1"}}><FL label="Email"/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div>
+          <div><FL label="Email"/><input className="inp" type="email" value={f.email} onChange={e=>s("email",e.target.value)}/></div>
           <div style={{gridColumn:"1/-1"}}><FL label="Address"/><textarea className="inp" rows={3} value={f.address} onChange={e=>s("address",e.target.value)} style={{resize:"vertical"}}/></div>
           <div style={{gridColumn:"1/-1"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
@@ -304,7 +304,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             </div>
             <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Province is used to auto-pick your default 🪪 Licence Renewal Agent below</div>
           </div>
-          <div style={{gridColumn:"1/-1"}}>
+          <div>
             <FL label="Currency"/>
             <select className="inp" value={f.currency||"ZAR R"} onChange={e=>s("currency",e.target.value)}>
               {["ZAR R","USD $","EUR €","GBP £","TWD NT$","CNY ¥","JPY ¥","AUD A$","CAD C$","SGD S$","MYR RM","THB ฿","INR ₹","AED د.إ","NGN ₦","KES KSh","GHS GH₵"].map(c=>(
@@ -330,7 +330,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
         <div>
           <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🏦 Bank Account Details</div>
           <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>Shown to customers on the quote-approval page when a deposit is requested, so they can pay directly.</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
             <div><FL label="Bank Name"/><input className="inp" value={f.bank_name||""} onChange={e=>s("bank_name",e.target.value)} placeholder="e.g. Standard Bank"/></div>
             <div><FL label="Account Holder"/><input className="inp" value={f.bank_account_holder||""} onChange={e=>s("bank_account_holder",e.target.value)} placeholder="e.g. ABC Auto Workshop"/></div>
             <div><FL label="Account Number"/><input className="inp" value={f.bank_account_number||""} onChange={e=>s("bank_account_number",e.target.value)}/></div>

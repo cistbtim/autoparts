@@ -3,7 +3,7 @@ import { uploadToStorage } from "../lib/api.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { makeId, waLink } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
-import { Overlay, MHead, FL, FG, ImgLightbox } from "./shared.jsx";
+import { Overlay, MHead, FL, FG, ImgLightbox, LicenceDocsChecklist, RenewalDocsModal } from "./shared.jsx";
 
 // current_expiry (the expiry the renewal was submitted against) + renewal_years
 // gives the date the NEW disc granted by a completed renewal actually expires —
@@ -211,7 +211,9 @@ export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSav
       )}
 
       {docsRenewal&&(
-        <RenewalDocsModal renewal={docsRenewal} onUpdate={onUpdate} onClose={()=>setDocsRenewal(null)}/>
+        <RenewalDocsModal renewal={docsRenewal} viewer="agent"
+          workshopName={workshopNames[docsRenewal.workshop_id]||(docsRenewal.workshop_id?docsRenewal.workshop_id:"🚶 Walk-in")}
+          onUpdate={onUpdate} onClose={()=>setDocsRenewal(null)}/>
       )}
 
       {walkInPrefill&&onSave&&(
@@ -232,13 +234,12 @@ function WalkInRenewalModal({prefill={}, onSave, onClose}) {
   const [f, setF] = useState({
     vehicle_reg:"", vehicle_make:"", vehicle_model:"", vin:"", engine_no:"",
     current_expiry:"", owner_name:"", owner_phone:"", owner_id:"",
-    renewal_years:"1", notes:"", document_url:"", workshop_id:null,
+    renewal_years:"1", notes:"", documents:{}, workshop_id:null,
     ...prefill,
   });
   const [saving, setSaving] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState("");
-  const [uploadingDoc, setUploadingDoc] = useState(false);
   const s = (k,v) => setF(p=>({...p,[k]:v}));
 
   const processScan = async (dataUrl) => {
@@ -262,37 +263,6 @@ function WalkInRenewalModal({prefill={}, onSave, onClose}) {
     const fr = new FileReader();
     fr.onload = ev => processScan(ev.target.result);
     fr.readAsDataURL(file);
-  };
-
-  const handleDocUpload = async (e) => {
-    const file = e.target.files?.[0]; if(!file) return;
-    e.target.value="";
-    setUploadingDoc(true);
-    try{
-      const isPdf = file.type==="application/pdf";
-      let blob, mimeType, ext;
-      if(isPdf){ blob=file; mimeType="application/pdf"; ext="pdf"; }
-      else {
-        const dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
-        blob = await new Promise((res,rej)=>{
-          const img=new Image();
-          img.onload=()=>{
-            const MAX=1600; const canvas=document.createElement("canvas");
-            let w=img.width,h=img.height;
-            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
-            canvas.width=w;canvas.height=h;
-            canvas.getContext("2d").drawImage(img,0,0,w,h);
-            canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
-          };
-          img.onerror=rej; img.src=dataUrl;
-        });
-        mimeType="image/jpeg"; ext="jpg";
-      }
-      const path=`licence_renewals/${(f.vehicle_reg||"walkin").replace(/[\s/\\]/g,"_").toUpperCase()}_${Date.now()}.${ext}`;
-      const url = await uploadToStorage("cars_parts",path,blob,mimeType);
-      s("document_url",url);
-    }catch(err){ alert("Upload failed: "+err.message); }
-    setUploadingDoc(false);
   };
 
   const save = async () => {
@@ -355,13 +325,9 @@ function WalkInRenewalModal({prefill={}, onSave, onClose}) {
       </div>
 
       <div style={{marginBottom:14}}>
-        <FL label="Attach current licence disc / document (optional)"/>
-        <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"10px 14px",
-          background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:uploadingDoc?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>
-          <input type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleDocUpload} disabled={uploadingDoc}/>
-          {uploadingDoc?"⏳ Uploading…":f.document_url?"✅ Document attached — tap to replace":"📎 Choose PDF or photo"}
-        </label>
-        {f.document_url&&<a href={f.document_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"var(--blue)",marginTop:4,display:"inline-block"}}>🔗 View attached document</a>}
+        <FL label="Supporting Documents (optional)"/>
+        <LicenceDocsChecklist documents={f.documents} onChange={docs=>s("documents",docs)}
+          pathPrefix={`licence_renewals/${(f.vehicle_reg||"walkin").replace(/[\s/\\]/g,"_").toUpperCase()}`}/>
       </div>
 
       <FL label="Notes"/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Any special instructions…" style={{minHeight:50,marginBottom:16}}/>
@@ -370,70 +336,6 @@ function WalkInRenewalModal({prefill={}, onSave, onClose}) {
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save Renewal"}</button>
       </div>
-    </Overlay>
-  );
-}
-
-function RenewalDocsModal({renewal, onUpdate, onClose}) {
-  const [uploading, setUploading] = useState(""); // "" | "receipt" | "new_licence"
-
-  const upload = async (field, file) => {
-    setUploading(field);
-    try{
-      const isPdf = file.type==="application/pdf";
-      let blob, mimeType, ext;
-      if(isPdf){ blob=file; mimeType="application/pdf"; ext="pdf"; }
-      else {
-        const dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
-        blob = await new Promise((res,rej)=>{
-          const img=new Image();
-          img.onload=()=>{
-            const MAX=1600; const canvas=document.createElement("canvas");
-            let w=img.width,h=img.height;
-            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
-            canvas.width=w;canvas.height=h;
-            canvas.getContext("2d").drawImage(img,0,0,w,h);
-            canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
-          };
-          img.onerror=rej; img.src=dataUrl;
-        });
-        mimeType="image/jpeg"; ext="jpg";
-      }
-      const path=`licence_renewals/${(renewal.vehicle_reg||"doc").replace(/[\s/\\]/g,"_").toUpperCase()}_${field}_${Date.now()}.${ext}`;
-      const url = await uploadToStorage("cars_parts",path,blob,mimeType);
-      await onUpdate(renewal.id,{[`${field}_url`]:url});
-    }catch(err){ alert("Upload failed: "+err.message); }
-    setUploading("");
-  };
-
-  const Row = ({field, label, icon, url}) => (
-    <div style={{marginBottom:14}}>
-      <FL label={`${icon} ${label}`}/>
-      <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"10px 14px",
-        background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:uploading?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>
-        <input type="file" accept="image/*,application/pdf" style={{display:"none"}}
-          onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f) upload(field,f); }} disabled={!!uploading}/>
-        {uploading===field?"⏳ Uploading…":url?"✅ Uploaded — tap to replace":"📎 Choose PDF or photo"}
-      </label>
-      {url&&<a href={url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"var(--blue)",marginTop:4,display:"inline-block"}}>🔗 View</a>}
-    </div>
-  );
-
-  return (
-    <Overlay onClose={onClose}>
-      <MHead title={`📎 Documents — ${renewal.vehicle_reg||"Renewal"}`} onClose={onClose}/>
-      <div style={{marginBottom:16}}>
-        <FL label="📄 Customer's Original Document"/>
-        {renewal.document_url
-          ? <a href={renewal.document_url} target="_blank" rel="noreferrer" style={{display:"block",marginTop:4,fontSize:13,color:"var(--blue)"}}>🔗 View submitted document</a>
-          : <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>No document was attached by the workshop.</div>}
-      </div>
-      <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
-        <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>Send back to customer</div>
-        <Row field="receipt" label="Payment Receipt" icon="🧾" url={renewal.receipt_url}/>
-        <Row field="new_licence" label="New Licence Disc" icon="🪪" url={renewal.new_licence_url}/>
-      </div>
-      <button className="btn btn-primary" style={{width:"100%"}} onClick={onClose}>Done</button>
     </Overlay>
   );
 }

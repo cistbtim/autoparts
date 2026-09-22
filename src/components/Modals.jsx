@@ -62,12 +62,13 @@ function detectSide(sku, name) {
   return null;
 }
 
-export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=[],user=null,subActive=false}) {
+export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=[],user=null,subActive=false,settings={}}) {
   const [pTab,setPTab]=useState("profile"); // "profile" | "users"
   const [f,setF]=useState({
     name:"", vat_number:"", tax_rate:0, phone:"", whatsapp:"", email:"",
-    address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"",
-    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", whatsapp_country_code:"", hide_ads:false, default_markup_pct:0, move_pin:"",
+    address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"", province:"",
+    licence_renewal_agent_name:"", licence_renewal_agent_phone:"", custom_licence_agents:[],
+    whatsapp_country_code:"", hide_ads:false, default_markup_pct:0, move_pin:"",
     label_width_mm:98, label_height_mm:45, linked_branch_id:"",
     part_label_w:98, part_label_h:45, shelf_label_w:70, shelf_label_h:45,
     bank_name:"", bank_account_holder:"", bank_account_number:"", bank_branch_code:"", bank_swift:"", bank_reference_note:"",
@@ -76,6 +77,9 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
   const [saving,setSaving]=useState(false);
   const [detectingLoc,setDetectingLoc]=useState(false);
   const [dragOver,setDragOver]=useState(false);
+  const [showAddAgent,setShowAddAgent]=useState(false);
+  const [newAgentName,setNewAgentName]=useState("");
+  const [newAgentPhone,setNewAgentPhone]=useState("");
   const fileRef=useRef(null);
   // Workshop users state
   const [wsUsers,setWsUsers]=useState([]);
@@ -275,16 +279,18 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
               <FL label="City & Country"/>
               <button type="button" className="btn btn-ghost btn-xs" disabled={detectingLoc} onClick={async()=>{
                 setDetectingLoc(true);
-                try{const loc=await detectGeoLocation();s("city",loc.city);s("country",loc.country);}catch{/* ignore geo detection errors */}
+                try{const loc=await detectGeoLocation();s("city",loc.city);s("country",loc.country);s("province",loc.province||"");}catch{/* ignore geo detection errors */}
                 setDetectingLoc(false);
               }} style={{fontSize:11,padding:"3px 9px"}}>
                 {detectingLoc?"Detecting...":"📍 Auto-detect"}
               </button>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
               <input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)} placeholder="City"/>
+              <input className="inp" value={f.province||""} onChange={e=>s("province",e.target.value)} placeholder="Province / State"/>
               <input className="inp" value={f.country||""} onChange={e=>s("country",e.target.value)} placeholder="Country"/>
             </div>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Province is used to auto-pick your default 🪪 Licence Renewal Agent below</div>
           </div>
           <div style={{gridColumn:"1/-1"}}>
             <FL label="Currency"/>
@@ -370,15 +376,78 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
           </div>
         </div>
 
-        {/* Licence Renewal Agent */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-          <div><FL label="🪪 Renewal Agent Name"/><input className="inp" value={f.licence_renewal_agent_name||""} onChange={e=>s("licence_renewal_agent_name",e.target.value)} placeholder="e.g. ABC Renewals"/></div>
-          <div>
-            <FL label="🪪 Renewal Agent WhatsApp"/>
-            <input className="inp" value={f.licence_renewal_agent_phone||""} onChange={e=>s("licence_renewal_agent_phone",e.target.value)} placeholder="27821234567"/>
-            <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Country code, no + or spaces</div>
-          </div>
-        </div>
+        {/* Licence Renewal Agent — a "Default" row (province match, else global
+            fallback from Settings) is always present and can't be removed here;
+            the workshop can add their own agent(s) alongside it and pick which
+            one is active, without ever losing the default. */}
+        {(()=>{
+          const provinceAgent = (settings?.licence_renewal_agents||[]).find(a=>
+            a.province && f.province && a.province.trim().toLowerCase()===f.province.trim().toLowerCase());
+          const defaultAgent = provinceAgent
+            ? {name:provinceAgent.name, phone:provinceAgent.phone}
+            : {name:settings?.licence_renewal_agent_name||"", phone:settings?.licence_renewal_agent_phone||""};
+          const customAgents = f.custom_licence_agents||[];
+          const isDefaultSelected = !f.licence_renewal_agent_name && !f.licence_renewal_agent_phone;
+          const selectAgent = (name,phone) => { s("licence_renewal_agent_name",name); s("licence_renewal_agent_phone",phone); };
+          const rowStyle = (sel) => ({display:"flex",alignItems:"center",gap:8,padding:"8px 12px",flex:1,
+            border:`1px solid ${sel?"var(--accent)":"var(--border)"}`,borderRadius:8,cursor:"pointer",
+            background:sel?"rgba(255,122,46,.08)":"var(--surface2)"});
+          return (
+            <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+              <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🪪 Licence Renewal Agent</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>
+                Used for WhatsApp renewal requests. {provinceAgent?`Your province (${f.province}) has a default agent.`:"Add your own agent below — the default is kept, you just pick which one is active."}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <label style={rowStyle(isDefaultSelected)}>
+                  <input type="radio" checked={isDefaultSelected} onChange={()=>selectAgent("","")}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:600}}>🌍 Default{provinceAgent?` — ${f.province}`:""}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{defaultAgent.name||"Not set yet — configure in global Settings"}{defaultAgent.phone?` · ${defaultAgent.phone}`:""}</div>
+                  </div>
+                </label>
+                {customAgents.map(a=>{
+                  const sel = f.licence_renewal_agent_name===a.name && f.licence_renewal_agent_phone===a.phone;
+                  return (
+                    <div key={a.id} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <label style={rowStyle(sel)}>
+                        <input type="radio" checked={sel} onChange={()=>selectAgent(a.name,a.phone)}/>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:13,fontWeight:600}}>{a.name}</div>
+                          <div style={{fontSize:11,color:"var(--text3)"}}>{a.phone}</div>
+                        </div>
+                      </label>
+                      <button type="button" className="btn btn-ghost btn-xs" style={{color:"var(--red)",flexShrink:0}} onClick={()=>{
+                        s("custom_licence_agents",customAgents.filter(x=>x.id!==a.id));
+                        if(sel) selectAgent("","");
+                      }}>✕</button>
+                    </div>
+                  );
+                })}
+                {!showAddAgent ? (
+                  <button type="button" className="btn btn-ghost btn-sm" style={{alignSelf:"flex-start",borderStyle:"dashed"}} onClick={()=>setShowAddAgent(true)}>+ Add your own agent</button>
+                ) : (
+                  <div style={{background:"var(--surface2)",border:"1px solid var(--border2)",borderRadius:8,padding:12}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <input className="inp" placeholder="Agent name" value={newAgentName} onChange={e=>setNewAgentName(e.target.value)}/>
+                      <input className="inp" placeholder="WhatsApp (27821234567)" value={newAgentPhone} onChange={e=>setNewAgentPhone(e.target.value)}/>
+                    </div>
+                    <div style={{display:"flex",gap:8,marginTop:10}}>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={()=>{
+                        if(!newAgentName.trim()||!newAgentPhone.trim()){alert("Name and WhatsApp required");return;}
+                        const agent={id:makeId(),name:newAgentName.trim(),phone:newAgentPhone.replace(/[^0-9]/g,"")};
+                        s("custom_licence_agents",[...customAgents,agent]);
+                        selectAgent(agent.name,agent.phone);
+                        setShowAddAgent(false); setNewAgentName(""); setNewAgentPhone("");
+                      }}>Save &amp; Select</button>
+                      <button type="button" className="cp-btn" onClick={()=>{setShowAddAgent(false);setNewAgentName("");setNewAgentPhone("");}}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* WhatsApp country code — customer numbers typed at Book-In (e.g. 0833927725) are
             normalized to this before opening any WhatsApp link (e.g. 27833927725). */}
@@ -1558,14 +1627,37 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
                 <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Separate deployment → saves to Tim_Car_Phot/Make/ID/view.png</div>
               </FD>
               <FD>
-                <FL label="🪪 Licence Renewal Agent Name"/>
+                <FL label="🪪 Licence Renewal Agent Name (Global Default)"/>
                 <input className="inp" value={f.licence_renewal_agent_name||""} onChange={e=>s("licence_renewal_agent_name",e.target.value)} placeholder="e.g. ABC Renewals"/>
                 <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Name shown in renewal request modal</div>
               </FD>
               <FD>
-                <FL label="🪪 Renewal Agent WhatsApp Number"/>
+                <FL label="🪪 Renewal Agent WhatsApp Number (Global Default)"/>
                 <input className="inp" value={f.licence_renewal_agent_phone||""} onChange={e=>s("licence_renewal_agent_phone",e.target.value)} placeholder="27821234567 (no + or spaces)"/>
-                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Renewal requests sent via WhatsApp — include country code</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Renewal requests sent via WhatsApp — include country code. This is the fallback used everywhere a province below has no agent of its own.</div>
+              </FD>
+              <FD>
+                <FL label="🗺️ Province Renewal Agents (optional overrides)"/>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>A workshop in a matching province uses this agent instead of the global default above. Adding these never removes the global default.</div>
+                {(f.licence_renewal_agents||[]).map((a,i)=>(
+                  <div key={a.id||i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8,marginBottom:6,alignItems:"center"}}>
+                    <input className="inp" placeholder="Province" value={a.province||""} onChange={e=>{
+                      const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],province:e.target.value}; s("licence_renewal_agents",arr);
+                    }}/>
+                    <input className="inp" placeholder="Agent name" value={a.name||""} onChange={e=>{
+                      const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],name:e.target.value}; s("licence_renewal_agents",arr);
+                    }}/>
+                    <input className="inp" placeholder="WhatsApp" value={a.phone||""} onChange={e=>{
+                      const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],phone:e.target.value}; s("licence_renewal_agents",arr);
+                    }}/>
+                    <button type="button" className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{
+                      s("licence_renewal_agents",(f.licence_renewal_agents||[]).filter((_,idx)=>idx!==i));
+                    }}>✕</button>
+                  </div>
+                ))}
+                <button type="button" className="btn btn-ghost btn-sm" style={{borderStyle:"dashed"}} onClick={()=>{
+                  s("licence_renewal_agents",[...(f.licence_renewal_agents||[]),{id:makeId(),province:"",name:"",phone:""}]);
+                }}>+ Add Province Agent</button>
               </FD>
             </div>
           </div>

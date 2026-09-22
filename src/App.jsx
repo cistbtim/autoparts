@@ -478,6 +478,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // Spare shop mode: scrapyard account that only manages parts, no sales/orders system
   const isSpareShop = (role==="scrapyard"||role==="scrapyard_admin") && !!workshopProfile.spare_shop_mode;
 
+  // Province default renewal agent — used only when the workshop hasn't picked
+  // their own agent (licence_renewal_agent_name/_phone left blank). Never
+  // overwrites the global fallback pair on `settings`, just takes priority over it.
+  const provinceLicenceAgent = (settings.licence_renewal_agents||[]).find(a=>
+    a.province && workshopProfile.province &&
+    a.province.trim().toLowerCase()===workshopProfile.province.trim().toLowerCase());
+
   // For workshop/scrapyard roles: merge their profile over shop settings so logo/name/contacts show correctly
   const wsDisplaySettings = (wsId || scrapId) ? {
     ...settings,
@@ -493,8 +500,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     currency:   workshopProfile.currency  || settings.currency || "ZAR R",
     city:       workshopProfile.city      || "",
     country:    workshopProfile.country   || "",
-    licence_renewal_agent_name:  workshopProfile.licence_renewal_agent_name  || settings.licence_renewal_agent_name  || "",
-    licence_renewal_agent_phone: workshopProfile.licence_renewal_agent_phone || settings.licence_renewal_agent_phone || "",
+    licence_renewal_agent_name:  workshopProfile.licence_renewal_agent_name  || provinceLicenceAgent?.name  || settings.licence_renewal_agent_name  || "",
+    licence_renewal_agent_phone: workshopProfile.licence_renewal_agent_phone || provinceLicenceAgent?.phone || settings.licence_renewal_agent_phone || "",
     whatsapp_country_code: workshopProfile.whatsapp_country_code || settings.whatsapp_country_code || "",
     label_width_mm:  workshopProfile.label_width_mm  || 98,
     label_height_mm: workshopProfile.label_height_mm || 45,
@@ -2380,9 +2387,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const row={...rec,id,workshop_id:wsId||null};
     let res=await api.insert("ws_licence_renewals",row).catch(e=>({message:e.message}));
     if(res&&!Array.isArray(res)&&res.message){
-      // document_url column may not exist yet (SQL migration not run) — retry
-      // without it so the renewal request itself still saves either way.
-      const {document_url,...fallbackRow}=row;
+      // documents (jsonb) column may not exist yet (SQL migration not run) —
+      // retry without it so the renewal request itself still saves either way.
+      const {documents,...fallbackRow}=row;
       await api.insert("ws_licence_renewals",fallbackRow).catch(e=>console.warn("Save renewal failed:",e));
     }
     setWsLicenceRenewals(p=>[row,...p.filter(r=>r.id!==id)]);
@@ -2396,7 +2403,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const row={...rec,id,workshop_id:rec.workshop_id||null};
     let res=await api.insert("ws_licence_renewals",row).catch(e=>({message:e.message}));
     if(res&&!Array.isArray(res)&&res.message){
-      const {document_url,...fallbackRow}=row;
+      const {documents,...fallbackRow}=row;
       await api.insert("ws_licence_renewals",fallbackRow).catch(e=>console.warn("Save renewal failed:",e));
     }
     setLicenceAgentQueue(p=>[row,...p.filter(r=>r.id!==id)]);
@@ -4119,7 +4126,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const saveSettings=async(data)=>{
     // Include id:1 so upsert creates row if missing
     const merged = {...getSettings(),...settings,...data, id:1};
-    await api.upsert("settings", merged);
+    let res = await api.upsert("settings", merged).catch(e=>({message:e.message}));
+    if(res&&!Array.isArray(res)&&res.message){
+      // licence_renewal_agents (jsonb) column may not exist yet — retry without it
+      const {licence_renewal_agents,...fallback} = merged;
+      res = await api.upsert("settings", fallback).catch(e=>({message:e.message}));
+      if(res&&!Array.isArray(res)&&res.message){
+        showToast(`❌ Save failed: ${res.message}`,"err");
+        return;
+      }
+      delete data.licence_renewal_agents;
+    }
     updateSettings(data);
     setSettings(s=>({...s,...data}));
     showToast("✅ Settings saved");
@@ -4133,19 +4150,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
     // Check if row already exists
     const existing=await api.get("workshop_profiles",`id=eq.${wsId}&select=id`).catch(()=>[]);
-    let res;
-    if(Array.isArray(existing)&&existing.length>0){
-      res=await api.patch("workshop_profiles","id",wsId,payload);
-    } else {
-      // New profile — seed name from the logged-in user if not provided
-      if(!payload.name) payload.name = user.name||"";
-      res=await api.insert("workshop_profiles",payload);
-    }
-    // Show actual Supabase error if save failed
+    const isNew = !(Array.isArray(existing)&&existing.length>0);
+    if(isNew && !payload.name) payload.name = user.name||""; // new profile — seed name from the logged-in user
+    let res = isNew ? await api.insert("workshop_profiles",payload) : await api.patch("workshop_profiles","id",wsId,payload);
     if(res&&!Array.isArray(res)&&res.message){
-      showToast(`❌ Save failed: ${res.message}`,"err");
-      console.error("workshop_profiles save error:",res);
-      return;
+      // province / custom_licence_agents columns may not exist yet (SQL migration
+      // not run) — retry without them so the rest of the profile still saves.
+      const {province,custom_licence_agents,...fallback} = payload;
+      res = isNew ? await api.insert("workshop_profiles",fallback) : await api.patch("workshop_profiles","id",wsId,fallback);
+      if(res&&!Array.isArray(res)&&res.message){
+        showToast(`❌ Save failed: ${res.message}`,"err");
+        console.error("workshop_profiles save error:",res);
+        return;
+      }
+      delete data.province; delete data.custom_licence_agents;
     }
     setWorkshopProfile(p=>({...p,...data}));
     showToast("✅ Workshop profile saved");
@@ -8178,7 +8196,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── VEHICLES ── */}
         {/* ── WORKSHOP (all sub-tabs) ── */}
         {tab==="wsprofile"&&role==="workshop"&&(
-          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId} branches={branches} user={user} subActive={wsSubActive}/>
+          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId} branches={branches} user={user} subActive={wsSubActive} settings={settings}/>
         )}
         {tab==="wssubscriptions"&&role==="admin"&&(
           <WsSubscriptionsPage settings={settings}/>

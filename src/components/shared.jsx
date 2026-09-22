@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, Component } from "react";
 import { createPortal } from "react-dom";
 import { toLogoUrl, extractDriveId, detectGeoLocation, fetchWeather, classifyWeather } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
-import { api } from "../lib/api.js";
+import { api, uploadToStorage } from "../lib/api.js";
 
 export class ErrorBoundary extends Component {
   constructor(props){ super(props); this.state={err:null}; }
@@ -547,5 +547,211 @@ export function AdGridCard({ad}) {
         color:"#fff",fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,
         letterSpacing:".05em",userSelect:"none"}}>AD</div>
     </div>
+  );
+}
+
+// ── Licence renewal supporting documents ──────────────────────────────────
+// A single renewal (especially a walk-in or a foreign national) can need
+// several distinct supporting documents, not just one generic "document" —
+// used by both the workshop's renewal-request form and the agent's walk-in
+// form, and shown read-only in the agent's docs modal.
+export const LICENCE_DOC_TYPES = [
+  {key:"licence_disc",      label:"Licence Disc / Vehicle Doc"},
+  {key:"passport",          label:"Passport"},
+  {key:"id",                label:"ID"},
+  {key:"traffic_register",  label:"Traffic Register Number"},
+  {key:"address_proof",     label:"Proof of Address"},
+  {key:"bank_statement",    label:"Bank Statement"},
+  {key:"permit_visa",       label:"Permit / Visa"},
+];
+
+// Documents are stored per-type as {url, expiry} — expiry is an optional
+// YYYY-MM-DD string, blank meaning "doesn't expire" (e.g. a Traffic Register
+// Number). These helpers also accept the older plain-string shape (just a
+// url, no expiry) so documents saved before expiry tracking existed still
+// display correctly.
+const docUrl    = (d) => typeof d === "string" ? d : (d?.url || "");
+const docExpiry = (d) => typeof d === "string" ? "" : (d?.expiry || "");
+
+export function LicenceDocsChecklist({documents={}, onChange, pathPrefix="licence_docs", readOnly=false}) {
+  const [uploading, setUploading] = useState("");
+
+  const uploadOne = async (key, file) => {
+    setUploading(key);
+    try{
+      const isPdf = file.type==="application/pdf";
+      let blob, mimeType, ext;
+      if(isPdf){ blob=file; mimeType="application/pdf"; ext="pdf"; }
+      else {
+        const dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
+        blob = await new Promise((res,rej)=>{
+          const img=new Image();
+          img.onload=()=>{
+            const MAX=1600; const canvas=document.createElement("canvas");
+            let w=img.width,h=img.height;
+            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+            canvas.width=w;canvas.height=h;
+            canvas.getContext("2d").drawImage(img,0,0,w,h);
+            canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
+          };
+          img.onerror=rej; img.src=dataUrl;
+        });
+        mimeType="image/jpeg"; ext="jpg";
+      }
+      const path=`${pathPrefix}/${key}_${Date.now()}.${ext}`;
+      const url = await uploadToStorage("cars_parts",path,blob,mimeType);
+      onChange({...documents,[key]:{url, expiry: docExpiry(documents[key])}});
+    }catch(err){ alert("Upload failed: "+err.message); }
+    setUploading("");
+  };
+
+  const setExpiry = (key, expiry) => {
+    const cur = documents[key];
+    if(!cur) return;
+    onChange({...documents,[key]:{url: docUrl(cur), expiry}});
+  };
+
+  return (
+    <div>
+      {LICENCE_DOC_TYPES.map(({key,label})=>{
+        const url = docUrl(documents[key]);
+        const expiry = docExpiry(documents[key]);
+        const isExpired = expiry && new Date(expiry) < new Date();
+        return (
+          <div key={key} style={{marginBottom:10,paddingBottom:readOnly?10:0,borderBottom:readOnly?"1px solid var(--border)":"none"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:170,flexShrink:0,fontSize:12,fontWeight:600,color:"var(--text2)"}}>{label}</div>
+              {readOnly ? (
+                url
+                  ? <a href={url} target="_blank" rel="noreferrer" style={{fontSize:12,color:"var(--blue)"}}>🔗 View</a>
+                  : <span style={{fontSize:12,color:"var(--text3)"}}>— not attached</span>
+              ) : (
+                <>
+                  <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"6px 10px",
+                    background:"var(--surface2)",border:"1px dashed var(--border)",borderRadius:7,cursor:uploading?"wait":"pointer",fontSize:12,fontWeight:600,color:url?"var(--green)":"var(--text3)"}}>
+                    <input type="file" accept="image/*,application/pdf" style={{display:"none"}}
+                      onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f) uploadOne(key,f); }} disabled={!!uploading}/>
+                    {uploading===key?"⏳ Uploading…":url?"✅ Uploaded — tap to replace":"📎 Choose PDF or photo"}
+                  </label>
+                  {url&&<a href={url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"var(--blue)",flexShrink:0}}>View</a>}
+                </>
+              )}
+            </div>
+            {url&&(
+              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:5,marginLeft:178,flexWrap:"wrap"}}>
+                {readOnly ? (
+                  expiry
+                    ? <span style={{fontSize:11,fontWeight:600,color:isExpired?"var(--red)":"var(--green)"}}>{isExpired?"⚠️ Expired ":"Expires "}{expiry}</span>
+                    : <span style={{fontSize:11,color:"var(--text3)"}}>No expiry date</span>
+                ) : (
+                  <>
+                    <span style={{fontSize:11,color:"var(--text3)"}}>Expiry date:</span>
+                    <input type="date" value={expiry} onChange={e=>setExpiry(key,e.target.value)}
+                      style={{fontSize:11,padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)"}}/>
+                    {expiry
+                      ? <button type="button" onClick={()=>setExpiry(key,"")} style={{fontSize:10,color:"var(--text3)",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>Doesn't expire</button>
+                      : <span style={{fontSize:10,color:"var(--text3)"}}>Leave blank if it doesn't expire</span>}
+                    {isExpired&&<span style={{fontSize:11,fontWeight:700,color:"var(--red)"}}>⚠️ Expired</span>}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Shared by the workshop's own renewal list and the licence agent's queue —
+// which side is editable depends on who's looking: the workshop can add/update
+// the customer's supporting documents (their own submission), while only the
+// agent can attach the payment receipt / new licence disc sent back to the
+// customer. workshopName is shown in the title only when passed (the agent's
+// cross-workshop queue needs it; a workshop viewing their own renewal doesn't).
+export function RenewalDocsModal({renewal, workshopName, viewer="agent", onUpdate, onClose}) {
+  const [uploading, setUploading] = useState("");
+
+  const uploadOutput = async (field, file) => {
+    setUploading(field);
+    try{
+      const isPdf = file.type==="application/pdf";
+      let blob, mimeType, ext;
+      if(isPdf){ blob=file; mimeType="application/pdf"; ext="pdf"; }
+      else {
+        const dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
+        blob = await new Promise((res,rej)=>{
+          const img=new Image();
+          img.onload=()=>{
+            const MAX=1600; const canvas=document.createElement("canvas");
+            let w=img.width,h=img.height;
+            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+            canvas.width=w;canvas.height=h;
+            canvas.getContext("2d").drawImage(img,0,0,w,h);
+            canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
+          };
+          img.onerror=rej; img.src=dataUrl;
+        });
+        mimeType="image/jpeg"; ext="jpg";
+      }
+      const path=`licence_renewals/${(renewal.vehicle_reg||"doc").replace(/[\s/\\]/g,"_").toUpperCase()}_${field}_${Date.now()}.${ext}`;
+      const url = await uploadToStorage("cars_parts",path,blob,mimeType);
+      await onUpdate(renewal.id,{[`${field}_url`]:url});
+    }catch(err){ alert("Upload failed: "+err.message); }
+    setUploading("");
+  };
+
+  const OutputRow = ({field, label, icon, url}) => (
+    <div style={{marginBottom:14}}>
+      <FL label={`${icon} ${label}`}/>
+      <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"10px 14px",
+        background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:uploading?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>
+        <input type="file" accept="image/*,application/pdf" style={{display:"none"}}
+          onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f) uploadOutput(field,f); }} disabled={!!uploading}/>
+        {uploading===field?"⏳ Uploading…":url?"✅ Uploaded — tap to replace":"📎 Choose PDF or photo"}
+      </label>
+      {url&&<a href={url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"var(--blue)",marginTop:4,display:"inline-block"}}>🔗 View</a>}
+    </div>
+  );
+
+  const canEditDocuments = viewer==="workshop";
+  const canEditOutputs = viewer==="agent";
+  const hasDocs = renewal.documents && Object.keys(renewal.documents).length>0;
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title={`📎 Documents${workshopName?` — ${workshopName}`:""} — ${renewal.vehicle_reg||"Renewal"}`} onClose={onClose}/>
+      <div style={{marginBottom:16}}>
+        <FL label="📄 Customer's Supporting Documents"/>
+        {renewal.document_url&&(
+          <a href={renewal.document_url} target="_blank" rel="noreferrer" style={{display:"block",marginTop:4,marginBottom:6,fontSize:13,color:"var(--blue)"}}>🔗 View legacy attached document</a>
+        )}
+        {canEditDocuments ? (
+          <LicenceDocsChecklist documents={renewal.documents||{}} onChange={docs=>onUpdate(renewal.id,{documents:docs})}
+            pathPrefix={`licence_renewals/${(renewal.vehicle_reg||"doc").replace(/[\s/\\]/g,"_").toUpperCase()}`}/>
+        ) : hasDocs ? (
+          <LicenceDocsChecklist documents={renewal.documents} readOnly/>
+        ) : !renewal.document_url&&<div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>No documents were attached.</div>}
+      </div>
+      <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+        <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>Sent back to customer</div>
+        {canEditOutputs ? (
+          <>
+            <OutputRow field="receipt" label="Payment Receipt" icon="🧾" url={renewal.receipt_url}/>
+            <OutputRow field="new_licence" label="New Licence Disc" icon="🪪" url={renewal.new_licence_url}/>
+          </>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{fontSize:13}}>
+              🧾 Payment Receipt: {renewal.receipt_url ? <a href={renewal.receipt_url} target="_blank" rel="noreferrer" style={{color:"var(--blue)"}}>🔗 View</a> : <span style={{color:"var(--text3)"}}>not yet provided</span>}
+            </div>
+            <div style={{fontSize:13}}>
+              🪪 New Licence Disc: {renewal.new_licence_url ? <a href={renewal.new_licence_url} target="_blank" rel="noreferrer" style={{color:"var(--blue)"}}>🔗 View</a> : <span style={{color:"var(--text3)"}}>not yet provided</span>}
+            </div>
+          </div>
+        )}
+      </div>
+      <button className="btn btn-primary" style={{width:"100%",marginTop:16}} onClick={onClose}>Done</button>
+    </Overlay>
   );
 }

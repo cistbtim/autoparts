@@ -11,6 +11,10 @@ let _settings = {
   tax_rate: 0, vat_number: "",
   invoice_prefix: "INV", credit_note_prefix: "CN", apps_script_url: "", vehicle_script_url: "",
   licence_renewal_agent_name: "", licence_renewal_agent_phone: "",
+  // Per-province default agents — additive to the fallback pair above, never
+  // replaces it: [{id, province, name, phone}, ...]. A workshop whose province
+  // matches uses this instead of the global fallback.
+  licence_renewal_agents: [],
   pos_manager_pin: "", worker_shared_secret: "",
 };
 

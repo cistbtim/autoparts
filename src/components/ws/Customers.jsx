@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { api, uploadToStorage } from "../../lib/api.js";
+import { api } from "../../lib/api.js";
 import { getSettings, curSym } from "../../lib/settings.js";
 import { makeId, waLink } from "../../lib/helpers.js";
-import { Overlay, MHead, FL, FG, FD, DriveImg } from "../shared.jsx";
+import { Overlay, MHead, FL, FG, FD, DriveImg, LicenceDocsChecklist, RenewalDocsModal } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 
 export function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,onDeleteCustomer,onSaveVehicle,onDeleteVehicle,onOpenJob,t,wsLocked=false}) {
@@ -405,42 +405,10 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
     owner_id:      "",
     renewal_years: "1",
     notes:         "",
-    document_url:  "",
+    documents:     {},
   });
   const [saving, setSaving] = useState(false);
-  const [uploadingDoc, setUploadingDoc] = useState(false);
   const s = (k,v) => setF(p=>({...p,[k]:v}));
-
-  const handleDocUpload = async (e) => {
-    const file = e.target.files?.[0]; if(!file) return;
-    e.target.value="";
-    setUploadingDoc(true);
-    try{
-      const isPdf = file.type==="application/pdf";
-      let blob, mimeType, ext;
-      if(isPdf){ blob=file; mimeType="application/pdf"; ext="pdf"; }
-      else {
-        const dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
-        blob = await new Promise((res,rej)=>{
-          const img=new Image();
-          img.onload=()=>{
-            const MAX=1600; const canvas=document.createElement("canvas");
-            let w=img.width,h=img.height;
-            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
-            canvas.width=w;canvas.height=h;
-            canvas.getContext("2d").drawImage(img,0,0,w,h);
-            canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
-          };
-          img.onerror=rej; img.src=dataUrl;
-        });
-        mimeType="image/jpeg"; ext="jpg";
-      }
-      const path=`licence_renewals/${(f.vehicle_reg||"doc").replace(/[\s/\\]/g,"_").toUpperCase()}_${Date.now()}.${ext}`;
-      const url = await uploadToStorage("cars_parts",path,blob,mimeType);
-      s("document_url",url);
-    }catch(err){ alert("Upload failed: "+err.message); }
-    setUploadingDoc(false);
-  };
 
   const handleSubmit = async () => {
     if (!f.vehicle_reg.trim()) { alert("Vehicle registration required"); return; }
@@ -523,13 +491,9 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
         </div>
         <FD><FL label="Notes"/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Any special instructions..." style={{minHeight:50}}/></FD>
         <FD>
-          <FL label="Attach current licence disc / document (optional)"/>
-          <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"10px 14px",
-            background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:uploadingDoc?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>
-            <input type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={handleDocUpload} disabled={uploadingDoc}/>
-            {uploadingDoc?"⏳ Uploading…":f.document_url?"✅ Document attached — tap to replace":"📎 Choose PDF or photo"}
-          </label>
-          {f.document_url&&<a href={f.document_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"var(--blue)",marginTop:4,display:"inline-block"}}>🔗 View attached document</a>}
+          <FL label="Supporting Documents (optional)"/>
+          <LicenceDocsChecklist documents={f.documents} onChange={docs=>s("documents",docs)}
+            pathPrefix={`licence_renewals/${(f.vehicle_reg||"doc").replace(/[\s/\\]/g,"_").toUpperCase()}`}/>
         </FD>
         <div style={{display:"flex",gap:10,marginTop:16}}>
           <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
@@ -544,6 +508,7 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
 
 export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUpdate, wsLocked=false}) {
   const [showModal, setShowModal] = useState(false);
+  const [docsRenewal, setDocsRenewal] = useState(null);
   const [filter, setFilter] = useState("all");
   const C = curSym(settings?.currency||getSettings().currency);
 
@@ -608,11 +573,6 @@ export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUp
                     <td>
                       <div style={{fontWeight:700,fontFamily:"DM Mono,monospace",fontSize:12}}>{r.vehicle_reg}</div>
                       <div style={{fontSize:11,color:"var(--text3)"}}>{r.vehicle_make} {r.vehicle_model}</div>
-                      <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
-                        {r.document_url&&<a href={r.document_url} target="_blank" rel="noreferrer" style={{fontSize:10,color:"var(--blue)"}}>📎 Doc</a>}
-                        {r.receipt_url&&<a href={r.receipt_url} target="_blank" rel="noreferrer" style={{fontSize:10,color:"var(--green)"}}>🧾 Receipt</a>}
-                        {r.new_licence_url&&<a href={r.new_licence_url} target="_blank" rel="noreferrer" style={{fontSize:10,color:"var(--green)"}}>🪪 New Licence</a>}
-                      </div>
                     </td>
                     <td>
                       <div style={{fontSize:13}}>{r.owner_name||"—"}</div>
@@ -651,11 +611,17 @@ export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUp
                     </td>
                     <td style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>{(r.submitted_at||"").slice(0,10)}</td>
                     <td>
-                      {r.owner_phone&&(
-                        <a href={waLink(r.owner_phone,"")} target="_blank" rel="noopener noreferrer">
-                          <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲</button>
-                        </a>
-                      )}
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={()=>setDocsRenewal(r)}
+                          style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
+                            background:(r.receipt_url||r.new_licence_url)?"var(--green)":"var(--surface2)",
+                            color:(r.receipt_url||r.new_licence_url)?"#fff":"var(--text3)"}}>📎 Docs</button>
+                        {r.owner_phone&&(
+                          <a href={waLink(r.owner_phone,"")} target="_blank" rel="noopener noreferrer">
+                            <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲</button>
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -670,6 +636,10 @@ export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUp
           job={null} vehicleRecord={null} settings={settings} wsId={wsId}
           onSave={async(rec)=>{ await onSave(rec); setShowModal(false); }}
           onClose={()=>setShowModal(false)}/>
+      )}
+
+      {docsRenewal&&(
+        <RenewalDocsModal renewal={docsRenewal} viewer="workshop" onUpdate={onUpdate} onClose={()=>setDocsRenewal(null)}/>
       )}
     </div>
   );

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { api, SUPABASE_URL } from "../lib/api.js";
 import { getSettings } from "../lib/settings.js";
 import { CSS } from "../styles.js";
-import { ShopLogo, FL, VelGeniusBanner } from "../components/shared.jsx";
+import { ShopLogo, FL, VelGeniusBanner, Overlay } from "../components/shared.jsx";
 import { makeId, detectGeoLocation, fetchWeather, waLink } from "../lib/helpers.js";
 import { getSubInfo } from "../lib/constants.js";
 
@@ -70,6 +70,30 @@ const IcGrid   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="non
 const IcBadge  = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 17c0-1.66 1.79-3 4-3s4 1.34 4 3"/></svg>;
 const IcTag    = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 3a1 1 0 0 0-1 1l.24 5.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.82z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>;
 
+// Wraps whichever module's login form is active. On the normal landing screen
+// (a module grid to choose from) it's a popup — click a tile, get a form, ✕
+// or click outside to go back to the grid. On a locked single-module entry
+// point (wsLoginOnly, a referral link, a catalogue link) there's no grid to
+// go back to, so the form just renders inline like before.
+function LoginCardShell({authTab, locked, onClose, children}) {
+  if (!authTab) return null;
+  if (locked) {
+    return (
+      <div style={{background:"var(--surface)",borderRadius:16,border:"1px solid var(--border2)",boxShadow:"var(--shadow-lg)",padding:"18px 20px",overflow:"hidden"}}>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:2}}>
+        <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+      </div>
+      {children}
+    </Overlay>
+  );
+}
+
 export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLoginOnly=false,initialError=""}) {
   // Referral: ?ref=<workshop id> jumps straight to workshop signup and gets stamped on the new account
   const [wsReferrerId] = useState(()=>new URLSearchParams(window.location.search).get("ref")||"");
@@ -77,7 +101,12 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   // pre-fills the Supplier field below — same field the customer could otherwise type
   // into by hand, so a shared link is just a shortcut, not the only way in.
   const [catalogName] = useState(()=>new URLSearchParams(window.location.search).get("catalog")||"");
-  const [authTab,setAuthTab] = useState(wsLoginOnly?"workshop":(wsReferrerId?"workshop":(catalogName?"customer":"branch")));
+  // "" = no module chosen yet — the landing screen just shows the module grid;
+  // clicking a module opens its login form in a popup. wsLoginOnly / a referral
+  // link / a catalogue link each force straight into one module's form instead
+  // (no grid to choose from, so nothing to pop over).
+  const [authTab,setAuthTab] = useState(wsLoginOnly?"workshop":(wsReferrerId?"workshop":(catalogName?"customer":"")));
+  const lockedSingleModule = wsLoginOnly||!!catalogName;
   // branch
   const [branchName,setBranchName] = useState("");
   const [branchUser,setBranchUser] = useState(""); const [branchPass,setBranchPass] = useState("");
@@ -437,8 +466,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
         </div>
         )}
 
-        {/* Card */}
-        <div style={{background:"var(--surface)",borderRadius:16,border:"1px solid var(--border2)",boxShadow:"var(--shadow-lg)",padding:"18px 20px",overflow:"hidden"}}>
+        {/* Card — popup for the module grid, inline for a locked single-module entry point */}
+        <LoginCardShell authTab={authTab} locked={lockedSingleModule} onClose={()=>switchTab("")}>
 
           {/* ── Branch ── */}
           {authTab==="branch"&&(
@@ -837,7 +866,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
             </div>
           )}
 
-        </div>
+        </LoginCardShell>
 
         {/* Footer */}
         <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:18}}>

@@ -4590,6 +4590,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         ["Cancelled",   tSt("Cancelled")],
       ];
   const sub=getSubInfo(user);
+  // "Is this workshop's subscription active" for gating paid-only features (e.g. Hide
+  // Ads Banner) — for a workshop's own login, use the real status (subStatus is a
+  // fresher server check, sub is the getSubInfo(user) fallback; same source that
+  // drives the "Active · Nd left" badge and canAccess everywhere else). For an
+  // admin/manager viewing someone else's workshop, there is no "own" subscription to
+  // check, so fall back to the workshop's own stored field — imperfect (confirmed
+  // 2026-09-22 it can go stale) but the only signal available for a workshop you're
+  // not logged into.
+  const wsSubActive = role==="workshop" ? (subStatus?.status??sub?.status)==="active" : workshopProfile?.subscription_status==="active";
 
   const saveWsShopRequest=async(data)=>{
     const res=await api.upsert("ws_shop_requests",data);
@@ -8055,7 +8064,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── VEHICLES ── */}
         {/* ── WORKSHOP (all sub-tabs) ── */}
         {tab==="wsprofile"&&role==="workshop"&&(
-          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId} branches={branches} user={user}/>
+          <WorkshopProfilePage profile={workshopProfile} onSave={saveWorkshopProfile} wsRole={wsRole} wsId={wsId} branches={branches} user={user} subActive={wsSubActive}/>
         )}
         {tab==="wssubscriptions"&&role==="admin"&&(
           <WsSubscriptionsPage settings={settings}/>
@@ -8162,6 +8171,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onSubmitFeedback={submitWorkshopFeedback}
             wsProfile={workshopProfile}
             onSaveWsProfile={saveWorkshopProfile}
+            subActive={wsSubActive}
             wsShopRequests={wsShopRequests}
             onSaveWsShopRequest={saveWsShopRequest}
             branches={branches}

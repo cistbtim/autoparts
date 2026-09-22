@@ -28,7 +28,7 @@ import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle}) {
+export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -607,7 +607,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         </select>
       </div>
 
-      {wsTab!=="spareshop"&&!(wsProfile?.hide_ads&&wsProfile?.subscription_status==="active")&&(
+      {wsTab!=="spareshop"&&!(wsProfile?.hide_ads&&subActive)&&(
         <div className="ws-compact-header">
           <svg className="ws-compact-header-icon" viewBox="0 0 48 48" fill="none">
             <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="var(--text3)" strokeWidth="3" strokeLinecap="round"/>
@@ -2257,7 +2257,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   <div style={{fontWeight:600,marginBottom:6}}>No spare shop linked</div>
                   <div style={{fontSize:13}}>Go to Workshop Settings → Linked Spare Parts Shop to connect a branch.</div>
                 </div>
-              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}|${spareShopFilter.nonce}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} initialJobId={spareShopFilter.jobId||""} initialJobLabel={spareShopFilter.jobLabel||""} initialJobCustomer={spareShopFilter.jobCustomer||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab} onEditPart={onEditPart} onDeletePart={onDeletePart} onAddPart={onAddPart}/>
+              : <WsSpareShopTab key={spareShopFilter.make?`${spareShopFilter.make}|${spareShopFilter.code||spareShopFilter.model}|${spareShopFilter.nonce}`:"__browse__"} linkedBranch={linkedBranch} linkedBranchId={linkedBranchId} mainBranchId={mainBranchId} settings={settings} onPlaceShopOrder={wsLocked?null:onPlaceShopOrder} wsProfile={wsProfile} subActive={subActive} vehicles={vehicles} partFitments={partFitments} initialMake={spareShopFilter.make} initialModel={spareShopFilter.model} initialCode={spareShopFilter.code||""} initialVin={spareShopFilter.vin||""} initialEngineNo={spareShopFilter.engineNo||""} initialReg={spareShopFilter.reg||""} initialJobId={spareShopFilter.jobId||""} initialJobLabel={spareShopFilter.jobLabel||""} initialJobCustomer={spareShopFilter.jobCustomer||""} ads={ads} userCtx={userCtx} wsLocked={wsLocked} onClearJobFilter={onGoToSpareShopTab} onEditPart={onEditPart} onDeletePart={onDeletePart} onAddPart={onAddPart}/>
             }
           </div>
         );
@@ -11133,7 +11133,7 @@ function WsShopCheckoutModal({localCart,mainCart,requestCart=[],wsProfile,Cs,onC
 // Module-level cache so spare shop parts survive WorkshopPage remounts (tab switches)
 const _spCache={data:null,branchId:null,ts:null};
 
-function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",initialVin="",initialEngineNo="",initialReg="",initialJobId="",initialJobLabel="",initialJobCustomer="",ads=[],userCtx=null,onClearJobFilter,onEditPart,onDeletePart,onAddPart}) {
+function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPlaceShopOrder,wsProfile={},subActive=false,vehicles=[],partFitments=[],initialMake="",initialModel="",initialCode="",initialVin="",initialEngineNo="",initialReg="",initialJobId="",initialJobLabel="",initialJobCustomer="",ads=[],userCtx=null,onClearJobFilter,onEditPart,onDeletePart,onAddPart}) {
   const showSku=!!linkedBranch?.show_supplier_sku;
   const [search,setSearch]=useState("");
   const [cart,setCart]=useState([]);
@@ -11436,7 +11436,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
 
   return (
     <div>
-      {!(wsProfile?.hide_ads&&wsProfile?.subscription_status==="active")&&<AdBanner ads={ads} page="spareshop" userCtx={userCtx}/>}
+      {!(wsProfile?.hide_ads&&subActive)&&<AdBanner ads={ads} page="spareshop" userCtx={userCtx}/>}
       {lightbox&&<ImgLightbox url={lightbox.url} urls={lightbox.urls} name={lightbox.name} onClose={()=>setLightbox(null)}/>}
       {showUnlock&&(
         <Overlay onClose={()=>{setShowUnlock(false);setUnlockPw("");setUnlockErr("");}}>

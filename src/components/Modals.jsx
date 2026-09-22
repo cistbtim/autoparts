@@ -62,7 +62,7 @@ function detectSide(sku, name) {
   return null;
 }
 
-export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=[],user=null}) {
+export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=[],user=null,subActive=false}) {
   const [pTab,setPTab]=useState("profile"); // "profile" | "users"
   const [f,setF]=useState({
     name:"", vat_number:"", tax_rate:0, phone:"", whatsapp:"", email:"",
@@ -391,7 +391,13 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
         </div>
 
         {(()=>{
-          const isActive = profile?.subscription_status==="active";
+          // The user's real subscription status lives on their login record (users
+          // table, surfaced via getSubInfo) and is what actually gates access
+          // elsewhere in the app — workshop_profiles.subscription_status is a
+          // separate, informational field that isn't reliably kept in sync (found
+          // 2026-09-22: a workshop showing "Active - 101d left" everywhere else
+          // still had "trial" stored here). Gate on the real one, passed in as subActive.
+          const isActive = subActive;
           if(isActive){
             return (
               <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
@@ -438,12 +444,18 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
           const daysLeft=exp?Math.ceil((exp-today)/(1000*60*60*24)):null;
           const expired=daysLeft!==null&&daysLeft<0;
           const statusColors={trial:"var(--blue)",active:"var(--green)",expired:"var(--red)",suspended:"var(--red)"};
-          const sc=statusColors[profile.subscription_status]||"var(--text3)";
+          // profile.subscription_status (workshop_profiles) can go stale relative to the
+          // real subscription state (subActive, from the same authoritative source as the
+          // "Active · Nd left" sidebar badge) — confirmed 2026-09-22 for a workshop that
+          // showed active everywhere else but still had "trial" stored here. Trust subActive
+          // when it says active, since a false negative here is what caused the confusion.
+          const displayStatus = subActive ? "active" : (profile.subscription_status||"trial");
+          const sc=statusColors[displayStatus]||"var(--text3)";
           return (
             <div style={{border:`1px solid ${sc}40`,borderRadius:10,padding:16,background:`${sc}08`,marginBottom:4}}>
               <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:sc}}>📋 Account & Subscription</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:13}}>
-                <div><span style={{color:"var(--text3)"}}>Status:</span><br/><strong style={{color:sc}}>{(profile.subscription_status||"—").toUpperCase()}</strong></div>
+                <div><span style={{color:"var(--text3)"}}>Status:</span><br/><strong style={{color:sc}}>{displayStatus.toUpperCase()}</strong></div>
                 <div><span style={{color:"var(--text3)"}}>Registered:</span><br/><strong>{profile.trial_start||"—"}</strong></div>
                 <div><span style={{color:"var(--text3)"}}>Expires:</span><br/><strong style={{color:expired?"var(--red)":undefined}}>{profile.subscription_expires_at||"—"}</strong></div>
                 <div><span style={{color:"var(--text3)"}}>Days Left:</span><br/><strong style={{color:expired?"var(--red)":daysLeft!==null&&daysLeft<=7?"var(--yellow)":"var(--green)"}}>

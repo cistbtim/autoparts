@@ -67,6 +67,8 @@ const IcFactory= () => <svg width="20" height="20" viewBox="0 0 24 24" fill="non
 const IcUser   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
 const IcLock   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
 const IcGrid   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
+const IcBadge  = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 17c0-1.66 1.79-3 4-3s4 1.34 4 3"/></svg>;
+const IcTag    = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 3a1 1 0 0 0-1 1l.24 5.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.82z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>;
 
 export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLoginOnly=false,initialError=""}) {
   // Referral: ?ref=<workshop id> jumps straight to workshop signup and gets stamped on the new account
@@ -84,6 +86,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const [coworkMode,setCoworkMode] = useState(false);
   // supplier
   const [supplierUser,setSupplierUser] = useState(""); const [supplierPass,setSupplierPass] = useState("");
+  // licence renewal agent
+  const [licAgentUser,setLicAgentUser] = useState(""); const [licAgentPass,setLicAgentPass] = useState("");
+  // car sales
+  const [carSalesUser,setCarSalesUser] = useState(""); const [carSalesPass,setCarSalesPass] = useState("");
   // workshop
   const [wsCompany,setWsCompany] = useState("");
   const [wsUser,setWsUser] = useState(""); const [wsPass,setWsPass] = useState("");
@@ -179,6 +185,26 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       const accErr=checkAccess(u);
       if(accErr){setErr(accErr);setExpiredInfo({name:u.name,username:u.username});setLoading(false);return;}
       logLogin(u);onLogin(u);
+    } else setErr(t.wrongPass);
+    setLoading(false);
+  };
+
+  const doLicAgentLogin = async () => {
+    if(!licAgentUser||!licAgentPass){setErr(t.wrongPass);return;}
+    setLoading(true);setErr("");setExpiredInfo(null);
+    const res = await api.fresh("users",`username=eq.${encodeURIComponent(licAgentUser)}&password=eq.${encodeURIComponent(licAgentPass)}&role=eq.licence_agent&select=*`);
+    if(Array.isArray(res)&&res.length>0){
+      logLogin(res[0]);onLogin(res[0]);
+    } else setErr(t.wrongPass);
+    setLoading(false);
+  };
+
+  const doCarSalesLogin = async () => {
+    if(!carSalesUser||!carSalesPass){setErr(t.wrongPass);return;}
+    setLoading(true);setErr("");setExpiredInfo(null);
+    const res = await api.fresh("users",`username=eq.${encodeURIComponent(carSalesUser)}&password=eq.${encodeURIComponent(carSalesPass)}&role=eq.car_sales&select=*`);
+    if(Array.isArray(res)&&res.length>0){
+      logLogin(res[0]);onLogin(res[0]);
     } else setErr(t.wrongPass);
     setLoading(false);
   };
@@ -353,6 +379,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     {id:"customer", Icon:IcCart,   label:t.loginShop||"Parts Shop"},
     {id:"supplier", Icon:IcFactory,label:t.loginSupplier||"Supplier"},
     {id:"staff",    Icon:IcStaff,  label:t.loginStaff||"Staff"},
+    {id:"licagent", Icon:IcBadge,  label:t.loginLicAgent||"Licence Agent"},
+    {id:"carsales", Icon:IcTag,    label:t.loginCarSales||"Car Sales"},
   ];
 
   const inpStyle = {
@@ -754,6 +782,58 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doStaffLogin} disabled={loading}>
                 {loading?t.connecting||"Connecting…":"Sign In →"}
               </button>
+            </div>
+          )}
+
+          {/* ── Licence Renewal Agent ── */}
+          {authTab==="licagent"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:13}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+                <div style={{width:38,height:38,borderRadius:10,background:"rgba(34,211,238,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"#22d3ee",flexShrink:0}}><IcBadge/></div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginLicAgent||"Licence Agent"} {t.signIn||"Login"}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Manage licence renewals across all workshops</div>
+                </div>
+              </div>
+              <Field label={t.username||"Username"}>
+                <InpIcon inp={<input style={inpStyle} type="text" value={licAgentUser} onChange={e=>setLicAgentUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doLicAgentLogin()} autoCapitalize="none" placeholder="Username"/>}><IcUser/></InpIcon>
+              </Field>
+              <Field label={t.password||"Password"}>
+                <InpIcon inp={<input style={inpStyle} type="password" value={licAgentPass} onChange={e=>setLicAgentPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doLicAgentLogin()}/>}><IcLock/></InpIcon>
+              </Field>
+              {err&&<ErrBox msg={err}/>}
+              <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doLicAgentLogin} disabled={loading}>
+                {loading?t.connecting||"Connecting…":"Sign In →"}
+              </button>
+              <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:"4px 0 0"}}>
+                Don't have a login? Ask an admin to set one up for you.
+              </p>
+            </div>
+          )}
+
+          {/* ── Car Sales ── */}
+          {authTab==="carsales"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:13}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+                <div style={{width:38,height:38,borderRadius:10,background:"rgba(251,146,60,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fb923c",flexShrink:0}}><IcTag/></div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginCarSales||"Car Sales"} {t.signIn||"Login"}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Manage trade-in & used car listings</div>
+                </div>
+              </div>
+              <Field label={t.username||"Username"}>
+                <InpIcon inp={<input style={inpStyle} type="text" value={carSalesUser} onChange={e=>setCarSalesUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCarSalesLogin()} autoCapitalize="none" placeholder="Username"/>}><IcUser/></InpIcon>
+              </Field>
+              <Field label={t.password||"Password"}>
+                <InpIcon inp={<input style={inpStyle} type="password" value={carSalesPass} onChange={e=>setCarSalesPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCarSalesLogin()}/>}><IcLock/></InpIcon>
+              </Field>
+              {err&&<ErrBox msg={err}/>}
+              <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doCarSalesLogin} disabled={loading}>
+                {loading?t.connecting||"Connecting…":"Sign In →"}
+              </button>
+              <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:"4px 0 0"}}>
+                Don't have a login? Ask an admin to set one up for you.
+              </p>
             </div>
           )}
 

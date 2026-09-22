@@ -21,6 +21,7 @@ import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
 import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierScanStockPage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
+import { LicenceAgentPage, CarSalesPage } from "./components/AgentPages.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage } from "./pages/PublicPages.jsx";
 
@@ -167,7 +168,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const isBranchUser = BRANCH_ROLES.includes(role);
   const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth<768;
-  const initTab = initialVehiclesMake&&role==="admin"?"vehicles":role==="customer"?"shop":role==="supplier"?"supplierParts":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"requestsKanban":role==="branch_manager"?"requestsKanban":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"requestsKanban":"dashboard";
+  const initTab = initialVehiclesMake&&role==="admin"?"vehicles":role==="customer"?"shop":role==="supplier"?"supplierParts":role==="licence_agent"?"licenceAgentQueue":role==="car_sales"?"carSalesListings":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"requestsKanban":role==="branch_manager"?"requestsKanban":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"requestsKanban":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
@@ -197,6 +198,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [wsGrowthLoginLogs,setWsGrowthLoginLogs]=useState([]); // full (unlimited) login_logs, workshop role only, for the same dashboard
   const [suppliers,setSuppliers]=useState([]);
   const [supplierParts,setSupplierParts]=useState([]); // self-service catalogue for role:"supplier" logins
+  const [licenceAgentQueue,setLicenceAgentQueue]=useState([]); // ws_licence_renewals across ALL workshops, for role:"licence_agent"
+  const [licenceAgentWsNames,setLicenceAgentWsNames]=useState({}); // {workshop_id: name} lookup for the queue above
+  const [carSalesListings,setCarSalesListings]=useState([]); // car_sales_listings, for role:"car_sales"
   const [supplierExistingParts,setSupplierExistingParts]=useState([]); // their parts already in the main inventory
   const [allSupplierParts,setAllSupplierParts]=useState([]); // admin: every supplier's self-added parts (for pricing)
   const [supplierCostUpdates,setSupplierCostUpdates]=useState([]); // admin: existing parts whose supplier just updated their cost
@@ -1049,6 +1053,32 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setSupplierPurchaseInvoiceItems(Array.isArray(purchItems)?purchItems:[]);
   },[role,user.supplier_id]);
   useEffect(()=>{ reloadSupplierParts(); },[reloadSupplierParts]);
+
+  // Licence Renewal Agent: the combined renewal queue across every workshop (not
+  // scoped by workshop_id like the workshop's own view of this same table) plus a
+  // name lookup so the queue can show which workshop each row belongs to.
+  const reloadLicenceAgentQueue=useCallback(async()=>{
+    if(role!=="licence_agent") return;
+    const data=await api.fresh("ws_licence_renewals","select=*&order=submitted_at.desc").catch(()=>[]);
+    const rows=Array.isArray(data)?data:[];
+    setLicenceAgentQueue(rows);
+    const wsIds=[...new Set(rows.map(r=>r.workshop_id).filter(Boolean))];
+    if(wsIds.length){
+      const profs=await api.fresh("workshop_profiles",`id=in.(${wsIds.join(",")})&select=id,name`).catch(()=>[]);
+      const map={};
+      (Array.isArray(profs)?profs:[]).forEach(p=>{ map[p.id]=p.name; });
+      setLicenceAgentWsNames(map);
+    }
+  },[role]);
+  useEffect(()=>{ reloadLicenceAgentQueue(); },[reloadLicenceAgentQueue]);
+
+  // Car Sales: trade-in / used car listings, global — not tied to any one workshop.
+  const reloadCarSalesListings=useCallback(async()=>{
+    if(role!=="car_sales") return;
+    const data=await api.fresh("car_sales_listings","select=*&order=created_at.desc").catch(()=>[]);
+    setCarSalesListings(Array.isArray(data)?data:[]);
+  },[role]);
+  useEffect(()=>{ reloadCarSalesListings(); },[reloadCarSalesListings]);
 
   // Admin: every supplier's self-added parts, so pending ones can be priced.
   // Small table (each supplier's own additions) — its own effect, same reasoning as above.
@@ -2348,13 +2378,63 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const saveWsLicenceRenewal=async(rec)=>{
     const id=rec.id||makeId("WSLR");
     const row={...rec,id,workshop_id:wsId||null};
-    await api.insert("ws_licence_renewals",row).catch(e=>console.warn("Save renewal failed:",e));
+    let res=await api.insert("ws_licence_renewals",row).catch(e=>({message:e.message}));
+    if(res&&!Array.isArray(res)&&res.message){
+      // document_url column may not exist yet (SQL migration not run) — retry
+      // without it so the renewal request itself still saves either way.
+      const {document_url,...fallbackRow}=row;
+      await api.insert("ws_licence_renewals",fallbackRow).catch(e=>console.warn("Save renewal failed:",e));
+    }
     setWsLicenceRenewals(p=>[row,...p.filter(r=>r.id!==id)]);
+  };
+
+  // Licence Agent creating a walk-in renewal directly (no workshop involved) —
+  // same insert as above, but always workshop_id:null and updates the agent's
+  // own cross-workshop queue state instead of the workshop-scoped one.
+  const saveLicenceAgentRenewal=async(rec)=>{
+    const id=rec.id||makeId("WSLR");
+    const row={...rec,id,workshop_id:rec.workshop_id||null};
+    let res=await api.insert("ws_licence_renewals",row).catch(e=>({message:e.message}));
+    if(res&&!Array.isArray(res)&&res.message){
+      const {document_url,...fallbackRow}=row;
+      await api.insert("ws_licence_renewals",fallbackRow).catch(e=>console.warn("Save renewal failed:",e));
+    }
+    setLicenceAgentQueue(p=>[row,...p.filter(r=>r.id!==id)]);
   };
 
   const updateWsLicenceRenewal=async(id,patch)=>{
     await api.patch("ws_licence_renewals","id",id,patch).catch(e=>console.warn("Update renewal failed:",e));
     setWsLicenceRenewals(p=>p.map(r=>r.id===id?{...r,...patch}:r));
+  };
+
+  // Licence Agent's own update — same table/patch as above, but updates the
+  // agent's cross-workshop queue state (licenceAgentQueue) instead of the
+  // workshop-scoped wsLicenceRenewals state, since an agent isn't scoped to one.
+  const updateLicenceAgentRenewal=async(id,patch)=>{
+    await api.patch("ws_licence_renewals","id",id,patch).catch(e=>console.warn("Update renewal failed:",e));
+    setLicenceAgentQueue(p=>p.map(r=>r.id===id?{...r,...patch}:r));
+  };
+  const deleteLicenceAgentRenewal=async(id)=>{
+    await api.delete("ws_licence_renewals","id",id).catch(e=>console.warn("Delete renewal failed:",e));
+    setLicenceAgentQueue(p=>p.filter(r=>r.id!==id));
+  };
+
+  // ── Car Sales listings ────────────────────────────────────────
+  const saveCarSalesListing=async(rec)=>{
+    const id=rec.id||makeId("CS");
+    const row={...rec,id};
+    const exists=carSalesListings.some(l=>l.id===id);
+    if(exists) await api.patch("car_sales_listings","id",id,row).catch(e=>console.warn("Save listing failed:",e));
+    else await api.insert("car_sales_listings",row).catch(e=>console.warn("Save listing failed:",e));
+    setCarSalesListings(p=>exists?p.map(l=>l.id===id?row:l):[row,...p]);
+  };
+  const updateCarSalesListing=async(id,patch)=>{
+    await api.patch("car_sales_listings","id",id,patch).catch(e=>console.warn("Update listing failed:",e));
+    setCarSalesListings(p=>p.map(l=>l.id===id?{...l,...patch}:l));
+  };
+  const deleteCarSalesListing=async(id)=>{
+    await api.delete("car_sales_listings","id",id).catch(e=>console.warn("Delete listing failed:",e));
+    setCarSalesListings(p=>p.filter(l=>l.id!==id));
   };
 
   const patchWsBooking=async(id,patch)=>{
@@ -4822,6 +4902,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       ]
     },
     {
+      id:"grp_licence_agent", icon:"🪪", label:"Licence Renewals", roles:["licence_agent"],
+      children:[
+        {id:"licenceAgentQueue", icon:"🪪", label:"Renewal Queue", roles:["licence_agent"]},
+      ]
+    },
+    {
+      id:"grp_car_sales", icon:"🏷️", label:"Car Sales", roles:["car_sales"],
+      children:[
+        {id:"carSalesListings", icon:"🏷️", label:"Listings", roles:["car_sales"]},
+      ]
+    },
+    {
       id:"grp_sales", icon:"🛒", label:t.grpSales, roles:["admin","manager","shipper","customer"],
       badge: pendingCnt,
       children:[
@@ -4905,6 +4997,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"stocktake",icon:"🔢",label:t.stockTake},
       {id:"stockmove",icon:"🔀",label:t.stockMove},
       {id:"partPhotos",icon:"📸",label:t.partPhotos||"Photos"},
+    ];
+    if(role==="licence_agent") return [
+      {id:"licenceAgentQueue",icon:"🪪",label:"Renewal Queue"},
+    ];
+    if(role==="car_sales") return [
+      {id:"carSalesListings",icon:"🏷️",label:"Listings"},
     ];
     if(role==="scrapyard"||role==="scrapyard_admin") return [
       {id:"sy_dashboard",icon:"📊", label:t.syDashboard||"Dashboard"},
@@ -6749,6 +6847,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             maxDiscountPct={supplierMaxDiscountPct} shopWideCap={+settings.max_customer_discount_pct||0}
             onUpdateDiscount={updateCustomerDiscount} onUpdateDefaultDiscount={updateSupplierDiscountPct}
             onUpdateMaxDiscount={updateSupplierMaxDiscountPct} onRefresh={reloadSupplierParts}/>
+        )}
+
+        {/* ── LICENCE RENEWAL AGENT ── */}
+        {tab==="licenceAgentQueue"&&role==="licence_agent"&&(
+          <LicenceAgentPage renewals={licenceAgentQueue} workshopNames={licenceAgentWsNames} onUpdate={updateLicenceAgentRenewal} onSave={saveLicenceAgentRenewal} onDelete={deleteLicenceAgentRenewal}/>
+        )}
+
+        {/* ── CAR SALES ── */}
+        {tab==="carSalesListings"&&role==="car_sales"&&(
+          <CarSalesPage listings={carSalesListings} onSave={saveCarSalesListing} onUpdate={updateCarSalesListing} onDelete={deleteCarSalesListing}/>
         )}
 
         {/* ── PURCHASE INVOICES ── */}

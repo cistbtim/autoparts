@@ -64,6 +64,7 @@ function detectSide(sku, name) {
 
 export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=[],user=null,subActive=false,settings={}}) {
   const [pTab,setPTab]=useState("profile"); // "profile" | "users"
+  const [wsPTab,setWsPTab]=useState("shop"); // sub-tab within "profile": shop | banking | labels | agent | ads
   const [f,setF]=useState({
     name:"", vat_number:"", tax_rate:0, phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"", province:"",
@@ -232,7 +233,18 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
         </div>
       )}
 
-      {pTab==="profile"&&<div className="card" style={{padding:20,display:"flex",flexDirection:"column",gap:14}}>
+      {pTab==="profile"&&<div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{display:"flex",borderBottom:"1px solid var(--border)",gap:0,flexWrap:"wrap"}}>
+          {[["shop","🏪 Shop Info"],["banking","🏦 Banking"],["labels","🏷️ Labels"],["agent","🪪 Licence Agent"],["ads","📢 Ads & Subscription"]].map(([id,lb])=>(
+            <button key={id} onClick={()=>setWsPTab(id)}
+              style={{padding:"8px 14px",border:"none",background:"none",cursor:"pointer",fontSize:12,fontWeight:wsPTab===id?700:400,
+                color:wsPTab===id?"var(--accent)":"var(--text2)",borderBottom:wsPTab===id?"2px solid var(--accent)":"2px solid transparent",marginBottom:-1,whiteSpace:"nowrap"}}>
+              {lb}
+            </button>
+          ))}
+        </div>
+      <div className="card" style={{padding:20,display:"flex",flexDirection:"column",gap:14}}>
+        {wsPTab==="shop"&&(<>
         {/* Logo */}
         <div>
           <FL label="Workshop Logo"/>
@@ -311,9 +323,11 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Only users who enter this PIN can move jobs between workshops. Leave blank to disable.</div>
           </div>
         </div>
+        </>)}
 
+        {wsPTab==="banking"&&(<>
         {/* Bank Account Details — shown to customers on quote-approval pages when a deposit is required */}
-        <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+        <div>
           <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🏦 Bank Account Details</div>
           <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>Shown to customers on the quote-approval page when a deposit is requested, so they can pay directly.</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
@@ -325,9 +339,11 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             <div><FL label="Payment Reference Note (optional)"/><input className="inp" value={f.bank_reference_note||""} onChange={e=>s("bank_reference_note",e.target.value)} placeholder="e.g. Use vehicle reg as reference"/></div>
           </div>
         </div>
+        </>)}
 
+        {wsPTab==="labels"&&(<>
         {/* Label Sizes */}
-        <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+        <div>
           <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🏷️ Label Sizes</div>
           <div style={{marginBottom:10}}>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>Job / Workshop label (used on job cards)</div>
@@ -375,7 +391,9 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             </div>
           </div>
         </div>
+        </>)}
 
+        {wsPTab==="agent"&&(<>
         {/* Licence Renewal Agent — a "Default" row (country/province match only)
             is always present and can't be removed here; the workshop can add
             their own agent(s) alongside it and pick which one is active,
@@ -398,7 +416,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             border:`1px solid ${sel?"var(--accent)":"var(--border)"}`,borderRadius:8,cursor:"pointer",
             background:sel?"rgba(255,122,46,.08)":"var(--surface2)"});
           return (
-            <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+            <div>
               <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🪪 Licence Renewal Agent</div>
               <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>
                 Used for WhatsApp renewal requests. {provinceAgent?`Your location (${defaultLabel}) has a default agent.`:"No agent is set for your area yet — add your own below, or ask about becoming one."}
@@ -458,17 +476,21 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             </div>
           );
         })()}
+        </>)}
 
+        {wsPTab==="shop"&&(<>
         {/* WhatsApp country code — customer numbers typed at Book-In (e.g. 0833927725) are
             normalized to this before opening any WhatsApp link (e.g. 27833927725). */}
-        <div>
+        <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
           <FL label="📱 WhatsApp Country Code"/>
           <input className="inp" style={{maxWidth:200}} value={f.whatsapp_country_code||""}
             onChange={e=>s("whatsapp_country_code",e.target.value.replace(/\D/g,""))}
             placeholder="e.g. 27 (South Africa)"/>
           <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Digits only, no + — applied to every customer/supplier number typed as a local number (e.g. 0833927725 → 27833927725) before opening WhatsApp</div>
         </div>
+        </>)}
 
+        {wsPTab==="ads"&&(<>
         {(()=>{
           // The user's real subscription status lives on their login record (users
           // table, surfaced via getSubInfo) and is what actually gates access
@@ -546,8 +568,9 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             </div>
           );
         })()}
+        </>)}
 
-        {branches.length>0&&(
+        {wsPTab==="shop"&&branches.length>0&&(
           <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
             <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🏪 Linked Spare Parts Shop</div>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>Link to a spare parts branch so your workshop can browse their stock and place orders directly.</div>
@@ -564,6 +587,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
         <button className="btn btn-primary" style={{padding:13,fontSize:15}} onClick={save} disabled={saving}>
           {saving?"Saving...":"✅ Save Settings"}
         </button>
+      </div>
       </div>}
     </div>
   );

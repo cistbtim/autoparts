@@ -7,6 +7,7 @@ import { C, curSym, getSettings, updateSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
 import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow, nemigaVinUrl } from "../lib/helpers.js";
 import { CAR_MAKES, getCategories, DEFAULT_CATS, getBrands, getRecentLocations, OC } from "../lib/constants.js";
+import { COUNTRIES, getProvinces } from "../lib/geoData.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
@@ -299,8 +300,21 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
               <input className="inp" value={f.city||""} onChange={e=>s("city",e.target.value)} placeholder="City"/>
-              <input className="inp" value={f.province||""} onChange={e=>s("province",e.target.value)} placeholder="Province / State"/>
-              <input className="inp" value={f.country||""} onChange={e=>s("country",e.target.value)} placeholder="Country"/>
+              <select className="inp" value={f.country||""} onChange={e=>{
+                const country=e.target.value;
+                setF(p=>({...p,country,province:getProvinces(country).includes(p.province)?p.province:""}));
+              }}>
+                <option value="">— Country —</option>
+                {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+              {getProvinces(f.country).length>0 ? (
+                <select className="inp" value={f.province||""} onChange={e=>s("province",e.target.value)}>
+                  <option value="">— Province / State —</option>
+                  {getProvinces(f.country).map(p=><option key={p} value={p}>{p}</option>)}
+                </select>
+              ) : (
+                <input className="inp" value={f.province||""} onChange={e=>s("province",e.target.value)} placeholder="Province / State"/>
+              )}
             </div>
             <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Province is used to auto-pick your default 🪪 Licence Renewal Agent below</div>
           </div>
@@ -1521,14 +1535,14 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
     cancelEditAd();
   };
 
-  const TABS=[["shop","🏪 Shop"],["billing","💰 Billing"],["inventory","🏷️ Inventory"],["pos","🖥️ POS"],["languages","🌐 Languages"],["partners","🔗 Workshop QR"],["ads","📢 Ads"]];
+  const TABS=[["shop","🏪 Shop"],["billing","💰 Billing"],["inventory","🏷️ Inventory"],["pos","🖥️ POS"],["languages","🌐 Languages"],["partners","🔗 Workshop QR"],["licence","🪪 Licence Agents"],["ads","📢 Ads"]];
 
   return (
     <div className="fu">
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
         <div><h1 style={{fontSize:20,fontWeight:700}}>⚙️ {t.settings}</h1></div>
-        {(sTab==="shop"||sTab==="billing")&&(
+        {(sTab==="shop"||sTab==="billing"||sTab==="licence")&&(
           <button className="btn btn-primary" onClick={()=>onSave(f)}>💾 {t.saveSettings}</button>
         )}
       </div>
@@ -1660,43 +1674,69 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
                   placeholder="https://script.google.com/macros/s/YOUR_VEHICLE_ID/exec"/>
                 <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Separate deployment → saves to Tim_Car_Phot/Make/ID/view.png</div>
               </FD>
-              <FD>
-                <FL label="🪪 Agent Recruitment Contact — Name"/>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: LICENCE AGENTS ── */}
+      {sTab==="licence"&&(
+        <div style={{maxWidth:900}}>
+          <div className="card" style={{padding:22,marginBottom:20}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>🪪 Agent Recruitment Contact</h3>
+            <FG cols="1fr 1fr">
+              <div>
+                <FL label="Name"/>
                 <input className="inp" value={f.licence_renewal_agent_name||""} onChange={e=>s("licence_renewal_agent_name",e.target.value)} placeholder="e.g. Tim"/>
                 <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Not a real renewal agent — shown to a workshop with no agent for their area yet, inviting them to become one. Never used to actually submit a renewal.</div>
-              </FD>
-              <FD>
-                <FL label="🪪 Agent Recruitment Contact — WhatsApp"/>
+              </div>
+              <div>
+                <FL label="WhatsApp"/>
                 <input className="inp" value={f.licence_renewal_agent_phone||""} onChange={e=>s("licence_renewal_agent_phone",e.target.value)} placeholder="27821234567 (no + or spaces)"/>
                 <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Where "want to become our agent" enquiries go — include country code. This is never the fallback that actual renewal requests get sent to.</div>
-              </FD>
-              <FD>
-                <FL label="🗺️ Country / Province Renewal Agents (the real agents)"/>
-                <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>A workshop in a matching country (and province, if set) uses this agent for real renewal requests. Leave Province blank for a country-wide default. A workshop with no match here sees no agent — just the recruitment contact above.</div>
-                {(f.licence_renewal_agents||[]).map((a,i)=>(
-                  <div key={a.id||i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr auto",gap:8,marginBottom:6,alignItems:"center"}}>
-                    <input className="inp" placeholder="Country" value={a.country||""} onChange={e=>{
-                      const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],country:e.target.value}; s("licence_renewal_agents",arr);
-                    }}/>
-                    <input className="inp" placeholder="Province (optional)" value={a.province||""} onChange={e=>{
-                      const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],province:e.target.value}; s("licence_renewal_agents",arr);
-                    }}/>
-                    <input className="inp" placeholder="Agent name" value={a.name||""} onChange={e=>{
-                      const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],name:e.target.value}; s("licence_renewal_agents",arr);
-                    }}/>
-                    <input className="inp" placeholder="WhatsApp" value={a.phone||""} onChange={e=>{
-                      const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],phone:e.target.value}; s("licence_renewal_agents",arr);
-                    }}/>
-                    <button type="button" className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{
-                      s("licence_renewal_agents",(f.licence_renewal_agents||[]).filter((_,idx)=>idx!==i));
-                    }}>✕</button>
-                  </div>
-                ))}
-                <button type="button" className="btn btn-ghost btn-sm" style={{borderStyle:"dashed"}} onClick={()=>{
-                  s("licence_renewal_agents",[...(f.licence_renewal_agents||[]),{id:makeId(),country:"",province:"",name:"",phone:""}]);
-                }}>+ Add Country/Province Agent</button>
-              </FD>
-            </div>
+              </div>
+            </FG>
+          </div>
+          <div className="card" style={{padding:22}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🗺️ Country / Province Renewal Agents</h3>
+            <div style={{fontSize:11,color:"var(--text3)",marginBottom:14}}>A workshop in a matching country (and province, if set) uses this agent for real renewal requests. Leave Province blank for a country-wide default. A workshop with no match here sees no agent — just the recruitment contact above.</div>
+            {(f.licence_renewal_agents||[]).map((a,i)=>(
+              <div key={a.id||i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr auto",gap:8,marginBottom:6,alignItems:"center"}}>
+                <select className="inp" value={a.country||""} onChange={e=>{
+                  const country=e.target.value;
+                  const arr=[...(f.licence_renewal_agents||[])];
+                  arr[i]={...arr[i],country,province:getProvinces(country).includes(arr[i].province)?arr[i].province:""};
+                  s("licence_renewal_agents",arr);
+                }}>
+                  <option value="">— Country —</option>
+                  {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
+                {getProvinces(a.country).length>0 ? (
+                  <select className="inp" value={a.province||""} onChange={e=>{
+                    const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],province:e.target.value}; s("licence_renewal_agents",arr);
+                  }}>
+                    <option value="">— Any / country-wide —</option>
+                    {getProvinces(a.country).map(p=><option key={p} value={p}>{p}</option>)}
+                  </select>
+                ) : (
+                  <input className="inp" placeholder="Province (optional)" value={a.province||""} onChange={e=>{
+                    const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],province:e.target.value}; s("licence_renewal_agents",arr);
+                  }}/>
+                )}
+                <input className="inp" placeholder="Agent name" value={a.name||""} onChange={e=>{
+                  const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],name:e.target.value}; s("licence_renewal_agents",arr);
+                }}/>
+                <input className="inp" placeholder="WhatsApp" value={a.phone||""} onChange={e=>{
+                  const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],phone:e.target.value}; s("licence_renewal_agents",arr);
+                }}/>
+                <button type="button" className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={()=>{
+                  s("licence_renewal_agents",(f.licence_renewal_agents||[]).filter((_,idx)=>idx!==i));
+                }}>✕</button>
+              </div>
+            ))}
+            <button type="button" className="btn btn-ghost btn-sm" style={{borderStyle:"dashed"}} onClick={()=>{
+              s("licence_renewal_agents",[...(f.licence_renewal_agents||[]),{id:makeId(),country:"",province:"",name:"",phone:""}]);
+            }}>+ Add Country/Province Agent</button>
           </div>
         </div>
       )}

@@ -390,8 +390,16 @@ export function WsVehicleForm({data,onSave,onPhotoSaved,onClose,t}) {
 }
 
 export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave, onClose}) {
-  const agentPhone = (settings?.licence_renewal_agent_phone||"").replace(/[^0-9]/g,"");
-  const agentName  = settings?.licence_renewal_agent_name || "Renewal Agent";
+  // Default = whatever the workshop already has configured in Workshop
+  // Settings (their own selection, or a province/country match). Picking one
+  // of their other saved agents here only changes where THIS request goes —
+  // it doesn't change the workshop's default for next time.
+  const defaultAgentName  = settings?.licence_renewal_agent_name || "Renewal Agent";
+  const defaultAgentPhone = settings?.licence_renewal_agent_phone || "";
+  const customAgents = settings?.custom_licence_agents||[];
+  const [pickedAgent, setPickedAgent] = useState(null); // null = use default
+  const agentName  = pickedAgent ? pickedAgent.name : defaultAgentName;
+  const agentPhone = (pickedAgent ? pickedAgent.phone : defaultAgentPhone).replace(/[^0-9]/g,"");
   const effExpiry  = vehicleRecord?.licence_disc_expiry || job?.licence_disc_expiry || "";
   const [f, setF] = useState({
     vehicle_reg:   job?.vehicle_reg   || vehicleRecord?.reg   || "",
@@ -449,7 +457,7 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
       <MHead title="🪪 Request Licence Renewal" onClose={onClose}/>
       <div style={{padding:"0 2px 4px"}}>
         {agentPhone ? (
-          <div style={{background:"rgba(37,211,102,.08)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"var(--text2)"}}>
+          <div style={{background:"rgba(37,211,102,.08)",border:"1px solid rgba(37,211,102,.3)",borderRadius:8,padding:"8px 12px",marginBottom:customAgents.length>0?8:14,fontSize:12,color:"var(--text2)"}}>
             Renewal request will be sent via WhatsApp to <strong>{agentName}</strong>
           </div>
         ) : (
@@ -460,6 +468,21 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
                 💬 Want to become the renewal agent for your area? Contact {settings.licence_agent_recruit_name||"us"}{settings.licence_agent_recruit_phone?` on WhatsApp ${settings.licence_agent_recruit_phone}`:""}.
               </div>
             )}
+          </div>
+        )}
+        {customAgents.length>0&&(
+          <div style={{marginBottom:14}}>
+            <FL label="Send this request to"/>
+            <select className="inp" value={pickedAgent?`${pickedAgent.name}|${pickedAgent.phone}`:""} onChange={e=>{
+              if(!e.target.value){ setPickedAgent(null); return; }
+              const [name,phone]=e.target.value.split("|");
+              setPickedAgent({name,phone});
+            }}>
+              <option value="">🌍 Default — {defaultAgentPhone?defaultAgentName:"none set"}</option>
+              {customAgents.map(a=>(
+                <option key={a.id} value={`${a.name}|${a.phone}`}>{a.name} — {a.phone}</option>
+              ))}
+            </select>
           </div>
         )}
         <FG cols="1fr 1fr 1fr">

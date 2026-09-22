@@ -528,6 +528,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     country:    workshopProfile.country   || "",
     licence_renewal_agent_name:  workshopProfile.licence_renewal_agent_name  || provinceLicenceAgent?.name  || "",
     licence_renewal_agent_phone: workshopProfile.licence_renewal_agent_phone || provinceLicenceAgent?.phone || "",
+    // The workshop's own saved agent list — lets the renewal-request modal
+    // itself offer a per-request override, not just the Workshop Settings default.
+    custom_licence_agents: workshopProfile.custom_licence_agents || [],
     // "Want to become our agent" contact — always passed through as-is, kept
     // separate from the operational pair above so it's never mistaken for a
     // working fallback agent.

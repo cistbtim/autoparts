@@ -155,8 +155,21 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
       <div className="card" style={{padding:14,marginBottom:14,overflow:"auto"}}>
         <div style={{fontWeight:700,marginBottom:12,fontSize:13}}>📊 Renewals by Workshop</div>
         {workshopRows.length===0&&<div style={{color:"var(--text3)",fontSize:13}}>No renewals yet</div>}
-        {workshopRows.length>0&&(
-          <table className="tbl" style={{width:"100%"}}>
+        {workshopRows.length>0&&(<>
+          <div className="mob-cards">
+            {workshopRows.map(w=>(
+              <div key={w.label} className="card" style={{padding:12}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>{w.label} <span style={{color:"var(--text3)",fontWeight:400}}>· {w.total} total</span></div>
+                <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12}}>
+                  <span style={{color:"var(--yellow)"}}>⏳ {w.pending||0}</span>
+                  <span style={{color:"var(--blue)"}}>📤 {w.submitted||0}</span>
+                  <span style={{color:"var(--green)"}}>✅ {w.completed||0}</span>
+                  <span style={{color:"var(--red)"}}>❌ {w.cancelled||0}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <table className="tbl desk-table" style={{width:"100%"}}>
             <thead><tr><th>Workshop</th><th style={{textAlign:"right"}}>Total</th><th style={{textAlign:"right"}}>Pending</th><th style={{textAlign:"right"}}>Submitted</th><th style={{textAlign:"right"}}>Completed</th><th style={{textAlign:"right"}}>Cancelled</th></tr></thead>
             <tbody>
               {workshopRows.map(w=>(
@@ -171,7 +184,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
               ))}
             </tbody>
           </table>
-        )}
+        </>)}
       </div>
 
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
@@ -191,8 +204,71 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
         </div>
       )}
 
-      {filtered.length>0&&(
-        <div className="card" style={{overflow:"auto"}}>
+      {filtered.length>0&&(<>
+        <div className="mob-cards">
+          {filtered.map(r=>{
+            const isExpired = r.current_expiry && new Date(r.current_expiry)<new Date();
+            const waPhone = r.workshop_id ? (workshopInfo[r.workshop_id]?.phone||"") : (r.owner_phone||"");
+            const waMsg = r.workshop_id
+              ? `Hi, regarding the licence renewal for ${r.vehicle_reg||"the vehicle"} (${r.owner_name||"customer"}) — status: ${r.status||"pending"}.`
+              : "";
+            return (
+              <div key={r.id} className="card" style={{padding:14,borderLeft:`3px solid ${isExpired?"var(--red)":"var(--border)"}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:8}}>
+                  <div>
+                    <div style={{fontWeight:700,fontFamily:"DM Mono,monospace",fontSize:14}}>{r.vehicle_reg}</div>
+                    <div style={{fontSize:12,color:"var(--text3)"}}>{r.vehicle_make} {r.vehicle_model}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:"🚶 Walk-in")}</div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontSize:12,fontWeight:600,color:isExpired?"var(--red)":"var(--green)"}}>{r.current_expiry||"—"} {isExpired?"⚠️":""}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{r.renewal_years||1} yr renewal</div>
+                  </div>
+                </div>
+                <div style={{fontSize:13,marginBottom:10}}>{r.owner_name||"—"}{r.owner_phone?` · ${r.owner_phone}`:""}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:10}}>
+                  <select value={r.status||"pending"} onChange={e=>onUpdate(r.id,{status:e.target.value})}
+                    style={{fontSize:12,padding:"4px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",cursor:"pointer",color:"var(--text1)"}}>
+                    <option value="pending">⏳ Pending</option>
+                    <option value="submitted">📤 Submitted</option>
+                    <option value="completed">✅ Completed</option>
+                    <option value="cancelled">❌ Cancelled</option>
+                  </select>
+                  <input type="number" min="0" value={r.commission_amount||""} placeholder="Commission"
+                    onChange={e=>onUpdate(r.id,{commission_amount:+e.target.value||null})}
+                    style={{width:90,fontSize:12,padding:"4px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)"}}/>
+                  <button onClick={()=>onUpdate(r.id,{commission_status:r.commission_status==="paid"?"unpaid":"paid"})}
+                    style={{fontSize:11,padding:"4px 10px",borderRadius:12,border:"none",cursor:"pointer",
+                      background:r.commission_status==="paid"?"var(--green)":"var(--surface2)",
+                      color:r.commission_status==="paid"?"#fff":"var(--text3)",fontWeight:600}}>
+                    {r.commission_status==="paid"?"✓ Paid":"Mark Paid"}
+                  </button>
+                  <span style={{fontSize:11,color:"var(--text3)",marginLeft:"auto"}}>{(r.submitted_at||"").slice(0,10)}</span>
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {onUpdate&&(
+                    <button onClick={()=>setEditRenewal(r)}
+                      style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,background:"var(--surface2)",color:"var(--text2)"}}>✏️ Edit</button>
+                  )}
+                  <button onClick={()=>setDocsRenewalId(r.id)}
+                    style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
+                      background:(r.receipt_url||r.new_licence_url)?"var(--green)":"var(--surface2)",
+                      color:(r.receipt_url||r.new_licence_url)?"#fff":"var(--text3)"}}>📎 Docs</button>
+                  {waPhone&&(
+                    <a href={waLink(waPhone,waMsg)} target="_blank" rel="noopener noreferrer">
+                      <button style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲 WhatsApp</button>
+                    </a>
+                  )}
+                  {onDelete&&(
+                    <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
+                      style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,background:"var(--red)",color:"#fff",cursor:"pointer"}}>🗑️ Delete</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="card desk-table" style={{overflow:"auto"}}>
           <table className="tbl" style={{width:"100%",minWidth:820}}>
             <thead>
               <tr>
@@ -289,7 +365,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
             </tbody>
           </table>
         </div>
-      )}
+      </>)}
 
       {docsRenewal&&(
         <RenewalDocsModal renewal={docsRenewal} viewer="agent"

@@ -2420,11 +2420,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   };
 
   // ── Workshop Licence Renewals ─────────────────────────────────
+  // writeTolerant silently drops whatever column doesn't exist yet so the
+  // rest of the row still saves — but silently is the problem: without this,
+  // a field can appear saved in the UI (local state gets it either way) and
+  // then vanish once the page reloads from the real (unpatched) database,
+  // with nothing telling the user why. Compare what was asked to save against
+  // what `writeTolerant` actually managed to and say so if they differ.
+  const warnDroppedFields = (asked, saved) => {
+    const dropped = Object.keys(asked).filter(k=>!(k in saved));
+    if(dropped.length) showToast(`⚠️ Saved, but "${dropped.join(", ")}" isn't set up in the database yet — ask admin to run the pending SQL migration`,"err");
+  };
+
   const saveWsLicenceRenewal=async(rec)=>{
     const id=rec.id||makeId("WSLR");
     const row={...rec,id,workshop_id:wsId||null};
     const {res,payload}=await writeTolerant(p=>api.insert("ws_licence_renewals",p),row);
-    if(res&&!Array.isArray(res)&&res.message){ console.warn("Save renewal failed:",res); }
+    if(res&&!Array.isArray(res)&&res.message){ console.warn("Save renewal failed:",res); return; }
+    warnDroppedFields(row,payload);
     setWsLicenceRenewals(p=>[payload,...p.filter(r=>r.id!==id)]);
   };
 
@@ -2435,21 +2447,26 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const id=rec.id||makeId("WSLR");
     const row={...rec,id,workshop_id:rec.workshop_id||null};
     const {res,payload}=await writeTolerant(p=>api.insert("ws_licence_renewals",p),row);
-    if(res&&!Array.isArray(res)&&res.message){ console.warn("Save renewal failed:",res); }
+    if(res&&!Array.isArray(res)&&res.message){ console.warn("Save renewal failed:",res); return; }
+    warnDroppedFields(row,payload);
     setLicenceAgentQueue(p=>[payload,...p.filter(r=>r.id!==id)]);
   };
 
   const updateWsLicenceRenewal=async(id,patch)=>{
-    await api.patch("ws_licence_renewals","id",id,patch).catch(e=>console.warn("Update renewal failed:",e));
-    setWsLicenceRenewals(p=>p.map(r=>r.id===id?{...r,...patch}:r));
+    const {res,payload}=await writeTolerant(p=>api.patch("ws_licence_renewals","id",id,p),patch);
+    if(res&&!Array.isArray(res)&&res.message){ showToast(`❌ Update failed: ${res.message}`,"err"); return; }
+    warnDroppedFields(patch,payload);
+    setWsLicenceRenewals(p=>p.map(r=>r.id===id?{...r,...payload}:r));
   };
 
   // Licence Agent's own update — same table/patch as above, but updates the
   // agent's cross-workshop queue state (licenceAgentQueue) instead of the
   // workshop-scoped wsLicenceRenewals state, since an agent isn't scoped to one.
   const updateLicenceAgentRenewal=async(id,patch)=>{
-    await api.patch("ws_licence_renewals","id",id,patch).catch(e=>console.warn("Update renewal failed:",e));
-    setLicenceAgentQueue(p=>p.map(r=>r.id===id?{...r,...patch}:r));
+    const {res,payload}=await writeTolerant(p=>api.patch("ws_licence_renewals","id",id,p),patch);
+    if(res&&!Array.isArray(res)&&res.message){ showToast(`❌ Update failed: ${res.message}`,"err"); return; }
+    warnDroppedFields(patch,payload);
+    setLicenceAgentQueue(p=>p.map(r=>r.id===id?{...r,...payload}:r));
   };
   const deleteLicenceAgentRenewal=async(id)=>{
     await api.delete("ws_licence_renewals","id",id).catch(e=>console.warn("Delete renewal failed:",e));

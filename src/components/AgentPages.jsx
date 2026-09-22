@@ -27,7 +27,15 @@ const daysUntil = (dateStr) => {
 // ═══════════════════════════════════════════════════════════════
 export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh}) {
   const [filter, setFilter] = useState("all");
-  const [docsRenewal, setDocsRenewal] = useState(null);
+  // Holds the id, not the row itself — RenewalDocsModal calls onUpdate on
+  // every change (upload, expiry date, etc.), which patches `renewals` up in
+  // App.jsx. If this held a snapshot of the row instead, the modal would keep
+  // showing the object from when it opened and every edit would look like it
+  // silently reverted (e.g. a manually-typed expiry date appearing blank
+  // right after picking it). Deriving it fresh from `renewals` every render
+  // keeps the open modal in sync with whatever was just saved.
+  const [docsRenewalId, setDocsRenewalId] = useState(null);
+  const docsRenewal = docsRenewalId ? renewals.find(r=>r.id===docsRenewalId)||null : null;
   const [walkInPrefill, setWalkInPrefill] = useState(null); // null=closed, {}=blank, {...}=prefilled from a due-soon row
   const [editRenewal, setEditRenewal] = useState(null); // null=closed, {...existing row} = editing it in place
   const [refreshing, setRefreshing] = useState(false);
@@ -251,7 +259,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                           <button onClick={()=>setEditRenewal(r)}
                             style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,background:"var(--surface2)",color:"var(--text2)"}}>✏️ Edit</button>
                         )}
-                        <button onClick={()=>setDocsRenewal(r)}
+                        <button onClick={()=>setDocsRenewalId(r.id)}
                           style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
                             background:(r.receipt_url||r.new_licence_url)?"var(--green)":"var(--surface2)",
                             color:(r.receipt_url||r.new_licence_url)?"#fff":"var(--text3)"}}>📎 Docs</button>
@@ -286,7 +294,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
       {docsRenewal&&(
         <RenewalDocsModal renewal={docsRenewal} viewer="agent"
           workshopName={workshopInfo[docsRenewal.workshop_id]?.name||(docsRenewal.workshop_id?docsRenewal.workshop_id:"🚶 Walk-in")}
-          onUpdate={onUpdate} onClose={()=>setDocsRenewal(null)}/>
+          onUpdate={onUpdate} onClose={()=>setDocsRenewalId(null)}/>
       )}
 
       {walkInPrefill&&onSave&&(

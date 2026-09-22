@@ -541,7 +541,12 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
 
 export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUpdate, wsLocked=false}) {
   const [showModal, setShowModal] = useState(false);
-  const [docsRenewal, setDocsRenewal] = useState(null);
+  // Holds the id, not a snapshot of the row — see the matching comment in
+  // LicenceAgentPage. RenewalDocsModal patches live via onUpdate on every
+  // change, so re-deriving from `renewals` each render keeps an open modal
+  // showing what was actually just saved instead of a stale copy.
+  const [docsRenewalId, setDocsRenewalId] = useState(null);
+  const docsRenewal = docsRenewalId ? renewals.find(r=>r.id===docsRenewalId)||null : null;
   const [filter, setFilter] = useState("all");
   const C = curSym(settings?.currency||getSettings().currency);
 
@@ -645,7 +650,7 @@ export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUp
                     <td style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>{(r.submitted_at||"").slice(0,10)}</td>
                     <td>
                       <div style={{display:"flex",gap:6}}>
-                        <button onClick={()=>setDocsRenewal(r)}
+                        <button onClick={()=>setDocsRenewalId(r.id)}
                           style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
                             background:(r.receipt_url||r.new_licence_url)?"var(--green)":"var(--surface2)",
                             color:(r.receipt_url||r.new_licence_url)?"#fff":"var(--text3)"}}>📎 Docs</button>
@@ -672,7 +677,7 @@ export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUp
       )}
 
       {docsRenewal&&(
-        <RenewalDocsModal renewal={docsRenewal} viewer="workshop" onUpdate={onUpdate} onClose={()=>setDocsRenewal(null)}/>
+        <RenewalDocsModal renewal={docsRenewal} viewer="workshop" onUpdate={onUpdate} onClose={()=>setDocsRenewalId(null)}/>
       )}
     </div>
   );

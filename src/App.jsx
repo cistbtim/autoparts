@@ -34,6 +34,25 @@ window.addEventListener("popstate",()=>{
   window.history.pushState({appLoaded:true},"");
 },{capture:true});
 
+// Retries a write, stripping whatever column PostgREST says it can't find
+// ("Could not find the 'x' column of 'y' in the schema cache") and trying
+// again — so one field whose SQL migration hasn't been run yet doesn't block
+// every other field in the same save. `write(payload)` performs the actual
+// insert/patch/upsert; returns {res, payload: the payload that actually saved}.
+async function writeTolerant(write, payload) {
+  let current = { ...payload };
+  let res = await write(current).catch(e => ({ message: e.message }));
+  let guard = 0;
+  while (res && !Array.isArray(res) && res.message && guard < 10) {
+    const m = /Could not find the '([^']+)' column/.exec(res.message);
+    if (!m || !(m[1] in current)) break;
+    delete current[m[1]];
+    res = await write(current).catch(e => ({ message: e.message }));
+    guard++;
+  }
+  return { res, payload: current };
+}
+
 const APP_VERSION = "2.0.0.1";
 const APP_UPDATE_DATE = __BUILD_DATE__;
 
@@ -478,12 +497,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // Spare shop mode: scrapyard account that only manages parts, no sales/orders system
   const isSpareShop = (role==="scrapyard"||role==="scrapyard_admin") && !!workshopProfile.spare_shop_mode;
 
-  // Province default renewal agent — used only when the workshop hasn't picked
-  // their own agent (licence_renewal_agent_name/_phone left blank). Never
-  // overwrites the global fallback pair on `settings`, just takes priority over it.
-  const provinceLicenceAgent = (settings.licence_renewal_agents||[]).find(a=>
-    a.province && workshopProfile.province &&
-    a.province.trim().toLowerCase()===workshopProfile.province.trim().toLowerCase());
+  // Country/province default renewal agent — used only when the workshop hasn't
+  // picked their own agent (licence_renewal_agent_name/_phone left blank). A
+  // country+province match wins; a country-only entry (blank province) is the
+  // fallback for any workshop in that country with no closer match. There is
+  // deliberately NO further fallback to settings.licence_renewal_agent_name/
+  // phone — that pair is just the "want to become our agent" contact shown to
+  // a workshop with no real agent yet, never a stand-in used to actually send
+  // renewal requests.
+  const eqCi = (a,b) => !!a && !!b && a.trim().toLowerCase()===b.trim().toLowerCase();
+  const licenceAgentCandidates = settings.licence_renewal_agents||[];
+  const provinceLicenceAgent =
+    licenceAgentCandidates.find(a=>eqCi(a.country,workshopProfile.country)&&eqCi(a.province,workshopProfile.province)) ||
+    licenceAgentCandidates.find(a=>eqCi(a.country,workshopProfile.country)&&!a.province);
 
   // For workshop/scrapyard roles: merge their profile over shop settings so logo/name/contacts show correctly
   const wsDisplaySettings = (wsId || scrapId) ? {
@@ -500,8 +526,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     currency:   workshopProfile.currency  || settings.currency || "ZAR R",
     city:       workshopProfile.city      || "",
     country:    workshopProfile.country   || "",
-    licence_renewal_agent_name:  workshopProfile.licence_renewal_agent_name  || provinceLicenceAgent?.name  || settings.licence_renewal_agent_name  || "",
-    licence_renewal_agent_phone: workshopProfile.licence_renewal_agent_phone || provinceLicenceAgent?.phone || settings.licence_renewal_agent_phone || "",
+    licence_renewal_agent_name:  workshopProfile.licence_renewal_agent_name  || provinceLicenceAgent?.name  || "",
+    licence_renewal_agent_phone: workshopProfile.licence_renewal_agent_phone || provinceLicenceAgent?.phone || "",
+    // "Want to become our agent" contact — always passed through as-is, kept
+    // separate from the operational pair above so it's never mistaken for a
+    // working fallback agent.
+    licence_agent_recruit_name:  settings.licence_renewal_agent_name  || "",
+    licence_agent_recruit_phone: settings.licence_renewal_agent_phone || "",
     whatsapp_country_code: workshopProfile.whatsapp_country_code || settings.whatsapp_country_code || "",
     label_width_mm:  workshopProfile.label_width_mm  || 98,
     label_height_mm: workshopProfile.label_height_mm || 45,
@@ -4126,19 +4157,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const saveSettings=async(data)=>{
     // Include id:1 so upsert creates row if missing
     const merged = {...getSettings(),...settings,...data, id:1};
-    let res = await api.upsert("settings", merged).catch(e=>({message:e.message}));
+    const {res,payload} = await writeTolerant(p=>api.upsert("settings",p), merged);
     if(res&&!Array.isArray(res)&&res.message){
-      // licence_renewal_agents (jsonb) column may not exist yet — retry without it
-      const {licence_renewal_agents,...fallback} = merged;
-      res = await api.upsert("settings", fallback).catch(e=>({message:e.message}));
-      if(res&&!Array.isArray(res)&&res.message){
-        showToast(`❌ Save failed: ${res.message}`,"err");
-        return;
-      }
-      delete data.licence_renewal_agents;
+      showToast(`❌ Save failed: ${res.message}`,"err");
+      return;
     }
-    updateSettings(data);
-    setSettings(s=>({...s,...data}));
+    // Only the fields that actually saved should update local state/cache —
+    // drop anything writeTolerant had to strip out.
+    const savedData = Object.fromEntries(Object.entries(data).filter(([k])=>k in payload));
+    updateSettings(savedData);
+    setSettings(s=>({...s,...savedData}));
     showToast("✅ Settings saved");
   };
 
@@ -4152,20 +4180,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const existing=await api.get("workshop_profiles",`id=eq.${wsId}&select=id`).catch(()=>[]);
     const isNew = !(Array.isArray(existing)&&existing.length>0);
     if(isNew && !payload.name) payload.name = user.name||""; // new profile — seed name from the logged-in user
-    let res = isNew ? await api.insert("workshop_profiles",payload) : await api.patch("workshop_profiles","id",wsId,payload);
+    const write = p => isNew ? api.insert("workshop_profiles",p) : api.patch("workshop_profiles","id",wsId,p);
+    const {res,payload:savedPayload} = await writeTolerant(write, payload);
     if(res&&!Array.isArray(res)&&res.message){
-      // province / custom_licence_agents columns may not exist yet (SQL migration
-      // not run) — retry without them so the rest of the profile still saves.
-      const {province,custom_licence_agents,...fallback} = payload;
-      res = isNew ? await api.insert("workshop_profiles",fallback) : await api.patch("workshop_profiles","id",wsId,fallback);
-      if(res&&!Array.isArray(res)&&res.message){
-        showToast(`❌ Save failed: ${res.message}`,"err");
-        console.error("workshop_profiles save error:",res);
-        return;
-      }
-      delete data.province; delete data.custom_licence_agents;
+      showToast(`❌ Save failed: ${res.message}`,"err");
+      console.error("workshop_profiles save error:",res);
+      return;
     }
-    setWorkshopProfile(p=>({...p,...data}));
+    const savedData = Object.fromEntries(Object.entries(data).filter(([k])=>k in savedPayload));
+    setWorkshopProfile(p=>({...p,...savedData}));
     showToast("✅ Workshop profile saved");
   };
 

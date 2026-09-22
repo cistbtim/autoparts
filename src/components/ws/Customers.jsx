@@ -454,7 +454,12 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
           </div>
         ) : (
           <div style={{background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.3)",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"var(--red)"}}>
-            ⚠️ No renewal agent phone configured — set it in Settings → Licence Renewal Agent
+            ⚠️ No renewal agent set up for your area yet — this request will still be saved, but won't auto-send on WhatsApp. Add your own agent in Workshop Settings.
+            {(settings?.licence_agent_recruit_phone||settings?.licence_agent_recruit_name)&&(
+              <div style={{marginTop:6,color:"var(--text2)"}}>
+                💬 Want to become the renewal agent for your area? Contact {settings.licence_agent_recruit_name||"us"}{settings.licence_agent_recruit_phone?` on WhatsApp ${settings.licence_agent_recruit_phone}`:""}.
+              </div>
+            )}
           </div>
         )}
         <FG cols="1fr 1fr 1fr">

@@ -376,16 +376,21 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
           </div>
         </div>
 
-        {/* Licence Renewal Agent — a "Default" row (province match, else global
-            fallback from Settings) is always present and can't be removed here;
-            the workshop can add their own agent(s) alongside it and pick which
-            one is active, without ever losing the default. */}
+        {/* Licence Renewal Agent — a "Default" row (country/province match only)
+            is always present and can't be removed here; the workshop can add
+            their own agent(s) alongside it and pick which one is active,
+            without ever losing the default. There is no global fallback agent
+            — the global contact in Settings is for people asking to become an
+            agent, not a stand-in for a real one, so it's never auto-used here. */}
         {(()=>{
-          const provinceAgent = (settings?.licence_renewal_agents||[]).find(a=>
-            a.province && f.province && a.province.trim().toLowerCase()===f.province.trim().toLowerCase());
-          const defaultAgent = provinceAgent
-            ? {name:provinceAgent.name, phone:provinceAgent.phone}
-            : {name:settings?.licence_renewal_agent_name||"", phone:settings?.licence_renewal_agent_phone||""};
+          const eqCi = (a,b) => !!a && !!b && a.trim().toLowerCase()===b.trim().toLowerCase();
+          const roster = settings?.licence_renewal_agents||[];
+          const provinceAgent =
+            roster.find(a=>eqCi(a.country,f.country)&&eqCi(a.province,f.province)) ||
+            roster.find(a=>eqCi(a.country,f.country)&&!a.province);
+          const defaultLabel = provinceAgent
+            ? (provinceAgent.province ? `${provinceAgent.province}, ${provinceAgent.country}` : provinceAgent.country)
+            : "";
           const customAgents = f.custom_licence_agents||[];
           const isDefaultSelected = !f.licence_renewal_agent_name && !f.licence_renewal_agent_phone;
           const selectAgent = (name,phone) => { s("licence_renewal_agent_name",name); s("licence_renewal_agent_phone",phone); };
@@ -396,14 +401,14 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
               <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🪪 Licence Renewal Agent</div>
               <div style={{fontSize:11,color:"var(--text3)",marginBottom:10}}>
-                Used for WhatsApp renewal requests. {provinceAgent?`Your province (${f.province}) has a default agent.`:"Add your own agent below — the default is kept, you just pick which one is active."}
+                Used for WhatsApp renewal requests. {provinceAgent?`Your location (${defaultLabel}) has a default agent.`:"No agent is set for your area yet — add your own below, or ask about becoming one."}
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 <label style={rowStyle(isDefaultSelected)}>
                   <input type="radio" checked={isDefaultSelected} onChange={()=>selectAgent("","")}/>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:600}}>🌍 Default{provinceAgent?` — ${f.province}`:""}</div>
-                    <div style={{fontSize:11,color:"var(--text3)"}}>{defaultAgent.name||"Not set yet — configure in global Settings"}{defaultAgent.phone?` · ${defaultAgent.phone}`:""}</div>
+                    <div style={{fontSize:13,fontWeight:600}}>🌍 Default{provinceAgent?` — ${defaultLabel}`:""}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{provinceAgent?`${provinceAgent.name}${provinceAgent.phone?` · ${provinceAgent.phone}`:""}`:"No agent for your area — renewal requests just won't auto-send on WhatsApp"}</div>
                   </div>
                 </label>
                 {customAgents.map(a=>{
@@ -442,6 +447,11 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
                       }}>Save &amp; Select</button>
                       <button type="button" className="cp-btn" onClick={()=>{setShowAddAgent(false);setNewAgentName("");setNewAgentPhone("");}}>Cancel</button>
                     </div>
+                  </div>
+                )}
+                {!provinceAgent&&(settings?.licence_renewal_agent_name||settings?.licence_renewal_agent_phone)&&(
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>
+                    💬 Want to become the renewal agent for your area? Contact {settings.licence_renewal_agent_name||"us"}{settings.licence_renewal_agent_phone?` on WhatsApp ${settings.licence_renewal_agent_phone}`:""}.
                   </div>
                 )}
               </div>
@@ -1627,21 +1637,24 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
                 <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Separate deployment → saves to Tim_Car_Phot/Make/ID/view.png</div>
               </FD>
               <FD>
-                <FL label="🪪 Licence Renewal Agent Name (Global Default)"/>
-                <input className="inp" value={f.licence_renewal_agent_name||""} onChange={e=>s("licence_renewal_agent_name",e.target.value)} placeholder="e.g. ABC Renewals"/>
-                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Name shown in renewal request modal</div>
+                <FL label="🪪 Agent Recruitment Contact — Name"/>
+                <input className="inp" value={f.licence_renewal_agent_name||""} onChange={e=>s("licence_renewal_agent_name",e.target.value)} placeholder="e.g. Tim"/>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Not a real renewal agent — shown to a workshop with no agent for their area yet, inviting them to become one. Never used to actually submit a renewal.</div>
               </FD>
               <FD>
-                <FL label="🪪 Renewal Agent WhatsApp Number (Global Default)"/>
+                <FL label="🪪 Agent Recruitment Contact — WhatsApp"/>
                 <input className="inp" value={f.licence_renewal_agent_phone||""} onChange={e=>s("licence_renewal_agent_phone",e.target.value)} placeholder="27821234567 (no + or spaces)"/>
-                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Renewal requests sent via WhatsApp — include country code. This is the fallback used everywhere a province below has no agent of its own.</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Where "want to become our agent" enquiries go — include country code. This is never the fallback that actual renewal requests get sent to.</div>
               </FD>
               <FD>
-                <FL label="🗺️ Province Renewal Agents (optional overrides)"/>
-                <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>A workshop in a matching province uses this agent instead of the global default above. Adding these never removes the global default.</div>
+                <FL label="🗺️ Country / Province Renewal Agents (the real agents)"/>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>A workshop in a matching country (and province, if set) uses this agent for real renewal requests. Leave Province blank for a country-wide default. A workshop with no match here sees no agent — just the recruitment contact above.</div>
                 {(f.licence_renewal_agents||[]).map((a,i)=>(
-                  <div key={a.id||i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8,marginBottom:6,alignItems:"center"}}>
-                    <input className="inp" placeholder="Province" value={a.province||""} onChange={e=>{
+                  <div key={a.id||i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr auto",gap:8,marginBottom:6,alignItems:"center"}}>
+                    <input className="inp" placeholder="Country" value={a.country||""} onChange={e=>{
+                      const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],country:e.target.value}; s("licence_renewal_agents",arr);
+                    }}/>
+                    <input className="inp" placeholder="Province (optional)" value={a.province||""} onChange={e=>{
                       const arr=[...(f.licence_renewal_agents||[])]; arr[i]={...arr[i],province:e.target.value}; s("licence_renewal_agents",arr);
                     }}/>
                     <input className="inp" placeholder="Agent name" value={a.name||""} onChange={e=>{
@@ -1656,8 +1669,8 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
                   </div>
                 ))}
                 <button type="button" className="btn btn-ghost btn-sm" style={{borderStyle:"dashed"}} onClick={()=>{
-                  s("licence_renewal_agents",[...(f.licence_renewal_agents||[]),{id:makeId(),province:"",name:"",phone:""}]);
-                }}>+ Add Province Agent</button>
+                  s("licence_renewal_agents",[...(f.licence_renewal_agents||[]),{id:makeId(),country:"",province:"",name:"",phone:""}]);
+                }}>+ Add Country/Province Agent</button>
               </FD>
             </div>
           </div>

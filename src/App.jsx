@@ -5002,7 +5002,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(role!=="workshop"||!user?.id) return;
     try{
       if(!localStorage.getItem(tourSeenKey(user.id))){
-        const t=setTimeout(()=>setTourActive(true),900);
+        // Re-check the flag when the timer actually fires, not just when it was
+        // scheduled — otherwise a user who manually opens the 🧭 tour and finishes
+        // it within this window gets it reopened on them right after closing it,
+        // since this pending timeout has no idea that already happened.
+        const t=setTimeout(()=>{
+          try{ if(!localStorage.getItem(tourSeenKey(user.id))) setTourActive(true); }catch{/* ignore */}
+        },900);
         return ()=>clearTimeout(t);
       }
     }catch{/* localStorage unavailable — skip auto-tour, manual 🧭 button still works */}

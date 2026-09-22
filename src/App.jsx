@@ -218,7 +218,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [suppliers,setSuppliers]=useState([]);
   const [supplierParts,setSupplierParts]=useState([]); // self-service catalogue for role:"supplier" logins
   const [licenceAgentQueue,setLicenceAgentQueue]=useState([]); // ws_licence_renewals across ALL workshops, for role:"licence_agent"
-  const [licenceAgentWsNames,setLicenceAgentWsNames]=useState({}); // {workshop_id: name} lookup for the queue above
+  const [licenceAgentWsNames,setLicenceAgentWsNames]=useState({}); // {workshop_id: {name, phone}} lookup for the queue above
   const [carSalesListings,setCarSalesListings]=useState([]); // car_sales_listings, for role:"car_sales"
   const [supplierExistingParts,setSupplierExistingParts]=useState([]); // their parts already in the main inventory
   const [allSupplierParts,setAllSupplierParts]=useState([]); // admin: every supplier's self-added parts (for pricing)
@@ -1105,9 +1105,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setLicenceAgentQueue(rows);
     const wsIds=[...new Set(rows.map(r=>r.workshop_id).filter(Boolean))];
     if(wsIds.length){
-      const profs=await api.fresh("workshop_profiles",`id=in.(${wsIds.join(",")})&select=id,name`).catch(()=>[]);
+      // whatsapp/phone included so the agent's contact button on a
+      // workshop-submitted renewal messages the WORKSHOP (who has to action
+      // it), not the end customer — only a walk-in (no workshop_id) messages
+      // the customer's own phone directly.
+      const profs=await api.fresh("workshop_profiles",`id=in.(${wsIds.join(",")})&select=id,name,phone,whatsapp`).catch(()=>[]);
       const map={};
-      (Array.isArray(profs)?profs:[]).forEach(p=>{ map[p.id]=p.name; });
+      (Array.isArray(profs)?profs:[]).forEach(p=>{ map[p.id]={name:p.name, phone:p.whatsapp||p.phone||""}; });
       setLicenceAgentWsNames(map);
     }
   },[role]);
@@ -2419,14 +2423,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const saveWsLicenceRenewal=async(rec)=>{
     const id=rec.id||makeId("WSLR");
     const row={...rec,id,workshop_id:wsId||null};
-    let res=await api.insert("ws_licence_renewals",row).catch(e=>({message:e.message}));
-    if(res&&!Array.isArray(res)&&res.message){
-      // documents (jsonb) column may not exist yet (SQL migration not run) —
-      // retry without it so the renewal request itself still saves either way.
-      const {documents,...fallbackRow}=row;
-      await api.insert("ws_licence_renewals",fallbackRow).catch(e=>console.warn("Save renewal failed:",e));
-    }
-    setWsLicenceRenewals(p=>[row,...p.filter(r=>r.id!==id)]);
+    const {res,payload}=await writeTolerant(p=>api.insert("ws_licence_renewals",p),row);
+    if(res&&!Array.isArray(res)&&res.message){ console.warn("Save renewal failed:",res); }
+    setWsLicenceRenewals(p=>[payload,...p.filter(r=>r.id!==id)]);
   };
 
   // Licence Agent creating a walk-in renewal directly (no workshop involved) —
@@ -2435,12 +2434,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const saveLicenceAgentRenewal=async(rec)=>{
     const id=rec.id||makeId("WSLR");
     const row={...rec,id,workshop_id:rec.workshop_id||null};
-    let res=await api.insert("ws_licence_renewals",row).catch(e=>({message:e.message}));
-    if(res&&!Array.isArray(res)&&res.message){
-      const {documents,...fallbackRow}=row;
-      await api.insert("ws_licence_renewals",fallbackRow).catch(e=>console.warn("Save renewal failed:",e));
-    }
-    setLicenceAgentQueue(p=>[row,...p.filter(r=>r.id!==id)]);
+    const {res,payload}=await writeTolerant(p=>api.insert("ws_licence_renewals",p),row);
+    if(res&&!Array.isArray(res)&&res.message){ console.warn("Save renewal failed:",res); }
+    setLicenceAgentQueue(p=>[payload,...p.filter(r=>r.id!==id)]);
   };
 
   const updateWsLicenceRenewal=async(id,patch)=>{
@@ -6895,7 +6891,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── LICENCE RENEWAL AGENT ── */}
         {tab==="licenceAgentQueue"&&role==="licence_agent"&&(
-          <LicenceAgentPage renewals={licenceAgentQueue} workshopNames={licenceAgentWsNames} onUpdate={updateLicenceAgentRenewal} onSave={saveLicenceAgentRenewal} onDelete={deleteLicenceAgentRenewal}/>
+          <LicenceAgentPage renewals={licenceAgentQueue} workshopInfo={licenceAgentWsNames} onUpdate={updateLicenceAgentRenewal} onSave={saveLicenceAgentRenewal} onDelete={deleteLicenceAgentRenewal} onRefresh={reloadLicenceAgentQueue}/>
         )}
 
         {/* ── CAR SALES ── */}

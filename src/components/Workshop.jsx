@@ -5,7 +5,7 @@ import { getSettings, C, curSym } from "../lib/settings.js";
 import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, normMake, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL, nemigaVinUrl } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
-import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner } from "../components/shared.jsx";
+import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner, RenewalDocsModal } from "../components/shared.jsx";
 import { VehiclePhotoUploader, VehicleSearchBar } from "./RfqVehicles.jsx";
 import { WsStockPage, WsStockModal, WsStockAdjustModal } from "./ws/Stock.jsx";
 import { WsServicesPage, WsServiceModal } from "./ws/Services.jsx";
@@ -413,6 +413,8 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         onGoToStock={()=>{ setView("list"); setWsTab("wsstock"); }}
         onGoToSpareShop={(make,model,code,vin,engineNo,reg,jobId,jobLabel,jobCustomer)=>{ setSpareShopFilter(p=>({make:make||"",model:model||"",code:code||"",vin:vin||"",engineNo:engineNo||"",reg:reg||"",jobId:jobId||"",jobLabel:jobLabel||"",jobCustomer:jobCustomer||"",nonce:p.nonce+1})); setView("list"); setWsTab("spareshop"); }}
         onSaveWsLicenceRenewal={onSaveWsLicenceRenewal}
+        wsLicenceRenewals={wsLicenceRenewals}
+        onUpdateWsLicenceRenewal={onUpdateWsLicenceRenewal}
         onSaveWsBooking={onSaveWsBooking}
         wsId={wsId}
         wsProfile={wsProfile}
@@ -2398,6 +2400,9 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         const revThisMonth=invThisMonth.reduce((s,i)=>s+(+i.total||0),0);
         // Status breakdown
         const byStatus=["Pending","Checkup","In Progress","Quoting","Ordered","Done","Delivered"].map(s=>([s,jobs.filter(j=>j.status===s).length]));
+        // Licence renewals submitted by this workshop, by status
+        const RENEWAL_STATUS_COLOR={pending:"var(--yellow)",submitted:"var(--blue)",completed:"var(--green)",cancelled:"var(--red)"};
+        const renewalsByStatus=["pending","submitted","completed","cancelled"].map(s=>([s,wsLicenceRenewals.filter(r=>(r.status||"pending")===s).length]));
         // Top customers by revenue
         const custRev={};
         invoices.forEach(inv=>{ const k=inv.invoice_customer||"Unknown"; custRev[k]=(custRev[k]||0)+(+inv.total||0); });
@@ -2458,6 +2463,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
               ["This Month Rev",fmt(revThisMonth),"var(--accent)","📈"],
               ["Collected",fmt(totalPaid),"var(--green)","💚"],
               ["Outstanding",fmt(totalOutstanding),"var(--red)","⚠️"],
+              ["Renewals Submitted",wsLicenceRenewals.length,"#22d3ee","🪪"],
             ].map(([l,v,c,ic])=>(
               <div key={l} className="card" style={{padding:"12px 14px"}}>
                 <div style={{fontSize:18,marginBottom:4}}>{ic}</div>
@@ -2466,7 +2472,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
               </div>
             ))}
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,flexWrap:"wrap"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,flexWrap:"wrap"}}>
             {/* Job status breakdown */}
             <div className="card" style={{padding:14}}>
               <div style={{fontWeight:700,marginBottom:12,fontSize:13}}>📊 Jobs by Status</div>
@@ -2489,6 +2495,20 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   <span style={{color:"var(--text3)",marginRight:8,minWidth:18}}>#{i+1}</span>
                   <span style={{flex:1,fontWeight:i===0?700:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</span>
                   <span style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",marginLeft:8}}>{fmt(rev)}</span>
+                </div>
+              ))}
+            </div>
+            {/* Licence renewals submitted by this workshop, by status */}
+            <div className="card" style={{padding:14}}>
+              <div style={{fontWeight:700,marginBottom:12,fontSize:13}}>🪪 Renewals by Status</div>
+              {wsLicenceRenewals.length===0&&<div style={{color:"var(--text3)",fontSize:13}}>No renewals submitted yet</div>}
+              {wsLicenceRenewals.length>0&&renewalsByStatus.map(([s,cnt])=>(
+                <div key={s} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <span className="badge" style={{background:`${RENEWAL_STATUS_COLOR[s]}20`,color:RENEWAL_STATUS_COLOR[s],fontSize:12,textTransform:"capitalize"}}>{s}</span>
+                  <div style={{flex:1,margin:"0 10px",height:6,background:"var(--surface2)",borderRadius:3,overflow:"hidden"}}>
+                    <div style={{width:`${wsLicenceRenewals.length?cnt/wsLicenceRenewals.length*100:0}%`,height:"100%",background:RENEWAL_STATUS_COLOR[s],borderRadius:3}}/>
+                  </div>
+                  <span style={{fontWeight:700,minWidth:24,textAlign:"right"}}>{cnt}</span>
                 </div>
               ))}
             </div>
@@ -4362,10 +4382,34 @@ export function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},onSaveWsProfile,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
+function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,wsLicenceRenewals=[],onUpdateWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},onSaveWsProfile,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
+  // Most recent licence renewal request tied to this job (or, failing that,
+  // this exact plate — a renewal can outlive the job it was requested from,
+  // e.g. requested during checkup, job closed before the disc comes back).
+  const jobRenewals = wsLicenceRenewals
+    .filter(r=>r.job_id===job.id || (r.vehicle_reg&&job.vehicle_reg&&r.vehicle_reg===job.vehicle_reg))
+    .sort((a,b)=>new Date(b.submitted_at||0)-new Date(a.submitted_at||0));
+  const latestRenewal = jobRenewals[0]||null;
+  const renewalStatusBadge = (r) => {
+    const colors={pending:"var(--yellow)",submitted:"var(--blue)",completed:"var(--green)",cancelled:"var(--red)"};
+    const c=colors[r.status]||"var(--text3)";
+    return <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:10,background:`${c}20`,color:c,textTransform:"uppercase",letterSpacing:".03em"}}>{r.status||"pending"}</span>;
+  };
+  // "Sent to X" only really means anything if that's ALSO where things stand —
+  // once the agent has moved status past "pending" some other way (marked it
+  // Submitted/Completed manually, no matching agent existed at request time,
+  // etc.), saying "not sent to an agent" next to a Submitted badge reads as a
+  // contradiction. Only claim "not sent" while status is still pending; once
+  // it's moved on with no recorded agent, say nothing rather than mislead.
+  const renewalSentLabel = (r) => {
+    if (r.sent_to_agent_name || r.sent_to_agent_phone) {
+      return <>Sent to <strong style={{color:"var(--text)"}}>{r.sent_to_agent_name||"agent"}</strong>{r.sent_to_agent_phone?` (${r.sent_to_agent_phone})`:""}</>;
+    }
+    return (r.status||"pending")==="pending" ? "Not sent to an agent yet" : null;
+  };
   // Auto-advance job.status as a side effect of a real action (sending a
   // supplier price request / shop request → Quoting; placing a supplier
   // order → Ordered) — forward-only, so it never regresses a job that's
@@ -4460,6 +4504,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   const [wsShopPartPhotoLightbox, setWsShopPartPhotoLightbox] = useState(null);
   const [linePartImgLightbox, setLinePartImgLightbox] = useState(null); // main-inventory photo enlarge for a parts/labour row
   const [renewalModal,  setRenewalModal]  = useState(false);
+  const [renewalDocsModal, setRenewalDocsModal] = useState(false);
+  const [applyingExpiry, setApplyingExpiry] = useState(false);
   const [serviceHistModal, setServiceHistModal] = useState(false);
   const [showMoreActions,  setShowMoreActions]  = useState(false);
   const [showJobMenu,      setShowJobMenu]      = useState(false);
@@ -5754,6 +5800,44 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             )}
           </div>
         )}
+        {latestRenewal&&(
+          <div style={{borderBottom:"1px solid var(--border)",borderLeft:"3px solid #22d3ee"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",flexWrap:"wrap"}}>
+              <span style={{fontSize:13,fontWeight:700,color:"#22d3ee",whiteSpace:"nowrap",minWidth:86}}>🪪 Renewal</span>
+              <div style={{flex:1,fontSize:13,color:"var(--text2)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                {renewalStatusBadge(latestRenewal)}
+                {renewalSentLabel(latestRenewal)&&<span>{renewalSentLabel(latestRenewal)}</span>}
+                {(latestRenewal.receipt_url||latestRenewal.new_licence_url)&&<span style={{color:"var(--green)",fontWeight:700}}>✅ Docs ready</span>}
+              </div>
+              <button onClick={()=>setRenewalDocsModal(true)}
+                style={{fontSize:12,padding:"3px 10px",border:"none",borderRadius:6,cursor:"pointer",fontWeight:700,flexShrink:0,
+                  background:(latestRenewal.receipt_url||latestRenewal.new_licence_url)?"rgba(52,211,153,.15)":"rgba(34,211,238,.12)",
+                  color:(latestRenewal.receipt_url||latestRenewal.new_licence_url)?"var(--green)":"#22d3ee"}}>
+                📎 Docs
+              </button>
+            </div>
+            {/* New disc's expiry was read straight off its barcode when the
+                agent uploaded it — offer to carry it onto the vehicle record
+                so next year's renewal (and the Car Details card) starts from
+                the real new date instead of the current job's stale one. */}
+            {latestRenewal.new_licence_expiry && latestRenewal.new_licence_expiry!==(vehicleRecord?.licence_disc_expiry||job?.licence_disc_expiry) && (
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",background:"rgba(52,211,153,.08)",flexWrap:"wrap"}}>
+                <span style={{fontSize:12,color:"var(--text2)"}}>🆕 New disc expires <strong style={{color:"var(--green)"}}>{latestRenewal.new_licence_expiry}</strong></span>
+                {vehicleRecord&&onPatchWsVehicle&&(
+                  <button disabled={applyingExpiry} onClick={async()=>{
+                    setApplyingExpiry(true);
+                    try{
+                      await api.patch("workshop_vehicles","id",vehicleRecord.id,{licence_disc_expiry:latestRenewal.new_licence_expiry});
+                      onPatchWsVehicle(vehicleRecord.id,{licence_disc_expiry:latestRenewal.new_licence_expiry});
+                    } finally { setApplyingExpiry(false); }
+                  }} style={{fontSize:11,padding:"3px 10px",border:"none",borderRadius:6,cursor:"pointer",fontWeight:700,background:"var(--green)",color:"#fff"}}>
+                    {applyingExpiry?"⏳ Updating…":"✅ Update Vehicle Record"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {job.diagnosis&&(
           <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 14px",borderBottom:"1px solid var(--border)",borderLeft:"3px solid #3b82f6"}}>
             <span style={{fontSize:13,fontWeight:700,color:"#3b82f6",whiteSpace:"nowrap",minWidth:86,paddingTop:1}}>🔍 Diagnosis</span>
@@ -6221,10 +6305,28 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       <div style={{fontWeight:800,fontSize:14,color:expired?"var(--red)":"var(--green)"}}>{exp} {expired?`⚠️ ${t.wsExpired}`:"✅"}</div>
                     </div>
                     {onSaveWsLicenceRenewal&&(
-                      <button onClick={()=>setRenewalModal(true)}
-                        style={{fontSize:11,padding:"6px 14px",background:expired?"rgba(248,113,113,.15)":"rgba(52,211,153,.15)",border:`1px solid ${expired?"rgba(248,113,113,.4)":"rgba(52,211,153,.4)"}`,borderRadius:8,cursor:"pointer",color:expired?"var(--red)":"var(--green)",fontWeight:700,whiteSpace:"nowrap"}}>
-                        🪪 {t.wsRequestRenewal}
-                      </button>
+                      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                        <button onClick={()=>setRenewalModal(true)}
+                          style={{fontSize:11,padding:"6px 14px",background:expired?"rgba(248,113,113,.15)":"rgba(52,211,153,.15)",border:`1px solid ${expired?"rgba(248,113,113,.4)":"rgba(52,211,153,.4)"}`,borderRadius:8,cursor:"pointer",color:expired?"var(--red)":"var(--green)",fontWeight:700,whiteSpace:"nowrap"}}>
+                          🪪 {latestRenewal?"Request Again":t.wsRequestRenewal}
+                        </button>
+                        {latestRenewal&&(
+                          <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text2)"}}>
+                            {renewalStatusBadge(latestRenewal)}
+                            {(latestRenewal.sent_to_agent_name||latestRenewal.sent_to_agent_phone) ? (
+                              <span>→ <strong style={{color:"var(--text)"}}>{latestRenewal.sent_to_agent_name||"agent"}</strong></span>
+                            ) : (latestRenewal.status||"pending")==="pending" ? (
+                              <span>not sent to an agent</span>
+                            ) : null}
+                            <button onClick={()=>setRenewalDocsModal(true)}
+                              style={{fontSize:10,padding:"2px 8px",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,
+                                background:(latestRenewal.receipt_url||latestRenewal.new_licence_url)?"var(--green)":"var(--surface3)",
+                                color:(latestRenewal.receipt_url||latestRenewal.new_licence_url)?"#fff":"var(--text2)"}}>
+                              📎 Docs
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
@@ -8795,6 +8897,11 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           job={job} vehicleRecord={vehicleRecord} settings={settings} wsId={wsId}
           onSave={async(rec)=>{ await onSaveWsLicenceRenewal(rec); setRenewalModal(false); }}
           onClose={()=>setRenewalModal(false)}/>
+      )}
+
+      {renewalDocsModal&&latestRenewal&&onUpdateWsLicenceRenewal&&(
+        <RenewalDocsModal renewal={latestRenewal} viewer="workshop"
+          onUpdate={onUpdateWsLicenceRenewal} onClose={()=>setRenewalDocsModal(false)}/>
       )}
 
       {/* Service Record History modal */}

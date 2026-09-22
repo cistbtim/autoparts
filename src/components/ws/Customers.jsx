@@ -429,6 +429,11 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
       status: "pending",
       commission_status: "unpaid",
       submitted_at: new Date().toISOString(),
+      // Who this specific request went to — the "Default" agent can change later
+      // (province roster edited, workshop picks a different one), so record it
+      // on the row itself rather than re-deriving it after the fact.
+      sent_to_agent_name:  agentPhone ? agentName : "",
+      sent_to_agent_phone: agentPhone || "",
     };
     await onSave(rec);
     if (agentPhone) {

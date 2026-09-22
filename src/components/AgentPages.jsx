@@ -25,10 +25,12 @@ const daysUntil = (dateStr) => {
 // ═══════════════════════════════════════════════════════════════
 // LICENCE RENEWAL AGENT — cross-workshop renewal queue
 // ═══════════════════════════════════════════════════════════════
-export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSave, onDelete}) {
+export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh}) {
   const [filter, setFilter] = useState("all");
   const [docsRenewal, setDocsRenewal] = useState(null);
   const [walkInPrefill, setWalkInPrefill] = useState(null); // null=closed, {}=blank, {...}=prefilled from a due-soon row
+  const [editRenewal, setEditRenewal] = useState(null); // null=closed, {...existing row} = editing it in place
+  const [refreshing, setRefreshing] = useState(false);
   const [dueSoonDays, setDueSoonDays] = useState(()=>{
     try{ return +localStorage.getItem("licence_agent_due_soon_days") || 30; }catch{ return 30; }
   });
@@ -39,12 +41,28 @@ export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSav
   const unpaidComm = renewals.filter(r=>r.commission_status==="unpaid"&&r.status==="completed");
   const totalComm = renewals.filter(r=>r.commission_status==="paid").reduce((s,r)=>s+(+r.commission_amount||0),0);
 
-  // Renewals already completed whose NEXT disc (current_expiry + renewal_years)
-  // is due within dueSoonDays — nothing stores that date directly, it's derived
-  // from the two fields the record already has.
+  // How many customer cars each workshop has sent through for renewal —
+  // grouped the same way the table already groups "🚶 Walk-in" (no workshop_id).
+  const byWorkshop = {};
+  renewals.forEach(r=>{
+    const key = r.workshop_id || "__walkin__";
+    if(!byWorkshop[key]) byWorkshop[key] = {
+      label: r.workshop_id ? (workshopInfo[r.workshop_id]?.name||r.workshop_id) : "🚶 Walk-in",
+      total:0, pending:0, submitted:0, completed:0, cancelled:0,
+    };
+    byWorkshop[key].total++;
+    byWorkshop[key][r.status||"pending"]++;
+  });
+  const workshopRows = Object.values(byWorkshop).sort((a,b)=>b.total-a.total);
+
+  // Renewals already completed whose NEXT disc is due within dueSoonDays.
+  // Prefer new_licence_expiry — read straight off the new disc's own barcode
+  // when it was uploaded — over the current_expiry + renewal_years guess,
+  // since the guess can be off (wrong renewal_years, disc issued a few days
+  // either side of the exact anniversary, etc.).
   const dueSoon = renewals
-    .filter(r=>r.status==="completed"&&r.current_expiry)
-    .map(r=>({...r, nextExpiry: addYears(r.current_expiry, r.renewal_years)}))
+    .filter(r=>r.status==="completed"&&(r.new_licence_expiry||r.current_expiry))
+    .map(r=>({...r, nextExpiry: r.new_licence_expiry||addYears(r.current_expiry, r.renewal_years)}))
     .filter(r=>r.nextExpiry!=null)
     .map(r=>({...r, daysLeft: daysUntil(r.nextExpiry)}))
     .filter(r=>r.daysLeft!=null && r.daysLeft<=dueSoonDays && r.daysLeft>=0)
@@ -57,7 +75,15 @@ export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSav
           <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🪪 Licence Renewals — All Workshops</div>
           <div style={{fontSize:13,color:"var(--text3)"}}>{renewals.length} total · {unpaidComm.length} awaiting commission</div>
         </div>
-        {onSave&&<button className="btn btn-primary" onClick={()=>setWalkInPrefill({})}>+ Walk-in Customer</button>}
+        <div style={{display:"flex",gap:8}}>
+          {onRefresh&&(
+            <button className="btn btn-ghost" disabled={refreshing}
+              onClick={async()=>{ setRefreshing(true); try{ await onRefresh(); } finally { setRefreshing(false); } }}>
+              {refreshing?"⏳":"🔄"} Refresh
+            </button>
+          )}
+          {onSave&&<button className="btn btn-primary" onClick={()=>setWalkInPrefill({})}>+ Walk-in Customer</button>}
+        </div>
       </div>
 
       {unpaidComm.length>0&&(
@@ -82,15 +108,26 @@ export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSav
             {dueSoon.map(r=>(
               <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(96,165,250,.15)"}}>
                 <span style={{fontWeight:700,fontFamily:"DM Mono,monospace"}}>{r.vehicle_reg}</span>
-                <span style={{color:"var(--text3)"}}>{workshopNames[r.workshop_id]||(r.workshop_id?r.workshop_id:"🚶 Walk-in")}</span>
+                <span style={{color:"var(--text3)"}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:"🚶 Walk-in")}</span>
                 <span style={{color:r.daysLeft<=7?"var(--red)":"var(--yellow)",fontWeight:600}}>
                   Expires {r.nextExpiry} ({r.daysLeft===0?"today":`${r.daysLeft}d left`})
                 </span>
-                {r.owner_phone&&(
-                  <a href={waLink(r.owner_phone,`Hi ${r.owner_name||""}, a reminder that your vehicle ${r.vehicle_reg}'s licence disc is due for renewal on ${r.nextExpiry}. Please contact us to arrange your next renewal.`)} target="_blank" rel="noopener noreferrer" style={{marginLeft:"auto"}}>
-                    <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲 Notify</button>
-                  </a>
-                )}
+                {(()=>{
+                  // Same routing as the main table's contact button: a
+                  // workshop-submitted renewal notifies the WORKSHOP (they're
+                  // the ones who deal with their own customer), a walk-in
+                  // notifies the customer directly.
+                  const waPhone = r.workshop_id ? (workshopInfo[r.workshop_id]?.phone||"") : (r.owner_phone||"");
+                  if(!waPhone) return null;
+                  const msg = r.workshop_id
+                    ? `Hi, a reminder that ${r.owner_name||"your customer"}'s vehicle ${r.vehicle_reg}'s licence disc is due for renewal again on ${r.nextExpiry}. Please arrange the next renewal with them.`
+                    : `Hi ${r.owner_name||""}, a reminder that your vehicle ${r.vehicle_reg}'s licence disc is due for renewal on ${r.nextExpiry}. Please contact us to arrange your next renewal.`;
+                  return (
+                    <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer" style={{marginLeft:"auto"}}>
+                      <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲 Notify</button>
+                    </a>
+                  );
+                })()}
                 {onSave&&(
                   <button onClick={()=>setWalkInPrefill({
                     vehicle_reg:r.vehicle_reg, vehicle_make:r.vehicle_make, vehicle_model:r.vehicle_model,
@@ -103,6 +140,29 @@ export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSav
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Report: how many customer cars each workshop has sent through for renewal */}
+      <div className="card" style={{padding:14,marginBottom:14,overflow:"auto"}}>
+        <div style={{fontWeight:700,marginBottom:12,fontSize:13}}>📊 Renewals by Workshop</div>
+        {workshopRows.length===0&&<div style={{color:"var(--text3)",fontSize:13}}>No renewals yet</div>}
+        {workshopRows.length>0&&(
+          <table className="tbl" style={{width:"100%"}}>
+            <thead><tr><th>Workshop</th><th style={{textAlign:"right"}}>Total</th><th style={{textAlign:"right"}}>Pending</th><th style={{textAlign:"right"}}>Submitted</th><th style={{textAlign:"right"}}>Completed</th><th style={{textAlign:"right"}}>Cancelled</th></tr></thead>
+            <tbody>
+              {workshopRows.map(w=>(
+                <tr key={w.label}>
+                  <td style={{fontWeight:600,fontSize:13}}>{w.label}</td>
+                  <td style={{textAlign:"right",fontWeight:700}}>{w.total}</td>
+                  <td style={{textAlign:"right",color:"var(--yellow)"}}>{w.pending||0}</td>
+                  <td style={{textAlign:"right",color:"var(--blue)"}}>{w.submitted||0}</td>
+                  <td style={{textAlign:"right",color:"var(--green)"}}>{w.completed||0}</td>
+                  <td style={{textAlign:"right",color:"var(--red)"}}>{w.cancelled||0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
@@ -144,7 +204,7 @@ export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSav
                 const isExpired = r.current_expiry && new Date(r.current_expiry)<new Date();
                 return (
                   <tr key={r.id}>
-                    <td style={{fontSize:12,fontWeight:600}}>{workshopNames[r.workshop_id]||(r.workshop_id?r.workshop_id:"🚶 Walk-in")}</td>
+                    <td style={{fontSize:12,fontWeight:600}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:"🚶 Walk-in")}</td>
                     <td>
                       <div style={{fontWeight:700,fontFamily:"DM Mono,monospace",fontSize:12}}>{r.vehicle_reg}</div>
                       <div style={{fontSize:11,color:"var(--text3)"}}>{r.vehicle_make} {r.vehicle_model}</div>
@@ -187,15 +247,28 @@ export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSav
                     <td style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>{(r.submitted_at||"").slice(0,10)}</td>
                     <td>
                       <div style={{display:"flex",gap:6}}>
+                        {onUpdate&&(
+                          <button onClick={()=>setEditRenewal(r)}
+                            style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,background:"var(--surface2)",color:"var(--text2)"}}>✏️ Edit</button>
+                        )}
                         <button onClick={()=>setDocsRenewal(r)}
                           style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
                             background:(r.receipt_url||r.new_licence_url)?"var(--green)":"var(--surface2)",
                             color:(r.receipt_url||r.new_licence_url)?"#fff":"var(--text3)"}}>📎 Docs</button>
-                        {r.owner_phone&&(
-                          <a href={waLink(r.owner_phone,"")} target="_blank" rel="noopener noreferrer">
-                            <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲</button>
-                          </a>
-                        )}
+                        {(()=>{
+                          // Workshop-submitted → message the WORKSHOP (they're the one who has to
+                          // action it); a walk-in (no workshop_id) → message the customer directly.
+                          const waPhone = r.workshop_id ? (workshopInfo[r.workshop_id]?.phone||"") : (r.owner_phone||"");
+                          if(!waPhone) return null;
+                          const msg = r.workshop_id
+                            ? `Hi, regarding the licence renewal for ${r.vehicle_reg||"the vehicle"} (${r.owner_name||"customer"}) — status: ${r.status||"pending"}.`
+                            : "";
+                          return (
+                            <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer">
+                              <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲</button>
+                            </a>
+                          );
+                        })()}
                         {onDelete&&(
                           <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
                             style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"var(--red)",color:"#fff",cursor:"pointer"}}>🗑️</button>
@@ -212,7 +285,7 @@ export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSav
 
       {docsRenewal&&(
         <RenewalDocsModal renewal={docsRenewal} viewer="agent"
-          workshopName={workshopNames[docsRenewal.workshop_id]||(docsRenewal.workshop_id?docsRenewal.workshop_id:"🚶 Walk-in")}
+          workshopName={workshopInfo[docsRenewal.workshop_id]?.name||(docsRenewal.workshop_id?docsRenewal.workshop_id:"🚶 Walk-in")}
           onUpdate={onUpdate} onClose={()=>setDocsRenewal(null)}/>
       )}
 
@@ -220,6 +293,11 @@ export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSav
         <WalkInRenewalModal prefill={walkInPrefill}
           onSave={async(rec)=>{ await onSave(rec); setWalkInPrefill(null); }}
           onClose={()=>setWalkInPrefill(null)}/>
+      )}
+
+      {editRenewal&&onUpdate&&(
+        <WalkInRenewalModal prefill={editRenewal} onUpdate={onUpdate}
+          onClose={()=>setEditRenewal(null)}/>
       )}
     </div>
   );
@@ -230,7 +308,13 @@ export function LicenceAgentPage({renewals=[], workshopNames={}, onUpdate, onSav
 // same fields below, which stay editable either way), then attach the disc
 // photo/ID as the document. Saved with workshop_id left null; the rest of this
 // page already treats a null workshop_id as "🚶 Walk-in".
-function WalkInRenewalModal({prefill={}, onSave, onClose}) {
+//
+// Also doubles as the "✏️ Edit" form for any existing row (walk-in or
+// workshop-submitted) — passing a `prefill` with an id plus `onUpdate` (no
+// `onSave`) switches it into edit mode: same fields, but it patches the
+// existing row instead of inserting a new one, and leaves workshop_id alone.
+function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose}) {
+  const isEdit = !!(prefill?.id && onUpdate);
   const [f, setF] = useState({
     vehicle_reg:"", vehicle_make:"", vehicle_model:"", vin:"", engine_no:"",
     current_expiry:"", owner_name:"", owner_phone:"", owner_id:"",
@@ -269,15 +353,21 @@ function WalkInRenewalModal({prefill={}, onSave, onClose}) {
     if(!f.vehicle_reg.trim()){ alert("Vehicle registration required"); return; }
     setSaving(true);
     try{
-      await onSave({...f, id: f.id||makeId("WSLR"), renewal_years:+f.renewal_years||1,
-        status: f.status||"pending", commission_status: f.commission_status||"unpaid",
-        submitted_at: f.submitted_at||new Date().toISOString()});
+      if(isEdit){
+        const {id,workshop_id,...patch}=f;
+        await onUpdate(id,{...patch, renewal_years:+f.renewal_years||1});
+      } else {
+        await onSave({...f, id: f.id||makeId("WSLR"), renewal_years:+f.renewal_years||1,
+          status: f.status||"pending", commission_status: f.commission_status||"unpaid",
+          submitted_at: f.submitted_at||new Date().toISOString()});
+      }
+      onClose();
     } finally { setSaving(false); }
   };
 
   return (
     <Overlay onClose={onClose}>
-      <MHead title="🚶 Walk-in Renewal" onClose={onClose}/>
+      <MHead title={isEdit?"✏️ Edit Renewal":"🚶 Walk-in Renewal"} onClose={onClose}/>
 
       <div style={{display:"flex",gap:8,marginBottom:14}}>
         <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:scanLoading?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>

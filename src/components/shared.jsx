@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { toLogoUrl, extractDriveId, detectGeoLocation, fetchWeather, classifyWeather } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { api, uploadToStorage } from "../lib/api.js";
+import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
 export class ErrorBoundary extends Component {
   constructor(props){ super(props); this.state={err:null}; }
@@ -557,12 +558,14 @@ export function AdGridCard({ad}) {
 // form, and shown read-only in the agent's docs modal.
 export const LICENCE_DOC_TYPES = [
   {key:"licence_disc",      label:"Licence Disc / Vehicle Doc"},
+  {key:"ownership_cert",    label:"Ownership Certificate"},
   {key:"passport",          label:"Passport"},
   {key:"id",                label:"ID"},
   {key:"traffic_register",  label:"Traffic Register Number"},
   {key:"address_proof",     label:"Proof of Address"},
   {key:"bank_statement",    label:"Bank Statement"},
   {key:"permit_visa",       label:"Permit / Visa"},
+  {key:"other",             label:"Other"},
 ];
 
 // Documents are stored per-type as {url, expiry} — expiry is an optional
@@ -671,15 +674,17 @@ export function LicenceDocsChecklist({documents={}, onChange, pathPrefix="licenc
 // cross-workshop queue needs it; a workshop viewing their own renewal doesn't).
 export function RenewalDocsModal({renewal, workshopName, viewer="agent", onUpdate, onClose}) {
   const [uploading, setUploading] = useState("");
+  const [scanNote, setScanNote] = useState("");
 
   const uploadOutput = async (field, file) => {
     setUploading(field);
+    setScanNote("");
     try{
       const isPdf = file.type==="application/pdf";
-      let blob, mimeType, ext;
+      let blob, mimeType, ext, dataUrl;
       if(isPdf){ blob=file; mimeType="application/pdf"; ext="pdf"; }
       else {
-        const dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
+        dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
         blob = await new Promise((res,rej)=>{
           const img=new Image();
           img.onload=()=>{
@@ -696,7 +701,25 @@ export function RenewalDocsModal({renewal, workshopName, viewer="agent", onUpdat
       }
       const path=`licence_renewals/${(renewal.vehicle_reg||"doc").replace(/[\s/\\]/g,"_").toUpperCase()}_${field}_${Date.now()}.${ext}`;
       const url = await uploadToStorage("cars_parts",path,blob,mimeType);
-      await onUpdate(renewal.id,{[`${field}_url`]:url});
+      const patch = {[`${field}_url`]:url};
+      // The new disc's own barcode is the authoritative source for its expiry —
+      // scan it automatically so next year's renewal doesn't rely on today's
+      // renewal_years guess. PDF-only uploads (no photo) just skip this.
+      if(field==="new_licence" && dataUrl){
+        try{
+          const raw = await decodePDF417fromImage(dataUrl);
+          const parsed = parseLicenceDisc(raw);
+          if(parsed.expiry_date){
+            patch.new_licence_expiry = parsed.expiry_date;
+            setScanNote(`✅ New expiry read from disc: ${parsed.expiry_date}`);
+          } else {
+            setScanNote("⚠️ Uploaded, but couldn't read an expiry date off the disc — you can type it in manually below.");
+          }
+        }catch{
+          setScanNote("⚠️ Uploaded, but the barcode wasn't readable — you can type the new expiry in manually below.");
+        }
+      }
+      await onUpdate(renewal.id,patch);
     }catch(err){ alert("Upload failed: "+err.message); }
     setUploading("");
   };
@@ -711,6 +734,15 @@ export function RenewalDocsModal({renewal, workshopName, viewer="agent", onUpdat
         {uploading===field?"⏳ Uploading…":url?"✅ Uploaded — tap to replace":"📎 Choose PDF or photo"}
       </label>
       {url&&<a href={url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"var(--blue)",marginTop:4,display:"inline-block"}}>🔗 View</a>}
+      {field==="new_licence"&&scanNote&&<div style={{fontSize:11,color:"var(--text2)",marginTop:4}}>{scanNote}</div>}
+      {field==="new_licence"&&(
+        <div style={{marginTop:8,display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:11,color:"var(--text3)"}}>New expiry:</span>
+          <input type="date" className="inp" style={{fontSize:12,padding:"4px 8px",width:150}}
+            value={renewal.new_licence_expiry||""} onChange={e=>onUpdate(renewal.id,{new_licence_expiry:e.target.value})}/>
+          <span style={{fontSize:10,color:"var(--text3)"}}>(auto-filled by scan; editable if it read wrong)</span>
+        </div>
+      )}
     </div>
   );
 
@@ -747,6 +779,7 @@ export function RenewalDocsModal({renewal, workshopName, viewer="agent", onUpdat
             </div>
             <div style={{fontSize:13}}>
               🪪 New Licence Disc: {renewal.new_licence_url ? <a href={renewal.new_licence_url} target="_blank" rel="noreferrer" style={{color:"var(--blue)"}}>🔗 View</a> : <span style={{color:"var(--text3)"}}>not yet provided</span>}
+              {renewal.new_licence_expiry&&<span style={{marginLeft:8,color:"var(--green)",fontWeight:600}}>· New expiry: {renewal.new_licence_expiry}</span>}
             </div>
           </div>
         )}

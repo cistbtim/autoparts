@@ -163,7 +163,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .veh-lightbox-panel{width:92vw;max-width:none}
   .veh-lightbox-imgwrap img{max-width:92vw;max-height:45vh}
 }
-.velg-banner{position:relative;background:#0B0D10;padding:34px 36px 28px;border-radius:14px;overflow:hidden}
+.velg-banner{position:relative;background:linear-gradient(135deg,#1c2230 0%,#2e1d15 60%,#4a2712 100%);padding:34px 36px 28px;border-radius:14px;overflow:hidden}
 .velg-banner::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 1px,transparent 1px 5px);pointer-events:none}
 .velg-row{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .velg-brand{display:flex;align-items:center;gap:18px}

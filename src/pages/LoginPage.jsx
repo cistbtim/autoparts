@@ -430,7 +430,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   return (
     <div style={{background:"radial-gradient(ellipse 900px 500px at 50% -10%, rgba(255,122,46,.10), transparent), var(--bg)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 16px"}}>
       <style>{CSS}</style>
-      <div style={{width:"100%",maxWidth:480}}>
+      <div style={{width:"100%",maxWidth:640}}>
 
         {/* Logo card */}
         <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:16,padding:"16px",textAlign:"center",marginBottom:14,boxShadow:"var(--shadow-lg)"}}>
@@ -459,26 +459,30 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
         {/* Module tabs — hidden in workshop-only mode, and on a supplier catalogue
             link (?catalog=) so a shared link only ever shows that one login form. */}
+        {/* auto-fit packs more columns in per row as width allows (wider on a
+            laptop, 2-across on a phone) instead of a fixed column count that
+            forces 4 rows and pushes the bottom tiles off screen on shorter
+            displays — the "automatic" sizing is the grid itself, not JS. */}
         {!wsLoginOnly&&!catalogName&&(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:16}}>
           {TAB_BTNS.map(({id,Icon,label})=>{
             const c = TAB_COLORS[id]||"var(--accent)";
             const on = authTab===id;
             return (
               <button key={id} onClick={()=>switchTab(id)} style={{
-                padding:"16px 10px",borderRadius:14,
+                padding:"12px 8px",borderRadius:14,
                 border:`1.5px solid ${on?c:"var(--border2)"}`,
                 cursor:"pointer",
                 background:"var(--surface)",
                 boxShadow:on?`0 6px 18px ${c}33`:"var(--shadow)",
-                display:"flex",flexDirection:"column",alignItems:"center",gap:9,
+                display:"flex",flexDirection:"column",alignItems:"center",gap:7,
                 transition:"all .15s",
               }}>
-                <div style={{width:42,height:42,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",
+                <div style={{width:36,height:36,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",
                   background:`${c}1c`,color:c}}>
                   <Icon/>
                 </div>
-                <span style={{fontSize:12,fontWeight:700,letterSpacing:".04em",textTransform:"uppercase",color:on?c:"var(--text2)"}}>{label}</span>
+                <span style={{fontSize:11,fontWeight:700,letterSpacing:".04em",textTransform:"uppercase",color:on?c:"var(--text2)"}}>{label}</span>
               </button>
             );
           })}

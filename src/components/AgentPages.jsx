@@ -170,23 +170,38 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
     setBusy(false);
   };
 
+  // Once sent, keep the same light-blue agent button rather than replacing
+  // it with a plain green tick — just add a small green checkmark badge in
+  // the corner so it still reads as "the office button" at a glance.
+  const badge = r.sent_to_office_at && (
+    <span style={{position:"absolute",top:-4,right:-4,width:14,height:14,borderRadius:"50%",
+      background:"var(--green)",color:"#fff",fontSize:9,fontWeight:900,display:"flex",
+      alignItems:"center",justifyContent:"center",border:"2px solid var(--surface)",lineHeight:1}}>✓</span>
+  );
+
   if(agents.length===1){
     const a = agents[0];
     return (
-      <button onClick={()=>sendTo(a)} disabled={busy}
-        title={busy?"Building PDF…":(sentTitle||`Send to ${label(a)}`)}
-        style={{...actionBtnStyle(r.sent_to_office_at?"done":"office"), cursor:busy?"wait":"pointer"}}>
-        {busy?"⏳":r.sent_to_office_at?"✅":"🧑‍💼"}
-      </button>
+      <div style={{position:"relative",display:"inline-flex"}}>
+        <button onClick={()=>sendTo(a)} disabled={busy}
+          title={busy?"Building PDF…":(sentTitle||`Send to ${label(a)}`)}
+          style={{...actionBtnStyle("office"), cursor:busy?"wait":"pointer"}}>
+          {busy?"⏳":"🧑‍💼"}
+        </button>
+        {badge}
+      </div>
     );
   }
   return (
-    <select value="" disabled={busy} title={busy?"Building PDF…":(sentTitle||"Choose an agent/office to send to")}
-      onChange={e=>{ const a=agents.find(x=>x.id===e.target.value); e.target.value=""; if(a) sendTo(a); }}
-      style={{...actionBtnStyle(r.sent_to_office_at?"done":"office"), appearance:"none", textAlign:"center", padding:0, cursor:busy?"wait":"pointer"}}>
-      <option value="" disabled>{busy?"⏳":r.sent_to_office_at?"✅":"🧑‍💼"}</option>
-      {agents.map(a=><option key={a.id} value={a.id}>{label(a)}</option>)}
-    </select>
+    <div style={{position:"relative",display:"inline-flex"}}>
+      <select value="" disabled={busy} title={busy?"Building PDF…":(sentTitle||"Choose an agent/office to send to")}
+        onChange={e=>{ const a=agents.find(x=>x.id===e.target.value); e.target.value=""; if(a) sendTo(a); }}
+        style={{...actionBtnStyle("office"), appearance:"none", textAlign:"center", padding:0, cursor:busy?"wait":"pointer"}}>
+        <option value="" disabled>{busy?"⏳":"🧑‍💼"}</option>
+        {agents.map(a=><option key={a.id} value={a.id}>{label(a)}</option>)}
+      </select>
+      {badge}
+    </div>
   );
 }
 

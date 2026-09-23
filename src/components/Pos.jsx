@@ -571,7 +571,7 @@ function AskMultiOverlay({ parts, suppliers, partSuppliers, selectedIds, sym, se
 }
 
 // ── Main POS page ─────────────────────────────────────────────────────────────
-export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, onRefresh, branchId = null, suppliers = [], partSuppliers = [], settings = {}, onRequestNewPart = null }) {
+export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, onRefresh, branchId = null, suppliers = [], partSuppliers = [], settings = {}, onRequestNewPart = null, t = {} }) {
   const sym = C();
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = async () => {
@@ -969,7 +969,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               <input ref={searchRef} className="inp" value={searchInput}
                 onChange={e => setSearch2(e.target.value)}
                 onKeyDown={handleSearchKey}
-                placeholder="🔍 SKU · part name · barcode…"
+                placeholder={t.posSearchPlaceholder||"🔍 SKU · part name · barcode…"}
                 style={{ fontSize: 14, fontWeight: 600, paddingRight: 32, width: "100%", boxSizing: "border-box", background: "var(--surface)", border: "2px solid var(--border)" }} />
               {searchInput && (
                 <button onClick={() => setSearch2("")}
@@ -980,7 +980,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             <div style={{ display: "flex", gap: 6 }}>
               <select className="inp" value={filterCat} onChange={e => setFilterCat2(e.target.value)}
                 style={{ flex: 1, minWidth: 0, fontSize: 12, background: "var(--surface)" }}>
-                <option value="__all__">All Categories</option>
+                <option value="__all__">{t.posAllCategories||"All Categories"}</option>
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               <button onClick={handleRefresh} disabled={refreshing} title="Refresh parts"
@@ -995,7 +995,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
             {vehicles.length > 0 && (
               <div style={{ background: "var(--surface)", border: "2px solid var(--accent)", borderRadius: 8, padding: "7px 8px" }}>
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".06em", color: "var(--accent)", textTransform: "uppercase", marginBottom: 5 }}>🚗 Filter by vehicle (make / model)</div>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".06em", color: "var(--accent)", textTransform: "uppercase", marginBottom: 5 }}>🚗 {t.posFilterByVehicle||"Filter by vehicle (make / model)"}</div>
                 <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} parts={parts} onFilter={setVehicleFilter2} onZoom={setLightbox} />
               </div>
             )}
@@ -1006,17 +1006,17 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             {!hasFilter ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 10, color: "var(--text3)" }}>
                 <div style={{ fontSize: 44, opacity: .4 }}>🔎</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text2)" }}>Search to browse parts</div>
-                {vehicles.length > 0 && <div style={{ fontSize: 12, color: "var(--text3)" }}>…or use the 🚗 vehicle filter above</div>}
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text2)" }}>{t.posSearchToBrowse||"Search to browse parts"}</div>
+                {vehicles.length > 0 && <div style={{ fontSize: 12, color: "var(--text3)" }}>{t.posOrUseVehicleFilter||"…or use the 🚗 vehicle filter above"}</div>}
               </div>
             ) : filteredParts.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 8, color: "var(--text3)" }}>
                 <div style={{ fontSize: 36, opacity: .4 }}>🔍</div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>No parts match</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{t.posNoPartsMatch||"No parts match"}</div>
                 {onRequestNewPart && (
                   <button onClick={onRequestNewPart}
                     style={{ marginTop: 6, background: "var(--surface2)", border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 8, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                    📬 Request New Part
+                    📬 {t.posRequestNewPart||"Request New Part"}
                   </button>
                 )}
               </div>
@@ -1056,7 +1056,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                           <span style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 800, fontSize: 17, color: "var(--accent)" }}>{sym}{(p.price || 0).toFixed(2)}</span>
                           <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 7px", borderRadius: 6, background: p.stock > 0 ? "rgba(52,211,153,.15)" : "rgba(248,113,113,.15)", color: p.stock > 0 ? "var(--green)" : "var(--red)", border: `1px solid ${p.stock > 0 ? "rgba(52,211,153,.3)" : "rgba(248,113,113,.3)"}` }}>{p.stock || 0}</span>
                           {inCart && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>+{inCart.qty} in cart</span>}
-                          {!inCart && p.stock <= 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)" }}>tap to add to quote anyway</span>}
+                          {!inCart && p.stock <= 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)" }}>{t.posTapToAddAnyway||"tap to add to quote anyway"}</span>}
                           {selectMode && isEnquirableMob && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--blue)" }}>📤</span>}
                         </div>
                       </div>
@@ -1287,7 +1287,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             </div>
 <select className="inp" value={filterCat} onChange={e => setFilterCat2(e.target.value)}
               style={{ width: 150, fontSize: 13, flexShrink: 0, background: "var(--surface)" }}>
-              <option value="__all__">All Categories</option>
+              <option value="__all__">{t.posAllCategories||"All Categories"}</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <button onClick={handleRefresh} disabled={refreshing} title="Refresh parts"
@@ -1317,11 +1317,11 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
           ) : filteredParts.length === 0 ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 8, color: "var(--text3)" }}>
               <div style={{ fontSize: 40, opacity: .4 }}>🔍</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>No parts match</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{t.posNoPartsMatch||"No parts match"}</div>
               {onRequestNewPart && (
                 <button onClick={onRequestNewPart}
                   style={{ marginTop: 6, background: "var(--surface2)", border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 8, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                  📬 Request New Part
+                  📬 {t.posRequestNewPart||"Request New Part"}
                 </button>
               )}
             </div>

@@ -4959,10 +4959,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       ]
     },
     {
-      id:"grp_licence_agent", icon:"🪪", label:"Licence Renewals", roles:["licence_agent"],
+      id:"grp_licence_agent", icon:"🪪", label:t.laNavGroupLabel||"Licence Renewals", roles:["licence_agent"],
       children:[
-        {id:"licenceAgentQueue", icon:"🪪", label:"Renewal Queue", roles:["licence_agent"]},
-        {id:"licenceAgentAgents", icon:"🧑‍💼", label:"Manage Agents", roles:["licence_agent"]},
+        {id:"licenceAgentQueue", icon:"🪪", label:t.laNavRenewalQueue||"Renewal Queue", roles:["licence_agent"]},
+        {id:"licenceAgentAgents", icon:"🧑‍💼", label:t.laManageAgents||"Manage Agents", roles:["licence_agent"]},
       ]
     },
     {
@@ -5057,7 +5057,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"partPhotos",icon:"📸",label:t.partPhotos||"Photos"},
     ];
     if(role==="licence_agent") return [
-      {id:"licenceAgentQueue",icon:"🪪",label:"Renewal Queue"},
+      {id:"licenceAgentQueue",icon:"🪪",label:t.laNavRenewalQueue||"Renewal Queue"},
     ];
     if(role==="car_sales") return [
       {id:"carSalesListings",icon:"🏷️",label:"Listings"},
@@ -6564,7 +6564,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             settings={settings}
             onSave={savePosInvoice}
             onRefresh={()=>refreshTables("parts","customers","vehicles","part_fitments","part_suppliers")}
-            onRequestNewPart={()=>openM("partRequest")}/>
+            onRequestNewPart={()=>openM("partRequest")} t={t}/>
         )}
 
         {/* ── MY SALES STATEMENT (branch_salesman) ── */}
@@ -6911,12 +6911,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── LICENCE RENEWAL AGENT ── */}
         {tab==="licenceAgentQueue"&&role==="licence_agent"&&(
           <LicenceAgentPage renewals={licenceAgentQueue} workshopInfo={licenceAgentWsNames} onUpdate={updateLicenceAgentRenewal} onSave={saveLicenceAgentRenewal} onDelete={deleteLicenceAgentRenewal} onRefresh={reloadLicenceAgentQueue}
-            officeAgents={settings.licence_processing_agents||[]}/>
+            officeAgents={settings.licence_processing_agents||[]} t={t}/>
         )}
         {tab==="licenceAgentAgents"&&role==="licence_agent"&&(
           <ManageOfficeAgentsModal agents={settings.licence_processing_agents||[]}
             onSave={agents=>saveSettings({licence_processing_agents:agents})}
-            onClose={()=>setTab("licenceAgentQueue")}/>
+            onClose={()=>setTab("licenceAgentQueue")} t={t}/>
         )}
 
         {/* ── CAR SALES ── */}

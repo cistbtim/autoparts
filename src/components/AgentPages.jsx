@@ -155,12 +155,12 @@ function TickBadge({show}) {
 // One agent configured → a plain send button, same as before. More than one
 // → a dropdown so the licence agent picks which office this particular
 // application goes to (they don't all handle the same region/vehicle type).
-function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
+function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle, t}) {
   const agents = allAgents.filter(a=>a.whatsapp);
   const [busy, setBusy] = useState(false);
   if(!agents.length) return null;
   const label = (a) => a.company||a.name||"Office";
-  const sentTitle = r.sent_to_office_at ? `Sent to ${r.sent_to_office_agent||"office"} ${new Date(r.sent_to_office_at).toLocaleString()}` : null;
+  const sentTitle = r.sent_to_office_at ? `${t.laSentTo||"Sent to"} ${r.sent_to_office_agent||"office"} ${new Date(r.sent_to_office_at).toLocaleString()}` : null;
 
   // Building the PDF is async, but a WhatsApp tab opened AFTER an await gets
   // killed by the popup blocker (it's no longer a direct response to the
@@ -187,7 +187,7 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
     return (
       <div style={{position:"relative",display:"inline-flex"}}>
         <button onClick={()=>sendTo(a)} disabled={busy}
-          title={busy?"Building PDF…":(sentTitle||`Send to ${label(a)}`)}
+          title={busy?(t.laBuildingPdf||"Building PDF…"):(sentTitle||`${t.laSendTo||"Send to"} ${label(a)}`)}
           style={{...actionBtnStyle("office"), cursor:busy?"wait":"pointer"}}>
           {busy?"⏳":"🧑‍💼"}
         </button>
@@ -197,7 +197,7 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
   }
   return (
     <div style={{position:"relative",display:"inline-flex"}}>
-      <select value="" disabled={busy} title={busy?"Building PDF…":(sentTitle||"Choose an agent/office to send to")}
+      <select value="" disabled={busy} title={busy?(t.laBuildingPdf||"Building PDF…"):(sentTitle||(t.laChooseOffice||"Choose an agent/office to send to"))}
         onChange={e=>{ const a=agents.find(x=>x.id===e.target.value); e.target.value=""; if(a) sendTo(a); }}
         style={{...actionBtnStyle("office"), appearance:"none", textAlign:"center", padding:0, cursor:busy?"wait":"pointer"}}>
         <option value="" disabled>{busy?"⏳":"🧑‍💼"}</option>
@@ -211,7 +211,7 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
 // Add / edit / remove the roster of processing agents/offices right from the
 // Licence Agent page itself — no need to go into global Settings for
 // something only this page uses.
-export function ManageOfficeAgentsModal({agents=[], onSave, onClose}) {
+export function ManageOfficeAgentsModal({agents=[], onSave, onClose, t={}}) {
   const [list, setList] = useState(agents);
   const [saving, setSaving] = useState(false);
   const upd = (i,patch) => setList(p=>{ const arr=[...p]; arr[i]={...arr[i],...patch}; return arr; });
@@ -224,28 +224,28 @@ export function ManageOfficeAgentsModal({agents=[], onSave, onClose}) {
   };
   return (
     <Overlay onClose={onClose}>
-      <MHead title="🏢 Manage Processing Agents / Offices" onClose={onClose}/>
+      <MHead title={`🏢 ${t.laManageAgentsTitle||"Manage Processing Agents / Offices"}`} onClose={onClose}/>
       <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
-        Where you forward a renewal's documents once collected, to actually get the application processed. Add every agent/office you deal with — the "📤 Office" button on each renewal sends a WhatsApp with links to view and print every uploaded document; with more than one here, it lets you pick which one to send to.
+        {t.laManageAgentsDesc||"Where you forward a renewal's documents once collected, to actually get the application processed. Add every agent/office you deal with — the \"📤 Office\" button on each renewal sends a WhatsApp with links to view and print every uploaded document; with more than one here, it lets you pick which one to send to."}
       </div>
       {list.map((a,i)=>(
         <div key={a.id||i} style={{border:"1px solid var(--border)",borderRadius:8,padding:"14px 12px 4px",marginBottom:10,position:"relative"}}>
           <button type="button" className="btn btn-ghost btn-xs" style={{position:"absolute",top:6,right:6,color:"var(--red)"}} onClick={()=>remove(i)}>✕</button>
           <FG cols="1fr 1fr">
-            <div><FL label="Company"/><input className="inp" value={a.company||""} onChange={e=>upd(i,{company:e.target.value})} placeholder="e.g. ABC Licensing Services"/></div>
-            <div><FL label="Company Address"/><input className="inp" value={a.address||""} onChange={e=>upd(i,{address:e.target.value})} placeholder="Street, city"/></div>
+            <div><FL label={t.laCompanyLabel||"Company"}/><input className="inp" value={a.company||""} onChange={e=>upd(i,{company:e.target.value})} placeholder="e.g. ABC Licensing Services"/></div>
+            <div><FL label={t.laCompanyAddressLabel||"Company Address"}/><input className="inp" value={a.address||""} onChange={e=>upd(i,{address:e.target.value})} placeholder="Street, city"/></div>
           </FG>
           <FG cols="1fr 1fr 1fr">
-            <div><FL label="Contact Name"/><input className="inp" value={a.name||""} onChange={e=>upd(i,{name:e.target.value})} placeholder="e.g. John"/></div>
-            <div><FL label="Telephone"/><input className="inp" value={a.telephone||""} onChange={e=>upd(i,{telephone:e.target.value})} placeholder="Landline (optional)"/></div>
-            <div><FL label="WhatsApp"/><input className="inp" value={a.whatsapp||""} onChange={e=>upd(i,{whatsapp:e.target.value})} placeholder="27821234567 (no + or spaces)"/></div>
+            <div><FL label={t.laContactNameLabel||"Contact Name"}/><input className="inp" value={a.name||""} onChange={e=>upd(i,{name:e.target.value})} placeholder="e.g. John"/></div>
+            <div><FL label={t.laTelephoneLabel||"Telephone"}/><input className="inp" value={a.telephone||""} onChange={e=>upd(i,{telephone:e.target.value})} placeholder="Landline (optional)"/></div>
+            <div><FL label={t.laWhatsAppLabel||"WhatsApp"}/><input className="inp" value={a.whatsapp||""} onChange={e=>upd(i,{whatsapp:e.target.value})} placeholder="27821234567 (no + or spaces)"/></div>
           </FG>
         </div>
       ))}
-      <button type="button" className="btn btn-ghost btn-sm" style={{borderStyle:"dashed",marginBottom:16}} onClick={add}>+ Add Agent / Office</button>
+      <button type="button" className="btn btn-ghost btn-sm" style={{borderStyle:"dashed",marginBottom:16}} onClick={add}>+ {t.laAddAgentOffice||"Add Agent / Office"}</button>
       <div style={{display:"flex",gap:10}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel||"Cancel"}</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>{saving?(t.laSavingEllipsis||"Saving…"):`💾 ${t.save||"Save"}`}</button>
       </div>
     </Overlay>
   );
@@ -254,7 +254,7 @@ export function ManageOfficeAgentsModal({agents=[], onSave, onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // LICENCE RENEWAL AGENT — cross-workshop renewal queue
 // ═══════════════════════════════════════════════════════════════
-export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeAgents=[]}) {
+export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeAgents=[], t={}}) {
   const [filter, setFilter] = useState("all");
   // Which renewal+field is mid-upload, as `${id}:${field}` — lets the quick
   // shortcut buttons in the table (receipt / new licence disc) show a spinner
@@ -329,7 +329,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   renewals.forEach(r=>{
     const key = r.workshop_id || "__walkin__";
     if(!byWorkshop[key]) byWorkshop[key] = {
-      label: r.workshop_id ? (workshopInfo[r.workshop_id]?.name||r.workshop_id) : "🚶 Walk-in",
+      label: r.workshop_id ? (workshopInfo[r.workshop_id]?.name||r.workshop_id) : `🚶 ${t.laWalkIn||"Walk-in"}`,
       total:0, pending:0, submitted:0, completed:0, cancelled:0,
     };
     byWorkshop[key].total++;
@@ -354,35 +354,35 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:16}}>
         <div>
-          <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🪪 Licence Renewals — All Workshops</div>
-          <div style={{fontSize:13,color:"var(--text3)"}}>{renewals.length} total · {unpaidComm.length} awaiting commission</div>
+          <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🪪 {t.laPageTitle||"Licence Renewals — All Workshops"}</div>
+          <div style={{fontSize:13,color:"var(--text3)"}}>{renewals.length} {t.laTotalLabel||"total"} · {unpaidComm.length} {t.laAwaitingCommission||"awaiting commission"}</div>
         </div>
         <div style={{display:"flex",gap:8}}>
           {onRefresh&&(
             <button className="btn btn-ghost" disabled={refreshing}
               onClick={async()=>{ setRefreshing(true); try{ await onRefresh(); } finally { setRefreshing(false); } }}>
-              {refreshing?"⏳":"🔄"} Refresh
+              {refreshing?"⏳":"🔄"} {t.laRefresh||"Refresh"}
             </button>
           )}
-          {onSave&&<button className="btn btn-primary" onClick={()=>setWalkInPrefill({})}>+ Walk-in Customer</button>}
+          {onSave&&<button className="btn btn-primary" onClick={()=>setWalkInPrefill({})}>+ {t.laAddWalkIn||"Walk-in Customer"}</button>}
         </div>
       </div>
 
       {unpaidComm.length>0&&(
         <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.3)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13}}>
-          <strong style={{color:"var(--amber,#f59e0b)"}}>💰 {unpaidComm.length} completed renewal{unpaidComm.length!==1?"s":""} with unpaid commission</strong>
+          <strong style={{color:"var(--amber,#f59e0b)"}}>💰 {unpaidComm.length} {t.laUnpaidCommissionSuffix||"completed renewal(s) with unpaid commission"}</strong>
         </div>
       )}
 
       {/* Renewals due again soon — derived from current_expiry + renewal_years */}
       <div style={{background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.3)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:dueSoon.length>0?10:0}}>
-          <strong style={{color:"var(--blue)",fontSize:13}}>🔔 {dueSoon.length} renewal{dueSoon.length!==1?"s":""} due again soon</strong>
+          <strong style={{color:"var(--blue)",fontSize:13}}>🔔 {dueSoon.length} {t.laDueAgainSoonSuffix||"renewal(s) due again soon"}</strong>
           <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--text3)"}}>
-            Notify
+            {t.laNotify||"Notify"}
             <input type="number" min="1" value={dueSoonDays} onChange={e=>setDueSoonDaysPersist(+e.target.value||30)}
               style={{width:50,fontSize:12,padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)"}}/>
-            days before expiry
+            {t.laDaysBeforeExpiry||"days before expiry"}
           </label>
         </div>
         {dueSoon.length>0&&(
@@ -390,12 +390,12 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
             {dueSoon.map(r=>(
               <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(96,165,250,.15)"}}>
                 <span style={{fontWeight:700,fontFamily:"DM Mono,monospace"}}>{r.vehicle_reg}</span>
-                <span style={{color:"var(--text3)"}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:"🚶 Walk-in")}</span>
+                <span style={{color:"var(--text3)"}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:`🚶 ${t.laWalkIn||"Walk-in"}`)}</span>
                 <span style={{color:r.daysLeft<=7?"var(--red)":"var(--yellow)",fontWeight:600}}>
-                  Expires {r.nextExpiry} ({r.daysLeft===0?"today":`${r.daysLeft}d left`})
+                  {t.laExpires||"Expires"} {r.nextExpiry} ({r.daysLeft===0?(t.laToday||"today"):`${r.daysLeft}${t.laDaysLeftSuffix||"d left"}`})
                 </span>
                 <span style={{fontSize:11,color:r.notified_at?"var(--green)":"var(--text3)",marginLeft:"auto"}}>
-                  {r.notified_at?`✅ Notified ${new Date(r.notified_at).toLocaleString()}`:"Not notified yet"}
+                  {r.notified_at?`✅ ${t.laNotifiedPrefix||"Notified"} ${new Date(r.notified_at).toLocaleString()}`:(t.laNotNotifiedYet||"Not notified yet")}
                 </span>
                 {(()=>{
                   // Same routing as the main table's contact button: a
@@ -410,7 +410,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                   return (
                     <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}
                       onClick={()=>onUpdate?.(r.id,{notified_at:new Date().toISOString()})}>
-                      <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲 Notify</button>
+                      <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲 {t.laNotify||"Notify"}</button>
                     </a>
                   );
                 })()}
@@ -435,7 +435,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                       workshop_id:r.workshop_id||null, documents:carriedDocs,
                     });
                   }}
-                    style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"var(--surface3)",color:"var(--text2)",cursor:"pointer"}}>🔄 Start Renewal</button>
+                    style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"var(--surface3)",color:"var(--text2)",cursor:"pointer"}}>🔄 {t.laStartRenewal||"Start Renewal"}</button>
                 )}
               </div>
             ))}
@@ -445,13 +445,13 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
 
       {/* Report: how many customer cars each workshop has sent through for renewal */}
       <div className="card" style={{padding:14,marginBottom:14,overflow:"auto"}}>
-        <div style={{fontWeight:700,marginBottom:12,fontSize:13}}>📊 Renewals by Workshop</div>
-        {workshopRows.length===0&&<div style={{color:"var(--text3)",fontSize:13}}>No renewals yet</div>}
+        <div style={{fontWeight:700,marginBottom:12,fontSize:13}}>📊 {t.laRenewalsByWorkshop||"Renewals by Workshop"}</div>
+        {workshopRows.length===0&&<div style={{color:"var(--text3)",fontSize:13}}>{t.laNoRenewalsYet||"No renewals yet"}</div>}
         {workshopRows.length>0&&(<>
           <div className="mob-cards">
             {workshopRows.map(w=>(
               <div key={w.label} className="card" style={{padding:12}}>
-                <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>{w.label} <span style={{color:"var(--text3)",fontWeight:400}}>· {w.total} total</span></div>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>{w.label} <span style={{color:"var(--text3)",fontWeight:400}}>· {w.total} {t.laTotalSuffix||"total"}</span></div>
                 <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12}}>
                   <span style={{color:"var(--yellow)"}}>⏳ {w.pending||0}</span>
                   <span style={{color:"var(--blue)"}}>📤 {w.submitted||0}</span>
@@ -462,7 +462,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
             ))}
           </div>
           <table className="tbl desk-table" style={{width:"100%"}}>
-            <thead><tr><th>Company / Walk-in</th><th style={{textAlign:"right"}}>Total</th><th style={{textAlign:"right"}}>Pending</th><th style={{textAlign:"right"}}>Submitted</th><th style={{textAlign:"right"}}>Completed</th><th style={{textAlign:"right"}}>Cancelled</th></tr></thead>
+            <thead><tr><th>{t.laColCompanyWalkIn||"Company / Walk-in"}</th><th style={{textAlign:"right"}}>{t.laColTotal||"Total"}</th><th style={{textAlign:"right"}}>{t.laStPending||"Pending"}</th><th style={{textAlign:"right"}}>{t.laStSubmitted||"Submitted"}</th><th style={{textAlign:"right"}}>{t.laStCompleted||"Completed"}</th><th style={{textAlign:"right"}}>{t.laStCancelled||"Cancelled"}</th></tr></thead>
             <tbody>
               {workshopRows.map(w=>(
                 <tr key={w.label}>
@@ -480,19 +480,19 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
       </div>
 
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-        {[["all","All"],["pending","Pending"],["submitted","Submitted"],["completed","Completed"],["cancelled","Cancelled"]].map(([v,l])=>(
+        {[["all",t.laStAll||"All"],["pending",t.laStPending||"Pending"],["submitted",t.laStSubmitted||"Submitted"],["completed",t.laStCompleted||"Completed"],["cancelled",t.laStCancelled||"Cancelled"]].map(([v,l])=>(
           <button key={v} onClick={()=>setFilter(v)}
             style={{padding:"5px 12px",borderRadius:20,border:"1px solid var(--border)",background:filter===v?"var(--accent)":"var(--surface2)",color:filter===v?"#fff":"var(--text2)",fontSize:12,cursor:"pointer",fontWeight:filter===v?700:400}}>
             {l} <span style={{opacity:.6}}>{v==="all"?renewals.length:renewals.filter(r=>r.status===v).length}</span>
           </button>
         ))}
-        {totalComm>0&&<span style={{marginLeft:"auto",fontSize:12,color:"var(--green)",fontWeight:700,alignSelf:"center"}}>Commission earned: {C}{totalComm.toLocaleString()}</span>}
+        {totalComm>0&&<span style={{marginLeft:"auto",fontSize:12,color:"var(--green)",fontWeight:700,alignSelf:"center"}}>{t.laCommissionEarned||"Commission earned:"} {C}{totalComm.toLocaleString()}</span>}
       </div>
 
       {filtered.length===0&&(
         <div style={{textAlign:"center",padding:"40px 0",color:"var(--text3)"}}>
           <div style={{fontSize:32,marginBottom:8}}>🪪</div>
-          <div style={{fontSize:14}}>No renewal requests {filter==="all"?"yet":`with status "${filter}"`}</div>
+          <div style={{fontSize:14}}>{t.laNoRenewalRequests||"No renewal requests"} {filter==="all"?(t.laYet||"yet"):`${t.laWithStatus||"with status"} "${filter}"`}</div>
         </div>
       )}
 
@@ -510,7 +510,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                   <div>
                     <div style={{fontWeight:700,fontFamily:"DM Mono,monospace",fontSize:14}}>{r.vehicle_reg}</div>
                     <div style={{fontSize:12,color:"var(--text3)"}}>{r.vehicle_make} {r.vehicle_model}</div>
-                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:"🚶 Walk-in")}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:`🚶 ${t.laWalkIn||"Walk-in"}`)}</div>
                   </div>
                   <div style={{textAlign:"right",flexShrink:0}}>
                     {r.new_licence_expiry ? (
@@ -521,46 +521,46 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     ) : (
                       <div style={{fontSize:12,fontWeight:600,color:isExpired?"var(--red)":"var(--green)"}}>{r.current_expiry||"—"} {isExpired?"⚠️":""}</div>
                     )}
-                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{r.renewal_years||1} yr renewal</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{r.renewal_years||1} {t.laYrRenewalSuffix||"yr renewal"}</div>
                   </div>
                 </div>
                 <div style={{fontSize:13,marginBottom:10}}>{r.owner_name||"—"}{r.owner_phone?` · ${r.owner_phone}`:""}</div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:10}}>
                   <select value={r.status||"pending"} onChange={e=>onUpdate(r.id,{status:e.target.value})}
                     style={{fontSize:12,padding:"4px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",cursor:"pointer",color:"var(--text1)"}}>
-                    <option value="pending">⏳ Pending</option>
-                    <option value="submitted">📤 Submitted</option>
-                    <option value="completed">✅ Completed</option>
-                    <option value="cancelled">❌ Cancelled</option>
+                    <option value="pending">⏳ {t.laStPending||"Pending"}</option>
+                    <option value="submitted">📤 {t.laStSubmitted||"Submitted"}</option>
+                    <option value="completed">✅ {t.laStCompleted||"Completed"}</option>
+                    <option value="cancelled">❌ {t.laStCancelled||"Cancelled"}</option>
                   </select>
-                  <input type="number" min="0" value={r.commission_amount||""} placeholder="Commission"
+                  <input type="number" min="0" value={r.commission_amount||""} placeholder={t.laCommissionPlaceholder||"Commission"}
                     onChange={e=>onUpdate(r.id,{commission_amount:+e.target.value||null})}
                     style={{width:90,fontSize:12,padding:"4px 8px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)"}}/>
                   <button onClick={()=>onUpdate(r.id,{commission_status:r.commission_status==="paid"?"unpaid":"paid"})}
                     style={{fontSize:11,padding:"4px 10px",borderRadius:12,border:"none",cursor:"pointer",
                       background:r.commission_status==="paid"?"var(--green)":"var(--surface2)",
                       color:r.commission_status==="paid"?"#fff":"var(--text3)",fontWeight:600}}>
-                    {r.commission_status==="paid"?"✓ Paid":"Mark Paid"}
+                    {r.commission_status==="paid"?`✓ ${t.paid||"Paid"}`:(t.laMarkPaid||"Mark Paid")}
                   </button>
                   <span style={{fontSize:11,color:"var(--text3)",marginLeft:"auto"}}>{(r.submitted_at||"").slice(0,10)}</span>
                 </div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                   {onUpdate&&(
-                    <button onClick={()=>setEditRenewal(r)} title="Edit" style={actionBtnStyle("default")}>✏️</button>
+                    <button onClick={()=>setEditRenewal(r)} title={t.edit||"Edit"} style={actionBtnStyle("default")}>✏️</button>
                   )}
-                  <button onClick={()=>setDocsRenewalId(r.id)} title="Documents"
+                  <button onClick={()=>setDocsRenewalId(r.id)} title={t.laDocuments||"Documents"}
                     style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎</button>
-                  <QuickUploadBtn r={r} field="receipt" label="Receipt" icon="🧾" doneUrl={r.receipt_url}/>
-                  <QuickUploadBtn r={r} field="new_licence" label="New Disc" icon="🪪" doneUrl={r.new_licence_url}/>
+                  <QuickUploadBtn r={r} field="receipt" label={t.laReceiptLabel||"Receipt"} icon="🧾" doneUrl={r.receipt_url}/>
+                  <QuickUploadBtn r={r} field="new_licence" label={t.laNewDiscLabel||"New Disc"} icon="🪪" doneUrl={r.new_licence_url}/>
                   {waPhone&&(
                     <a href={waLink(waPhone,waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
                       <button title="WhatsApp" style={actionBtnStyle("brand")}><IcWhatsApp size={15}/></button>
                     </a>
                   )}
-                  <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle}/>
+                  <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle} t={t}/>
                   {onDelete&&(
-                    <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
-                      title="Delete" style={actionBtnStyle("danger")}><IcTrash size={15}/></button>
+                    <button onClick={()=>{ if(window.confirm(`${t.laDeleteConfirm||"Delete renewal for"} ${r.vehicle_reg||(t.laThisVehicle||"this vehicle")}?`)) onDelete(r.id); }}
+                      title={t.delete||"Delete"} style={actionBtnStyle("danger")}><IcTrash size={15}/></button>
                   )}
                 </div>
               </div>
@@ -571,14 +571,14 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
           <table className="tbl" style={{width:"100%",minWidth:820}}>
             <thead>
               <tr>
-                <th>Company / Walk-in</th>
-                <th>Vehicle</th>
-                <th>Owner</th>
-                <th>Expiry (new, once applied)</th>
-                <th>Years</th>
-                <th>Status</th>
-                <th>Commission</th>
-                <th>Date</th>
+                <th>{t.laColCompanyWalkIn||"Company / Walk-in"}</th>
+                <th>{t.laColVehicle||"Vehicle"}</th>
+                <th>{t.laColOwner||"Owner"}</th>
+                <th>{t.laColExpiryNew||"Expiry (new, once applied)"}</th>
+                <th>{t.laColYears||"Years"}</th>
+                <th>{t.status||"Status"}</th>
+                <th>{t.laColCommission||"Commission"}</th>
+                <th>{t.date||"Date"}</th>
                 <th></th>
               </tr>
             </thead>
@@ -587,7 +587,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                 const isExpired = r.current_expiry && new Date(r.current_expiry)<new Date();
                 return (
                   <tr key={r.id}>
-                    <td style={{fontSize:12,fontWeight:600}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:"🚶 Walk-in")}</td>
+                    <td style={{fontSize:12,fontWeight:600}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:`🚶 ${t.laWalkIn||"Walk-in"}`)}</td>
                     <td>
                       <div style={{fontWeight:700,fontFamily:"DM Mono,monospace",fontSize:12}}>{r.vehicle_reg}</div>
                       <div style={{fontSize:11,color:"var(--text3)"}}>{r.vehicle_make} {r.vehicle_model}</div>
@@ -612,10 +612,10 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     <td>
                       <select value={r.status||"pending"} onChange={e=>onUpdate(r.id,{status:e.target.value})}
                         style={{fontSize:11,padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",cursor:"pointer",color:"var(--text1)"}}>
-                        <option value="pending">⏳ Pending</option>
-                        <option value="submitted">📤 Submitted</option>
-                        <option value="completed">✅ Completed</option>
-                        <option value="cancelled">❌ Cancelled</option>
+                        <option value="pending">⏳ {t.laStPending||"Pending"}</option>
+                        <option value="submitted">📤 {t.laStSubmitted||"Submitted"}</option>
+                        <option value="completed">✅ {t.laStCompleted||"Completed"}</option>
+                        <option value="cancelled">❌ {t.laStCancelled||"Cancelled"}</option>
                       </select>
                     </td>
                     <td>
@@ -630,7 +630,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                           style={{fontSize:10,padding:"3px 8px",borderRadius:12,border:"none",cursor:"pointer",
                             background:r.commission_status==="paid"?"var(--green)":"var(--surface2)",
                             color:r.commission_status==="paid"?"#fff":"var(--text3)",fontWeight:600}}>
-                          {r.commission_status==="paid"?"✓ Paid":"Mark Paid"}
+                          {r.commission_status==="paid"?`✓ ${t.paid||"Paid"}`:(t.laMarkPaid||"Mark Paid")}
                         </button>
                       </div>
                     </td>
@@ -638,12 +638,12 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     <td>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                         {onUpdate&&(
-                          <button onClick={()=>setEditRenewal(r)} title="Edit" style={actionBtnStyle("default")}>✏️</button>
+                          <button onClick={()=>setEditRenewal(r)} title={t.edit||"Edit"} style={actionBtnStyle("default")}>✏️</button>
                         )}
-                        <button onClick={()=>setDocsRenewalId(r.id)} title="Documents"
+                        <button onClick={()=>setDocsRenewalId(r.id)} title={t.laDocuments||"Documents"}
                           style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎</button>
-                        <QuickUploadBtn r={r} field="receipt" label="Receipt" icon="🧾" doneUrl={r.receipt_url}/>
-                        <QuickUploadBtn r={r} field="new_licence" label="New Disc" icon="🪪" doneUrl={r.new_licence_url}/>
+                        <QuickUploadBtn r={r} field="receipt" label={t.laReceiptLabel||"Receipt"} icon="🧾" doneUrl={r.receipt_url}/>
+                        <QuickUploadBtn r={r} field="new_licence" label={t.laNewDiscLabel||"New Disc"} icon="🪪" doneUrl={r.new_licence_url}/>
                         {(()=>{
                           // Workshop-submitted → message the WORKSHOP (they're the one who has to
                           // action it); a walk-in (no workshop_id) → message the customer directly.
@@ -658,10 +658,10 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                             </a>
                           );
                         })()}
-                        <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle}/>
+                        <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle} t={t}/>
                         {onDelete&&(
-                          <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
-                            title="Delete" style={actionBtnStyle("danger")}><IcTrash size={15}/></button>
+                          <button onClick={()=>{ if(window.confirm(`${t.laDeleteConfirm||"Delete renewal for"} ${r.vehicle_reg||(t.laThisVehicle||"this vehicle")}?`)) onDelete(r.id); }}
+                            title={t.delete||"Delete"} style={actionBtnStyle("danger")}><IcTrash size={15}/></button>
                         )}
                       </div>
                     </td>
@@ -675,18 +675,18 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
 
       {docsRenewal&&(
         <RenewalDocsModal renewal={docsRenewal} viewer="agent"
-          workshopName={workshopInfo[docsRenewal.workshop_id]?.name||(docsRenewal.workshop_id?docsRenewal.workshop_id:"🚶 Walk-in")}
+          workshopName={workshopInfo[docsRenewal.workshop_id]?.name||(docsRenewal.workshop_id?docsRenewal.workshop_id:`🚶 ${t.laWalkIn||"Walk-in"}`)}
           onUpdate={onUpdate} onClose={()=>setDocsRenewalId(null)}/>
       )}
 
       {walkInPrefill&&onSave&&(
-        <WalkInRenewalModal prefill={walkInPrefill}
+        <WalkInRenewalModal prefill={walkInPrefill} t={t}
           onSave={async(rec)=>{ await onSave(rec); setWalkInPrefill(null); }}
           onClose={()=>setWalkInPrefill(null)}/>
       )}
 
       {editRenewal&&onUpdate&&(
-        <WalkInRenewalModal prefill={editRenewal} onUpdate={onUpdate}
+        <WalkInRenewalModal prefill={editRenewal} onUpdate={onUpdate} t={t}
           onClose={()=>setEditRenewal(null)}/>
       )}
     </div>
@@ -703,7 +703,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
 // workshop-submitted) — passing a `prefill` with an id plus `onUpdate` (no
 // `onSave`) switches it into edit mode: same fields, but it patches the
 // existing row instead of inserting a new one, and leaves workshop_id alone.
-function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose}) {
+function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose, t={}}) {
   const isEdit = !!(prefill?.id && onUpdate);
   const [f, setF] = useState({
     vehicle_reg:"", vehicle_make:"", vehicle_model:"", vin:"", engine_no:"",
@@ -748,7 +748,7 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose}) {
   };
 
   const save = async () => {
-    if(!f.vehicle_reg.trim()){ alert("Vehicle registration required"); return; }
+    if(!f.vehicle_reg.trim()){ alert(t.laVehicleRegRequired||"Vehicle registration required"); return; }
     setSaving(true);
     try{
       if(isEdit){
@@ -765,7 +765,7 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose}) {
 
   return (
     <Overlay onClose={onClose}>
-      <MHead title={isEdit?"✏️ Edit Renewal":"🚶 Walk-in Renewal"} onClose={onClose}/>
+      <MHead title={isEdit?`✏️ ${t.laEditRenewalTitle||"Edit Renewal"}`:`🚶 ${t.laWalkInRenewalTitle||"Walk-in Renewal"}`} onClose={onClose}/>
 
       {(() => {
         // Documents carried forward from a previous renewal (via "🔄 Start
@@ -774,11 +774,11 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose}) {
         // per-row ⚠️ badge further down the form to be noticed.
         const expiredDocs = Object.entries(f.documents||{})
           .filter(([,d])=>{ const exp = typeof d==="string"?"":(d?.expiry||""); return exp && new Date(exp)<new Date(); })
-          .map(([k])=>LICENCE_DOC_TYPES.find(t=>t.key===k)?.label||k);
+          .map(([k])=>LICENCE_DOC_TYPES.find(dt=>dt.key===k)?.label||k);
         if(!expiredDocs.length) return null;
         return (
           <div style={{background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.3)",borderRadius:8,padding:"9px 13px",marginBottom:14,fontSize:12,color:"var(--red)"}}>
-            ⚠️ On file but expired: <strong>{expiredDocs.join(", ")}</strong> — ask for an updated copy before continuing.
+            ⚠️ {t.laOnFileButExpired||"On file but expired:"} <strong>{expiredDocs.join(", ")}</strong> — {t.laAskUpdatedCopy||"ask for an updated copy before continuing."}
           </div>
         );
       })()}
@@ -786,59 +786,59 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose}) {
       <div style={{display:"flex",gap:8,marginBottom:14}}>
         <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:scanLoading?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>
           <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleScanFile} disabled={scanLoading}/>
-          {scanLoading?"⏳ Scanning…":"📷 Scan Disc (camera)"}
+          {scanLoading?`⏳ ${t.laScanning||"Scanning…"}`:`📷 ${t.laScanDiscCamera||"Scan Disc (camera)"}`}
         </label>
         <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:scanLoading?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>
           <input type="file" accept="image/*" style={{display:"none"}} onChange={handleScanFile} disabled={scanLoading}/>
-          {scanLoading?"⏳ Scanning…":"🖼️ Scan Disc (gallery)"}
+          {scanLoading?`⏳ ${t.laScanning||"Scanning…"}`:`🖼️ ${t.laScanDiscGallery||"Scan Disc (gallery)"}`}
         </label>
       </div>
       {scanError&&<div style={{fontSize:12,color:"var(--red)",marginBottom:14}}>{scanError}</div>}
-      <div style={{fontSize:11,color:"var(--text3)",marginBottom:14,textAlign:"center"}}>Or just type the details below — scanning is optional.</div>
+      <div style={{fontSize:11,color:"var(--text3)",marginBottom:14,textAlign:"center"}}>{t.laScanOptionalHint||"Or just type the details below — scanning is optional."}</div>
 
       <FG cols="1fr 1fr 1fr">
-        <div><FL label="Reg Plate"/><input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="ABC123GP"/></div>
-        <div><FL label="Make"/><input className="inp" value={f.vehicle_make} onChange={e=>s("vehicle_make",e.target.value)}/></div>
-        <div><FL label="Model"/><input className="inp" value={f.vehicle_model} onChange={e=>s("vehicle_model",e.target.value)}/></div>
+        <div><FL label={t.laRegPlateLabel||"Reg Plate"}/><input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="ABC123GP"/></div>
+        <div><FL label={t.make||"Make"}/><input className="inp" value={f.vehicle_make} onChange={e=>s("vehicle_make",e.target.value)}/></div>
+        <div><FL label={t.model||"Model"}/><input className="inp" value={f.vehicle_model} onChange={e=>s("vehicle_model",e.target.value)}/></div>
       </FG>
       <FG cols="1fr 1fr">
-        <div><FL label="VIN"/><input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value.toUpperCase())} style={{fontFamily:"DM Mono,monospace",fontSize:12}}/></div>
-        <div><FL label="Engine No."/><input className="inp" value={f.engine_no} onChange={e=>s("engine_no",e.target.value.toUpperCase())} style={{fontFamily:"DM Mono,monospace",fontSize:12}}/></div>
+        <div><FL label={t.laVinLabel||"VIN"}/><input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value.toUpperCase())} style={{fontFamily:"DM Mono,monospace",fontSize:12}}/></div>
+        <div><FL label={t.laEngineNoLabel||"Engine No."}/><input className="inp" value={f.engine_no} onChange={e=>s("engine_no",e.target.value.toUpperCase())} style={{fontFamily:"DM Mono,monospace",fontSize:12}}/></div>
       </FG>
       <FG cols="1fr 1fr">
         <div>
-          <FL label="Current Expiry"/>
+          <FL label={t.laCurrentExpiryLabel||"Current Expiry"}/>
           <input className="inp" type="date" value={f.current_expiry} onChange={e=>s("current_expiry",e.target.value)}/>
         </div>
         <div>
-          <FL label="Renew for (years)"/>
+          <FL label={t.laRenewForYears||"Renew for (years)"}/>
           <select className="inp" value={f.renewal_years} onChange={e=>s("renewal_years",e.target.value)}>
-            <option value="1">1 year</option>
-            <option value="2">2 years</option>
-            <option value="3">3 years</option>
+            <option value="1">1 {t.laYear||"year"}</option>
+            <option value="2">2 {t.laYears||"years"}</option>
+            <option value="3">3 {t.laYears||"years"}</option>
           </select>
         </div>
       </FG>
       <div style={{borderTop:"1px solid var(--border)",paddingTop:12,marginTop:4,marginBottom:14}}>
-        <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>Customer Details</div>
+        <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}}>{t.laCustomerDetails||"Customer Details"}</div>
         <FG cols="1fr 1fr">
-          <div><FL label="Customer Name"/><input className="inp" value={f.owner_name} onChange={e=>s("owner_name",e.target.value)}/></div>
-          <div><FL label="Customer Phone"/><input className="inp" value={f.owner_phone} onChange={e=>s("owner_phone",e.target.value)}/></div>
+          <div><FL label={t.laCustomerNameLabel||"Customer Name"}/><input className="inp" value={f.owner_name} onChange={e=>s("owner_name",e.target.value)}/></div>
+          <div><FL label={t.laCustomerPhoneLabel||"Customer Phone"}/><input className="inp" value={f.owner_phone} onChange={e=>s("owner_phone",e.target.value)}/></div>
         </FG>
-        <FL label="Owner ID / Passport No."/><input className="inp" value={f.owner_id} onChange={e=>s("owner_id",e.target.value)} placeholder="SA ID number or passport"/>
+        <FL label={t.laOwnerIdLabel||"Owner ID / Passport No."}/><input className="inp" value={f.owner_id} onChange={e=>s("owner_id",e.target.value)} placeholder="SA ID number or passport"/>
       </div>
 
       <div style={{marginBottom:14}}>
-        <FL label="Supporting Documents (optional)"/>
+        <FL label={t.laSupportingDocsOptional||"Supporting Documents (optional)"}/>
         <LicenceDocsChecklist documents={f.documents} onChange={docs=>s("documents",docs)}
           pathPrefix={`licence_renewals/${(f.vehicle_reg||"walkin").replace(/[\s/\\]/g,"_").toUpperCase()}`}/>
       </div>
 
-      <FL label="Notes"/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Any special instructions…" style={{minHeight:50,marginBottom:16}}/>
+      <FL label={t.notes||"Notes"}/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder={t.laSpecialInstructionsPh||"Any special instructions…"} style={{minHeight:50,marginBottom:16}}/>
 
       <div style={{display:"flex",gap:10}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save Renewal"}</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel||"Cancel"}</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>{saving?(t.laSavingEllipsis||"Saving…"):`💾 ${t.laSaveRenewal||"Save Renewal"}`}</button>
       </div>
     </Overlay>
   );

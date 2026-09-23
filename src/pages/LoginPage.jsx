@@ -419,50 +419,69 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   };
   const companyInpStyle = {...inpStyle, borderColor:"rgba(37,99,235,.25)", background:"rgba(37,99,235,.03)"};
 
+  // Each module gets its own accent tint for the icon badge — small touch,
+  // but it's what turns "8 identical grey boxes" into something that reads
+  // as a deliberately designed set of destinations rather than a plain menu.
+  const TAB_COLORS = {
+    branch:"#60a5fa", workshop:"#ff7a2e", scrapyard:"#a78bfa", customer:"#34d399",
+    supplier:"#c084fc", staff:"#f59e0b", licagent:"#22d3ee", carsales:"#fb923c",
+  };
+
   return (
-    <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",padding:"20px 16px"}}>
+    <div style={{background:"radial-gradient(ellipse 900px 500px at 50% -10%, rgba(255,122,46,.10), transparent), var(--bg)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 16px"}}>
       <style>{CSS}</style>
       <div style={{width:"100%",maxWidth:480}}>
 
         {/* Logo card */}
-        <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:14,padding:"12px",textAlign:"center",marginBottom:10,boxShadow:"var(--shadow)"}}>
+        <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:16,padding:"16px",textAlign:"center",marginBottom:14,boxShadow:"var(--shadow-lg)"}}>
           <VelGeniusBanner/>
-          <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:10,marginTop:8,flexWrap:"wrap"}}>
-            {langs.length>1&&langs.map(l=>(
-              <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
-                {l.flag||l.lang.toUpperCase()}
-              </button>
-            ))}
+          {langs.length>1&&(
+            <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:10,marginTop:14}}>
+              {langs.map(l=>(
+                <button key={l.lang} onClick={()=>setLang(l.lang)} title={l.name} style={{
+                  width:40,height:40,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:16,cursor:"pointer",background:"var(--surface2)",
+                  border:lang===l.lang?"2px solid var(--accent)":"1px solid var(--border)",
+                  boxShadow:lang===l.lang?"0 0 0 3px rgba(255,122,46,.15)":"none",
+                  transition:"all .15s",flexShrink:0,
+                }}>
+                  {l.flag||l.lang.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+          <div style={{display:"flex",justifyContent:"center",marginTop:12}}>
             {dbStatus==="checking"&&<span style={{fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}><span style={{width:6,height:6,borderRadius:"50%",background:"var(--text3)",display:"inline-block",opacity:.5}}/>Checking…</span>}
-            {dbStatus==="connected"&&<span style={{fontSize:11,fontWeight:600,color:"#16a34a",display:"flex",alignItems:"center",gap:5,padding:"3px 10px",borderRadius:20,background:"rgba(22,163,74,.1)",border:"1px solid rgba(22,163,74,.25)"}}><span style={{width:6,height:6,borderRadius:"50%",background:"#16a34a",display:"inline-block"}}/>Database Connected</span>}
-            {dbStatus==="disconnected"&&<span style={{fontSize:11,fontWeight:600,color:"var(--red)",display:"flex",alignItems:"center",gap:5,padding:"3px 10px",borderRadius:20,background:"rgba(220,38,38,.07)",border:"1px solid rgba(220,38,38,.2)"}}><span style={{width:6,height:6,borderRadius:"50%",background:"var(--red)",display:"inline-block"}}/>Disconnected</span>}
+            {dbStatus==="connected"&&<span style={{fontSize:11,fontWeight:600,color:"#16a34a",display:"flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,background:"rgba(22,163,74,.1)",border:"1px solid rgba(22,163,74,.25)"}}><span style={{width:6,height:6,borderRadius:"50%",background:"#16a34a",display:"inline-block"}}/>Database Connected</span>}
+            {dbStatus==="disconnected"&&<span style={{fontSize:11,fontWeight:600,color:"var(--red)",display:"flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,background:"rgba(220,38,38,.07)",border:"1px solid rgba(220,38,38,.2)"}}><span style={{width:6,height:6,borderRadius:"50%",background:"var(--red)",display:"inline-block"}}/>Disconnected</span>}
           </div>
         </div>
 
         {/* Module tabs — hidden in workshop-only mode, and on a supplier catalogue
             link (?catalog=) so a shared link only ever shows that one login form. */}
         {!wsLoginOnly&&!catalogName&&(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:10}}>
-          {TAB_BTNS.map(({id,Icon,label})=>(
-            <button key={id} onClick={()=>switchTab(id)} style={{
-              position:"relative",
-              padding:"7px 4px 8px",borderRadius:10,
-              border:`1.5px solid ${authTab===id?"var(--accent)":"rgba(93,122,147,.35)"}`,
-              cursor:"pointer",
-              background:authTab===id?"#0B0D10":"var(--surface)",
-              color:authTab===id?"var(--accent)":"#5D7A93",
-              fontWeight:authTab===id?700:500,
-              fontSize:10,letterSpacing:".06em",textTransform:"uppercase",
-              display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-              boxShadow:authTab===id?"0 4px 14px rgba(255,122,46,.18)":"none",
-              transition:"all .15s",
-              overflow:"hidden",
-            }}>
-              {authTab===id&&<span style={{position:"absolute",bottom:0,left:0,right:0,height:2,background:"var(--accent)"}}/>}
-              <Icon/>
-              <span>{label}</span>
-            </button>
-          ))}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:16}}>
+          {TAB_BTNS.map(({id,Icon,label})=>{
+            const c = TAB_COLORS[id]||"var(--accent)";
+            const on = authTab===id;
+            return (
+              <button key={id} onClick={()=>switchTab(id)} style={{
+                padding:"16px 10px",borderRadius:14,
+                border:`1.5px solid ${on?c:"var(--border2)"}`,
+                cursor:"pointer",
+                background:"var(--surface)",
+                boxShadow:on?`0 6px 18px ${c}33`:"var(--shadow)",
+                display:"flex",flexDirection:"column",alignItems:"center",gap:9,
+                transition:"all .15s",
+              }}>
+                <div style={{width:42,height:42,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",
+                  background:`${c}1c`,color:c}}>
+                  <Icon/>
+                </div>
+                <span style={{fontSize:12,fontWeight:700,letterSpacing:".04em",textTransform:"uppercase",color:on?c:"var(--text2)"}}>{label}</span>
+              </button>
+            );
+          })}
         </div>
         )}
 

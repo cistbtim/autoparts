@@ -964,34 +964,41 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       {mobView === "catalog" ? (
         <>
           {/* Search + filter bar */}
-          <div style={{ padding: "8px 10px", borderBottom: "2px solid var(--border)", background: "var(--surface2)", display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ padding: "10px 10px 8px", borderBottom: "2px solid var(--border)", background: "var(--surface2)", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ position: "relative" }}>
+              <input ref={searchRef} className="inp" value={searchInput}
+                onChange={e => setSearch2(e.target.value)}
+                onKeyDown={handleSearchKey}
+                placeholder="🔍 SKU · part name · barcode…"
+                style={{ fontSize: 14, fontWeight: 600, paddingRight: 32, width: "100%", boxSizing: "border-box", background: "var(--surface)", border: "2px solid var(--border)" }} />
+              {searchInput && (
+                <button onClick={() => setSearch2("")}
+                  style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 14 }}>✕</button>
+              )}
+            </div>
+
             <div style={{ display: "flex", gap: 6 }}>
-              <div style={{ position: "relative", flex: 1 }}>
-                <input ref={searchRef} className="inp" value={searchInput}
-                  onChange={e => setSearch2(e.target.value)}
-                  onKeyDown={handleSearchKey}
-                  placeholder="🔍 SKU · part name · barcode…"
-                  style={{ fontSize: 14, fontWeight: 600, paddingRight: 32, background: "var(--surface)", border: "2px solid var(--border)" }} />
-                {searchInput && (
-                  <button onClick={() => setSearch2("")}
-                    style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 14 }}>✕</button>
-                )}
-              </div>
               <select className="inp" value={filterCat} onChange={e => setFilterCat2(e.target.value)}
-                style={{ width: 130, fontSize: 12, flexShrink: 0, background: "var(--surface)" }}>
-                <option value="__all__">All Cat.</option>
+                style={{ flex: 1, minWidth: 0, fontSize: 12, background: "var(--surface)" }}>
+                <option value="__all__">All Categories</option>
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               <button onClick={handleRefresh} disabled={refreshing} title="Refresh parts"
-                style={{ flexShrink: 0, background: "var(--surface)", border: "2px solid var(--border)", borderRadius: 8, padding: "0 10px", cursor: refreshing ? "default" : "pointer", fontSize: 15, opacity: refreshing ? .5 : 1, transition: "opacity .2s" }}>
+                style={{ flexShrink: 0, background: "var(--surface)", border: "2px solid var(--border)", borderRadius: 8, padding: "0 12px", cursor: refreshing ? "default" : "pointer", fontSize: 15, opacity: refreshing ? .5 : 1, transition: "opacity .2s" }}>
                 {refreshing ? "⏳" : "🔄"}
               </button>
               <button onClick={toggleSelectMode} title={selectMode ? "Exit select mode" : "Select parts to enquire"}
-                style={{ flexShrink: 0, background: selectMode ? "var(--blue)" : "var(--surface)", border: `2px solid ${selectMode ? "var(--blue)" : "var(--border)"}`, borderRadius: 8, padding: "0 10px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: selectMode ? "#fff" : "var(--text2)", whiteSpace: "nowrap" }}>
+                style={{ flexShrink: 0, background: selectMode ? "var(--blue)" : "var(--surface)", border: `2px solid ${selectMode ? "var(--blue)" : "var(--border)"}`, borderRadius: 8, padding: "0 12px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: selectMode ? "#fff" : "var(--text2)", whiteSpace: "nowrap" }}>
                 {selectMode ? "✕ Done" : "☑ Select"}
               </button>
             </div>
-            <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} parts={parts} onFilter={setVehicleFilter2} onZoom={setLightbox} />
+
+            {vehicles.length > 0 && (
+              <div style={{ background: "var(--surface)", border: "2px solid var(--accent)", borderRadius: 8, padding: "7px 8px" }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".06em", color: "var(--accent)", textTransform: "uppercase", marginBottom: 5 }}>🚗 Filter by vehicle (make / model)</div>
+                <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} parts={parts} onFilter={setVehicleFilter2} onZoom={setLightbox} />
+              </div>
+            )}
           </div>
 
           {/* Parts list */}
@@ -1000,6 +1007,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 10, color: "var(--text3)" }}>
                 <div style={{ fontSize: 44, opacity: .4 }}>🔎</div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text2)" }}>Search to browse parts</div>
+                {vehicles.length > 0 && <div style={{ fontSize: 12, color: "var(--text3)" }}>…or use the 🚗 vehicle filter above</div>}
               </div>
             ) : filteredParts.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 8, color: "var(--text3)" }}>

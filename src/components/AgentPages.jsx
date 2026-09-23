@@ -65,21 +65,35 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
     catch(err){ alert("Upload failed: "+err.message); }
     setQuickUploading("");
   };
-  // One clean button per document, not a cluster of tiny icons — leaving
-  // `capture` off means tapping this on a phone shows the OS's own native
-  // sheet (Camera / Photos / Files), which already IS the camera+gallery
-  // choice, just done by the platform instead of us building two buttons.
+  // One consistent button system for every action on a row (Edit, Docs,
+  // Receipt, New Disc, WhatsApp, Office, Delete) — same size and shape, color
+  // only signals meaning: neutral = plain action, soft green tint = something
+  // is on file, solid brand green = a WhatsApp send, red = destructive. The
+  // previous version had each button a different shape/saturation (pill vs
+  // rect, solid green vs solid red vs solid teal), which is what made the row
+  // look like a pile of mismatched chips instead of one toolbar.
+  const ACTION_BTN = {display:"flex",alignItems:"center",justifyContent:"center",gap:5,
+    padding:"9px 8px",borderRadius:9,fontSize:12,fontWeight:600,cursor:"pointer",
+    border:"1px solid transparent",whiteSpace:"nowrap"};
+  const actionBtnStyle = (variant) => {
+    if(variant==="done")   return {...ACTION_BTN,background:"rgba(52,211,153,.14)",color:"var(--green)",border:"1px solid rgba(52,211,153,.35)"};
+    if(variant==="brand")  return {...ACTION_BTN,background:"#25D366",color:"#fff"};
+    if(variant==="danger") return {...ACTION_BTN,background:"rgba(248,113,113,.12)",color:"var(--red)",border:"1px solid rgba(248,113,113,.35)"};
+    return {...ACTION_BTN,background:"var(--surface2)",color:"var(--text2)",border:"1px solid var(--border)"};
+  };
+
+  // Leaving `capture` off the file input means tapping this on a phone shows
+  // the OS's own native sheet (Camera / Photos / Files) — that already IS the
+  // camera+gallery choice, just handled by the platform instead of us
+  // building two separate buttons for it.
   const QuickUploadBtn = ({r, field, label, icon, doneUrl}) => {
     const busy = quickUploading===`${r.id}:${field}`;
     return (
       <label title={doneUrl?`${label} — uploaded, tap to replace`:`Upload ${label}`}
-        style={{display:"flex",alignItems:"center",gap:5,padding:"6px 11px",borderRadius:20,
-          cursor:quickUploading?"wait":"pointer",fontSize:12,fontWeight:600,flexShrink:0,
-          background:doneUrl?"var(--green)":"var(--surface2)",color:doneUrl?"#fff":"var(--text2)",
-          border:doneUrl?"none":"1px solid var(--border)",transition:"background .15s"}}>
+        style={{...actionBtnStyle(doneUrl?"done":"default"), cursor:quickUploading?"wait":"pointer"}}>
         <input type="file" accept="image/*,application/pdf" style={{display:"none"}}
           onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f) quickUpload(r,field,f); }} disabled={!!quickUploading}/>
-        <span style={{fontSize:14}}>{busy?"⏳":doneUrl?"✅":icon}</span>
+        <span>{busy?"⏳":doneUrl?"✅":icon}</span>
         {label}
       </label>
     );
@@ -327,34 +341,30 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                   </button>
                   <span style={{fontSize:11,color:"var(--text3)",marginLeft:"auto"}}>{(r.submitted_at||"").slice(0,10)}</span>
                 </div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
                   {onUpdate&&(
-                    <button onClick={()=>setEditRenewal(r)}
-                      style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,background:"var(--surface2)",color:"var(--text2)"}}>✏️ Edit</button>
+                    <button onClick={()=>setEditRenewal(r)} style={actionBtnStyle("default")}>✏️ Edit</button>
                   )}
                   <button onClick={()=>setDocsRenewalId(r.id)}
-                    style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
-                      background:(r.receipt_url||r.new_licence_url)?"var(--green)":"var(--surface2)",
-                      color:(r.receipt_url||r.new_licence_url)?"#fff":"var(--text3)"}}>📎 Docs</button>
+                    style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎 Docs</button>
                   <QuickUploadBtn r={r} field="receipt" label="Receipt" icon="🧾" doneUrl={r.receipt_url}/>
                   <QuickUploadBtn r={r} field="new_licence" label="New Disc" icon="🪪" doneUrl={r.new_licence_url}/>
                   {waPhone&&(
                     <a href={waLink(waPhone,waMsg)} target="_blank" rel="noopener noreferrer">
-                      <button style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲 WhatsApp</button>
+                      <button style={actionBtnStyle("brand")}><IcWhatsApp size={13}/> WhatsApp</button>
                     </a>
                   )}
                   {officeContact?.phone&&(
                     <a href={waLink(officeContact.phone,buildOfficeMessage(r))} target="_blank" rel="noopener noreferrer"
                       onClick={()=>onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString()})}>
-                      <button style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
-                        background:r.sent_to_office_at?"var(--green)":"#128C7E",color:"#fff"}}>
-                        {r.sent_to_office_at?"✅ Sent to Office":"📤 Send to Office"}
+                      <button style={actionBtnStyle(r.sent_to_office_at?"done":"brand")}>
+                        {r.sent_to_office_at?"✅ Sent":"📤"} Office
                       </button>
                     </a>
                   )}
                   {onDelete&&(
                     <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
-                      style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,background:"var(--red)",color:"#fff",cursor:"pointer"}}>🗑️ Delete</button>
+                      style={actionBtnStyle("danger")}>🗑️ Delete</button>
                   )}
                 </div>
               </div>
@@ -430,15 +440,12 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     </td>
                     <td style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>{(r.submitted_at||"").slice(0,10)}</td>
                     <td>
-                      <div style={{display:"flex",gap:6}}>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                         {onUpdate&&(
-                          <button onClick={()=>setEditRenewal(r)}
-                            style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,background:"var(--surface2)",color:"var(--text2)"}}>✏️ Edit</button>
+                          <button onClick={()=>setEditRenewal(r)} style={actionBtnStyle("default")}>✏️ Edit</button>
                         )}
                         <button onClick={()=>setDocsRenewalId(r.id)}
-                          style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
-                            background:(r.receipt_url||r.new_licence_url)?"var(--green)":"var(--surface2)",
-                            color:(r.receipt_url||r.new_licence_url)?"#fff":"var(--text3)"}}>📎 Docs</button>
+                          style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎 Docs</button>
                         <QuickUploadBtn r={r} field="receipt" label="Receipt" icon="🧾" doneUrl={r.receipt_url}/>
                         <QuickUploadBtn r={r} field="new_licence" label="New Disc" icon="🪪" doneUrl={r.new_licence_url}/>
                         {(()=>{
@@ -451,25 +458,21 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                             : "";
                           return (
                             <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer">
-                              <button style={{fontSize:12,padding:"5px 12px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
-                                display:"flex",alignItems:"center",gap:6,background:"#25D366",color:"#fff"}}>
-                                <IcWhatsApp size={14}/> WhatsApp
-                              </button>
+                              <button style={actionBtnStyle("brand")}><IcWhatsApp size={13}/> WhatsApp</button>
                             </a>
                           );
                         })()}
                         {officeContact?.phone&&(
                           <a href={waLink(officeContact.phone,buildOfficeMessage(r))} target="_blank" rel="noopener noreferrer"
                             onClick={()=>onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString()})} title={r.sent_to_office_at?`Sent to office ${new Date(r.sent_to_office_at).toLocaleString()}`:"Send to office"}>
-                            <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
-                              background:r.sent_to_office_at?"var(--green)":"#128C7E",color:"#fff"}}>
-                              {r.sent_to_office_at?"✅🏢":"📤🏢"}
+                            <button style={actionBtnStyle(r.sent_to_office_at?"done":"brand")}>
+                              {r.sent_to_office_at?"✅":"📤"} Office
                             </button>
                           </a>
                         )}
                         {onDelete&&(
                           <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
-                            style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"var(--red)",color:"#fff",cursor:"pointer"}}>🗑️</button>
+                            style={actionBtnStyle("danger")}>🗑️ Delete</button>
                         )}
                       </div>
                     </td>

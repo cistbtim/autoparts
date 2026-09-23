@@ -211,7 +211,7 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
 // Add / edit / remove the roster of processing agents/offices right from the
 // Licence Agent page itself — no need to go into global Settings for
 // something only this page uses.
-function ManageOfficeAgentsModal({agents=[], onSave, onClose}) {
+export function ManageOfficeAgentsModal({agents=[], onSave, onClose}) {
   const [list, setList] = useState(agents);
   const [saving, setSaving] = useState(false);
   const upd = (i,patch) => setList(p=>{ const arr=[...p]; arr[i]={...arr[i],...patch}; return arr; });
@@ -254,7 +254,7 @@ function ManageOfficeAgentsModal({agents=[], onSave, onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // LICENCE RENEWAL AGENT — cross-workshop renewal queue
 // ═══════════════════════════════════════════════════════════════
-export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeAgents=[], onSaveOfficeAgents}) {
+export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeAgents=[]}) {
   const [filter, setFilter] = useState("all");
   // Which renewal+field is mid-upload, as `${id}:${field}` — lets the quick
   // shortcut buttons in the table (receipt / new licence disc) show a spinner
@@ -312,7 +312,6 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   const docsRenewal = docsRenewalId ? renewals.find(r=>r.id===docsRenewalId)||null : null;
   const [walkInPrefill, setWalkInPrefill] = useState(null); // null=closed, {}=blank, {...}=prefilled from a due-soon row
   const [editRenewal, setEditRenewal] = useState(null); // null=closed, {...existing row} = editing it in place
-  const [manageAgentsOpen, setManageAgentsOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dueSoonDays, setDueSoonDays] = useState(()=>{
     try{ return +localStorage.getItem("licence_agent_due_soon_days") || 30; }catch{ return 30; }
@@ -365,14 +364,9 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
               {refreshing?"⏳":"🔄"} Refresh
             </button>
           )}
-          <button className="btn btn-ghost" onClick={()=>setManageAgentsOpen(true)}>🏢 Manage Agents</button>
           {onSave&&<button className="btn btn-primary" onClick={()=>setWalkInPrefill({})}>+ Walk-in Customer</button>}
         </div>
       </div>
-
-      {manageAgentsOpen&&(
-        <ManageOfficeAgentsModal agents={officeAgents} onSave={onSaveOfficeAgents} onClose={()=>setManageAgentsOpen(false)}/>
-      )}
 
       {unpaidComm.length>0&&(
         <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.3)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13}}>

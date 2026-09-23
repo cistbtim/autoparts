@@ -21,7 +21,7 @@ import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
 import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierScanStockPage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
-import { LicenceAgentPage, CarSalesPage } from "./components/AgentPages.jsx";
+import { LicenceAgentPage, ManageOfficeAgentsModal, CarSalesPage } from "./components/AgentPages.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage } from "./pages/PublicPages.jsx";
 
@@ -4962,6 +4962,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       id:"grp_licence_agent", icon:"🪪", label:"Licence Renewals", roles:["licence_agent"],
       children:[
         {id:"licenceAgentQueue", icon:"🪪", label:"Renewal Queue", roles:["licence_agent"]},
+        {id:"licenceAgentAgents", icon:"🧑‍💼", label:"Manage Agents", roles:["licence_agent"]},
       ]
     },
     {
@@ -6910,7 +6911,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── LICENCE RENEWAL AGENT ── */}
         {tab==="licenceAgentQueue"&&role==="licence_agent"&&(
           <LicenceAgentPage renewals={licenceAgentQueue} workshopInfo={licenceAgentWsNames} onUpdate={updateLicenceAgentRenewal} onSave={saveLicenceAgentRenewal} onDelete={deleteLicenceAgentRenewal} onRefresh={reloadLicenceAgentQueue}
-            officeAgents={settings.licence_processing_agents||[]} onSaveOfficeAgents={agents=>saveSettings({licence_processing_agents:agents})}/>
+            officeAgents={settings.licence_processing_agents||[]}/>
+        )}
+        {tab==="licenceAgentAgents"&&role==="licence_agent"&&(
+          <ManageOfficeAgentsModal agents={settings.licence_processing_agents||[]}
+            onSave={agents=>saveSettings({licence_processing_agents:agents})}
+            onClose={()=>setTab("licenceAgentQueue")}/>
         )}
 
         {/* ── CAR SALES ── */}

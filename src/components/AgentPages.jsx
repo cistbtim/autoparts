@@ -279,7 +279,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
     if(variant==="done")   return {...ACTION_BTN,background:"rgba(52,211,153,.14)",color:"var(--green)",border:"1px solid rgba(52,211,153,.35)"};
     if(variant==="brand")  return {...ACTION_BTN,background:"#25D366",color:"#fff"};
     if(variant==="office") return {...ACTION_BTN,background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.35)"};
-    if(variant==="danger") return {...ACTION_BTN,background:"#dc2626",color:"#fff"};
+    if(variant==="danger") return {...ACTION_BTN,background:"rgba(220,38,38,.15)",color:"#dc2626",border:"1px solid rgba(220,38,38,.4)"};
     return {...ACTION_BTN,background:"var(--surface2)",color:"var(--text2)",border:"1px solid var(--border)"};
   };
 

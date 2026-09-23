@@ -3,7 +3,7 @@ import { uploadToStorage } from "../lib/api.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { makeId, waLink } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
-import { Overlay, MHead, FL, FG, ImgLightbox, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, uploadRenewalOutput, IcWhatsApp } from "./shared.jsx";
+import { Overlay, MHead, FL, FG, ImgLightbox, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, uploadRenewalOutput, uploadAttachment, IcWhatsApp } from "./shared.jsx";
 
 // current_expiry (the expiry the renewal was submitted against) + renewal_years
 // gives the date the NEW disc granted by a completed renewal actually expires —
@@ -527,17 +527,25 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose}) {
   const [scanError, setScanError] = useState("");
   const s = (k,v) => setF(p=>({...p,[k]:v}));
 
-  const processScan = async (dataUrl) => {
+  const processScan = async (dataUrl, file) => {
     setScanLoading(true); setScanError("");
     try{
       const raw = await decodePDF417fromImage(dataUrl);
       const parsed = parseLicenceDisc(raw);
+      const reg = parsed.reg ? parsed.reg.replace(/\s/g,"").toUpperCase() : f.vehicle_reg;
       setF(p=>({...p,
         vehicle_reg: parsed.reg ? parsed.reg.replace(/\s/g,"").toUpperCase() : p.vehicle_reg,
         vehicle_make: parsed.make||p.vehicle_make, vehicle_model: parsed.model||p.vehicle_model,
         vin: parsed.vin||p.vin, engine_no: parsed.engine_no||p.engine_no,
         current_expiry: parsed.expiry_date||p.current_expiry,
       }));
+      // The scanned photo itself IS the licence disc / vehicle doc — save it
+      // straight into that checklist slot so the customer/agent doesn't have
+      // to upload the same photo a second time by hand.
+      try{
+        const url = await uploadAttachment(file, `licence_renewals/${(reg||"walkin").replace(/[\s/\\]/g,"_")}`);
+        setF(p=>({...p, documents:{...p.documents, licence_disc:{url, expiry:parsed.expiry_date||""}}}));
+      }catch{ /* form fields already filled; saving the photo itself is best-effort */ }
     }catch(err){ setScanError("Barcode not detected — try a clearer photo, or just type the details below. ("+err.message+")"); }
     setScanLoading(false);
   };
@@ -546,7 +554,7 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose}) {
     const file = e.target.files?.[0]; if(!file) return;
     e.target.value="";
     const fr = new FileReader();
-    fr.onload = ev => processScan(ev.target.result);
+    fr.onload = ev => processScan(ev.target.result, file);
     fr.readAsDataURL(file);
   };
 

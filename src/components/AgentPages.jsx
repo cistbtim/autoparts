@@ -22,17 +22,18 @@ const daysUntil = (dateStr) => {
   return Math.round((d - today) / 86400000);
 };
 
-// WhatsApp can't attach files, only text — so the office gets a direct link
-// to each document that's actually been uploaded (Supabase storage URLs are
-// already public), instead of a generic "documents are ready" message they'd
-// have to chase up separately.
-const buildOfficeMessage = (r) => {
+// WhatsApp can't attach files, only text — so the office gets a direct link.
+// When a merged PDF packet was built successfully, that single link replaces
+// the old one-link-per-document list (much easier for the office to open,
+// read and print in one go); if PDF generation wasn't available, it falls
+// back to linking every uploaded document separately like before.
+const buildOfficeMessage = (r, pdfUrl) => {
   const docLines = LICENCE_DOC_TYPES.map(({key,label})=>{
     const d = r.documents?.[key];
     const url = typeof d==="string" ? d : d?.url;
     return url ? `${label}: ${url}` : null;
   }).filter(Boolean);
-  return [
+  const lines = [
     "🪪 Licence Renewal — please process",
     "",
     `Reg: ${r.vehicle_reg||"—"}  ${r.vehicle_make||""} ${r.vehicle_model||""}`.trim(),
@@ -45,9 +46,96 @@ const buildOfficeMessage = (r) => {
     r.owner_id ? `ID / Passport: ${r.owner_id}` : null,
     r.owner_phone ? `Phone: ${r.owner_phone}` : null,
     "",
-    docLines.length ? "📎 Documents:" : "⚠️ No documents attached yet",
-    ...docLines,
-  ].filter(Boolean).join("\n");
+  ];
+  if(pdfUrl){
+    lines.push(`📄 Full renewal packet (PDF): ${pdfUrl}`);
+  } else {
+    lines.push(docLines.length ? "📎 Documents:" : "⚠️ No documents attached yet");
+    lines.push(...docLines);
+  }
+  return lines.filter(Boolean).join("\n");
+};
+
+// Loads a (same-origin-CORS) image URL and re-encodes it as a JPEG data URL —
+// jsPDF needs pixel data it can embed, not a bare URL.
+const imgToJpegDataUrl = (url) => new Promise((resolve, reject) => {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    try{
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      resolve({ dataUrl: canvas.toDataURL("image/jpeg", 0.85), w: img.naturalWidth, h: img.naturalHeight });
+    }catch(err){ reject(err); }
+  };
+  img.onerror = reject;
+  img.src = url;
+});
+
+// One PDF covering the renewal details plus every uploaded document — each
+// image gets its own full page; a document that's itself a PDF can't be
+// merged in client-side, so it gets a page with its name and a link instead.
+const buildOfficePdfBlob = async (r) => {
+  // Dynamically imported — jsPDF (plus its optional html2canvas/DOMPurify
+  // deps) is only needed by this one admin-only action, so it shouldn't be
+  // in everyone else's initial bundle.
+  const { default: jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pageW = 210, pageH = 297, margin = 16;
+  let y = margin;
+  const line = (txt, opts) => { if(!txt) return; doc.text(txt, margin, y); y += (opts?.gap ?? 6); };
+  doc.setFontSize(16); doc.setFont(undefined, "bold");
+  line("Licence Renewal — Please Process", { gap: 9 });
+  doc.setFontSize(11); doc.setFont(undefined, "normal");
+  line(`Reg: ${r.vehicle_reg||"—"}  ${r.vehicle_make||""} ${r.vehicle_model||""}`.trim());
+  line(r.vin ? `VIN: ${r.vin}` : null);
+  line(r.engine_no ? `Engine: ${r.engine_no}` : null);
+  line(r.current_expiry ? `Current Expiry: ${r.current_expiry}` : null);
+  line(`Renew for: ${r.renewal_years||1} year${+r.renewal_years>1?"s":""}`, { gap: 9 });
+  line(`Owner: ${r.owner_name||"—"}`);
+  line(r.owner_id ? `ID / Passport: ${r.owner_id}` : null);
+  line(r.owner_phone ? `Phone: ${r.owner_phone}` : null);
+  if(r.notes){ y += 3; doc.setFont(undefined, "italic"); line(`Notes: ${r.notes}`); doc.setFont(undefined, "normal"); }
+
+  const docsList = LICENCE_DOC_TYPES.map(({key,label})=>{
+    const d = r.documents?.[key];
+    const url = typeof d==="string" ? d : d?.url;
+    return url ? {label,url} : null;
+  }).filter(Boolean);
+  if(r.receipt_url) docsList.push({label:"Payment Receipt", url:r.receipt_url});
+  if(r.new_licence_url) docsList.push({label:"New Licence Disc", url:r.new_licence_url});
+
+  for(const {label,url} of docsList){
+    doc.addPage();
+    doc.setFontSize(13); doc.setFont(undefined, "bold");
+    doc.text(label, margin, margin);
+    doc.setFontSize(9); doc.setFont(undefined, "normal");
+    const isPdf = /\.pdf(\?|$)/i.test(url);
+    let embedded = false;
+    if(!isPdf){
+      try{
+        const { dataUrl, w, h } = await imgToJpegDataUrl(url);
+        const maxW = pageW - margin*2, maxH = pageH - margin*2 - 10;
+        const scale = Math.min(maxW/w, maxH/h, 1);
+        doc.addImage(dataUrl, "JPEG", margin, margin+10, w*scale, h*scale);
+        embedded = true;
+      }catch{ /* fall through to the link-only page below */ }
+    }
+    if(!embedded){
+      doc.text(isPdf ? "This is a PDF and can't be merged in here — open it directly:" : "Couldn't load this image — open it directly:", margin, margin+8);
+      doc.setTextColor(37,99,235);
+      doc.textWithLink(url, margin, margin+14, { url });
+      doc.setTextColor(0,0,0);
+    }
+  }
+  return doc.output("blob");
+};
+
+const buildAndUploadOfficePdf = async (r) => {
+  const blob = await buildOfficePdfBlob(r);
+  const path = `licence_renewals/${(r.vehicle_reg||"walkin").replace(/[\s/\\]/g,"_")}/office_${Date.now()}.pdf`;
+  return uploadToStorage("cars_parts", path, blob, "application/pdf");
 };
 
 // The "Office" button on a renewal row — sends a WhatsApp with links to every
@@ -57,31 +145,46 @@ const buildOfficeMessage = (r) => {
 // application goes to (they don't all handle the same region/vehicle type).
 function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
   const agents = allAgents.filter(a=>a.whatsapp);
+  const [busy, setBusy] = useState(false);
   if(!agents.length) return null;
   const label = (a) => a.company||a.name||"Office";
   const sentTitle = r.sent_to_office_at ? `Sent to ${r.sent_to_office_agent||"office"} ${new Date(r.sent_to_office_at).toLocaleString()}` : null;
+
+  // Building the PDF is async, but a WhatsApp tab opened AFTER an await gets
+  // killed by the popup blocker (it's no longer a direct response to the
+  // click) — so the tab opens blank right away, in-click, and gets pointed
+  // at the real wa.me link once the PDF upload finishes.
+  const sendTo = async (a) => {
+    const win = window.open("", "_blank");
+    setBusy(true);
+    try{
+      const pdfUrl = await buildAndUploadOfficePdf(r);
+      if(win) win.location.href = waLink(a.whatsapp, buildOfficeMessage(r, pdfUrl));
+      onUpdate?.(r.id, {sent_to_office_at:new Date().toISOString(), sent_to_office_agent:label(a)});
+    }catch(err){
+      win?.close();
+      alert("Couldn't build the PDF — sending the document links instead. ("+err.message+")");
+      window.open(waLink(a.whatsapp, buildOfficeMessage(r)), "_blank", "noopener,noreferrer");
+      onUpdate?.(r.id, {sent_to_office_at:new Date().toISOString(), sent_to_office_agent:label(a)});
+    }
+    setBusy(false);
+  };
+
   if(agents.length===1){
     const a = agents[0];
     return (
-      <a href={waLink(a.whatsapp,buildOfficeMessage(r))} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}
-        onClick={()=>onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString(), sent_to_office_agent:label(a)})}
-        title={sentTitle||`Send to ${label(a)}`}>
-        <button style={actionBtnStyle(r.sent_to_office_at?"done":"brand")}>
-          {r.sent_to_office_at?"✅":"📤"}
-        </button>
-      </a>
+      <button onClick={()=>sendTo(a)} disabled={busy}
+        title={busy?"Building PDF…":(sentTitle||`Send to ${label(a)}`)}
+        style={{...actionBtnStyle(r.sent_to_office_at?"done":"brand"), cursor:busy?"wait":"pointer"}}>
+        {busy?"⏳":r.sent_to_office_at?"✅":"📤"}
+      </button>
     );
   }
   return (
-    <select value="" title={sentTitle||"Choose an agent/office to send to"}
-      onChange={e=>{
-        const a = agents.find(x=>x.id===e.target.value); e.target.value="";
-        if(!a) return;
-        if(a.whatsapp) window.open(waLink(a.whatsapp,buildOfficeMessage(r)),"_blank","noopener,noreferrer");
-        onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString(), sent_to_office_agent:label(a)});
-      }}
-      style={{...actionBtnStyle(r.sent_to_office_at?"done":"brand"), appearance:"none", textAlign:"center", padding:0, cursor:"pointer"}}>
-      <option value="" disabled>{r.sent_to_office_at?"✅":"📤"}</option>
+    <select value="" disabled={busy} title={busy?"Building PDF…":(sentTitle||"Choose an agent/office to send to")}
+      onChange={e=>{ const a=agents.find(x=>x.id===e.target.value); e.target.value=""; if(a) sendTo(a); }}
+      style={{...actionBtnStyle(r.sent_to_office_at?"done":"brand"), appearance:"none", textAlign:"center", padding:0, cursor:busy?"wait":"pointer"}}>
+      <option value="" disabled>{busy?"⏳":r.sent_to_office_at?"✅":"📤"}</option>
       {agents.map(a=><option key={a.id} value={a.id}>{label(a)}</option>)}
     </select>
   );

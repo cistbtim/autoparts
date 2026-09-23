@@ -997,9 +997,12 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                   const codes = partCodeMap[String(p.id)];
                   const isSelected = selectedIds.has(p.id);
                   const isEnquirableMob = p.stock <= 0 || !p.price || p.price === 0;
-                  const handleMobClick = selectMode ? () => toggleSelect(p.id) : (p.stock <= 0 ? undefined : () => addToCart(p));
+                  // Zero stock still needs to reach a customer quote (special-order /
+                  // backorder parts) — tapping adds it either way; "Select" mode + the
+                  // bulk "Ask Supplier →" bar below is the separate path for that.
+                  const handleMobClick = selectMode ? () => toggleSelect(p.id) : () => addToCart(p);
                   return (
-                    <div key={p.id} onClick={handleMobClick} style={{ display: "flex", gap: 10, padding: "10px 12px", borderBottom: "1px solid var(--border)", background: isSelected ? "rgba(96,165,250,.1)" : inCart ? "rgba(255,122,46,.08)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)", borderLeft: isSelected ? "3px solid var(--blue)" : inCart ? "3px solid var(--accent)" : "3px solid transparent", opacity: selectMode ? 1 : (p.stock <= 0 ? 0.5 : 1), cursor: selectMode ? "pointer" : (p.stock <= 0 ? "not-allowed" : "pointer") }}>
+                    <div key={p.id} onClick={handleMobClick} style={{ display: "flex", gap: 10, padding: "10px 12px", borderBottom: "1px solid var(--border)", background: isSelected ? "rgba(96,165,250,.1)" : inCart ? "rgba(255,122,46,.08)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)", borderLeft: isSelected ? "3px solid var(--blue)" : inCart ? "3px solid var(--accent)" : "3px solid transparent", opacity: selectMode ? 1 : (p.stock <= 0 ? 0.7 : 1), cursor: "pointer" }}>
                       {selectMode && (
                         <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.id)} onClick={e => e.stopPropagation()}
@@ -1022,6 +1025,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                           <span style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 800, fontSize: 17, color: "var(--accent)" }}>{sym}{(p.price || 0).toFixed(2)}</span>
                           <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 7px", borderRadius: 6, background: p.stock > 0 ? "rgba(52,211,153,.15)" : "rgba(248,113,113,.15)", color: p.stock > 0 ? "var(--green)" : "var(--red)", border: `1px solid ${p.stock > 0 ? "rgba(52,211,153,.3)" : "rgba(248,113,113,.3)"}` }}>{p.stock || 0}</span>
                           {inCart && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>+{inCart.qty} in cart</span>}
+                          {!inCart && p.stock <= 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)" }}>tap to add to quote anyway</span>}
                           {selectMode && isEnquirableMob && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--blue)" }}>📤</span>}
                         </div>
                       </div>
@@ -1361,16 +1365,22 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                               style={{ background: "var(--accent)", border: "none", color: "#fff", borderRadius: 8, padding: "6px 10px", fontWeight: 800, fontSize: 14, cursor: "pointer", minWidth: 42 }}>
                               +{inCart.qty}
                             </button>
-                          ) : p.stock <= 0 ? (
-                            <button onClick={() => setAskPart(p)} title="Ask supplier for stock & price"
-                              style={{ background: "rgba(96,165,250,.12)", border: "1px solid rgba(96,165,250,.35)", color: "var(--blue)", borderRadius: 8, padding: "6px 10px", fontWeight: 700, fontSize: 14, cursor: "pointer", minWidth: 42 }}>
-                              📤
-                            </button>
                           ) : (
-                            <button onClick={() => addToCart(p)}
-                              style={{ background: "var(--surface2)", border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 8, padding: "6px 10px", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>
-                              +
-                            </button>
+                            // Zero stock still needs to reach a customer quote (special-order /
+                            // backorder parts) — "+" adds it to the quote either way, "📤" is
+                            // just the separate action to ask a supplier about it.
+                            <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                              <button onClick={() => addToCart(p)} title={p.stock <= 0 ? "Add to quote (no stock on hand)" : "Add to cart"}
+                                style={{ background: p.stock <= 0 ? "rgba(248,113,113,.08)" : "var(--surface2)", border: `1px solid ${p.stock <= 0 ? "rgba(248,113,113,.35)" : "var(--accent)"}`, color: p.stock <= 0 ? "var(--red)" : "var(--accent)", borderRadius: 8, padding: "6px 10px", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>
+                                +
+                              </button>
+                              {p.stock <= 0 && (
+                                <button onClick={() => setAskPart(p)} title="Ask supplier for stock & price"
+                                  style={{ background: "rgba(96,165,250,.12)", border: "1px solid rgba(96,165,250,.35)", color: "var(--blue)", borderRadius: 8, padding: "6px 8px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                                  📤
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -1427,8 +1437,13 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
           {loadErr && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 3 }}>{loadErr}</div>}
         </div>
 
-        {/* Cart items */}
-        <div style={{ flex: 1, overflowY: "auto", background: "var(--surface)" }}>
+        {/* Cart items — minHeight:0 is required here: without it, a flex:1
+            child in a column flex container defaults to min-height:auto and
+            won't shrink below its own content's height, so instead of
+            scrolling internally it can end up clipped to a single row by the
+            panel's overflow:hidden with the rest of the items invisible and
+            no obvious scrollbar. */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "var(--surface)" }}>
           {cart.length === 0 ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text3)", flexDirection: "column", gap: 8 }}>
               <div style={{ fontSize: 36, opacity: .3 }}>🛒</div>
@@ -1493,17 +1508,21 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
           )}
         </div>
 
-        {/* ── Bottom: Totals + Payment ── */}
-        <div style={{ background: "var(--surface2)", borderTop: "2px solid var(--border)", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {/* ── Bottom: Totals + Payment — kept as compact as the numbers allow so
+            the cart list above (flex:1) keeps most of the panel's height; this
+            block used to run ~450px tall (32px TOTAL text, 15px-tall buttons,
+            generous gaps everywhere) and squeezed a multi-item cart down to
+            showing just one row before you had to scroll to find the rest. ── */}
+        <div style={{ background: "var(--surface2)", borderTop: "2px solid var(--border)", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
 
           {/* Subtotal + Discount */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
               <span style={{ color: "var(--text3)" }}>Subtotal</span>
               <span style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 700 }}>{sym}{subtotal.toFixed(2)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 13, color: "var(--text3)" }}>Discount</span>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>Discount</span>
               {discLocked ? (
                 <button className="btn btn-xs btn-ghost" style={{ fontSize: 11, borderColor: "rgba(255,154,92,.3)", color: "var(--accent)" }} onClick={() => setShowPin(true)}>🔒 Manager PIN</button>
               ) : (
@@ -1511,55 +1530,55 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                   <input className="inp" type="number" min={0} step="0.01" value={discount || ""}
                     onChange={e => setDiscount(+e.target.value || 0)}
                     placeholder="0.00" autoFocus
-                    style={{ width: 72, textAlign: "right", padding: "3px 6px", fontSize: 14, color: "var(--green)", fontWeight: 800 }} />
+                    style={{ width: 72, textAlign: "right", padding: "3px 6px", fontSize: 13, color: "var(--green)", fontWeight: 800 }} />
                   <button className="btn btn-xs btn-ghost" title="Lock" onClick={() => { setDiscount(0); setDiscLocked(true); }}>🔒</button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* TOTAL — big and bold */}
-          <div style={{ background: "var(--surface)", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "2px solid var(--border)" }}>
-            <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: ".02em" }}>TOTAL</span>
-            <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 32, fontWeight: 900, color: "var(--accent)", letterSpacing: "-.01em" }}>
+          {/* TOTAL */}
+          <div style={{ background: "var(--surface)", borderRadius: 9, padding: "6px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "2px solid var(--border)" }}>
+            <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: ".02em" }}>TOTAL</span>
+            <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 22, fontWeight: 900, color: "var(--accent)", letterSpacing: "-.01em" }}>
               {sym}{total.toFixed(2)}
             </span>
           </div>
 
           {/* Split payment */}
           <div>
-            <div style={S.label}>Payment</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ ...S.label, marginBottom: 3 }}>Payment</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {splits.map((sp, i) => (
                 <div key={i} style={{ display: "flex", gap: 5, alignItems: "center" }}>
                   <select value={sp.method} onChange={e => setSplitMethod(i, e.target.value)}
-                    style={{ flex: "0 0 110px", background: "var(--surface)", border: "1.5px solid var(--border)", color: "var(--text)", borderRadius: 8, padding: "8px 8px", fontSize: 13, cursor: "pointer" }}>
+                    style={{ flex: "0 0 100px", background: "var(--surface)", border: "1.5px solid var(--border)", color: "var(--text)", borderRadius: 8, padding: "5px 6px", fontSize: 12, cursor: "pointer" }}>
                     {PAY_OPTS.map(([m,,lbl]) => <option key={m} value={m}>{lbl}</option>)}
                   </select>
                   <input className="inp" type="number" min={0} step="0.01" value={sp.amount}
                     onChange={e => setSplitAmount(i, e.target.value)}
                     placeholder={i === 0 && splits.length === 1 ? total.toFixed(2) : "0.00"}
-                    style={{ flex: 1, textAlign: "right", fontSize: 18, fontWeight: 800, padding: "8px 10px" }} />
+                    style={{ flex: 1, textAlign: "right", fontSize: 15, fontWeight: 800, padding: "5px 8px" }} />
                   {splits.length > 1 && (
                     <button onClick={() => removeSplit(i)}
-                      style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text3)", cursor: "pointer", padding: "6px 9px", fontSize: 14, flexShrink: 0 }}>✕</button>
+                      style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text3)", cursor: "pointer", padding: "4px 8px", fontSize: 13, flexShrink: 0 }}>✕</button>
                   )}
                 </div>
               ))}
               <button onClick={addSplit}
-                style={{ background: "none", border: "1.5px dashed var(--border2)", borderRadius: 8, color: "var(--blue)", cursor: "pointer", padding: "7px 0", fontSize: 13, fontWeight: 600, width: "100%", textAlign: "center" }}>
+                style={{ background: "none", border: "1.5px dashed var(--border2)", borderRadius: 8, color: "var(--blue)", cursor: "pointer", padding: "4px 0", fontSize: 12, fontWeight: 600, width: "100%", textAlign: "center" }}>
                 + Add payment method
               </button>
               {remaining > 0 && splitTotal > 0 && (
-                <div style={{ padding: "8px 12px", background: "rgba(248,113,113,.12)", border: "1px solid rgba(248,113,113,.25)", borderRadius: 8, display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--red)" }}>Still unpaid</span>
-                  <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 20, fontWeight: 900, color: "var(--red)" }}>{sym}{remaining.toFixed(2)}</span>
+                <div style={{ padding: "5px 10px", background: "rgba(248,113,113,.12)", border: "1px solid rgba(248,113,113,.25)", borderRadius: 8, display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--red)" }}>Still unpaid</span>
+                  <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 16, fontWeight: 900, color: "var(--red)" }}>{sym}{remaining.toFixed(2)}</span>
                 </div>
               )}
               {change > 0 && (
-                <div style={{ padding: "8px 12px", background: "rgba(52,211,153,.12)", border: "1px solid rgba(52,211,153,.25)", borderRadius: 8, display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--green)" }}>Change</span>
-                  <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 20, fontWeight: 900, color: "var(--green)" }}>{sym}{change.toFixed(2)}</span>
+                <div style={{ padding: "5px 10px", background: "rgba(52,211,153,.12)", border: "1px solid rgba(52,211,153,.25)", borderRadius: 8, display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--green)" }}>Change</span>
+                  <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 16, fontWeight: 900, color: "var(--green)" }}>{sym}{change.toFixed(2)}</span>
                 </div>
               )}
             </div>
@@ -1567,17 +1586,17 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
           {/* Complete Sale */}
           <button onClick={completeSale} disabled={saving || cart.length === 0}
-            style={{ padding: "15px 0", borderRadius: 10, border: "none", background: cart.length === 0 ? "var(--border)" : "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", fontSize: 16, fontWeight: 900, cursor: cart.length === 0 ? "not-allowed" : "pointer", letterSpacing: ".02em", boxShadow: cart.length > 0 ? "0 4px 16px rgba(34,197,94,.35)" : "none", transition: "all .15s" }}>
+            style={{ padding: "10px 0", borderRadius: 10, border: "none", background: cart.length === 0 ? "var(--border)" : "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", fontSize: 15, fontWeight: 900, cursor: cart.length === 0 ? "not-allowed" : "pointer", letterSpacing: ".02em", boxShadow: cart.length > 0 ? "0 4px 16px rgba(34,197,94,.35)" : "none", transition: "all .15s" }}>
             {saving ? "⏳  Processing…" : "✅  Complete Sale"}
           </button>
 
           {/* Save Quote + Clear */}
           <div style={{ display: "flex", gap: 6 }}>
-            <button className="btn btn-ghost" style={{ flex: 1, fontSize: 12, padding: "8px 0", borderColor: "rgba(96,165,250,.4)", color: "var(--blue)" }}
+            <button className="btn btn-ghost" style={{ flex: 1, fontSize: 12, padding: "6px 0", borderColor: "rgba(96,165,250,.4)", color: "var(--blue)" }}
               onClick={saveQuote} disabled={saving || cart.length === 0}>
               📋 {quoteId ? "Update Quote" : "Save as Quote"}
             </button>
-            <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: 13, color: "var(--text3)" }}
+            <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: 13, color: "var(--text3)" }}
               title="Clear cart" onClick={clearAll}>🗑</button>
           </div>
         </div>

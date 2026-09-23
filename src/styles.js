@@ -165,7 +165,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 }
 .velg-banner{position:relative;background:linear-gradient(135deg,#1c2230 0%,#2e1d15 60%,#4a2712 100%);padding:34px 36px 28px;border-radius:14px;overflow:hidden}
 .velg-banner::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 1px,transparent 1px 5px);pointer-events:none}
-.velg-row{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.velg-row{position:relative;display:flex;align-items:flex-start;justify-content:center;gap:16px;flex-wrap:wrap}
 .velg-brand{display:flex;align-items:center;gap:18px}
 .velg-wordmark{font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:36px;color:#F2F1ED;letter-spacing:.2px;line-height:1.1}
 .velg-wordmark .velg-vel{font-weight:700;color:#e85d04}

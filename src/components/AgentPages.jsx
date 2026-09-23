@@ -3,7 +3,7 @@ import { uploadToStorage } from "../lib/api.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { makeId, waLink } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
-import { Overlay, MHead, FL, FG, ImgLightbox, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, uploadRenewalOutput, uploadAttachment, IcWhatsApp } from "./shared.jsx";
+import { Overlay, MHead, FL, FG, ImgLightbox, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, uploadRenewalOutput, uploadAttachment, IcWhatsApp, IcTrash } from "./shared.jsx";
 
 // current_expiry (the expiry the renewal was submitted against) + renewal_years
 // gives the date the NEW disc granted by a completed renewal actually expires —
@@ -566,7 +566,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                   <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle}/>
                   {onDelete&&(
                     <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
-                      title="Delete" style={actionBtnStyle("danger")}>🗑️</button>
+                      title="Delete" style={actionBtnStyle("danger")}><IcTrash size={15}/></button>
                   )}
                 </div>
               </div>
@@ -667,7 +667,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                         <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle}/>
                         {onDelete&&(
                           <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
-                            title="Delete" style={actionBtnStyle("danger")}>🗑️</button>
+                            title="Delete" style={actionBtnStyle("danger")}><IcTrash size={15}/></button>
                         )}
                       </div>
                     </td>

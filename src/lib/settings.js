@@ -15,6 +15,10 @@ let _settings = {
   // replaces it: [{id, province, name, phone}, ...]. A workshop whose province
   // matches uses this instead of the global fallback.
   licence_renewal_agents: [],
+  // Where the Licence Agent forwards a renewal's documents once collected —
+  // the actual licensing office/department, distinct from the recruitment
+  // contact above (that one's for "want to become an agent" enquiries).
+  licence_office_name: "", licence_office_phone: "",
   pos_manager_pin: "", worker_shared_secret: "",
 };
 

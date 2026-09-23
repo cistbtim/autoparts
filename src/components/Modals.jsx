@@ -1697,6 +1697,21 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
               </div>
             </FG>
           </div>
+          <div className="card" style={{padding:22,marginBottom:20}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:18}}>🏢 Office Contact</h3>
+            <FG cols="1fr 1fr">
+              <div>
+                <FL label="Name"/>
+                <input className="inp" value={f.licence_office_name||""} onChange={e=>s("licence_office_name",e.target.value)} placeholder="e.g. Licensing Dept"/>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Where the agent forwards a renewal's documents once they're all collected, to actually get it processed.</div>
+              </div>
+              <div>
+                <FL label="WhatsApp"/>
+                <input className="inp" value={f.licence_office_phone||""} onChange={e=>s("licence_office_phone",e.target.value)} placeholder="27821234567 (no + or spaces)"/>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Powers the "📤 Send to Office" button on the agent's renewal queue.</div>
+              </div>
+            </FG>
+          </div>
           <div className="card" style={{padding:22}}>
             <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🗺️ Country / Province Renewal Agents</h3>
             <div style={{fontSize:11,color:"var(--text3)",marginBottom:14}}>A workshop in a matching country (and province, if set) uses this agent for real renewal requests. Leave Province blank for a country-wide default. A workshop with no match here sees no agent — just the recruitment contact above.</div>

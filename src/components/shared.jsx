@@ -84,6 +84,10 @@ export const MHead = ({title,sub,actions,onClose}) => (
 );
 
 export const FL = ({label,req}) => <span className="lbl">{label}{req&&" *"}</span>;
+
+export const IcWhatsApp = ({size=16}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+);
 export const FG = ({children,cols="1fr 1fr"}) => <div className="fg-grid" style={{display:"grid",gridTemplateColumns:cols,gap:12,marginBottom:14}}>{children}</div>;
 export const FD = ({children}) => <div style={{marginBottom:14}}>{children}</div>;
 
@@ -630,6 +634,13 @@ export function LicenceDocsChecklist({documents={}, onChange, pathPrefix="licenc
                   : <span style={{fontSize:12,color:"var(--text3)"}}>— not attached</span>
               ) : (
                 <>
+                  <label style={{width:36,height:32,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+                    background:"var(--surface2)",border:"1px dashed var(--border)",borderRadius:7,cursor:uploading?"wait":"pointer",fontSize:15}}
+                    title="Take a photo">
+                    <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+                      onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f) uploadOne(key,f); }} disabled={!!uploading}/>
+                    📷
+                  </label>
                   <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"6px 10px",
                     background:"var(--surface2)",border:"1px dashed var(--border)",borderRadius:7,cursor:uploading?"wait":"pointer",fontSize:12,fontWeight:600,color:url?"var(--green)":"var(--text3)"}}>
                     <input type="file" accept="image/*,application/pdf" style={{display:"none"}}
@@ -666,6 +677,55 @@ export function LicenceDocsChecklist({documents={}, onChange, pathPrefix="licenc
   );
 }
 
+// Uploads a receipt/new-licence-disc photo for a renewal and patches it via
+// onUpdate — pulled out of RenewalDocsModal so a quick shortcut button
+// elsewhere (the agent's queue table) can do the same upload+scan without
+// opening the full modal. Returns {url, patch, scanNote} — scanNote is only
+// set for field==="new_licence" (the disc's own barcode is the authoritative
+// source for its expiry, read automatically instead of trusting today's
+// renewal_years guess for next year's cycle).
+export async function uploadRenewalOutput(renewal, field, file, onUpdate) {
+  const isPdf = file.type==="application/pdf";
+  let blob, mimeType, ext, dataUrl;
+  if(isPdf){ blob=file; mimeType="application/pdf"; ext="pdf"; }
+  else {
+    dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
+    blob = await new Promise((res,rej)=>{
+      const img=new Image();
+      img.onload=()=>{
+        const MAX=1600; const canvas=document.createElement("canvas");
+        let w=img.width,h=img.height;
+        if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+        canvas.width=w;canvas.height=h;
+        canvas.getContext("2d").drawImage(img,0,0,w,h);
+        canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
+      };
+      img.onerror=rej; img.src=dataUrl;
+    });
+    mimeType="image/jpeg"; ext="jpg";
+  }
+  const path=`licence_renewals/${(renewal.vehicle_reg||"doc").replace(/[\s/\\]/g,"_").toUpperCase()}_${field}_${Date.now()}.${ext}`;
+  const url = await uploadToStorage("cars_parts",path,blob,mimeType);
+  const patch = {[`${field}_url`]:url};
+  let scanNote = "";
+  if(field==="new_licence" && dataUrl){
+    try{
+      const raw = await decodePDF417fromImage(dataUrl);
+      const parsed = parseLicenceDisc(raw);
+      if(parsed.expiry_date){
+        patch.new_licence_expiry = parsed.expiry_date;
+        scanNote = `✅ New expiry read from disc: ${parsed.expiry_date}`;
+      } else {
+        scanNote = "⚠️ Uploaded, but couldn't read an expiry date off the disc — you can type it in manually below.";
+      }
+    }catch{
+      scanNote = "⚠️ Uploaded, but the barcode wasn't readable — you can type the new expiry in manually below.";
+    }
+  }
+  await onUpdate(renewal.id,patch);
+  return { url, patch, scanNote };
+}
+
 // Shared by the workshop's own renewal list and the licence agent's queue —
 // which side is editable depends on who's looking: the workshop can add/update
 // the customer's supporting documents (their own submission), while only the
@@ -680,46 +740,8 @@ export function RenewalDocsModal({renewal, workshopName, viewer="agent", onUpdat
     setUploading(field);
     setScanNote("");
     try{
-      const isPdf = file.type==="application/pdf";
-      let blob, mimeType, ext, dataUrl;
-      if(isPdf){ blob=file; mimeType="application/pdf"; ext="pdf"; }
-      else {
-        dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
-        blob = await new Promise((res,rej)=>{
-          const img=new Image();
-          img.onload=()=>{
-            const MAX=1600; const canvas=document.createElement("canvas");
-            let w=img.width,h=img.height;
-            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
-            canvas.width=w;canvas.height=h;
-            canvas.getContext("2d").drawImage(img,0,0,w,h);
-            canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
-          };
-          img.onerror=rej; img.src=dataUrl;
-        });
-        mimeType="image/jpeg"; ext="jpg";
-      }
-      const path=`licence_renewals/${(renewal.vehicle_reg||"doc").replace(/[\s/\\]/g,"_").toUpperCase()}_${field}_${Date.now()}.${ext}`;
-      const url = await uploadToStorage("cars_parts",path,blob,mimeType);
-      const patch = {[`${field}_url`]:url};
-      // The new disc's own barcode is the authoritative source for its expiry —
-      // scan it automatically so next year's renewal doesn't rely on today's
-      // renewal_years guess. PDF-only uploads (no photo) just skip this.
-      if(field==="new_licence" && dataUrl){
-        try{
-          const raw = await decodePDF417fromImage(dataUrl);
-          const parsed = parseLicenceDisc(raw);
-          if(parsed.expiry_date){
-            patch.new_licence_expiry = parsed.expiry_date;
-            setScanNote(`✅ New expiry read from disc: ${parsed.expiry_date}`);
-          } else {
-            setScanNote("⚠️ Uploaded, but couldn't read an expiry date off the disc — you can type it in manually below.");
-          }
-        }catch{
-          setScanNote("⚠️ Uploaded, but the barcode wasn't readable — you can type the new expiry in manually below.");
-        }
-      }
-      await onUpdate(renewal.id,patch);
+      const {scanNote:note} = await uploadRenewalOutput(renewal, field, file, onUpdate);
+      if(note) setScanNote(note);
     }catch(err){ alert("Upload failed: "+err.message); }
     setUploading("");
   };

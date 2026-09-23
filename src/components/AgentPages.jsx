@@ -3,7 +3,7 @@ import { uploadToStorage } from "../lib/api.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { makeId, waLink } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
-import { Overlay, MHead, FL, FG, ImgLightbox, LicenceDocsChecklist, RenewalDocsModal } from "./shared.jsx";
+import { Overlay, MHead, FL, FG, ImgLightbox, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, uploadRenewalOutput, IcWhatsApp } from "./shared.jsx";
 
 // current_expiry (the expiry the renewal was submitted against) + renewal_years
 // gives the date the NEW disc granted by a completed renewal actually expires —
@@ -22,11 +22,68 @@ const daysUntil = (dateStr) => {
   return Math.round((d - today) / 86400000);
 };
 
+// WhatsApp can't attach files, only text — so the office gets a direct link
+// to each document that's actually been uploaded (Supabase storage URLs are
+// already public), instead of a generic "documents are ready" message they'd
+// have to chase up separately.
+const buildOfficeMessage = (r) => {
+  const docLines = LICENCE_DOC_TYPES.map(({key,label})=>{
+    const d = r.documents?.[key];
+    const url = typeof d==="string" ? d : d?.url;
+    return url ? `${label}: ${url}` : null;
+  }).filter(Boolean);
+  return [
+    "🪪 Licence Renewal — please process",
+    "",
+    `Reg: ${r.vehicle_reg||"—"}  ${r.vehicle_make||""} ${r.vehicle_model||""}`.trim(),
+    r.vin ? `VIN: ${r.vin}` : null,
+    r.engine_no ? `Engine: ${r.engine_no}` : null,
+    r.current_expiry ? `Current Expiry: ${r.current_expiry}` : null,
+    `Renew for: ${r.renewal_years||1} year${+r.renewal_years>1?"s":""}`,
+    "",
+    `Owner: ${r.owner_name||"—"}`,
+    r.owner_id ? `ID / Passport: ${r.owner_id}` : null,
+    r.owner_phone ? `Phone: ${r.owner_phone}` : null,
+    "",
+    docLines.length ? "📎 Documents:" : "⚠️ No documents attached yet",
+    ...docLines,
+  ].filter(Boolean).join("\n");
+};
+
 // ═══════════════════════════════════════════════════════════════
 // LICENCE RENEWAL AGENT — cross-workshop renewal queue
 // ═══════════════════════════════════════════════════════════════
-export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh}) {
+export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeContact={}}) {
   const [filter, setFilter] = useState("all");
+  // Which renewal+field is mid-upload, as `${id}:${field}` — lets the quick
+  // shortcut buttons in the table (receipt / new licence disc) show a spinner
+  // on just that one button instead of blocking the whole row or page.
+  const [quickUploading, setQuickUploading] = useState("");
+  const quickUpload = async (r, field, file) => {
+    setQuickUploading(`${r.id}:${field}`);
+    try{ await uploadRenewalOutput(r, field, file, onUpdate); }
+    catch(err){ alert("Upload failed: "+err.message); }
+    setQuickUploading("");
+  };
+  // One clean button per document, not a cluster of tiny icons — leaving
+  // `capture` off means tapping this on a phone shows the OS's own native
+  // sheet (Camera / Photos / Files), which already IS the camera+gallery
+  // choice, just done by the platform instead of us building two buttons.
+  const QuickUploadBtn = ({r, field, label, icon, doneUrl}) => {
+    const busy = quickUploading===`${r.id}:${field}`;
+    return (
+      <label title={doneUrl?`${label} — uploaded, tap to replace`:`Upload ${label}`}
+        style={{display:"flex",alignItems:"center",gap:5,padding:"6px 11px",borderRadius:20,
+          cursor:quickUploading?"wait":"pointer",fontSize:12,fontWeight:600,flexShrink:0,
+          background:doneUrl?"var(--green)":"var(--surface2)",color:doneUrl?"#fff":"var(--text2)",
+          border:doneUrl?"none":"1px solid var(--border)",transition:"background .15s"}}>
+        <input type="file" accept="image/*,application/pdf" style={{display:"none"}}
+          onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f) quickUpload(r,field,f); }} disabled={!!quickUploading}/>
+        <span style={{fontSize:14}}>{busy?"⏳":doneUrl?"✅":icon}</span>
+        {label}
+      </label>
+    );
+  };
   // Holds the id, not the row itself — RenewalDocsModal calls onUpdate on
   // every change (upload, expiry date, etc.), which patches `renewals` up in
   // App.jsx. If this held a snapshot of the row instead, the modal would keep
@@ -120,6 +177,9 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                 <span style={{color:r.daysLeft<=7?"var(--red)":"var(--yellow)",fontWeight:600}}>
                   Expires {r.nextExpiry} ({r.daysLeft===0?"today":`${r.daysLeft}d left`})
                 </span>
+                <span style={{fontSize:11,color:r.notified_at?"var(--green)":"var(--text3)",marginLeft:"auto"}}>
+                  {r.notified_at?`✅ Notified ${new Date(r.notified_at).toLocaleString()}`:"Not notified yet"}
+                </span>
                 {(()=>{
                   // Same routing as the main table's contact button: a
                   // workshop-submitted renewal notifies the WORKSHOP (they're
@@ -131,18 +191,33 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     ? `Hi, a reminder that ${r.owner_name||"your customer"}'s vehicle ${r.vehicle_reg}'s licence disc is due for renewal again on ${r.nextExpiry}. Please arrange the next renewal with them.`
                     : `Hi ${r.owner_name||""}, a reminder that your vehicle ${r.vehicle_reg}'s licence disc is due for renewal on ${r.nextExpiry}. Please contact us to arrange your next renewal.`;
                   return (
-                    <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer" style={{marginLeft:"auto"}}>
+                    <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer"
+                      onClick={()=>onUpdate?.(r.id,{notified_at:new Date().toISOString()})}>
                       <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲 Notify</button>
                     </a>
                   );
                 })()}
                 {onSave&&(
-                  <button onClick={()=>setWalkInPrefill({
-                    vehicle_reg:r.vehicle_reg, vehicle_make:r.vehicle_make, vehicle_model:r.vehicle_model,
-                    vin:r.vin, engine_no:r.engine_no, current_expiry:r.nextExpiry,
-                    owner_name:r.owner_name, owner_phone:r.owner_phone, owner_id:r.owner_id||"",
-                    workshop_id:r.workshop_id||null,
-                  })}
+                  <button onClick={()=>{
+                    // Carry the customer's documents on file forward too — no
+                    // need to re-upload a passport/ID that hasn't changed.
+                    // LicenceDocsChecklist already flags any that have since
+                    // expired (⚠️ Expired next to that row) so it's obvious
+                    // which ones need a fresh copy before this goes through.
+                    // The one exception: "Licence Disc / Vehicle Doc" itself —
+                    // carrying the OLD supporting document forward would show
+                    // it as expired (it's literally the disc that just ran
+                    // out), when the disc actually on file now is the NEW one
+                    // that was uploaded to finish that previous renewal.
+                    const carriedDocs = {...(r.documents||{})};
+                    if(r.new_licence_url) carriedDocs.licence_disc = {url:r.new_licence_url, expiry:r.new_licence_expiry||""};
+                    setWalkInPrefill({
+                      vehicle_reg:r.vehicle_reg, vehicle_make:r.vehicle_make, vehicle_model:r.vehicle_model,
+                      vin:r.vin, engine_no:r.engine_no, current_expiry:r.nextExpiry,
+                      owner_name:r.owner_name, owner_phone:r.owner_phone, owner_id:r.owner_id||"",
+                      workshop_id:r.workshop_id||null, documents:carriedDocs,
+                    });
+                  }}
                     style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"var(--surface3)",color:"var(--text2)",cursor:"pointer"}}>🔄 Start Renewal</button>
                 )}
               </div>
@@ -170,7 +245,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
             ))}
           </div>
           <table className="tbl desk-table" style={{width:"100%"}}>
-            <thead><tr><th>Workshop</th><th style={{textAlign:"right"}}>Total</th><th style={{textAlign:"right"}}>Pending</th><th style={{textAlign:"right"}}>Submitted</th><th style={{textAlign:"right"}}>Completed</th><th style={{textAlign:"right"}}>Cancelled</th></tr></thead>
+            <thead><tr><th>Company / Walk-in</th><th style={{textAlign:"right"}}>Total</th><th style={{textAlign:"right"}}>Pending</th><th style={{textAlign:"right"}}>Submitted</th><th style={{textAlign:"right"}}>Completed</th><th style={{textAlign:"right"}}>Cancelled</th></tr></thead>
             <tbody>
               {workshopRows.map(w=>(
                 <tr key={w.label}>
@@ -221,7 +296,14 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:"🚶 Walk-in")}</div>
                   </div>
                   <div style={{textAlign:"right",flexShrink:0}}>
-                    <div style={{fontSize:12,fontWeight:600,color:isExpired?"var(--red)":"var(--green)"}}>{r.current_expiry||"—"} {isExpired?"⚠️":""}</div>
+                    {r.new_licence_expiry ? (
+                      <>
+                        <div style={{fontSize:10,color:"var(--text3)",textDecoration:"line-through"}}>{r.current_expiry||"—"}</div>
+                        <div style={{fontSize:13,fontWeight:700,color:"var(--green)"}}>🆕 {r.new_licence_expiry}</div>
+                      </>
+                    ) : (
+                      <div style={{fontSize:12,fontWeight:600,color:isExpired?"var(--red)":"var(--green)"}}>{r.current_expiry||"—"} {isExpired?"⚠️":""}</div>
+                    )}
                     <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{r.renewal_years||1} yr renewal</div>
                   </div>
                 </div>
@@ -254,9 +336,20 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
                       background:(r.receipt_url||r.new_licence_url)?"var(--green)":"var(--surface2)",
                       color:(r.receipt_url||r.new_licence_url)?"#fff":"var(--text3)"}}>📎 Docs</button>
+                  <QuickUploadBtn r={r} field="receipt" label="Receipt" icon="🧾" doneUrl={r.receipt_url}/>
+                  <QuickUploadBtn r={r} field="new_licence" label="New Disc" icon="🪪" doneUrl={r.new_licence_url}/>
                   {waPhone&&(
                     <a href={waLink(waPhone,waMsg)} target="_blank" rel="noopener noreferrer">
                       <button style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲 WhatsApp</button>
+                    </a>
+                  )}
+                  {officeContact?.phone&&(
+                    <a href={waLink(officeContact.phone,buildOfficeMessage(r))} target="_blank" rel="noopener noreferrer"
+                      onClick={()=>onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString()})}>
+                      <button style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
+                        background:r.sent_to_office_at?"var(--green)":"#128C7E",color:"#fff"}}>
+                        {r.sent_to_office_at?"✅ Sent to Office":"📤 Send to Office"}
+                      </button>
                     </a>
                   )}
                   {onDelete&&(
@@ -272,10 +365,10 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
           <table className="tbl" style={{width:"100%",minWidth:820}}>
             <thead>
               <tr>
-                <th>Workshop</th>
+                <th>Company / Walk-in</th>
                 <th>Vehicle</th>
                 <th>Owner</th>
-                <th>Expiry</th>
+                <th>Expiry (new, once applied)</th>
                 <th>Years</th>
                 <th>Status</th>
                 <th>Commission</th>
@@ -298,9 +391,16 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                       {r.owner_phone&&<div style={{fontSize:11,color:"var(--text3)"}}>{r.owner_phone}</div>}
                     </td>
                     <td>
-                      <span style={{fontSize:12,fontWeight:600,color:isExpired?"var(--red)":"var(--green)"}}>
-                        {r.current_expiry||"—"} {isExpired?"⚠️":""}
-                      </span>
+                      {r.new_licence_expiry ? (
+                        <>
+                          <div style={{fontSize:10,color:"var(--text3)",textDecoration:"line-through"}}>{r.current_expiry||"—"}</div>
+                          <div style={{fontSize:13,fontWeight:700,color:"var(--green)"}}>🆕 {r.new_licence_expiry}</div>
+                        </>
+                      ) : (
+                        <span style={{fontSize:12,fontWeight:600,color:isExpired?"var(--red)":"var(--green)"}}>
+                          {r.current_expiry||"—"} {isExpired?"⚠️":""}
+                        </span>
+                      )}
                     </td>
                     <td style={{textAlign:"center"}}>{r.renewal_years||1}</td>
                     <td>
@@ -339,6 +439,8 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                           style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
                             background:(r.receipt_url||r.new_licence_url)?"var(--green)":"var(--surface2)",
                             color:(r.receipt_url||r.new_licence_url)?"#fff":"var(--text3)"}}>📎 Docs</button>
+                        <QuickUploadBtn r={r} field="receipt" label="Receipt" icon="🧾" doneUrl={r.receipt_url}/>
+                        <QuickUploadBtn r={r} field="new_licence" label="New Disc" icon="🪪" doneUrl={r.new_licence_url}/>
                         {(()=>{
                           // Workshop-submitted → message the WORKSHOP (they're the one who has to
                           // action it); a walk-in (no workshop_id) → message the customer directly.
@@ -349,10 +451,22 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                             : "";
                           return (
                             <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer">
-                              <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲</button>
+                              <button style={{fontSize:12,padding:"5px 12px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
+                                display:"flex",alignItems:"center",gap:6,background:"#25D366",color:"#fff"}}>
+                                <IcWhatsApp size={14}/> WhatsApp
+                              </button>
                             </a>
                           );
                         })()}
+                        {officeContact?.phone&&(
+                          <a href={waLink(officeContact.phone,buildOfficeMessage(r))} target="_blank" rel="noopener noreferrer"
+                            onClick={()=>onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString()})} title={r.sent_to_office_at?`Sent to office ${new Date(r.sent_to_office_at).toLocaleString()}`:"Send to office"}>
+                            <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,cursor:"pointer",fontWeight:600,
+                              background:r.sent_to_office_at?"var(--green)":"#128C7E",color:"#fff"}}>
+                              {r.sent_to_office_at?"✅🏢":"📤🏢"}
+                            </button>
+                          </a>
+                        )}
                         {onDelete&&(
                           <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
                             style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"var(--red)",color:"#fff",cursor:"pointer"}}>🗑️</button>
@@ -452,6 +566,22 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose}) {
   return (
     <Overlay onClose={onClose}>
       <MHead title={isEdit?"✏️ Edit Renewal":"🚶 Walk-in Renewal"} onClose={onClose}/>
+
+      {(() => {
+        // Documents carried forward from a previous renewal (via "🔄 Start
+        // Renewal" on the due-soon list) may themselves have expired since
+        // then — call it out up front rather than relying on the small
+        // per-row ⚠️ badge further down the form to be noticed.
+        const expiredDocs = Object.entries(f.documents||{})
+          .filter(([,d])=>{ const exp = typeof d==="string"?"":(d?.expiry||""); return exp && new Date(exp)<new Date(); })
+          .map(([k])=>LICENCE_DOC_TYPES.find(t=>t.key===k)?.label||k);
+        if(!expiredDocs.length) return null;
+        return (
+          <div style={{background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.3)",borderRadius:8,padding:"9px 13px",marginBottom:14,fontSize:12,color:"var(--red)"}}>
+            ⚠️ On file but expired: <strong>{expiredDocs.join(", ")}</strong> — ask for an updated copy before continuing.
+          </div>
+        );
+      })()}
 
       <div style={{display:"flex",gap:8,marginBottom:14}}>
         <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:scanLoading?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>

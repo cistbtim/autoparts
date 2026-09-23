@@ -138,6 +138,18 @@ const buildAndUploadOfficePdf = async (r) => {
   return uploadToStorage("cars_parts", path, blob, "application/pdf");
 };
 
+// A small green tick badge in the corner of an action button — shows
+// "done"/"sent" without swapping out the button's own icon/color, so it
+// still reads as the same button (Office, New Disc, Receipt, …) at a glance.
+function TickBadge({show}) {
+  if(!show) return null;
+  return (
+    <span style={{position:"absolute",top:-4,right:-4,width:14,height:14,borderRadius:"50%",
+      background:"var(--green)",color:"#fff",fontSize:9,fontWeight:900,display:"flex",
+      alignItems:"center",justifyContent:"center",border:"2px solid var(--surface)",lineHeight:1}}>✓</span>
+  );
+}
+
 // The "Office" button on a renewal row — sends a WhatsApp with links to every
 // uploaded document to whichever processing agent/office it's forwarded to.
 // One agent configured → a plain send button, same as before. More than one
@@ -170,15 +182,6 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
     setBusy(false);
   };
 
-  // Once sent, keep the same light-blue agent button rather than replacing
-  // it with a plain green tick — just add a small green checkmark badge in
-  // the corner so it still reads as "the office button" at a glance.
-  const badge = r.sent_to_office_at && (
-    <span style={{position:"absolute",top:-4,right:-4,width:14,height:14,borderRadius:"50%",
-      background:"var(--green)",color:"#fff",fontSize:9,fontWeight:900,display:"flex",
-      alignItems:"center",justifyContent:"center",border:"2px solid var(--surface)",lineHeight:1}}>✓</span>
-  );
-
   if(agents.length===1){
     const a = agents[0];
     return (
@@ -188,7 +191,7 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
           style={{...actionBtnStyle("office"), cursor:busy?"wait":"pointer"}}>
           {busy?"⏳":"🧑‍💼"}
         </button>
-        {badge}
+        <TickBadge show={!!r.sent_to_office_at && !busy}/>
       </div>
     );
   }
@@ -200,7 +203,7 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
         <option value="" disabled>{busy?"⏳":"🧑‍💼"}</option>
         {agents.map(a=><option key={a.id} value={a.id}>{label(a)}</option>)}
       </select>
-      {badge}
+      <TickBadge show={!!r.sent_to_office_at && !busy}/>
     </div>
   );
 }
@@ -287,12 +290,15 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   const QuickUploadBtn = ({r, field, label, icon, doneUrl}) => {
     const busy = quickUploading===`${r.id}:${field}`;
     return (
-      <label title={doneUrl?`${label} — uploaded, tap to replace`:`Upload ${label}`}
-        style={{...actionBtnStyle(doneUrl?"done":"default"), cursor:quickUploading?"wait":"pointer"}}>
-        <input type="file" accept="image/*,application/pdf" style={{display:"none"}}
-          onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f) quickUpload(r,field,f); }} disabled={!!quickUploading}/>
-        <span>{busy?"⏳":doneUrl?"✅":icon}</span>
-      </label>
+      <div style={{position:"relative",display:"inline-flex"}}>
+        <label title={doneUrl?`${label} — uploaded, tap to replace`:`Upload ${label}`}
+          style={{...actionBtnStyle("default"), cursor:quickUploading?"wait":"pointer"}}>
+          <input type="file" accept="image/*,application/pdf" style={{display:"none"}}
+            onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f) quickUpload(r,field,f); }} disabled={!!quickUploading}/>
+          <span>{busy?"⏳":icon}</span>
+        </label>
+        <TickBadge show={!!doneUrl && !busy}/>
+      </div>
     );
   };
   // Holds the id, not the row itself — RenewalDocsModal calls onUpdate on

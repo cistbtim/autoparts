@@ -9,7 +9,7 @@ import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, det
 import { CAR_MAKES, getCategories, DEFAULT_CATS, getBrands, getRecentLocations, OC } from "../lib/constants.js";
 import { COUNTRIES, getProvinces } from "../lib/geoData.js";
 import { CSS } from "../styles.js";
-import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
+import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AttachmentPicker } from "../components/shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 import { decodeVin } from "./Workshop.jsx";
 
@@ -5757,6 +5757,7 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],rfqQuote
     lines.push("  " + (!supplierPartNo?"4":"3") + ". Lead time");
     lines.push("");
     lines.push("You can submit your quote via the link we will send (no login needed).");
+    if(attachmentUrl) lines.push("", `Attachment: ${attachmentUrl}`);
     lines.push("");
     lines.push("Thank you,");
     lines.push("VelGenius Team");
@@ -5766,6 +5767,7 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],rfqQuote
   const defaultQty=part?.min_stock||part?.reorder_qty||1;
   const [selectedSuppliers,setSelectedSuppliers]=useState([]);
   const [qty,setQty]=useState(()=>defaultQty);
+  const [attachmentUrl,setAttachmentUrl]=useState("");
   const [msg,setMsg]=useState(()=>buildMsg("Supplier", defaultQty, ""));
   const [showPhoto,setShowPhoto]=useState(false);
   const [supplierSearch,setSupplierSearch]=useState("");
@@ -5800,7 +5802,13 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],rfqQuote
     const items=selectedSuppliers.map(s=>{
       const ps = linkedPsMap[s.id];
       const suppPartNo = ps?.supplier_part_no || "";
-      const personalMsg = buildMsg(s.name, qty, suppPartNo);
+      // With one supplier selected, the editable preview textarea IS the
+      // message — send exactly what's typed there (including any manual
+      // edits) rather than silently discarding them and regenerating fresh
+      // text. With several selected, per-supplier personalisation (their own
+      // part number, etc.) matters more than one shared edited draft, so
+      // those still get freshly built text.
+      const personalMsg = selectedSuppliers.length===1 ? msg : buildMsg(s.name, qty, suppPartNo);
       return {
         part_id:part.id, part_name:part.name, part_sku:part.sku,
         part_oe_number:part.oe_number||"", part_make:part.make||"",
@@ -6048,6 +6056,10 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],rfqQuote
         <div><FL label="Quantity Required *"/><input className="inp" type="number" value={qty} onChange={e=>setQty(e.target.value)}/></div>
       </FG>
       <FD><FL label="Message (auto-generated, editable)"/><textarea className="inp" value={msg} onChange={e=>setMsg(e.target.value)} style={{minHeight:160,fontSize:13,fontFamily:"DM Mono,monospace"}}/></FD>
+      <FD>
+        <AttachmentPicker url={attachmentUrl} onChange={setAttachmentUrl} pathPrefix={`inquiries/${part.sku||part.id}`}
+          label="Attach a spec sheet or price list (optional)"/>
+      </FD>
       <div style={{display:"flex",gap:10}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel}</button>
         <button className="btn btn-primary" style={{flex:2}} onClick={handleSend} disabled={selectedSuppliers.length===0||!qty}>📩 {t.sendToSelected} ({selectedSuppliers.length})</button>
@@ -9579,7 +9591,7 @@ export function PartRequestModal({currentBranch, user, onClose, onSave, t={}}) {
   const MAKES=Object.keys(CAR_MAKES);
   const branchCode=(currentBranch?.name||"BR").substring(0,4).toUpperCase().replace(/\s/g,"");
   const tempSku=`TMP-${branchCode}-${Math.random().toString(36).substring(2,6).toUpperCase()}`;
-  const [f,setF]=useState({name:"",category:CATS[0]||"Engine",oe_number:"",vehicle_make:"",vehicle_model:"",year_from:"",year_to:"",notes:"",image_url:"",suggested_price:""});
+  const [f,setF]=useState({name:"",category:CATS[0]||"Engine",oe_number:"",vehicle_make:"",vehicle_model:"",year_from:"",year_to:"",notes:"",image_url:"",attachment_url:"",suggested_price:""});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
@@ -9588,29 +9600,33 @@ export function PartRequestModal({currentBranch, user, onClose, onSave, t={}}) {
     if(!f.name.trim())return setErr("Part name / description is required");
     if(!f.oe_number.trim())return setErr("OE number is required — this helps head office identify the part");
     setSaving(true);setErr("");
-    try{
-      await api.insert("part_requests",{
-        branch_id:currentBranch?.id,
-        requested_by:user.id,
-        name:f.name.trim(),
-        description:f.name.trim(),
-        category:f.category,
-        oe_number:f.oe_number.trim(),
-        vehicle_make:f.vehicle_make||null,
-        vehicle_model:f.vehicle_model||null,
-        year_from:f.year_from?parseInt(f.year_from):null,
-        year_to:f.year_to?parseInt(f.year_to):null,
-        notes:f.notes||null,
-        image_url:f.image_url||null,
-        suggested_price:f.suggested_price?parseFloat(f.suggested_price):null,
-        temp_sku:tempSku,
-        status:"pending",
-      });
-      onSave();
-    }catch(e){
-      setErr("Submit failed: "+e.message);
-      setSaving(false);
+    const payload={
+      branch_id:currentBranch?.id,
+      requested_by:user.id,
+      name:f.name.trim(),
+      description:f.name.trim(),
+      category:f.category,
+      oe_number:f.oe_number.trim(),
+      vehicle_make:f.vehicle_make||null,
+      vehicle_model:f.vehicle_model||null,
+      year_from:f.year_from?parseInt(f.year_from):null,
+      year_to:f.year_to?parseInt(f.year_to):null,
+      notes:f.notes||null,
+      image_url:f.image_url||null,
+      attachment_url:f.attachment_url||null,
+      suggested_price:f.suggested_price?parseFloat(f.suggested_price):null,
+      temp_sku:tempSku,
+      status:"pending",
+    };
+    let res=await api.insert("part_requests",payload).catch(e=>({message:e.message}));
+    if(res&&!Array.isArray(res)&&res.message){
+      // attachment_url column may not exist yet (SQL migration not run) —
+      // retry without it so the request itself still saves either way.
+      const {attachment_url,...fallback}=payload;
+      res=await api.insert("part_requests",fallback).catch(e=>({message:e.message}));
+      if(res&&!Array.isArray(res)&&res.message){ setErr("Submit failed: "+res.message); setSaving(false); return; }
     }
+    onSave();
   };
 
   return (
@@ -9645,6 +9661,10 @@ export function PartRequestModal({currentBranch, user, onClose, onSave, t={}}) {
           <input className="inp" value={f.image_url} onChange={e=>s("image_url",e.target.value)} placeholder="Paste Google Drive or image link"/>
         </FD>
         {f.image_url&&<div style={{textAlign:"center"}}><img src={toImgUrl(f.image_url)} alt="" referrerPolicy="no-referrer" style={{maxHeight:120,maxWidth:"100%",borderRadius:8,border:"1px solid var(--border)"}} onError={e=>e.target.style.display="none"}/></div>}
+        <FD>
+          <AttachmentPicker url={f.attachment_url} onChange={u=>s("attachment_url",u)} pathPrefix={`part_requests/${tempSku}`}
+            label="Attach a spec sheet, price list or photo (Excel / PDF / image, optional)"/>
+        </FD>
         <FD><FL label="Your Suggested Selling Price"/><input className="inp" type="number" value={f.suggested_price} onChange={e=>s("suggested_price",e.target.value)} placeholder="0.00"/></FD>
         <FD><FL label="Notes for Head Office"/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} rows={2} placeholder="Where you sourced this, urgency, any other info…"/></FD>
         <div style={{fontSize:11,color:"var(--text3)"}}>Temp reference: <code style={{fontFamily:"monospace"}}>{tempSku}</code></div>
@@ -9712,6 +9732,7 @@ export function PartRequestCard({r,isAdmin,branches=[],parts=[],user,suppliers=[
             {r.vehicle_make&&<span style={{color:"var(--text3)"}}>{r.vehicle_make}{r.vehicle_model?" — "+r.vehicle_model:""}{r.year_from?" ("+r.year_from+(r.year_to?"–"+r.year_to:"+")+")":""}</span>}
           </div>
           {r.notes&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>"{r.notes}"</div>}
+          {r.attachment_url&&<a href={r.attachment_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"var(--blue)",marginTop:4,display:"inline-block"}}>📎 View attachment</a>}
           {r.suggested_price&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Suggested price: <strong>{C()}{(+r.suggested_price).toFixed(2)}</strong></div>}
           {r.status==="approved"&&linked&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:7,fontSize:12,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <span style={{flex:1}}>✅ Linked to <strong>{linked.sku}</strong> — {linked.name}</span>

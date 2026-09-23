@@ -555,6 +555,66 @@ export function AdGridCard({ad}) {
   );
 }
 
+// Generic file attachment upload — Excel/PDF/image, no login-doc-specific
+// logic. Images get the same lightweight resize used everywhere else in the
+// app; Excel/PDF (and anything else) upload as-is since compressing those
+// isn't meaningful. Returns the public URL to drop straight into a WhatsApp
+// or email message.
+export async function uploadAttachment(file, pathPrefix) {
+  const isImage = file.type.startsWith("image/");
+  let blob = file, mimeType = file.type || "application/octet-stream", ext = (file.name.split(".").pop() || "bin").toLowerCase();
+  if (isImage) {
+    const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = ev => res(ev.target.result); fr.onerror = rej; fr.readAsDataURL(file); });
+    blob = await new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1600; const canvas = document.createElement("canvas");
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) { const r = Math.min(MAX / w, MAX / h); w = Math.round(w * r); h = Math.round(h * r); }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        canvas.toBlob(b => b ? res(b) : rej(new Error("toBlob failed")), "image/jpeg", 0.85);
+      };
+      img.onerror = rej; img.src = dataUrl;
+    });
+    mimeType = "image/jpeg"; ext = "jpg";
+  }
+  const safeName = (file.name || "file").replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
+  const path = `${pathPrefix}/${Date.now()}_${safeName}.${ext}`;
+  return uploadToStorage("cars_parts", path, blob, mimeType);
+}
+
+// Small reusable "attach a file" control — used anywhere a request/inquiry
+// can carry an optional Excel/PDF/photo attachment (part requests, supplier
+// inquiries). Shows the upload button, or a link + replace button once
+// something's attached.
+export function AttachmentPicker({url, onChange, pathPrefix, label = "Attach File (Excel / PDF / Photo)"}) {
+  const [uploading, setUploading] = useState(false);
+  const handleFile = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try { onChange(await uploadAttachment(file, pathPrefix)); }
+    catch (err) { alert("Upload failed: " + err.message); }
+    setUploading(false);
+  };
+  return (
+    <div>
+      <FL label={label} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <label style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px",
+          background: "var(--surface2)", border: "1px dashed var(--border)", borderRadius: 8, cursor: uploading ? "wait" : "pointer",
+          fontSize: 12, fontWeight: 600, color: url ? "var(--green)" : "var(--text3)" }}>
+          <input type="file" accept=".xlsx,.xls,.csv,.pdf,image/*" style={{ display: "none" }}
+            onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handleFile(f); }} disabled={uploading} />
+          {uploading ? "⏳ Uploading…" : url ? "✅ Attached — tap to replace" : "📎 Choose Excel, PDF or photo"}
+        </label>
+        {url && <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "var(--blue)", flexShrink: 0 }}>View</a>}
+        {url && <button type="button" onClick={() => onChange("")} style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>✕</button>}
+      </div>
+    </div>
+  );
+}
+
 // ── Licence renewal supporting documents ──────────────────────────────────
 // A single renewal (especially a walk-in or a foreign national) can need
 // several distinct supporting documents, not just one generic "document" —

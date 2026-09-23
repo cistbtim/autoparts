@@ -3,6 +3,7 @@ import { getSettings, C } from "../lib/settings.js";
 import { api } from "../lib/api.js";
 import { makeId, toImgUrl, waLink, mailLink } from "../lib/helpers.js";
 import { getCategories } from "../lib/constants.js";
+import { AttachmentPicker } from "./shared.jsx";
 
 // ── Abbreviation expansion ────────────────────────────────────────────────────
 const ABBREVS = [
@@ -462,6 +463,8 @@ function AskMultiOverlay({ parts, suppliers, partSuppliers, selectedIds, sym, se
   const otherSuppliers  = suppliers.filter(s => s.name && !linkedSupIds.has(String(s.id)));
 
   const [chosenSupId, setChosenSupId] = useState(linkedSuppliers[0]?.id ? String(linkedSuppliers[0].id) : "");
+  const [customMsg, setCustomMsg] = useState("");
+  const [attachment, setAttachment] = useState("");
 
   const buildMsg = (supId) => {
     const sup = suppliers.find(s => String(s.id) === String(supId));
@@ -482,7 +485,10 @@ function AskMultiOverlay({ parts, suppliers, partSuppliers, selectedIds, sym, se
   };
 
   const chosenSup = suppliers.find(s => String(s.id) === String(chosenSupId));
-  const msg = buildMsg(chosenSupId);
+  // Re-seed the editable draft whenever the supplier (or part list) changes —
+  // after that, typing in the preview box below wins over the auto-generated text.
+  useEffect(() => { setCustomMsg(buildMsg(chosenSupId)); }, [chosenSupId, selectedIds.size]); // eslint-disable-line react-hooks/exhaustive-deps
+  const finalMsg = customMsg + (attachment ? `\n\nAttachment: ${attachment}` : "");
 
   return (
     <div className="overlay" onClick={onClose}
@@ -532,19 +538,22 @@ function AskMultiOverlay({ parts, suppliers, partSuppliers, selectedIds, sym, se
 
         {chosenSupId && chosenSup && (
           <>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Message Preview</div>
-            <textarea readOnly value={msg}
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Message (edit as needed)</div>
+            <textarea value={customMsg} onChange={e => setCustomMsg(e.target.value)}
               style={{ width: "100%", height: 140, resize: "vertical", fontFamily: "DM Mono,monospace", fontSize: 11, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface2)", padding: "8px 10px", color: "var(--text2)", boxSizing: "border-box" }} />
+            <div style={{ marginTop: 10 }}>
+              <AttachmentPicker url={attachment} onChange={setAttachment} pathPrefix="ask_supplier_bulk" label="Attach a spec sheet or price list (optional)" />
+            </div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               {chosenSup.phone && (
-                <a href={waLink(chosenSup.phone, msg)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                <a href={waLink(chosenSup.phone, finalMsg)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
                   <button style={{ background: "#25D366", border: "none", color: "#fff", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
                     💬 WhatsApp
                   </button>
                 </a>
               )}
               {chosenSup.email && (
-                <a href={mailLink(chosenSup.email, `Stock & price check — ${selectedParts.length} part${selectedParts.length !== 1 ? "s" : ""}`, msg)} style={{ textDecoration: "none" }}>
+                <a href={mailLink(chosenSup.email, `Stock & price check — ${selectedParts.length} part${selectedParts.length !== 1 ? "s" : ""}`, finalMsg)} style={{ textDecoration: "none" }}>
                   <button style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text2)", borderRadius: 8, padding: "9px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                     ✉ Email
                   </button>
@@ -562,7 +571,7 @@ function AskMultiOverlay({ parts, suppliers, partSuppliers, selectedIds, sym, se
 }
 
 // ── Main POS page ─────────────────────────────────────────────────────────────
-export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, onRefresh, branchId = null, suppliers = [], partSuppliers = [], settings = {} }) {
+export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, onRefresh, branchId = null, suppliers = [], partSuppliers = [], settings = {}, onRequestNewPart = null }) {
   const sym = C();
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = async () => {
@@ -598,6 +607,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
   // Ask-supplier modal
   const [askPart, setAskPart] = useState(null);
+  const [askNote, setAskNote] = useState(""); // free-text extra note, appended to the generated message
+  const [askAttachment, setAskAttachment] = useState(""); // optional Excel/PDF/photo URL, linked in the message
 
   // Multi-select enquiry
   const [selectMode, setSelectMode] = useState(false);
@@ -871,6 +882,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       const vehicle = [askPart.make, askPart.model, askPart.year_range].filter(Boolean).join(" ");
       if (vehicle) lines.push(`Vehicle: ${vehicle}`);
       if (askPart.oe_number) lines.push(`OE: ${askPart.oe_number}`);
+      if (askNote.trim()) lines.push("", askNote.trim());
+      if (askAttachment) lines.push("", `Attachment: ${askAttachment}`);
       lines.push("", `Thank you,\n${shopName}`);
       return lines.join("\n");
     };
@@ -893,6 +906,10 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <textarea value={askNote} onChange={e => setAskNote(e.target.value)}
+                placeholder="Anything extra to tell the supplier? (optional)" rows={2}
+                style={{ width: "100%", padding: "7px 10px", fontSize: 12, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text)", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }} />
+              <AttachmentPicker url={askAttachment} onChange={setAskAttachment} pathPrefix={`ask_supplier/${askPart.sku || askPart.id}`} label="Attach a spec sheet or price list (optional)" />
               {linked.map(ps => {
                 const s = ps.sup;
                 const m = msg(ps);
@@ -988,6 +1005,12 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 8, color: "var(--text3)" }}>
                 <div style={{ fontSize: 36, opacity: .4 }}>🔍</div>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>No parts match</div>
+                {onRequestNewPart && (
+                  <button onClick={onRequestNewPart}
+                    style={{ marginTop: 6, background: "var(--surface2)", border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 8, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    📬 Request New Part
+                  </button>
+                )}
               </div>
             ) : (
               <>
@@ -1287,6 +1310,12 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 8, color: "var(--text3)" }}>
               <div style={{ fontSize: 40, opacity: .4 }}>🔍</div>
               <div style={{ fontSize: 14, fontWeight: 600 }}>No parts match</div>
+              {onRequestNewPart && (
+                <button onClick={onRequestNewPart}
+                  style={{ marginTop: 6, background: "var(--surface2)", border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 8, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                  📬 Request New Part
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -1375,7 +1404,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                                 +
                               </button>
                               {p.stock <= 0 && (
-                                <button onClick={() => setAskPart(p)} title="Ask supplier for stock & price"
+                                <button onClick={() => { setAskPart(p); setAskNote(""); setAskAttachment(""); }} title="Ask supplier for stock & price"
                                   style={{ background: "rgba(96,165,250,.12)", border: "1px solid rgba(96,165,250,.35)", color: "var(--blue)", borderRadius: 8, padding: "6px 8px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
                                   📤
                                 </button>

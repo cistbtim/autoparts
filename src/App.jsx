@@ -6562,7 +6562,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             partSuppliers={partSuppliers}
             settings={settings}
             onSave={savePosInvoice}
-            onRefresh={()=>refreshTables("parts","customers","vehicles","part_fitments","part_suppliers")}/>
+            onRefresh={()=>refreshTables("parts","customers","vehicles","part_fitments","part_suppliers")}
+            onRequestNewPart={()=>openM("partRequest")}/>
         )}
 
         {/* ── MY SALES STATEMENT (branch_salesman) ── */}

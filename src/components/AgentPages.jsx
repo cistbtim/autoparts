@@ -63,7 +63,7 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
   if(agents.length===1){
     const a = agents[0];
     return (
-      <a href={waLink(a.whatsapp,buildOfficeMessage(r))} target="_blank" rel="noopener noreferrer"
+      <a href={waLink(a.whatsapp,buildOfficeMessage(r))} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}
         onClick={()=>onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString(), sent_to_office_agent:label(a)})}
         title={sentTitle||`Send to ${label(a)}`}>
         <button style={actionBtnStyle(r.sent_to_office_at?"done":"brand")}>
@@ -291,7 +291,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     ? `Hi, a reminder that ${r.owner_name||"your customer"}'s vehicle ${r.vehicle_reg}'s licence disc is due for renewal again on ${r.nextExpiry}. Please arrange the next renewal with them.`
                     : `Hi ${r.owner_name||""}, a reminder that your vehicle ${r.vehicle_reg}'s licence disc is due for renewal on ${r.nextExpiry}. Please contact us to arrange your next renewal.`;
                   return (
-                    <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer"
+                    <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}
                       onClick={()=>onUpdate?.(r.id,{notified_at:new Date().toISOString()})}>
                       <button style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer"}}>📲 Notify</button>
                     </a>
@@ -436,7 +436,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                   <QuickUploadBtn r={r} field="receipt" label="Receipt" icon="🧾" doneUrl={r.receipt_url}/>
                   <QuickUploadBtn r={r} field="new_licence" label="New Disc" icon="🪪" doneUrl={r.new_licence_url}/>
                   {waPhone&&(
-                    <a href={waLink(waPhone,waMsg)} target="_blank" rel="noopener noreferrer">
+                    <a href={waLink(waPhone,waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
                       <button style={actionBtnStyle("brand")}><IcWhatsApp size={13}/> WhatsApp</button>
                     </a>
                   )}
@@ -536,7 +536,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                             ? `Hi, regarding the licence renewal for ${r.vehicle_reg||"the vehicle"} (${r.owner_name||"customer"}) — status: ${r.status||"pending"}.`
                             : "";
                           return (
-                            <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer">
+                            <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
                               <button style={actionBtnStyle("brand")}><IcWhatsApp size={13}/> WhatsApp</button>
                             </a>
                           );

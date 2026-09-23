@@ -167,7 +167,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .velg-banner::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 1px,transparent 1px 5px);pointer-events:none}
 .velg-row{position:relative;display:flex;align-items:flex-start;justify-content:center;gap:16px;flex-wrap:wrap}
 .velg-brand{display:flex;align-items:center;gap:18px}
-.velg-wordmark{font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:36px;color:#F2F1ED;letter-spacing:.2px;line-height:1.1}
+.velg-wordmark{font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:54px;color:#F2F1ED;letter-spacing:.2px;line-height:1.1}
 .velg-wordmark .velg-vel{font-weight:700;color:#e85d04}
 .velg-tagline{margin-top:4px;font-size:15px;color:#8A9099;font-weight:500;font-family:'DM Sans',sans-serif}
 .velg-scanline{position:relative;height:2px;background:linear-gradient(90deg,transparent,#262B32 8%,#262B32 92%,transparent);margin-top:16px;overflow:hidden}
@@ -177,7 +177,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .velg-banner{padding:18px 16px 14px;border-radius:12px}
   .velg-brand{gap:11px;transform:translateX(-10px)}
   .velg-mark{width:34px;height:34px}
-  .velg-wordmark{font-size:22px}
+  .velg-wordmark{font-size:33px}
   .velg-tagline{font-size:11px;margin-top:2px}
   .velg-scanline{margin-top:10px}
 }

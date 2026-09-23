@@ -176,7 +176,7 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
       <button onClick={()=>sendTo(a)} disabled={busy}
         title={busy?"Building PDF…":(sentTitle||`Send to ${label(a)}`)}
         style={{...actionBtnStyle(r.sent_to_office_at?"done":"office"), cursor:busy?"wait":"pointer"}}>
-        {busy?"⏳":r.sent_to_office_at?"✅":"🏛️"}
+        {busy?"⏳":r.sent_to_office_at?"✅":"🧑‍💼"}
       </button>
     );
   }
@@ -184,7 +184,7 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
     <select value="" disabled={busy} title={busy?"Building PDF…":(sentTitle||"Choose an agent/office to send to")}
       onChange={e=>{ const a=agents.find(x=>x.id===e.target.value); e.target.value=""; if(a) sendTo(a); }}
       style={{...actionBtnStyle(r.sent_to_office_at?"done":"office"), appearance:"none", textAlign:"center", padding:0, cursor:busy?"wait":"pointer"}}>
-      <option value="" disabled>{busy?"⏳":r.sent_to_office_at?"✅":"🏛️"}</option>
+      <option value="" disabled>{busy?"⏳":r.sent_to_office_at?"✅":"🧑‍💼"}</option>
       {agents.map(a=><option key={a.id} value={a.id}>{label(a)}</option>)}
     </select>
   );
@@ -260,8 +260,8 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   const actionBtnStyle = (variant) => {
     if(variant==="done")   return {...ACTION_BTN,background:"rgba(52,211,153,.14)",color:"var(--green)",border:"1px solid rgba(52,211,153,.35)"};
     if(variant==="brand")  return {...ACTION_BTN,background:"#25D366",color:"#fff"};
-    if(variant==="office") return {...ACTION_BTN,background:"var(--yellow)",color:"#1c1c1e"};
-    if(variant==="danger") return {...ACTION_BTN,background:"rgba(248,113,113,.12)",color:"var(--red)",border:"1px solid rgba(248,113,113,.35)"};
+    if(variant==="office") return {...ACTION_BTN,background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.35)"};
+    if(variant==="danger") return {...ACTION_BTN,background:"var(--red)",color:"#fff"};
     return {...ACTION_BTN,background:"var(--surface2)",color:"var(--text2)",border:"1px solid var(--border)"};
   };
 

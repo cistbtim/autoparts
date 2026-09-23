@@ -87,10 +87,53 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
   );
 }
 
+// Add / edit / remove the roster of processing agents/offices right from the
+// Licence Agent page itself — no need to go into global Settings for
+// something only this page uses.
+function ManageOfficeAgentsModal({agents=[], onSave, onClose}) {
+  const [list, setList] = useState(agents);
+  const [saving, setSaving] = useState(false);
+  const upd = (i,patch) => setList(p=>{ const arr=[...p]; arr[i]={...arr[i],...patch}; return arr; });
+  const remove = (i) => setList(p=>p.filter((_,idx)=>idx!==i));
+  const add = () => setList(p=>[...p,{id:makeId(),company:"",address:"",name:"",telephone:"",whatsapp:""}]);
+  const save = async () => {
+    setSaving(true);
+    try{ await onSave?.(list); onClose(); }
+    finally{ setSaving(false); }
+  };
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="🏢 Manage Processing Agents / Offices" onClose={onClose}/>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
+        Where you forward a renewal's documents once collected, to actually get the application processed. Add every agent/office you deal with — the "📤 Office" button on each renewal sends a WhatsApp with links to view and print every uploaded document; with more than one here, it lets you pick which one to send to.
+      </div>
+      {list.map((a,i)=>(
+        <div key={a.id||i} style={{border:"1px solid var(--border)",borderRadius:8,padding:"14px 12px 4px",marginBottom:10,position:"relative"}}>
+          <button type="button" className="btn btn-ghost btn-xs" style={{position:"absolute",top:6,right:6,color:"var(--red)"}} onClick={()=>remove(i)}>✕</button>
+          <FG cols="1fr 1fr">
+            <div><FL label="Company"/><input className="inp" value={a.company||""} onChange={e=>upd(i,{company:e.target.value})} placeholder="e.g. ABC Licensing Services"/></div>
+            <div><FL label="Company Address"/><input className="inp" value={a.address||""} onChange={e=>upd(i,{address:e.target.value})} placeholder="Street, city"/></div>
+          </FG>
+          <FG cols="1fr 1fr 1fr">
+            <div><FL label="Contact Name"/><input className="inp" value={a.name||""} onChange={e=>upd(i,{name:e.target.value})} placeholder="e.g. John"/></div>
+            <div><FL label="Telephone"/><input className="inp" value={a.telephone||""} onChange={e=>upd(i,{telephone:e.target.value})} placeholder="Landline (optional)"/></div>
+            <div><FL label="WhatsApp"/><input className="inp" value={a.whatsapp||""} onChange={e=>upd(i,{whatsapp:e.target.value})} placeholder="27821234567 (no + or spaces)"/></div>
+          </FG>
+        </div>
+      ))}
+      <button type="button" className="btn btn-ghost btn-sm" style={{borderStyle:"dashed",marginBottom:16}} onClick={add}>+ Add Agent / Office</button>
+      <div style={{display:"flex",gap:10}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
+      </div>
+    </Overlay>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // LICENCE RENEWAL AGENT — cross-workshop renewal queue
 // ═══════════════════════════════════════════════════════════════
-export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeAgents=[]}) {
+export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeAgents=[], onSaveOfficeAgents}) {
   const [filter, setFilter] = useState("all");
   // Which renewal+field is mid-upload, as `${id}:${field}` — lets the quick
   // shortcut buttons in the table (receipt / new licence disc) show a spinner
@@ -146,6 +189,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   const docsRenewal = docsRenewalId ? renewals.find(r=>r.id===docsRenewalId)||null : null;
   const [walkInPrefill, setWalkInPrefill] = useState(null); // null=closed, {}=blank, {...}=prefilled from a due-soon row
   const [editRenewal, setEditRenewal] = useState(null); // null=closed, {...existing row} = editing it in place
+  const [manageAgentsOpen, setManageAgentsOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dueSoonDays, setDueSoonDays] = useState(()=>{
     try{ return +localStorage.getItem("licence_agent_due_soon_days") || 30; }catch{ return 30; }
@@ -198,9 +242,14 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
               {refreshing?"⏳":"🔄"} Refresh
             </button>
           )}
+          <button className="btn btn-ghost" onClick={()=>setManageAgentsOpen(true)}>🏢 Manage Agents</button>
           {onSave&&<button className="btn btn-primary" onClick={()=>setWalkInPrefill({})}>+ Walk-in Customer</button>}
         </div>
       </div>
+
+      {manageAgentsOpen&&(
+        <ManageOfficeAgentsModal agents={officeAgents} onSave={onSaveOfficeAgents} onClose={()=>setManageAgentsOpen(false)}/>
+      )}
 
       {unpaidComm.length>0&&(
         <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.3)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13}}>

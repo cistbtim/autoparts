@@ -1697,30 +1697,8 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
               </div>
             </FG>
           </div>
-          <div className="card" style={{padding:22,marginBottom:20}}>
-            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🏢 Processing Agents / Offices</h3>
-            <div style={{fontSize:11,color:"var(--text3)",marginBottom:14}}>Where the licence agent forwards a renewal's documents once they're all collected, to actually get the application processed. Add every agent/office you deal with — the "📤 Office" button on the renewal queue sends a WhatsApp with links to view and print every uploaded document; with more than one added here, it lets you pick which one to send to.</div>
-            {(f.licence_processing_agents||[]).map((a,i)=>{
-              const upd = (patch) => { const arr=[...(f.licence_processing_agents||[])]; arr[i]={...arr[i],...patch}; s("licence_processing_agents",arr); };
-              return (
-                <div key={a.id||i} style={{border:"1px solid var(--border)",borderRadius:8,padding:"14px 12px 4px",marginBottom:10,position:"relative"}}>
-                  <button type="button" className="btn btn-ghost btn-xs" style={{position:"absolute",top:6,right:6,color:"var(--red)"}}
-                    onClick={()=>s("licence_processing_agents",(f.licence_processing_agents||[]).filter((_,idx)=>idx!==i))}>✕</button>
-                  <FG cols="1fr 1fr">
-                    <div><FL label="Company"/><input className="inp" value={a.company||""} onChange={e=>upd({company:e.target.value})} placeholder="e.g. ABC Licensing Services"/></div>
-                    <div><FL label="Company Address"/><input className="inp" value={a.address||""} onChange={e=>upd({address:e.target.value})} placeholder="Street, city"/></div>
-                  </FG>
-                  <FG cols="1fr 1fr 1fr">
-                    <div><FL label="Contact Name"/><input className="inp" value={a.name||""} onChange={e=>upd({name:e.target.value})} placeholder="e.g. John"/></div>
-                    <div><FL label="Telephone"/><input className="inp" value={a.telephone||""} onChange={e=>upd({telephone:e.target.value})} placeholder="Landline (optional)"/></div>
-                    <div><FL label="WhatsApp"/><input className="inp" value={a.whatsapp||""} onChange={e=>upd({whatsapp:e.target.value})} placeholder="27821234567 (no + or spaces)"/></div>
-                  </FG>
-                </div>
-              );
-            })}
-            <button type="button" className="btn btn-ghost btn-sm" style={{borderStyle:"dashed"}} onClick={()=>{
-              s("licence_processing_agents",[...(f.licence_processing_agents||[]),{id:makeId(),company:"",address:"",name:"",telephone:"",whatsapp:""}]);
-            }}>+ Add Agent / Office</button>
+          <div className="card" style={{padding:22,marginBottom:20,fontSize:12,color:"var(--text3)"}}>
+            🏢 Processing agents/offices (who a collected renewal gets forwarded to) are now managed from the "🏢 Manage Agents" button on the Licence Agent page itself, not here.
           </div>
           <div className="card" style={{padding:22}}>
             <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🗺️ Country / Province Renewal Agents</h3>

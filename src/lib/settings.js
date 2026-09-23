@@ -16,9 +16,11 @@ let _settings = {
   // matches uses this instead of the global fallback.
   licence_renewal_agents: [],
   // Where the Licence Agent forwards a renewal's documents once collected —
-  // the actual licensing office/department, distinct from the recruitment
-  // contact above (that one's for "want to become an agent" enquiries).
-  licence_office_name: "", licence_office_phone: "",
+  // real processing agents/offices, distinct from the recruitment contact
+  // above (that one's for "want to become an agent" enquiries). A roster, not
+  // a single fixed contact, since the agent may deal with several:
+  // [{id, company, address, name, telephone, whatsapp}, ...]
+  licence_processing_agents: [],
   pos_manager_pin: "", worker_shared_secret: "",
 };
 

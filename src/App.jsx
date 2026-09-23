@@ -6910,7 +6910,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── LICENCE RENEWAL AGENT ── */}
         {tab==="licenceAgentQueue"&&role==="licence_agent"&&(
           <LicenceAgentPage renewals={licenceAgentQueue} workshopInfo={licenceAgentWsNames} onUpdate={updateLicenceAgentRenewal} onSave={saveLicenceAgentRenewal} onDelete={deleteLicenceAgentRenewal} onRefresh={reloadLicenceAgentQueue}
-            officeContact={{name:settings.licence_office_name, phone:settings.licence_office_phone}}/>
+            officeAgents={settings.licence_processing_agents||[]}/>
         )}
 
         {/* ── CAR SALES ── */}

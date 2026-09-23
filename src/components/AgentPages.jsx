@@ -50,10 +50,47 @@ const buildOfficeMessage = (r) => {
   ].filter(Boolean).join("\n");
 };
 
+// The "Office" button on a renewal row — sends a WhatsApp with links to every
+// uploaded document to whichever processing agent/office it's forwarded to.
+// One agent configured → a plain send button, same as before. More than one
+// → a dropdown so the licence agent picks which office this particular
+// application goes to (they don't all handle the same region/vehicle type).
+function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
+  const agents = allAgents.filter(a=>a.whatsapp);
+  if(!agents.length) return null;
+  const label = (a) => a.company||a.name||"Office";
+  const sentTitle = r.sent_to_office_at ? `Sent to ${r.sent_to_office_agent||"office"} ${new Date(r.sent_to_office_at).toLocaleString()}` : null;
+  if(agents.length===1){
+    const a = agents[0];
+    return (
+      <a href={waLink(a.whatsapp,buildOfficeMessage(r))} target="_blank" rel="noopener noreferrer"
+        onClick={()=>onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString(), sent_to_office_agent:label(a)})}
+        title={sentTitle||`Send to ${label(a)}`}>
+        <button style={actionBtnStyle(r.sent_to_office_at?"done":"brand")}>
+          {r.sent_to_office_at?"✅ Sent":"📤"} Office
+        </button>
+      </a>
+    );
+  }
+  return (
+    <select value="" title={sentTitle||"Choose an agent/office to send to"}
+      onChange={e=>{
+        const a = agents.find(x=>x.id===e.target.value); e.target.value="";
+        if(!a) return;
+        if(a.whatsapp) window.open(waLink(a.whatsapp,buildOfficeMessage(r)),"_blank","noopener,noreferrer");
+        onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString(), sent_to_office_agent:label(a)});
+      }}
+      style={{...actionBtnStyle(r.sent_to_office_at?"done":"brand"), appearance:"none", cursor:"pointer"}}>
+      <option value="" disabled>{r.sent_to_office_at?"✅ Sent ▾":"📤 Office ▾"}</option>
+      {agents.map(a=><option key={a.id} value={a.id}>{label(a)}</option>)}
+    </select>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // LICENCE RENEWAL AGENT — cross-workshop renewal queue
 // ═══════════════════════════════════════════════════════════════
-export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeContact={}}) {
+export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeAgents=[]}) {
   const [filter, setFilter] = useState("all");
   // Which renewal+field is mid-upload, as `${id}:${field}` — lets the quick
   // shortcut buttons in the table (receipt / new licence disc) show a spinner
@@ -354,14 +391,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                       <button style={actionBtnStyle("brand")}><IcWhatsApp size={13}/> WhatsApp</button>
                     </a>
                   )}
-                  {officeContact?.phone&&(
-                    <a href={waLink(officeContact.phone,buildOfficeMessage(r))} target="_blank" rel="noopener noreferrer"
-                      onClick={()=>onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString()})}>
-                      <button style={actionBtnStyle(r.sent_to_office_at?"done":"brand")}>
-                        {r.sent_to_office_at?"✅ Sent":"📤"} Office
-                      </button>
-                    </a>
-                  )}
+                  <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle}/>
                   {onDelete&&(
                     <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
                       style={actionBtnStyle("danger")}>🗑️ Delete</button>
@@ -462,14 +492,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                             </a>
                           );
                         })()}
-                        {officeContact?.phone&&(
-                          <a href={waLink(officeContact.phone,buildOfficeMessage(r))} target="_blank" rel="noopener noreferrer"
-                            onClick={()=>onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString()})} title={r.sent_to_office_at?`Sent to office ${new Date(r.sent_to_office_at).toLocaleString()}`:"Send to office"}>
-                            <button style={actionBtnStyle(r.sent_to_office_at?"done":"brand")}>
-                              {r.sent_to_office_at?"✅":"📤"} Office
-                            </button>
-                          </a>
-                        )}
+                        <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle}/>
                         {onDelete&&(
                           <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
                             style={actionBtnStyle("danger")}>🗑️ Delete</button>

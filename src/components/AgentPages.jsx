@@ -67,7 +67,7 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
         onClick={()=>onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString(), sent_to_office_agent:label(a)})}
         title={sentTitle||`Send to ${label(a)}`}>
         <button style={actionBtnStyle(r.sent_to_office_at?"done":"brand")}>
-          {r.sent_to_office_at?"✅ Sent":"📤"} Office
+          {r.sent_to_office_at?"✅":"📤"}
         </button>
       </a>
     );
@@ -80,8 +80,8 @@ function OfficeSendControl({r, agents: allAgents, onUpdate, actionBtnStyle}) {
         if(a.whatsapp) window.open(waLink(a.whatsapp,buildOfficeMessage(r)),"_blank","noopener,noreferrer");
         onUpdate?.(r.id,{sent_to_office_at:new Date().toISOString(), sent_to_office_agent:label(a)});
       }}
-      style={{...actionBtnStyle(r.sent_to_office_at?"done":"brand"), appearance:"none", cursor:"pointer"}}>
-      <option value="" disabled>{r.sent_to_office_at?"✅ Sent ▾":"📤 Office ▾"}</option>
+      style={{...actionBtnStyle(r.sent_to_office_at?"done":"brand"), appearance:"none", textAlign:"center", padding:0, cursor:"pointer"}}>
+      <option value="" disabled>{r.sent_to_office_at?"✅":"📤"}</option>
       {agents.map(a=><option key={a.id} value={a.id}>{label(a)}</option>)}
     </select>
   );
@@ -145,16 +145,15 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
     catch(err){ alert("Upload failed: "+err.message); }
     setQuickUploading("");
   };
-  // One consistent button system for every action on a row (Edit, Docs,
-  // Receipt, New Disc, WhatsApp, Office, Delete) — same size and shape, color
-  // only signals meaning: neutral = plain action, soft green tint = something
-  // is on file, solid brand green = a WhatsApp send, red = destructive. The
-  // previous version had each button a different shape/saturation (pill vs
-  // rect, solid green vs solid red vs solid teal), which is what made the row
-  // look like a pile of mismatched chips instead of one toolbar.
-  const ACTION_BTN = {display:"flex",alignItems:"center",justifyContent:"center",gap:5,
-    padding:"9px 8px",borderRadius:9,fontSize:12,fontWeight:600,cursor:"pointer",
-    border:"1px solid transparent",whiteSpace:"nowrap"};
+  // One consistent icon-only button for every action on a row (Edit, Docs,
+  // Receipt, New Disc, WhatsApp, Office, Delete) — a row of 7 full text+icon
+  // buttons wrapped onto 3 messy lines, so each is now a small fixed-size
+  // square with just its icon; the name shows as a tooltip (title) instead.
+  // Color still signals meaning: neutral = plain action, soft green tint =
+  // something is on file, solid brand green = a WhatsApp send, red = destructive.
+  const ACTION_BTN = {display:"flex",alignItems:"center",justifyContent:"center",
+    width:34,height:34,borderRadius:9,fontSize:15,fontWeight:600,cursor:"pointer",
+    border:"1px solid transparent",flexShrink:0};
   const actionBtnStyle = (variant) => {
     if(variant==="done")   return {...ACTION_BTN,background:"rgba(52,211,153,.14)",color:"var(--green)",border:"1px solid rgba(52,211,153,.35)"};
     if(variant==="brand")  return {...ACTION_BTN,background:"#25D366",color:"#fff"};
@@ -174,7 +173,6 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
         <input type="file" accept="image/*,application/pdf" style={{display:"none"}}
           onChange={e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f) quickUpload(r,field,f); }} disabled={!!quickUploading}/>
         <span>{busy?"⏳":doneUrl?"✅":icon}</span>
-        {label}
       </label>
     );
   };
@@ -427,23 +425,23 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                   </button>
                   <span style={{fontSize:11,color:"var(--text3)",marginLeft:"auto"}}>{(r.submitted_at||"").slice(0,10)}</span>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                   {onUpdate&&(
-                    <button onClick={()=>setEditRenewal(r)} style={actionBtnStyle("default")}>✏️ Edit</button>
+                    <button onClick={()=>setEditRenewal(r)} title="Edit" style={actionBtnStyle("default")}>✏️</button>
                   )}
-                  <button onClick={()=>setDocsRenewalId(r.id)}
-                    style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎 Docs</button>
+                  <button onClick={()=>setDocsRenewalId(r.id)} title="Documents"
+                    style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎</button>
                   <QuickUploadBtn r={r} field="receipt" label="Receipt" icon="🧾" doneUrl={r.receipt_url}/>
                   <QuickUploadBtn r={r} field="new_licence" label="New Disc" icon="🪪" doneUrl={r.new_licence_url}/>
                   {waPhone&&(
                     <a href={waLink(waPhone,waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
-                      <button style={actionBtnStyle("brand")}><IcWhatsApp size={13}/> WhatsApp</button>
+                      <button title="WhatsApp" style={actionBtnStyle("brand")}><IcWhatsApp size={15}/></button>
                     </a>
                   )}
                   <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle}/>
                   {onDelete&&(
                     <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
-                      style={actionBtnStyle("danger")}>🗑️ Delete</button>
+                      title="Delete" style={actionBtnStyle("danger")}>🗑️</button>
                   )}
                 </div>
               </div>
@@ -521,10 +519,10 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     <td>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                         {onUpdate&&(
-                          <button onClick={()=>setEditRenewal(r)} style={actionBtnStyle("default")}>✏️ Edit</button>
+                          <button onClick={()=>setEditRenewal(r)} title="Edit" style={actionBtnStyle("default")}>✏️</button>
                         )}
-                        <button onClick={()=>setDocsRenewalId(r.id)}
-                          style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎 Docs</button>
+                        <button onClick={()=>setDocsRenewalId(r.id)} title="Documents"
+                          style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎</button>
                         <QuickUploadBtn r={r} field="receipt" label="Receipt" icon="🧾" doneUrl={r.receipt_url}/>
                         <QuickUploadBtn r={r} field="new_licence" label="New Disc" icon="🪪" doneUrl={r.new_licence_url}/>
                         {(()=>{
@@ -537,14 +535,14 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                             : "";
                           return (
                             <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
-                              <button style={actionBtnStyle("brand")}><IcWhatsApp size={13}/> WhatsApp</button>
+                              <button title="WhatsApp" style={actionBtnStyle("brand")}><IcWhatsApp size={15}/></button>
                             </a>
                           );
                         })()}
                         <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle}/>
                         {onDelete&&(
                           <button onClick={()=>{ if(window.confirm(`Delete renewal for ${r.vehicle_reg||"this vehicle"}?`)) onDelete(r.id); }}
-                            style={actionBtnStyle("danger")}>🗑️ Delete</button>
+                            title="Delete" style={actionBtnStyle("danger")}>🗑️</button>
                         )}
                       </div>
                     </td>

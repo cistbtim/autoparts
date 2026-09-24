@@ -95,6 +95,7 @@ export const T = {
     appTagline: "One platform for every vehicle need",
     loginSpareShop: "Spare Shop", loginSpareShopSub: "Sign in to your spare parts shop", branchNameField: "Branch Name", branchNamePlaceholder: "e.g. North Branch",
     loginShop: "Catalogue", loginWorkshop: "Workshop", loginScrapyard: "Scrapyard", loginStaff: "Staff",
+    loginSupplier: "Supplier", loginLicAgent: "Licence Agent", loginCarSales: "Car Sales",
     signIn: "Sign In", registerNew: "Register", registerWorkshop: "Register Workshop", registerScrapyard: "Register Scrapyard",
     noAccount: "No account?", createAccount: "Create Account",
     startFreeTrial: "Start Free Trial", alreadyAccount: "Already have an account?",

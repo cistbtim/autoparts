@@ -47,7 +47,7 @@ export const ShopLogo = ({settings, size="md", style={}}) => {
   return null;
 };
 
-export const VelGeniusBanner = () => (
+export const VelGeniusBanner = ({t}={}) => (
   <div className="velg-banner">
     <div className="velg-row">
       <div className="velg-brand">
@@ -59,7 +59,7 @@ export const VelGeniusBanner = () => (
         </svg>
         <div>
           <div className="velg-wordmark"><span className="velg-vel">VEL</span>GENIUS</div>
-          <div className="velg-tagline">One platform for every vehicle need</div>
+          <div className="velg-tagline">{t?.appTagline||"One platform for every vehicle need"}</div>
         </div>
       </div>
     </div>

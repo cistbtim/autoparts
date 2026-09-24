@@ -92,6 +92,7 @@ export const T = {
     rptTotalPurchased: "Total Purchased", rptAvgInvoice: "Avg Invoice",
     rptNoSuppliers: "No purchase invoice data yet",
     // Login page tabs & buttons
+    appTagline: "One platform for every vehicle need",
     loginSpareShop: "Spare Shop", loginSpareShopSub: "Sign in to your spare parts shop", branchNameField: "Branch Name", branchNamePlaceholder: "e.g. North Branch",
     loginShop: "Catalogue", loginWorkshop: "Workshop", loginScrapyard: "Scrapyard", loginStaff: "Staff",
     signIn: "Sign In", registerNew: "Register", registerWorkshop: "Register Workshop", registerScrapyard: "Register Scrapyard",

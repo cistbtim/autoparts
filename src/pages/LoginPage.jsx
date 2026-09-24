@@ -434,7 +434,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
         {/* Logo card */}
         <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:16,padding:"16px",textAlign:"center",marginBottom:14,boxShadow:"var(--shadow-lg)"}}>
-          <VelGeniusBanner/>
+          <VelGeniusBanner t={t}/>
           {langs.length>1&&(
             <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:10,marginTop:14}}>
               {langs.map(l=>(

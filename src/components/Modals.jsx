@@ -1202,8 +1202,10 @@ function TranslationEditor({row, onClose, onSaved}) {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
+  const [untranslatedOnly, setUntranslatedOnly] = useState(false);
   const allKeys = Object.keys(T.en);
   const filtered = allKeys.filter(k => {
+    if (untranslatedOnly && (isEn ? !!vals[k] : (vals[k] && vals[k] !== T.en[k]))) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return k.toLowerCase().includes(q) || (T.en[k] || "").toLowerCase().includes(q) || (vals[k] || "").toLowerCase().includes(q);
@@ -1276,6 +1278,10 @@ function TranslationEditor({row, onClose, onSaved}) {
           <div style={{padding:"12px 22px",flexShrink:0,borderBottom:"1px solid var(--border)"}}>
             <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
               placeholder="Search keys or text…" style={{maxWidth:400}}/>
+            <label style={{marginLeft:14,fontSize:12,color:"var(--text2)",display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer"}}>
+              <input type="checkbox" checked={untranslatedOnly} onChange={e=>setUntranslatedOnly(e.target.checked)}/>
+              Untranslated only
+            </label>
             <span style={{marginLeft:12,fontSize:12,color:"var(--text3)"}}>{filtered.length} / {allKeys.length} keys</span>
           </div>
         )}

@@ -1203,9 +1203,12 @@ function TranslationEditor({row, onClose, onSaved}) {
   const [err, setErr] = useState("");
 
   const [untranslatedOnly, setUntranslatedOnly] = useState(false);
+  // Snapshot taken at open time so a row being edited doesn't vanish mid-typing —
+  // the filter reflects what was untranslated when the list was opened, not live edits.
+  const initialVals = useState(() => ({ ...T.en, ...(row.t || {}) }))[0];
   const allKeys = Object.keys(T.en);
   const filtered = allKeys.filter(k => {
-    if (untranslatedOnly && (isEn ? !!vals[k] : (vals[k] && vals[k] !== T.en[k]))) return false;
+    if (untranslatedOnly && (isEn ? !!initialVals[k] : (initialVals[k] && initialVals[k] !== T.en[k]))) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return k.toLowerCase().includes(q) || (T.en[k] || "").toLowerCase().includes(q) || (vals[k] || "").toLowerCase().includes(q);

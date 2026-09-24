@@ -59,7 +59,7 @@ export const VelGeniusBanner = () => (
         </svg>
         <div>
           <div className="velg-wordmark"><span className="velg-vel">VEL</span>GENIUS</div>
-          <div className="velg-tagline">AI automotive operations platform</div>
+          <div className="velg-tagline">One platform for every vehicle need</div>
         </div>
       </div>
     </div>

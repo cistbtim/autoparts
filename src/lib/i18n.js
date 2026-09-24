@@ -93,7 +93,7 @@ export const T = {
     rptNoSuppliers: "No purchase invoice data yet",
     // Login page tabs & buttons
     loginSpareShop: "Spare Shop", loginSpareShopSub: "Sign in to your spare parts shop", branchNameField: "Branch Name", branchNamePlaceholder: "e.g. North Branch",
-    loginShop: "Parts Shop", loginWorkshop: "Workshop", loginScrapyard: "Scrapyard", loginStaff: "Staff",
+    loginShop: "Catalogue", loginWorkshop: "Workshop", loginScrapyard: "Scrapyard", loginStaff: "Staff",
     signIn: "Sign In", registerNew: "Register", registerWorkshop: "Register Workshop", registerScrapyard: "Register Scrapyard",
     noAccount: "No account?", createAccount: "Create Account",
     startFreeTrial: "Start Free Trial", alreadyAccount: "Already have an account?",

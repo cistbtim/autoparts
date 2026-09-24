@@ -405,7 +405,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     {id:"branch",   Icon:IcBox,    label:t.loginSpareShop||"Spare Shop"},
     {id:"workshop", Icon:IcWrench, label:t.loginWorkshop||"Workshop"},
     {id:"scrapyard",Icon:IcCar,    label:t.loginScrapyard||"Scrapyard"},
-    {id:"customer", Icon:IcCart,   label:t.loginShop||"Parts Shop"},
+    {id:"customer", Icon:IcCart,   label:t.loginShop||"Catalogue"},
     {id:"supplier", Icon:IcFactory,label:t.loginSupplier||"Supplier"},
     {id:"staff",    Icon:IcStaff,  label:t.loginStaff||"Staff"},
     {id:"licagent", Icon:IcBadge,  label:t.loginLicAgent||"Licence Agent"},
@@ -726,7 +726,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
                     <div style={{width:38,height:38,borderRadius:10,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcCart/></div>
                     <div>
-                      <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginShop||"Parts Shop"} {t.signIn||"Login"}</div>
+                      <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginShop||"Catalogue"} {t.signIn||"Login"}</div>
                       <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Browse and order parts</div>
                     </div>
                   </div>

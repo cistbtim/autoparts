@@ -4887,7 +4887,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       children:[
         {id:"workshop",    icon:"🔧",label:t.wsJobs,                      roles:["admin","manager"]},
         {id:"wscustomers", icon:"👥",label:t.wsCustomers,                 roles:["admin","manager"]},
-        {id:"wsbookings",  icon:"🗓️",label:"Bookings",                    roles:["admin","manager"]},
+        {id:"wsbookings",  icon:"🗓️",label:t.wsBookings||"Bookings",       roles:["admin","manager"]},
         {id:"wsquotations",icon:"📝",label:t.wsQuotations,                roles:["admin","manager"]},
         {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,                  roles:["admin","manager"]},
         {id:"wspayments",  icon:"💳",label:t.wsPayments,                  roles:["admin","manager"]},
@@ -4897,8 +4897,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"wsstock",     icon:"📦",label:t.wsStock,                     roles:["admin","manager"]},
         {id:"wstransfer",  icon:"🔄",label:t.wsTransfer,                  roles:["admin","manager"]},
         {id:"wsservices",  icon:"🔧",label:t.wsServices,                  roles:["admin","manager"]},
-        {id:"wsdocs",      icon:"📎",label:"Documents",                   roles:["admin","manager"]},
-        {id:"wslicencerenewal",icon:"🪪",label:"Licence Renewals",        roles:["admin","manager"]},
+        {id:"wsdocs",      icon:"📎",label:t.wsDocs||"Documents",          roles:["admin","manager"]},
+        {id:"wslicencerenewal",icon:"🪪",label:t.wsLicenceRenewal||"Licence Renewals", roles:["admin","manager"]},
         {id:"wsstatement", icon:"📄",label:t.wsStatement,                 roles:["admin","manager"]},
         {id:"wsreport",    icon:"📊",label:t.wsReport,                    roles:["admin","manager"]},
         {id:"wssubscriptions",icon:"💳",label:t.wsSubscriptions,          roles:["admin"]},
@@ -4911,11 +4911,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         children:[
           {id:"workshop",    icon:"🔧",label:t.wsJobs,       roles:["workshop"]},
           {id:"wscustomers", icon:"👥",label:t.wsCustomers,  roles:["workshop"], wsRoles:["main","manager"]},
-          {id:"wsbookings",  icon:"🗓️",label:"Bookings",     roles:["workshop"]},
+          {id:"wsbookings",  icon:"🗓️",label:t.wsBookings||"Bookings", roles:["workshop"]},
           {id:"wsquotations",icon:"📝",label:t.wsQuotations, roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,   roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wspayments",  icon:"💳",label:t.wsPayments,   roles:["workshop"], wsRoles:["main","manager"]},
-          {id:"wsspareshop", icon:"🏪",label:"🏪 Spare Shop", roles:["workshop"]},
+          {id:"wsspareshop", icon:"🏪",label:t.wsSpareShop||"Spare Shop", roles:["workshop"]},
         ]
       },
       {
@@ -4937,8 +4937,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {
         id:"grp_ws_admin", icon:"📊", label:t.wsAdmin, roles:["workshop"],
         children:[
-          {id:"wsdocs",      icon:"📎",label:"Documents",     roles:["workshop"], wsRoles:["main","manager"]},
-          {id:"wslicencerenewal",icon:"🪪",label:"Licence Renewals",roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wsdocs",      icon:"📎",label:t.wsDocs||"Documents", roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wslicencerenewal",icon:"🪪",label:t.wsLicenceRenewal||"Licence Renewals",roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsstatement", icon:"📄",label:t.wsStatement,    roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsreport",    icon:"📊",label:t.wsReport,       roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsprofile",   icon:"⚙️",label:t.wsSettings,     roles:["workshop"], wsRoles:["main"]},
@@ -5465,7 +5465,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           {
             label:t.grpWorkshop||"Jobs",
             items:[
-              {id:"wsspareshop",icon:"🏪",label:"Spare Shop"},
+              {id:"wsspareshop",icon:"🏪",label:t.wsSpareShop||"Spare Shop"},
               ...(wsRole!=="mechanic"?[
                 {id:"wspayments", icon:"💳", label:t.wsPayments||"Payments"},
               ]:[]),
@@ -5629,12 +5629,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             // Bookings, Invoices...) — reuse the same labels already shown for these
             // in the sidebar so the header actually reflects which page you're on.
             const WS_PAGE_TITLES={
-              workshop:t.wsJobs||"Jobs", wscustomers:t.wsCustomers||"Customers", wsbookings:"Bookings",
+              workshop:t.wsJobs||"Jobs", wscustomers:t.wsCustomers||"Customers", wsbookings:t.wsBookings||"Bookings",
               wsquotations:t.wsQuotations||"Quotations", wsinvoices:t.wsInvoices||"Invoices", wspayments:t.wsPayments||"Payments",
               wsstock:t.wsStock||"WS Stock", wsservices:t.wsServices||"Services", wssuppliers:t.wsSuppliers||"Suppliers",
               wssuporders:t.wsPurchaseOrders||"Purchase Orders", wssupinv:t.wsSupInvoices||"Supplier Inv", wstransfer:t.wsTransfer||"Transfer",
-              wsstatement:t.wsStatement||"Statement", wsreport:t.wsReport||"Report", wsspareshop:"Spare Shop",
-              wsdocs:"Documents", wslicencerenewal:"Licence Renewals",
+              wsstatement:t.wsStatement||"Statement", wsreport:t.wsReport||"Report", wsspareshop:t.wsSpareShop||"Spare Shop",
+              wsdocs:t.wsDocs||"Documents", wslicencerenewal:t.wsLicenceRenewal||"Licence Renewals",
             };
             return(<>
               <div className="velg-mainstrip-divider"/>

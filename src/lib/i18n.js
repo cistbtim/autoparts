@@ -127,6 +127,7 @@ export const T = {
     wsSupInvoices: "WS Supplier Invoice",
     wsTransfer: "WS Transfer", wsStatement: "WS Statement", wsReport: "WS Report",
     wsSettings: "WS Settings", wsSubscriptions: "WS Subscriptions",
+    wsBookings: "Bookings", wsDocs: "Documents", wsLicenceRenewal: "Licence Renewals", wsSpareShop: "Spare Shop",
     wsProcurement: "Procurement", wsStockGroup: "Stock", wsAdmin: "Admin",
     // Workshop page strings
     wsCountCustomers: "customers", wsCountVehicles: "vehicles",

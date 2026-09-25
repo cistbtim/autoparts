@@ -668,6 +668,7 @@ export const LICENCE_DOC_TYPES = [
   {key:"address_proof",     label:"Proof of Address"},
   {key:"bank_statement",    label:"Bank Statement"},
   {key:"permit_visa",       label:"Permit / Visa"},
+  {key:"brnc_doc",          label:"BRNC Doc. (Business)"},
   {key:"other",             label:"Other"},
 ];
 

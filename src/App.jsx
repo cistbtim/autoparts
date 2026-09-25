@@ -5199,21 +5199,21 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   if(loading) return (
     <div style={{background:"#0a0f1a",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>
       <style>{CSS}{`
-        @keyframes needleSweep{0%,100%{transform:rotate(-30deg)}50%{transform:rotate(30deg)}}
         @keyframes pulseGlow{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
+        @keyframes wrenchDraw{0%{stroke-dashoffset:140}70%,100%{stroke-dashoffset:0}}
         @keyframes ldFill{from{width:0%}to{width:100%}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
       `}</style>
       <div style={{textAlign:"center",animation:"fadeUp .5s ease"}}>
-        {/* VelGenius dial mark, needle sweeping like a running meter */}
+        {/* VelGenius shield mark, wrench squiggle drawing in like a running trace */}
         <div style={{position:"relative",width:110,height:110,margin:"0 auto 28px",display:"flex",alignItems:"center",justifyContent:"center"}}>
           <div style={{position:"absolute",inset:14,borderRadius:"50%",background:"radial-gradient(circle,rgba(232,93,4,.25) 0%,transparent 70%)",animation:"pulseGlow 1.4s ease-in-out infinite"}}/>
-          <svg width="96" height="96" viewBox="0 0 48 48" fill="none" style={{position:"relative"}}>
-            <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="#3a4152" strokeWidth="3" strokeLinecap="round"/>
-            <g style={{transformOrigin:"24px 24px",animation:"needleSweep 1.3s ease-in-out infinite"}}>
-              <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
-            </g>
-            <circle cx="24" cy="24" r="3.4" fill="#e85d04"/>
+          <svg width="96" height="96" viewBox="0 0 120 120" fill="none" style={{position:"relative"}}>
+            <path d="M44,15 L60,34 L76,15 L107,33 L107,87 L60,114 L13,87 L13,33 Z" fill="#101725" stroke="#3a4152" strokeWidth="6" strokeLinejoin="round"/>
+            <path d="M22,74 H36 L42,62 L49,86 L55,74 H58 L64,64 L74,52 H88 L96,62 L101,65 V74" fill="none" stroke="#e85d04" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"
+              strokeDasharray="140" style={{animation:"wrenchDraw 1.3s ease-in-out infinite"}}/>
+            <circle cx="70" cy="77" r="6" fill="#101725" stroke="#e85d04" strokeWidth="5"/>
+            <circle cx="93" cy="77" r="6" fill="#101725" stroke="#e85d04" strokeWidth="5"/>
           </svg>
         </div>
         {/* App name */}
@@ -5604,14 +5604,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
              row with the ad banner (see .ws-compact-header in Workshop.jsx) — this one hides there via
              the velg-mainstrip--ws-tab CSS modifier so the two aren't both taking up vertical space. ── */}
         <div className={`velg-mainstrip${WS_TAB_IDS.includes(tab)?" velg-mainstrip--ws-tab":""}`}>
-          <svg className="velg-mainstrip-icon" viewBox="0 0 48 48" fill="none">
-            <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="var(--text3)" strokeWidth="3" strokeLinecap="round"/>
-            <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
-            <circle cx="24" cy="24" r="3.4" fill="#e85d04"/>
+          <svg className="velg-mainstrip-icon" viewBox="0 0 120 120" fill="none">
+            <path d="M44,15 L60,34 L76,15 L107,33 L107,87 L60,114 L13,87 L13,33 Z" fill="var(--surface2)" stroke="var(--text3)" strokeWidth="7"/>
+            <path d="M22,74 H36 L42,62 L49,86 L55,74 H58 L64,64 L74,52 H88 L96,62 L101,65 V74" fill="none" stroke="#e85d04" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="70" cy="77" r="7" fill="var(--surface2)" stroke="#e85d04" strokeWidth="6"/>
+            <circle cx="93" cy="77" r="7" fill="var(--surface2)" stroke="#e85d04" strokeWidth="6"/>
           </svg>
           <div className="velg-mainstrip-text">
             <div className="velg-mainstrip-word"><span className="velg-vel">VEL</span>GENIUS</div>
-            <div className="velg-mainstrip-tag">AI Automotive Operations Platform</div>
+            <div className="velg-mainstrip-tag">{t?.appTagline||"One platform for every vehicle need"}</div>
           </div>
           {/* Left-aligned (see .velg-mainstrip--ws-tab) with the module title right
               next to the logo instead of centered — customer feedback was that the

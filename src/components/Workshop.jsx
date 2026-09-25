@@ -611,10 +611,11 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
 
       {wsTab!=="spareshop"&&!(wsProfile?.hide_ads&&subActive)&&(
         <div className="ws-compact-header">
-          <svg className="ws-compact-header-icon" viewBox="0 0 48 48" fill="none">
-            <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="var(--text3)" strokeWidth="3" strokeLinecap="round"/>
-            <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
-            <circle cx="24" cy="24" r="3.4" fill="#e85d04"/>
+          <svg className="ws-compact-header-icon" viewBox="0 0 120 120" fill="none">
+            <path d="M44,15 L60,34 L76,15 L107,33 L107,87 L60,114 L13,87 L13,33 Z" fill="var(--surface2)" stroke="var(--text3)" strokeWidth="7"/>
+            <path d="M22,74 H36 L42,62 L49,86 L55,74 H58 L64,64 L74,52 H88 L96,62 L101,65 V74" fill="none" stroke="#e85d04" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="70" cy="77" r="7" fill="var(--surface2)" stroke="#e85d04" strokeWidth="6"/>
+            <circle cx="93" cy="77" r="7" fill="var(--surface2)" stroke="#e85d04" strokeWidth="6"/>
           </svg>
           <div className="ws-compact-header-word"><span className="velg-vel">VEL</span>GENIUS</div>
           <AdBanner ads={ads} page="workshop" userCtx={userCtx} height={140} mobileHeight={112} tabletHeight={90}/>

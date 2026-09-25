@@ -864,17 +864,17 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           const cancelCol = jobs.filter(j=>j.is_cancelled&&matchesSearch(j));
 
           const COLS = [
-            {id:"booking",  label:"Booking",          hint:"Confirm & create job",   color:"#60a5fa", items:bkCol,   type:"booking"},
-            {id:"pending",  label:"Pending",           hint:"Waiting to start",       color:"#a78bfa", items:pendCol, type:"job", nextStatus:"In Progress", nextLabel:"▶ Start"},
-            {id:"checkup",  label:"Checkup",           hint:"Inspection only — no repair", color:"#38bdf8", items:checkupCol, type:"job"},
-            {id:"wip",      label:"In Progress",       hint:"Add quote + do the work",color:"#fbbf24", items:wipCol,  type:"job", nextStatus:"Done",        nextLabel:"✓ Mark Done"},
-            {id:"quoting",  label:"Quoting",           hint:"Waiting on supplier prices", color:"#a78bfa", items:quotingCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
-            {id:"ordered",  label:"Ordered",           hint:"Parts on order",         color:"#818cf8", items:orderedCol, type:"job", nextStatus:"Done", nextLabel:"✓ Mark Done"},
-            {id:"done",     label:"Done",              hint:"Create invoice",          color:"#34d399", items:doneCol, type:"job"},
-            {id:"invoiced", label:"Invoiced",          hint:"Collect payment",         color:"#ff7a2e", items:invCol,  type:"job"},
-            {id:"paid",     label:"Payment Received",  hint:"Job complete ✓",          color:"#10b981", items:paidCol, type:"job"},
-            {id:"problem",  label:"Problem Job",       hint:"Needs attention",         color:"#f87171", items:probCol, type:"job"},
-            {id:"cancelled",label:"Cancelled",         hint:"Customer didn't proceed", color:"#ef4444", items:cancelCol, type:"job"},
+            {id:"booking",  label:t.wsColBooking||"Booking",          hint:t.wsColBookingHint||"Confirm & create job",   color:"#60a5fa", items:bkCol,   type:"booking"},
+            {id:"pending",  label:t.wsColPending||"Pending",           hint:t.wsColPendingHint||"Waiting to start",       color:"#a78bfa", items:pendCol, type:"job", nextStatus:"In Progress", nextLabel:t.wsBtnStart||"▶ Start"},
+            {id:"checkup",  label:t.wsColCheckup||"Checkup",           hint:t.wsColCheckupHint||"Inspection only — no repair", color:"#38bdf8", items:checkupCol, type:"job"},
+            {id:"wip",      label:t.wsColInProgress||"In Progress",       hint:t.wsColInProgressHint||"Add quote + do the work",color:"#fbbf24", items:wipCol,  type:"job", nextStatus:"Done",        nextLabel:t.wsBtnMarkDone||"✓ Mark Done"},
+            {id:"quoting",  label:t.wsColQuoting||"Quoting",           hint:t.wsColQuotingHint||"Waiting on supplier prices", color:"#a78bfa", items:quotingCol, type:"job", nextStatus:"Done", nextLabel:t.wsBtnMarkDone||"✓ Mark Done"},
+            {id:"ordered",  label:t.wsColOrdered||"Ordered",           hint:t.wsColOrderedHint||"Parts on order",         color:"#818cf8", items:orderedCol, type:"job", nextStatus:"Done", nextLabel:t.wsBtnMarkDone||"✓ Mark Done"},
+            {id:"done",     label:t.wsColDone||"Done",              hint:t.wsColDoneHint||"Create invoice",          color:"#34d399", items:doneCol, type:"job"},
+            {id:"invoiced", label:t.wsColInvoiced||"Invoiced",          hint:t.wsColInvoicedHint||"Collect payment",         color:"#ff7a2e", items:invCol,  type:"job"},
+            {id:"paid",     label:t.wsColPaid||"Payment Received",  hint:t.wsColPaidHint||"Job complete ✓",          color:"#10b981", items:paidCol, type:"job"},
+            {id:"problem",  label:t.wsColProblem||"Problem Job",       hint:t.wsColProblemHint||"Needs attention",         color:"#f87171", items:probCol, type:"job"},
+            {id:"cancelled",label:t.wsColCancelled||"Cancelled",         hint:t.wsColCancelledHint||"Customer didn't proceed", color:"#ef4444", items:cancelCol, type:"job"},
           ];
 
           const BkCard = ({b}) => (
@@ -1245,7 +1245,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                       })()}
                       {col.id==="pending"&&(
                         <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:10,padding:"5px 0",marginTop:3,color:"#38bdf8"}}
-                          onClick={()=>moveJobStatus(job,"Checkup")}>🔍 Checkup Only</button>
+                          onClick={()=>moveJobStatus(job,"Checkup")}>{t.wsBtnCheckupOnly||"🔍 Checkup Only"}</button>
                       )}
                       {col.id==="checkup"&&(
                         <button className="btn btn-xs btn-ghost" style={{width:"100%",fontSize:10,padding:"5px 0",marginTop:3}}

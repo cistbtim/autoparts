@@ -188,9 +188,9 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 @keyframes velgSweep{0%{left:-120px}50%{left:calc(100% - 0px)}100%{left:-120px}}
 @media(max-width:480px){
   .velg-banner{padding:18px 16px 14px;border-radius:12px}
-  .velg-toprow{justify-content:center}
-  .velg-brand{gap:11px;transform:translateX(-10px)}
-  .velg-mark{width:34px;height:34px}
+  .velg-toprow{justify-content:center;text-align:center}
+  .velg-brand{gap:11px}
+  .velg-mark{width:48px;height:48px}
   .velg-wordmark{font-size:33px}
   .velg-tagline{font-size:11px;margin-top:2px}
   .velg-side{flex-direction:column-reverse;align-items:center;width:100%}

@@ -109,6 +109,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
      right edge instead of wrapping. Stack to one column. */
   .fg-grid{grid-template-columns:1fr!important}
 }
+@media(min-width:768px){.hide-desktop{display:none!important}}
 .mob-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;border-radius:8px;transition:all .18s;position:relative}
 .mob-nav-btn.on{color:var(--accent)}.mob-nav-btn .mi{font-size:18px;line-height:1}
 .mob-badge{position:absolute;top:3px;right:calc(50% - 16px);background:var(--accent);color:#fff;border-radius:99px;min-width:15px;height:15px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;padding:0 3px}

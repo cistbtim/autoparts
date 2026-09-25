@@ -321,6 +321,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [shopVehicleFilter,setShopVehicleFilter]=useState({make:"",model:""});
   const [workshopJobFilter,setWorkshopJobFilter]=useState(null); // {label,jobIds} — one-shot nav from Vehicle Management's job-card badge
+  const [headerBookInTrigger,setHeaderBookInTrigger]=useState(0); // bumped by the header-strip "Book In Car" button (desktop) to open Workshop's modal
   const [rfqJumpSessionId,setRfqJumpSessionId]=useState(null); // one-shot nav — jump straight into an RFQ session's quotes from a Branch Transfer Request card
   const [stockingInId,setStockingInId]=useState(null); // supplier_invoices.id currently mid-"Stock In" — disables the button so a double-click can't double-apply stock
   const [vehiclesJumpMake,setVehiclesJumpMake]=useState(initialVehiclesMake||null);
@@ -5638,6 +5639,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             return(<>
               <div className="velg-mainstrip-divider"/>
               <div className="velg-mainstrip-pagetitle">🔧 {WS_PAGE_TITLES[tab]||"Workshop"}</div>
+              {/* Book In Car — desktop-only home for it, moved up from the jobs
+                  toolbar into this row's otherwise-empty space right next to the
+                  page title; mobile keeps its own copy in the toolbar since the
+                  pagetitle/wsinfo row hides there. */}
+              {tab==="workshop"&&(
+                <button className="btn btn-primary hide-mobile" style={{fontSize:13,padding:"7px 14px",marginLeft:14,flexShrink:0}}
+                  onClick={()=>setHeaderBookInTrigger(c=>c+1)}>📷 Book In Car</button>
+              )}
               {/* Subscription + job-count summary — was its own separate row inside
                   Workshop.jsx directly below this header, reading as a second,
                   disconnected header. Filling this row's empty right side instead. */}
@@ -8256,6 +8265,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsbookings"?"wsbookings":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":tab==="wsdocs"?"wsdocs":tab==="wslicencerenewal"?"wslicencerenewal":"report"}
             initialJobFilter={tab==="workshop"?workshopJobFilter:null}
             onConsumeInitialJobFilter={()=>setWorkshopJobFilter(null)}
+            headerBookInTrigger={headerBookInTrigger}
             onReturnToVehicle={role==="admin"?(make,model,searchKw)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setVehiclesJumpSearch(searchKw||"");setTab("vehicles");}:null}
             ads={liveAds}
             userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}

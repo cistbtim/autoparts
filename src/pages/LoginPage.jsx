@@ -494,7 +494,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               {err&&<ErrBox msg={err}/>}
               {waRenewLink}
               <button className="btn btn-primary" style={{width:"100%",padding:"11px",fontSize:15,borderRadius:10,marginTop:0}} onClick={doBranchLogin} disabled={loading}>
-                {loading?t.connecting||"Connecting…":"Sign In →"}
+                {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
               </button>
             </div>
           )}
@@ -512,13 +512,13 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                     <div style={{width:38,height:38,borderRadius:10,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcWrench/></div>
                     <div>
                       <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginWorkshop||"Workshop"} {t.signIn||"Login"}</div>
-                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Sign in to your workshop account</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginWorkshopSub||"Sign in to your workshop account"}</div>
                     </div>
                   </div>
 
-                  <Field label="Company Name" hint="Optional">
+                  <Field label={t.companyNameField||"Company Name"} hint={t.optionalHint||"Optional"}>
                     <InpIcon inp={<input style={companyInpStyle} type="text" value={wsCompany} onChange={e=>setWsCompany(e.target.value)} placeholder="e.g. ABC Auto Workshop" autoCapitalize="words"/>}><IcGrid/></InpIcon>
-                    <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Helps identify your account if multiple workshops share a username</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>{t.companyNameHintWorkshop||"Helps identify your account if multiple workshops share a username"}</div>
                   </Field>
 
                   <Field label={t.username||"Username"}>
@@ -531,7 +531,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   {err&&<ErrBox msg={err}/>}
               {waRenewLink}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doWorkshopLogin} disabled={loading}>
-                    {loading?t.connecting||"Connecting…":"Sign In →"}
+                    {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
                   </button>
                 </div>
               )}
@@ -607,13 +607,13 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                     <div style={{width:38,height:38,borderRadius:10,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcCar/></div>
                     <div>
                       <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginScrapyard||"Scrapyard"} {t.signIn||"Login"}</div>
-                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Sign in to your scrapyard account</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginScrapyardSub||"Sign in to your scrapyard account"}</div>
                     </div>
                   </div>
 
-                  <Field label="Company Name" hint="Optional">
+                  <Field label={t.companyNameField||"Company Name"} hint={t.optionalHint||"Optional"}>
                     <InpIcon inp={<input style={companyInpStyle} type="text" value={scrapCompany} onChange={e=>setScrapCompany(e.target.value)} placeholder="e.g. City Scrapyard" autoCapitalize="words"/>}><IcGrid/></InpIcon>
-                    <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Helps identify your account if multiple scrapyards share a username</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>{t.companyNameHintScrapyard||"Helps identify your account if multiple scrapyards share a username"}</div>
                   </Field>
 
                   <Field label={t.username||"Username"}>
@@ -626,7 +626,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   {err&&<ErrBox msg={err}/>}
               {waRenewLink}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doScrapyardLogin} disabled={loading}>
-                    {loading?t.connecting||"Connecting…":"Sign In →"}
+                    {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
                   </button>
                 </div>
               )}
@@ -722,7 +722,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   {err&&<ErrBox msg={err}/>}
               {waRenewLink}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doCustLogin} disabled={loading}>
-                    {loading?t.connecting||"Connecting…":"Sign In →"}
+                    {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
                   </button>
                   <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:"4px 0 0"}}>
                     {t.noAccount||"No account?"} <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setCustTab("register");setErr("");}}>{t.registerNew||"Register"}</span>
@@ -781,7 +781,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               {err&&<ErrBox msg={err}/>}
               {waRenewLink}
               <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doSupplierLogin} disabled={loading}>
-                {loading?t.connecting||"Connecting…":"Sign In →"}
+                {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
               </button>
               <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:"4px 0 0"}}>
                 Don't have a login? Ask your account contact to set one up for you.
@@ -812,7 +812,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               {err&&<ErrBox msg={err}/>}
               {waRenewLink}
               <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doStaffLogin} disabled={loading}>
-                {loading?t.connecting||"Connecting…":"Sign In →"}
+                {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
               </button>
             </div>
           )}
@@ -835,7 +835,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               </Field>
               {err&&<ErrBox msg={err}/>}
               <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doLicAgentLogin} disabled={loading}>
-                {loading?t.connecting||"Connecting…":"Sign In →"}
+                {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
               </button>
               <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:"4px 0 0"}}>
                 Don't have a login? Ask an admin to set one up for you.
@@ -861,7 +861,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               </Field>
               {err&&<ErrBox msg={err}/>}
               <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doCarSalesLogin} disabled={loading}>
-                {loading?t.connecting||"Connecting…":"Sign In →"}
+                {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
               </button>
               <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:"4px 0 0"}}>
                 Don't have a login? Ask an admin to set one up for you.

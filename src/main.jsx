@@ -13,6 +13,9 @@ import '@fontsource/space-grotesk/700.css'
 import '@fontsource/dm-mono/400.css'
 import '@fontsource/dm-mono/500.css'
 import App from './App.jsx'
+import { startVersionCheck } from './lib/versionCheck.js'
+
+startVersionCheck();
 
 // Browsers change a focused <input type="number">'s value when the mouse wheel
 // scrolls over it — surprising and easy to trigger by accident while scrolling

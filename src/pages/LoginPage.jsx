@@ -541,7 +541,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   <div style={{background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.2)",borderRadius:9,padding:"10px 13px",fontSize:12,color:"var(--green)",lineHeight:1.5}}>
                     ✅ {t.freeTrial30||"30-day free trial — no credit card required"}
                   </div>
-                  <Field label="Workshop Name *">
+                  <Field label={(t.workshopNameField||"Workshop Name")+" *"}>
                     <input style={inpStyle} value={wsRegName} onChange={e=>setWsRegName(e.target.value)} placeholder="e.g. ABC Auto Workshop"/>
                   </Field>
                   <Field label={(t.username||"Username")+" *"}>
@@ -556,10 +556,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                     </Field>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                    <Field label="Email">
+                    <Field label={t.email||"Email"}>
                       <input style={inpStyle} type="email" value={wsRegEmail} onChange={e=>setWsRegEmail(e.target.value)} placeholder="email@workshop.com"/>
                     </Field>
-                    <Field label="Phone">
+                    <Field label={t.phone||"Phone"}>
                       <input style={inpStyle} type="tel" value={wsRegPhone} onChange={e=>setWsRegPhone(e.target.value)} placeholder="+27..."/>
                     </Field>
                   </div>
@@ -636,7 +636,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   <div style={{background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.2)",borderRadius:9,padding:"10px 13px",fontSize:12,color:"var(--green)",lineHeight:1.5}}>
                     ✅ {t.freeTrial30||"30-day free trial — no credit card required"}
                   </div>
-                  <Field label="Scrapyard Name *">
+                  <Field label={(t.scrapyardNameField||"Scrapyard Name")+" *"}>
                     <input style={inpStyle} value={scrapRegName} onChange={e=>setScrapRegName(e.target.value)} placeholder="e.g. City Scrapyard"/>
                   </Field>
                   <Field label={(t.username||"Username")+" *"}>
@@ -651,10 +651,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                     </Field>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                    <Field label="Email">
+                    <Field label={t.email||"Email"}>
                       <input style={inpStyle} type="email" value={scrapRegEmail} onChange={e=>setScrapRegEmail(e.target.value)} placeholder="email@scrapyard.com"/>
                     </Field>
-                    <Field label="Phone">
+                    <Field label={t.phone||"Phone"}>
                       <input style={inpStyle} type="tel" value={scrapRegPhone} onChange={e=>setScrapRegPhone(e.target.value)} placeholder="+27..."/>
                     </Field>
                   </div>
@@ -707,10 +707,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                     <div style={{width:38,height:38,borderRadius:10,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcCart/></div>
                     <div>
                       <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginShop||"Catalogue"} {t.signIn||"Login"}</div>
-                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Browse and order parts</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginShopSub||"Browse and order parts"}</div>
                     </div>
                   </div>
-                  <Field label="Supplier" hint="Leave blank for the main shop">
+                  <Field label={t.catalogSupplierLabel||"Supplier"} hint={t.catalogSupplierHint||"Leave blank for the main shop"}>
                     <InpIcon inp={<input style={inpStyle} type="text" value={custSupplierName} onChange={e=>setCustSupplierName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCustLogin()} placeholder="e.g. MCK" autoCapitalize="words"/>}><IcGrid/></InpIcon>
                   </Field>
                   <Field label={t.phone||"Phone"}>
@@ -732,16 +732,16 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
               {custTab==="register"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                  <Field label="Supplier" hint="Leave blank for the main shop">
+                  <Field label={t.catalogSupplierLabel||"Supplier"} hint={t.catalogSupplierHint||"Leave blank for the main shop"}>
                     <input style={inpStyle} type="text" value={custSupplierName} onChange={e=>setCustSupplierName(e.target.value)} placeholder="e.g. MCK" autoCapitalize="words"/>
                   </Field>
                   <Field label={(t.name||"Name")+" *"}>
                     <input style={inpStyle} value={cName} onChange={e=>setCName(e.target.value)}/>
                   </Field>
-                  <Field label={(t.phone||"Phone")+" *"} hint="Min 9 digits">
+                  <Field label={(t.phone||"Phone")+" *"} hint={t.minDigitsHint||"Min 9 digits"}>
                     <input style={inpStyle} type="tel" value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="+27..."/>
                   </Field>
-                  <Field label="Email">
+                  <Field label={t.email||"Email"}>
                     <input style={inpStyle} type="email" value={cEmail} onChange={e=>setCEmail(e.target.value)}/>
                   </Field>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -769,7 +769,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                 <div style={{width:38,height:38,borderRadius:10,background:"rgba(192,132,252,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"#c084fc",flexShrink:0}}><IcFactory/></div>
                 <div>
                   <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginSupplier||"Supplier"} {t.signIn||"Login"}</div>
-                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Manage your own parts catalogue</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginSupplierSub||"Manage your own parts catalogue"}</div>
                 </div>
               </div>
               <Field label={t.username||"Username"}>
@@ -796,7 +796,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                 <div style={{width:38,height:38,borderRadius:10,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcStaff/></div>
                 <div>
                   <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginStaff||"Staff"} {t.signIn||"Login"}</div>
-                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Admin, manager and fulfilment access</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginStaffSub||"Admin, manager and fulfilment access"}</div>
                 </div>
               </div>
               <Field label={t.username||"Username"}>
@@ -824,7 +824,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                 <div style={{width:38,height:38,borderRadius:10,background:"rgba(34,211,238,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"#22d3ee",flexShrink:0}}><IcBadge/></div>
                 <div>
                   <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginLicAgent||"Licence Agent"} {t.signIn||"Login"}</div>
-                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Manage licence renewals across all workshops</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginLicAgentSub||"Manage licence renewals across all workshops"}</div>
                 </div>
               </div>
               <Field label={t.username||"Username"}>
@@ -850,7 +850,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                 <div style={{width:38,height:38,borderRadius:10,background:"rgba(251,146,60,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fb923c",flexShrink:0}}><IcTag/></div>
                 <div>
                   <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginCarSales||"Car Sales"} {t.signIn||"Login"}</div>
-                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>Manage trade-in & used car listings</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginCarSalesSub||"Manage trade-in & used car listings"}</div>
                 </div>
               </div>
               <Field label={t.username||"Username"}>

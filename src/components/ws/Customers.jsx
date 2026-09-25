@@ -448,7 +448,6 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
         "",
         `Owner: ${f.owner_name}`,
         f.owner_id    ? `ID No: ${f.owner_id}` : null,
-        f.owner_phone ? `Phone: ${f.owner_phone}` : null,
         f.notes       ? `Notes: ${f.notes}` : null,
       ].filter(Boolean).join("\n");
       window.open(waLink(agentPhone,msg), "_blank");

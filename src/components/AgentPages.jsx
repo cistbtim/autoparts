@@ -44,7 +44,6 @@ const buildOfficeMessage = (r, pdfUrl) => {
     "",
     `Owner: ${r.owner_name||"—"}`,
     r.owner_id ? `ID / Passport: ${r.owner_id}` : null,
-    r.owner_phone ? `Phone: ${r.owner_phone}` : null,
     "",
   ];
   if(pdfUrl){
@@ -95,7 +94,6 @@ const buildOfficePdfBlob = async (r) => {
   line(`Renew for: ${r.renewal_years||1} year${+r.renewal_years>1?"s":""}`, { gap: 9 });
   line(`Owner: ${r.owner_name||"—"}`);
   line(r.owner_id ? `ID / Passport: ${r.owner_id}` : null);
-  line(r.owner_phone ? `Phone: ${r.owner_phone}` : null);
   if(r.notes){ y += 3; doc.setFont(undefined, "italic"); line(`Notes: ${r.notes}`); doc.setFont(undefined, "normal"); }
 
   const docsList = LICENCE_DOC_TYPES.map(({key,label})=>{

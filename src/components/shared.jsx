@@ -51,13 +51,16 @@ export const VelGeniusBanner = ({t, langs=[], lang, setLang, dbStatus}={}) => (
   <div className="velg-banner">
     <div className="velg-toprow">
       <div className="velg-brand">
-        {/* VelGenius shield mark — wrench squiggle stays orange, never recoloured. */}
-        <svg className="velg-mark" width="56" height="56" viewBox="0 0 120 120" fill="none" aria-hidden="true" style={{flexShrink:0}}>
-          <path d="M44,15 L60,34 L76,15 L107,33 L107,87 L60,114 L13,87 L13,33 Z" fill="#F4F2EE" stroke="#F4F2EE" strokeWidth="10" strokeLinejoin="round"/>
-          <path d="M22,74 H36 L42,62 L49,86 L55,74 H58 L64,64 L74,52 H88 L96,62 L101,65 V74" fill="none" stroke="#e85d04" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
-          <circle cx="70" cy="77" r="6" fill="#F4F2EE" stroke="#e85d04" strokeWidth="5"/>
-          <circle cx="93" cy="77" r="6" fill="#F4F2EE" stroke="#e85d04" strokeWidth="5"/>
-        </svg>
+        {/* VelGenius shield mark — wrench squiggle stays orange, never recoloured.
+            Wrench-draw + glow animation matches the boot loading screen (App.jsx). */}
+        <div className="velg-mark-wrap">
+          <svg className="velg-mark" width="56" height="56" viewBox="0 0 120 120" fill="none" aria-hidden="true" style={{position:"relative"}}>
+            <path d="M44,15 L60,34 L76,15 L107,33 L107,87 L60,114 L13,87 L13,33 Z" fill="#F4F2EE" stroke="#F4F2EE" strokeWidth="10" strokeLinejoin="round"/>
+            <path className="velg-mark-wrench" d="M22,74 H36 L42,62 L49,86 L55,74 H58 L64,64 L74,52 H88 L96,62 L101,65 V74" fill="none" stroke="#e85d04" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="70" cy="77" r="6" fill="#F4F2EE" stroke="#e85d04" strokeWidth="5"/>
+            <circle cx="93" cy="77" r="6" fill="#F4F2EE" stroke="#e85d04" strokeWidth="5"/>
+          </svg>
+        </div>
         <div>
           <div className="velg-wordmark"><span className="velg-vel">VEL</span>GENIUS</div>
           <div className="velg-tagline">{t?.appTagline||"One platform for every vehicle need"}</div>

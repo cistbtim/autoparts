@@ -168,6 +168,13 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .velg-banner::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 1px,transparent 1px 5px);pointer-events:none}
 .velg-toprow{position:relative;display:flex;align-items:flex-start;justify-content:center;gap:16px;flex-wrap:wrap}
 .velg-brand{display:flex;align-items:center;gap:18px}
+/* Wrench-draw + glow, matching the boot loading screen's dial mark animation (App.jsx) */
+.velg-mark-wrap{position:relative;display:inline-flex;flex-shrink:0}
+.velg-mark-wrap::before{content:"";position:absolute;inset:-10px;border-radius:50%;background:radial-gradient(circle,rgba(232,93,4,.35) 0%,transparent 70%);animation:velgMarkGlow 1.4s ease-in-out infinite}
+.velg-mark-wrench{stroke-dasharray:140;animation:velgMarkDraw 1.3s ease-in-out infinite}
+@keyframes velgMarkGlow{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
+@keyframes velgMarkDraw{0%{stroke-dashoffset:140}70%,100%{stroke-dashoffset:0}}
+@media(prefers-reduced-motion:reduce){.velg-mark-wrap::before{animation:none}.velg-mark-wrench{animation:none;stroke-dashoffset:0}}
 .velg-wordmark{font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:54px;color:#F2F1ED;letter-spacing:.2px;line-height:1.1}
 .velg-wordmark .velg-vel{font-weight:700;color:#e85d04}
 .velg-tagline{margin-top:4px;font-size:15px;color:#8A9099;font-weight:500;font-family:'DM Sans',sans-serif}

@@ -119,6 +119,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const [licAgentUser,setLicAgentUser] = useState(""); const [licAgentPass,setLicAgentPass] = useState("");
   // car sales
   const [carSalesUser,setCarSalesUser] = useState(""); const [carSalesPass,setCarSalesPass] = useState("");
+  const [carSalesTab,setCarSalesTab] = useState("login");
+  const [carSalesRegName,setCarSalesRegName] = useState(""); const [carSalesRegUser,setCarSalesRegUser] = useState("");
+  const [carSalesRegPass,setCarSalesRegPass] = useState(""); const [carSalesRegPass2,setCarSalesRegPass2] = useState("");
+  const [carSalesRegEmail,setCarSalesRegEmail] = useState(""); const [carSalesRegPhone,setCarSalesRegPhone] = useState("");
   // workshop
   const [wsCompany,setWsCompany] = useState("");
   const [wsUser,setWsUser] = useState(""); const [wsPass,setWsPass] = useState("");
@@ -231,10 +235,25 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const doCarSalesLogin = async () => {
     if(!carSalesUser||!carSalesPass){setErr(t.wrongPass);return;}
     setLoading(true);setErr("");setExpiredInfo(null);
-    const res = await api.fresh("users",`username=eq.${encodeURIComponent(carSalesUser)}&password=eq.${encodeURIComponent(carSalesPass)}&role=eq.car_sales&select=*`);
+    const res = await api.fresh("users",`username=eq.${encodeURIComponent(carSalesUser)}&password=eq.${encodeURIComponent(carSalesPass)}&role=in.(car_sales,carsales_admin)&select=*`);
     if(Array.isArray(res)&&res.length>0){
       logLogin(res[0]);onLogin(res[0]);
     } else setErr(t.wrongPass);
+    setLoading(false);
+  };
+
+  const doCarSalesSignup = async () => {
+    if(!carSalesRegName||!carSalesRegUser||!carSalesRegPass){setErr("Business name, username and password are required");return;}
+    if(carSalesRegPass!==carSalesRegPass2){setErr("Passwords don't match");return;}
+    if(carSalesRegPass.length<4){setErr("Password must be at least 4 characters");return;}
+    setLoading(true);setErr("");
+    const ex=await api.fresh("users",`username=eq.${encodeURIComponent(carSalesRegUser)}&select=id`).catch(()=>[]);
+    if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
+    const newUser=await api.insert("users",{username:carSalesRegUser,password:carSalesRegPass,name:carSalesRegName,role:"carsales_admin",phone:carSalesRegPhone||"",email:carSalesRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
+    if(!newUser||newUser.code){setErr("Signup failed: "+(newUser?.message||"unknown error"));setLoading(false);return;}
+    const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
+    if(!loginUser||loginUser.code){setErr("Signup failed");setLoading(false);return;}
+    logLogin({...loginUser});onLogin({...loginUser});
     setLoading(false);
   };
 
@@ -845,27 +864,71 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
           {/* ── Car Sales ── */}
           {authTab==="carsales"&&(
-            <div style={{display:"flex",flexDirection:"column",gap:13}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
-                <div style={{width:38,height:38,borderRadius:10,background:"rgba(251,146,60,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fb923c",flexShrink:0}}><IcTag/></div>
-                <div>
-                  <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginCarSales||"Car Sales"} {t.signIn||"Login"}</div>
-                  <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginCarSalesSub||"Manage trade-in & used car listings"}</div>
-                </div>
+            <div style={{display:"flex",flexDirection:"column",gap:0}}>
+              <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:18}}>
+                {[["login",t.signIn||"Sign In"],["signup",t.registerCarSales||"Register"]].map(([id,lb])=>(
+                  <button key={id} className={`auth-tab ${carSalesTab===id?"on":""}`} onClick={()=>{setCarSalesTab(id);setErr("");}}>{lb}</button>
+                ))}
               </div>
-              <Field label={t.username||"Username"}>
-                <InpIcon inp={<input style={inpStyle} type="text" value={carSalesUser} onChange={e=>setCarSalesUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCarSalesLogin()} autoCapitalize="none" placeholder="Username"/>}><IcUser/></InpIcon>
-              </Field>
-              <Field label={t.password||"Password"}>
-                <InpIcon inp={<input style={inpStyle} type="password" value={carSalesPass} onChange={e=>setCarSalesPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCarSalesLogin()}/>}><IcLock/></InpIcon>
-              </Field>
-              {err&&<ErrBox msg={err}/>}
-              <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doCarSalesLogin} disabled={loading}>
-                {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
-              </button>
-              <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:"4px 0 0"}}>
-                Don't have a login? Ask an admin to set one up for you.
-              </p>
+
+              {carSalesTab==="login"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:13}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(251,146,60,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fb923c",flexShrink:0}}><IcTag/></div>
+                    <div>
+                      <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginCarSales||"Car Sales"} {t.signIn||"Login"}</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginCarSalesSub||"Manage trade-in & used car listings"}</div>
+                    </div>
+                  </div>
+                  <Field label={t.username||"Username"}>
+                    <InpIcon inp={<input style={inpStyle} type="text" value={carSalesUser} onChange={e=>setCarSalesUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCarSalesLogin()} autoCapitalize="none" placeholder="Username"/>}><IcUser/></InpIcon>
+                  </Field>
+                  <Field label={t.password||"Password"}>
+                    <InpIcon inp={<input style={inpStyle} type="password" value={carSalesPass} onChange={e=>setCarSalesPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCarSalesLogin()}/>}><IcLock/></InpIcon>
+                  </Field>
+                  {err&&<ErrBox msg={err}/>}
+                  <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doCarSalesLogin} disabled={loading}>
+                    {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
+                  </button>
+                  <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:"4px 0 0"}}>
+                    {t.noAccount||"No account?"} <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setCarSalesTab("signup");setErr("");}}>{t.registerNew||"Register"}</span>
+                  </p>
+                </div>
+              )}
+
+              {carSalesTab==="signup"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  <Field label={(t.carSalesNameField||"Business Name")+" *"}>
+                    <input style={inpStyle} value={carSalesRegName} onChange={e=>setCarSalesRegName(e.target.value)} placeholder="e.g. ABC Car Sales"/>
+                  </Field>
+                  <Field label={(t.username||"Username")+" *"}>
+                    <input style={inpStyle} value={carSalesRegUser} onChange={e=>setCarSalesRegUser(e.target.value)} autoCapitalize="none" placeholder="Choose a login username"/>
+                  </Field>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <Field label={(t.password||"Password")+" *"}>
+                      <input style={inpStyle} type="password" value={carSalesRegPass} onChange={e=>setCarSalesRegPass(e.target.value)}/>
+                    </Field>
+                    <Field label={(t.confirmPwd||"Confirm")+" *"}>
+                      <input style={inpStyle} type="password" value={carSalesRegPass2} onChange={e=>setCarSalesRegPass2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doCarSalesSignup()}/>
+                    </Field>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <Field label={t.email||"Email"}>
+                      <input style={inpStyle} type="email" value={carSalesRegEmail} onChange={e=>setCarSalesRegEmail(e.target.value)}/>
+                    </Field>
+                    <Field label={t.phone||"Phone"}>
+                      <input style={inpStyle} type="tel" value={carSalesRegPhone} onChange={e=>setCarSalesRegPhone(e.target.value)} placeholder="+27..."/>
+                    </Field>
+                  </div>
+                  {err&&<ErrBox msg={err}/>}
+                  <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10}} onClick={doCarSalesSignup} disabled={loading}>
+                    {loading?t.connecting||"Connecting…":t.createAccount||"Create Account"}
+                  </button>
+                  <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:0}}>
+                    {t.alreadyAccount||"Already have an account?"} <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setCarSalesTab("login");setErr("");}}>{t.signIn||"Sign In"}</span>
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

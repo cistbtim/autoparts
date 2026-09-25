@@ -17,6 +17,7 @@ export const ROLES = {
   supplier:          { color: "#c084fc", bg: "rgba(192,132,252,0.12)",  icon: "🏭" },
   licence_agent:     { color: "#22d3ee", bg: "rgba(34,211,238,0.12)",   icon: "🪪" },
   car_sales:         { color: "#fb923c", bg: "rgba(251,146,60,0.12)",   icon: "🏷️" },
+  carsales_admin:    { color: "#fb923c", bg: "rgba(251,146,60,0.12)",   icon: "🏷️" },
 };
 
 export const BRANCH_ROLES = ["branch_admin","branch_manager","branch_warehouse","branch_picker","branch_salesman"];
@@ -144,7 +145,7 @@ export const getSubInfo = (u) => {
   if (u.role === "branch_picker")     return { status: "admin", label: "Branch Picker",    color: "#f59e0b" };
   if (u.role === "branch_salesman")   return { status: "admin", label: "Branch Salesman",  color: "#ec4899" };
   if (u.role === "licence_agent")     return { status: "admin", label: "Licence Agent",     color: "#22d3ee" };
-  if (u.role === "car_sales")         return { status: "admin", label: "Car Sales",         color: "#fb923c" };
+  if (u.role === "car_sales" || u.role === "carsales_admin") return { status: "admin", label: "Car Sales", color: "#fb923c" };
   const s = u.subscription_status || "trial";
   if (s === "active") {
     if (u.subscription_expires_at) {
@@ -178,6 +179,7 @@ export const canAccess = (u) => {
   if (u.role === "supplier") return true;
   if (u.role === "licence_agent") return true;
   if (u.role === "car_sales") return true;
+  if (u.role === "carsales_admin") return true;
   if (u._isCustomer) return true;
   const s = getSubInfo(u);
   return s.status === "active" || s.status === "trial";

@@ -118,6 +118,7 @@ export const T = {
     loginShop: "Catalogue", loginWorkshop: "Workshop", loginScrapyard: "Scrapyard", loginStaff: "Staff",
     loginSupplier: "Supplier", loginLicAgent: "Licence Agent", loginCarSales: "Car Sales",
     signIn: "Sign In", registerNew: "Register", registerWorkshop: "Register Workshop", registerScrapyard: "Register Scrapyard",
+    registerCarSales: "Register", carSalesNameField: "Business Name",
     noAccount: "No account?", createAccount: "Create Account",
     startFreeTrial: "Start Free Trial", alreadyAccount: "Already have an account?",
     freeTrial30: "30-day free trial — no credit card needed. After trial, a monthly fee applies.",

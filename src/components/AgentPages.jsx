@@ -958,32 +958,71 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose, t={}}) {
   const [soldTo, setSoldTo] = useState(listing.sold_to||"");
   const s = (k,v) => setF(p=>({...p,[k]:v}));
 
+  // Shared by manual photo picks and the licence-disc scan below — the
+  // scanned photo doubles as a listing photo so it isn't uploaded twice.
+  const resizeAndUpload = async (file) => {
+    const dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
+    const blob = await new Promise((res,rej)=>{
+      const img=new Image();
+      img.onload=()=>{
+        const MAX=1200; const canvas=document.createElement("canvas");
+        let w=img.width,h=img.height;
+        if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+        canvas.width=w;canvas.height=h;
+        canvas.getContext("2d").drawImage(img,0,0,w,h);
+        canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
+      };
+      img.onerror=rej; img.src=dataUrl;
+    });
+    const path=`car_sales/${(f.vehicle_reg||"listing").replace(/[\s/\\]/g,"_").toUpperCase()}_${Date.now()}.jpg`;
+    return uploadToStorage("cars_parts",path,blob,"image/jpeg");
+  };
+
   const handlePhoto = async (e) => {
     const file = e.target.files?.[0]; if(!file) return;
     e.target.value="";
     setUploading(true);
     try{
-      const dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
-      const blob = await new Promise((res,rej)=>{
-        const img=new Image();
-        img.onload=()=>{
-          const MAX=1200; const canvas=document.createElement("canvas");
-          let w=img.width,h=img.height;
-          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
-          canvas.width=w;canvas.height=h;
-          canvas.getContext("2d").drawImage(img,0,0,w,h);
-          canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/jpeg",0.85);
-        };
-        img.onerror=rej; img.src=dataUrl;
-      });
-      const path=`car_sales/${(f.vehicle_reg||"listing").replace(/[\s/\\]/g,"_").toUpperCase()}_${Date.now()}.jpg`;
-      const url = await uploadToStorage("cars_parts",path,blob,"image/jpeg");
-      s("photos",[...(f.photos||[]),url]);
+      const url = await resizeAndUpload(file);
+      setF(p=>({...p, photos:[...(p.photos||[]),url]}));
     }catch(err){ alert("Photo upload failed: "+err.message); }
     setUploading(false);
   };
 
   const removePhoto = (idx) => s("photos",(f.photos||[]).filter((_,i)=>i!==idx));
+
+  // Scan the vehicle's licence disc (same PDF417 decoder as the Licence Agent
+  // module) to auto-fill reg/make/model/VIN/color instead of typing them —
+  // fields stay editable either way, and the scanned photo doubles as a
+  // listing photo so it isn't uploaded twice.
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState("");
+
+  const processScan = async (dataUrl, file) => {
+    setScanLoading(true); setScanError("");
+    try{
+      const raw = await decodePDF417fromImage(dataUrl);
+      const parsed = parseLicenceDisc(raw);
+      setF(p=>({...p,
+        vehicle_reg: parsed.reg ? parsed.reg.replace(/\s/g,"").toUpperCase() : p.vehicle_reg,
+        make: parsed.make||p.make, model: parsed.model||p.model,
+        vin: parsed.vin||p.vin, color: parsed.color||p.color,
+      }));
+      try{
+        const url = await resizeAndUpload(file);
+        setF(p=>({...p, photos:[...(p.photos||[]),url]}));
+      }catch{ /* fields already filled; saving the photo itself is best-effort */ }
+    }catch(err){ setScanError("Barcode not detected — try a clearer photo, or just type the details below. ("+err.message+")"); }
+    setScanLoading(false);
+  };
+
+  const handleScanFile = (e) => {
+    const file = e.target.files?.[0]; if(!file) return;
+    e.target.value="";
+    const fr = new FileReader();
+    fr.onload = ev => processScan(ev.target.result, file);
+    fr.readAsDataURL(file);
+  };
 
   const save = async () => {
     if(!f.make.trim()&&!f.vehicle_reg.trim()){ alert("Enter at least a make or registration number"); return; }
@@ -1012,6 +1051,19 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose, t={}}) {
           </label>
         </div>
       </div>
+
+      <div style={{display:"flex",gap:8,marginBottom:8}}>
+        <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:scanLoading?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>
+          <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleScanFile} disabled={scanLoading}/>
+          {scanLoading?`⏳ ${t.laScanning||"Scanning…"}`:`📷 ${t.laScanDiscCamera||"Scan Disc (camera)"}`}
+        </label>
+        <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:scanLoading?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>
+          <input type="file" accept="image/*" style={{display:"none"}} onChange={handleScanFile} disabled={scanLoading}/>
+          {scanLoading?`⏳ ${t.laScanning||"Scanning…"}`:`🖼️ ${t.laScanDiscGallery||"Scan Disc (gallery)"}`}
+        </label>
+      </div>
+      {scanError&&<div style={{fontSize:12,color:"var(--red)",marginBottom:10}}>{scanError}</div>}
+      <div style={{fontSize:11,color:"var(--text3)",marginBottom:14,textAlign:"center"}}>{t.laScanOptionalHint||"Or just type the details below — scanning is optional."}</div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
         <div><FL label={t.carSalesRegLabel||"Registration"}/><input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="e.g. AB12CDGP"/></div>

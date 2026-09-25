@@ -525,8 +525,11 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               )}
             </div>
           )}
-          {wsTab==="jobs"&&(
-          <div className="ws-toolbar" style={{display:"flex",gap:8,alignItems:"center"}}>
+        </div>
+      </div>
+
+      {wsTab==="jobs"&&(
+          <div className="ws-toolbar" style={{display:"flex",gap:8,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
             {!wsId&&wsProfiles.length>0&&(
               <select className="inp" value={filterWs} onChange={e=>{setFilterWs(e.target.value);setFilterCity("__all__");setFilterCountry("__all__");}} style={{flex:"0 0 auto",width:"auto",minWidth:160}}>
                 <option value="__all__">🏪 All Workshops</option>
@@ -586,9 +589,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               </div>
             )}
           </div>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* ── Sub-navigation (desktop) — REMOVED. Every WS_TABS destination now has its
            own sidebar item (see WS_TAB_IDS / grp_workshop / grp_ws_jobs in App.jsx),

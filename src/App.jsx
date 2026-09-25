@@ -4967,9 +4967,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       ]
     },
     {
-      id:"grp_car_sales", icon:"🏷️", label:"Car Sales", roles:["car_sales","carsales_admin"],
+      id:"grp_car_sales", icon:"🏷️", label:t.loginCarSales||"Car Sales", roles:["car_sales","carsales_admin"],
       children:[
-        {id:"carSalesListings", icon:"🏷️", label:"Listings", roles:["car_sales","carsales_admin"]},
+        {id:"carSalesListings", icon:"🏷️", label:t.carSalesListingsNav||"Listings", roles:["car_sales","carsales_admin"]},
       ]
     },
     {
@@ -5061,7 +5061,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"licenceAgentQueue",icon:"🪪",label:t.laNavRenewalQueue||"Renewal Queue"},
     ];
     if(role==="car_sales"||role==="carsales_admin") return [
-      {id:"carSalesListings",icon:"🏷️",label:"Listings"},
+      {id:"carSalesListings",icon:"🏷️",label:t.carSalesListingsNav||"Listings"},
     ];
     if(role==="scrapyard"||role==="scrapyard_admin") return [
       {id:"sy_dashboard",icon:"📊", label:t.syDashboard||"Dashboard"},
@@ -6931,7 +6931,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── CAR SALES ── */}
         {tab==="carSalesListings"&&(role==="car_sales"||role==="carsales_admin")&&(
-          <CarSalesPage listings={carSalesListings} onSave={saveCarSalesListing} onUpdate={updateCarSalesListing} onDelete={deleteCarSalesListing}/>
+          <CarSalesPage listings={carSalesListings} onSave={saveCarSalesListing} onUpdate={updateCarSalesListing} onDelete={deleteCarSalesListing} t={t}/>
         )}
 
         {/* ── PURCHASE INVOICES ── */}

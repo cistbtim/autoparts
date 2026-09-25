@@ -846,13 +846,22 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose, t={}}) {
 // CAR SALES — trade-in / used car listings pipeline
 // ═══════════════════════════════════════════════════════════════
 const STATUS_INFO = {
-  available: {label:"Available", color:"var(--green)",  bg:"rgba(52,211,153,.15)"},
-  reserved:  {label:"Reserved",  color:"var(--yellow)", bg:"rgba(251,191,36,.15)"},
-  sold:      {label:"Sold",      color:"var(--text3)",  bg:"rgba(148,163,184,.15)"},
+  available: {color:"var(--green)",  bg:"rgba(52,211,153,.15)"},
+  reserved:  {color:"var(--yellow)", bg:"rgba(251,191,36,.15)"},
+  sold:      {color:"var(--text3)",  bg:"rgba(148,163,184,.15)"},
 };
-const SOURCE_LABEL = {trade_in:"🔄 Trade-in", referral:"🤝 Referral", other:"📋 Other"};
+const statusLabel = (status,t) => ({
+  available: t.carSalesStatusAvailable||"Available",
+  reserved:  t.carSalesStatusReserved||"Reserved",
+  sold:      t.carSalesStatusSold||"Sold",
+}[status] || status);
+const sourceLabel = (source,t) => ({
+  trade_in: t.carSalesSourceTradeIn||"🔄 Trade-in",
+  referral: t.carSalesSourceReferral||"🤝 Referral",
+  other:    t.carSalesSourceOther||"📋 Other",
+}[source] || source || "");
 
-export function CarSalesPage({listings=[], onSave, onUpdate, onDelete}) {
+export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, t={}}) {
   const [filter, setFilter] = useState("available");
   const [search, setSearch] = useState("");
   const [modalListing, setModalListing] = useState(null); // null=closed, {}=new, {...}=edit
@@ -870,29 +879,29 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete}) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:16}}>
         <div>
-          <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🏷️ Car Sales</div>
+          <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🏷️ {t.loginCarSales||"Car Sales"}</div>
           <div style={{fontSize:13,color:"var(--text3)"}}>
-            {listings.length} listings · {C}{totalValue.toLocaleString()} available · {C}{soldValue.toLocaleString()} sold
+            {listings.length} {t.carSalesListingsWord||"listings"} · {C}{totalValue.toLocaleString()} {t.carSalesStatusAvailable?.toLowerCase()||"available"} · {C}{soldValue.toLocaleString()} {t.carSalesStatusSold?.toLowerCase()||"sold"}
           </div>
         </div>
-        <button className="btn btn-primary" onClick={()=>setModalListing({})}>+ New Listing</button>
+        <button className="btn btn-primary" onClick={()=>setModalListing({})}>{t.carSalesNewListing||"+ New Listing"}</button>
       </div>
 
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
-        {[["all","All"],["available","Available"],["reserved","Reserved"],["sold","Sold"]].map(([v,l])=>(
+        {[["all",t.carSalesFilterAll||"All"],["available",t.carSalesStatusAvailable||"Available"],["reserved",t.carSalesStatusReserved||"Reserved"],["sold",t.carSalesStatusSold||"Sold"]].map(([v,l])=>(
           <button key={v} onClick={()=>setFilter(v)}
             style={{padding:"5px 12px",borderRadius:20,border:"1px solid var(--border)",background:filter===v?"var(--accent)":"var(--surface2)",color:filter===v?"#fff":"var(--text2)",fontSize:12,cursor:"pointer",fontWeight:filter===v?700:400}}>
             {l} <span style={{opacity:.6}}>{v==="all"?listings.length:listings.filter(x=>x.status===v).length}</span>
           </button>
         ))}
-        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search reg, make, model, VIN…"
+        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder={t.carSalesSearchPlaceholder||"Search reg, make, model, VIN…"}
           style={{marginLeft:"auto",maxWidth:240,fontSize:12,padding:"6px 10px"}}/>
       </div>
 
       {filtered.length===0&&(
         <div style={{textAlign:"center",padding:"40px 0",color:"var(--text3)"}}>
           <div style={{fontSize:32,marginBottom:8}}>🏷️</div>
-          <div style={{fontSize:14}}>No listings {filter==="all"?"yet":`with status "${filter}"`}</div>
+          <div style={{fontSize:14}}>{filter==="all"?(t.carSalesNoListingsYet||"No listings yet"):(t.carSalesNoListingsStatus||'No listings with status "{status}"').replace("{status}",statusLabel(filter,t))}</div>
         </div>
       )}
 
@@ -909,10 +918,10 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete}) {
                   : <div style={{width:"100%",height:130,background:"var(--surface2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,marginBottom:10}}>🚗</div>}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6,marginBottom:4}}>
                   <div style={{fontWeight:700,fontSize:14}}>{l.year||""} {l.make} {l.model}</div>
-                  <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:si.bg,color:si.color,flexShrink:0}}>{si.label}</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:si.bg,color:si.color,flexShrink:0}}>{statusLabel(l.status,t)}</span>
                 </div>
                 <div style={{fontSize:12,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginBottom:6}}>{l.vehicle_reg||"—"}</div>
-                <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>{SOURCE_LABEL[l.source]||l.source||""}{l.mileage?` · ${(+l.mileage).toLocaleString()} km`:""}</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>{sourceLabel(l.source,t)}{l.mileage?` · ${(+l.mileage).toLocaleString()} km`:""}</div>
                 <div style={{marginTop:"auto",fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:20,color:"var(--accent)"}}>
                   {l.status==="sold"?`${C}${(+l.sold_price||+l.price||0).toLocaleString()}`:`${C}${(+l.price||0).toLocaleString()}`}
                 </div>
@@ -923,7 +932,7 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete}) {
       )}
 
       {modalListing&&(
-        <CarSaleModal listing={modalListing}
+        <CarSaleModal listing={modalListing} t={t}
           onSave={async(rec)=>{ await onSave(rec); setModalListing(null); }}
           onDelete={modalListing.id?async()=>{ if(window.confirm("Delete this listing?")){ await onDelete(modalListing.id); setModalListing(null); } }:null}
           onMarkSold={modalListing.id?async(soldPrice,soldTo)=>{ await onUpdate(modalListing.id,{status:"sold",sold_at:new Date().toISOString(),sold_price:soldPrice||null,sold_to:soldTo||null}); setModalListing(null); }:null}
@@ -933,7 +942,7 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete}) {
   );
 }
 
-function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose}) {
+function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose, t={}}) {
   const isNew = !listing.id;
   const [f, setF] = useState({
     vehicle_reg:"", make:"", model:"", year:"", vin:"", color:"", mileage:"",
@@ -985,11 +994,11 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose}) {
 
   return (
     <Overlay onClose={onClose}>
-      <MHead title={isNew?"🏷️ New Car Listing":"🏷️ Edit Listing"} onClose={onClose}/>
+      <MHead title={isNew?(t.carSalesNewTitle||"🏷️ New Car Listing"):(t.carSalesEditTitle||"🏷️ Edit Listing")} onClose={onClose}/>
 
       {/* Photos */}
       <div style={{marginBottom:14}}>
-        <FL label="Photos"/>
+        <FL label={t.carSalesPhotosLabel||"Photos"}/>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {(f.photos||[]).map((url,i)=>(
             <div key={i} style={{position:"relative",width:80,height:80,flexShrink:0}}>
@@ -1005,48 +1014,48 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose}) {
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-        <div><FL label="Registration"/><input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="e.g. AB12CDGP"/></div>
-        <div><FL label="VIN"/><input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value)}/></div>
-        <div><FL label="Make"/><input className="inp" value={f.make} onChange={e=>s("make",e.target.value)} placeholder="e.g. Toyota"/></div>
-        <div><FL label="Model"/><input className="inp" value={f.model} onChange={e=>s("model",e.target.value)} placeholder="e.g. Corolla"/></div>
-        <div><FL label="Year"/><input className="inp" type="number" value={f.year} onChange={e=>s("year",e.target.value)}/></div>
-        <div><FL label="Color"/><input className="inp" value={f.color} onChange={e=>s("color",e.target.value)}/></div>
-        <div><FL label="Mileage (km)"/><input className="inp" type="number" value={f.mileage} onChange={e=>s("mileage",e.target.value)}/></div>
+        <div><FL label={t.carSalesRegLabel||"Registration"}/><input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="e.g. AB12CDGP"/></div>
+        <div><FL label={t.laVinLabel||"VIN"}/><input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value)}/></div>
+        <div><FL label={t.carSalesMakeLabel||"Make"}/><input className="inp" value={f.make} onChange={e=>s("make",e.target.value)} placeholder="e.g. Toyota"/></div>
+        <div><FL label={t.carSalesModelLabel||"Model"}/><input className="inp" value={f.model} onChange={e=>s("model",e.target.value)} placeholder="e.g. Corolla"/></div>
+        <div><FL label={t.carSalesYearLabel||"Year"}/><input className="inp" type="number" value={f.year} onChange={e=>s("year",e.target.value)}/></div>
+        <div><FL label={t.carSalesColorLabel||"Color"}/><input className="inp" value={f.color} onChange={e=>s("color",e.target.value)}/></div>
+        <div><FL label={t.carSalesMileageLabel||"Mileage (km)"}/><input className="inp" type="number" value={f.mileage} onChange={e=>s("mileage",e.target.value)}/></div>
         <div>
-          <FL label="Source"/>
+          <FL label={t.carSalesSourceLabel||"Source"}/>
           <select className="inp" value={f.source} onChange={e=>s("source",e.target.value)}>
-            <option value="trade_in">🔄 Trade-in</option>
-            <option value="referral">🤝 Referral</option>
-            <option value="other">📋 Other</option>
+            <option value="trade_in">{t.carSalesSourceTradeIn||"🔄 Trade-in"}</option>
+            <option value="referral">{t.carSalesSourceReferral||"🤝 Referral"}</option>
+            <option value="other">{t.carSalesSourceOther||"📋 Other"}</option>
           </select>
         </div>
-        <div><FL label="Asking Price"/><input className="inp" type="number" value={f.price} onChange={e=>s("price",e.target.value)}/></div>
-        <div><FL label="Trade-in Value (optional)"/><input className="inp" type="number" value={f.trade_in_value} onChange={e=>s("trade_in_value",e.target.value)}/></div>
-        <div><FL label="Contact Name"/><input className="inp" value={f.contact_name} onChange={e=>s("contact_name",e.target.value)}/></div>
-        <div><FL label="Contact Phone"/><input className="inp" value={f.contact_phone} onChange={e=>s("contact_phone",e.target.value)}/></div>
+        <div><FL label={t.carSalesPriceLabel||"Asking Price"}/><input className="inp" type="number" value={f.price} onChange={e=>s("price",e.target.value)}/></div>
+        <div><FL label={t.carSalesTradeInValueLabel||"Trade-in Value (optional)"}/><input className="inp" type="number" value={f.trade_in_value} onChange={e=>s("trade_in_value",e.target.value)}/></div>
+        <div><FL label={t.carSalesContactNameLabel||"Contact Name"}/><input className="inp" value={f.contact_name} onChange={e=>s("contact_name",e.target.value)}/></div>
+        <div><FL label={t.carSalesContactPhoneLabel||"Contact Phone"}/><input className="inp" value={f.contact_phone} onChange={e=>s("contact_phone",e.target.value)}/></div>
         <div style={{gridColumn:"1/-1"}}>
-          <FL label="Status"/>
+          <FL label={t.status||"Status"}/>
           <select className="inp" value={f.status} onChange={e=>s("status",e.target.value)}>
-            <option value="available">✅ Available</option>
-            <option value="reserved">⏳ Reserved</option>
-            <option value="sold">🏁 Sold</option>
+            <option value="available">✅ {t.carSalesStatusAvailable||"Available"}</option>
+            <option value="reserved">⏳ {t.carSalesStatusReserved||"Reserved"}</option>
+            <option value="sold">🏁 {t.carSalesStatusSold||"Sold"}</option>
           </select>
         </div>
-        <div style={{gridColumn:"1/-1"}}><FL label="Notes"/><textarea className="inp" rows={3} value={f.notes} onChange={e=>s("notes",e.target.value)}/></div>
+        <div style={{gridColumn:"1/-1"}}><FL label={t.notes||"Notes"}/><textarea className="inp" rows={3} value={f.notes} onChange={e=>s("notes",e.target.value)}/></div>
       </div>
 
       {!isNew&&onMarkSold&&f.status!=="sold"&&(
         <div style={{marginBottom:14,padding:12,background:"var(--surface2)",borderRadius:10}}>
           {!showSoldForm ? (
-            <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>setShowSoldForm(true)}>🏁 Mark as Sold</button>
+            <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>setShowSoldForm(true)}>{t.carSalesMarkSold||"🏁 Mark as Sold"}</button>
           ) : (
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <div style={{fontWeight:700,fontSize:13}}>🏁 Confirm Sale</div>
-              <input className="inp" type="number" placeholder="Sold price" value={soldPrice} onChange={e=>setSoldPrice(e.target.value)}/>
-              <input className="inp" placeholder="Sold to (buyer name, optional)" value={soldTo} onChange={e=>setSoldTo(e.target.value)}/>
+              <div style={{fontWeight:700,fontSize:13}}>{t.carSalesConfirmSaleTitle||"🏁 Confirm Sale"}</div>
+              <input className="inp" type="number" placeholder={t.carSalesSoldPricePh||"Sold price"} value={soldPrice} onChange={e=>setSoldPrice(e.target.value)}/>
+              <input className="inp" placeholder={t.carSalesSoldToPh||"Sold to (buyer name, optional)"} value={soldTo} onChange={e=>setSoldTo(e.target.value)}/>
               <div style={{display:"flex",gap:8}}>
-                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowSoldForm(false)}>Cancel</button>
-                <button className="btn btn-primary" style={{flex:1}} onClick={()=>onMarkSold(soldPrice,soldTo)}>Confirm Sold</button>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowSoldForm(false)}>{t.cancel||"Cancel"}</button>
+                <button className="btn btn-primary" style={{flex:1}} onClick={()=>onMarkSold(soldPrice,soldTo)}>{t.carSalesConfirmSoldBtn||"Confirm Sold"}</button>
               </div>
             </div>
           )}
@@ -1054,8 +1063,8 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose}) {
       )}
 
       <div style={{display:"flex",gap:10}}>
-        {onDelete&&<button className="btn btn-danger" onClick={onDelete}>🗑️ Delete</button>}
-        <button className="btn btn-primary" style={{flex:1}} onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save Listing"}</button>
+        {onDelete&&<button className="btn btn-danger" onClick={onDelete}>🗑️ {t.delete||"Delete"}</button>}
+        <button className="btn btn-primary" style={{flex:1}} onClick={save} disabled={saving}>{saving?(t.laSavingEllipsis||"Saving…"):(t.carSalesSaveListing||"💾 Save Listing")}</button>
       </div>
 
       {lightbox&&<ImgLightbox url={lightbox} onClose={()=>setLightbox(null)}/>}

@@ -47,21 +47,44 @@ export const ShopLogo = ({settings, size="md", style={}}) => {
   return null;
 };
 
-export const VelGeniusBanner = ({t}={}) => (
+export const VelGeniusBanner = ({t, langs=[], lang, setLang, dbStatus}={}) => (
   <div className="velg-banner">
-    <div className="velg-row">
+    <div className="velg-toprow">
       <div className="velg-brand">
-        {/* VelGenius dial mark — see BRAND.md. Needle stays orange, never recoloured. */}
-        <svg className="velg-mark" width="56" height="56" viewBox="0 0 48 48" fill="none" style={{flexShrink:0}}>
-          <path d="M11.3 36.7A18 18 0 1 1 36.7 36.7" stroke="#3a4152" strokeWidth="3" strokeLinecap="round"/>
-          <path d="M24 24 36 14.5" stroke="#e85d04" strokeWidth="3.6" strokeLinecap="round"/>
-          <circle cx="24" cy="24" r="3.4" fill="#e85d04"/>
+        {/* VelGenius shield mark — wrench squiggle stays orange, never recoloured. */}
+        <svg className="velg-mark" width="56" height="56" viewBox="0 0 120 120" fill="none" aria-hidden="true" style={{flexShrink:0}}>
+          <path d="M44,15 L60,34 L76,15 L107,33 L107,87 L60,114 L13,87 L13,33 Z" fill="#F4F2EE" stroke="#F4F2EE" strokeWidth="10" strokeLinejoin="round"/>
+          <path d="M22,74 H36 L42,62 L49,86 L55,74 H58 L64,64 L74,52 H88 L96,62 L101,65 V74" fill="none" stroke="#e85d04" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
+          <circle cx="70" cy="77" r="6" fill="#F4F2EE" stroke="#e85d04" strokeWidth="5"/>
+          <circle cx="93" cy="77" r="6" fill="#F4F2EE" stroke="#e85d04" strokeWidth="5"/>
         </svg>
         <div>
           <div className="velg-wordmark"><span className="velg-vel">VEL</span>GENIUS</div>
           <div className="velg-tagline">{t?.appTagline||"One platform for every vehicle need"}</div>
         </div>
       </div>
+      {(langs.length>1||dbStatus)&&(
+        <div className="velg-side">
+          {langs.length>1&&(
+            <div className="velg-langpills" role="group" aria-label="Language">
+              {langs.map(l=>(
+                <button key={l.lang} type="button" onClick={()=>setLang(l.lang)} title={l.name}
+                  className={"velg-langpill"+(lang===l.lang?" is-active":"")}>
+                  {l.flag||l.lang.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+          {dbStatus&&(
+            <div className={"velg-dbstatus velg-dbstatus--"+dbStatus}>
+              <span className="velg-dbdot"/>
+              {dbStatus==="checking"&&(t?.checkingEllipsis||"Checking…")}
+              {dbStatus==="connected"&&(t?.dbConnected||"Database connected")}
+              {dbStatus==="disconnected"&&(t?.dbDisconnected||"Disconnected")}
+            </div>
+          )}
+        </div>
+      )}
     </div>
     <div className="velg-scanline"/>
   </div>

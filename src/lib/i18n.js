@@ -93,6 +93,7 @@ export const T = {
     rptNoSuppliers: "No purchase invoice data yet",
     // Login page tabs & buttons
     appTagline: "One platform for every vehicle need",
+    checkingEllipsis: "Checking…", dbConnected: "Database connected", dbDisconnected: "Disconnected",
     loginSpareShop: "Spare Shop", loginSpareShopSub: "Sign in to your spare parts shop", branchNameField: "Branch Name", branchNamePlaceholder: "e.g. North Branch",
     loginShop: "Catalogue", loginWorkshop: "Workshop", loginScrapyard: "Scrapyard", loginStaff: "Staff",
     loginSupplier: "Supplier", loginLicAgent: "Licence Agent", loginCarSales: "Car Sales",

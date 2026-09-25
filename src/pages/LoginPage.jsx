@@ -433,28 +433,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       <div style={{width:"100%",maxWidth:640}}>
 
         {/* Logo card */}
-        <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:16,padding:"16px",textAlign:"center",marginBottom:14,boxShadow:"var(--shadow-lg)"}}>
-          <VelGeniusBanner t={t}/>
-          {langs.length>1&&(
-            <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:10,marginTop:14}}>
-              {langs.map(l=>(
-                <button key={l.lang} onClick={()=>setLang(l.lang)} title={l.name} style={{
-                  width:40,height:40,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",
-                  fontSize:16,cursor:"pointer",background:"var(--surface2)",
-                  border:lang===l.lang?"2px solid var(--accent)":"1px solid var(--border)",
-                  boxShadow:lang===l.lang?"0 0 0 3px rgba(255,122,46,.15)":"none",
-                  transition:"all .15s",flexShrink:0,
-                }}>
-                  {l.flag||l.lang.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
-          <div style={{display:"flex",justifyContent:"center",marginTop:12}}>
-            {dbStatus==="checking"&&<span style={{fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}><span style={{width:6,height:6,borderRadius:"50%",background:"var(--text3)",display:"inline-block",opacity:.5}}/>Checking…</span>}
-            {dbStatus==="connected"&&<span style={{fontSize:11,fontWeight:600,color:"#16a34a",display:"flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,background:"rgba(22,163,74,.1)",border:"1px solid rgba(22,163,74,.25)"}}><span style={{width:6,height:6,borderRadius:"50%",background:"#16a34a",display:"inline-block"}}/>Database Connected</span>}
-            {dbStatus==="disconnected"&&<span style={{fontSize:11,fontWeight:600,color:"var(--red)",display:"flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,background:"rgba(220,38,38,.07)",border:"1px solid rgba(220,38,38,.2)"}}><span style={{width:6,height:6,borderRadius:"50%",background:"var(--red)",display:"inline-block"}}/>Disconnected</span>}
-          </div>
+        <div style={{borderRadius:16,marginBottom:14,boxShadow:"var(--shadow-lg)"}}>
+          <VelGeniusBanner t={t} langs={langs} lang={lang} setLang={setLang} dbStatus={dbStatus}/>
         </div>
 
         {/* Module tabs — hidden in workshop-only mode, and on a supplier catalogue

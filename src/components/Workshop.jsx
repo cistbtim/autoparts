@@ -5439,6 +5439,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     : null;
   const nemigaHref = job.vin ? nemigaVinUrl(job.vin, job.vehicle_make || decodeVin(job.vin)?.make) : null;
   const vinSearchLinks = job.vin ? [
+    {label:"Google AI", icon:"🔎", color:"#4285F4",       bg:"rgba(66,133,244,.12)",  href:`https://www.google.com/search?udm=50&q=${encodeURIComponent(job.vin+" what year make model")}`},
     ...(catcarHref?[{label:"CatCar ⚡", icon:"🐱", color:"#ff7a2e",       bg:"rgba(255,122,46,.13)",  href:catcarHref}]:[]),
     {label:"Nemiga",    icon:"🗂️", color:"#14b8a6",       bg:"rgba(20,184,166,.12)",  href:nemigaHref},
     {label:"7zap",      icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/", copyVin:true},
@@ -6540,6 +6541,12 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 const result=vehDamageChecks[slotKey];
                 return (
                   <div className="veh-lightbox-panel">
+                    <a href={`https://www.google.com/searchbyimage?image_url=${encodeURIComponent(photo.url)}${job.vin?`&q=${encodeURIComponent(job.vin+" what year make model")}`:""}`} target="_blank" rel="noopener noreferrer"
+                      style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"7px 12px",borderRadius:8,
+                        background:"rgba(66,133,244,.15)",border:"1px solid rgba(66,133,244,.4)",color:"#8ab4ff",
+                        textDecoration:"none",fontSize:12,fontWeight:700,width:"fit-content"}}>
+                      🔎 Google AI (photo{job.vin?" + VIN":""})
+                    </a>
                     {result?(<>
                       <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🔍 AI damage read</div>
                       {result.panels?.map((p,i)=>(

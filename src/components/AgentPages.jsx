@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { uploadToStorage } from "../lib/api.js";
-import { getSettings, curSym } from "../lib/settings.js";
+import { api, uploadToStorage } from "../lib/api.js";
+import { getSettings, updateSettings, curSym } from "../lib/settings.js";
 import { makeId, waLink, nemigaVinUrl } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
-import { Overlay, MHead, FL, FG, ImgLightbox, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, uploadRenewalOutput, uploadAttachment, IcWhatsApp, IcTrash } from "./shared.jsx";
+import { Overlay, MHead, FL, FD, FG, ImgLightbox, ShopLogo, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, uploadRenewalOutput, uploadAttachment, IcWhatsApp, IcTrash } from "./shared.jsx";
 
 // current_expiry (the expiry the renewal was submitted against) + renewal_years
 // gives the date the NEW disc granted by a completed renewal actually expires —
@@ -869,6 +869,7 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, onRefresh
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [modalListing, setModalListing] = useState(null); // null=closed, {}=new, {...}=edit
+  const [brandingOpen, setBrandingOpen] = useState(false);
   const C = curSym(getSettings().currency);
 
   // pending_confirmation offers haven't had their price confirmed by workshop
@@ -877,10 +878,14 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, onRefresh
   const visibleListings = listings.filter(l=>l.status!=="pending_confirmation");
   const pendingReviewCount = visibleListings.filter(l=>l.status==="pending_review").length;
 
-  const q = search.trim().toLowerCase();
+  const qWords = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const filtered = visibleListings
     .filter(l => filter==="all" || l.status===filter)
-    .filter(l => !q || [l.vehicle_reg,l.make,l.model,l.vin].filter(Boolean).some(v=>v.toLowerCase().includes(q)));
+    .filter(l => {
+      if(qWords.length===0) return true;
+      const haystack = [l.vehicle_reg,l.make,l.model,l.vin].filter(Boolean).join(" ").toLowerCase();
+      return qWords.every(w=>haystack.includes(w));
+    });
 
   const totalValue = visibleListings.filter(l=>l.status==="available").reduce((s,l)=>s+(+l.price||0),0);
   const soldValue = visibleListings.filter(l=>l.status==="sold").reduce((s,l)=>s+(+l.sold_price||l.price||0),0);
@@ -888,10 +893,13 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, onRefresh
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:16}}>
-        <div>
-          <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🏷️ {t.loginCarSales||"Car Sales"}</div>
-          <div style={{fontSize:13,color:"var(--text3)"}}>
-            {visibleListings.length} {t.carSalesListingsWord||"listings"} · {C}{totalValue.toLocaleString()} {t.carSalesStatusAvailable?.toLowerCase()||"available"} · {C}{soldValue.toLocaleString()} {t.carSalesStatusSold?.toLowerCase()||"sold"}
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <ShopLogo settings={{logo_url:getSettings().car_sales_logo_url,logo_data:getSettings().car_sales_logo_data}} size="sm"/>
+          <div>
+            <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🏷️ {getSettings().car_sales_shop_name||t.loginCarSales||"Car Sales"}</div>
+            <div style={{fontSize:13,color:"var(--text3)"}}>
+              {visibleListings.length} {t.carSalesListingsWord||"listings"} · {C}{totalValue.toLocaleString()} {t.carSalesStatusAvailable?.toLowerCase()||"available"} · {C}{soldValue.toLocaleString()} {t.carSalesStatusSold?.toLowerCase()||"sold"}
+            </div>
           </div>
         </div>
         <div style={{display:"flex",gap:10,alignItems:"center"}}>
@@ -906,6 +914,11 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, onRefresh
               {refreshing?"⏳":"🔄"} {t.laRefresh||"Refresh"}
             </button>
           )}
+          <button className="btn btn-ghost" onClick={()=>setBrandingOpen(true)}>🖼️ Shop Branding</button>
+          <button className="btn btn-ghost"
+            onClick={()=>navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?cars=1`).then(()=>alert("Public shop link copied!"))}>
+            🌐 Copy Shop Link
+          </button>
           <button className="btn btn-primary" onClick={()=>setModalListing({})}>{t.carSalesNewListing||"+ New Listing"}</button>
         </div>
       </div>
@@ -941,13 +954,22 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, onRefresh
                   : <div style={{width:"100%",height:130,background:"var(--surface2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,marginBottom:10}}>🚗</div>}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6,marginBottom:4}}>
                   <div style={{fontWeight:700,fontSize:14}}>{l.year||""} {l.make} {l.model}</div>
-                  <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:si.bg,color:si.color,flexShrink:0}}>{statusLabel(l.status,t)}</span>
+                  <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end",flexShrink:0}}>
+                    <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:si.bg,color:si.color}}>{statusLabel(l.status,t)}</span>
+                    {l.for_parts_only&&<span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:"rgba(220,38,38,.12)",color:"#dc2626"}}>🔧 Stripping</span>}
+                  </div>
                 </div>
                 <div style={{fontSize:12,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginBottom:6}}>{l.vehicle_reg||"—"}</div>
                 <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>{sourceLabel(l.source,t)}{l.mileage?` · ${(+l.mileage).toLocaleString()} km`:""}{(l.city||l.country)?` · 📍 ${[l.city,l.country].filter(Boolean).join(", ")}`:""}</div>
+                {l.notes&&<div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic",marginBottom:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📝 {l.notes}</div>}
                 <div style={{marginTop:"auto",fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:20,color:"var(--accent)"}}>
                   {l.status==="sold"?`${C}${(+l.sold_price||+l.price||0).toLocaleString()}`:`${C}${(+l.price||0).toLocaleString()}`}
                 </div>
+                {(!!l.view_count||!!l.whatsapp_click_count)&&(
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:6,paddingTop:6,borderTop:"1px solid var(--border)"}}>
+                    👁️ {l.view_count||0} views · 💬 {l.whatsapp_click_count||0} WhatsApp clicks
+                  </div>
+                )}
               </div>
             );
           })}
@@ -962,7 +984,85 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, onRefresh
           onPromote={modalListing.id&&modalListing.status==="pending_review"?async()=>{ await onUpdate(modalListing.id,{status:"available"}); setModalListing(null); }:null}
           onClose={()=>setModalListing(null)}/>
       )}
+      {brandingOpen&&<CarSalesBrandingModal onClose={()=>setBrandingOpen(false)}/>}
     </div>
+  );
+}
+
+// Car Sales gets its own name + logo, stored under car_sales_* keys on the
+// shared settings row — never falls back to the main shop_name/logo_url,
+// so the public storefront never gets mixed up with the parts shop,
+// workshop, or any other platform sharing that same row.
+function CarSalesBrandingModal({onClose}) {
+  const cur = getSettings();
+  const [name, setName] = useState(cur.car_sales_shop_name||"");
+  const [logoUrl, setLogoUrl] = useState(cur.car_sales_logo_url||"");
+  const [logoData, setLogoData] = useState(cur.car_sales_logo_data||"");
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const logoSrc = logoData||logoUrl;
+
+  const handleLogoFile = async (e) => {
+    const file = e.target.files?.[0]; if(!file) return;
+    e.target.value="";
+    setUploading(true);
+    try{
+      const dataUrl = await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=ev=>res(ev.target.result);fr.onerror=rej;fr.readAsDataURL(file);});
+      const blob = await new Promise((res,rej)=>{
+        const img=new Image();
+        img.onload=()=>{
+          const MAX=400; const canvas=document.createElement("canvas");
+          let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          canvas.width=w;canvas.height=h;
+          canvas.getContext("2d").drawImage(img,0,0,w,h);
+          canvas.toBlob(b=>b?res(b):rej(new Error("toBlob failed")),"image/png",0.9);
+        };
+        img.onerror=rej; img.src=dataUrl;
+      });
+      const url = await uploadToStorage("cars_parts",`car_sales_branding/logo_${Date.now()}.png`,blob,"image/png");
+      setLogoUrl(url); setLogoData("");
+    }catch(err){ alert("Logo upload failed: "+err.message); }
+    setUploading(false);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try{
+      const patch = {car_sales_shop_name:name, car_sales_logo_url:logoUrl, car_sales_logo_data:logoData};
+      const res = await api.patch("settings","id",1,patch);
+      if(res&&!Array.isArray(res)&&res.message){ alert("Failed to save: "+res.message); return; }
+      updateSettings(patch);
+      onClose();
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="🖼️ Car Sales Shop Branding" onClose={onClose}/>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
+        This name and logo appear on the public "Cars for Sale" pages only — separate from your main shop branding.
+      </div>
+      <FD>
+        <FL label="Shop Name"/>
+        <input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. AutoFix Car Sales"/>
+      </FD>
+      <FD>
+        <FL label="Logo"/>
+        <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          {logoSrc&&<img src={logoSrc} alt="logo preview" style={{maxHeight:56,maxWidth:180,objectFit:"contain",background:"var(--surface2)",borderRadius:8,padding:6}}/>}
+          <label style={{padding:"8px 14px",background:"var(--surface2)",border:"1px dashed var(--border)",borderRadius:8,cursor:uploading?"wait":"pointer",fontSize:13,fontWeight:600}}>
+            <input type="file" accept="image/*" style={{display:"none"}} onChange={handleLogoFile} disabled={uploading}/>
+            {uploading?"⏳ Uploading…":"📤 Upload Logo"}
+          </label>
+          {logoSrc&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setLogoUrl("");setLogoData("");}}>✕ Remove</button>}
+        </div>
+      </FD>
+      <div style={{display:"flex",gap:10,marginTop:8}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={saving} onClick={save}>{saving?"Saving…":"💾 Save"}</button>
+      </div>
+    </Overlay>
   );
 }
 
@@ -972,7 +1072,7 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onPromote, onClose
     vehicle_reg:"", make:"", model:"", year:"", vin:"", color:"", mileage:"",
     price:"", trade_in_value:"", status:"available", source:"trade_in",
     photos:[], notes:"", contact_name:"", contact_phone:"",
-    country:"", province:"", city:"",
+    country:"", province:"", city:"", for_parts_only:false,
     ...listing,
   });
   const [uploading, setUploading] = useState(false);
@@ -1097,6 +1197,12 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onPromote, onClose
         );
       })()}
 
+      {!isNew&&(!!f.view_count||!!f.whatsapp_click_count)&&(
+        <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
+          👁️ {f.view_count||0} buyers viewed this car · 💬 {f.whatsapp_click_count||0} sent a WhatsApp inquiry
+        </div>
+      )}
+
       {/* Photos */}
       <div style={{marginBottom:14}}>
         <FL label={t.carSalesPhotosLabel||"Photos"}/>
@@ -1176,6 +1282,12 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onPromote, onClose
           </select>
         </div>
         <div style={{gridColumn:"1/-1"}}><FL label={t.notes||"Notes"}/><textarea className="inp" rows={3} value={f.notes} onChange={e=>s("notes",e.target.value)}/></div>
+        <div style={{gridColumn:"1/-1"}}>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,cursor:"pointer"}}>
+            <input type="checkbox" checked={f.for_parts_only} onChange={e=>s("for_parts_only",e.target.checked)}/>
+            🔧 For stripping only (parts/scrap — not a roadworthy resale)
+          </label>
+        </div>
       </div>
 
       {!isNew&&f.status==="pending_review"&&(

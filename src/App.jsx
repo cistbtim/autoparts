@@ -23,7 +23,7 @@ import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturns
 import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierScanStockPage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
 import { LicenceAgentPage, ManageOfficeAgentsModal, CarSalesPage } from "./components/AgentPages.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
-import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage } from "./pages/PublicPages.jsx";
+import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage, CarShopPage } from "./pages/PublicPages.jsx";
 
 // ── Trap browser back button so the page never goes blank ─────
 if(window.history.state?.appLoaded !== true){
@@ -151,6 +151,8 @@ export default function App() {
   if(wsRegToken) return <WorkshopRegisterPage token={wsRegToken}/>;
   const carListingId = new URLSearchParams(window.location.search).get("car");
   if(carListingId) return <CarListingPage id={carListingId}/>;
+  const carShop = new URLSearchParams(window.location.search).get("cars");
+  if(carShop) return <CarShopPage/>;
   if(new URLSearchParams(window.location.search).get("sysmap")==="1") return(
     <div style={{minHeight:"100vh"}} data-theme={document.documentElement.getAttribute("data-theme")||"dark"}>
       <style>{CSS}</style>
@@ -2499,7 +2501,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // saveCarSalesListing above, failures here must be visible: the whole point
   // is capturing offers that would otherwise be silently lost, so this uses
   // writeTolerant + an explicit ok/message result instead of swallowing errors.
-  const submitWorkshopBuyoutOffer = async (job, {price, notes}) => {
+  const submitWorkshopBuyoutOffer = async (job, {price, notes, year, mileage, model, phone, forPartsOnly}) => {
     const reg = (job.vehicle_reg||"").trim();
     if(!reg) return {ok:false, message:"This job has no vehicle registration on file."};
     // D5: block a duplicate offer for the same car — checked right before insert
@@ -2524,6 +2526,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // D2: job.vehicle_model is often an internal catalog code (e.g. "BM001D"), not
     // a display name — resolve it the same way resolvedVehicleModel does elsewhere
     // in Workshop.jsx before writing it to a listing anyone will actually read.
+    // The UI pre-fills its own editable field from this same resolution, so
+    // `model` here is only the fallback if that field was somehow left blank.
     const resolvedModel = (job.vehicle_model && job.vehicle_make)
       ? (vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&normMake(v.make)===normMake(job.vehicle_make))?.model || job.vehicle_model)
       : (job.vehicle_model||"");
@@ -2534,20 +2538,23 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       id: makeId("CS"),
       vehicle_reg: reg,
       make: job.vehicle_make||"",
-      model: resolvedModel,
-      year: job.vehicle_year||null,
+      model: model||resolvedModel,
+      year: year||job.vehicle_year||null,
       vin: job.vin||"",
       color: job.vehicle_color||"",
-      mileage: job.mileage||null,
+      mileage: mileage||job.mileage||null,
       price: price||null,
       status: needsConfirmation ? "pending_confirmation" : "pending_review",
       source: "workshop_buyout",
+      for_parts_only: !!forPartsOnly,
       photos,
       notes: notes||"",
-      // D-buyout-contact: default to the workshop's own contact/location so a
-      // listing isn't published with blank fields — still editable in Car Sales.
+      // D-buyout-contact: contact name still comes from the workshop's own
+      // profile, but the phone is whatever the submitting user typed/edited —
+      // it defaults from the profile in the UI, but they may swap in a
+      // specific salesperson's number instead.
       contact_name: workshopProfile.name||"",
-      contact_phone: workshopProfile.whatsapp||workshopProfile.phone||"",
+      contact_phone: phone||workshopProfile.whatsapp||workshopProfile.phone||"",
       country: workshopProfile.country||"",
       province: workshopProfile.province||"",
       city: workshopProfile.city||"",

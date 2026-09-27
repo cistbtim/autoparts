@@ -4533,10 +4533,23 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   // no pending offer for this vehicle, or the existing row otherwise.
   const [buyoutOffer,     setBuyoutOffer]     = useState(undefined);
   const [buyoutModal,     setBuyoutModal]     = useState(false);
-  const [buyoutForm,      setBuyoutForm]      = useState({price:"",notes:""});
+  const [buyoutForm,      setBuyoutForm]      = useState({year:"",mileage:"",model:"",phone:"",price:"",notes:"",forPartsOnly:false});
   const [buyoutSubmitting,setBuyoutSubmitting]= useState(false);
   const [buyoutError,     setBuyoutError]     = useState("");
   const [buyoutConfirming,setBuyoutConfirming]= useState(false);
+  // Pre-fill once per open from job data / workshop profile — fields stay
+  // editable since job data is often incomplete or wrong (no mileage on
+  // file, internal catalog code instead of a real model description, etc.).
+  useEffect(()=>{
+    if(!buyoutModal) return;
+    setBuyoutForm(f=>({
+      ...f,
+      year: f.year||job.vehicle_year||"",
+      mileage: f.mileage||job.mileage||"",
+      model: f.model||resolvedVehicleModel||"",
+      phone: f.phone||wsProfile?.whatsapp||wsProfile?.phone||"",
+    }));
+  },[buyoutModal]); // eslint-disable-line react-hooks/exhaustive-deps
   // Scoped, cheap lookup — workshop users never load the full car_sales_listings
   // table client-side (that fetch is gated to role car_sales/carsales_admin), so
   // this can't reuse any already-loaded state; it queries just this one vehicle.
@@ -4550,10 +4563,16 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   useEffect(()=>{ refreshBuyoutOffer(); },[refreshBuyoutOffer]);
   const submitBuyout = async () => {
     if(!buyoutForm.price||buyoutSubmitting) return;
+    const phoneDigits=(buyoutForm.phone||"").replace(/\D/g,"");
+    if(phoneDigits.length<6){ setBuyoutError("Enter a valid contact phone number (at least 6 digits)."); return; }
     setBuyoutSubmitting(true); setBuyoutError("");
     try{
-      const r = await onSubmitBuyoutOffer(job,{price:buyoutForm.price,notes:buyoutForm.notes});
-      if(r?.ok){ setBuyoutOffer(r.listing); setBuyoutModal(false); setBuyoutForm({price:"",notes:""}); }
+      const r = await onSubmitBuyoutOffer(job,{
+        price:buyoutForm.price, notes:buyoutForm.notes,
+        year:buyoutForm.year, mileage:buyoutForm.mileage, model:buyoutForm.model,
+        phone:buyoutForm.phone, forPartsOnly:buyoutForm.forPartsOnly,
+      });
+      if(r?.ok){ setBuyoutOffer(r.listing); setBuyoutModal(false); setBuyoutForm({year:"",mileage:"",model:"",phone:"",price:"",notes:"",forPartsOnly:false}); }
       else setBuyoutError(r?.message||"Failed to save the offer.");
     } finally { setBuyoutSubmitting(false); }
   };
@@ -8935,13 +8954,29 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             <div>{[job.vehicle_year,job.vehicle_make,resolvedVehicleModel].filter(Boolean).join(" ")||"—"} {job.vehicle_reg&&<code style={{fontFamily:"DM Mono,monospace",marginLeft:6}}>{job.vehicle_reg}</code>}</div>
           </div>
           <FD>
+            <FL label={`Model description${job.vehicle_make?` (after "${job.vehicle_make}")`:""}`}/>
+            <input className="inp" autoFocus placeholder="e.g. E90 3 Series 320i" value={buyoutForm.model} onChange={e=>setBuyoutForm(f=>({...f,model:e.target.value}))}/>
+          </FD>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <FD><FL label="Year"/><input className="inp" type="number" placeholder="e.g. 2011" value={buyoutForm.year} onChange={e=>setBuyoutForm(f=>({...f,year:e.target.value}))}/></FD>
+            <FD><FL label="Mileage (km)"/><input className="inp" type="number" placeholder="e.g. 144555" value={buyoutForm.mileage} onChange={e=>setBuyoutForm(f=>({...f,mileage:e.target.value}))}/></FD>
+          </div>
+          <FD>
             <FL label="Offer price *"/>
-            <input className="inp" type="number" autoFocus placeholder="e.g. 45000" value={buyoutForm.price} onChange={e=>setBuyoutForm(f=>({...f,price:e.target.value}))}/>
+            <input className="inp" type="number" placeholder="e.g. 45000" value={buyoutForm.price} onChange={e=>setBuyoutForm(f=>({...f,price:e.target.value}))}/>
+          </FD>
+          <FD>
+            <FL label="Contact phone *"/>
+            <input className="inp" type="tel" placeholder="e.g. 0821234567" value={buyoutForm.phone} onChange={e=>setBuyoutForm(f=>({...f,phone:e.target.value}))}/>
           </FD>
           <FD>
             <FL label="Notes (optional)"/>
             <textarea className="inp" rows={3} placeholder="Why the customer's selling, condition notes, etc." value={buyoutForm.notes} onChange={e=>setBuyoutForm(f=>({...f,notes:e.target.value}))} style={{resize:"vertical"}}/>
           </FD>
+          <label style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,fontSize:13,cursor:"pointer"}}>
+            <input type="checkbox" checked={buyoutForm.forPartsOnly} onChange={e=>setBuyoutForm(f=>({...f,forPartsOnly:e.target.checked}))}/>
+            🔧 For stripping only (parts/scrap — not a roadworthy resale)
+          </label>
           {wsRole==="mechanic"&&(
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>A main/manager will need to confirm this price before you offer it to the customer.</div>
           )}

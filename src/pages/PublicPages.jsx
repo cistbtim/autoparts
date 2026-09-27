@@ -2358,9 +2358,13 @@ export function CarListingPage({id}) {
         api.get("settings","id=eq.1&select=*").catch(()=>[]),
       ]);
       const rec=Array.isArray(ls)&&ls[0]?ls[0]:null;
-      setListing(rec&&PUBLIC_LISTING_STATUSES.includes(rec.status)?rec:null);
+      const visible=rec&&PUBLIC_LISTING_STATUSES.includes(rec.status)?rec:null;
+      setListing(visible);
       setShopSettings(Array.isArray(ss)&&ss[0]?ss[0]:{});
       setLoaded(true);
+      // Fire-and-forget view counter — not exact under concurrent viewers,
+      // but good enough for "how many buyers looked at this car".
+      if(visible) api.patch("car_sales_listings","id",id,{view_count:(+visible.view_count||0)+1}).catch(()=>{});
     })();
   },[id]);
 
@@ -2385,7 +2389,11 @@ export function CarListingPage({id}) {
   const sym=curSym(shopSettings.currency||"R");
   const photos=(Array.isArray(listing.photos)?listing.photos:[]).filter(Boolean);
   const title=[listing.year,listing.make,listing.model].filter(Boolean).join(" ")||"Vehicle";
-  const bizName=shopSettings.shop_name||"VelGenius";
+  // Car Sales gets its own brand — never falls back to the main shop's
+  // name/logo, so this storefront doesn't get mixed up with the parts shop,
+  // workshop, or any other platform sharing this same settings row.
+  const bizName=shopSettings.car_sales_shop_name||"Car Sales";
+  const carSalesLogoSettings={logo_url:shopSettings.car_sales_logo_url,logo_data:shopSettings.car_sales_logo_data,logo_h_lg:280};
   const si=LISTING_STATUS_INFO[listing.status]||LISTING_STATUS_INFO.available;
   const isSold=listing.status==="sold";
   const contactPhone=listing.contact_phone||shopSettings.whatsapp||shopSettings.phone||"";
@@ -2402,8 +2410,10 @@ export function CarListingPage({id}) {
       <style>{CSS}</style>
       <div style={{width:"100%",maxWidth:520,paddingTop:16}}>
         <div style={{textAlign:"center",marginBottom:20}}>
+          <ShopLogo settings={carSalesLogoSettings} size="lg" style={{margin:"0 auto 8px"}}/>
           <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:22,fontWeight:700,color:"var(--accent)"}}>{bizName}</div>
           <div style={{color:"var(--text3)",fontSize:13,marginTop:2}}>Vehicle for Sale</div>
+          <a href="?cars=1" style={{display:"inline-block",marginTop:8,fontSize:12,color:"var(--blue)",textDecoration:"none"}}>← See all cars for sale</a>
         </div>
 
         {/* Photos */}
@@ -2428,7 +2438,10 @@ export function CarListingPage({id}) {
         <div className="card" style={{padding:16,marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:6}}>
             <div style={{fontWeight:700,fontSize:18}}>{title}</div>
-            <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99,background:si.bg,color:si.color,flexShrink:0}}>{listingStatusLabel(listing.status)}</span>
+            <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end",flexShrink:0}}>
+              <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99,background:si.bg,color:si.color}}>{listingStatusLabel(listing.status)}</span>
+              {listing.for_parts_only&&<span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99,background:"rgba(220,38,38,.15)",color:"#f87171"}}>🔧 For Stripping</span>}
+            </div>
           </div>
           {listing.vehicle_reg&&<div style={{fontSize:13,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginBottom:10}}>{listing.vehicle_reg}</div>}
           <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:28,color:"var(--accent)",marginBottom:10}}>
@@ -2461,6 +2474,7 @@ export function CarListingPage({id}) {
             </FD>
             {contactPhone?(
               <a href={waLink(contactPhone,askMsg)} target="_blank" rel="noopener noreferrer"
+                onClick={()=>api.patch("car_sales_listings","id",id,{whatsapp_click_count:(+listing.whatsapp_click_count||0)+1}).catch(()=>{})}
                 className="btn btn-primary" style={{width:"100%",textAlign:"center",textDecoration:"none",display:"block",padding:"12px",marginTop:4}}>
                 📱 Ask via WhatsApp
               </a>
@@ -2471,6 +2485,98 @@ export function CarListingPage({id}) {
         )}
       </div>
       {lightboxIdx!==null&&<ImgLightbox urls={photos} startIdx={lightboxIdx} onClose={()=>setLightboxIdx(null)}/>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CAR SHOP — public, no-auth browse/search across every available
+// listing (?cars=1). Each card links to that car's own ?car=<id> page.
+// ═══════════════════════════════════════════════════════════════
+export function CarShopPage() {
+  const [listings,setListings]=useState([]);
+  const [shopSettings,setShopSettings]=useState({});
+  const [loaded,setLoaded]=useState(false);
+  const [search,setSearch]=useState("");
+
+  useEffect(()=>{
+    (async()=>{
+      const [ls,ss]=await Promise.all([
+        api.get("car_sales_listings","status=in.(available,reserved)&select=*&order=created_at.desc").catch(()=>[]),
+        api.get("settings","id=eq.1&select=*").catch(()=>[]),
+      ]);
+      setListings(Array.isArray(ls)?ls:[]);
+      setShopSettings(Array.isArray(ss)&&ss[0]?ss[0]:{});
+      setLoaded(true);
+    })();
+  },[]);
+
+  const sym=curSym(shopSettings.currency||"R");
+  const bizName=shopSettings.car_sales_shop_name||"Car Sales";
+  const carSalesLogoSettings={logo_url:shopSettings.car_sales_logo_url,logo_data:shopSettings.car_sales_logo_data,logo_h_lg:280};
+  const qWords=search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const filtered=listings.filter(l=>{
+    if(qWords.length===0) return true;
+    const haystack=[l.make,l.model,l.year,l.vehicle_reg,l.city,l.province,l.country].filter(Boolean).join(" ").toLowerCase();
+    return qWords.every(w=>haystack.includes(w));
+  });
+
+  if(!loaded) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
+      <style>{CSS}</style>
+      <div style={{color:"#ff7a2e",fontSize:15}}>⏳ Loading…</div>
+    </div>
+  );
+
+  return (
+    <div style={{background:"#0a0e1a",minHeight:"100vh",padding:"20px 16px"}}>
+      <style>{CSS}</style>
+      <div style={{maxWidth:960,margin:"0 auto"}}>
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <ShopLogo settings={carSalesLogoSettings} size="lg" style={{margin:"0 auto 8px"}}/>
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:24,fontWeight:700,color:"var(--accent)"}}>{bizName}</div>
+          <div style={{color:"var(--text3)",fontSize:13,marginTop:2}}>Cars for Sale</div>
+        </div>
+
+        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="Search make, model, year, city…" style={{width:"100%",marginBottom:16,padding:"12px 14px",fontSize:14}}/>
+
+        {filtered.length===0?(
+          <div className="card" style={{padding:40,textAlign:"center",color:"var(--text3)"}}>
+            <div style={{fontSize:32,marginBottom:10}}>🚗</div>
+            {listings.length===0?"No cars listed right now — check back soon.":"No cars match your search."}
+          </div>
+        ):(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:14}}>
+            {filtered.map(l=>{
+              const photos=(Array.isArray(l.photos)?l.photos:[]).filter(Boolean);
+              const si=LISTING_STATUS_INFO[l.status]||LISTING_STATUS_INFO.available;
+              return (
+                <a key={l.id} href={`?car=${l.id}`}
+                  className="card card-hover" style={{padding:14,textDecoration:"none",color:"inherit",display:"flex",flexDirection:"column"}}>
+                  {photos[0]
+                    ? <img src={photos[0]} alt={l.make} style={{width:"100%",height:130,objectFit:"cover",borderRadius:9,marginBottom:10,background:"var(--surface2)"}}/>
+                    : <div style={{width:"100%",height:130,background:"var(--surface2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,marginBottom:10}}>🚗</div>}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6,marginBottom:4}}>
+                    <div style={{fontWeight:700,fontSize:14}}>{l.year||""} {l.make} {l.model}</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end",flexShrink:0}}>
+                      <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:si.bg,color:si.color}}>{listingStatusLabel(l.status)}</span>
+                      {l.for_parts_only&&<span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:"rgba(220,38,38,.15)",color:"#f87171"}}>🔧 Stripping</span>}
+                    </div>
+                  </div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>
+                    {l.mileage?`${(+l.mileage).toLocaleString()} km`:""}
+                    {(l.city||l.country)?`${l.mileage?" · ":""}📍 ${[l.city,l.country].filter(Boolean).join(", ")}`:""}
+                  </div>
+                  <div style={{marginTop:"auto",fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:20,color:"var(--accent)"}}>
+                    {sym}{(+l.price||0).toLocaleString()}
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

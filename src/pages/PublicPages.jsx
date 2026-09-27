@@ -2437,6 +2437,7 @@ export function CarListingPage({id}) {
           <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13,color:"var(--text2)"}}>
             {listing.mileage&&<div>🛣️ {(+listing.mileage).toLocaleString()} km</div>}
             {listing.color&&<div>🎨 {listing.color}</div>}
+            {(listing.city||listing.province||listing.country)&&<div>📍 {[listing.city,listing.province,listing.country].filter(Boolean).join(", ")}</div>}
             {listing.vin&&<div style={{fontFamily:"DM Mono,monospace",fontSize:12}}>VIN: {listing.vin}</div>}
           </div>
           {listing.notes&&<div style={{marginTop:10,fontSize:13,color:"var(--text2)",lineHeight:1.5,whiteSpace:"pre-wrap"}}>{listing.notes}</div>}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { uploadToStorage } from "../lib/api.js";
 import { getSettings, curSym } from "../lib/settings.js";
-import { makeId, waLink } from "../lib/helpers.js";
+import { makeId, waLink, nemigaVinUrl } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 import { Overlay, MHead, FL, FG, ImgLightbox, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, uploadRenewalOutput, uploadAttachment, IcWhatsApp, IcTrash } from "./shared.jsx";
 
@@ -944,7 +944,7 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, onRefresh
                   <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:si.bg,color:si.color,flexShrink:0}}>{statusLabel(l.status,t)}</span>
                 </div>
                 <div style={{fontSize:12,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginBottom:6}}>{l.vehicle_reg||"—"}</div>
-                <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>{sourceLabel(l.source,t)}{l.mileage?` · ${(+l.mileage).toLocaleString()} km`:""}</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>{sourceLabel(l.source,t)}{l.mileage?` · ${(+l.mileage).toLocaleString()} km`:""}{(l.city||l.country)?` · 📍 ${[l.city,l.country].filter(Boolean).join(", ")}`:""}</div>
                 <div style={{marginTop:"auto",fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:20,color:"var(--accent)"}}>
                   {l.status==="sold"?`${C}${(+l.sold_price||+l.price||0).toLocaleString()}`:`${C}${(+l.price||0).toLocaleString()}`}
                 </div>
@@ -972,6 +972,7 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onPromote, onClose
     vehicle_reg:"", make:"", model:"", year:"", vin:"", color:"", mileage:"",
     price:"", trade_in_value:"", status:"available", source:"trade_in",
     photos:[], notes:"", contact_name:"", contact_phone:"",
+    country:"", province:"", city:"",
     ...listing,
   });
   const [uploading, setUploading] = useState(false);
@@ -1048,6 +1049,26 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onPromote, onClose
     fr.readAsDataURL(file);
   };
 
+  // VIN catalogue lookup — same tool set as the workshop's VIN popup, for
+  // cars whose year/spec don't decode cleanly from the VIN itself.
+  const catcarSlug=(make)=>{
+    const m=(make||"").toLowerCase().replace(/[-\s]+/g,"");
+    const map={mercedesbenz:"mercedes",mercedes:"mercedes",smart:"mercedes",vw:"audivw",volkswagen:"audivw",audi:"audivw",landrover:"land-rover",rangerover:"land-rover",alfaromeo:"alfa-romeo",mini:"bmw",rollsroyce:"bmw","rolls-royce":"bmw"};
+    return map[m]||(make||"").toLowerCase().replace(/\s+/g,"-");
+  };
+  const vinToolLinks = f.vin ? [
+    {label:"Google AI", icon:"🔎", color:"#4285F4", bg:"rgba(66,133,244,.12)",  href:`https://www.google.com/search?udm=50&q=${encodeURIComponent(f.vin+" what year make model")}`},
+    {label:"CatCar",    icon:"🐱", color:"#ff7a2e", bg:"rgba(255,122,46,.13)",  href:f.make?`https://catcar.info/${catcarSlug(f.make)}/?lang=en&vin=${encodeURIComponent(f.vin)}`:`https://catcar.info/?lang=en&vin=${encodeURIComponent(f.vin)}`},
+    {label:"Nemiga",    icon:"🗂️", color:"#14b8a6", bg:"rgba(20,184,166,.12)",  href:nemigaVinUrl(f.vin,f.make)},
+    {label:"7zap",      icon:"🔩", color:"#60a5fa", bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/"},
+    {label:"RealOEM",   icon:"🚗", color:"#34d399", bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(f.vin)}`},
+    {label:"VIN Decode",icon:"🔎", color:"#fbbf24", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(f.vin)}`},
+    {label:"17VIN",     icon:"🆔", color:"#94a3b8", bg:"rgba(148,163,184,.13)", href:`https://en.17vin.com/vin/${encodeURIComponent(f.vin)}`},
+    {label:"DecodeThis",icon:"🧬", color:"#a78bfa", bg:"rgba(167,139,250,.13)", href:`https://decodethis.com/web/vin/${encodeURIComponent(f.vin)}`},
+    {label:"AutoZone",  icon:"🔴", color:"#dc2626", bg:"rgba(220,38,38,.12)",   href:`https://www.autozoneonline.co.za/t/index?q=${encodeURIComponent(f.vin)}`},
+    {label:"Amayama",   icon:"🔧", color:"#0ea5e9", bg:"rgba(14,165,233,.12)",  href:`https://www.amayama.com/search/?q=${encodeURIComponent(f.vin)}`},
+  ] : [];
+
   const save = async () => {
     if(!f.make.trim()&&!f.vehicle_reg.trim()){ alert("Enter at least a make or registration number"); return; }
     setSaving(true);
@@ -1109,6 +1130,21 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onPromote, onClose
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
         <div><FL label={t.carSalesRegLabel||"Registration"}/><input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="e.g. AB12CDGP"/></div>
         <div><FL label={t.laVinLabel||"VIN"}/><input className="inp" value={f.vin} onChange={e=>s("vin",e.target.value)}/></div>
+        {vinToolLinks.length>0&&(
+          <div style={{gridColumn:"1/-1"}}>
+            <FL label="VIN Lookup"/>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6}}>
+              {vinToolLinks.map(lk=>(
+                <a key={lk.label} href={lk.href} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"7px 2px",
+                    background:lk.bg,border:`1px solid ${lk.color}44`,borderRadius:8,
+                    color:lk.color,textDecoration:"none",fontSize:10,fontWeight:600,textAlign:"center",lineHeight:1.2}}>
+                  <span style={{fontSize:16}}>{lk.icon}</span><span>{lk.label}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
         <div><FL label={t.carSalesMakeLabel||"Make"}/><input className="inp" value={f.make} onChange={e=>s("make",e.target.value)} placeholder="e.g. Toyota"/></div>
         <div><FL label={t.carSalesModelLabel||"Model"}/><input className="inp" value={f.model} onChange={e=>s("model",e.target.value)} placeholder="e.g. Corolla"/></div>
         <div><FL label={t.carSalesYearLabel||"Year"}/><input className="inp" type="number" value={f.year} onChange={e=>s("year",e.target.value)}/></div>
@@ -1127,6 +1163,9 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onPromote, onClose
         <div><FL label={t.carSalesTradeInValueLabel||"Trade-in Value (optional)"}/><input className="inp" type="number" value={f.trade_in_value} onChange={e=>s("trade_in_value",e.target.value)}/></div>
         <div><FL label={t.carSalesContactNameLabel||"Contact Name"}/><input className="inp" value={f.contact_name} onChange={e=>s("contact_name",e.target.value)}/></div>
         <div><FL label={t.carSalesContactPhoneLabel||"Contact Phone"}/><input className="inp" value={f.contact_phone} onChange={e=>s("contact_phone",e.target.value)}/></div>
+        <div><FL label={t.carSalesCountryLabel||"Country"}/><input className="inp" value={f.country} onChange={e=>s("country",e.target.value)}/></div>
+        <div><FL label={t.carSalesProvinceLabel||"Province / State"}/><input className="inp" value={f.province} onChange={e=>s("province",e.target.value)}/></div>
+        <div><FL label={t.carSalesCityLabel||"City"}/><input className="inp" value={f.city} onChange={e=>s("city",e.target.value)}/></div>
         <div style={{gridColumn:"1/-1"}}>
           <FL label={t.status||"Status"}/>
           <select className="inp" value={f.status} onChange={e=>s("status",e.target.value)} disabled={f.status==="pending_review"}>

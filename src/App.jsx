@@ -2538,12 +2538,19 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       year: job.vehicle_year||null,
       vin: job.vin||"",
       color: job.vehicle_color||"",
-      mileage: null,
+      mileage: job.mileage||null,
       price: price||null,
       status: needsConfirmation ? "pending_confirmation" : "pending_review",
       source: "workshop_buyout",
       photos,
       notes: notes||"",
+      // D-buyout-contact: default to the workshop's own contact/location so a
+      // listing isn't published with blank fields — still editable in Car Sales.
+      contact_name: workshopProfile.name||"",
+      contact_phone: workshopProfile.whatsapp||workshopProfile.phone||"",
+      country: workshopProfile.country||"",
+      province: workshopProfile.province||"",
+      city: workshopProfile.city||"",
     };
     const {res} = await writeTolerant(p=>api.insert("car_sales_listings",p), row);
     if(!Array.isArray(res) || !res[0]?.id){

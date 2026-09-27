@@ -846,19 +846,22 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose, t={}}) {
 // CAR SALES — trade-in / used car listings pipeline
 // ═══════════════════════════════════════════════════════════════
 const STATUS_INFO = {
-  available: {color:"var(--green)",  bg:"rgba(52,211,153,.15)"},
-  reserved:  {color:"var(--yellow)", bg:"rgba(251,191,36,.15)"},
-  sold:      {color:"var(--text3)",  bg:"rgba(148,163,184,.15)"},
+  available:       {color:"var(--green)",  bg:"rgba(52,211,153,.15)"},
+  reserved:        {color:"var(--yellow)", bg:"rgba(251,191,36,.15)"},
+  sold:            {color:"var(--text3)",  bg:"rgba(148,163,184,.15)"},
+  pending_review:  {color:"#fb923c",       bg:"rgba(251,146,60,.15)"},
 };
 const statusLabel = (status,t) => ({
   available: t.carSalesStatusAvailable||"Available",
   reserved:  t.carSalesStatusReserved||"Reserved",
   sold:      t.carSalesStatusSold||"Sold",
+  pending_review: t.carSalesStatusPendingReview||"⏳ Pending Review",
 }[status] || status);
 const sourceLabel = (source,t) => ({
   trade_in: t.carSalesSourceTradeIn||"🔄 Trade-in",
   referral: t.carSalesSourceReferral||"🤝 Referral",
   other:    t.carSalesSourceOther||"📋 Other",
+  workshop_buyout: t.carSalesSourceWorkshopBuyout||"🔧 Workshop Buyout",
 }[source] || source || "");
 
 export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, t={}}) {
@@ -867,13 +870,19 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, t={}}) {
   const [modalListing, setModalListing] = useState(null); // null=closed, {}=new, {...}=edit
   const C = curSym(getSettings().currency);
 
+  // pending_confirmation offers haven't had their price confirmed by workshop
+  // main/manager yet — they're not this admin's decision to make, so they never
+  // appear here at all, not even under "All".
+  const visibleListings = listings.filter(l=>l.status!=="pending_confirmation");
+  const pendingReviewCount = visibleListings.filter(l=>l.status==="pending_review").length;
+
   const q = search.trim().toLowerCase();
-  const filtered = listings
+  const filtered = visibleListings
     .filter(l => filter==="all" || l.status===filter)
     .filter(l => !q || [l.vehicle_reg,l.make,l.model,l.vin].filter(Boolean).some(v=>v.toLowerCase().includes(q)));
 
-  const totalValue = listings.filter(l=>l.status==="available").reduce((s,l)=>s+(+l.price||0),0);
-  const soldValue = listings.filter(l=>l.status==="sold").reduce((s,l)=>s+(+l.sold_price||l.price||0),0);
+  const totalValue = visibleListings.filter(l=>l.status==="available").reduce((s,l)=>s+(+l.price||0),0);
+  const soldValue = visibleListings.filter(l=>l.status==="sold").reduce((s,l)=>s+(+l.sold_price||l.price||0),0);
 
   return (
     <div>
@@ -881,17 +890,24 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, t={}}) {
         <div>
           <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🏷️ {t.loginCarSales||"Car Sales"}</div>
           <div style={{fontSize:13,color:"var(--text3)"}}>
-            {listings.length} {t.carSalesListingsWord||"listings"} · {C}{totalValue.toLocaleString()} {t.carSalesStatusAvailable?.toLowerCase()||"available"} · {C}{soldValue.toLocaleString()} {t.carSalesStatusSold?.toLowerCase()||"sold"}
+            {visibleListings.length} {t.carSalesListingsWord||"listings"} · {C}{totalValue.toLocaleString()} {t.carSalesStatusAvailable?.toLowerCase()||"available"} · {C}{soldValue.toLocaleString()} {t.carSalesStatusSold?.toLowerCase()||"sold"}
           </div>
         </div>
-        <button className="btn btn-primary" onClick={()=>setModalListing({})}>{t.carSalesNewListing||"+ New Listing"}</button>
+        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+          {pendingReviewCount>0&&(
+            <button onClick={()=>setFilter("pending_review")} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:20,border:"1px solid rgba(251,146,60,.4)",background:"rgba(251,146,60,.12)",color:"#fb923c",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+              ⏳ {pendingReviewCount} awaiting review
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={()=>setModalListing({})}>{t.carSalesNewListing||"+ New Listing"}</button>
+        </div>
       </div>
 
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
-        {[["all",t.carSalesFilterAll||"All"],["available",t.carSalesStatusAvailable||"Available"],["reserved",t.carSalesStatusReserved||"Reserved"],["sold",t.carSalesStatusSold||"Sold"]].map(([v,l])=>(
+        {[["all",t.carSalesFilterAll||"All"],["pending_review",statusLabel("pending_review",t)],["available",t.carSalesStatusAvailable||"Available"],["reserved",t.carSalesStatusReserved||"Reserved"],["sold",t.carSalesStatusSold||"Sold"]].map(([v,l])=>(
           <button key={v} onClick={()=>setFilter(v)}
             style={{padding:"5px 12px",borderRadius:20,border:"1px solid var(--border)",background:filter===v?"var(--accent)":"var(--surface2)",color:filter===v?"#fff":"var(--text2)",fontSize:12,cursor:"pointer",fontWeight:filter===v?700:400}}>
-            {l} <span style={{opacity:.6}}>{v==="all"?listings.length:listings.filter(x=>x.status===v).length}</span>
+            {l} <span style={{opacity:.6}}>{v==="all"?visibleListings.length:visibleListings.filter(x=>x.status===v).length}</span>
           </button>
         ))}
         <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder={t.carSalesSearchPlaceholder||"Search reg, make, model, VIN…"}
@@ -936,13 +952,14 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, t={}}) {
           onSave={async(rec)=>{ await onSave(rec); setModalListing(null); }}
           onDelete={modalListing.id?async()=>{ if(window.confirm("Delete this listing?")){ await onDelete(modalListing.id); setModalListing(null); } }:null}
           onMarkSold={modalListing.id?async(soldPrice,soldTo)=>{ await onUpdate(modalListing.id,{status:"sold",sold_at:new Date().toISOString(),sold_price:soldPrice||null,sold_to:soldTo||null}); setModalListing(null); }:null}
+          onPromote={modalListing.id&&modalListing.status==="pending_review"?async()=>{ await onUpdate(modalListing.id,{status:"available"}); setModalListing(null); }:null}
           onClose={()=>setModalListing(null)}/>
       )}
     </div>
   );
 }
 
-function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose, t={}}) {
+function CarSaleModal({listing, onSave, onDelete, onMarkSold, onPromote, onClose, t={}}) {
   const isNew = !listing.id;
   const [f, setF] = useState({
     vehicle_reg:"", make:"", model:"", year:"", vin:"", color:"", mileage:"",
@@ -1078,6 +1095,7 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose, t={}}) {
           <select className="inp" value={f.source} onChange={e=>s("source",e.target.value)}>
             <option value="trade_in">{t.carSalesSourceTradeIn||"🔄 Trade-in"}</option>
             <option value="referral">{t.carSalesSourceReferral||"🤝 Referral"}</option>
+            <option value="workshop_buyout">{t.carSalesSourceWorkshopBuyout||"🔧 Workshop Buyout"}</option>
             <option value="other">{t.carSalesSourceOther||"📋 Other"}</option>
           </select>
         </div>
@@ -1087,7 +1105,8 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose, t={}}) {
         <div><FL label={t.carSalesContactPhoneLabel||"Contact Phone"}/><input className="inp" value={f.contact_phone} onChange={e=>s("contact_phone",e.target.value)}/></div>
         <div style={{gridColumn:"1/-1"}}>
           <FL label={t.status||"Status"}/>
-          <select className="inp" value={f.status} onChange={e=>s("status",e.target.value)}>
+          <select className="inp" value={f.status} onChange={e=>s("status",e.target.value)} disabled={f.status==="pending_review"}>
+            {f.status==="pending_review"&&<option value="pending_review">⏳ {statusLabel("pending_review",t)} — use the buttons above</option>}
             <option value="available">✅ {t.carSalesStatusAvailable||"Available"}</option>
             <option value="reserved">⏳ {t.carSalesStatusReserved||"Reserved"}</option>
             <option value="sold">🏁 {t.carSalesStatusSold||"Sold"}</option>
@@ -1096,7 +1115,17 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onClose, t={}}) {
         <div style={{gridColumn:"1/-1"}}><FL label={t.notes||"Notes"}/><textarea className="inp" rows={3} value={f.notes} onChange={e=>s("notes",e.target.value)}/></div>
       </div>
 
-      {!isNew&&onMarkSold&&f.status!=="sold"&&(
+      {!isNew&&f.status==="pending_review"&&(
+        <div style={{marginBottom:14,padding:12,background:"rgba(251,146,60,.1)",border:"1px solid rgba(251,146,60,.35)",borderRadius:10}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>⏳ Workshop buyout offer — awaiting your decision</div>
+          <div style={{display:"flex",gap:8}}>
+            {onPromote&&<button className="btn btn-primary" style={{flex:1}} onClick={onPromote}>✅ Promote to Available</button>}
+            {onDelete&&<button className="btn btn-danger" style={{flex:1}} onClick={onDelete}>❌ Decline</button>}
+          </div>
+        </div>
+      )}
+
+      {!isNew&&onMarkSold&&f.status!=="sold"&&f.status!=="pending_review"&&(
         <div style={{marginBottom:14,padding:12,background:"var(--surface2)",borderRadius:10}}>
           {!showSoldForm ? (
             <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>setShowSoldForm(true)}>{t.carSalesMarkSold||"🏁 Mark as Sold"}</button>

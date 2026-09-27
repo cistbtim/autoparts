@@ -51,7 +51,7 @@ Start-Process -FilePath "npx.cmd" `
 
 $tunnelUrl = $null
 $waited = 0
-while ($waited -lt 30 -and -not $tunnelUrl) {
+while ($waited -lt 60 -and -not $tunnelUrl) {
     Start-Sleep -Seconds 1
     $waited++
     foreach ($f in @($CloudflaredErr, $CloudflaredOut)) {

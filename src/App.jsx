@@ -2,7 +2,7 @@
 import { api, setDemoMode, SUPABASE_URL, SUPABASE_KEY } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
-import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag, openPartLabelsWindow } from "./lib/helpers.js";
+import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag, openPartLabelsWindow, normMake } from "./lib/helpers.js";
 import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess, CITY_PROVINCE } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
 import { CSS } from "./styles.js";
@@ -2490,6 +2490,68 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const deleteCarSalesListing=async(id)=>{
     await api.delete("car_sales_listings","id",id).catch(e=>console.warn("Delete listing failed:",e));
     setCarSalesListings(p=>p.filter(l=>l.id!==id));
+  };
+
+  // A workshop customer asking "just buy it instead of fixing it" — creates a
+  // car_sales_listings row from the job's own vehicle data. Unlike
+  // saveCarSalesListing above, failures here must be visible: the whole point
+  // is capturing offers that would otherwise be silently lost, so this uses
+  // writeTolerant + an explicit ok/message result instead of swallowing errors.
+  const submitWorkshopBuyoutOffer = async (job, {price, notes}) => {
+    const reg = (job.vehicle_reg||"").trim();
+    if(!reg) return {ok:false, message:"This job has no vehicle registration on file."};
+    // D5: block a duplicate offer for the same car — checked right before insert
+    // (the calling UI already hides the button once one exists, this is the
+    // race-safe backstop).
+    const existing = await api.fresh("car_sales_listings", `vehicle_reg=eq.${encodeURIComponent(reg)}&status=in.(pending_confirmation,pending_review)&select=id,status,price&limit=1`).catch(()=>null);
+    if(Array.isArray(existing) && existing.length>0){
+      return {ok:false, message:"An offer for this vehicle is already pending.", existing:existing[0]};
+    }
+    // D2: photos live in workshop_job_photos, not on the job itself.
+    const jobPhotos = await api.fresh("workshop_job_photos", `job_id=eq.${job.id}&select=url`).catch(()=>[]);
+    const photos = Array.isArray(jobPhotos) ? jobPhotos.map(p=>p.url).filter(Boolean) : [];
+    // D2: job.vehicle_model is often an internal catalog code (e.g. "BM001D"), not
+    // a display name — resolve it the same way resolvedVehicleModel does elsewhere
+    // in Workshop.jsx before writing it to a listing anyone will actually read.
+    const resolvedModel = (job.vehicle_model && job.vehicle_make)
+      ? (vehicles.find(v=>(v.code===job.vehicle_model||v.model===job.vehicle_model)&&normMake(v.make)===normMake(job.vehicle_make))?.model || job.vehicle_model)
+      : (job.vehicle_model||"");
+    // D8: a mechanic's offer isn't yet a price they may speak to the customer —
+    // it needs main/manager confirmation. main/manager submissions skip that gate.
+    const needsConfirmation = wsRole==="mechanic";
+    const row = {
+      id: makeId("CS"),
+      vehicle_reg: reg,
+      make: job.vehicle_make||"",
+      model: resolvedModel,
+      year: job.vehicle_year||"",
+      vin: job.vin||"",
+      color: job.vehicle_color||"",
+      mileage: "",
+      price: price||"",
+      status: needsConfirmation ? "pending_confirmation" : "pending_review",
+      source: "workshop_buyout",
+      photos,
+      notes: notes||"",
+    };
+    const {res} = await writeTolerant(p=>api.insert("car_sales_listings",p), row);
+    if(!Array.isArray(res) || !res[0]?.id){
+      return {ok:false, message: res?.message || "Failed to save the offer — check your connection and try again."};
+    }
+    const saved = res[0];
+    setCarSalesListings(p=>[saved,...p]);
+    return {ok:true, listing:saved};
+  };
+
+  // D8: main/manager confirms a mechanic-submitted price before it may be spoken
+  // to the customer.
+  const confirmWorkshopBuyoutOffer = async (id) => {
+    const {res} = await writeTolerant(p=>api.patch("car_sales_listings","id",id,p), {status:"pending_review"});
+    if(!Array.isArray(res) || !res[0]?.id){
+      return {ok:false, message: res?.message || "Failed to confirm the offer — check your connection and try again."};
+    }
+    setCarSalesListings(p=>p.map(l=>l.id===id?{...l,status:"pending_review"}:l));
+    return {ok:true};
   };
 
   const patchWsBooking=async(id,patch)=>{
@@ -8320,6 +8382,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onDeleteWsCustomer={deleteWorkshopCustomer}
             onSaveWsVehicle={saveWorkshopVehicle}
             onPatchWsVehicle={patchWsVehicleLocal}
+            onSubmitBuyoutOffer={submitWorkshopBuyoutOffer}
+            onConfirmBuyoutOffer={confirmWorkshopBuyoutOffer}
             onDeleteWsVehicle={deleteWorkshopVehicle}
             onSaveWsStock={saveWsStockItem}
             onDeleteWsStock={deleteWsStockItem}

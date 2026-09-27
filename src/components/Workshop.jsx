@@ -28,7 +28,7 @@ import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
-export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle,headerBookInTrigger=0}) {
+export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle,headerBookInTrigger=0}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -407,6 +407,8 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         onSendQuoteForApproval={onSendQuoteForApproval}
         onSaveWsVehicle={onSaveWsVehicle}
         onPatchWsVehicle={onPatchWsVehicle}
+        onSubmitBuyoutOffer={onSubmitBuyoutOffer}
+        onConfirmBuyoutOffer={onConfirmBuyoutOffer}
         wsRole={wsRole}
         sqReplies={wsSqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===activeJob.id))}
         onGenerateWsQuoteLink={onGenerateWsQuoteLink}
@@ -4387,7 +4389,7 @@ export function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,wsLicenceRenewals=[],onUpdateWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},onSaveWsProfile,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
+function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,wsLicenceRenewals=[],onUpdateWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},onSaveWsProfile,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -4527,6 +4529,43 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   const [vinPopup,      setVinPopup]      = useState(false);
   const [inspectPopup,  setInspectPopup]  = useState(false);
   const [carPopup,      setCarPopup]      = useState(false);
+  // "Offer to buy instead" — undefined while loading, null once confirmed there's
+  // no pending offer for this vehicle, or the existing row otherwise.
+  const [buyoutOffer,     setBuyoutOffer]     = useState(undefined);
+  const [buyoutModal,     setBuyoutModal]     = useState(false);
+  const [buyoutForm,      setBuyoutForm]      = useState({price:"",notes:""});
+  const [buyoutSubmitting,setBuyoutSubmitting]= useState(false);
+  const [buyoutError,     setBuyoutError]     = useState("");
+  const [buyoutConfirming,setBuyoutConfirming]= useState(false);
+  // Scoped, cheap lookup — workshop users never load the full car_sales_listings
+  // table client-side (that fetch is gated to role car_sales/carsales_admin), so
+  // this can't reuse any already-loaded state; it queries just this one vehicle.
+  const refreshBuyoutOffer = useCallback(()=>{
+    const reg=(job.vehicle_reg||"").trim();
+    if(!reg){ setBuyoutOffer(null); return; }
+    api.get("car_sales_listings",`vehicle_reg=eq.${encodeURIComponent(reg)}&status=in.(pending_confirmation,pending_review)&select=id,status,price,notes&limit=1`)
+      .then(rows=>setBuyoutOffer(Array.isArray(rows)&&rows[0]?rows[0]:null))
+      .catch(()=>setBuyoutOffer(null));
+  },[job.vehicle_reg]);
+  useEffect(()=>{ refreshBuyoutOffer(); },[refreshBuyoutOffer]);
+  const submitBuyout = async () => {
+    if(!buyoutForm.price||buyoutSubmitting) return;
+    setBuyoutSubmitting(true); setBuyoutError("");
+    try{
+      const r = await onSubmitBuyoutOffer(job,{price:buyoutForm.price,notes:buyoutForm.notes});
+      if(r?.ok){ setBuyoutOffer(r.listing); setBuyoutModal(false); setBuyoutForm({price:"",notes:""}); }
+      else setBuyoutError(r?.message||"Failed to save the offer.");
+    } finally { setBuyoutSubmitting(false); }
+  };
+  const handleConfirmBuyout = async () => {
+    if(!buyoutOffer||buyoutConfirming) return;
+    setBuyoutConfirming(true);
+    try{
+      const r = await onConfirmBuyoutOffer(buyoutOffer.id);
+      if(r?.ok) setBuyoutOffer(p=>p?{...p,status:"pending_review"}:p);
+      else alert(r?.message||"Failed to confirm the offer.");
+    } finally { setBuyoutConfirming(false); }
+  };
   const [docsPopup,     setDocsPopup]     = useState(false);
   const [docsPopupTab,  setDocsPopupTab]  = useState("photos");
   const [payPopup,      setPayPopup]      = useState(false);
@@ -6024,6 +6063,38 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             <div style={{display:"flex",flexDirection:"column",gap:isMobile?8:12,marginBottom:14}}>
               <div style={{display:"flex",gap:isMobile?8:12}}>{row1.map(renderTile)}</div>
               {row2.length>0&&<div style={{display:"flex",gap:isMobile?8:12}}>{row2.map(renderTile)}</div>}
+              {onSubmitBuyoutOffer&&buyoutOffer!==undefined&&(
+                buyoutOffer
+                  ? <div style={{padding:"12px 14px",borderRadius:14,
+                      background: buyoutOffer.status==="pending_confirmation" ? "rgba(251,191,36,.12)" : "rgba(52,211,153,.12)",
+                      border: `1px solid ${buyoutOffer.status==="pending_confirmation" ? "rgba(251,191,36,.35)" : "rgba(52,211,153,.35)"}`}}>
+                      {buyoutOffer.status==="pending_confirmation" ? (
+                        wsRole!=="mechanic" ? (
+                          <>
+                            <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>⏳ Buyout offer awaiting your confirmation — R{(+buyoutOffer.price||0).toLocaleString()}</div>
+                            <button className="btn btn-primary btn-sm" disabled={buyoutConfirming} onClick={handleConfirmBuyout}>
+                              {buyoutConfirming?"Confirming…":"✅ Confirm this price"}
+                            </button>
+                          </>
+                        ) : (
+                          <div style={{fontWeight:700,fontSize:13}}>⏳ Offer of R{(+buyoutOffer.price||0).toLocaleString()} sent to main/manager for confirmation — don't tell the customer yet.</div>
+                        )
+                      ) : (
+                        <div style={{fontWeight:700,fontSize:13}}>✅ You may offer R{(+buyoutOffer.price||0).toLocaleString()} to the customer — awaiting Car Sales review.</div>
+                      )}
+                    </div>
+                  : <button onClick={()=>setBuyoutModal(true)}
+                      style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"none",cursor:"pointer",
+                        background:"linear-gradient(135deg,#065f46,#059669)",color:"#fff",
+                        boxShadow:"0 4px 14px rgba(5,150,105,.35)",textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
+                      <span style={{fontSize:28,lineHeight:1}}>💰</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:800,letterSpacing:".02em",marginBottom:2}}>Sell This Car</div>
+                        <div style={{fontSize:12,color:"rgba(255,255,255,.7)"}}>Offer to buy it from the customer instead of repairing</div>
+                      </div>
+                      <span style={{fontSize:20}}>›</span>
+                    </button>
+              )}
               {hasSpareShop&&(
                 isCodeLinked
                   ? <button onClick={()=>onGoToSpareShop(job.vehicle_make||"",_linkedV.model||"",_linkedV.code||"",job.vin||"",job.engine_no||"",job.vehicle_reg||"",job.id,`${[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}${job.vehicle_reg?` · ${job.vehicle_reg}`:""}`.trim()||job.id,job.customer_name||"")}
@@ -6129,6 +6200,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                   <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);setServiceHistModal(true);}}>📋 {t.wsHistory||"History"}{vehicleHistory.length>0?` (${vehicleHistory.length})`:""}</button>
                   <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);setDeliveryModal(true);}}>🚗 {t.wsCollect}</button>
                   {onSaveWsBooking&&<button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--blue)"}} onClick={()=>{setShowJobMenu(false);setNewBooking({complaint:"",preferred_date:""});}}>🗓️ New Booking for this Vehicle</button>}
+                  {onSubmitBuyoutOffer&&!buyoutOffer&&<button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--green)"}} onClick={()=>{setShowJobMenu(false);setBuyoutModal(true);}}>💰 Offer to Buy This Car Instead</button>}
                   {wsRole==="main"&&onMoveJob&&wsProfile?.move_pin&&<button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--yellow)"}} onClick={()=>{setShowJobMenu(false);setMovePinVal("");setMovePinErr("");setMovePinOpen(true);}}>🔀 {t.wsMove}</button>}
                   <button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px"}} onClick={()=>{setShowJobMenu(false);const lines=["============================","  VEHICLE INFO","============================",`Plate    : ${job.vehicle_reg||"—"}`,`Make     : ${job.vehicle_make||"—"}`,`Model    : ${job.vehicle_model||"—"}`,`Year     : ${job.vehicle_year||"—"}`,`Color    : ${job.vehicle_color||"—"}`,`Mileage  : ${job.mileage?job.mileage.toLocaleString()+" km":"—"}`,job.vin?`VIN      : ${job.vin}`:"",job.engine_no?`Engine No: ${job.engine_no}`:"","============================"].filter(Boolean).join("\r\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines],{type:"text/plain"}));a.download=`VehicleInfo_${job.vehicle_reg||job.id}.txt`;a.click();}}>⬇️ {t.wsInfoBtn}</button>
                   {wsRole==="main"&&onDeleteJob&&!wsLocked&&<><div style={{height:1,background:"var(--border)",margin:"4px 8px"}}/><button className="btn btn-ghost btn-sm" style={{justifyContent:"flex-start",padding:"10px 14px",color:"var(--red)"}} onClick={()=>{setShowJobMenu(false);if(window.confirm(`Delete job ${job.id} for ${job.customer_name}?\n\nThis cannot be undone.`))onDeleteJob();}}>🗑 {t.delete}</button></>}
@@ -6136,6 +6208,27 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               </>
             )}
           </div>
+          {/* ── Buyout offer status ── */}
+          {buyoutOffer&&(
+            <div style={{marginBottom:14,padding:"12px 14px",borderRadius:10,
+              background: buyoutOffer.status==="pending_confirmation" ? "rgba(251,191,36,.12)" : "rgba(52,211,153,.12)",
+              border: `1px solid ${buyoutOffer.status==="pending_confirmation" ? "rgba(251,191,36,.35)" : "rgba(52,211,153,.35)"}`}}>
+              {buyoutOffer.status==="pending_confirmation" ? (
+                wsRole!=="mechanic" ? (
+                  <>
+                    <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>⏳ Buyout offer awaiting your confirmation — R{(+buyoutOffer.price||0).toLocaleString()}</div>
+                    <button className="btn btn-primary btn-sm" disabled={buyoutConfirming} onClick={handleConfirmBuyout}>
+                      {buyoutConfirming?"Confirming…":"✅ Confirm this price"}
+                    </button>
+                  </>
+                ) : (
+                  <div style={{fontWeight:700,fontSize:13}}>⏳ Offer of R{(+buyoutOffer.price||0).toLocaleString()} sent to main/manager for confirmation — don't tell the customer yet.</div>
+                )
+              ) : (
+                <div style={{fontWeight:700,fontSize:13}}>✅ You may offer R{(+buyoutOffer.price||0).toLocaleString()} to the customer — awaiting Car Sales review.</div>
+              )}
+            </div>
+          )}
           {/* ── Online Booking Source ── */}
           {sourceBooking&&(
             <div style={{marginBottom:14}}>
@@ -8823,6 +8916,33 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setNewBooking(null)}>Cancel</button>
             <button className="btn btn-primary" style={{flex:2}} disabled={!newBooking.complaint.trim()||savingBooking} onClick={submitNewBooking}>
               {savingBooking?"Saving…":"🗓️ Create Booking"}
+            </button>
+          </div>
+        </Overlay>
+      )}
+
+      {buyoutModal&&(
+        <Overlay onClose={()=>{setBuyoutModal(false);setBuyoutError("");}}>
+          <MHead title="💰 Offer to Buy This Car Instead" sub={`${job.vehicle_reg||job.id} · ${job.customer_name||"Customer"}`} onClose={()=>{setBuyoutModal(false);setBuyoutError("");}}/>
+          <div style={{background:"var(--surface2)",borderRadius:10,padding:12,marginBottom:14,border:"1px solid var(--border)",fontSize:13}}>
+            <div>{[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")||"—"} {job.vehicle_reg&&<code style={{fontFamily:"DM Mono,monospace",marginLeft:6}}>{job.vehicle_reg}</code>}</div>
+          </div>
+          <FD>
+            <FL label="Offer price *"/>
+            <input className="inp" type="number" autoFocus placeholder="e.g. 45000" value={buyoutForm.price} onChange={e=>setBuyoutForm(f=>({...f,price:e.target.value}))}/>
+          </FD>
+          <FD>
+            <FL label="Notes (optional)"/>
+            <textarea className="inp" rows={3} placeholder="Why the customer's selling, condition notes, etc." value={buyoutForm.notes} onChange={e=>setBuyoutForm(f=>({...f,notes:e.target.value}))} style={{resize:"vertical"}}/>
+          </FD>
+          {wsRole==="mechanic"&&(
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>A main/manager will need to confirm this price before you offer it to the customer.</div>
+          )}
+          {buyoutError&&<div style={{fontSize:12,color:"var(--red)",marginBottom:10}}>{buyoutError}</div>}
+          <div style={{display:"flex",gap:10,marginTop:8}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setBuyoutModal(false);setBuyoutError("");}}>Cancel</button>
+            <button className="btn btn-primary" style={{flex:2}} disabled={!buyoutForm.price||buyoutSubmitting} onClick={submitBuyout}>
+              {buyoutSubmitting?"Saving…":"💰 Submit Offer"}
             </button>
           </div>
         </Overlay>

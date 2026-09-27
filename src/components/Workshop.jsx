@@ -8932,7 +8932,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
         <Overlay onClose={()=>{setBuyoutModal(false);setBuyoutError("");}}>
           <MHead title="💰 Offer to Buy This Car Instead" sub={`${job.vehicle_reg||job.id} · ${job.customer_name||"Customer"}`} onClose={()=>{setBuyoutModal(false);setBuyoutError("");}}/>
           <div style={{background:"var(--surface2)",borderRadius:10,padding:12,marginBottom:14,border:"1px solid var(--border)",fontSize:13}}>
-            <div>{[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")||"—"} {job.vehicle_reg&&<code style={{fontFamily:"DM Mono,monospace",marginLeft:6}}>{job.vehicle_reg}</code>}</div>
+            <div>{[job.vehicle_year,job.vehicle_make,resolvedVehicleModel].filter(Boolean).join(" ")||"—"} {job.vehicle_reg&&<code style={{fontFamily:"DM Mono,monospace",marginLeft:6}}>{job.vehicle_reg}</code>}</div>
           </div>
           <FD>
             <FL label="Offer price *"/>

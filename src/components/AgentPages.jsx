@@ -864,9 +864,10 @@ const sourceLabel = (source,t) => ({
   workshop_buyout: t.carSalesSourceWorkshopBuyout||"🔧 Workshop Buyout",
 }[source] || source || "");
 
-export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, t={}}) {
+export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, onRefresh, t={}}) {
   const [filter, setFilter] = useState("available");
   const [search, setSearch] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const [modalListing, setModalListing] = useState(null); // null=closed, {}=new, {...}=edit
   const C = curSym(getSettings().currency);
 
@@ -897,6 +898,12 @@ export function CarSalesPage({listings=[], onSave, onUpdate, onDelete, t={}}) {
           {pendingReviewCount>0&&(
             <button onClick={()=>setFilter("pending_review")} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:20,border:"1px solid rgba(251,146,60,.4)",background:"rgba(251,146,60,.12)",color:"#fb923c",fontWeight:700,fontSize:12,cursor:"pointer"}}>
               ⏳ {pendingReviewCount} awaiting review
+            </button>
+          )}
+          {onRefresh&&(
+            <button className="btn btn-ghost" disabled={refreshing}
+              onClick={async()=>{ setRefreshing(true); try{ await onRefresh(); } finally { setRefreshing(false); } }}>
+              {refreshing?"⏳":"🔄"} {t.laRefresh||"Refresh"}
             </button>
           )}
           <button className="btn btn-primary" onClick={()=>setModalListing({})}>{t.carSalesNewListing||"+ New Listing"}</button>
@@ -1051,6 +1058,23 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onPromote, onClose
   return (
     <Overlay onClose={onClose}>
       <MHead title={isNew?(t.carSalesNewTitle||"🏷️ New Car Listing"):(t.carSalesEditTitle||"🏷️ Edit Listing")} onClose={onClose}/>
+
+      {!isNew&&["available","reserved","sold"].includes(f.status)&&(()=>{
+        const publicUrl=`${window.location.origin}${window.location.pathname}?car=${f.id}`;
+        return (
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            <button className="btn btn-ghost btn-sm" style={{flex:1}}
+              onClick={()=>navigator.clipboard.writeText(publicUrl).then(()=>alert("Public listing link copied!"))}>
+              🔗 Copy Public Link
+            </button>
+            <a className="btn btn-ghost btn-sm" style={{flex:1,textDecoration:"none",textAlign:"center"}}
+              href={waLink("",`Check out this ${[f.year,f.make,f.model].filter(Boolean).join(" ")} — ${publicUrl}`)}
+              target="_blank" rel="noopener noreferrer">
+              📱 Share via WhatsApp
+            </a>
+          </div>
+        );
+      })()}
 
       {/* Photos */}
       <div style={{marginBottom:14}}>

@@ -23,7 +23,7 @@ import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturns
 import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierScanStockPage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
 import { LicenceAgentPage, ManageOfficeAgentsModal, CarSalesPage } from "./components/AgentPages.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
-import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage } from "./pages/PublicPages.jsx";
+import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage } from "./pages/PublicPages.jsx";
 
 // ── Trap browser back button so the page never goes blank ─────
 if(window.history.state?.appLoaded !== true){
@@ -149,6 +149,8 @@ export default function App() {
   if(bsrConfirmToken) return <BranchStockRequestConfirmPage token={bsrConfirmToken}/>;
   const wsRegToken = new URLSearchParams(window.location.search).get("ws_register");
   if(wsRegToken) return <WorkshopRegisterPage token={wsRegToken}/>;
+  const carListingId = new URLSearchParams(window.location.search).get("car");
+  if(carListingId) return <CarListingPage id={carListingId}/>;
   if(new URLSearchParams(window.location.search).get("sysmap")==="1") return(
     <div style={{minHeight:"100vh"}} data-theme={document.documentElement.getAttribute("data-theme")||"dark"}>
       <style>{CSS}</style>
@@ -7002,7 +7004,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {/* ── CAR SALES ── */}
         {tab==="carSalesListings"&&(role==="car_sales"||role==="carsales_admin")&&(
-          <CarSalesPage listings={carSalesListings} onSave={saveCarSalesListing} onUpdate={updateCarSalesListing} onDelete={deleteCarSalesListing} t={t}/>
+          <CarSalesPage listings={carSalesListings} onSave={saveCarSalesListing} onUpdate={updateCarSalesListing} onDelete={deleteCarSalesListing} onRefresh={reloadCarSalesListings} t={t}/>
         )}
 
         {/* ── PURCHASE INVOICES ── */}

@@ -4,7 +4,7 @@ import { toImgUrl, waLink, makeId } from "../lib/helpers.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { T } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
-import { ShopLogo, MHead, FG, FD, FL } from "../components/shared.jsx";
+import { ShopLogo, MHead, FG, FD, FL, ImgLightbox } from "../components/shared.jsx";
 import { LogoUploader } from "../components/Modals.jsx";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
@@ -2326,3 +2326,151 @@ export function WorkshopRegisterPage({ token }) {
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// CAR LISTING — public, no-auth view of a single Car Sales listing
+// (?car=<id>) so a link can be shared with a prospective buyer. Only
+// listings that Car Sales has actually made public are shown — offers
+// still awaiting workshop/Car-Sales confirmation stay hidden.
+// ═══════════════════════════════════════════════════════════════
+const PUBLIC_LISTING_STATUSES = ["available","reserved","sold"];
+const LISTING_STATUS_INFO = {
+  available: {color:"var(--green)",  bg:"rgba(52,211,153,.15)"},
+  reserved:  {color:"var(--yellow)", bg:"rgba(251,191,36,.15)"},
+  sold:      {color:"var(--text3)",  bg:"rgba(148,163,184,.15)"},
+};
+const listingStatusLabel = (status) => ({
+  available: "Available", reserved: "Reserved", sold: "Sold",
+}[status] || status);
+
+export function CarListingPage({id}) {
+  const [listing,setListing]=useState(null);
+  const [shopSettings,setShopSettings]=useState({});
+  const [loaded,setLoaded]=useState(false);
+  const [lightboxIdx,setLightboxIdx]=useState(null);
+  const [buyerName,setBuyerName]=useState("");
+  const [buyerMsg,setBuyerMsg]=useState("");
+
+  useEffect(()=>{
+    (async()=>{
+      const [ls,ss]=await Promise.all([
+        api.get("car_sales_listings",`id=eq.${id}&select=*`).catch(()=>[]),
+        api.get("settings","id=eq.1&select=*").catch(()=>[]),
+      ]);
+      const rec=Array.isArray(ls)&&ls[0]?ls[0]:null;
+      setListing(rec&&PUBLIC_LISTING_STATUSES.includes(rec.status)?rec:null);
+      setShopSettings(Array.isArray(ss)&&ss[0]?ss[0]:{});
+      setLoaded(true);
+    })();
+  },[id]);
+
+  if(!loaded) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
+      <style>{CSS}</style>
+      <div style={{color:"#ff7a2e",fontSize:15}}>⏳ Loading…</div>
+    </div>
+  );
+
+  if(!listing) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0e1a"}}>
+      <style>{CSS}</style>
+      <div style={{textAlign:"center",color:"#fff",padding:40}}>
+        <div style={{fontSize:40,marginBottom:12}}>🚗</div>
+        <div style={{fontSize:16,fontWeight:600}}>Listing not found</div>
+        <div style={{fontSize:13,color:"#888",marginTop:8}}>This link may be invalid, or the vehicle is no longer listed.</div>
+      </div>
+    </div>
+  );
+
+  const sym=curSym(shopSettings.currency||"R");
+  const photos=(Array.isArray(listing.photos)?listing.photos:[]).filter(Boolean);
+  const title=[listing.year,listing.make,listing.model].filter(Boolean).join(" ")||"Vehicle";
+  const bizName=shopSettings.shop_name||"VelGenius";
+  const si=LISTING_STATUS_INFO[listing.status]||LISTING_STATUS_INFO.available;
+  const isSold=listing.status==="sold";
+  const contactPhone=listing.contact_phone||shopSettings.whatsapp||shopSettings.phone||"";
+  const displayPrice=isSold?(+listing.sold_price||+listing.price||0):(+listing.price||0);
+
+  const askMsg=[
+    `Hi, I'm interested in the ${title}${listing.vehicle_reg?` (${listing.vehicle_reg})`:""} listed at ${sym}${displayPrice.toLocaleString()}.`,
+    buyerName.trim()&&`My name is ${buyerName.trim()}.`,
+    buyerMsg.trim(),
+  ].filter(Boolean).join(" ");
+
+  return (
+    <div style={{background:"#0a0e1a",minHeight:"100vh",padding:"20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"center"}}>
+      <style>{CSS}</style>
+      <div style={{width:"100%",maxWidth:520,paddingTop:16}}>
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:22,fontWeight:700,color:"var(--accent)"}}>{bizName}</div>
+          <div style={{color:"var(--text3)",fontSize:13,marginTop:2}}>Vehicle for Sale</div>
+        </div>
+
+        {/* Photos */}
+        {photos.length>0?(
+          <div style={{marginBottom:14}}>
+            <img src={photos[0]} alt={title} onClick={()=>setLightboxIdx(0)}
+              style={{width:"100%",height:260,objectFit:"cover",borderRadius:12,cursor:"zoom-in",background:"var(--surface2)"}}/>
+            {photos.length>1&&(
+              <div style={{display:"flex",gap:6,marginTop:6,overflowX:"auto"}}>
+                {photos.slice(1).map((url,i)=>(
+                  <img key={i} src={url} alt="" onClick={()=>setLightboxIdx(i+1)}
+                    style={{width:64,height:64,objectFit:"cover",borderRadius:8,cursor:"zoom-in",flexShrink:0}}/>
+                ))}
+              </div>
+            )}
+          </div>
+        ):(
+          <div style={{width:"100%",height:200,background:"var(--surface2)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:48,marginBottom:14}}>🚗</div>
+        )}
+
+        {/* Title / status / price */}
+        <div className="card" style={{padding:16,marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:6}}>
+            <div style={{fontWeight:700,fontSize:18}}>{title}</div>
+            <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99,background:si.bg,color:si.color,flexShrink:0}}>{listingStatusLabel(listing.status)}</span>
+          </div>
+          {listing.vehicle_reg&&<div style={{fontSize:13,color:"var(--text3)",fontFamily:"DM Mono,monospace",marginBottom:10}}>{listing.vehicle_reg}</div>}
+          <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:28,color:"var(--accent)",marginBottom:10}}>
+            {sym}{displayPrice.toLocaleString()}
+          </div>
+          <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13,color:"var(--text2)"}}>
+            {listing.mileage&&<div>🛣️ {(+listing.mileage).toLocaleString()} km</div>}
+            {listing.color&&<div>🎨 {listing.color}</div>}
+            {listing.vin&&<div style={{fontFamily:"DM Mono,monospace",fontSize:12}}>VIN: {listing.vin}</div>}
+          </div>
+          {listing.notes&&<div style={{marginTop:10,fontSize:13,color:"var(--text2)",lineHeight:1.5,whiteSpace:"pre-wrap"}}>{listing.notes}</div>}
+        </div>
+
+        {/* Ask about this car */}
+        {isSold?(
+          <div className="card" style={{padding:16,textAlign:"center",color:"var(--text3)",fontSize:14}}>
+            This vehicle has already been sold.
+          </div>
+        ):(
+          <div className="card" style={{padding:16}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>💬 Ask about this car</div>
+            <FD>
+              <FL label="Your name (optional)"/>
+              <input className="inp" value={buyerName} onChange={e=>setBuyerName(e.target.value)} placeholder="e.g. John"/>
+            </FD>
+            <FD>
+              <FL label="Message (optional)"/>
+              <textarea className="inp" rows={3} value={buyerMsg} onChange={e=>setBuyerMsg(e.target.value)} placeholder="Any questions about the car?" style={{resize:"vertical"}}/>
+            </FD>
+            {contactPhone?(
+              <a href={waLink(contactPhone,askMsg)} target="_blank" rel="noopener noreferrer"
+                className="btn btn-primary" style={{width:"100%",textAlign:"center",textDecoration:"none",display:"block",padding:"12px",marginTop:4}}>
+                📱 Ask via WhatsApp
+              </a>
+            ):(
+              <div style={{fontSize:12,color:"var(--text3)"}}>No contact number on file for this listing yet.</div>
+            )}
+          </div>
+        )}
+      </div>
+      {lightboxIdx!==null&&<ImgLightbox urls={photos} startIdx={lightboxIdx} onClose={()=>setLightboxIdx(null)}/>}
+    </div>
+  );
+}
+

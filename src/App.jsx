@@ -2507,9 +2507,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(Array.isArray(existing) && existing.length>0){
       return {ok:false, message:"An offer for this vehicle is already pending.", existing:existing[0]};
     }
-    // D2: photos live in workshop_job_photos, not on the job itself.
+    // D2: photos live in workshop_job_photos (repair-in-progress shots), plus the
+    // vehicle's own profile photos (front/rear/side etc.) on its workshop_vehicles
+    // record — a job like a licence renewal often has no repair photos at all, so
+    // without the profile shots the listing goes out with no image.
     const jobPhotos = await api.fresh("workshop_job_photos", `job_id=eq.${job.id}&select=url`).catch(()=>[]);
-    const photos = Array.isArray(jobPhotos) ? jobPhotos.map(p=>p.url).filter(Boolean) : [];
+    const vehicleRec = workshopVehicles.find(v=>v.id===job.workshop_vehicle_id);
+    const vehiclePhotoFields = ["photo_front","photo_front_left","photo_front_right","photo_left","photo_right","photo_rear","photo_rear_left","photo_rear_right","photo_side"];
+    const vehiclePhotos = vehicleRec ? vehiclePhotoFields.map(f=>vehicleRec[f]).filter(Boolean) : [];
+    const photos = [
+      ...vehiclePhotos,
+      ...(Array.isArray(jobPhotos) ? jobPhotos.map(p=>p.url).filter(Boolean) : []),
+    ];
     // D2: job.vehicle_model is often an internal catalog code (e.g. "BM001D"), not
     // a display name — resolve it the same way resolvedVehicleModel does elsewhere
     // in Workshop.jsx before writing it to a listing anyone will actually read.

@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import { api, uploadToStorage } from "../lib/api.js";
 import { getSettings, updateSettings, curSym } from "../lib/settings.js";
 import { makeId, waLink, nemigaVinUrl } from "../lib/helpers.js";
@@ -250,65 +249,6 @@ export function ManageOfficeAgentsModal({agents=[], onSave, onClose, t={}}) {
   );
 }
 
-// A single "•••" button per row that reveals the row's action buttons in a
-// small floating panel, positioned off the button's own on-screen rect via
-// a portal to document.body. Replaces cramming 5-7 icon buttons into the
-// table's last (narrow) column — at that width they wrapped onto multiple
-// lines and, since the row's height is set by its other cells, the wrapped
-// stack spilled out below/beside the row instead of staying inside it,
-// reading as a detached floating icon strip on the right edge of the page.
-// One compact trigger button per row avoids that entirely; same portal +
-// getBoundingClientRect positioning as PartActionsMenu in Modals.jsx.
-function RowActionsMenu({children, label="Actions"}) {
-  const [open, setOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState({top: 0, left: 0});
-  const btnRef = useRef(null);
-  const menuRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (btnRef.current && btnRef.current.contains(e.target)) return;
-      if (menuRef.current && menuRef.current.contains(e.target)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const handleOpen = () => {
-    if (btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      const menuW = 190, menuH = 220;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const top = spaceBelow > menuH ? rect.bottom + 4 : Math.max(8, rect.top - menuH - 4);
-      const left = Math.max(8, Math.min(rect.right - menuW, window.innerWidth - menuW - 8));
-      setMenuPos({top, left});
-    }
-    setOpen(o => !o);
-  };
-
-  return (
-    <div style={{position: "relative", display: "inline-block"}}>
-      <button ref={btnRef} className="btn btn-ghost btn-xs" title={label}
-        style={{fontWeight: 700, fontSize: 16, letterSpacing: 2, padding: "4px 10px"}}
-        onClick={handleOpen}>•••</button>
-      {open && createPortal(
-        <div ref={menuRef} style={{
-          position: "fixed", top: menuPos.top, left: menuPos.left,
-          background: "var(--surface2)", border: "1px solid var(--border2)",
-          borderRadius: 10, padding: 8, zIndex: 9999,
-          display: "flex", flexWrap: "wrap", gap: 6, maxWidth: 190,
-          boxShadow: "0 8px 32px rgba(0,0,0,.6)", animation: "fadeUp .15s ease"
-        }}>
-          {children}
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════
 // LICENCE RENEWAL AGENT — cross-workshop renewal queue
 // ═══════════════════════════════════════════════════════════════
@@ -554,8 +494,8 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
         </div>
       )}
 
-      {filtered.length>0&&(<>
-        <div className="mob-cards">
+      {filtered.length>0&&(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {filtered.map(r=>{
             const isExpired = r.current_expiry && new Date(r.current_expiry)<new Date();
             const waPhone = r.workshop_id ? (workshopInfo[r.workshop_id]?.phone||"") : (r.owner_phone||"");
@@ -625,111 +565,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
             );
           })}
         </div>
-        <div className="card desk-table" style={{overflow:"auto"}}>
-          <table className="tbl" style={{width:"100%",minWidth:820}}>
-            <thead>
-              <tr>
-                <th>{t.laColCompanyWalkIn||"Company / Walk-in"}</th>
-                <th>{t.laColVehicle||"Vehicle"}</th>
-                <th>{t.laColOwner||"Owner"}</th>
-                <th>{t.laColExpiryNew||"Expiry (new, once applied)"}</th>
-                <th>{t.laColYears||"Years"}</th>
-                <th>{t.status||"Status"}</th>
-                <th>{t.laColCommission||"Commission"}</th>
-                <th>{t.date||"Date"}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(r=>{
-                const isExpired = r.current_expiry && new Date(r.current_expiry)<new Date();
-                return (
-                  <tr key={r.id}>
-                    <td style={{fontSize:12,fontWeight:600}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:`🚶 ${t.laWalkIn||"Walk-in"}`)}</td>
-                    <td>
-                      <div style={{fontWeight:700,fontFamily:"DM Mono,monospace",fontSize:12}}>{r.vehicle_reg}</div>
-                      <div style={{fontSize:11,color:"var(--text3)"}}>{r.vehicle_make} {r.vehicle_model}</div>
-                    </td>
-                    <td>
-                      <div style={{fontSize:13}}>{r.owner_name||"—"}</div>
-                      {r.owner_phone&&<div style={{fontSize:11,color:"var(--text3)"}}>{r.owner_phone}</div>}
-                    </td>
-                    <td>
-                      {r.new_licence_expiry ? (
-                        <>
-                          <div style={{fontSize:10,color:"var(--text3)",textDecoration:"line-through"}}>{r.current_expiry||"—"}</div>
-                          <div style={{fontSize:13,fontWeight:700,color:"var(--green)"}}>🆕 {r.new_licence_expiry}</div>
-                        </>
-                      ) : (
-                        <span style={{fontSize:12,fontWeight:600,color:isExpired?"var(--red)":"var(--green)"}}>
-                          {r.current_expiry||"—"} {isExpired?"⚠️":""}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{textAlign:"center"}}>{r.renewal_years||1}</td>
-                    <td>
-                      <select value={r.status||"pending"} onChange={e=>onUpdate(r.id,{status:e.target.value})}
-                        style={{fontSize:11,padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",cursor:"pointer",color:"var(--text1)"}}>
-                        <option value="pending">⏳ {t.laStPending||"Pending"}</option>
-                        <option value="submitted">📤 {t.laStSubmitted||"Submitted"}</option>
-                        <option value="completed">✅ {t.laStCompleted||"Completed"}</option>
-                        <option value="cancelled">❌ {t.laStCancelled||"Cancelled"}</option>
-                      </select>
-                    </td>
-                    <td>
-                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                        <input
-                          type="number" min="0"
-                          value={r.commission_amount||""} placeholder="0"
-                          onChange={e=>onUpdate(r.id,{commission_amount:+e.target.value||null})}
-                          style={{width:70,fontSize:11,padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text1)"}}/>
-                        <button
-                          onClick={()=>onUpdate(r.id,{commission_status:r.commission_status==="paid"?"unpaid":"paid"})}
-                          style={{fontSize:10,padding:"3px 8px",borderRadius:12,border:"none",cursor:"pointer",
-                            background:r.commission_status==="paid"?"var(--green)":"var(--surface2)",
-                            color:r.commission_status==="paid"?"#fff":"var(--text3)",fontWeight:600}}>
-                          {r.commission_status==="paid"?`✓ ${t.paid||"Paid"}`:(t.laMarkPaid||"Mark Paid")}
-                        </button>
-                      </div>
-                    </td>
-                    <td style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>{(r.submitted_at||"").slice(0,10)}</td>
-                    <td>
-                      <RowActionsMenu label={t.actions||"Actions"}>
-                        {onUpdate&&(
-                          <button onClick={()=>setEditRenewal(r)} title={t.edit||"Edit"} style={actionBtnStyle("default")}>✏️</button>
-                        )}
-                        <button onClick={()=>setDocsRenewalId(r.id)} title={t.laDocuments||"Documents"}
-                          style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎</button>
-                        <QuickUploadBtn r={r} field="receipt" label={t.laReceiptLabel||"Receipt"} icon="🧾" doneUrl={r.receipt_url}/>
-                        <QuickUploadBtn r={r} field="new_licence" label={t.laNewDiscLabel||"New Disc"} icon="🪪" doneUrl={r.new_licence_url}/>
-                        {(()=>{
-                          // Workshop-submitted → message the WORKSHOP (they're the one who has to
-                          // action it); a walk-in (no workshop_id) → message the customer directly.
-                          const waPhone = r.workshop_id ? (workshopInfo[r.workshop_id]?.phone||"") : (r.owner_phone||"");
-                          if(!waPhone) return null;
-                          const msg = r.workshop_id
-                            ? `Hi, regarding the licence renewal for ${r.vehicle_reg||"the vehicle"} (${r.owner_name||"customer"}) — status: ${r.status||"pending"}.`
-                            : "";
-                          return (
-                            <a href={waLink(waPhone,msg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
-                              <button title="WhatsApp" style={actionBtnStyle("brand")}><IcWhatsApp size={15}/></button>
-                            </a>
-                          );
-                        })()}
-                        <OfficeSendControl r={r} agents={officeAgents} onUpdate={onUpdate} actionBtnStyle={actionBtnStyle} t={t}/>
-                        {onDelete&&(
-                          <button onClick={()=>{ if(window.confirm(`${t.laDeleteConfirm||"Delete renewal for"} ${r.vehicle_reg||(t.laThisVehicle||"this vehicle")}?`)) onDelete(r.id); }}
-                            title={t.delete||"Delete"} style={actionBtnStyle("danger")}><IcTrash size={15}/></button>
-                        )}
-                      </RowActionsMenu>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </>)}
+      )}
 
       {docsRenewal&&(
         <RenewalDocsModal renewal={docsRenewal} viewer="agent"

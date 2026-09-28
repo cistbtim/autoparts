@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../lib/api.js";
 import { makeId, today, fmtAmt } from "../lib/helpers.js";
+import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 import { Overlay, MHead, FL, FG, FD } from "./shared.jsx";
 
 const VEHICLE_STATUSES = ["Available", "Rented", "Maintenance"];
@@ -46,7 +47,41 @@ function RentalVehicleModal({ vehicle, rentalId, onSave, onClose }) {
     mileage: "", location: "", notes: "", ...(vehicle || {}),
   });
   const [saving, setSaving] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanMessage, setScanMessage] = useState("");
+  const cameraInput = useRef(null);
+  const photoInput = useRef(null);
   const s = (k, v) => setF(p => ({ ...p, [k]: v }));
+
+  const handleDiscScan = async e => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setScanLoading(true);
+    setScanMessage("");
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Could not read the selected image"));
+        reader.readAsDataURL(file);
+      });
+      const parsed = parseLicenceDisc(await decodePDF417fromImage(dataUrl));
+      const updates = {};
+      if (parsed.make) updates.make = parsed.make;
+      if (parsed.model) updates.model = parsed.model;
+      if (parsed.reg) updates.reg = parsed.reg.replace(/\s/g, "").toUpperCase();
+      if (parsed.vin) updates.vin = parsed.vin.toUpperCase();
+      if (parsed.color) updates.color = parsed.color;
+      if (parsed.body_type) updates.category = parsed.body_type;
+      if (!Object.keys(updates).length) throw new Error("Barcode found, but no vehicle details could be read");
+      setF(previous => ({ ...previous, ...updates }));
+      setScanMessage("Disc read. Check the filled details before saving.");
+    } catch {
+      setScanMessage("Could not read the disc. Try a clearer photo, or enter the details manually.");
+    }
+    setScanLoading(false);
+  };
 
   const save = async () => {
     if (!f.make.trim() || !f.model.trim() || !f.reg.trim()) { alert("Make, model and registration are required"); return; }
@@ -66,6 +101,17 @@ function RentalVehicleModal({ vehicle, rentalId, onSave, onClose }) {
   return (
     <Overlay onClose={onClose}>
       <MHead title={vehicle ? "Edit Vehicle" : "Add Vehicle"} onClose={onClose} />
+      <div style={{ marginBottom: 14, padding: 12, border: "1px solid var(--border)", borderRadius: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>South African Licence Disc</div>
+        <input ref={cameraInput} type="file" accept="image/*" capture="environment" onChange={handleDiscScan} style={{ display: "none" }} />
+        <input ref={photoInput} type="file" accept="image/*" onChange={handleDiscScan} style={{ display: "none" }} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={() => cameraInput.current?.click()} disabled={scanLoading}>Scan with Camera</button>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={() => photoInput.current?.click()} disabled={scanLoading}>Choose Disc Photo</button>
+          {scanLoading && <span style={{ fontSize: 12, color: "var(--text3)", alignSelf: "center" }}>Reading disc…</span>}
+        </div>
+        {scanMessage && <div role="status" style={{ fontSize: 12, color: scanMessage.startsWith("Could not") ? "var(--red)" : "var(--green)", marginTop: 8 }}>{scanMessage}</div>}
+      </div>
       <FG><FD><FL label="Make *" /><input className="inp" value={f.make} onChange={e => s("make", e.target.value)} /></FD><FD><FL label="Model *" /><input className="inp" value={f.model} onChange={e => s("model", e.target.value)} /></FD></FG>
       <FG><FD><FL label="Year" /><input className="inp" type="number" value={f.year} onChange={e => s("year", e.target.value)} /></FD><FD><FL label="Registration *" /><input className="inp" value={f.reg} onChange={e => s("reg", e.target.value.toUpperCase())} /></FD></FG>
       <FG><FD><FL label="VIN" /><input className="inp" value={f.vin || ""} onChange={e => s("vin", e.target.value.toUpperCase())} /></FD><FD><FL label="Color" /><input className="inp" value={f.color || ""} onChange={e => s("color", e.target.value)} /></FD></FG>

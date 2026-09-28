@@ -20,6 +20,7 @@ import { SupplierImportModal } from "./components/SupplierImport.jsx";
 import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
+import { RentalDashboardPage, RentalVehiclesPage, RentalBookingsPage, RentalCustomersPage, RentalProfilePage } from "./components/Rental.jsx";
 import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierScanStockPage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
 import { LicenceAgentPage, ManageOfficeAgentsModal, CarSalesPage } from "./components/AgentPages.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
@@ -188,10 +189,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // workshop_id scopes all workshop data to this user's own records
   const wsId  = role==="workshop" ? String(user.id) : (role==="admin"&&adminActingAsWsId) ? adminActingAsWsId : null;
   const scrapId = (role==="scrapyard"||role==="scrapyard_admin") ? String(user.id) : null;
+  const rentalId = (role==="rental"||role==="rental_admin") ? String(user.id) : null;
   const wsF  = wsId ? `&workshop_id=eq.${wsId}` : ""; // query filter
   const isBranchUser = BRANCH_ROLES.includes(role);
   const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth<768;
-  const initTab = initialVehiclesMake&&role==="admin"?"vehicles":role==="customer"?"shop":role==="supplier"?"supplierParts":role==="licence_agent"?"licenceAgentQueue":(role==="car_sales"||role==="carsales_admin")?"carSalesListings":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"requestsKanban":role==="branch_manager"?"requestsKanban":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"requestsKanban":"dashboard";
+  const initTab = initialVehiclesMake&&role==="admin"?"vehicles":role==="customer"?"shop":role==="supplier"?"supplierParts":role==="licence_agent"?"licenceAgentQueue":(role==="car_sales"||role==="carsales_admin")?"carSalesListings":role==="shipper"?"orders":role==="stockman"?"inventory":role==="manager"?"stocktake":role==="workshop"?"workshop":(role==="scrapyard"||role==="scrapyard_admin")?"sy_dashboard":(role==="rental"||role==="rental_admin")?"rental_dashboard":role==="branch_picker"?"orders":role==="branch_salesman"?"pos":role==="branch_admin"?"requestsKanban":role==="branch_manager"?"requestsKanban":isBranchUser?"inventory":role==="demo"?"inventory":role==="admin"?"requestsKanban":"dashboard";
   const [tab,setTab] = useState(initTab);
   // Data
   const [pendingFitsCopy,setPendingFitsCopy]=useState(null); // partId to copy fitments from on next new-part save
@@ -360,6 +362,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [syOrders,setSyOrders]=useState([]);
   const [syInvoices,setSyInvoices]=useState([]);
   const [syReturns,setSyReturns]=useState([]);
+  const [rentalVehicles,setRentalVehicles]=useState([]);
+  const [rentalCustomers,setRentalCustomers]=useState([]);
+  const [rentalBookings,setRentalBookings]=useState([]);
+  const [rentalProfile,setRentalProfile]=useState({});
   const [allWsProfiles,setAllWsProfiles]=useState([]); // all workshop profiles for admin name lookup
   const [allScrapVehicles,setAllScrapVehicles]=useState([]);
   const [allScrapParts,setAllScrapParts]=useState([]);
@@ -940,6 +946,20 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       setSyInvoices(Array.isArray(syI)?syI:[]);
       setSyReturns(Array.isArray(syR)?syR:[]);
     }
+    // Load rental profile + data
+    if(rentalId){
+      const [rProf,rVeh,rCust,rBook]=await Promise.all([
+        api.get("rental_profiles",`id=eq.${rentalId}&select=*`).catch(()=>[]),
+        api.get("rental_vehicles",`rental_id=eq.${rentalId}&select=*&order=created_at.desc`).catch(()=>[]),
+        api.get("rental_customers",`rental_id=eq.${rentalId}&select=*&order=name.asc`).catch(()=>[]),
+        api.get("rental_bookings",`rental_id=eq.${rentalId}&select=*&order=created_at.desc`).catch(()=>[]),
+      ]);
+      const rp=Array.isArray(rProf)&&rProf[0]?rProf[0]:{};
+      setRentalProfile(rp);
+      setRentalVehicles(Array.isArray(rVeh)?rVeh:[]);
+      setRentalCustomers(Array.isArray(rCust)?rCust:[]);
+      setRentalBookings(Array.isArray(rBook)?rBook:[]);
+    }
     lastLoadRef.current = Date.now();
   },[]);
 
@@ -1311,6 +1331,30 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setSyInvoices(Array.isArray(syI)?syI:[]);
     setSyReturns(Array.isArray(syR)?syR:[]);
   },[scrapId]);
+
+  const refreshRentalData=useCallback(async()=>{
+    if(!rentalId) return;
+    const [veh,cust,book]=await Promise.all([
+      api.get("rental_vehicles",`rental_id=eq.${rentalId}&select=*&order=created_at.desc`).catch(()=>[]),
+      api.get("rental_customers",`rental_id=eq.${rentalId}&select=*&order=name.asc`).catch(()=>[]),
+      api.get("rental_bookings",`rental_id=eq.${rentalId}&select=*&order=created_at.desc`).catch(()=>[]),
+    ]);
+    setRentalVehicles(Array.isArray(veh)?veh:[]);
+    setRentalCustomers(Array.isArray(cust)?cust:[]);
+    setRentalBookings(Array.isArray(book)?book:[]);
+  },[rentalId]);
+
+  const saveRentalProfile=useCallback(async(data)=>{
+    if(!rentalId) return;
+    const payload={...data,id:rentalId};
+    const existing=await api.get("rental_profiles",`id=eq.${rentalId}&select=id`).catch(()=>[]);
+    const res=(Array.isArray(existing)&&existing.length>0)
+      ? await api.patch("rental_profiles","id",rentalId,payload)
+      : await api.insert("rental_profiles",payload);
+    if(res&&!Array.isArray(res)&&res.message){ showToast(`❌ Save failed: ${res.message}`,"err"); return; }
+    setRentalProfile(p=>({...p,...data}));
+    showToast("Profile saved");
+  },[rentalId]);
 
   // Sync Apps Script URL to window whenever settings changes
   useEffect(()=>{
@@ -5159,6 +5203,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"sy_gate",    icon:"🛡️", label:t.syGate||"Gate"},
       ]:[]),
     ];
+    if(role==="rental"||role==="rental_admin") return [
+      {id:"rental_dashboard",icon:"📊", label:t.rentalDashboard||"Dashboard"},
+      {id:"rental_vehicles", icon:"🚗", label:t.rentalVehicles||"Vehicles"},
+      {id:"rental_bookings", icon:"📋", label:t.rentalBookings||"Bookings", badge:rentalBookings.filter(b=>b.status==="Reserved"||b.status==="Active").length||0},
+      {id:"rental_customers",icon:"👥", label:t.rentalCustomers||"Customers"},
+      {id:"rental_settings", icon:"⚙️", label:t.rentalSettings||"Settings"},
+    ];
     if(role==="shipper") return [
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"picking",   icon:"🔍",label:t.picking},
@@ -6538,6 +6589,37 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── SCRAPYARD GATE CHECK ── */}
         {tab==="sy_gate"&&(role==="scrapyard"||role==="scrapyard_admin")&&(
           <SyGatePage scrapId={scrapId} syInvoices={syInvoices} syOrders={syOrders} onRefresh={refreshScrapyardData} showToast={showToast} settings={wsDisplaySettings}/>
+        )}
+
+        {/* ── RENTAL DASHBOARD ── */}
+        {tab==="rental_dashboard"&&(role==="rental"||role==="rental_admin")&&(
+          <RentalDashboardPage
+            vehicles={rentalVehicles}
+            bookings={rentalBookings}
+            customers={rentalCustomers}
+            settings={wsDisplaySettings}
+            onNavigate={setTab}
+          />
+        )}
+
+        {/* ── RENTAL VEHICLES ── */}
+        {tab==="rental_vehicles"&&(role==="rental"||role==="rental_admin")&&(
+          <RentalVehiclesPage rentalId={rentalId} vehicles={rentalVehicles} onRefresh={refreshRentalData} showToast={showToast} settings={wsDisplaySettings}/>
+        )}
+
+        {/* ── RENTAL BOOKINGS ── */}
+        {tab==="rental_bookings"&&(role==="rental"||role==="rental_admin")&&(
+          <RentalBookingsPage rentalId={rentalId} bookings={rentalBookings} vehicles={rentalVehicles} customers={rentalCustomers} onRefresh={refreshRentalData} showToast={showToast} settings={wsDisplaySettings}/>
+        )}
+
+        {/* ── RENTAL CUSTOMERS ── */}
+        {tab==="rental_customers"&&(role==="rental"||role==="rental_admin")&&(
+          <RentalCustomersPage rentalId={rentalId} customers={rentalCustomers} onRefresh={refreshRentalData} showToast={showToast}/>
+        )}
+
+        {/* ── RENTAL SETTINGS ── */}
+        {tab==="rental_settings"&&(role==="rental"||role==="rental_admin")&&(
+          <RentalProfilePage profile={rentalProfile} onSave={saveRentalProfile}/>
         )}
 
         {/* ── ALL SCRAPYARDS (admin/manager) ── */}

@@ -79,7 +79,7 @@ function Get-WaProcess {
         if ($sb.ToString() -like "*WhatsApp*" -and [WaWin32]::IsWindowVisible($h)) {
             $r = New-Object WaWin32+RECT
             [WaWin32]::GetWindowRect($h, [ref]$r) | Out-Null
-            if (($r.Right - $r.Left) -gt 800 -and ($r.Bottom - $r.Top) -gt 600) {
+            if (($r.Right - $r.Left) -ge 800 -and ($r.Bottom - $r.Top) -ge 600) {
                 $script:_waHandle = $h
             }
         }

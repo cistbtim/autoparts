@@ -69,6 +69,7 @@ const IcLock   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="non
 const IcGrid   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
 const IcBadge  = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 17c0-1.66 1.79-3 4-3s4 1.34 4 3"/></svg>;
 const IcTag    = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 3a1 1 0 0 0-1 1l.24 5.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.82z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>;
+const IcKey    = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0L19 4m-3.5 3.5L18 10"/></svg>;
 
 // Wraps whichever module's login form is active. On the normal landing screen
 // (a module grid to choose from) it's a popup — click a tile, get a form, ✕
@@ -139,6 +140,14 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   const [scrapRegPass,setScrapRegPass] = useState(""); const [scrapRegPass2,setScrapRegPass2] = useState("");
   const [scrapRegEmail,setScrapRegEmail] = useState(""); const [scrapRegPhone,setScrapRegPhone] = useState("");
   const [scrapRegCity,setScrapRegCity] = useState(""); const [scrapRegCountry,setScrapRegCountry] = useState("");
+  // rental
+  const [rentCompany,setRentCompany] = useState("");
+  const [rentUser,setRentUser] = useState(""); const [rentPass,setRentPass] = useState("");
+  const [rentTab,setRentTab] = useState("login");
+  const [rentRegName,setRentRegName] = useState(""); const [rentRegUser,setRentRegUser] = useState("");
+  const [rentRegPass,setRentRegPass] = useState(""); const [rentRegPass2,setRentRegPass2] = useState("");
+  const [rentRegEmail,setRentRegEmail] = useState(""); const [rentRegPhone,setRentRegPhone] = useState("");
+  const [rentRegCity,setRentRegCity] = useState(""); const [rentRegCountry,setRentRegCountry] = useState("");
   // customer
   const [custTab,setCustTab] = useState("login");
   const [cName,setCName] = useState(""); const [cPhone,setCPhone] = useState("");
@@ -349,6 +358,40 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     setLoading(false);
   };
 
+  const doRentalLogin = async () => {
+    if(!rentUser||!rentPass){setErr(t.wrongPass);return;}
+    setLoading(true);setErr("");setExpiredInfo(null);
+    const company = rentCompany.trim();
+    let q = `username=eq.${encodeURIComponent(rentUser)}&password=eq.${encodeURIComponent(rentPass)}&role=in.(rental,rental_admin)&select=*`;
+    if(company) q += `&name=ilike.*${encodeURIComponent(company)}*`;
+    const res = await api.fresh("users", q);
+    if(Array.isArray(res)&&res.length>0){
+      const accErr=checkAccess(res[0]);
+      if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username,company:res[0].name});setLoading(false);return;}
+      logLogin(res[0]);onLogin(res[0]);
+    } else setErr(t.wrongPass);
+    setLoading(false);
+  };
+
+  const doRentalSignup = async () => {
+    if(!rentRegName||!rentRegUser||!rentRegPass||!rentRegCity||!rentRegCountry){setErr("Rental business name, username, password, city and country are required");return;}
+    if(rentRegPass!==rentRegPass2){setErr("Passwords don't match");return;}
+    if(rentRegPass.length<4){setErr("Password must be at least 4 characters");return;}
+    setLoading(true);setErr("");
+    const ex=await api.fresh("users",`username=eq.${encodeURIComponent(rentRegUser)}&select=id`).catch(()=>[]);
+    if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
+    const rentalId=makeId("RT");
+    const today=new Date().toISOString().slice(0,10);
+    const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
+    const newUser=await api.insert("users",{id:rentalId,username:rentRegUser,password:rentRegPass,name:rentRegName,role:"rental_admin",phone:rentRegPhone||"",email:rentRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
+    if(!newUser){setLoading(false);return;}
+    await api.upsert("rental_profiles",{id:rentalId,name:rentRegName,phone:rentRegPhone||"",email:rentRegEmail||"",city:rentRegCity,country:rentRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>{});
+    const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
+    if(loginUser){logLogin({...loginUser});onLogin({...loginUser});}
+    else setErr("Account created — please log in");
+    setLoading(false);
+  };
+
   // Resolves the typed Supplier field to a suppliers.id — same ilike-exact-name
   // lookup the old catalog-link effect used, just run on submit instead of on
   // mount so it works whether the name came from a link or was typed by hand.
@@ -429,6 +472,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     {id:"staff",    Icon:IcStaff,  label:t.loginStaff||"Staff"},
     {id:"licagent", Icon:IcBadge,  label:t.loginLicAgent||"Licence Agent"},
     {id:"carsales", Icon:IcTag,    label:t.loginCarSales||"Car Sales"},
+    {id:"rental",   Icon:IcKey,    label:t.loginRental||"Rental"},
   ];
 
   const inpStyle = {
@@ -443,7 +487,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   // as a deliberately designed set of destinations rather than a plain menu.
   const TAB_COLORS = {
     branch:"#60a5fa", workshop:"#ff7a2e", scrapyard:"#a78bfa", customer:"#34d399",
-    supplier:"#c084fc", staff:"#f59e0b", licagent:"#22d3ee", carsales:"#fb923c",
+    supplier:"#c084fc", staff:"#f59e0b", licagent:"#22d3ee", carsales:"#fb923c", rental:"#2dd4bf",
   };
 
   return (
@@ -700,6 +744,101 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   </button>
                   <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:0}}>
                     Already have an account? <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setScrapTab("login");setErr("");}}>Sign In</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Rental ── */}
+          {authTab==="rental"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:0}}>
+              <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:18}}>
+                {[["login",t.signIn||"Sign In"],["signup",t.registerRental||"Register"]].map(([id,lb])=>(
+                  <button key={id} className={`auth-tab ${rentTab===id?"on":""}`} onClick={()=>{setRentTab(id);setErr("");}}>{lb}</button>
+                ))}
+              </div>
+
+              {rentTab==="login"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:13}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+                    <div style={{width:38,height:38,borderRadius:10,background:"rgba(45,212,191,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"#2dd4bf",flexShrink:0}}><IcKey/></div>
+                    <div>
+                      <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>{t.loginRental||"Rental"} {t.signIn||"Login"}</div>
+                      <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginRentalSub||"Sign in to your rental business account"}</div>
+                    </div>
+                  </div>
+
+                  <Field label={t.companyNameField||"Company Name"} hint={t.optionalHint||"Optional"}>
+                    <InpIcon inp={<input style={companyInpStyle} type="text" value={rentCompany} onChange={e=>setRentCompany(e.target.value)} placeholder="e.g. City Car Rentals" autoCapitalize="words"/>}><IcGrid/></InpIcon>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>{t.companyNameHintRental||"Helps identify your account if multiple rental businesses share a username"}</div>
+                  </Field>
+
+                  <Field label={t.username||"Username"}>
+                    <InpIcon inp={<input style={inpStyle} type="text" value={rentUser} onChange={e=>setRentUser(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doRentalLogin()} autoCapitalize="none" placeholder="Your login username"/>}><IcUser/></InpIcon>
+                  </Field>
+                  <Field label={t.password||"Password"}>
+                    <InpIcon inp={<input style={inpStyle} type="password" value={rentPass} onChange={e=>setRentPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doRentalLogin()}/>}><IcLock/></InpIcon>
+                  </Field>
+
+                  {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
+                  <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doRentalLogin} disabled={loading}>
+                    {loading?t.connecting||"Connecting…":t.signInArrow||"Sign In →"}
+                  </button>
+                </div>
+              )}
+
+              {rentTab==="signup"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  <div style={{background:"rgba(52,211,153,.08)",border:"1px solid rgba(52,211,153,.2)",borderRadius:9,padding:"10px 13px",fontSize:12,color:"var(--green)",lineHeight:1.5}}>
+                    ✅ {t.freeTrial30||"30-day free trial — no credit card required"}
+                  </div>
+                  <Field label={(t.rentalNameField||"Rental Business Name")+" *"}>
+                    <input style={inpStyle} value={rentRegName} onChange={e=>setRentRegName(e.target.value)} placeholder="e.g. City Car Rentals"/>
+                  </Field>
+                  <Field label={(t.username||"Username")+" *"}>
+                    <input style={inpStyle} value={rentRegUser} onChange={e=>setRentRegUser(e.target.value)} autoCapitalize="none" placeholder="Choose a login username"/>
+                  </Field>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <Field label={(t.password||"Password")+" *"}>
+                      <input style={inpStyle} type="password" value={rentRegPass} onChange={e=>setRentRegPass(e.target.value)}/>
+                    </Field>
+                    <Field label={(t.confirmPwd||"Confirm")+" *"}>
+                      <input style={inpStyle} type="password" value={rentRegPass2} onChange={e=>setRentRegPass2(e.target.value)}/>
+                    </Field>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <Field label={t.email||"Email"}>
+                      <input style={inpStyle} type="email" value={rentRegEmail} onChange={e=>setRentRegEmail(e.target.value)} placeholder="email@rentals.com"/>
+                    </Field>
+                    <Field label={t.phone||"Phone"}>
+                      <input style={inpStyle} type="tel" value={rentRegPhone} onChange={e=>setRentRegPhone(e.target.value)} placeholder="+27..."/>
+                    </Field>
+                  </div>
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                      <label style={{fontSize:12,fontWeight:700,color:"var(--text3)"}}>City &amp; Country *</label>
+                      <button type="button" className="btn btn-ghost btn-xs" disabled={detectingLoc} onClick={async()=>{
+                        setDetectingLoc(true);
+                        try{const loc=await detectGeoLocation();setRentRegCity(loc.city);setRentRegCountry(loc.country);}catch(e){/* ignore geolocation failures */}
+                        setDetectingLoc(false);
+                      }} style={{fontSize:11,padding:"3px 9px"}}>
+                        {detectingLoc?"Detecting…":"📍 Auto-detect"}
+                      </button>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <input style={inpStyle} value={rentRegCity} onChange={e=>setRentRegCity(e.target.value)} placeholder="City"/>
+                      <input style={inpStyle} value={rentRegCountry} onChange={e=>setRentRegCountry(e.target.value)} placeholder="Country"/>
+                    </div>
+                  </div>
+                  {err&&<ErrBox msg={err}/>}
+              {waRenewLink}
+                  <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10}} onClick={doRentalSignup} disabled={loading}>
+                    {loading?t.connecting||"Connecting…":"🔑 Start Free Trial"}
+                  </button>
+                  <p style={{fontSize:12,color:"var(--text3)",textAlign:"center",margin:0}}>
+                    Already have an account? <span style={{color:"var(--accent)",cursor:"pointer",fontWeight:600}} onClick={()=>{setRentTab("login");setErr("");}}>Sign In</span>
                   </p>
                 </div>
               )}

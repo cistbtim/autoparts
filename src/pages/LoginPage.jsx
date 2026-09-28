@@ -380,14 +380,18 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     setLoading(true);setErr("");
     const ex=await api.fresh("users",`username=eq.${encodeURIComponent(rentRegUser)}&select=id`).catch(()=>[]);
     if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
-    const rentalId=makeId("RT");
     const today=new Date().toISOString().slice(0,10);
     const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
-    const newUser=await api.insert("users",{id:rentalId,username:rentRegUser,password:rentRegPass,name:rentRegName,role:"rental_admin",phone:rentRegPhone||"",email:rentRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
-    if(!newUser){setLoading(false);return;}
-    await api.upsert("rental_profiles",{id:rentalId,name:rentRegName,phone:rentRegPhone||"",email:rentRegEmail||"",city:rentRegCity,country:rentRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>{});
+    // users.id is a DB-generated identity column (like scrapyard_admin signup,
+    // unlike workshop's pre-generated WS-id) — don't send an id, round-trip the
+    // generated one back for the rental_profiles FK instead.
+    const newUser=await api.insert("users",{username:rentRegUser,password:rentRegPass,name:rentRegName,role:"rental_admin",phone:rentRegPhone||"",email:rentRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
+    if(!newUser||newUser.code){setErr("Signup failed: "+(newUser?.message||"unknown error"));setLoading(false);return;}
     const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
-    if(loginUser){logLogin({...loginUser});onLogin({...loginUser});}
+    if(!loginUser||loginUser.code||!loginUser.id){setErr("Signup failed");setLoading(false);return;}
+    const profRes=await api.upsert("rental_profiles",{id:loginUser.id,name:rentRegName,phone:rentRegPhone||"",email:rentRegEmail||"",city:rentRegCity,country:rentRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd}).catch(()=>null);
+    if(profRes?.code) setErr("Account created but profile save failed — "+(profRes.message||"check DB"));
+    if(!profRes?.code){logLogin({...loginUser});onLogin({...loginUser});}
     else setErr("Account created — please log in");
     setLoading(false);
   };

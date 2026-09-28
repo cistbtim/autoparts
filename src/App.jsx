@@ -5104,6 +5104,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       ]
     },
     {
+      id:"grp_rental", icon:"🔑", label:t.grpRental||"Rental", roles:["rental","rental_admin"],
+      children:[
+        {id:"rental_dashboard", icon:"📊", label:t.rentalDashboard||"Dashboard", roles:["rental","rental_admin"]},
+        {id:"rental_vehicles",  icon:"🚗", label:t.rentalVehicles||"Vehicles",  roles:["rental","rental_admin"]},
+        {id:"rental_bookings",  icon:"📋", label:t.rentalBookings||"Bookings",  roles:["rental","rental_admin"]},
+        {id:"rental_customers", icon:"👥", label:t.rentalCustomers||"Customers",roles:["rental","rental_admin"]},
+        {id:"rental_settings",  icon:"⚙️", label:t.rentalSettings||"Settings",  roles:["rental","rental_admin"]},
+      ]
+    },
+    {
       id:"grp_sales", icon:"🛒", label:t.grpSales, roles:["admin","manager","shipper","customer"],
       badge: pendingCnt,
       children:[

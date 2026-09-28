@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { api, uploadToStorage } from "../lib/api.js";
 import { getSettings, updateSettings, curSym } from "../lib/settings.js";
 import { makeId, waLink, nemigaVinUrl } from "../lib/helpers.js";
@@ -246,6 +247,65 @@ export function ManageOfficeAgentsModal({agents=[], onSave, onClose, t={}}) {
         <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>{saving?(t.laSavingEllipsis||"Saving…"):`💾 ${t.save||"Save"}`}</button>
       </div>
     </Overlay>
+  );
+}
+
+// A single "•••" button per row that reveals the row's action buttons in a
+// small floating panel, positioned off the button's own on-screen rect via
+// a portal to document.body. Replaces cramming 5-7 icon buttons into the
+// table's last (narrow) column — at that width they wrapped onto multiple
+// lines and, since the row's height is set by its other cells, the wrapped
+// stack spilled out below/beside the row instead of staying inside it,
+// reading as a detached floating icon strip on the right edge of the page.
+// One compact trigger button per row avoids that entirely; same portal +
+// getBoundingClientRect positioning as PartActionsMenu in Modals.jsx.
+function RowActionsMenu({children, label="Actions"}) {
+  const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({top: 0, left: 0});
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (btnRef.current && btnRef.current.contains(e.target)) return;
+      if (menuRef.current && menuRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const menuW = 190, menuH = 220;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const top = spaceBelow > menuH ? rect.bottom + 4 : Math.max(8, rect.top - menuH - 4);
+      const left = Math.max(8, Math.min(rect.right - menuW, window.innerWidth - menuW - 8));
+      setMenuPos({top, left});
+    }
+    setOpen(o => !o);
+  };
+
+  return (
+    <div style={{position: "relative", display: "inline-block"}}>
+      <button ref={btnRef} className="btn btn-ghost btn-xs" title={label}
+        style={{fontWeight: 700, fontSize: 16, letterSpacing: 2, padding: "4px 10px"}}
+        onClick={handleOpen}>•••</button>
+      {open && createPortal(
+        <div ref={menuRef} style={{
+          position: "fixed", top: menuPos.top, left: menuPos.left,
+          background: "var(--surface2)", border: "1px solid var(--border2)",
+          borderRadius: 10, padding: 8, zIndex: 9999,
+          display: "flex", flexWrap: "wrap", gap: 6, maxWidth: 190,
+          boxShadow: "0 8px 32px rgba(0,0,0,.6)", animation: "fadeUp .15s ease"
+        }}>
+          {children}
+        </div>,
+        document.body
+      )}
+    </div>
   );
 }
 
@@ -634,7 +694,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     </td>
                     <td style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>{(r.submitted_at||"").slice(0,10)}</td>
                     <td>
-                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      <RowActionsMenu label={t.actions||"Actions"}>
                         {onUpdate&&(
                           <button onClick={()=>setEditRenewal(r)} title={t.edit||"Edit"} style={actionBtnStyle("default")}>✏️</button>
                         )}
@@ -661,7 +721,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                           <button onClick={()=>{ if(window.confirm(`${t.laDeleteConfirm||"Delete renewal for"} ${r.vehicle_reg||(t.laThisVehicle||"this vehicle")}?`)) onDelete(r.id); }}
                             title={t.delete||"Delete"} style={actionBtnStyle("danger")}><IcTrash size={15}/></button>
                         )}
-                      </div>
+                      </RowActionsMenu>
                     </td>
                   </tr>
                 );

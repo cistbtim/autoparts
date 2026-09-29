@@ -254,6 +254,9 @@ export function ManageOfficeAgentsModal({agents=[], onSave, onClose, t={}}) {
 // ═══════════════════════════════════════════════════════════════
 export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeAgents=[], t={}}) {
   const [filter, setFilter] = useState("all");
+  // Set by clicking a row in "Renewals by Workshop" — narrows the list below to
+  // just that company/walk-in group. null = no workshop filter (show all).
+  const [workshopFilter, setWorkshopFilter] = useState(null);
   // Which renewal+field is mid-upload, as `${id}:${field}` — lets the quick
   // shortcut buttons in the table (receipt / new licence disc) show a spinner
   // on just that one button instead of blocking the whole row or page.
@@ -317,7 +320,11 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   const setDueSoonDaysPersist = (v) => { setDueSoonDays(v); try{ localStorage.setItem("licence_agent_due_soon_days", v); }catch{/* ignore */} };
   const C = curSym(getSettings().currency);
 
-  const filtered = filter==="all" ? renewals : renewals.filter(r=>r.status===filter);
+  const filtered = renewals.filter(r=>{
+    if(filter!=="all" && r.status!==filter) return false;
+    if(workshopFilter!=null && (r.workshop_id||"__walkin__")!==workshopFilter) return false;
+    return true;
+  });
   const unpaidComm = renewals.filter(r=>r.commission_status==="unpaid"&&r.status==="completed");
   const totalComm = renewals.filter(r=>r.commission_status==="paid").reduce((s,r)=>s+(+r.commission_amount||0),0);
 
@@ -327,6 +334,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   renewals.forEach(r=>{
     const key = r.workshop_id || "__walkin__";
     if(!byWorkshop[key]) byWorkshop[key] = {
+      key,
       label: r.workshop_id ? (workshopInfo[r.workshop_id]?.name||r.workshop_id) : `🚶 ${t.laWalkIn||"Walk-in"}`,
       total:0, pending:0, submitted:0, completed:0, cancelled:0,
     };
@@ -334,6 +342,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
     byWorkshop[key][r.status||"pending"]++;
   });
   const workshopRows = Object.values(byWorkshop).sort((a,b)=>b.total-a.total);
+  const activeWorkshopLabel = workshopFilter!=null ? byWorkshop[workshopFilter]?.label : null;
 
   // Renewals already completed whose NEXT disc is due within dueSoonDays.
   // Prefer new_licence_expiry — read straight off the new disc's own barcode
@@ -441,14 +450,24 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
         )}
       </div>
 
-      {/* Report: how many customer cars each workshop has sent through for renewal */}
+      {/* Report: how many customer cars each workshop has sent through for renewal.
+          Clicking a row filters the list below to just that company/walk-in group —
+          toggling the same row again (or the "Show all" chip) clears it. */}
       <div className="card" style={{padding:14,marginBottom:14,overflow:"auto"}}>
-        <div style={{fontWeight:700,marginBottom:12,fontSize:13}}>📊 {t.laRenewalsByWorkshop||"Renewals by Workshop"}</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:12}}>
+          <div style={{fontWeight:700,fontSize:13}}>📊 {t.laRenewalsByWorkshop||"Renewals by Workshop"}</div>
+          {activeWorkshopLabel&&(
+            <button className="btn btn-ghost btn-xs" onClick={()=>setWorkshopFilter(null)}>
+              {t.laFilteringBy||"Filtering by"}: <strong>{activeWorkshopLabel}</strong> · {t.laShowAll||"Show all"} ✕
+            </button>
+          )}
+        </div>
         {workshopRows.length===0&&<div style={{color:"var(--text3)",fontSize:13}}>{t.laNoRenewalsYet||"No renewals yet"}</div>}
         {workshopRows.length>0&&(<>
           <div className="mob-cards">
             {workshopRows.map(w=>(
-              <div key={w.label} className="card" style={{padding:12}}>
+              <div key={w.key} className="card" onClick={()=>setWorkshopFilter(f=>f===w.key?null:w.key)}
+                style={{padding:12,cursor:"pointer",border:workshopFilter===w.key?"1px solid var(--accent)":undefined,background:workshopFilter===w.key?"rgba(255,122,46,.08)":undefined}}>
                 <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>{w.label} <span style={{color:"var(--text3)",fontWeight:400}}>· {w.total} {t.laTotalSuffix||"total"}</span></div>
                 <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12}}>
                   <span style={{color:"var(--yellow)"}}>⏳ {w.pending||0}</span>
@@ -463,7 +482,8 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
             <thead><tr><th>{t.laColCompanyWalkIn||"Company / Walk-in"}</th><th style={{textAlign:"right"}}>{t.laColTotal||"Total"}</th><th style={{textAlign:"right"}}>{t.laStPending||"Pending"}</th><th style={{textAlign:"right"}}>{t.laStSubmitted||"Submitted"}</th><th style={{textAlign:"right"}}>{t.laStCompleted||"Completed"}</th><th style={{textAlign:"right"}}>{t.laStCancelled||"Cancelled"}</th></tr></thead>
             <tbody>
               {workshopRows.map(w=>(
-                <tr key={w.label}>
+                <tr key={w.key} onClick={()=>setWorkshopFilter(f=>f===w.key?null:w.key)}
+                  style={{cursor:"pointer",background:workshopFilter===w.key?"rgba(255,122,46,.1)":undefined}}>
                   <td style={{fontWeight:600,fontSize:13}}>{w.label}</td>
                   <td style={{textAlign:"right",fontWeight:700}}>{w.total}</td>
                   <td style={{textAlign:"right",color:"var(--yellow)"}}>{w.pending||0}</td>
@@ -478,12 +498,15 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
       </div>
 
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-        {[["all",t.laStAll||"All"],["pending",t.laStPending||"Pending"],["submitted",t.laStSubmitted||"Submitted"],["completed",t.laStCompleted||"Completed"],["cancelled",t.laStCancelled||"Cancelled"]].map(([v,l])=>(
-          <button key={v} onClick={()=>setFilter(v)}
-            style={{padding:"5px 12px",borderRadius:20,border:"1px solid var(--border)",background:filter===v?"var(--accent)":"var(--surface2)",color:filter===v?"#fff":"var(--text2)",fontSize:12,cursor:"pointer",fontWeight:filter===v?700:400}}>
-            {l} <span style={{opacity:.6}}>{v==="all"?renewals.length:renewals.filter(r=>r.status===v).length}</span>
-          </button>
-        ))}
+        {[["all",t.laStAll||"All"],["pending",t.laStPending||"Pending"],["submitted",t.laStSubmitted||"Submitted"],["completed",t.laStCompleted||"Completed"],["cancelled",t.laStCancelled||"Cancelled"]].map(([v,l])=>{
+          const scoped = workshopFilter!=null ? renewals.filter(r=>(r.workshop_id||"__walkin__")===workshopFilter) : renewals;
+          return (
+            <button key={v} onClick={()=>setFilter(v)}
+              style={{padding:"5px 12px",borderRadius:20,border:"1px solid var(--border)",background:filter===v?"var(--accent)":"var(--surface2)",color:filter===v?"#fff":"var(--text2)",fontSize:12,cursor:"pointer",fontWeight:filter===v?700:400}}>
+              {l} <span style={{opacity:.6}}>{v==="all"?scoped.length:scoped.filter(r=>r.status===v).length}</span>
+            </button>
+          );
+        })}
         {totalComm>0&&<span style={{marginLeft:"auto",fontSize:12,color:"var(--green)",fontWeight:700,alignSelf:"center"}}>{t.laCommissionEarned||"Commission earned:"} {C}{totalComm.toLocaleString()}</span>}
       </div>
 

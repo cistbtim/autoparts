@@ -173,7 +173,9 @@ function MindMapEditor({ map, onBack, showToast }) {
             )}
 
             {nodes.map(node => (
-              <div key={node.id} onMouseDown={(e) => dragNode(e, node)} onClick={(e) => { e.stopPropagation(); if (connectFrom) finishConnect(node.id); else setSelected(node.id); }}
+              <div key={node.id} onMouseDown={(e) => dragNode(e, node)}
+                onMouseUp={(e) => { if (connectFrom) { e.stopPropagation(); finishConnect(node.id); } }}
+                onClick={(e) => { e.stopPropagation(); if (!connectFrom) { setSelected(node.id); setEditingText(node.id); } }}
                 style={{
                   position: "absolute", left: node.x, top: node.y, width: NODE_W, minHeight: NODE_H,
                   background: (node.color || COLORS[0]) + "22", border: `1.5px solid ${node.color || COLORS[0]}`,
@@ -182,12 +184,11 @@ function MindMapEditor({ map, onBack, showToast }) {
                 }}>
                 {editingText === node.id ? (
                   <input autoFocus className="inp" value={node.text} onChange={e => updateNode(node.id, { text: e.target.value })}
-                    onMouseDown={e => e.stopPropagation()} onBlur={() => setEditingText(null)}
+                    onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={() => setEditingText(null)}
                     onKeyDown={e => { if (e.key === "Enter") setEditingText(null); }}
                     style={{ fontSize: 12, padding: "4px 6px", textAlign: "center" }} />
                 ) : (
-                  <span onDoubleClick={(e) => { e.stopPropagation(); setEditingText(node.id); }}
-                    style={{ fontSize: 13, fontWeight: 600, textAlign: "center", wordBreak: "break-word", color: "var(--text)" }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, textAlign: "center", wordBreak: "break-word", color: "var(--text)" }}>
                     {node.text}
                   </span>
                 )}

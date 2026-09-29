@@ -23,6 +23,7 @@ import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturns
 import { RentalDashboardPage, RentalVehiclesPage, RentalBookingsPage, RentalCustomersPage, RentalProfilePage } from "./components/Rental.jsx";
 import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierScanStockPage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
 import { LicenceAgentPage, ManageOfficeAgentsModal, CarSalesPage } from "./components/AgentPages.jsx";
+import { MindMapPage } from "./components/MindMap.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage, CarShopPage } from "./pages/PublicPages.jsx";
 
@@ -5149,6 +5150,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"branch_users",     icon:"👤",label:"Branch Users",     roles:["admin"],branchAdminOnly:true},
         {id:"vehicleRequests",  icon:"🚗",label:"Vehicle Requests", roles:["admin"],branchAdminOnly:true,badge:pendingVehicleRequests},
         {id:"workshopfeedback", icon:"💬",label:"App Feedback",     roles:["admin"],badge:pendingWsFeedback},
+        {id:"mindmaps",         icon:"🧠",label:"Mind Map",         roles:["admin"]},
       ]
     },
   ].filter(g=>
@@ -8887,6 +8889,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             </div>
           );
         })()}
+
+        {/* ── MIND MAP (admin) ── */}
+        {tab==="mindmaps"&&role==="admin"&&(
+          <MindMapPage showToast={showToast}/>
+        )}
 
         {/* ── MY QUERIES (customer) ── */}
         {tab==="myqueries"&&(()=>{

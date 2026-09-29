@@ -571,7 +571,6 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                   )}
                   <button onClick={()=>setDocsRenewalId(r.id)} title={t.laDocuments||"Documents"}
                     style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎</button>
-                  <QuickUploadBtn r={r} field="receipt" label={t.laReceiptLabel||"Receipt"} icon="🧾" doneUrl={r.receipt_url}/>
                   <QuickUploadBtn r={r} field="new_licence" label={t.laNewDiscLabel||"New Disc"} icon="🪪" doneUrl={r.new_licence_url}/>
                   {waPhone&&(
                     <a href={waLink(waPhone,waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>

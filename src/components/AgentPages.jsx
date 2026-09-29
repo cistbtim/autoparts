@@ -261,10 +261,27 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   // shortcut buttons in the table (receipt / new licence disc) show a spinner
   // on just that one button instead of blocking the whole row or page.
   const [quickUploading, setQuickUploading] = useState("");
+  // Reading the barcode + uploading the photo can take a few seconds on a
+  // slow connection — a user complained the tiny button spinner wasn't
+  // enough feedback that anything was happening. This tracks a per-row
+  // "busy" / "done" banner: busy while quickUpload is running, then the
+  // scanNote result (previously computed by uploadRenewalOutput and thrown
+  // away) so the agent can actually see whether the expiry was read, plus a
+  // one-tap reminder to let the customer know their disc is ready.
+  const [uploadStatus, setUploadStatus] = useState({});
+  const clearUploadStatus = (id) => setUploadStatus(prev=>{ const n={...prev}; delete n[id]; return n; });
   const quickUpload = async (r, field, file) => {
     setQuickUploading(`${r.id}:${field}`);
-    try{ await uploadRenewalOutput(r, field, file, onUpdate); }
-    catch(err){ alert("Upload failed: "+err.message); }
+    setUploadStatus(prev=>({...prev, [r.id]:{stage:"busy"}}));
+    try{
+      const result = await uploadRenewalOutput(r, field, file, onUpdate);
+      if(field==="new_licence"){
+        setUploadStatus(prev=>({...prev, [r.id]:{stage:"done", ok:!!result.patch?.new_licence_expiry, message:result.scanNote, newExpiry:result.patch?.new_licence_expiry||null}}));
+      } else {
+        clearUploadStatus(r.id);
+      }
+    }
+    catch(err){ alert("Upload failed: "+err.message); clearUploadStatus(r.id); }
     setQuickUploading("");
   };
   // One consistent icon-only button for every action on a row (Edit, Docs,
@@ -583,6 +600,33 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                       title={t.delete||"Delete"} style={actionBtnStyle("danger")}><IcTrash size={15}/></button>
                   )}
                 </div>
+                {uploadStatus[r.id]?.stage==="busy"&&(
+                  <div style={{marginTop:8,fontSize:12,color:"var(--text3)",display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⏳</span>
+                    {t.laReadingDisc||"Reading disc & uploading… this can take a few seconds"}
+                  </div>
+                )}
+                {uploadStatus[r.id]?.stage==="done"&&(()=>{
+                  const st = uploadStatus[r.id];
+                  const remindMsg = r.workshop_id
+                    ? `Hi, good news — ${r.owner_name||"your customer"}'s vehicle ${r.vehicle_reg}'s licence renewal is done. New expiry: ${st.newExpiry}.`
+                    : `Hi ${r.owner_name||""}, good news — your vehicle ${r.vehicle_reg}'s licence renewal is done. New expiry: ${st.newExpiry}.`;
+                  return (
+                    <div style={{marginTop:8,padding:"8px 10px",borderRadius:8,fontSize:12,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",
+                      background:st.ok?"rgba(52,211,153,.1)":"rgba(251,191,36,.1)",
+                      border:`1px solid ${st.ok?"rgba(52,211,153,.3)":"rgba(251,191,36,.3)"}`,
+                      color:st.ok?"var(--green)":"#f59e0b"}}>
+                      <span style={{flex:1}}>{st.message}</span>
+                      {st.ok&&waPhone&&(
+                        <a href={waLink(waPhone,remindMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                          <button style={{fontSize:11,padding:"4px 10px",border:"none",borderRadius:12,background:"#25D366",color:"#fff",cursor:"pointer",fontWeight:600}}>📲 {t.laRemindCustomer||"Remind Customer"}</button>
+                        </a>
+                      )}
+                      <button onClick={()=>clearUploadStatus(r.id)} title={t.dismiss||"Dismiss"}
+                        style={{background:"none",border:"none",cursor:"pointer",color:"inherit",fontSize:14,padding:0,lineHeight:1}}>✕</button>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

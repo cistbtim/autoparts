@@ -486,6 +486,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
         {id:"scrapyard",Icon:IcCar,    label:t.loginScrapyard||"Scrapyard"},
         {id:"rental",   Icon:IcKey,    label:t.loginRental||"Rental"},
         {id:"carsales", Icon:IcTag,    label:t.loginCarSales||"Car Sales"},
+        {id:"licagent", Icon:IcBadge,  label:t.loginLicAgent||"Licence Agent"},
       ],
     },
     {
@@ -494,7 +495,6 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
         {id:"staff",    Icon:IcStaff,  label:t.loginStaff||"Staff"},
         {id:"branch",   Icon:IcBox,    label:t.loginSpareShop||"Store"},
         {id:"supplier", Icon:IcFactory,label:t.loginSupplier||"Supplier"},
-        {id:"licagent", Icon:IcBadge,  label:t.loginLicAgent||"Licence Agent"},
         {id:"customer", Icon:IcCart,   label:t.loginShop||"Catalogue"},
       ],
     },

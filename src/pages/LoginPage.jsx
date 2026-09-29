@@ -108,6 +108,11 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   // (no grid to choose from, so nothing to pop over).
   const [authTab,setAuthTab] = useState(wsLoginOnly?"workshop":(wsReferrerId?"workshop":(catalogName?"customer":"")));
   const lockedSingleModule = wsLoginOnly||!!catalogName;
+  // Group sub-text (e.g. "Free 30-day trial") only on hover of one of its
+  // tiles — a click-based "selected" check would never actually be visible,
+  // since clicking opens a popup over the grid and resets authTab to "" the
+  // moment it closes, so the sub-text would show only while hidden.
+  const [hoverTab,setHoverTab] = useState("");
   // branch
   const [branchName,setBranchName] = useState("");
   const [branchUser,setBranchUser] = useState(""); const [branchPass,setBranchPass] = useState("");
@@ -542,7 +547,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
             <div key={group.label} style={{marginBottom:gi<TAB_GROUPS.length-1?16:0}}>
               <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8,paddingLeft:2}}>
                 <span style={{fontSize:11,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text3)"}}>{group.label}</span>
-                {group.sub&&<span style={{fontSize:11,color:"var(--text3)",opacity:.7}}>· {group.sub}</span>}
+                {group.sub&&group.tabs.some(tb=>tb.id===hoverTab)&&<span style={{fontSize:11,color:"var(--text3)",opacity:.7}}>· {group.sub}</span>}
               </div>
               {/* A 1-2 tile group in the same stretching grid as the 3-4 tile
                   groups would blow up into one full-width button — flex+fixed
@@ -555,7 +560,9 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   const c = TAB_COLORS[id]||"var(--accent)";
                   const on = authTab===id;
                   return (
-                    <button key={id} onClick={()=>switchTab(id)} style={{
+                    <button key={id} onClick={()=>switchTab(id)}
+                      onMouseEnter={()=>setHoverTab(id)} onMouseLeave={()=>setHoverTab(t=>t===id?"":t)}
+                      style={{
                       padding:"12px 8px",borderRadius:14,
                       border:`1.5px solid ${on?c:"var(--border2)"}`,
                       cursor:"pointer",

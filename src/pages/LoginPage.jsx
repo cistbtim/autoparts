@@ -483,7 +483,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       ],
     },
     {
-      label: t.loginGroupAdmin||"Admin",
+      label: t.loginGroupAdmin||"Staff Login",
       sub: t.loginGroupAdminSub||"Admin, manager & fulfilment access",
       tabs: [
         {id:"staff", Icon:IcStaff, label:t.loginStaff||"Staff"},
@@ -492,7 +492,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     {
       label: t.loginGroupBranch||"Branch Login",
       tabs: [
-        {id:"branch", Icon:IcBox, label:t.loginSpareShop||"Spare Shop"},
+        {id:"branch", Icon:IcBox, label:t.loginSpareShop||"Store"},
       ],
     },
     {
@@ -588,7 +588,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:0}}>
                 <div style={{width:32,height:32,borderRadius:9,background:"rgba(255,122,46,.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",flexShrink:0}}><IcBox/></div>
                 <div>
-                  <div style={{fontSize:15,fontWeight:700,color:"var(--text)"}}>{t.loginSpareShop||"Spare Shop"} {t.signIn||"Login"}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:"var(--text)"}}>{t.loginSpareShop||"Store"} {t.signIn||"Login"}</div>
                   <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>{t.loginSpareShopSub||"Sign in to your spare parts shop"}</div>
                 </div>
               </div>

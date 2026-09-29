@@ -121,7 +121,7 @@ export const T = {
     carSalesMarkSold: "🏁 Mark as Sold", carSalesConfirmSaleTitle: "🏁 Confirm Sale",
     carSalesSoldPricePh: "Sold price", carSalesSoldToPh: "Sold to (buyer name, optional)", carSalesConfirmSoldBtn: "Confirm Sold",
     carSalesSaveListing: "💾 Save Listing",
-    loginSpareShop: "Spare Shop", loginSpareShopSub: "Sign in to your spare parts shop", branchNameField: "Branch Name", branchNamePlaceholder: "e.g. North Branch",
+    loginSpareShop: "Store", loginSpareShopSub: "Sign in to your spare parts shop", branchNameField: "Branch Name", branchNamePlaceholder: "e.g. North Branch",
     signInArrow: "Sign In →", companyNameField: "Company Name", optionalHint: "Optional",
     loginWorkshopSub: "Sign in to your workshop account", companyNameHintWorkshop: "Helps identify your account if multiple workshops share a username",
     loginScrapyardSub: "Sign in to your scrapyard account", companyNameHintScrapyard: "Helps identify your account if multiple scrapyards share a username",

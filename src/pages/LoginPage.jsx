@@ -472,10 +472,11 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     );
   })();
 
-  // Grouped by what the tile actually is, not alphabetically. Staff is its
-  // own standalone group (it's the admin/manager/fulfilment login, distinct
-  // from everything else here) rather than sharing a row with Spare Shop —
-  // that row is relabeled "Branch Login" now that it's just the one tile.
+  // Grouped by what the tile actually is, not alphabetically. Everything
+  // that isn't a self-signup business (staff, branch, supplier, licence
+  // agent, catalogue) shares one row now — they were three separate
+  // single-purpose sections before, which read as more structure than the
+  // five tiles actually needed.
   const TAB_GROUPS = [
     {
       label: t.loginGroupBusiness||"Run Your Own Business",
@@ -488,21 +489,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       ],
     },
     {
-      label: t.loginGroupAdmin||"Staff Login",
-      sub: t.loginGroupAdminSub||"Admin, manager & fulfilment access",
+      label: t.loginGroupOther||"Team & Partners",
       tabs: [
-        {id:"staff", Icon:IcStaff, label:t.loginStaff||"Staff"},
-      ],
-    },
-    {
-      label: t.loginGroupBranch||"Branch Login",
-      tabs: [
-        {id:"branch", Icon:IcBox, label:t.loginSpareShop||"Store"},
-      ],
-    },
-    {
-      label: t.loginGroupPartners||"Partners & Customers",
-      tabs: [
+        {id:"staff",    Icon:IcStaff,  label:t.loginStaff||"Staff"},
+        {id:"branch",   Icon:IcBox,    label:t.loginSpareShop||"Store"},
         {id:"supplier", Icon:IcFactory,label:t.loginSupplier||"Supplier"},
         {id:"licagent", Icon:IcBadge,  label:t.loginLicAgent||"Licence Agent"},
         {id:"customer", Icon:IcCart,   label:t.loginShop||"Catalogue"},

@@ -467,16 +467,38 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     );
   })();
 
-  const TAB_BTNS = [
-    {id:"branch",   Icon:IcBox,    label:t.loginSpareShop||"Spare Shop"},
-    {id:"workshop", Icon:IcWrench, label:t.loginWorkshop||"Workshop"},
-    {id:"scrapyard",Icon:IcCar,    label:t.loginScrapyard||"Scrapyard"},
-    {id:"customer", Icon:IcCart,   label:t.loginShop||"Catalogue"},
-    {id:"supplier", Icon:IcFactory,label:t.loginSupplier||"Supplier"},
-    {id:"staff",    Icon:IcStaff,  label:t.loginStaff||"Staff"},
-    {id:"licagent", Icon:IcBadge,  label:t.loginLicAgent||"Licence Agent"},
-    {id:"carsales", Icon:IcTag,    label:t.loginCarSales||"Car Sales"},
-    {id:"rental",   Icon:IcKey,    label:t.loginRental||"Rental"},
+  // Grouped by what the tile actually is, not alphabetically — the flat 3x3
+  // grid stopped scanning well once Rental joined Workshop/Scrapyard/Car
+  // Sales as a fourth independent self-signup business. Three sections:
+  // businesses that sign themselves up for a free trial, VelGenius's own
+  // team/branch logins (accounts an admin sets up), and partners/customers
+  // (supplier, licence agent, catalogue) who log into an existing account.
+  const TAB_GROUPS = [
+    {
+      label: t.loginGroupBusiness||"Run Your Own Business",
+      sub: t.loginGroupBusinessSub||"Free 30-day trial, no credit card",
+      tabs: [
+        {id:"workshop", Icon:IcWrench, label:t.loginWorkshop||"Workshop"},
+        {id:"scrapyard",Icon:IcCar,    label:t.loginScrapyard||"Scrapyard"},
+        {id:"rental",   Icon:IcKey,    label:t.loginRental||"Rental"},
+        {id:"carsales", Icon:IcTag,    label:t.loginCarSales||"Car Sales"},
+      ],
+    },
+    {
+      label: t.loginGroupTeam||"VelGenius Team",
+      tabs: [
+        {id:"branch", Icon:IcBox,   label:t.loginSpareShop||"Spare Shop"},
+        {id:"staff",  Icon:IcStaff, label:t.loginStaff||"Staff"},
+      ],
+    },
+    {
+      label: t.loginGroupPartners||"Partners & Customers",
+      tabs: [
+        {id:"supplier", Icon:IcFactory,label:t.loginSupplier||"Supplier"},
+        {id:"licagent", Icon:IcBadge,  label:t.loginLicAgent||"Licence Agent"},
+        {id:"customer", Icon:IcCart,   label:t.loginShop||"Catalogue"},
+      ],
+    },
   ];
 
   const inpStyle = {
@@ -511,28 +533,38 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
             forces 4 rows and pushes the bottom tiles off screen on shorter
             displays — the "automatic" sizing is the grid itself, not JS. */}
         {!wsLoginOnly&&!catalogName&&(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:16}}>
-          {TAB_BTNS.map(({id,Icon,label})=>{
-            const c = TAB_COLORS[id]||"var(--accent)";
-            const on = authTab===id;
-            return (
-              <button key={id} onClick={()=>switchTab(id)} style={{
-                padding:"12px 8px",borderRadius:14,
-                border:`1.5px solid ${on?c:"var(--border2)"}`,
-                cursor:"pointer",
-                background:"var(--surface)",
-                boxShadow:on?`0 6px 18px ${c}33`:"var(--shadow)",
-                display:"flex",flexDirection:"column",alignItems:"center",gap:7,
-                transition:"all .15s",
-              }}>
-                <div style={{width:36,height:36,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",
-                  background:`${c}1c`,color:c}}>
-                  <Icon/>
-                </div>
-                <span style={{fontSize:11,fontWeight:700,letterSpacing:".04em",textTransform:"uppercase",color:on?c:"var(--text2)"}}>{label}</span>
-              </button>
-            );
-          })}
+        <div style={{marginBottom:16}}>
+          {TAB_GROUPS.map((group,gi)=>(
+            <div key={group.label} style={{marginBottom:gi<TAB_GROUPS.length-1?16:0}}>
+              <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8,paddingLeft:2}}>
+                <span style={{fontSize:11,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text3)"}}>{group.label}</span>
+                {group.sub&&<span style={{fontSize:11,color:"var(--text3)",opacity:.7}}>· {group.sub}</span>}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
+                {group.tabs.map(({id,Icon,label})=>{
+                  const c = TAB_COLORS[id]||"var(--accent)";
+                  const on = authTab===id;
+                  return (
+                    <button key={id} onClick={()=>switchTab(id)} style={{
+                      padding:"12px 8px",borderRadius:14,
+                      border:`1.5px solid ${on?c:"var(--border2)"}`,
+                      cursor:"pointer",
+                      background:"var(--surface)",
+                      boxShadow:on?`0 6px 18px ${c}33`:"var(--shadow)",
+                      display:"flex",flexDirection:"column",alignItems:"center",gap:7,
+                      transition:"all .15s",
+                    }}>
+                      <div style={{width:36,height:36,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",
+                        background:`${c}1c`,color:c}}>
+                        <Icon/>
+                      </div>
+                      <span style={{fontSize:11,fontWeight:700,letterSpacing:".04em",textTransform:"uppercase",color:on?c:"var(--text2)"}}>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
         )}
 

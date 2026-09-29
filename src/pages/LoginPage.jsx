@@ -467,12 +467,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     );
   })();
 
-  // Grouped by what the tile actually is, not alphabetically — the flat 3x3
-  // grid stopped scanning well once Rental joined Workshop/Scrapyard/Car
-  // Sales as a fourth independent self-signup business. Three sections:
-  // businesses that sign themselves up for a free trial, VelGenius's own
-  // team/branch logins (accounts an admin sets up), and partners/customers
-  // (supplier, licence agent, catalogue) who log into an existing account.
+  // Grouped by what the tile actually is, not alphabetically. Staff is its
+  // own standalone group (it's the admin/manager/fulfilment login, distinct
+  // from everything else here) rather than sharing a row with Spare Shop —
+  // that row is relabeled "Branch Login" now that it's just the one tile.
   const TAB_GROUPS = [
     {
       label: t.loginGroupBusiness||"Run Your Own Business",
@@ -485,10 +483,16 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       ],
     },
     {
-      label: t.loginGroupTeam||"VelGenius Team",
+      label: t.loginGroupAdmin||"Admin",
+      sub: t.loginGroupAdminSub||"Admin, manager & fulfilment access",
       tabs: [
-        {id:"branch", Icon:IcBox,   label:t.loginSpareShop||"Spare Shop"},
-        {id:"staff",  Icon:IcStaff, label:t.loginStaff||"Staff"},
+        {id:"staff", Icon:IcStaff, label:t.loginStaff||"Staff"},
+      ],
+    },
+    {
+      label: t.loginGroupBranch||"Branch Login",
+      tabs: [
+        {id:"branch", Icon:IcBox, label:t.loginSpareShop||"Spare Shop"},
       ],
     },
     {
@@ -540,7 +544,13 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                 <span style={{fontSize:11,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text3)"}}>{group.label}</span>
                 {group.sub&&<span style={{fontSize:11,color:"var(--text3)",opacity:.7}}>· {group.sub}</span>}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
+              {/* A 1-2 tile group in the same stretching grid as the 3-4 tile
+                  groups would blow up into one full-width button — flex+fixed
+                  width instead, so a lone tile (Admin, Branch Login) stays the
+                  same compact size as everything else instead of stretching. */}
+              <div style={group.tabs.length<3
+                ? {display:"flex",gap:8,flexWrap:"wrap"}
+                : {display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
                 {group.tabs.map(({id,Icon,label})=>{
                   const c = TAB_COLORS[id]||"var(--accent)";
                   const on = authTab===id;
@@ -553,6 +563,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                       boxShadow:on?`0 6px 18px ${c}33`:"var(--shadow)",
                       display:"flex",flexDirection:"column",alignItems:"center",gap:7,
                       transition:"all .15s",
+                      ...(group.tabs.length<3?{width:150,flexShrink:0}:{}),
                     }}>
                       <div style={{width:36,height:36,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",
                         background:`${c}1c`,color:c}}>

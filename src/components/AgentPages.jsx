@@ -257,6 +257,9 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   // Set by clicking a row in "Renewals by Workshop" — narrows the list below to
   // just that company/walk-in group. null = no workshop filter (show all).
   const [workshopFilter, setWorkshopFilter] = useState(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
   // Which renewal+field is mid-upload, as `${id}:${field}` — lets the quick
   // shortcut buttons in the table (receipt / new licence disc) show a spinner
   // on just that one button instead of blocking the whole row or page.
@@ -337,11 +340,20 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   const setDueSoonDaysPersist = (v) => { setDueSoonDays(v); try{ localStorage.setItem("licence_agent_due_soon_days", v); }catch{/* ignore */} };
   const C = curSym(getSettings().currency);
 
+  const searchQ = search.trim().toLowerCase();
   const filtered = renewals.filter(r=>{
     if(filter!=="all" && r.status!==filter) return false;
     if(workshopFilter!=null && (r.workshop_id||"__walkin__")!==workshopFilter) return false;
+    if(searchQ){
+      const wsName = r.workshop_id ? (workshopInfo[r.workshop_id]?.name||r.workshop_id) : "walk-in";
+      const haystack = [r.vehicle_reg, r.vehicle_make, r.vehicle_model, r.owner_name, r.owner_phone, wsName].filter(Boolean).join(" ").toLowerCase();
+      if(!haystack.includes(searchQ)) return false;
+    }
     return true;
   });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage-1)*PAGE_SIZE, safePage*PAGE_SIZE);
   const unpaidComm = renewals.filter(r=>r.commission_status==="unpaid"&&r.status==="completed");
   const totalComm = renewals.filter(r=>r.commission_status==="paid").reduce((s,r)=>s+(+r.commission_amount||0),0);
 
@@ -474,7 +486,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:12}}>
           <div style={{fontWeight:700,fontSize:13}}>📊 {t.laRenewalsByWorkshop||"Renewals by Workshop"}</div>
           {activeWorkshopLabel&&(
-            <button className="btn btn-ghost btn-xs" onClick={()=>setWorkshopFilter(null)}>
+            <button className="btn btn-ghost btn-xs" onClick={()=>{setWorkshopFilter(null);setPage(1);}}>
               {t.laFilteringBy||"Filtering by"}: <strong>{activeWorkshopLabel}</strong> · {t.laShowAll||"Show all"} ✕
             </button>
           )}
@@ -483,7 +495,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
         {workshopRows.length>0&&(<>
           <div className="mob-cards">
             {workshopRows.map(w=>(
-              <div key={w.key} className="card" onClick={()=>setWorkshopFilter(f=>f===w.key?null:w.key)}
+              <div key={w.key} className="card" onClick={()=>{setWorkshopFilter(f=>f===w.key?null:w.key);setPage(1);}}
                 style={{padding:12,cursor:"pointer",border:workshopFilter===w.key?"1px solid var(--accent)":undefined,background:workshopFilter===w.key?"rgba(255,122,46,.08)":undefined}}>
                 <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>{w.label} <span style={{color:"var(--text3)",fontWeight:400}}>· {w.total} {t.laTotalSuffix||"total"}</span></div>
                 <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12}}>
@@ -499,7 +511,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
             <thead><tr><th>{t.laColCompanyWalkIn||"Company / Walk-in"}</th><th style={{textAlign:"right"}}>{t.laColTotal||"Total"}</th><th style={{textAlign:"right"}}>{t.laStPending||"Pending"}</th><th style={{textAlign:"right"}}>{t.laStSubmitted||"Submitted"}</th><th style={{textAlign:"right"}}>{t.laStCompleted||"Completed"}</th><th style={{textAlign:"right"}}>{t.laStCancelled||"Cancelled"}</th></tr></thead>
             <tbody>
               {workshopRows.map(w=>(
-                <tr key={w.key} onClick={()=>setWorkshopFilter(f=>f===w.key?null:w.key)}
+                <tr key={w.key} onClick={()=>{setWorkshopFilter(f=>f===w.key?null:w.key);setPage(1);}}
                   style={{cursor:"pointer",background:workshopFilter===w.key?"rgba(255,122,46,.1)":undefined}}>
                   <td style={{fontWeight:600,fontSize:13}}>{w.label}</td>
                   <td style={{textAlign:"right",fontWeight:700}}>{w.total}</td>
@@ -514,11 +526,15 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
         </>)}
       </div>
 
+      <input className="inp" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}
+        placeholder={t.laSearchPlaceholder||"Search reg, make/model, owner, phone or company…"}
+        style={{marginBottom:10,width:"100%"}}/>
+
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
         {[["all",t.laStAll||"All"],["pending",t.laStPending||"Pending"],["submitted",t.laStSubmitted||"Submitted"],["completed",t.laStCompleted||"Completed"],["cancelled",t.laStCancelled||"Cancelled"]].map(([v,l])=>{
           const scoped = workshopFilter!=null ? renewals.filter(r=>(r.workshop_id||"__walkin__")===workshopFilter) : renewals;
           return (
-            <button key={v} onClick={()=>setFilter(v)}
+            <button key={v} onClick={()=>{setFilter(v);setPage(1);}}
               style={{padding:"5px 12px",borderRadius:20,border:"1px solid var(--border)",background:filter===v?"var(--accent)":"var(--surface2)",color:filter===v?"#fff":"var(--text2)",fontSize:12,cursor:"pointer",fontWeight:filter===v?700:400}}>
               {l} <span style={{opacity:.6}}>{v==="all"?scoped.length:scoped.filter(r=>r.status===v).length}</span>
             </button>
@@ -530,13 +546,16 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
       {filtered.length===0&&(
         <div style={{textAlign:"center",padding:"40px 0",color:"var(--text3)"}}>
           <div style={{fontSize:32,marginBottom:8}}>🪪</div>
-          <div style={{fontSize:14}}>{t.laNoRenewalRequests||"No renewal requests"} {filter==="all"?(t.laYet||"yet"):`${t.laWithStatus||"with status"} "${filter}"`}</div>
+          <div style={{fontSize:14}}>{t.laNoRenewalRequests||"No renewal requests"} {searchQ?`${t.laMatching||"matching"} "${search}"`:filter==="all"?(t.laYet||"yet"):`${t.laWithStatus||"with status"} "${filter}"`}</div>
         </div>
       )}
 
       {filtered.length>0&&(
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {filtered.map(r=>{
+          <div style={{fontSize:12,color:"var(--text3)"}}>
+            {t.laShowing||"Showing"} {(safePage-1)*PAGE_SIZE+1}–{Math.min(safePage*PAGE_SIZE,filtered.length)} {t.laOf||"of"} {filtered.length}
+          </div>
+          {pageItems.map(r=>{
             const isExpired = r.current_expiry && new Date(r.current_expiry)<new Date();
             const waPhone = r.workshop_id ? (workshopInfo[r.workshop_id]?.phone||"") : (r.owner_phone||"");
             const waMsg = r.workshop_id
@@ -630,6 +649,13 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
               </div>
             );
           })}
+          {totalPages>1&&(
+            <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:10,padding:"10px 0"}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={safePage<=1}>‹ {t.laPrev||"Prev"}</button>
+              <span style={{fontSize:12,color:"var(--text2)"}}>{t.laPage||"Page"} {safePage} / {totalPages}</span>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={safePage>=totalPages}>{t.laNext||"Next"} ›</button>
+            </div>
+          )}
         </div>
       )}
 

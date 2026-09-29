@@ -113,6 +113,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   // since clicking opens a popup over the grid and resets authTab to "" the
   // moment it closes, so the sub-text would show only while hidden.
   const [hoverTab,setHoverTab] = useState("");
+  // Which group's tiles are showing — a segmented selector above the grid
+  // instead of stacking every group's tiles at once, so a narrow/mobile
+  // screen only ever scrolls through one group at a time.
+  const [activeGroup,setActiveGroup] = useState(0);
   // branch
   const [branchName,setBranchName] = useState("");
   const [branchUser,setBranchUser] = useState(""); const [branchPass,setBranchPass] = useState("");
@@ -531,50 +535,65 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
             laptop, 2-across on a phone) instead of a fixed column count that
             forces 4 rows and pushes the bottom tiles off screen on shorter
             displays — the "automatic" sizing is the grid itself, not JS. */}
-        {!wsLoginOnly&&!catalogName&&(
+        {!wsLoginOnly&&!catalogName&&(()=>{
+          const gi = Math.min(activeGroup, TAB_GROUPS.length-1);
+          const group = TAB_GROUPS[gi];
+          return (
         <div style={{marginBottom:16}}>
-          {TAB_GROUPS.map((group,gi)=>(
-            <div key={group.label} style={{marginBottom:gi<TAB_GROUPS.length-1?16:0}}>
-              <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8,paddingLeft:2}}>
-                <span style={{fontSize:11,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text3)"}}>{group.label}</span>
-                {group.sub&&group.tabs.some(tb=>tb.id===hoverTab)&&<span style={{fontSize:11,color:"var(--text3)",opacity:.7}}>· {group.sub}</span>}
-              </div>
-              {/* A 1-2 tile group in the same stretching grid as the 3-4 tile
-                  groups would blow up into one full-width button — flex+fixed
-                  width instead, so a lone tile (Admin, Branch Login) stays the
-                  same compact size as everything else instead of stretching. */}
-              <div style={group.tabs.length<3
-                ? {display:"flex",gap:8,flexWrap:"wrap"}
-                : {display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
-                {group.tabs.map(({id,Icon,label})=>{
-                  const c = TAB_COLORS[id]||"var(--accent)";
-                  const on = authTab===id;
-                  return (
-                    <button key={id} onClick={()=>switchTab(id)}
-                      onMouseEnter={()=>setHoverTab(id)} onMouseLeave={()=>setHoverTab(t=>t===id?"":t)}
-                      style={{
-                      padding:"12px 8px",borderRadius:14,
-                      border:`1.5px solid ${on?c:"var(--border2)"}`,
-                      cursor:"pointer",
-                      background:"var(--surface)",
-                      boxShadow:on?`0 6px 18px ${c}33`:"var(--shadow)",
-                      display:"flex",flexDirection:"column",alignItems:"center",gap:7,
-                      transition:"all .15s",
-                      ...(group.tabs.length<3?{width:150,flexShrink:0}:{}),
-                    }}>
-                      <div style={{width:36,height:36,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",
-                        background:`${c}1c`,color:c}}>
-                        <Icon/>
-                      </div>
-                      <span style={{fontSize:11,fontWeight:700,letterSpacing:".04em",textTransform:"uppercase",color:on?c:"var(--text2)"}}>{label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+          {/* Segmented selector — picks which group's tiles show below, so a
+              narrow/mobile screen scrolls through one group at a time instead
+              of every group stacked at once. */}
+          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+            {TAB_GROUPS.map((g,i)=>(
+              <button key={g.label} onClick={()=>setActiveGroup(i)} style={{
+                padding:"7px 14px",borderRadius:20,border:"1px solid var(--border2)",
+                cursor:"pointer",fontSize:12,fontWeight:700,letterSpacing:".02em",
+                background:i===gi?"var(--accent)":"var(--surface)",
+                color:i===gi?"#fff":"var(--text2)",
+                transition:"all .15s",
+              }}>{g.label}</button>
+            ))}
+          </div>
+          <div key={group.label}>
+            <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8,paddingLeft:2}}>
+              {group.sub&&group.tabs.some(tb=>tb.id===hoverTab)&&<span style={{fontSize:11,color:"var(--text3)",opacity:.7}}>· {group.sub}</span>}
             </div>
-          ))}
+            {/* A 1-2 tile group in the same stretching grid as the 3-4 tile
+                groups would blow up into one full-width button — flex+fixed
+                width instead, so a lone tile (Admin, Branch Login) stays the
+                same compact size as everything else instead of stretching. */}
+            <div style={group.tabs.length<3
+              ? {display:"flex",gap:8,flexWrap:"wrap"}
+              : {display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
+              {group.tabs.map(({id,Icon,label})=>{
+                const c = TAB_COLORS[id]||"var(--accent)";
+                const on = authTab===id;
+                return (
+                  <button key={id} onClick={()=>switchTab(id)}
+                    onMouseEnter={()=>setHoverTab(id)} onMouseLeave={()=>setHoverTab(t=>t===id?"":t)}
+                    style={{
+                    padding:"12px 8px",borderRadius:14,
+                    border:`1.5px solid ${on?c:"var(--border2)"}`,
+                    cursor:"pointer",
+                    background:"var(--surface)",
+                    boxShadow:on?`0 6px 18px ${c}33`:"var(--shadow)",
+                    display:"flex",flexDirection:"column",alignItems:"center",gap:7,
+                    transition:"all .15s",
+                    ...(group.tabs.length<3?{width:150,flexShrink:0}:{}),
+                  }}>
+                    <div style={{width:36,height:36,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",
+                      background:`${c}1c`,color:c}}>
+                      <Icon/>
+                    </div>
+                    <span style={{fontSize:11,fontWeight:700,letterSpacing:".04em",textTransform:"uppercase",color:on?c:"var(--text2)"}}>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
-        )}
+          );
+        })()}
 
         {/* Card — popup for the module grid, inline for a locked single-module entry point */}
         <LoginCardShell authTab={authTab} locked={lockedSingleModule} onClose={()=>switchTab("")}>

@@ -4329,6 +4329,12 @@ export function decodeVin(vin) {
     JHM:'Honda (JP)',JN1:'Nissan (JP)',JN6:'Nissan (JP)',
     JMZ:'Mazda (JP)',JS3:'Suzuki (JP)',JS4:'Suzuki (JP)',
     AAT:'Toyota (SA)',
+    // BYD (CN) — per chinavehiclehistory.com/en/manufacturer/byd: genuine BYD VINs
+    // always start with "L" (China); LVV is the main Shenzhen Pingshan passenger-car
+    // plant (Atto 3, Seal, Han, Tang, Dolphin, Seagull), LSV covers other domestic
+    // plants (Xi'an/Changsha/Hefei — Qin Plus, Song Plus, commercial models), LGX is
+    // the export-market production code.
+    LVV:'BYD (CN)', LSV:'BYD (CN)', LGX:'BYD (CN)',
   };
   const JT_MAKES = {JT:'Toyota (JP)',JA:'Isuzu (JP)',JD:'Daihatsu (JP)',JM:'Mazda (JP)'};
   const make = WMI_MAP[wmi] || WMI_MAP[wmi2] || JT_MAKES[wmi2] || `WMI: ${wmi}`;

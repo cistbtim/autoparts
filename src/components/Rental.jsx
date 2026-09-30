@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { api } from "../lib/api.js";
 import { makeId, today, fmtAmt } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
+import { decodeVin } from "./Workshop.jsx";
 import { Overlay, MHead, FL, FG, FD } from "./shared.jsx";
 
 const VEHICLE_STATUSES = ["Available", "Rented", "Maintenance"];
@@ -49,9 +50,30 @@ function RentalVehicleModal({ vehicle, rentalId, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanMessage, setScanMessage] = useState("");
+  const [vinMessage, setVinMessage] = useState("");
   const cameraInput = useRef(null);
   const photoInput = useRef(null);
   const s = (k, v) => setF(p => ({ ...p, [k]: v }));
+
+  // WMI-based decode (make/year/plant from the VIN itself) — separate from the
+  // licence-disc scan above, useful when there's no disc photo yet but the VIN
+  // is already known (e.g. typed from the windscreen or a customer's docs).
+  const handleDecodeVin = () => {
+    const vin = (f.vin || "").trim().toUpperCase();
+    if (vin.length < 11) { setVinMessage("Enter a full VIN first (11+ characters)."); return; }
+    const d = decodeVin(vin);
+    if (!d || !d.make || d.make.startsWith("WMI:")) { setVinMessage("Could not recognise this VIN's manufacturer code — enter the details manually."); return; }
+    const makeClean = d.make.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    const updates = { make: makeClean };
+    if (d.year && d.year !== "?") {
+      // Position 10 repeats every 30 years (e.g. "1991 / 2021") — for a rental
+      // fleet the later year is essentially always the right one.
+      const years = d.year.split("/").map(y => y.trim());
+      updates.year = years[years.length - 1];
+    }
+    setF(p => ({ ...p, ...updates }));
+    setVinMessage(`Decoded: ${makeClean}${updates.year ? ` · ${updates.year}` : ""}${d.model ? ` · ${d.model}` : ""}${d.plant ? ` · Built: ${d.plant}` : ""}`);
+  };
 
   const handleDiscScan = async e => {
     const file = e.target.files?.[0];
@@ -114,7 +136,13 @@ function RentalVehicleModal({ vehicle, rentalId, onSave, onClose }) {
       </div>
       <FG><FD><FL label="Make *" /><input className="inp" value={f.make} onChange={e => s("make", e.target.value)} /></FD><FD><FL label="Model *" /><input className="inp" value={f.model} onChange={e => s("model", e.target.value)} /></FD></FG>
       <FG><FD><FL label="Year" /><input className="inp" type="number" value={f.year} onChange={e => s("year", e.target.value)} /></FD><FD><FL label="Registration *" /><input className="inp" value={f.reg} onChange={e => s("reg", e.target.value.toUpperCase())} /></FD></FG>
-      <FG><FD><FL label="VIN" /><input className="inp" value={f.vin || ""} onChange={e => s("vin", e.target.value.toUpperCase())} /></FD><FD><FL label="Color" /><input className="inp" value={f.color || ""} onChange={e => s("color", e.target.value)} /></FD></FG>
+      <FG><FD><FL label="VIN" />
+        <div style={{ display: "flex", gap: 6 }}>
+          <input className="inp" value={f.vin || ""} onChange={e => { s("vin", e.target.value.toUpperCase()); setVinMessage(""); }} />
+          <button type="button" className="btn" onClick={handleDecodeVin} style={{ whiteSpace: "nowrap" }}>🔍 Decode</button>
+        </div>
+        {vinMessage && <div role="status" style={{ fontSize: 12, color: vinMessage.startsWith("Could not") || vinMessage.startsWith("Enter") ? "var(--red)" : "var(--green)", marginTop: 4 }}>{vinMessage}</div>}
+      </FD><FD><FL label="Color" /><input className="inp" value={f.color || ""} onChange={e => s("color", e.target.value)} /></FD></FG>
       <FG><FD><FL label="Category" /><input className="inp" placeholder="e.g. Sedan, SUV, Bakkie" value={f.category || ""} onChange={e => s("category", e.target.value)} /></FD><FD><FL label="Status" /><select className="inp" value={f.status} onChange={e => s("status", e.target.value)}>{VEHICLE_STATUSES.map(st => <option key={st} value={st}>{st}</option>)}</select></FD></FG>
       <FG cols="1fr 1fr 1fr">
         <FD><FL label="Daily Rate" /><input className="inp" type="number" value={f.daily_rate} onChange={e => s("daily_rate", e.target.value)} /></FD>

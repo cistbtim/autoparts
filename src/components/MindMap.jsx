@@ -20,6 +20,8 @@ function MindMapEditor({ map, onBack, showToast }) {
   const [selected, setSelected] = useState(null);
   const [editingText, setEditingText] = useState(null); // node id mid-edit
   const [connectFrom, setConnectFrom] = useState(null);
+  const [tool, setTool] = useState("select"); // select | connect | unlink
+  const [linkSource, setLinkSource] = useState(null); // first node picked in connect tool
   const [tempLine, setTempLine] = useState(null); // {x1,y1,x2,y2}
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -63,7 +65,24 @@ function MindMapEditor({ map, onBack, showToast }) {
     };
   };
 
+  const pickTool = (t) => { setTool(t); setLinkSource(null); setEditingText(null); setConnectFrom(null); setTempLine(null); };
+
+  const clickNode = (node) => {
+    if (tool === "connect") {
+      if (!linkSource) { setLinkSource(node.id); return; }
+      if (linkSource !== node.id) {
+        const exists = edges.some(ed => (ed.from === linkSource && ed.to === node.id) || (ed.from === node.id && ed.to === linkSource));
+        if (!exists) { setEdges(prev => [...prev, { from: linkSource, to: node.id }]); markDirty(); }
+      }
+      setLinkSource(null);
+      return;
+    }
+    if (tool === "unlink") return;
+    if (!connectFrom) { setSelected(node.id); setEditingText(node.id); }
+  };
+
   const dragNode = (e, node) => {
+    if (tool !== "select") { e.stopPropagation(); return; }
     if (editingText === node.id) return;
     e.stopPropagation();
     setSelected(node.id);
@@ -106,7 +125,7 @@ function MindMapEditor({ map, onBack, showToast }) {
   };
 
   const onCanvasMouseUp = () => { if (connectFrom) finishConnect(null); };
-  const onCanvasClick = () => { setSelected(null); setEditingText(null); };
+  const onCanvasClick = () => { setSelected(null); setEditingText(null); setLinkSource(null); };
 
   const save = async () => {
     setSaving(true);
@@ -127,28 +146,39 @@ function MindMapEditor({ map, onBack, showToast }) {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {dirty && <span style={{ fontSize: 11, color: "var(--yellow)" }}>Unsaved changes</span>}
-          <button className="btn btn-ghost btn-sm" onClick={addNode}>+ Add Idea</button>
           <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "💾 Save"}</button>
         </div>
       </div>
 
-      {selected && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, padding: "8px 12px", background: "var(--surface2)", borderRadius: 10 }}>
-          <span style={{ fontSize: 12, color: "var(--text3)" }}>Selected: color</span>
-          {COLORS.map(c => (
-            <button key={c} onClick={() => updateNode(selected, { color: c })}
-              title={c} style={{ width: 20, height: 20, borderRadius: "50%", background: c, border: nodes.find(n => n.id === selected)?.color === c ? "2px solid var(--text)" : "1px solid var(--border)", cursor: "pointer", padding: 0 }} />
-          ))}
-          <button className="btn btn-danger btn-xs" style={{ marginLeft: "auto" }} onClick={() => deleteNode(selected)}>🗑 Delete idea</button>
-        </div>
-      )}
-
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+      <div className="card" style={{ width: 150, flexShrink: 0, padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".05em" }}>Toolbox</div>
+        <button className={`btn btn-sm ${tool === "select" ? "btn-primary" : "btn-ghost"}`} onClick={() => pickTool("select")} title="Move and edit ideas">🖐 Select / Move</button>
+        <button className="btn btn-ghost btn-sm" onClick={addNode}>➕ Add Idea</button>
+        <button className={`btn btn-sm ${tool === "connect" ? "btn-primary" : "btn-ghost"}`} onClick={() => pickTool(tool === "connect" ? "select" : "connect")} title="Click one idea, then another">🔗 Add Line</button>
+        <button className={`btn btn-sm ${tool === "unlink" ? "btn-danger" : "btn-ghost"}`} onClick={() => pickTool(tool === "unlink" ? "select" : "unlink")} title="Click a line to remove it">✂ Remove Line</button>
+        {tool === "connect" && <div style={{ fontSize: 11, color: "var(--text3)" }}>{linkSource ? "Now click the idea to link to." : "Click the first idea."}</div>}
+        {tool === "unlink" && <div style={{ fontSize: 11, color: "var(--text3)" }}>Click a line to remove it.</div>}
+        {selected && tool === "select" && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".05em", marginTop: 6 }}>Selected idea</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {COLORS.map(c => (
+                <button key={c} onClick={() => updateNode(selected, { color: c })}
+                  title={c} style={{ width: 20, height: 20, borderRadius: "50%", background: c, border: nodes.find(n => n.id === selected)?.color === c ? "2px solid var(--text)" : "1px solid var(--border)", cursor: "pointer", padding: 0 }} />
+              ))}
+            </div>
+            <button className="btn btn-danger btn-xs" onClick={() => deleteNode(selected)}>🗑 Delete idea</button>
+          </>
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <div ref={canvasRef} onMouseMove={onCanvasMouseMove} onMouseUp={onCanvasMouseUp} onClick={onCanvasClick}
           style={{
             position: "relative", width: "100%", height: "65vh", overflow: "auto",
             background: "radial-gradient(circle, var(--border) 1px, transparent 1px) 0 0/18px 18px, var(--bg)",
-            cursor: connectFrom ? "crosshair" : "default",
+            cursor: connectFrom || tool === "connect" ? "crosshair" : tool === "unlink" ? "pointer" : "default",
           }}>
           <div style={{ position: "relative", width: CANVAS_W, height: CANVAS_H }}>
             <svg width={CANVAS_W} height={CANVAS_H} style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}>
@@ -157,9 +187,9 @@ function MindMapEditor({ map, onBack, showToast }) {
                 if (!from || !to) return null;
                 const x1 = from.x + NODE_W / 2, y1 = from.y + NODE_H / 2, x2 = to.x + NODE_W / 2, y2 = to.y + NODE_H / 2;
                 return (
-                  <g key={i} style={{ pointerEvents: "stroke", cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); if (window.confirm("Remove this connection?")) deleteEdge(i); }}>
+                  <g key={i} style={{ pointerEvents: "stroke", cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); if (tool === "unlink" || window.confirm("Remove this connection?")) deleteEdge(i); }}>
                     <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--border2)" strokeWidth={8} opacity={0} />
-                    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--text3)" strokeWidth={2} />
+                    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={tool === "unlink" ? "var(--red, #f87171)" : "var(--text3)"} strokeWidth={2} />
                   </g>
                 );
               })}
@@ -168,19 +198,19 @@ function MindMapEditor({ map, onBack, showToast }) {
 
             {nodes.length === 0 && (
               <div style={{ position: "absolute", top: 40, left: 40, color: "var(--text3)", fontSize: 13 }}>
-                Click "+ Add Idea" to place your first node, then drag from the ⚭ handle on a selected node to connect ideas.
+                Click "Add Idea" in the toolbox to place your first node, then use "Add Line" to connect ideas.
               </div>
             )}
 
             {nodes.map(node => (
               <div key={node.id} onMouseDown={(e) => dragNode(e, node)}
                 onMouseUp={(e) => { if (connectFrom) { e.stopPropagation(); finishConnect(node.id); } }}
-                onClick={(e) => { e.stopPropagation(); if (!connectFrom) { setSelected(node.id); setEditingText(node.id); } }}
+                onClick={(e) => { e.stopPropagation(); clickNode(node); }}
                 style={{
                   position: "absolute", left: node.x, top: node.y, width: NODE_W, minHeight: NODE_H,
                   background: (node.color || COLORS[0]) + "22", border: `1.5px solid ${node.color || COLORS[0]}`,
                   borderRadius: 12, padding: "8px 10px", display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "grab", userSelect: "none", boxShadow: selected === node.id ? `0 0 0 2px ${node.color || COLORS[0]}` : "var(--shadow)",
+                  cursor: tool === "select" ? "grab" : "pointer", userSelect: "none", boxShadow: linkSource === node.id ? "0 0 0 3px var(--accent)" : selected === node.id ? `0 0 0 2px ${node.color || COLORS[0]}` : "var(--shadow)",
                 }}>
                 {editingText === node.id ? (
                   <input autoFocus className="inp" value={node.text} onChange={e => updateNode(node.id, { text: e.target.value })}
@@ -202,6 +232,8 @@ function MindMapEditor({ map, onBack, showToast }) {
             ))}
           </div>
         </div>
+      </div>
+      </div>
       </div>
     </div>
   );

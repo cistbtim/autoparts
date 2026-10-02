@@ -3,7 +3,7 @@ import { api, SUPABASE_URL } from "../lib/api.js";
 import { getSettings } from "../lib/settings.js";
 import { CSS } from "../styles.js";
 import { ShopLogo, FL, VelGeniusBanner, Overlay } from "../components/shared.jsx";
-import { makeId, detectGeoLocation, fetchWeather, waLink } from "../lib/helpers.js";
+import { detectGeoLocation, fetchWeather, waLink } from "../lib/helpers.js";
 import { getSubInfo } from "../lib/constants.js";
 
 // Attach spare_shop_name + queue linked_branch_id from localStorage (set during QR registration)
@@ -335,15 +335,16 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     setLoading(true);setErr("");
     const ex=await api.fresh("users",`username=eq.${encodeURIComponent(wsRegUser)}&select=id`).catch(()=>[]);
     if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
-    const wsId=makeId("WS");
     const today=new Date().toISOString().slice(0,10);
     const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
-    const newUser=await api.insert("users",{id:wsId,username:wsRegUser,password:wsRegPass,name:wsRegName,role:"workshop",phone:wsRegPhone||"",email:wsRegEmail||""}).catch(e=>{setErr("Signup failed: "+e.message);return null;});
-    if(!newUser){setLoading(false);return;}
-    await api.upsert("workshop_profiles",{id:wsId,name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd,referral_source:wsReferrerId?"referral":"organic",referred_by_user_id:wsReferrerId||null}).catch(()=>{});
+    // users.id is a DB-generated bigint — don't send our own id. api.insert resolves with the
+    // Postgres error JSON on failure instead of throwing, so check the result, not just .catch.
+    const newUser=await api.insert("users",{username:wsRegUser,password:wsRegPass,name:wsRegName,role:"workshop",phone:wsRegPhone||"",email:wsRegEmail||""}).catch(e=>({message:e.message}));
     const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
-    if(loginUser){logLogin({...loginUser});onLogin({...loginUser});}
-    else setErr("Account created — please log in");
+    if(!loginUser||loginUser.code||loginUser.message||!loginUser.id){setErr("Signup failed: "+(loginUser?.message||"unknown error"));setLoading(false);return;}
+    const profRes=await api.upsert("workshop_profiles",{id:String(loginUser.id),name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd,referral_source:wsReferrerId?"referral":"organic",referred_by_user_id:wsReferrerId||null}).catch(e=>({message:e.message}));
+    if(profRes?.code||profRes?.message){setErr("Account created but profile save failed — "+(profRes.message||profRes.code)+". Please log in.");setLoading(false);return;}
+    logLogin({...loginUser});onLogin({...loginUser});
     setLoading(false);
   };
 

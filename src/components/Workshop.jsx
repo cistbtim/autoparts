@@ -3835,7 +3835,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
 
   return (
     <div style={{maxWidth:520,width:"100%"}}>
-      <MHead title="📲 Send to Supplier" onClose={onClose}/>
+      <MHead title="📲 Send to Supplier" onClose={onClose} actions={<HelpIcon topic="supplier-quote"/>}/>
 
       {/* Car banner */}
       <div style={{background:"var(--surface2)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>

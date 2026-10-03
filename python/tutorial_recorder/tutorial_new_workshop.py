@@ -62,7 +62,7 @@ def run(page):
 
     step(page, "Open Bookings in the sidebar")
     page.get_by_text(re.compile(r"^Bookings$")).first.click()
-    page.wait_for_timeout(1500)
+    page.wait_for_timeout(1000)
 
     step(page, "Click + Booking to add a phone or walk-in booking")
     page.get_by_role("button", name=re.compile(r"\+ Booking")).click()
@@ -78,14 +78,14 @@ def run(page):
 
     step(page, "Click Save Booking")
     page.get_by_role("button", name=re.compile("Save Booking")).click()
-    page.wait_for_timeout(2500)
+    page.wait_for_timeout(1000)
     step(page, "The booking is saved - confirm it when the customer is ready to come in", 3500)
     say(page, "", 300)
 
 
 def main():
     print("Username:", USERNAME, "Password:", PASSWORD)
-    with tutorial_session(start_url=URL, output_dir="videos", pace_ms=700,
+    with tutorial_session(start_url=URL, output_dir="videos", pace_ms=400,
                           typing_delay_ms=90, locale="en-GB") as page:
         try:
             run(page)

@@ -40,7 +40,7 @@ def run(page):
 
     step(page, "Find the job - search the board for the plate")
     page.get_by_placeholder(re.compile("Search board")).fill(PLATE)
-    page.wait_for_timeout(1500)
+    page.wait_for_timeout(1000)
 
     step(page, "Open the job card")
     # The board re-renders constantly, so an element click keeps losing its target:
@@ -77,15 +77,15 @@ def run(page):
     search = page.get_by_placeholder(re.compile("Search model, code"))
     step(page, "Type the model or code to narrow the list")
     search.fill("F30")
-    page.wait_for_timeout(1500)
+    page.wait_for_timeout(1000)
 
     step(page, "Tap the right car - compare its photos with the customer's car")
     page.get_by_role("button", name=re.compile("F30 3 SERIES STANDARD")).first.click()
-    page.wait_for_timeout(2500)
+    page.wait_for_timeout(1000)
 
     step(page, "Click Confirm to link it")
     page.get_by_role("button", name=re.compile("Confirm —")).first.click()
-    page.wait_for_timeout(3000)
+    page.wait_for_timeout(2000)
 
     linked = page.get_by_text(re.compile("BM091A")).first
     linked.evaluate("e => e.scrollIntoView({block: 'center'})")  # keep it clear of the caption bar
@@ -97,7 +97,7 @@ def run(page):
 
 
 def main():
-    with tutorial_session(start_url=URL, output_dir="videos", pace_ms=700,
+    with tutorial_session(start_url=URL, output_dir="videos", pace_ms=400,
                           typing_delay_ms=90, locale="en-GB") as page:
         try:
             run(page)

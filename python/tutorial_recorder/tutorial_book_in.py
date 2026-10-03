@@ -35,9 +35,14 @@ CAPTION_JS = """
 """
 
 
+# Viewers don't like waiting: every caption hold is shortened by this much (floor 500ms).
+HOLD_TRIM_MS = 1000
+
+
 def say(page, text, hold_ms=1800):
     page.evaluate(CAPTION_JS, text)
-    page.wait_for_timeout(hold_ms)
+    if hold_ms:
+        page.wait_for_timeout(max(500, hold_ms - HOLD_TRIM_MS))
 
 
 _n = [0]
@@ -49,7 +54,7 @@ def step(page, text, hold_ms=1800):
 
 
 def main():
-    with tutorial_session(start_url=URL, output_dir="videos", pace_ms=700, typing_delay_ms=90) as page:
+    with tutorial_session(start_url=URL, output_dir="videos", pace_ms=400, typing_delay_ms=90) as page:
         try:
             run(page)
         except Exception:
@@ -70,7 +75,7 @@ def run(page):
         page.get_by_role("button", name=re.compile("Sign In .*")).click()
         say(page, "Signing in - the workspace takes a few seconds to load", 0)
         page.get_by_text(re.compile("loading your workspace", re.I)).wait_for(state="detached", timeout=120000)
-        page.wait_for_timeout(2500)
+        page.wait_for_timeout(1000)
 
         # The welcome tour auto-opens ~1s after first login on a fresh browser profile
         skip_tour = page.get_by_role("button", name="Skip tour")
@@ -103,7 +108,7 @@ def run(page):
 
         step(page, "Save - then take the reference photos")
         page.get_by_role("button", name=re.compile("Save & Take Photos")).click()
-        page.wait_for_timeout(1500)
+        page.wait_for_timeout(1000)
 
         say(page, "Photos are taken with the phone camera. For this demo we skip them", 2500)
         skip = page.get_by_role("button", name=re.compile(r"^Skip"))
@@ -116,16 +121,16 @@ def run(page):
         if done.count():
             step(page, "Click Done")
             done.first.click()
-        page.wait_for_timeout(2500)
+        page.wait_for_timeout(1000)
 
         step(page, "Search the board for the plate to find the new job")
         page.get_by_placeholder(re.compile("Search board")).fill(PLATE)
-        page.wait_for_timeout(1500)
+        page.wait_for_timeout(1000)
         say(page, "The new job sits in the Pending column", 2500)
 
         step(page, "Click Start when work begins - the job moves to In Progress")
         page.get_by_role("button", name=re.compile("Start")).first.click()
-        page.wait_for_timeout(2500)
+        page.wait_for_timeout(1000)
         say(page, "That's it - the car is booked in and the job is under way", 3500)
         say(page, "", 300)
 

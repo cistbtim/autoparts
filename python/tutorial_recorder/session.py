@@ -145,6 +145,7 @@ def tutorial_session(
     viewport=(1280, 800),
     pace_ms: int = 400,
     typing_delay_ms: int = 60,
+    locale: str = None,
 ):
     """Yields a Playwright `page` already navigated to `start_url`, with
     cursor highlighting + human-paced typing + video recording wired up.
@@ -179,6 +180,7 @@ def tutorial_session(
             record_video_dir=str(out),
             record_video_size={"width": viewport[0], "height": viewport[1]},
             viewport={"width": viewport[0], "height": viewport[1]},
+            **({"locale": locale} if locale else {}),
         )
         # Pre-approve geolocation for the dev server so the native permission
         # bubble never blocks a replay — this fresh profile has no saved

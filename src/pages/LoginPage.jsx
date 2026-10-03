@@ -3,6 +3,7 @@ import { api, SUPABASE_URL } from "../lib/api.js";
 import { getSettings } from "../lib/settings.js";
 import { CSS } from "../styles.js";
 import { ShopLogo, FL, VelGeniusBanner, Overlay } from "../components/shared.jsx";
+import { helpUrl } from "../lib/tutorials.js";
 import { detectGeoLocation, fetchWeather, waLink } from "../lib/helpers.js";
 import { getSubInfo } from "../lib/constants.js";
 
@@ -1139,6 +1140,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
         {/* Footer */}
         <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:18}}>
+          <a href={helpUrl()} style={{fontSize:11,color:"var(--text3)",cursor:"pointer",fontWeight:500,letterSpacing:".03em",textDecoration:"none"}} title="Search tutorials and learn how to use VelGenius">Tutorials</a>
+          <span style={{fontSize:11,color:"var(--border2)"}}>|</span>
           <span style={{fontSize:11,color:"var(--text3)",cursor:"pointer",fontWeight:500,letterSpacing:".03em"}} onClick={()=>{}}>Help Desk</span>
           <span style={{fontSize:11,color:"var(--border2)"}}>|</span>
           <span style={{fontSize:11,color:"var(--text3)",cursor:"pointer",fontWeight:500,letterSpacing:".03em"}} onClick={()=>{}}>Security Policy</span>

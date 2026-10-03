@@ -19,6 +19,7 @@ import { WsSupplierInvoicesPage, WsSupInvoiceModal, WsSupInvoiceViewModal, WsSup
 import { WsCreatePoFromJobModal, WsPurchaseOrdersPage, WsPurchaseOrderModal, WsReceiveGoodsModal } from "./ws/PurchaseOrders.jsx";
 import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, WorkshopInvoiceModal } from "./ws/InvoiceModals.jsx";
 import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
+import { HelpIcon } from "./HelpIcon.jsx";
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -544,6 +545,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               </select>
             )}
             <button className="btn btn-primary hide-desktop" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
+            <HelpIcon topic="book-in-car" className="hide-desktop"/>
             {/* Moved right after Book In Car — on mobile this used to sit after the
                 Search box, which greedily takes remaining row width and pushed this
                 toggle onto its own near-empty row by itself. Anchoring it here means
@@ -1688,6 +1690,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
               {bookingsLastAt&&<span style={{fontSize:11,color:"var(--text3)"}}>Updated {bookingsLastAt.toLocaleTimeString()}</span>}
               {!wsLocked&&<button className="btn btn-ghost btn-sm" title="Add a phone/walk-in booking"
                 onClick={()=>setManualBk({customer_name:"",customer_phone:"",vehicle_reg:"",vehicle_make:"",vehicle_model:"",preferred_date:"",complaint:""})}>🗓️ + Booking</button>}
+              <HelpIcon topic="add-booking"/>
               <button className="btn btn-ghost btn-sm" disabled={bookingsRefreshing}
                 onClick={async()=>{ if(!onRefreshBookings)return; setBookingsRefreshing(true); await onRefreshBookings(); setBookingsRefreshing(false); setBookingsLastAt(new Date()); }}>
                 {bookingsRefreshing?"⏳":"🔄"} Refresh
@@ -1698,7 +1701,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
           {/* Booking link card */}
           <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
-            <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🔗 Customer Booking Link</div>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:4,display:"flex",alignItems:"center",gap:8}}>🔗 Customer Booking Link <HelpIcon topic="booking-link"/></div>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>
               Share this link with customers so they can book online — they must scan their licence disc (no manual plate entry).
             </div>
@@ -1723,7 +1726,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             const refUrl=`${window.location.origin}${window.location.pathname}?ref=${wsId}`;
             return(
               <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
-                <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>🤝 Invite Another Workshop</div>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:4,display:"flex",alignItems:"center",gap:8}}>🤝 Invite Another Workshop <HelpIcon topic="invite-workshop"/></div>
                 <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>
                   Know another workshop owner? Share this link — when they sign up with it, we'll know it came from you.
                 </div>
@@ -6141,7 +6144,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                         </div>
                       )}
                     </button>
-                  : <button onClick={()=>setMatchModelOpen(true)}
+                  : <div style={{position:"relative"}}><button onClick={()=>setMatchModelOpen(true)}
                       style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"1px dashed rgba(255,154,92,.6)",cursor:"pointer",
                         background:"rgba(255,154,92,.08)",color:"#ff7a2e",
                         textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
@@ -6154,6 +6157,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       </div>
                       <span style={{fontSize:20}}>›</span>
                     </button>
+                    <HelpIcon topic="match-vehicle" style={{position:"absolute",top:8,right:10}}/></div>
               )}
             </div>
           );

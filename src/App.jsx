@@ -12,6 +12,9 @@ import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocat
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage } from "./components/Workshop.jsx";
 import { WorkshopTour, tourSeenKey } from "./components/WorkshopTour.jsx";
+import { HelpPage } from "./pages/HelpPage.jsx";
+import { HelpIcon } from "./components/HelpIcon.jsx";
+import { helpUrl } from "./lib/tutorials.js";
 import { SystemMapPage } from "./components/SystemMap.jsx";
 import { AgentOfficePage } from "./components/AgentOffice.jsx";
 import { RequestsKanbanPage } from "./components/RequestsKanban.jsx";
@@ -131,6 +134,8 @@ export default function App() {
     init().catch(()=>setSettingsLoaded(true));
   },[]);
 
+  // Public Help Center (?help or ?help=<tutorial id>) — no login, no settings needed
+  if(new URLSearchParams(window.location.search).has("help")) return <HelpPage/>;
   const rfqToken = new URLSearchParams(window.location.search).get("rfq");
   if(rfqToken) return <RfqReplyPage token={rfqToken} lang={lang}/>;
   const rfqQuoteToken = new URLSearchParams(window.location.search).get("rfq_quote");
@@ -5528,6 +5533,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             {role==="workshop"&&(
               <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={()=>setTourActive(true)} title="Take a Tour">🧭</button>
             )}
+            {(role==="workshop"||role==="admin")&&(
+              <a className="btn btn-ghost btn-sm" href={helpUrl()} target="_blank" rel="noopener noreferrer" style={{flex:1,padding:"7px 0",fontSize:15,textDecoration:"none"}} title="Help & tutorials — search and learn how to use VelGenius">❓</a>
+            )}
             <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={()=>openM("changePassword")} title={t.changePassword||"Change Password"}>🔑</button>
             <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={clearAppCache} title="Clear Cache — force a fresh reload if the app looks out of date">🧹</button>
             <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15,color:"rgba(248,113,113,.85)"}} onClick={onLogout} title={t.logout||"Sign Out"}>🚪</button>
@@ -5592,6 +5600,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           )}
           {role==="workshop"&&(
             <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>{setTourActive(true);setDrawerOpen(false);}}>🧭 Take a Tour</button>
+          )}
+          {(role==="workshop"||role==="admin")&&(
+            <a className="btn btn-ghost btn-sm" href={helpUrl()} target="_blank" rel="noopener noreferrer" style={{width:"100%",fontSize:12,textDecoration:"none"}}>❓ Help &amp; Tutorials</a>
           )}
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={()=>{openM("changePassword");setDrawerOpen(false);}}>🔑 Change Password</button>
           <button className="btn btn-ghost btn-sm" style={{width:"100%",fontSize:12}} onClick={clearAppCache} title="App looking out of date? Force a fresh reload">🧹 Clear Cache</button>
@@ -5794,8 +5805,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                   page title; mobile keeps its own copy in the toolbar since the
                   pagetitle/wsinfo row hides there. */}
               {tab==="workshop"&&(
-                <button className="btn btn-primary hide-mobile" style={{fontSize:13,padding:"7px 14px",marginLeft:14,flexShrink:0}}
-                  onClick={()=>setHeaderBookInTrigger(c=>c+1)}>📷 Book In Car</button>
+                <>
+                  <button className="btn btn-primary hide-mobile" style={{fontSize:13,padding:"7px 14px",marginLeft:14,flexShrink:0}}
+                    onClick={()=>setHeaderBookInTrigger(c=>c+1)}>📷 Book In Car</button>
+                  <HelpIcon topic="book-in-car" style={{marginLeft:8}}/>
+                </>
               )}
               {/* Subscription + job-count summary — was its own separate row inside
                   Workshop.jsx directly below this header, reading as a second,

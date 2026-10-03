@@ -273,4 +273,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .ws-compact-header-icon{display:none;flex-shrink:0;width:30px;height:30px}
 .ws-compact-header-word{display:none;font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:20px;color:var(--text);letter-spacing:.2px;line-height:1;white-space:nowrap}
 .ws-compact-header-word .velg-vel{font-weight:700;color:#e85d04}
+.help-icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:22px;height:22px;border-radius:50%;background:rgba(96,165,250,.14);border:1px solid rgba(96,165,250,.35);color:var(--blue);font-size:13px;font-weight:800;line-height:1;text-decoration:none;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+.help-icon:hover,.help-icon:focus-visible{background:var(--blue);color:#fff;transform:scale(1.12)}
+.help-icon.help-icon-lg{width:34px;height:34px;font-size:17px}
 `;

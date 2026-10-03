@@ -47,15 +47,18 @@ src/
 │   ├── i18n.js                # Translations T object, setCurrentLang, tSt
 │   ├── helpers.js             # URL/format utilities (toImgUrl, fmtAmt, makeId, waLink, …)
 │   ├── constants.js           # ROLES, CAR_MAKES, getCategories, getSubInfo, canAccess, …
-│   └── barcode.js             # Dynamsoft PDF417 decoder for SA eNaTIS licence discs
+│   ├── barcode.js             # Dynamsoft PDF417 decoder for SA eNaTIS licence discs
+│   └── tutorials.js           # Help Center catalogue (TUTORIALS), searchTutorials, helpUrl — add new tutorials here
 ├── components/
 │   ├── shared.jsx             # ErrorBoundary, Overlay, MHead, FL/FG/FD, DriveImg, StatusBadge, ImgLightbox, …
 │   ├── Modals.jsx             # All inventory/supplier/customer/settings modals and pages (~3 580 lines): PartModal, SettingsPage, ReportsPage, StockTakePage, OrdersTable, CustomerModal, InquiryModal, PdfInvoiceModal, AddPaymentModal, …
 │   ├── RfqVehicles.jsx        # RfqPage, PickingPage, VehiclesPage, VehicleModal, VehicleFitmentTab, PartPhotoUploader, VehiclePhotoUploader, VehicleSearchBar
+│   ├── HelpIcon.jsx           # <HelpIcon topic="id"/> — "?" button that opens the Help Center tutorial in a new tab
 │   └── Workshop.jsx           # All workshop components — WorkshopPage and ~40 sub-components (BookInModal, WorkshopJobDetail, WsStockPage, print functions, …)
 └── pages/
     ├── LoginPage.jsx          # LoginPage, PaywallPage
-    └── PublicPages.jsx        # RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage
+    ├── PublicPages.jsx        # RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage
+    └── HelpPage.jsx           # Public searchable Help Center (?help, ?help=<tutorial id>); videos in public/tutorials/
 ```
 
 ## Architecture
@@ -64,6 +67,7 @@ src/
 
 ```
 App()
+  ├─ URL param ?help       → HelpPage            (public Help Center, no auth; ?help=<id> opens one tutorial)
   ├─ URL param ?rfq=       → RfqReplyPage        (supplier quote reply, no auth)
   ├─ URL param ?rfq_quote= → RfqQuoteReplyPage   (supplier single-quote reply, no auth)
   ├─ URL param ?rfq_batch= → RfqBatchReplyPage   (supplier batch reply, no auth)

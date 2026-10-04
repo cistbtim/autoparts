@@ -15,7 +15,7 @@ export const TUTORIALS = [
     summary: "Sign up, confirm your location, skip the welcome tour and add your first customer booking.",
     keywords: ["sign up", "signup", "register", "create account", "new workshop", "invite link", "trial", "location", "city", "country", "tour", "first booking"],
     video: "new-workshop",
-    duration: "1:36",
+    duration: "1:07",
     steps: [
       { title: "Open the sign-up form", text: "Workshops sign up through an invite link (it ends in ?ref= and a number). Opening it goes straight to the sign-up form." },
       { title: "Enter your details", text: "Type the workshop name, a username, a password and your phone number." },
@@ -35,7 +35,7 @@ export const TUTORIALS = [
     summary: "Book a customer's car in with its number plate, create the job card and move it along the Jobs board.",
     keywords: ["book in", "book in car", "job", "job card", "plate", "registration", "reg", "customer", "new job", "pending", "start", "board", "kanban"],
     video: "book-in-car",
-    duration: "2:12",
+    duration: "1:35",
     steps: [
       { title: "Sign in and skip the tour", text: "Choose Workshop on the login screen, enter your username and password, and click Skip tour if it appears." },
       { title: "Click Book In Car", text: "The button is at the top of the Jobs board." },
@@ -56,7 +56,7 @@ export const TUTORIALS = [
     summary: "Link a job's car to the right entry in the vehicle database so you can browse spare parts that fit it.",
     keywords: ["match", "match vehicle", "link vehicle", "vehicle database", "vehicle code", "model", "spare parts", "fitment", "browse parts", "spare shop"],
     video: "match-vehicle",
-    duration: "1:52",
+    duration: "1:24",
     steps: [
       { title: "Open the job", text: "Search the Jobs board for the plate and open the job card. Click Later if it asks for vehicle photos." },
       { title: "Click Link vehicle", text: "If the car was booked in with a loose model name such as BMW F30, the job card shows Link vehicle to browse spare parts." },
@@ -76,7 +76,7 @@ export const TUTORIALS = [
     summary: "Ask a supplier for prices on the parts a job needs, by WhatsApp, with a link they use to reply.",
     keywords: ["supplier", "quotation", "quote", "parts request", "send quote", "send to supplier", "whatsapp", "prices", "parts quotation", "reply link", "quoting"],
     video: "supplier-quote",
-    duration: "2:01",
+    duration: "1:30",
     steps: [
       { title: "Open the job", text: "Search the Jobs board for the plate and open the job card. Click Later if it asks for vehicle photos." },
       { title: "Click Parts Quotation", text: "Then click Send Quote to open the Send to Supplier window." },
@@ -98,7 +98,7 @@ export const TUTORIALS = [
     summary: "Build a quotation with parts and labour, send the customer an approval link, then turn it into an invoice and record the payment.",
     keywords: ["quotation", "quote", "parts", "labour", "labor", "oil", "antifreeze", "approve", "approval", "approval link", "customer approve", "deposit", "invoice", "convert to invoice", "payment", "record payment", "paid", "stock", "create new part", "mark accepted"],
     video: "quotation-invoice-payment",
-    duration: "2:45",
+    duration: "2:40",
     steps: [
       { title: "Open Parts Quotation", text: "Search the Jobs board for the plate, open the job card and click Parts Quotation." },
       { title: "Add a part you stock", text: "Click + Part and search, for example oil. Click your saved part, set the quantity, then click Add Part." },

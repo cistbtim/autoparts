@@ -64,7 +64,7 @@ const APP_UPDATE_DATE = __BUILD_DATE__;
 // Every tab id rendered by <WorkshopPage> — shared between the tab gate below and
 // the tablet-only compact-header logic (hides the big global brand strip and lets
 // WorkshopPage show its own combined logo+ad row instead, see .ws-compact-header).
-const WS_TAB_IDS = ["workshop","wscustomers","wsbookings","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop","wsdocs","wslicencerenewal"];
+const WS_TAB_IDS = ["workshop","wscustomers","wsbookings","wsreminders","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop","wsdocs","wslicencerenewal"];
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -5025,6 +5025,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"workshop",    icon:"🔧",label:t.wsJobs,                      roles:["admin","manager"]},
         {id:"wscustomers", icon:"👥",label:t.wsCustomers,                 roles:["admin","manager"]},
         {id:"wsbookings",  icon:"🗓️",label:t.wsBookings||"Bookings",       roles:["admin","manager"]},
+        {id:"wsreminders", icon:"🔔",label:t.wsReminders||"Service Reminders", roles:["admin","manager"]},
         {id:"wsquotations",icon:"📝",label:t.wsQuotations,                roles:["admin","manager"]},
         {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,                  roles:["admin","manager"]},
         {id:"wspayments",  icon:"💳",label:t.wsPayments,                  roles:["admin","manager"]},
@@ -5049,6 +5050,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           {id:"workshop",    icon:"🔧",label:t.wsJobs,       roles:["workshop"]},
           {id:"wscustomers", icon:"👥",label:t.wsCustomers,  roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsbookings",  icon:"🗓️",label:t.wsBookings||"Bookings", roles:["workshop"]},
+          {id:"wsreminders", icon:"🔔",label:t.wsReminders||"Service Reminders", roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsquotations",icon:"📝",label:t.wsQuotations, roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,   roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wspayments",  icon:"💳",label:t.wsPayments,   roles:["workshop"], wsRoles:["main","manager"]},
@@ -5628,6 +5630,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             items:[
               {id:"wsspareshop",icon:"🏪",label:t.wsSpareShop||"Spare Shop"},
               ...(wsRole!=="mechanic"?[
+                {id:"wsreminders", icon:"🔔", label:t.wsReminders||"Service Reminders"},
                 {id:"wspayments", icon:"💳", label:t.wsPayments||"Payments"},
               ]:[]),
             ]
@@ -5790,7 +5793,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             // Bookings, Invoices...) — reuse the same labels already shown for these
             // in the sidebar so the header actually reflects which page you're on.
             const WS_PAGE_TITLES={
-              workshop:t.wsJobs||"Jobs", wscustomers:t.wsCustomers||"Customers", wsbookings:t.wsBookings||"Bookings",
+              workshop:t.wsJobs||"Jobs", wscustomers:t.wsCustomers||"Customers", wsbookings:t.wsBookings||"Bookings", wsreminders:t.wsReminders||"Service Reminders",
               wsquotations:t.wsQuotations||"Quotations", wsinvoices:t.wsInvoices||"Invoices", wspayments:t.wsPayments||"Payments",
               wsstock:t.wsStock||"WS Stock", wsservices:t.wsServices||"Services", wssuppliers:t.wsSuppliers||"Suppliers",
               wssuporders:t.wsPurchaseOrders||"Purchase Orders", wssupinv:t.wsSupInvoices||"Supplier Inv", wstransfer:t.wsTransfer||"Transfer",
@@ -8457,7 +8460,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {WS_TAB_IDS.includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
           <WorkshopPage
             key={tab}
-            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsbookings"?"wsbookings":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":tab==="wsdocs"?"wsdocs":tab==="wslicencerenewal"?"wslicencerenewal":"report"}
+            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsbookings"?"wsbookings":tab==="wsreminders"?"wsreminders":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":tab==="wsdocs"?"wsdocs":tab==="wslicencerenewal"?"wslicencerenewal":"report"}
             initialJobFilter={tab==="workshop"?workshopJobFilter:null}
             onConsumeInitialJobFilter={()=>setWorkshopJobFilter(null)}
             headerBookInTrigger={headerBookInTrigger}

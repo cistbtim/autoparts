@@ -2,6 +2,7 @@
 
 import re
 
+from cursor_overlay import move_to, pulse
 from tutorial_book_in import say, step
 
 PHONE_JS = """
@@ -54,3 +55,37 @@ def show_phone(page, url, label):
 
 def hide_phone(page):
     page.evaluate("() => document.getElementById('cust-overlay')?.remove()")
+
+
+def open_job(page, plate):
+    """Search the board for the plate and open its job card (click by position: the board re-renders constantly)."""
+    step(page, "Find the job - search the board for the plate")
+    page.get_by_placeholder(re.compile("Search board")).fill(plate)
+    page.wait_for_timeout(1000)
+    step(page, "Open the job card")
+    box = None
+    for _ in range(60):
+        try:
+            box = page.get_by_text(plate).first.bounding_box(timeout=1000)
+        except Exception:
+            box = None
+        if box:
+            break
+        page.wait_for_timeout(250)
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    move_to(page, x, y)
+    pulse(page)
+    page.mouse.click(x, y)
+    later = page.get_by_role("button", name="Later")
+    try:
+        later.wait_for(state="visible", timeout=5000)
+        later.click()
+    except Exception:
+        pass
+    page.wait_for_timeout(800)
+
+
+def close_top_modal(page):
+    """Close the topmost pop-up (scoped to it, because table rows have their own red x buttons)."""
+    page.locator(".overlay").last.get_by_role("button", name="✕", exact=True).first.click()
+    page.wait_for_timeout(800)

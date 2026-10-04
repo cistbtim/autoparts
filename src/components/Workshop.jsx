@@ -20,6 +20,8 @@ import { WsCreatePoFromJobModal, WsPurchaseOrdersPage, WsPurchaseOrderModal, WsR
 import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, WorkshopInvoiceModal } from "./ws/InvoiceModals.jsx";
 import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 import { HelpIcon } from "./HelpIcon.jsx";
+import { WsServiceRemindersPage, JobReminderCard } from "./ws/ServiceReminders.jsx";
+import { JobTimeProfitCard, WsPerformanceReport } from "./ws/TimeProfit.jsx";
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -454,6 +456,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     ["jobs",       "🔧 Jobs",        jobs.length],
     ["customers",  "👥 Customers",   wsCustomers.length],
     ["wsbookings", wsBookings.filter(b=>b.status==="pending").length>0?`🗓️ Bookings 🔔`:"🗓️ Bookings", wsBookings.filter(b=>b.status!=="deleted").length||null],
+    ["wsreminders", "🔔 Reminders", null],
     ["quotations", quoteResponses>0?`📝 Quotations 🔔`:"📝 Quotations",  quotes.length],
     ["invoices",   "🧾 Invoices",    invoices.length],
     ["payments",   "💳 Payments",    invoices.filter(i=>(+i.paid_amount||0)>0).length],
@@ -2280,6 +2283,11 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           onSave={onSaveWsDoc} onDelete={onDeleteWsDoc} wsLocked={wsLocked}/>
       )}
 
+      {/* ══════════════ SERVICE REMINDERS TAB ══════════════ */}
+      {wsTab==="wsreminders"&&(
+        <WsServiceRemindersPage wsId={wsId} wsProfile={wsProfile} wsLocked={wsLocked}/>
+      )}
+
       {/* ══════════════ LICENCE RENEWALS TAB ══════════════ */}
       {wsTab==="wslicencerenewal"&&(
         <WsLicenceRenewalsPage
@@ -2555,6 +2563,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
               </div>
             );
           })()}
+          <WsPerformanceReport wsId={wsId} jobs={jobs} jobItems={jobItems}/>
         </>);
       })()}
 
@@ -6159,6 +6168,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                     </button>
                     <HelpIcon topic="match-vehicle" style={{position:"absolute",top:8,right:10}}/></div>
               )}
+              <JobTimeProfitCard job={job} items={items} wsId={wsId||job.workshop_id} wsRole={wsRole} userName={userCtx?.name||""} wsLocked={wsLocked}/>
+              {wsRole!=="mechanic"&&<JobReminderCard job={job} wsId={wsId||job.workshop_id} wsLocked={wsLocked}/>}
             </div>
           );
         }

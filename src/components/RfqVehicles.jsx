@@ -1657,26 +1657,26 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
       {/* Paste-over-existing-photo compare — side by side, no silent overwrite */}
       {pasteCompare&&(
         <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.86)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-          <div style={{background:"var(--surface)",borderRadius:16,padding:"20px 24px 24px",maxWidth:1100,width:"96vw",boxShadow:"0 16px 48px rgba(0,0,0,.5)"}}>
+          <div style={{background:"var(--surface)",borderRadius:16,padding:"20px 24px 0",maxWidth:1100,width:"96vw",maxHeight:"94vh",overflowY:"auto",boxShadow:"0 16px 48px rgba(0,0,0,.5)"}}>
             <div style={{fontWeight:700,fontSize:16,marginBottom:3,textAlign:"center"}}>📋 Replace Photo?</div>
             <div style={{fontSize:12,color:"var(--text3)",textAlign:"center",marginBottom:14}}>
               This part already has a photo — compare before replacing it
             </div>
             <div style={{display:"flex",gap:14,marginBottom:16,flexWrap:"wrap"}}>
-              <div style={{flex:"1 1 320px",minWidth:0}}>
+              <div style={{flex:"1 1 140px",minWidth:0}}>
                 <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",textAlign:"center",marginBottom:6}}>Current</div>
-                <div style={{background:"var(--surface2)",borderRadius:10,padding:10,display:"flex",alignItems:"center",justifyContent:"center",height:"56vh",minHeight:280}}>
+                <div style={{background:"var(--surface2)",borderRadius:10,padding:10,display:"flex",alignItems:"center",justifyContent:"center",height:"min(56vh, 72vw)",minHeight:200}}>
                   <img src={preview} alt="current" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",display:"block"}}/>
                 </div>
               </div>
-              <div style={{flex:"1 1 320px",minWidth:0}}>
+              <div style={{flex:"1 1 140px",minWidth:0}}>
                 <div style={{fontSize:11,color:"var(--accent)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",textAlign:"center",marginBottom:6}}>New (pasted)</div>
-                <div style={{background:"var(--surface2)",borderRadius:10,padding:10,display:"flex",alignItems:"center",justifyContent:"center",height:"56vh",minHeight:280,border:"1px solid rgba(255,122,46,.35)"}}>
+                <div style={{background:"var(--surface2)",borderRadius:10,padding:10,display:"flex",alignItems:"center",justifyContent:"center",height:"min(56vh, 72vw)",minHeight:200,border:"1px solid rgba(255,122,46,.35)"}}>
                   <img src={pasteCompare.previewUrl} alt="new" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",display:"block"}}/>
                 </div>
               </div>
             </div>
-            <div style={{display:"flex",gap:8,maxWidth:420,margin:"0 auto"}}>
+            <div style={{display:"flex",gap:8,padding:"10px 0 20px",position:"sticky",bottom:0,background:"var(--surface)",borderTop:"1px solid var(--border)"}}>
               <button className="btn btn-ghost" style={{flex:1}}
                 onClick={()=>{URL.revokeObjectURL(pasteCompare.previewUrl);setPasteCompare(null);}}>
                 ✕ Cancel

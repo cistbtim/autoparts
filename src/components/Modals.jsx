@@ -4987,22 +4987,24 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               ⚠️ Unsaved changes
             </div>
           )}
-          <div style={{display:"flex",gap:10,marginTop:10}}>
-            <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{t.cancel}</button>
+          <div style={{display:"flex",gap:10,marginTop:10,flexWrap:"wrap"}}>
+            {/* zero-height full-width spacer: forces a line break so Cancel + Save always share the last line */}
+            <div style={{flexBasis:"100%",height:0,order:2}}/>
+            <button className="btn btn-ghost" style={{flex:"1 1 90px",order:3}} onClick={handleClose}>{t.cancel}</button>
             {onAddNewPart&&(
-              <button className="btn btn-ghost" style={{flexShrink:0,borderColor:"var(--green)",color:"var(--green)",fontWeight:700}}
+              <button className="btn btn-ghost" style={{flex:"1 1 auto",order:1,borderColor:"var(--green)",color:"var(--green)",fontWeight:700}}
                 onClick={()=>setNewPartConfirm({copyFits:myFitments.length>0,copyVehicleInfo:!!(f.make||f.model||f.year_range)})}>
                 + New Part
               </button>
             )}
             {part&&onGoSupplier&&(
-              <button className="btn btn-ghost" style={{flexShrink:0,borderColor:"var(--blue)",color:"var(--blue)"}}
+              <button className="btn btn-ghost" style={{flex:"1 1 auto",order:1,borderColor:"var(--blue)",color:"var(--blue)"}}
                 onClick={()=>onGoSupplier(part)}>
                 🏭 Suppliers
               </button>
             )}
             {part&&side&&onCreateOpposite&&!oppConfirm&&(
-              <button className="btn btn-ghost" style={{flexShrink:0,borderColor:"rgba(139,92,246,.5)",color:"var(--purple)"}}
+              <button className="btn btn-ghost" style={{flex:"1 1 auto",order:1,borderColor:"rgba(139,92,246,.5)",color:"var(--purple)"}}
                 title={`建立${side==='L'?'右':'左'}邊對應零件`}
                 onClick={()=>{
                   const newSku=swapLR(f.sku);
@@ -5014,7 +5016,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               </button>
             )}
             {part&&onCreateOpposite&&!oppConfirm&&(
-              <button className="btn btn-ghost" style={{flexShrink:0,borderColor:"rgba(139,92,246,.5)",color:"var(--purple)"}}
+              <button className="btn btn-ghost" style={{flex:"1 1 auto",order:1,borderColor:"rgba(139,92,246,.5)",color:"var(--purple)"}}
                 title="用一個新號碼建立同一個零件的相似版本（複製名稱/價格/圖片等，SKU 自己輸入）"
                 onClick={()=>{
                   setOppConfirm({sku:"",name:f.name,chineseDesc:f.chinese_desc,editableSku:true,fitCount:myFitments.length,originalPart:part,originalF:f,flipPhoto:false,copyFits:myFitments.length>0,copyVehicleInfo:!!(f.make||f.model||f.year_range)});
@@ -5022,7 +5024,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                 🔗 相似零件
               </button>
             )}
-            <button className="btn btn-primary" style={{flex:2,position:"relative",
+            <button className="btn btn-primary" style={{flex:"2 1 140px",order:4,position:"relative",
               boxShadow:dirty?"0 0 0 3px rgba(255,154,92,.4)":undefined,
               animation:dirty?"pulse-ring 1.5s ease infinite":undefined}}
               onClick={async()=>{

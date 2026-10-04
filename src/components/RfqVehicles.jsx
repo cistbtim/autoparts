@@ -925,6 +925,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
   const [pasteCompare, setPasteCompare] = useState(null); // {blob, previewUrl} — shown instead of an instant overwrite when a photo already exists
   const [brushSize, setBrushSize] = useState(28);
   const fileRef = useRef(null);
+  const camRef = useRef(null);   // camera-only input; fileRef must NOT use capture or phones skip the file/gallery picker
   const touchUpCanvasRef = useRef(null);
   const touchUpHistoryRef = useRef([]); // stack of ImageData snapshots for undo
   const touchUpOrigRef = useRef(null);  // original loaded <img>, for Reset
@@ -1457,8 +1458,10 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
 
   return (
     <div>
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
-        onChange={e => uploadToGDrive(e.target.files[0])}/>
+      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
+        onChange={e => { uploadToGDrive(e.target.files[0]); e.target.value = ""; }}/>
+      <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}}
+        onChange={e => { uploadToGDrive(e.target.files[0]); e.target.value = ""; }}/>
 
       {/* Photo zone */}
       <div
@@ -1562,7 +1565,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
       )}
 
       {/* Action strip */}
-      <div style={{display:"flex",gap:5,marginBottom:7}}>
+      <div style={{display:"flex",gap:5,marginBottom:7,flexWrap:"wrap"}}>
         {/* App clipboard paste — shown when a photo was copied via Flip */}
         {hasClip&&!imageUrl&&(
           <button className="btn btn-sm" style={{flex:1,fontSize:11,background:"rgba(34,197,94,.12)",borderColor:"rgba(34,197,94,.4)",color:"var(--green)",fontWeight:700}}
@@ -1574,6 +1577,15 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
             📋 Paste Photo{_appPhotoClip?.fromSku?" ("+_appPhotoClip.fromSku+")":""}
           </button>
         )}
+        {/* Choose from the phone's files / gallery, or take a new photo */}
+        <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:11}} disabled={uploading}
+          onClick={()=>fileRef.current?.click()}>
+          🖼️ {t.phuBrowse||"Browse"}
+        </button>
+        <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:11}} disabled={uploading}
+          onClick={()=>camRef.current?.click()}>
+          📷 Take photo
+        </button>
         {/* System clipboard / browse */}
         {(!hasClip||imageUrl)&&(
           <button className="btn btn-ghost btn-sm" style={{flex:1,fontSize:11}}

@@ -1690,7 +1690,6 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
               {bookingsLastAt&&<span style={{fontSize:11,color:"var(--text3)"}}>Updated {bookingsLastAt.toLocaleTimeString()}</span>}
               {!wsLocked&&<button className="btn btn-ghost btn-sm" title="Add a phone/walk-in booking"
                 onClick={()=>setManualBk({customer_name:"",customer_phone:"",vehicle_reg:"",vehicle_make:"",vehicle_model:"",preferred_date:"",complaint:""})}>🗓️ + Booking</button>}
-              <HelpIcon topic="add-booking"/>
               <button className="btn btn-ghost btn-sm" disabled={bookingsRefreshing}
                 onClick={async()=>{ if(!onRefreshBookings)return; setBookingsRefreshing(true); await onRefreshBookings(); setBookingsRefreshing(false); setBookingsLastAt(new Date()); }}>
                 {bookingsRefreshing?"⏳":"🔄"} Refresh

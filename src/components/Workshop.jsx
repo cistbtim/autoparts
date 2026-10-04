@@ -4501,6 +4501,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
   const [editMarkupId,  setEditMarkupId]  = useState(null);
   const [editMarkupVal, setEditMarkupVal] = useState("");
   const [editDescId,    setEditDescId]    = useState(null);
+  const [bigEdit,        setBigEdit]       = useState(null); // phone: enlarged edit pop-up for one quote line
   const [editDescVal,   setEditDescVal]   = useState("");
   const [descOverrides,     setDescOverrides]     = useState({});
   const [partTypeOverrides, setPartTypeOverrides] = useState({});
@@ -7160,8 +7161,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           const mainPartFor = (item) => item.type==="part" && item.part_sku
             ? parts.find(p=>p.sku && p.sku.toLowerCase()===item.part_sku.toLowerCase())
             : null;
-          const commitDesc = async (item) => {
-            const v = editDescVal.trim();
+          const commitDesc = async (item, valOverride) => {
+            const v = (typeof valOverride==="string"?valOverride:editDescVal).trim();
             setEditDescId(null);
             if (!v || v === (descOverrides[item.id]??item.description)) return;
             const oldDesc = (descOverrides[item.id]??item.description??"").trim();
@@ -7231,6 +7232,46 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               await onSaveItem({...item, qty: newQty, total: (+item.unit_price||0) * newQty});
             }
             setEditQtyId(null);
+          };
+          // Phone: tapping a line's name / qty / price / markup opens one enlarged pop-up instead of tiny inline fields.
+          const openBigEdit = (item) => {
+            if (itemsLocked) return;
+            setBigEdit({
+              id: item.id, type: item.type,
+              desc: descOverrides[item.id]??item.description??"",
+              qty: String(item.qty||1),
+              price: String(item.unit_price||0),
+              markup: String(item.markup_pct||0),
+              remark: remarkOverrides[item.id]??item.remark??"",
+            });
+          };
+          const saveBigEdit = async () => {
+            const be = bigEdit;
+            const item = items.find(i=>i.id===be?.id);
+            setBigEdit(null);
+            if (!item) return;
+            const newDesc = be.desc.trim();
+            const descChanged = !!newDesc && newDesc !== (descOverrides[item.id]??item.description??"").trim();
+            const qty = Math.max(1, Math.round(+be.qty||1));
+            const costP = +(item.cost_price||0);
+            let price = +be.price;
+            let markup = +be.markup;
+            if (isNaN(price)) price = +item.unit_price||0;
+            if (price !== +item.unit_price) markup = costP > 0 ? +((price/costP - 1)*100).toFixed(1) : +(item.markup_pct||0);
+            else if (!isNaN(markup) && markup !== +(item.markup_pct||0)) price = costP > 0 ? +(costP*(1+markup/100)).toFixed(2) : +(item.unit_price||0);
+            else markup = +(item.markup_pct||0);
+            // One save for numbers + description (onSaveItem writes the whole row, so a separate
+            // description patch made first would be overwritten by the old text).
+            if (qty !== +item.qty || price !== +item.unit_price || markup !== +(item.markup_pct||0)) {
+              await onSaveItem({...item, ...(descChanged?{description:newDesc}:{}), qty, unit_price: price, markup_pct: markup, total: price*qty});
+            }
+            // Description change also syncs supplier requests/quotes for this job (and sets the local override)
+            if (descChanged) await commitDesc(item, newDesc);
+            const rv = be.remark.trim();
+            if (rv !== (remarkOverrides[item.id]??item.remark??"").trim()) {
+              setRemarkOverrides(prev=>({...prev,[item.id]:rv}));
+              await api.patch("workshop_job_items","id",item.id,{remark:rv}).catch(()=>{});
+            }
           };
 
           // Build supplier cost lookup: description (lowercase) → [{name, price}]
@@ -7493,12 +7534,96 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             </div>
           );
         })()}
+        {/* Phone: enlarged edit pop-up for one quote line (bottom sheet) */}
+        {bigEdit&&isMobile&&(()=>{
+          const be=bigEdit;
+          const isLab=be.type==="labour";
+          const setBe=(patch)=>setBigEdit(prev=>({...prev,...patch}));
+          const qtyN=Math.max(1,Math.round(+be.qty||1));
+          const priceN=isNaN(+be.price)?0:+be.price;
+          const cur=fmtAmt(0).replace(/[0-9.,\s]/g,"")||"R";
+          const headBg=isLab?"linear-gradient(135deg,#065f46,#10b981)":"linear-gradient(135deg,#1e3a5f,#2563eb)";
+          const lbl={display:"block",fontSize:11,fontWeight:800,letterSpacing:".09em",textTransform:"uppercase",color:"var(--text3)",marginBottom:7};
+          const field={width:"100%",fontSize:20,fontWeight:700,padding:"14px 16px",borderRadius:14,border:"1.5px solid var(--border2)",background:"var(--surface2)",color:"var(--text)",fontFamily:"inherit"};
+          const round={width:52,height:52,borderRadius:"50%",border:"none",fontSize:28,fontWeight:700,lineHeight:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0};
+          return (
+            <div className="overlay" onClick={()=>setBigEdit(null)} style={{zIndex:300}}>
+              <div onClick={e=>e.stopPropagation()} style={{background:"var(--surface)",width:"100%",maxWidth:520,maxHeight:"94vh",overflowY:"auto",borderRadius:"26px 26px 0 0",boxShadow:"0 -12px 40px rgba(0,0,0,.35)",animation:"slideUp .2s ease"}}>
+                <div style={{background:headBg,padding:"10px 20px 20px",borderRadius:"26px 26px 0 0",color:"#fff"}}>
+                  <div style={{width:44,height:5,borderRadius:99,background:"rgba(255,255,255,.45)",margin:"0 auto 14px"}}/>
+                  <div style={{display:"flex",alignItems:"center",gap:14}}>
+                    <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>{isLab?"👷":"🔩"}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:11,fontWeight:800,letterSpacing:".12em",textTransform:"uppercase",opacity:.75}}>{isLab?"Edit labour":"Edit part"}</div>
+                      <div style={{fontSize:18,fontWeight:800,lineHeight:1.25,marginTop:2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{be.desc||"—"}</div>
+                    </div>
+                    <button onClick={()=>setBigEdit(null)} aria-label="Close" style={{width:38,height:38,borderRadius:"50%",border:"none",background:"rgba(255,255,255,.22)",color:"#fff",fontSize:18,fontWeight:700,cursor:"pointer",flexShrink:0}}>✕</button>
+                  </div>
+                </div>
+
+                <div style={{padding:"20px 20px 24px",display:"flex",flexDirection:"column",gap:18}}>
+                  <div>
+                    <span style={lbl}>Description</span>
+                    <textarea rows={2} value={be.desc} onChange={e=>setBe({desc:e.target.value})} style={{...field,fontSize:17,fontWeight:600,minHeight:68,resize:"vertical"}}/>
+                  </div>
+
+                  <div>
+                    <span style={lbl}>Quantity</span>
+                    <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:6,borderRadius:99,background:"var(--surface2)",border:"1.5px solid var(--border2)"}}>
+                      <button onClick={()=>setBe({qty:String(Math.max(1,qtyN-1))})} aria-label="Less" style={{...round,background:"var(--surface)",color:"var(--text)",boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}>−</button>
+                      <input type="number" inputMode="numeric" min="1" step="1" value={be.qty} onChange={e=>setBe({qty:e.target.value})}
+                        style={{width:84,textAlign:"center",fontSize:28,fontWeight:800,border:"none",background:"transparent",color:"var(--text)",fontFamily:"Rajdhani,sans-serif",outline:"none"}}/>
+                      <button onClick={()=>setBe({qty:String(qtyN+1)})} aria-label="More" style={{...round,background:"linear-gradient(135deg,#ff7a2e,#ff9a5c)",color:"#fff",boxShadow:"0 4px 12px rgba(255,122,46,.45)"}}>+</button>
+                    </div>
+                  </div>
+
+                  <div style={{display:"flex",gap:12}}>
+                    <div style={{flex:1.3,minWidth:0}}>
+                      <span style={lbl}>Unit price</span>
+                      <div style={{position:"relative"}}>
+                        <span style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",fontSize:18,fontWeight:800,color:"var(--text3)"}}>{cur}</span>
+                        <input type="number" inputMode="decimal" min="0" step="0.01" value={be.price} onChange={e=>setBe({price:e.target.value})} style={{...field,paddingLeft:cur.length>1?44:36}}/>
+                      </div>
+                    </div>
+                    {!isLab&&(
+                      <div style={{flex:1,minWidth:0}}>
+                        <span style={lbl}>Markup</span>
+                        <div style={{position:"relative"}}>
+                          <input type="number" inputMode="decimal" min="0" step="0.1" value={be.markup} onChange={e=>setBe({markup:e.target.value})} style={{...field,paddingRight:38,color:"#d97706"}}/>
+                          <span style={{position:"absolute",right:16,top:"50%",transform:"translateY(-50%)",fontSize:18,fontWeight:800,color:"#d97706"}}>%</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <span style={lbl}>Remark <span style={{textTransform:"none",letterSpacing:0,fontWeight:600}}>(optional)</span></span>
+                    <input value={be.remark} onChange={e=>setBe({remark:e.target.value})} placeholder="Add a note for this line…" style={{...field,fontSize:16,fontWeight:600}}/>
+                  </div>
+
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",borderRadius:18,background:"linear-gradient(135deg,#ff7a2e,#ff9a5c)",color:"#fff",boxShadow:"0 8px 20px rgba(255,122,46,.35)"}}>
+                    <div>
+                      <div style={{fontSize:11,fontWeight:800,letterSpacing:".12em",textTransform:"uppercase",opacity:.85}}>Line total</div>
+                      <div style={{fontSize:13,fontWeight:600,opacity:.9,marginTop:2}}>{qtyN} × {fmtAmt(priceN)}</div>
+                    </div>
+                    <div style={{fontSize:32,fontWeight:800,fontFamily:"Rajdhani,sans-serif",lineHeight:1}}>{fmtAmt(qtyN*priceN)}</div>
+                  </div>
+
+                  <div style={{display:"flex",gap:12}}>
+                    <button onClick={()=>setBigEdit(null)} style={{flex:1,height:54,borderRadius:16,border:"1.5px solid var(--border2)",background:"var(--surface2)",color:"var(--text2)",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+                    <button onClick={saveBigEdit} style={{flex:2,height:54,borderRadius:16,border:"none",background:headBg,color:"#fff",fontSize:17,fontWeight:800,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 6px 16px rgba(37,99,235,.35)"}}>💾 Save changes</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         <div style={{marginBottom:14,borderRadius:14,overflow:"hidden",boxShadow:"0 4px 24px rgba(0,0,0,.18)",border:"1px solid var(--border2)"}}>
           {/* Card header */}
-          <div style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:16}}>🔧</span>
-              <span style={{fontSize:13,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".08em"}}>{t.wsqtPartsLabour}</span>
+              <span style={{fontSize:13,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:".08em",whiteSpace:"nowrap"}}>{t.wsqtPartsLabour}</span>
               {items.length>0&&(
                 <span style={{fontSize:11,color:"rgba(255,255,255,.6)",fontWeight:600}}>
                   {quoteItems.length}/{items.length}
@@ -7506,7 +7631,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 </span>
               )}
             </div>
-            <div style={{display:"flex",gap:6}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("part")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtPart}</button>}
               {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("labour")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtLabour}</button>}
               {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("combo")} style={{background:"rgba(251,191,36,.25)",color:"#fff",border:"1px solid rgba(251,191,36,.5)",borderRadius:8,fontWeight:700,fontSize:12}}>⚡ {t.wsqtCombo||"Combo"}</button>}
@@ -7558,7 +7683,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               const accentBg=item.type==="part"?"rgba(96,165,250,.1)":"rgba(52,211,153,.1)";
               const accentBorder=item.type==="part"?"rgba(96,165,250,.3)":"rgba(52,211,153,.3)";
               return (
-                <div key={item.id} style={{padding:"14px 16px",borderLeft:`4px solid ${accentColor}`,background:idx%2===0?"var(--surface2)":"var(--surface)",borderBottom:`1px solid var(--border2)`}}>
+                <div key={item.id} style={{padding:"14px 16px",borderLeft:`4px solid ${accentColor}`,background:idx%2===0?"rgba(96,165,250,.22)":"rgba(251,191,36,.20)",borderBottom:"14px solid #1e3a8a"}}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:8}}>
                     <input type="checkbox" checked={!quoteExcluded.has(item.id)}
                       onChange={()=>setQuoteExcluded(prev=>{const n=new Set(prev);n.has(item.id)?n.delete(item.id):n.add(item.id);return n;})}
@@ -7579,7 +7704,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       );
                     })()}
                     <div style={{flex:1,minWidth:0}}>
-                      <div onClick={()=>{if(!itemsLocked){setEditDescId(item.id);setEditDescVal(descOverrides[item.id]??item.description??"");}}} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":"1px dashed var(--text3)"}}>{descOverrides[item.id]??item.description}</div>
+                      <div onClick={()=>openBigEdit(item)} style={{fontWeight:700,fontSize:16,lineHeight:1.35,color:"var(--text)",cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":"1px dashed var(--text3)"}}>{descOverrides[item.id]??item.description}</div>
                       {item.part_sku&&<code style={{fontFamily:"DM Mono,monospace",fontSize:12,color:"var(--text3)",marginTop:2,display:"block"}}>{item.part_sku}</code>}
                     </div>
                     {!itemsLocked&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0}}>
@@ -7610,7 +7735,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.qty}</span>
                       {isEditingQty
                         ?<input autoFocus type="number" min="1" step="1" value={editQtyVal} onChange={e=>setEditQtyVal(e.target.value)} onBlur={()=>commitQty(item)} onKeyDown={e=>{if(e.key==="Enter")commitQty(item);if(e.key==="Escape")setEditQtyId(null);}} style={{width:52,textAlign:"center",fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:`1px solid ${accentColor}`,background:"var(--surface2)",color:"var(--text1)"}}/>
-                        :<span onClick={()=>{if(!itemsLocked){setEditQtyId(item.id);setEditQtyVal(String(item.qty||1));setEditPriceId(null);}}} style={{fontWeight:700,fontSize:15,cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":`1px dashed ${accentColor}`,color:"var(--text)"}}>{item.qty}</span>
+                        :<span onClick={()=>openBigEdit(item)} style={{fontWeight:700,fontSize:15,cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":`1px dashed ${accentColor}`,color:"var(--text)"}}>{item.qty}</span>
                       }
                     </div>
                     <span style={{color:accentColor,fontWeight:700,opacity:.6}}>×</span>
@@ -7618,7 +7743,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.wsqtPrice}</span>
                       {isEditingPrice
                         ?<input autoFocus type="number" min="0" step="0.01" value={editPriceVal} onChange={e=>setEditPriceVal(e.target.value)} onBlur={()=>commitPrice(item)} onKeyDown={e=>{if(e.key==="Enter")commitPrice(item);if(e.key==="Escape")setEditPriceId(null);}} style={{width:80,fontFamily:"Rajdhani,sans-serif",fontSize:14,fontWeight:700,padding:"2px 6px",borderRadius:6,border:`1px solid ${accentColor}`,background:"var(--surface2)",color:"var(--text1)"}}/>
-                        :<span onClick={()=>{if(!itemsLocked){setEditPriceId(item.id);setEditPriceVal(String(item.unit_price||0));setEditQtyId(null);setEditMarkupId(null);}}} style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":`1px dashed ${accentColor}`,color:"var(--text)"}}>{fmtAmt(item.unit_price)}</span>
+                        :<span onClick={()=>openBigEdit(item)} style={{fontWeight:700,fontSize:15,fontFamily:"Rajdhani,sans-serif",cursor:itemsLocked?"default":"pointer",borderBottom:itemsLocked?"none":`1px dashed ${accentColor}`,color:"var(--text)"}}>{fmtAmt(item.unit_price)}</span>
                       }
                     </div>
                     <span style={{color:accentColor,fontWeight:700,opacity:.6}}>=</span>
@@ -7634,7 +7759,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       <span style={{fontSize:10,color:"var(--text3)",fontWeight:600,flexShrink:0}}>{t.wsqtMarkup}</span>
                       {editMarkupId===item.id
                         ?<input autoFocus type="number" min="0" step="0.1" value={editMarkupVal} onChange={e=>setEditMarkupVal(e.target.value)} onBlur={()=>commitMarkup(item)} onKeyDown={e=>{if(e.key==="Enter")commitMarkup(item);if(e.key==="Escape")setEditMarkupId(null);}} style={{width:56,fontFamily:"Rajdhani,sans-serif",fontSize:13,fontWeight:700,padding:"2px 5px",borderRadius:5,border:"1px solid #f59e0b",background:"var(--surface2)",color:"var(--text1)"}}/>
-                        :<span onClick={()=>{if(!itemsLocked){setEditMarkupId(item.id);setEditMarkupVal(String(item.markup_pct||0));setEditPriceId(null);setEditQtyId(null);}}} style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,cursor:itemsLocked?"default":"pointer",color:"#f59e0b",borderBottom:itemsLocked?"none":"1px dashed rgba(251,191,36,.4)"}}>{item.markup_pct||0}%</span>
+                        :<span onClick={()=>openBigEdit(item)} style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,cursor:itemsLocked?"default":"pointer",color:"#f59e0b",borderBottom:itemsLocked?"none":"1px dashed rgba(251,191,36,.4)"}}>{item.markup_pct||0}%</span>
                       }
                     </div>
                   )}

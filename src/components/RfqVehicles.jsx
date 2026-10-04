@@ -938,7 +938,9 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
     || (typeof window._APPS_SCRIPT_URL==="string"&&window._APPS_SCRIPT_URL)
     || "";
 
-  const _processImage = async (file, skipBgRemoval=false) => {
+  // Background removal is opt-in: uploads, flips and edits keep the photo as taken.
+  // Only the Tools menu "Remove background" button passes skipBgRemoval=false.
+  const _processImage = async (file, skipBgRemoval=true) => {
     // Step 1: AI background removal
     let processedBlob = file;
     if (!skipBgRemoval) {
@@ -980,7 +982,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
     });
   };
 
-  const uploadToGDrive = async (file, {skipBgRemoval=false}={}) => {
+  const uploadToGDrive = async (file, {skipBgRemoval=true}={}) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) { setError("Please select an image file"); return; }
 
@@ -1133,7 +1135,7 @@ export function PartPhotoUploader({imageUrl, onChange, sku, t, bucket=""}) {
       const r = await fetch(srcUrl, {credentials:"omit"});
       if (!r.ok) throw new Error("fetch failed");
       const blob = await r.blob();
-      const processed = await _processImage(blob);
+      const processed = await _processImage(blob, false); // explicit: this is the manual "Remove background" action
       await _saveDerivedBlob(processed, "nobg");
     } catch (e) { setError("Could not remove background — " + (e.message||e)); }
     setUploading(false); setUploadStatus("");

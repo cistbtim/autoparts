@@ -7045,13 +7045,16 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
       {quotePopup&&wsRole!=="mechanic"&&(
         <Overlay wide maxWidth={1100} onClose={()=>setQuotePopup(false)}>
           <MHead title={quotePopupQuoteOnly?"📋 Parts Quotation":"📝 Quote / Invoice"} onClose={()=>setQuotePopup(false)}
-            actions={onRefresh&&(
-              <button className="btn btn-ghost btn-sm" disabled={quoteRefreshing}
-                onClick={async()=>{ setQuoteRefreshing(true); try{await onRefresh();}finally{setQuoteRefreshing(false);} }}
-                style={{padding:"6px 10px",minWidth:32}} title="Refresh supplier reply prices">
-                <span style={{display:"inline-block",animation:quoteRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
-              </button>
-            )}/>
+            actions={<>
+              <HelpIcon topic="quotation-invoice-payment" large/>
+              {onRefresh&&(
+                <button className="btn btn-ghost btn-sm" disabled={quoteRefreshing}
+                  onClick={async()=>{ setQuoteRefreshing(true); try{await onRefresh();}finally{setQuoteRefreshing(false);} }}
+                  style={{padding:"6px 10px",minWidth:32}} title="Refresh supplier reply prices">
+                  <span style={{display:"inline-block",animation:quoteRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
+                </button>
+              )}
+            </>}/>
           {!quotePopupQuoteOnly&&<div style={{display:"flex",gap:6,padding:"8px 14px",borderBottom:"1px solid var(--border)"}}>
             {["quote","invoice"].map(tid=>(
               <button key={tid} onClick={()=>setQuotePopupTab(tid)} style={{

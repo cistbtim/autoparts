@@ -7243,6 +7243,9 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               price: String(item.unit_price||0),
               markup: String(item.markup_pct||0),
               remark: remarkOverrides[item.id]??item.remark??"",
+              costs: getSupCosts(item.description), // supplier / spare-shop prices that came back for this line
+              selIdx: null,                          // which supplier price is picked (null = none)
+              defMarkup: defaultMarkup,
             });
           };
           const saveBigEdit = async () => {
@@ -7253,17 +7256,25 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             const newDesc = be.desc.trim();
             const descChanged = !!newDesc && newDesc !== (descOverrides[item.id]??item.description??"").trim();
             const qty = Math.max(1, Math.round(+be.qty||1));
+            const sel = be.selIdx!=null ? be.costs?.[be.selIdx] : null;
             const costP = +(item.cost_price||0);
             let price = +be.price;
             let markup = +be.markup;
-            if (isNaN(price)) price = +item.unit_price||0;
-            if (price !== +item.unit_price) markup = costP > 0 ? +((price/costP - 1)*100).toFixed(1) : +(item.markup_pct||0);
-            else if (!isNaN(markup) && markup !== +(item.markup_pct||0)) price = costP > 0 ? +(costP*(1+markup/100)).toFixed(2) : +(item.unit_price||0);
-            else markup = +(item.markup_pct||0);
+            let costField = {};
+            if (sel) {
+              markup = +be.markup||0;
+              price = +(sel.price*(1+markup/100)).toFixed(2);
+              costField = {cost_price: sel.price};
+            } else {
+              if (isNaN(price)) price = +item.unit_price||0;
+              if (price !== +item.unit_price) markup = costP > 0 ? +((price/costP - 1)*100).toFixed(1) : +(item.markup_pct||0);
+              else if (!isNaN(markup) && markup !== +(item.markup_pct||0)) price = costP > 0 ? +(costP*(1+markup/100)).toFixed(2) : +(item.unit_price||0);
+              else markup = +(item.markup_pct||0);
+            }
             // One save for numbers + description (onSaveItem writes the whole row, so a separate
             // description patch made first would be overwritten by the old text).
-            if (qty !== +item.qty || price !== +item.unit_price || markup !== +(item.markup_pct||0)) {
-              await onSaveItem({...item, ...(descChanged?{description:newDesc}:{}), qty, unit_price: price, markup_pct: markup, total: price*qty});
+            if (sel || qty !== +item.qty || price !== +item.unit_price || markup !== +(item.markup_pct||0)) {
+              await onSaveItem({...item, ...costField, ...(descChanged?{description:newDesc}:{}), qty, unit_price: price, markup_pct: markup, total: price*qty});
             }
             // Description change also syncs supplier requests/quotes for this job (and sets the local override)
             if (descChanged) await commitDesc(item, newDesc);
@@ -7577,19 +7588,54 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                     </div>
                   </div>
 
+                  {be.costs?.length>0&&(
+                    <div>
+                      <span style={lbl}>Supplier prices</span>
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        {be.costs.map((sc,i)=>{
+                          const mk=+be.markup>0?+be.markup:(+be.defMarkup||0);
+                          const sellP=+(sc.price*(1+mk/100)).toFixed(2);
+                          const isSel=be.selIdx===i;
+                          return (
+                            <div key={i} onClick={()=>setBe({selIdx:i,markup:String(mk),price:String(sellP)})}
+                              style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:14,cursor:"pointer",
+                                border:`2px solid ${isSel?"#f59e0b":"var(--border2)"}`,background:isSel?"rgba(251,191,36,.14)":"var(--surface2)"}}>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:12,color:"var(--text3)",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sc.isShop?"🏪 ":"💰 "}{sc.name}</div>
+                                <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:20,color:"#d97706"}}>{fmtAmt(sc.price)}<span style={{fontSize:11,color:"var(--text3)",marginLeft:5,fontFamily:"inherit"}}>cost</span></div>
+                              </div>
+                              <div style={{textAlign:"right"}}>
+                                <div style={{fontSize:11,color:"var(--text3)",fontWeight:700}}>+{mk}% = sell</div>
+                                <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:20,color:"var(--accent)"}}>{fmtAmt(sellP)}</div>
+                              </div>
+                              <span style={{width:22,color:"#d97706",fontSize:18,fontWeight:800,textAlign:"center"}}>{isSel?"✓":""}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {be.selIdx!=null&&be.costs[be.selIdx]?.isShop&&(
+                        <button onClick={()=>{const it=items.find(x=>x.id===be.id); if(it){orderFromSpareShop(it,be.costs[be.selIdx],be.markup); setBigEdit(null);}}}
+                          style={{width:"100%",marginTop:8,height:48,borderRadius:14,border:"none",background:"#16a34a",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+                          🏪 Order from Spare Shop
+                        </button>
+                      )}
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>Tap a price to use it: sell price = cost + markup. Save changes to apply.</div>
+                    </div>
+                  )}
+
                   <div style={{display:"flex",gap:12}}>
                     <div style={{flex:1.3,minWidth:0}}>
                       <span style={lbl}>Unit price</span>
                       <div style={{position:"relative"}}>
                         <span style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",fontSize:18,fontWeight:800,color:"var(--text3)"}}>{cur}</span>
-                        <input type="number" inputMode="decimal" min="0" step="0.01" value={be.price} onChange={e=>setBe({price:e.target.value})} style={{...field,paddingLeft:cur.length>1?44:36}}/>
+                        <input type="number" inputMode="decimal" min="0" step="0.01" value={be.price} onChange={e=>setBe({price:e.target.value,selIdx:null})} style={{...field,paddingLeft:cur.length>1?44:36}}/>
                       </div>
                     </div>
                     {!isLab&&(
                       <div style={{flex:1,minWidth:0}}>
                         <span style={lbl}>Markup</span>
                         <div style={{position:"relative"}}>
-                          <input type="number" inputMode="decimal" min="0" step="0.1" value={be.markup} onChange={e=>setBe({markup:e.target.value})} style={{...field,paddingRight:38,color:"#d97706"}}/>
+                          <input type="number" inputMode="decimal" min="0" step="0.1" value={be.markup} onChange={e=>{const m=e.target.value; setBigEdit(prev=>{const nx={...prev,markup:m}; if(prev.selIdx!=null&&prev.costs?.[prev.selIdx]) nx.price=String(+(prev.costs[prev.selIdx].price*(1+(+m||0)/100)).toFixed(2)); return nx;});}} style={{...field,paddingRight:38,color:"#d97706"}}/>
                           <span style={{position:"absolute",right:16,top:"50%",transform:"translateY(-50%)",fontSize:18,fontWeight:800,color:"#d97706"}}>%</span>
                         </div>
                       </div>

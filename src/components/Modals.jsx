@@ -3912,6 +3912,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
   });
   const setPtab=id=>{ setPtabRaw(id); try{ localStorage.setItem("pm_last_tab",id); }catch{ /* storage unavailable */ } };
   useEffect(()=>{ if(ptab==="supplier") onLoadSuppliers?.(); },[]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [linkFormOpen, setLinkFormOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -4727,6 +4728,10 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               })():null;
               return (
                 <div>
+                  {partSuppliers.length>0&&!linkFormOpen&&(
+                    <button type="button" className="btn btn-ghost" style={{width:"100%"}} onClick={()=>setLinkFormOpen(true)}>+ Link new supplier code</button>
+                  )}
+                  {(partSuppliers.length===0||linkFormOpen)&&(<>
                   <FL label="Link New Supplier"/>
                   <div style={{background:"var(--surface2)",borderRadius:11,padding:"10px 12px",border:"1px solid var(--border)"}}>
                     <FG cols="1fr 1fr">
@@ -4775,13 +4780,21 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                           <button className="btn btn-primary" style={{alignSelf:"end",whiteSpace:"nowrap"}} onClick={()=>{
                           if(!suppId) return;
                           if(!suppPartNo.trim()){setSuppPartNoErr("Supplier part number is required");return;}
-                          onSavePartSupplier?.({part_id:part.id,supplier_id:+suppId,supplier_part_no:suppPartNo.trim(),supplier_price:suppPrice?+suppPrice:null,lead_time:suppLead,min_order:+suppMinOrd});
-                          setSuppId("");setSuppPartNo("");setSuppPrice("");setSuppLead("");setSuppMinOrd(1);setSuppPartNoErr("");
+                          const rec={part_id:part.id,supplier_id:+suppId,supplier_part_no:suppPartNo.trim(),supplier_price:suppPrice?+suppPrice:null,lead_time:suppLead,min_order:+suppMinOrd};
+                          onSavePartSupplier?.(rec);
+                          // Head office + Cape Town branch share one code: GR ⇄ GRCT, MIT ⇄ MITCT (supplier named <name>CT)
+                          const chosen=suppliers.find(x=>String(x.id)===String(suppId));
+                          const cn=(chosen?.name||"").trim().toUpperCase();
+                          const twinName=cn.endsWith("CT")?cn.slice(0,-2):cn+"CT";
+                          const twin=chosen&&twinName&&suppliers.find(x=>(x.name||"").trim().toUpperCase()===twinName);
+                          if(twin&&!partSuppliers.find(ps=>ps.supplier_id===twin.id)) onSavePartSupplier?.({...rec,supplier_id:twin.id});
+                          setSuppId("");setSuppPartNo("");setSuppPrice("");setSuppLead("");setSuppMinOrd(1);setSuppPartNoErr("");setLinkFormOpen(false);
                         }}>Link Supplier</button>
                         </FG>
                       </>
                     )}
                   </div>
+                  </>)}
                 </div>
               );
             }

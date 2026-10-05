@@ -6099,7 +6099,23 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
           const isCodeLinked = !!_linkedV;
           return (
             <div style={{display:"flex",flexDirection:"column",gap:isMobile?8:12,marginBottom:14}}>
-              <div style={{display:"flex",gap:isMobile?8:12}}>{row1.map(renderTile)}</div>
+              <div style={{display:"flex",gap:isMobile?8:12}}>
+                {row1.map(renderTile)}
+                {hasSpareShop&&isCodeLinked&&(
+                  <button onClick={()=>onGoToSpareShop(job.vehicle_make||"",_linkedV.model||"",_linkedV.code||"",job.vin||"",job.engine_no||"",job.vehicle_reg||"",job.id,`${[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}${job.vehicle_reg?` · ${job.vehicle_reg}`:""}`.trim()||job.id,job.customer_name||"")}
+                    style={{
+                      display:"flex",flexDirection:"column",alignItems:"center",gap:tileSize.gap,position:"relative",
+                      padding:tileSize.padding,border:"1.5px solid #1d4ed838",borderRadius:tileSize.borderRadius,cursor:"pointer",
+                      background:"var(--surface)",color:"var(--text)",boxShadow:"0 2px 10px rgba(0,0,0,.10)",
+                      WebkitTapHighlightColor:"transparent",flex:1,minWidth:0,
+                    }}>
+                    <span style={{fontSize:tileSize.iconSize,lineHeight:1,background:"#1d4ed816",borderRadius:10,padding:"7px 16px"}}>🏪</span>
+                    <span style={{fontSize:tileSize.labelSize,fontWeight:700,lineHeight:1.2,textAlign:"center",color:"#1d4ed8",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.vehicle_make} · {_linkedV.model}</span>
+                    <span style={{fontSize:tileSize.labelSize-1,color:"var(--text3)",lineHeight:1}}>{_linkedV.code}</span>
+                    {spareShopPartsCount>0&&<span style={{position:"absolute",top:6,right:8,fontSize:10,fontWeight:800,background:"#1d4ed8",color:"#fff",borderRadius:99,padding:"2px 7px"}}>{spareShopPartsCount} parts</span>}
+                  </button>
+                )}
+              </div>
               {row2.length>0&&<div style={{display:"flex",gap:isMobile?8:12}}>{row2.map(renderTile)}</div>}
               {onSubmitBuyoutOffer&&buyoutOffer!==undefined&&(
                 buyoutOffer
@@ -6133,27 +6149,8 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                       <span style={{fontSize:20}}>›</span>
                     </button>
               )}
-              {hasSpareShop&&(
-                isCodeLinked
-                  ? <button onClick={()=>onGoToSpareShop(job.vehicle_make||"",_linkedV.model||"",_linkedV.code||"",job.vin||"",job.engine_no||"",job.vehicle_reg||"",job.id,`${[job.vehicle_year,job.vehicle_make,job.vehicle_model].filter(Boolean).join(" ")}${job.vehicle_reg?` · ${job.vehicle_reg}`:""}`.trim()||job.id,job.customer_name||"")}
-                      style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"none",cursor:"pointer",
-                        background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",color:"#fff",
-                        boxShadow:"0 4px 14px rgba(29,78,216,.35)",textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
-                      <span style={{fontSize:28,lineHeight:1}}>🏪</span>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:800,letterSpacing:".02em",marginBottom:2}}>
-                          {job.vehicle_make} · {_linkedV.model}
-                        </div>
-                        <div style={{fontSize:12,color:"rgba(255,255,255,.7)"}}>{_linkedV.code}</div>
-                      </div>
-                      {spareShopPartsCount>0&&(
-                        <div style={{display:"flex",flexDirection:"column",alignItems:"center",background:"rgba(255,255,255,.15)",borderRadius:10,padding:"6px 12px",flexShrink:0}}>
-                          <span style={{fontSize:20,fontWeight:800,fontFamily:"Rajdhani,sans-serif",lineHeight:1}}>{spareShopPartsCount}</span>
-                          <span style={{fontSize:10,fontWeight:600,color:"rgba(255,255,255,.75)"}}>parts</span>
-                        </div>
-                      )}
-                    </button>
-                  : <div style={{position:"relative"}}><button onClick={()=>setMatchModelOpen(true)}
+              {hasSpareShop&&!isCodeLinked&&(
+                <div style={{position:"relative"}}><button onClick={()=>setMatchModelOpen(true)}
                       style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 18px",borderRadius:14,border:"1px dashed rgba(255,154,92,.6)",cursor:"pointer",
                         background:"rgba(255,154,92,.08)",color:"#ff7a2e",
                         textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
@@ -7141,6 +7138,12 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               <div style={{fontWeight:700,fontSize:13}}>🩹 Damage marks ({quoteMarks.length})</div>
               {vehVisiblePhotos.length>0&&<button className="btn btn-ghost btn-sm" onClick={()=>setPhotoLightbox(0)}>📷 View car photos</button>}
             </div>
+            {vehiclePhotos.front&&(
+              <img src={toImgUrl(vehiclePhotos.front)} alt="Front of car" referrerPolicy="no-referrer"
+                onClick={()=>setPhotoLightbox(0)}
+                onError={e=>{e.target.style.display="none";}}
+                style={{width:140,maxWidth:"100%",height:"auto",borderRadius:8,border:"1px solid var(--border)",marginBottom:8,cursor:"pointer",display:"block"}}/>
+            )}
             {quoteMarks.length===0?(
               <div style={{fontSize:12,color:"var(--text3)"}}>No marks yet — open a photo above and click on it to mark damage.</div>
             ):(<>

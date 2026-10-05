@@ -96,6 +96,9 @@ function LoginCardShell({authTab, locked, onClose, children}) {
   );
 }
 
+// Workshops that sign up without an invite link (?ref=) are credited to the owner's workshop (Autofix Service).
+const DEFAULT_REFERRER_ID = "9";
+
 export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLoginOnly=false,initialError=""}) {
   // Referral: ?ref=<workshop id> jumps straight to workshop signup and gets stamped on the new account
   const [wsReferrerId] = useState(()=>new URLSearchParams(window.location.search).get("ref")||"");
@@ -343,7 +346,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     const newUser=await api.insert("users",{username:wsRegUser,password:wsRegPass,name:wsRegName,role:"workshop",phone:wsRegPhone||"",email:wsRegEmail||""}).catch(e=>({message:e.message}));
     const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
     if(!loginUser||loginUser.code||loginUser.message||!loginUser.id){setErr("Signup failed: "+(loginUser?.message||"unknown error"));setLoading(false);return;}
-    const profRes=await api.upsert("workshop_profiles",{id:String(loginUser.id),name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd,referral_source:wsReferrerId?"referral":"organic",referred_by_user_id:wsReferrerId||null}).catch(e=>({message:e.message}));
+    const profRes=await api.upsert("workshop_profiles",{id:String(loginUser.id),name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd,referral_source:"referral",referred_by_user_id:wsReferrerId||DEFAULT_REFERRER_ID}).catch(e=>({message:e.message}));
     if(profRes?.code||profRes?.message){setErr("Account created but profile save failed — "+(profRes.message||profRes.code)+". Please log in.");setLoading(false);return;}
     logLogin({...loginUser});onLogin({...loginUser});
     setLoading(false);
@@ -631,7 +634,9 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
           {authTab==="workshop"&&(
             <div style={{display:"flex",flexDirection:"column",gap:0}}>
               <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:18}}>
-                <button className="auth-tab on">{t.signIn||"Sign In"}</button>
+                {[["login",t.signIn||"Sign In"],["signup",t.registerNew||"Register"]].map(([id,lb])=>(
+                  <button key={id} className={`auth-tab ${wsTab===id?"on":""}`} onClick={()=>{setWsTab(id);setErr("");}}>{lb}</button>
+                ))}
               </div>
 
               {wsTab==="login"&&(

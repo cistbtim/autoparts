@@ -9,7 +9,9 @@ import { isDbError, isMissingTable } from "./wsUtil.js";
 // ── date helpers (all dates are plain YYYY-MM-DD, local time) ───────────────
 const pad = (n) => String(n).padStart(2, "0");
 const toYmd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const addMonthsYmd = (n) => { const d = new Date(); d.setMonth(d.getMonth() + n); return toYmd(d); };
+const parseYmd = (ymd) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd || ""); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(); };
+const addMonthsYmd = (n, from) => { const d = parseYmd(from); d.setMonth(d.getMonth() + n); return toYmd(d); };
+const addDaysYmd = (n, from) => { const d = parseYmd(from); d.setDate(d.getDate() + n); return toYmd(d); };
 const daysUntil = (ymd) => {
   if (!ymd) return null;
   const [y, m, d] = ymd.split("-").map(Number);
@@ -61,10 +63,12 @@ function useReminders(wsId, jobId) {
 }
 
 // ── add / edit form ─────────────────────────────────────────────────────────
-function ReminderForm({ initial, mileage, wsId, onSaved, onClose }) {
+function ReminderForm({ initial, mileage, serviceDate, wsId, onSaved, onClose }) {
+  // The date the car was serviced (job date). Not saved — only the base the +months / +days buttons count from.
+  const [svc, setSvc] = useState(() => toYmd(parseYmd(serviceDate)));
   const [f, setF] = useState(() => ({
     customer_name: "", customer_phone: "", vehicle_reg: "", vehicle_make: "", vehicle_model: "",
-    due_date: addMonthsYmd(6), note: "", ...initial,
+    due_date: addMonthsYmd(6, serviceDate), note: "", ...initial,
     due_km: initial?.due_km != null ? String(initial.due_km) : (mileage ? String(mileage + 10000) : ""),
   }));
   const [saving, setSaving] = useState(false);
@@ -100,10 +104,18 @@ function ReminderForm({ initial, mileage, wsId, onSaved, onClose }) {
         sub={[f.vehicle_reg, f.vehicle_make, f.vehicle_model].filter(Boolean).join(" · ") || undefined}/>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
+          <span style={lbl}>Car was serviced on</span>
+          <input className="inp" type="date" value={svc} onChange={e => e.target.value && setSvc(e.target.value)} style={{ fontSize: 16, fontWeight: 600 }}/>
+        </div>
+        <div>
           <span style={lbl}>Remind the customer on</span>
           <input className="inp" type="date" value={f.due_date || ""} onChange={e => set({ due_date: e.target.value })} style={{ fontSize: 16, fontWeight: 600 }}/>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-            {[3, 6, 12].map(m => <button key={m} type="button" style={chip} onClick={() => set({ due_date: addMonthsYmd(m) })}>+{m} months</button>)}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
+            {[3, 6, 12].map(m => <button key={m} type="button" style={chip} onClick={() => set({ due_date: addMonthsYmd(m, svc) })}>+{m} months</button>)}
+            <span style={{ fontSize: 12, color: "var(--text3)", marginLeft: 4 }}>or +</span>
+            <input className="inp" type="number" inputMode="numeric" min="1" placeholder="days" style={{ width: 80, padding: "6px 10px", fontSize: 14 }}
+              onChange={e => +e.target.value > 0 && set({ due_date: addDaysYmd(Math.round(+e.target.value), svc) })}/>
+            <span style={{ fontSize: 12, color: "var(--text3)" }}>days</span>
           </div>
         </div>
         <div>
@@ -290,7 +302,7 @@ export function JobReminderCard({ job, wsId, wsLocked }) {
         <span style={{ fontSize: 20, color: "#7c3aed" }}>›</span>
       </button>
       {open && (
-        <ReminderForm wsId={wsId} mileage={+job.mileage || 0} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); reload(); }}
+        <ReminderForm wsId={wsId} mileage={+job.mileage || 0} serviceDate={job.date_out || job.date_in} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); reload(); }}
           initial={current ? current : {
             job_id: job.id, vehicle_reg: job.vehicle_reg || "", vehicle_make: job.vehicle_make || "", vehicle_model: job.vehicle_model || "",
             customer_name: job.customer_name || "", customer_phone: job.customer_phone || "",

@@ -11248,6 +11248,7 @@ export function WsShopRequestDetail({req, parts=[], settings={}, suppliers=[], p
                   {label:"CatCar",    icon:"🐱", color:"#ff7a2e", bg:"rgba(255,122,46,.13)", href:`https://catcar.info/?lang=en&vin=${encodeURIComponent(req.vin)}`},
                   {label:"Nemiga",    icon:"🗂️", color:"#14b8a6", bg:"rgba(20,184,166,.12)", href:nemigaVinUrl(req.vin, decodeVin(req.vin)?.make)},
                   {label:"7zap",      icon:"🔩", color:"#60a5fa", bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/", copyVin:true},
+                  {label:"PartsOuq",  icon:"🔩", color:"#60a5fa", bg:"rgba(96,165,250,.13)",  href:`https://partsouq.com/en/search/all?q=${encodeURIComponent(req.vin)}`},
                   {label:"RealOEM",   icon:"🚗", color:"#34d399", bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(req.vin)}`},
                   {label:"VIN Decode",icon:"🔎", color:"#fbbf24", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(req.vin)}`},
                   {label:"17VIN",     icon:"🆔", color:"#94a3b8", bg:"rgba(148,163,184,.13)", href:`https://en.17vin.com/vin/${encodeURIComponent(req.vin)}`},

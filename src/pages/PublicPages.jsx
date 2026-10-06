@@ -1243,31 +1243,39 @@ export function WsSupplierQuoteReplyPage({token}) {
                 </button>
               </div>
             )}
-            {/* 7zap link */}
+            {/* Catalogue lookup links */}
             {(req.vin||req.vehicle_make)&&(
               <div style={{marginTop:10,display:"flex",gap:6,flexWrap:"wrap"}}>
-                {req.vin&&(
-                  <a href="https://7zap.com/en/vin-decoder/"
-                    target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}
-                    onClick={()=>navigator.clipboard.writeText(req.vin)}>
-                    <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.12)",color:"#60a5fa",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                      🔩 7zap <span style={{fontSize:10,opacity:.7}}>by VIN</span>
-                    </button>
-                  </a>
-                )}
-                {(req.vehicle_make||req.vehicle_model)&&(
-                  <a href="https://7zap.com/en/catalog/cars/"
-                    target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
-                    <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,.4)",background:"rgba(96,165,250,.12)",color:"#60a5fa",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                      🔩 7zap <span style={{fontSize:10,opacity:.7}}>browse</span>
-                    </button>
-                  </a>
-                )}
+                {(()=>{
+                  // Same make → CatCar section mapping the workshop job screen uses
+                  const mk=(req.vehicle_make||"").toLowerCase().replace(/[-\s]+/g,"");
+                  const slugMap={mercedesbenz:"mercedes",mercedes:"mercedes",smart:"mercedes",vw:"audivw",volkswagen:"audivw",audi:"audivw",landrover:"land-rover",rangerover:"land-rover",alfaromeo:"alfa-romeo",mini:"bmw",rollsroyce:"bmw"};
+                  const slug=slugMap[mk]||(req.vehicle_make||"").toLowerCase().replace(/\s+/g,"-");
+                  const href=req.vin
+                    ? `https://catcar.info/${req.vehicle_make?slug+"/":""}?lang=en&vin=${encodeURIComponent(req.vin)}`
+                    : "https://catcar.info/?lang=en";
+                  return (
+                    <a href={href} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                      <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(255,122,46,.4)",background:"rgba(255,122,46,.12)",color:"#ff7a2e",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                        🐱 CatCar{req.vin&&<span style={{fontSize:10,opacity:.7}}>by VIN</span>}
+                      </button>
+                    </a>
+                  );
+                })()}
                 {req.vin&&(
                   <a href={`https://decodethis.com/web/vin/${encodeURIComponent(req.vin)}`}
                     target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
                     <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(167,139,250,.4)",background:"rgba(167,139,250,.12)",color:"#a78bfa",fontSize:12,fontWeight:700,cursor:"pointer"}}>
                       🧬 DecodeThis
+                    </button>
+                  </a>
+                )}
+                {/* RealOEM covers BMW and MINI (same catalogue) */}
+                {/\b(bmw|mini)\b/i.test(`${req.vehicle_make||""} ${req.vehicle_model||""}`)&&(
+                  <a href={req.vin?`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(req.vin)}`:"https://www.realoem.com/bmw/enUS/select"}
+                    target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                    <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(52,211,153,.4)",background:"rgba(52,211,153,.12)",color:"#34d399",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                      🚗 RealOEM{req.vin&&<span style={{fontSize:10,opacity:.7}}>by VIN</span>}
                     </button>
                   </a>
                 )}

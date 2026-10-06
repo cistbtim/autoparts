@@ -137,9 +137,21 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [kanbanZoom,      setKanbanZoom]      = useState(()=>{try{return Number(localStorage.getItem("ws_kanban_zoom")||1);}catch{return 1;}});
   const KANBAN_WIDTHS=[150,200,270,340,420];
   const kanbanColW=KANBAN_WIDTHS[Math.max(0,Math.min(4,kanbanZoom))];
+  // Admin dropdown shows jobs created per workshop. Counted from the DB (not `jobs`), because while
+  // acting as one workshop `jobs` only holds that workshop's rows.
+  const [wsJobCounts,setWsJobCounts]=useState({});
+  useEffect(()=>{
+    if(role!=="admin") return;
+    api.get("workshop_jobs","select=workshop_id").then(rows=>{
+      if(!Array.isArray(rows)) return;
+      const c={}; rows.forEach(r=>{ const k=String(r.workshop_id); c[k]=(c[k]||0)+1; });
+      setWsJobCounts(c);
+    }).catch(()=>{});
+  },[role,jobs.length]);
   const wsOptionLabel=p=>{
     const uname=users.find(u=>String(u.id)===String(p.id))?.username;
-    return `${p.name||p.id}${uname?` (@${uname})`:""}`;
+    const n=wsJobCounts[String(p.id)];
+    return `${p.name||p.id}${uname?` (@${uname})`:""}${n!==undefined?` · ${n} jobs`:""}`;
   };
   const [deleteWsOpen,   setDeleteWsOpen]   = useState(false);
   const [deleteWsTyped,  setDeleteWsTyped]  = useState("");

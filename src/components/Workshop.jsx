@@ -5493,6 +5493,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     {label:"Nemiga",    icon:"🗂️", color:"#14b8a6",       bg:"rgba(20,184,166,.12)",  href:nemigaHref},
     {label:"7zap",      icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/", copyVin:true},
     {label:"PartsOuq",  icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:`https://partsouq.com/en/search/all?q=${encodeURIComponent(job.vin)}`},
+    {label:"Megazip",   icon:"🧩", color:"#f43f5e",       bg:"rgba(244,63,94,.13)",   href:`https://www.megazip.net/search?q=${encodeURIComponent(job.vin)}`},
     {label:"RealOEM",   icon:"🚗", color:"var(--green)",  bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`},
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},
     {label:"17VIN",     icon:"🆔", color:"var(--text2)",  bg:"rgba(148,163,184,.13)", href:`https://en.17vin.com/vin/${encodeURIComponent(job.vin)}`},
@@ -10385,6 +10386,10 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], wsId=nul
                     onClick={()=>navigator.clipboard.writeText(f.vin)}
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                     7zap
+                  </a>
+                  <a href={`https://www.megazip.net/search?q=${encodeURIComponent(f.vin)}`} target="_blank" rel="noopener noreferrer"
+                    style={{fontSize:11,padding:"2px 8px",background:"rgba(244,63,94,.12)",color:"#f43f5e",border:"1px solid rgba(244,63,94,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
+                    Megazip
                   </a>
                   <a href={`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(f.vin)}`} target="_blank" rel="noopener noreferrer"
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(52,211,153,.12)",color:"var(--green)",border:"1px solid rgba(52,211,153,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>

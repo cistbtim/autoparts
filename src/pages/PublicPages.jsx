@@ -1263,6 +1263,14 @@ export function WsSupplierQuoteReplyPage({token}) {
                   );
                 })()}
                 {req.vin&&(
+                  <a href={`https://www.megazip.net/search?q=${encodeURIComponent(req.vin)}`}
+                    target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                    <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(244,63,94,.4)",background:"rgba(244,63,94,.12)",color:"#f43f5e",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                      🧩 Megazip <span style={{fontSize:10,opacity:.7}}>by VIN</span>
+                    </button>
+                  </a>
+                )}
+                {req.vin&&(
                   <a href={`https://decodethis.com/web/vin/${encodeURIComponent(req.vin)}`}
                     target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
                     <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(167,139,250,.4)",background:"rgba(167,139,250,.12)",color:"#a78bfa",fontSize:12,fontWeight:700,cursor:"pointer"}}>

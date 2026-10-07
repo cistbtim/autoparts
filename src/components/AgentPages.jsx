@@ -378,7 +378,19 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
   // when it was uploaded — over the current_expiry + renewal_years guess,
   // since the guess can be off (wrong renewal_years, disc issued a few days
   // either side of the exact anniversary, etc.).
+  // A car the customer has told us they sold is never reminded again — flagging any one
+  // renewal for a reg silences the whole reg (later renewals of the same car included).
+  const regKey = r => (r.vehicle_reg||"").replace(/\s/g,"").toUpperCase();
+  const soldRegs = new Set(renewals.filter(r=>r.vehicle_sold&&regKey(r)).map(regKey));
+  const isSold = r => !!r.vehicle_sold || (!!regKey(r) && soldRegs.has(regKey(r)));
+  const markSold = (r, sold) => {
+    if(sold && !window.confirm(`Mark ${r.vehicle_reg||"this vehicle"} as sold — customer no longer owns the car?
+
+No more renewal reminders will be shown for it.`)) return;
+    onUpdate?.(r.id,{vehicle_sold:sold, vehicle_sold_at:sold?new Date().toISOString():null});
+  };
   const dueSoon = renewals
+    .filter(r=>!isSold(r))
     .filter(r=>r.status==="completed"&&(r.new_licence_expiry||r.current_expiry))
     .map(r=>({...r, nextExpiry: r.new_licence_expiry||addYears(r.current_expiry, r.renewal_years)}))
     .filter(r=>r.nextExpiry!=null)
@@ -450,6 +462,10 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     </a>
                   );
                 })()}
+                {onUpdate&&(
+                  <button onClick={()=>markSold(r,true)} title="Customer replied: no longer owns this car — stop reminders"
+                    style={{fontSize:11,padding:"3px 8px",border:"none",borderRadius:12,background:"rgba(239,68,68,.12)",color:"var(--red)",cursor:"pointer"}}>🚗 Sold</button>
+                )}
                 {onSave&&(
                   <button onClick={()=>{
                     // Carry the customer's documents on file forward too — no
@@ -556,7 +572,8 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
             {t.laShowing||"Showing"} {(safePage-1)*PAGE_SIZE+1}–{Math.min(safePage*PAGE_SIZE,filtered.length)} {t.laOf||"of"} {filtered.length}
           </div>
           {pageItems.map(r=>{
-            const isExpired = r.current_expiry && new Date(r.current_expiry)<new Date();
+            const sold = isSold(r);
+            const isExpired = !sold && r.current_expiry && new Date(r.current_expiry)<new Date();
             const waPhone = r.workshop_id ? (workshopInfo[r.workshop_id]?.phone||"") : (r.owner_phone||"");
             const waMsg = r.workshop_id
               ? `Hi, regarding the licence renewal for ${r.vehicle_reg||"the vehicle"} (${r.owner_name||"customer"}) — status: ${r.status||"pending"}.`
@@ -568,6 +585,7 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                     <div style={{fontWeight:700,fontFamily:"DM Mono,monospace",fontSize:14}}>{r.vehicle_reg}</div>
                     <div style={{fontSize:12,color:"var(--text3)"}}>{r.vehicle_make} {r.vehicle_model}</div>
                     <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:`🚶 ${t.laWalkIn||"Walk-in"}`)}</div>
+                    {sold&&<div style={{display:"inline-block",marginTop:4,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10,background:"rgba(148,163,184,.18)",color:"var(--text2)"}}>🚗 Sold — no longer owns this car{r.vehicle_sold_at?` · ${r.vehicle_sold_at.slice(0,10)}`:""}</div>}
                   </div>
                   <div style={{textAlign:"right",flexShrink:0}}>
                     {r.new_licence_expiry ? (
@@ -604,6 +622,10 @@ export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave
                 <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                   {onUpdate&&(
                     <button onClick={()=>setEditRenewal(r)} title={t.edit||"Edit"} style={actionBtnStyle("default")}>✏️</button>
+                  )}
+                  {onUpdate&&(
+                    <button onClick={()=>markSold(r,!r.vehicle_sold)} title={r.vehicle_sold?"Undo — customer still owns the car":"Customer sold the car — stop reminders"}
+                      style={actionBtnStyle(r.vehicle_sold?"done":"default")}>🚗</button>
                   )}
                   <button onClick={()=>setDocsRenewalId(r.id)} title={t.laDocuments||"Documents"}
                     style={actionBtnStyle((r.receipt_url||r.new_licence_url)?"done":"default")}>📎</button>

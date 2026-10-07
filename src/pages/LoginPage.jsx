@@ -98,6 +98,8 @@ function LoginCardShell({authTab, locked, onClose, children}) {
 
 // Workshops that sign up without an invite link (?ref=) are credited to the owner's workshop (Autofix Service).
 const DEFAULT_REFERRER_ID = "9";
+// ...and are linked to Speedgrand Auto Spares (branches.id) as their spare shop by default.
+const DEFAULT_SPARE_SHOP = {id:"1bb00a87-a687-4faa-8bfd-d1ffabbcc2d7", name:"Speedgrand Auto Spares"};
 
 export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLoginOnly=false,initialError=""}) {
   // Referral: ?ref=<workshop id> jumps straight to workshop signup and gets stamped on the new account
@@ -343,10 +345,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
     // users.id is a DB-generated bigint — don't send our own id. api.insert resolves with the
     // Postgres error JSON on failure instead of throwing, so check the result, not just .catch.
-    const newUser=await api.insert("users",{username:wsRegUser,password:wsRegPass,name:wsRegName,role:"workshop",phone:wsRegPhone||"",email:wsRegEmail||""}).catch(e=>({message:e.message}));
+    const newUser=await api.insert("users",{username:wsRegUser,password:wsRegPass,name:wsRegName,role:"workshop",phone:wsRegPhone||"",email:wsRegEmail||"",spare_shop_name:DEFAULT_SPARE_SHOP.name}).catch(e=>({message:e.message}));
     const loginUser=Array.isArray(newUser)?newUser[0]:newUser;
     if(!loginUser||loginUser.code||loginUser.message||!loginUser.id){setErr("Signup failed: "+(loginUser?.message||"unknown error"));setLoading(false);return;}
-    const profRes=await api.upsert("workshop_profiles",{id:String(loginUser.id),name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd,referral_source:"referral",referred_by_user_id:wsReferrerId||DEFAULT_REFERRER_ID}).catch(e=>({message:e.message}));
+    const profRes=await api.upsert("workshop_profiles",{id:String(loginUser.id),name:wsRegName,phone:wsRegPhone||"",email:wsRegEmail||"",city:wsRegCity,country:wsRegCountry,trial_start:today,subscription_status:"trial",subscription_expires_at:trialEnd,referral_source:"referral",referred_by_user_id:wsReferrerId||DEFAULT_REFERRER_ID,linked_branch_id:DEFAULT_SPARE_SHOP.id}).catch(e=>({message:e.message}));
     if(profRes?.code||profRes?.message){setErr("Account created but profile save failed — "+(profRes.message||profRes.code)+". Please log in.");setLoading(false);return;}
     logLogin({...loginUser});onLogin({...loginUser});
     setLoading(false);

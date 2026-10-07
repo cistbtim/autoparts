@@ -5811,6 +5811,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 <>
                   <button className="btn btn-primary hide-mobile" style={{fontSize:13,padding:"7px 14px",marginLeft:14,flexShrink:0}}
                     onClick={()=>setHeaderBookInTrigger(c=>c+1)}>📷 Book In Car</button>
+                  {workshopProfile?.linked_branch_id&&(
+                    <button className="btn btn-ghost hide-mobile" style={{fontSize:13,padding:"7px 14px",marginLeft:8,flexShrink:0,border:"1px solid rgba(96,165,250,.4)",color:"var(--blue)"}}
+                      onClick={()=>setTab("wsspareshop")}>🔍 Search Spare</button>
+                  )}
                   <HelpIcon topic="book-in-car" style={{marginLeft:8}}/>
                 </>
               )}

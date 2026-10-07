@@ -560,6 +560,9 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               </select>
             )}
             <button className="btn btn-primary hide-desktop" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
+            {wsProfile?.linked_branch_id&&onGoToSpareShopTab&&(
+              <button className="btn btn-ghost hide-desktop" style={{fontSize:14,padding:"9px 14px",border:"1px solid rgba(96,165,250,.4)",color:"var(--blue)"}} onClick={()=>onGoToSpareShopTab()}>🔍 Search Spare</button>
+            )}
             <HelpIcon topic="book-in-car" className="hide-desktop"/>
             {/* Moved right after Book In Car — on mobile this used to sit after the
                 Search box, which greedily takes remaining row width and pushed this

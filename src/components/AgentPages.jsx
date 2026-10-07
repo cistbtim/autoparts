@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, uploadToStorage } from "../lib/api.js";
 import { getSettings, updateSettings, curSym } from "../lib/settings.js";
-import { makeId, waLink, nemigaVinUrl } from "../lib/helpers.js";
+import { makeId, waLink, nemigaVinUrl, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 import { Overlay, MHead, FL, FD, FG, ImgLightbox, ShopLogo, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, uploadRenewalOutput, uploadAttachment, IcWhatsApp, IcTrash } from "./shared.jsx";
 
@@ -1150,6 +1150,7 @@ function CarSaleModal({listing, onSave, onDelete, onMarkSold, onPromote, onClose
     {label:"Nemiga",    icon:"🗂️", color:"#14b8a6", bg:"rgba(20,184,166,.12)",  href:nemigaVinUrl(f.vin,f.make)},
     {label:"7zap",      icon:"🔩", color:"#60a5fa", bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/"},
     {label:"PartsOuq",  icon:"🔩", color:"#60a5fa", bg:"rgba(96,165,250,.13)",  href:`https://partsouq.com/en/search/all?q=${encodeURIComponent(f.vin)}`},
+    ...(isChineseVin(f.vin)?[{label:"ChinaCarMart",icon:"🇨🇳", color:"#dc2626", bg:"rgba(220,38,38,.13)", href:CHINACARMART_URL}]:[]),
     {label:"Megazip",   icon:"🧩", color:"#f43f5e", bg:"rgba(244,63,94,.13)",   href:`https://www.megazip.net/search?q=${encodeURIComponent(f.vin)}`},
     {label:"RealOEM",   icon:"🚗", color:"#34d399", bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(f.vin)}`},
     {label:"VIN Decode",icon:"🔎", color:"#fbbf24", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(f.vin)}`},

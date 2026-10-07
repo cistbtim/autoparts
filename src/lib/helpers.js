@@ -125,6 +125,10 @@ export const nemigaVinUrl = (vin, make) => {
   return `https://nemigaparts.com/cat_spares/${path}/vin/${encodeURIComponent(vin)}/`;
 };
 
+// VINs starting with "L" are Chinese-market vehicles (ISO 3779 country code) — gates the ChinaCarMart decoder.
+export const isChineseVin = (vin) => /^L[A-Z0-9]{10,}$/i.test((vin || "").trim());
+export const CHINACARMART_URL = "https://chinacarmart.com/pages/parts";
+
 export const today = () => new Date().toISOString().slice(0, 10);
 export const fmtAmt = (n) => `${C()}${(n || 0).toLocaleString()}`;
 

@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, normMake, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL, nemigaVinUrl } from "../lib/helpers.js";
+import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, normMake, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL, nemigaVinUrl, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner, RenewalDocsModal } from "../components/shared.jsx";
@@ -4298,6 +4298,10 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
 // since 7zap is a client-side app with no VIN-in-URL deep link.
 const SEVENZAP_BOOKMARKLET = `javascript:(async function(){try{const v=(await navigator.clipboard.readText()).trim();if(!v){alert('Copy a VIN first');return}let i=document.querySelector('.ant-input[placeholder="VIN search"]');if(!i){const o=document.querySelector('.vin-input');if(o)o.click();await new Promise(r=>setTimeout(r,400));i=document.querySelector('.ant-input[placeholder="VIN search"]')}if(!i){alert('Open the VIN search box on 7zap first, then click this bookmark again.');return}i.focus();const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(i,v);i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,150));const b=i.closest('.ant-input-group')?.querySelector('.ant-input-search-button');if(b)b.click();else i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))}catch(e){alert('Bookmarklet error: '+e.message)}})();`;
 
+// Bookmarklet: run on the chinacarmart.com/pages/parts tab (after copying a VIN). Waits 2s for the
+// page to settle, pastes the copied VIN into the VIN box and presses "Decode VIN".
+const CCM_BOOKMARKLET = `javascript:(async function(){try{await new Promise(r=>setTimeout(r,2000));const v=(await navigator.clipboard.readText()).trim();if(!v){alert('Copy a VIN first');return}const i=document.querySelector('input.ccm-parts-vin-input');if(!i){alert('Open chinacarmart.com/pages/parts first, then click this bookmark again.');return}i.focus();const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(i,v);i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,300));const b=document.querySelector('button[id^="decodeBtn"]');if(b)b.click()}catch(e){alert('Bookmarklet error: '+e.message)}})();`;
+
 // ═══════════════════════════════════════════════════════════════
 // VIN DECODER
 // ═══════════════════════════════════════════════════════════════
@@ -5493,6 +5497,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
     {label:"Nemiga",    icon:"🗂️", color:"#14b8a6",       bg:"rgba(20,184,166,.12)",  href:nemigaHref},
     {label:"7zap",      icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:"https://7zap.com/en/vin-decoder/", copyVin:true},
     {label:"PartsOuq",  icon:"🔩", color:"var(--blue)",   bg:"rgba(96,165,250,.13)",  href:`https://partsouq.com/en/search/all?q=${encodeURIComponent(job.vin)}`},
+    ...(isChineseVin(job.vin)?[{label:"ChinaCarMart",icon:"🇨🇳", color:"#dc2626", bg:"rgba(220,38,38,.13)", href:CHINACARMART_URL, copyVin:true}]:[]),
     {label:"Megazip",   icon:"🧩", color:"#f43f5e",       bg:"rgba(244,63,94,.13)",   href:`https://www.megazip.net/search?q=${encodeURIComponent(job.vin)}`},
     {label:"RealOEM",   icon:"🚗", color:"var(--green)",  bg:"rgba(52,211,153,.13)",  href:`https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(job.vin)}`},
     {label:"VIN Decode",icon:"🔎", color:"var(--yellow)", bg:"rgba(251,191,36,.13)",  href:`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(job.vin)}`},
@@ -6052,6 +6057,15 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               7zap Auto-fill
             </a> — drag to your bookmarks bar once, then click it on the 7zap tab to skip the manual paste.
           </div>
+          {isChineseVin(job.vin)&&(
+            <div style={{marginTop:8,padding:"8px 10px",background:"var(--surface2)",border:"1px dashed var(--border2)",borderRadius:8,fontSize:11,color:"var(--text3)",lineHeight:1.5}}>
+              🔖 <a href={CCM_BOOKMARKLET} draggable="true"
+                onClick={e=>{e.preventDefault();alert("Drag this link up to your bookmarks bar (don't click it).\n\nThen: click the 🇨🇳 ChinaCarMart button (it copies the VIN), and on the ChinaCarMart tab click your new bookmark. After 2 seconds it pastes the VIN and presses Decode VIN.");}}
+                style={{color:"#dc2626",fontWeight:700,textDecoration:"none",padding:"2px 6px",background:"rgba(220,38,38,.12)",borderRadius:5,border:"1px solid rgba(220,38,38,.3)"}}>
+                ChinaCarMart Auto-fill
+              </a> — drag to your bookmarks bar once, then click it on the ChinaCarMart tab: waits 2s, pastes the VIN and decodes.
+            </div>
+          )}
         </Overlay>
       )}
 
@@ -10387,6 +10401,11 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], wsId=nul
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(96,165,250,.15)",color:"var(--blue)",border:"1px solid rgba(96,165,250,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                     7zap
                   </a>
+                  {isChineseVin(f.vin)&&<a href={CHINACARMART_URL} target="_blank" rel="noopener noreferrer"
+                    onClick={()=>navigator.clipboard.writeText(f.vin)}
+                    style={{fontSize:11,padding:"2px 8px",background:"rgba(220,38,38,.12)",color:"#dc2626",border:"1px solid rgba(220,38,38,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
+                    ChinaCarMart
+                  </a>}
                   <a href={`https://www.megazip.net/search?q=${encodeURIComponent(f.vin)}`} target="_blank" rel="noopener noreferrer"
                     style={{fontSize:11,padding:"2px 8px",background:"rgba(244,63,94,.12)",color:"#f43f5e",border:"1px solid rgba(244,63,94,.3)",borderRadius:5,textDecoration:"none",whiteSpace:"nowrap"}}>
                     Megazip

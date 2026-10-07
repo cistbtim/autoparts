@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
-import { toImgUrl, waLink, makeId } from "../lib/helpers.js";
+import { toImgUrl, waLink, makeId, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { T } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
@@ -1262,6 +1262,14 @@ export function WsSupplierQuoteReplyPage({token}) {
                     </a>
                   );
                 })()}
+                {isChineseVin(req.vin)&&(
+                  <a href={CHINACARMART_URL} onClick={()=>navigator.clipboard.writeText(req.vin)}
+                    target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+                    <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(220,38,38,.4)",background:"rgba(220,38,38,.12)",color:"#dc2626",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                      🇨🇳 ChinaCarMart <span style={{fontSize:10,opacity:.7}}>VIN copied</span>
+                    </button>
+                  </a>
+                )}
                 {req.vin&&(
                   <a href={`https://www.megazip.net/search?q=${encodeURIComponent(req.vin)}`}
                     target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>

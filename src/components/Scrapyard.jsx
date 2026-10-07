@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { api } from "../lib/api.js";
-import { toImgUrl, openLabelWindow } from "../lib/helpers.js";
+import { toImgUrl, openLabelWindow, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
 import { getSettings } from "../lib/settings.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
@@ -742,6 +742,9 @@ function VehicleDetail({vehicle, parts, allParts, scrapId, vehicles, onRefresh, 
             <a href="https://7zap.com/en/vin-decoder/" target="_blank" rel="noopener noreferrer"
               onClick={()=>navigator.clipboard.writeText(vehicle.vin)}
               style={{fontSize:11,fontWeight:600,color:"var(--blue)",background:"rgba(96,165,250,.13)",border:"1px solid rgba(96,165,250,.35)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🔩 7zap</a>
+            {isChineseVin(vehicle.vin)&&<a href={CHINACARMART_URL} target="_blank" rel="noopener noreferrer"
+              onClick={()=>navigator.clipboard.writeText(vehicle.vin)}
+              style={{fontSize:11,fontWeight:600,color:"#dc2626",background:"rgba(220,38,38,.13)",border:"1px solid rgba(220,38,38,.35)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🇨🇳 ChinaCarMart</a>}
             <a href={`https://www.megazip.net/search?q=${encodeURIComponent(vehicle.vin)}`} target="_blank" rel="noopener noreferrer"
               style={{fontSize:11,fontWeight:600,color:"#f43f5e",background:"rgba(244,63,94,.13)",border:"1px solid rgba(244,63,94,.35)",borderRadius:99,padding:"3px 10px",textDecoration:"none",whiteSpace:"nowrap"}}>🧩 Megazip</a>
             <a href={`https://www.vindecoderz.com/EN/check-lookup/${encodeURIComponent(vehicle.vin)}`} target="_blank" rel="noopener noreferrer"

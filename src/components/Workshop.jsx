@@ -563,6 +563,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
             {wsProfile?.linked_branch_id&&onGoToSpareShopTab&&(
               <button className="btn btn-ghost hide-desktop" style={{fontSize:14,padding:"9px 14px",border:"1px solid rgba(96,165,250,.4)",color:"var(--blue)"}} onClick={()=>onGoToSpareShopTab()}>🔍 Search Spare</button>
             )}
+            <WsShareButtons wsId={wsId} wsRole={wsRole} wsProfile={wsProfile} onTokenSaved={setBookingToken} className="hide-desktop" style={{fontSize:14,padding:"9px 14px"}}/>
             <HelpIcon topic="book-in-car" className="hide-desktop"/>
             {/* Moved right after Book In Car — on mobile this used to sit after the
                 Search box, which greedily takes remaining row width and pushed this
@@ -12680,4 +12681,65 @@ ${refUrl}`)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"n
       </div>
     </div>
   );
+}
+
+
+// Header/toolbar shortcuts: (1) send the customer booking link, (2) invite another workshop.
+// Self-contained so the desktop header strip (App.jsx) and the mobile jobs toolbar share one copy.
+export function WsShareButtons({wsId,wsRole="main",wsProfile,onTokenSaved,className="",style={}}){
+  const [open,setOpen]=useState(null); // null | "booking" | "invite"
+  const [token,setToken]=useState(wsProfile?.booking_token||"");
+  const [phone,setPhone]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [copied,setCopied]=useState(false);
+  useEffect(()=>{ if(wsProfile?.booking_token) setToken(wsProfile.booking_token); },[wsProfile?.booking_token]);
+  if(!wsId) return null;
+  const bookingUrl=token?`${window.location.origin}${window.location.pathname}?wsbooking=${token}`:"";
+  const bookingText=`Hi! Book your car service with ${wsProfile?.name||"us"} online — scan your licence disc to get started:
+${bookingUrl}`;
+  const copy=async(txt)=>{ try{ await navigator.clipboard.writeText(txt); setCopied(true); setTimeout(()=>setCopied(false),1800); }catch{/* clipboard blocked */} };
+  const openBooking=async()=>{
+    setOpen("booking");
+    if(token) return;
+    setBusy(true);
+    const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const tok=Array.from({length:8},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
+    const res=await api.patch("workshop_profiles","id",wsId,{booking_token:tok}).catch(()=>null);
+    setBusy(false);
+    if(Array.isArray(res)&&res[0]?.booking_token){ setToken(res[0].booking_token); onTokenSaved&&onTokenSaved(res[0].booking_token); }
+    else { setOpen(null); alert("❌ Save failed — run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles ADD COLUMN IF NOT EXISTS booking_token text;\n\nThen try again."); }
+  };
+  const btn={fontSize:13,padding:"7px 14px",flexShrink:0,...style};
+  return(<>
+    <button className={`btn btn-ghost ${className}`} style={{...btn,border:"1px solid rgba(37,211,102,.45)",color:"#25D366"}} onClick={openBooking}>📲 Send Booking Link</button>
+    {wsRole==="main"&&<button className={`btn btn-ghost ${className}`} style={{...btn,border:"1px solid rgba(255,122,46,.45)",color:"var(--accent)"}} onClick={()=>setOpen("invite")}>🤝 Invite Workshop</button>}
+    {open==="booking"&&(
+      <Overlay onClose={()=>setOpen(null)}>
+        <MHead title="📲 Send Booking Link" sub="Customer scans their licence disc and picks a date — no calling back and forth." onClose={()=>setOpen(null)}/>
+        {busy||!token?<div style={{padding:20,textAlign:"center",color:"var(--text3)"}}>Creating your link…</div>:(<>
+          <FD>
+            <FL label="Customer WhatsApp number (optional)"/>
+            <input className="inp" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="e.g. 0821234567 — leave empty to pick a contact in WhatsApp"/>
+          </FD>
+          <FD>
+            <FL label="Booking link"/>
+            <code style={{display:"block",fontSize:11,background:"var(--surface2)",padding:"8px 10px",borderRadius:6,wordBreak:"break-all",color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{bookingUrl}</code>
+          </FD>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <a href={waLink(phone,bookingText)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none",flex:1}}>
+              <button className="btn" style={{width:"100%",background:"#25D366",color:"#fff",border:"none",fontWeight:700}}>💬 Send via WhatsApp</button>
+            </a>
+            <button className="btn btn-ghost" onClick={()=>copy(bookingUrl)}>{copied?"✅ Copied":"📋 Copy link"}</button>
+            {navigator.share&&<button className="btn btn-ghost" onClick={()=>navigator.share({title:"Book your car service",text:bookingText,url:bookingUrl}).catch(()=>{})}>📤 Share</button>}
+          </div>
+        </>)}
+      </Overlay>
+    )}
+    {open==="invite"&&(
+      <Overlay onClose={()=>setOpen(null)}>
+        <MHead title="🤝 Invite Another Workshop" onClose={()=>setOpen(null)}/>
+        <RefInviteCard wsId={wsId}/>
+      </Overlay>
+    )}
+  </>);
 }

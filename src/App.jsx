@@ -10,7 +10,7 @@ import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg,
 
 import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, PartPhotoCapturePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage, PartOcrScanModal, resolveMarginOptions } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
-import { WorkshopPage } from "./components/Workshop.jsx";
+import { WorkshopPage, WsShareButtons } from "./components/Workshop.jsx";
 import { WorkshopTour, tourSeenKey } from "./components/WorkshopTour.jsx";
 import { HelpPage } from "./pages/HelpPage.jsx";
 import { HelpIcon } from "./components/HelpIcon.jsx";
@@ -5819,6 +5819,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     <button className="btn btn-ghost hide-mobile" style={{fontSize:13,padding:"7px 14px",marginLeft:8,flexShrink:0,border:"1px solid rgba(96,165,250,.4)",color:"var(--blue)"}}
                       onClick={()=>setTab("wsspareshop")}>🔍 Search Spare</button>
                   )}
+                  <span className="hide-mobile" style={{display:"contents"}}>
+                    <WsShareButtons wsId={wsId} wsRole={wsRole} wsProfile={workshopProfile} onTokenSaved={tok=>setWorkshopProfile(p=>({...p,booking_token:tok}))} style={{marginLeft:8}}/>
+                  </span>
                   <HelpIcon topic="book-in-car" style={{marginLeft:8}}/>
                 </>
               )}

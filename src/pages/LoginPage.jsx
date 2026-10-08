@@ -551,11 +551,11 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
           {/* Segmented selector — picks which group's tiles show below, so a
               narrow/mobile screen scrolls through one group at a time instead
               of every group stacked at once. */}
-          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+          <div style={{display:"flex",justifyContent:"center",gap:6,marginBottom:12,flexWrap:"wrap"}}>
             {TAB_GROUPS.map((g,i)=>(
               <button key={g.label} onClick={()=>setActiveGroup(i)} style={{
-                padding:"7px 14px",borderRadius:20,border:"1px solid var(--border2)",
-                cursor:"pointer",fontSize:12,fontWeight:700,letterSpacing:".02em",
+                padding:"11px 24px",borderRadius:24,border:"1px solid var(--border2)",
+                cursor:"pointer",fontSize:15,fontWeight:700,letterSpacing:".02em",
                 background:i===gi?"var(--accent)":"var(--surface)",
                 color:i===gi?"#fff":"var(--text2)",
                 transition:"all .15s",
@@ -570,9 +570,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                 groups would blow up into one full-width button — flex+fixed
                 width instead, so a lone tile (Admin, Branch Login) stays the
                 same compact size as everything else instead of stretching. */}
-            <div style={group.tabs.length<3
-              ? {display:"flex",gap:8,flexWrap:"wrap"}
-              : {display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
+            <div style={{display:"flex",gap:12,flexWrap:"wrap",justifyContent:"center"}}>
               {group.tabs.map(({id,Icon,label})=>{
                 const c = TAB_COLORS[id]||"var(--accent)";
                 const on = authTab===id;
@@ -580,20 +578,19 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   <button key={id} onClick={()=>switchTab(id)}
                     onMouseEnter={()=>setHoverTab(id)} onMouseLeave={()=>setHoverTab(t=>t===id?"":t)}
                     style={{
-                    padding:"12px 8px",borderRadius:14,
+                    padding:"20px 10px",borderRadius:16,width:168,flexShrink:0,
                     border:`1.5px solid ${on?c:"var(--border2)"}`,
                     cursor:"pointer",
                     background:"var(--surface)",
                     boxShadow:on?`0 6px 18px ${c}33`:"var(--shadow)",
-                    display:"flex",flexDirection:"column",alignItems:"center",gap:7,
+                    display:"flex",flexDirection:"column",alignItems:"center",gap:10,
                     transition:"all .15s",
-                    ...(group.tabs.length<3?{width:150,flexShrink:0}:{}),
                   }}>
-                    <div style={{width:36,height:36,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",
+                    <div style={{width:52,height:52,borderRadius:15,display:"flex",alignItems:"center",justifyContent:"center",
                       background:`${c}1c`,color:c}}>
-                      <Icon/>
+                      <span style={{display:"flex",transform:"scale(1.4)"}}><Icon/></span>
                     </div>
-                    <span style={{fontSize:11,fontWeight:700,letterSpacing:".04em",textTransform:"uppercase",color:on?c:"var(--text2)"}}>{label}</span>
+                    <span style={{fontSize:14,fontWeight:700,letterSpacing:".04em",textTransform:"uppercase",color:on?c:"var(--text2)"}}>{label}</span>
                   </button>
                 );
               })}
@@ -1146,14 +1143,24 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
 
         </LoginCardShell>
 
-        {/* Footer */}
-        <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:18}}>
-          <a href={helpUrl()} style={{fontSize:11,color:"var(--text3)",cursor:"pointer",fontWeight:500,letterSpacing:".03em",textDecoration:"none"}} title="Search tutorials and learn how to use VelGenius">{t.loginTutorials||"Tutorials"}</a>
-          <span style={{fontSize:11,color:"var(--border2)"}}>|</span>
-          <span style={{fontSize:11,color:"var(--text3)",cursor:"pointer",fontWeight:500,letterSpacing:".03em"}} onClick={()=>{}}>{t.loginHelpDesk||"Help Desk"}</span>
-          <span style={{fontSize:11,color:"var(--border2)"}}>|</span>
-          <span style={{fontSize:11,color:"var(--text3)",cursor:"pointer",fontWeight:500,letterSpacing:".03em"}} onClick={()=>{}}>{t.loginSecurityPolicy||"Security Policy"}</span>
-        </div>
+        {/* Footer — pill links, big enough to notice (was 11px grey text) */}
+        {(()=>{
+          const pill={display:"inline-flex",alignItems:"center",gap:7,padding:"9px 16px",borderRadius:999,border:"1.5px solid var(--border2)",background:"var(--surface)",color:"var(--text)",fontSize:14,fontWeight:600,cursor:"pointer",textDecoration:"none",boxShadow:"0 1px 3px rgba(0,0,0,.06)"};
+          const ico={width:16,height:16,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};
+          return(
+            <div style={{display:"flex",justifyContent:"center",gap:10,marginTop:22,flexWrap:"wrap"}}>
+              <a href={helpUrl()} style={{...pill,color:"var(--accent)",borderColor:"rgba(255,122,46,.5)"}} title="Search tutorials and learn how to use VelGenius">
+                <svg {...ico}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>{t.loginTutorials||"Tutorials"}
+              </a>
+              <span style={pill} onClick={()=>{}}>
+                <svg {...ico}><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>{t.loginHelpDesk||"Help Desk"}
+              </span>
+              <span style={pill} onClick={()=>{}}>
+                <svg {...ico}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{t.loginSecurityPolicy||"Security Policy"}
+              </span>
+            </div>
+          );
+        })()}
 
       </div>
     </div>

@@ -563,7 +563,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
             {wsProfile?.linked_branch_id&&onGoToSpareShopTab&&(
               <button className="btn btn-ghost hide-desktop" style={{fontSize:14,padding:"9px 14px",border:"1px solid rgba(96,165,250,.4)",color:"var(--blue)"}} onClick={()=>onGoToSpareShopTab()}>🔍 Search Spare</button>
             )}
-            <WsShareButtons wsId={wsId} wsRole={wsRole} wsProfile={wsProfile} onTokenSaved={setBookingToken} className="hide-desktop" style={{fontSize:14,padding:"9px 14px"}}/>
+            <WsShareButtons wsId={wsId} wsRole={wsRole} wsProfile={wsProfile} onTokenSaved={setBookingToken} className="hide-desktop" compact/>
             <HelpIcon topic="book-in-car" className="hide-desktop"/>
             {/* Moved right after Book In Car — on mobile this used to sit after the
                 Search box, which greedily takes remaining row width and pushed this
@@ -12686,7 +12686,7 @@ ${refUrl}`)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"n
 
 // Header/toolbar shortcuts: (1) send the customer booking link, (2) invite another workshop.
 // Self-contained so the desktop header strip (App.jsx) and the mobile jobs toolbar share one copy.
-export function WsShareButtons({wsId,wsRole="main",wsProfile,onTokenSaved,className="",style={}}){
+export function WsShareButtons({wsId,wsRole="main",wsProfile,onTokenSaved,className="",style={},compact=false}){
   const [open,setOpen]=useState(null); // null | "booking" | "invite"
   const [token,setToken]=useState(wsProfile?.booking_token||"");
   const [phone,setPhone]=useState("");
@@ -12710,9 +12710,25 @@ ${bookingUrl}`;
     else { setOpen(null); alert("❌ Save failed — run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles ADD COLUMN IF NOT EXISTS booking_token text;\n\nThen try again."); }
   };
   const btn={fontSize:13,padding:"7px 14px",flexShrink:0,...style};
+  // compact (mobile): one joined pill of two icon-only buttons — calendar = booking link, person+ = invite workshop
+  const ico={width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};
+  const cbtn={width:38,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",cursor:"pointer",padding:0};
   return(<>
-    <button className={`btn btn-ghost ${className}`} style={{...btn,border:"1px solid rgba(37,211,102,.45)",color:"#25D366"}} onClick={openBooking}>📲 Send Booking Link</button>
-    {wsRole==="main"&&<button className={`btn btn-ghost ${className}`} style={{...btn,border:"1px solid rgba(255,122,46,.45)",color:"var(--accent)"}} onClick={()=>setOpen("invite")}>🤝 Invite Workshop</button>}
+    {compact?(
+      <div className={className} style={{display:"inline-flex",flexShrink:0,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden",background:"var(--surface2)"}}>
+        <button type="button" title="Send booking link to a customer" aria-label="Send booking link to a customer" style={{...cbtn,color:"#25D366"}} onClick={openBooking}>
+          <svg {...ico}><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>
+        </button>
+        {wsRole==="main"&&(
+          <button type="button" title="Invite another workshop" aria-label="Invite another workshop" style={{...cbtn,color:"var(--accent)",borderLeft:"1px solid var(--border)"}} onClick={()=>setOpen("invite")}>
+            <svg {...ico}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+          </button>
+        )}
+      </div>
+    ):(<>
+      <button className={`btn btn-ghost ${className}`} style={{...btn,border:"1px solid rgba(37,211,102,.45)",color:"#25D366"}} onClick={openBooking}>📲 Send Booking Link</button>
+      {wsRole==="main"&&<button className={`btn btn-ghost ${className}`} style={{...btn,border:"1px solid rgba(255,122,46,.45)",color:"var(--accent)"}} onClick={()=>setOpen("invite")}>🤝 Invite Workshop</button>}
+    </>)}
     {open==="booking"&&(
       <Overlay onClose={()=>setOpen(null)}>
         <MHead title="📲 Send Booking Link" sub="Customer scans their licence disc and picks a date — no calling back and forth." onClose={()=>setOpen(null)}/>

@@ -9,7 +9,7 @@ import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, det
 import { CAR_MAKES, getCategories, DEFAULT_CATS, getBrands, getRecentLocations, OC } from "../lib/constants.js";
 import { COUNTRIES, getProvinces } from "../lib/geoData.js";
 import { CSS } from "../styles.js";
-import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AttachmentPicker } from "../components/shared.jsx";
+import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AttachmentPicker, Flag } from "../components/shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 import { decodeVin } from "./Workshop.jsx";
 
@@ -1253,7 +1253,7 @@ function TranslationEditor({row, onClose, onSaved}) {
       <div style={{background:"var(--surface)",borderRadius:16,width:"min(900px,96vw)",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,.4)"}}>
         {/* Header */}
         <div style={{padding:"18px 22px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
-          <span style={{fontSize:24}}>{row.flag||"🌐"}</span>
+          <span style={{fontSize:24}}><Flag flag={row.flag} fallback="🌐" size={28}/></span>
           <div style={{flex:1}}>
             <div style={{fontWeight:700,fontSize:16}}>{row.name} — Translation Editor</div>
             <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
@@ -1445,7 +1445,7 @@ function LangManagerSection() {
               background: i%2===0 ? "var(--surface)" : "var(--surface2)",
               borderBottom: i<allRows.length-1 ? "1px solid var(--border)" : "none"
             }}>
-              <span style={{fontSize:22,flexShrink:0}}>{row.flag||"🌐"}</span>
+              <span style={{fontSize:22,flexShrink:0}}><Flag flag={row.flag} fallback="🌐" size={26}/></span>
               <div style={{flex:1}}>
                 <div style={{fontWeight:600,fontSize:14}}>{row.name}</div>
                 <div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{row.lang}</div>

@@ -4,7 +4,7 @@ import { toImgUrl, waLink, makeId, isChineseVin, CHINACARMART_URL } from "../lib
 import { getSettings, curSym } from "../lib/settings.js";
 import { T } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
-import { ShopLogo, MHead, FG, FD, FL, ImgLightbox } from "../components/shared.jsx";
+import { ShopLogo, MHead, FG, FD, FL, ImgLightbox, Flag } from "../components/shared.jsx";
 import { LogoUploader } from "../components/Modals.jsx";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
@@ -1654,7 +1654,7 @@ export function WorkshopBookingPage({token}) {
             style={{padding:"4px 10px",borderRadius:20,border:`1px solid ${lang===l.lang?CL.accent:CL.border}`,
               background:lang===l.lang?"rgba(255,122,46,.15)":"transparent",
               color:lang===l.lang?CL.accent:CL.text2,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-            {l.flag?`${l.flag} `:""}{l.lang.toUpperCase()}
+            {l.flag?<><Flag flag={l.flag} size={16}/> </>:""}{l.lang.toUpperCase()}
           </button>
         ))}
       </div>

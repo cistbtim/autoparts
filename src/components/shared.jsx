@@ -5,6 +5,22 @@ import { tSt } from "../lib/i18n.js";
 import { api, uploadToStorage } from "../lib/api.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 
+// Flag emoji don't render on Windows desktop browsers (they show as "GB", "CN"…), so draw a real flag image
+// from the emoji's two regional-indicator letters; anything that isn't a country flag falls back to text.
+const flagCode=(f)=>{
+  if(!f) return "";
+  const cps=[...f].map(c=>c.codePointAt(0));
+  if(cps.length!==2||cps.some(c=>c<0x1F1E6||c>0x1F1FF)) return "";
+  return cps.map(c=>String.fromCharCode(c-0x1F1E6+97)).join("");
+};
+export function Flag({flag,fallback="",size=18}){
+  const [bad,setBad]=useState(false);
+  const code=flagCode(flag);
+  if(!code||bad) return <>{flag||fallback}</>;
+  return <img src={`https://flagcdn.com/w40/${code}.png`} alt={fallback||code.toUpperCase()} onError={()=>setBad(true)}
+    style={{width:size,height:Math.round(size*0.75),objectFit:"cover",borderRadius:2,display:"inline-block",verticalAlign:"middle"}}/>;
+}
+
 export class ErrorBoundary extends Component {
   constructor(props){ super(props); this.state={err:null}; }
   static getDerivedStateFromError(e){ return {err:e}; }
@@ -73,7 +89,7 @@ export const VelGeniusBanner = ({t, langs=[], lang, setLang, dbStatus}={}) => (
               {langs.map(l=>(
                 <button key={l.lang} type="button" onClick={()=>setLang(l.lang)} title={l.name}
                   className={"velg-langpill"+(lang===l.lang?" is-active":"")}>
-                  {l.flag||l.lang.toUpperCase()}
+                  <Flag flag={l.flag} fallback={l.lang.toUpperCase()}/>
                 </button>
               ))}
             </div>

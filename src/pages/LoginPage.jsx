@@ -554,8 +554,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
           <div style={{display:"flex",justifyContent:"center",gap:6,marginBottom:12,flexWrap:"wrap"}}>
             {TAB_GROUPS.map((g,i)=>(
               <button key={g.label} onClick={()=>setActiveGroup(i)} style={{
-                padding:"11px 24px",borderRadius:24,border:"1px solid var(--border2)",
-                cursor:"pointer",fontSize:15,fontWeight:700,letterSpacing:".02em",
+                padding:"clamp(8px,2.4vw,11px) clamp(10px,3.2vw,24px)",borderRadius:24,whiteSpace:"nowrap",border:"1px solid var(--border2)",
+                cursor:"pointer",fontSize:"clamp(12px,3.6vw,15px)",fontWeight:700,letterSpacing:".02em",
                 background:i===gi?"var(--accent)":"var(--surface)",
                 color:i===gi?"#fff":"var(--text2)",
                 transition:"all .15s",

@@ -5,7 +5,7 @@ import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
 import { C, curSym, getSettings, updateSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
-import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow, nemigaVinUrl, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
+import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow, nemigaVinUrl, isChineseVin, CHINACARMART_URL, workshopRegUrl } from "../lib/helpers.js";
 import { CAR_MAKES, getCategories, DEFAULT_CATS, getBrands, getRecentLocations, OC } from "../lib/constants.js";
 import { COUNTRIES, getProvinces } from "../lib/geoData.js";
 import { CSS } from "../styles.js";
@@ -6553,6 +6553,9 @@ export function CustHistoryModal({customer,orders,onClose}) {
 export function PdfInvoiceModal({inv,settings,onClose}) {
   const [items,setItems]=useState([]);
   const printRef=useRef(null);
+  // "Own a garage?" workshop-signup QR in the footer of customer invoices (remembered per browser)
+  const [wsQr,setWsQr]=useState(()=>{try{return localStorage.getItem("inv_ws_qr")!=="0";}catch{return true;}});
+  const toggleWsQr=(v)=>{setWsQr(v);try{localStorage.setItem("inv_ws_qr",v?"1":"0");}catch{/* storage unavailable */}};
 
   useEffect(()=>{
     const tbl=inv.type==="customer"?"customer_invoice_items":"supplier_invoice_items";
@@ -6622,6 +6625,7 @@ export function PdfInvoiceModal({inv,settings,onClose}) {
           <button className="btn btn-ghost" onClick={handleDownloadHtml}>📥 Download HTML</button>
           {settings.whatsapp&&<a href={waLink(settings.whatsapp,waText)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{background:"#25D366",color:"#fff",border:"none"}}>📲 WhatsApp</button></a>}
           {settings.email&&<a href={`mailto:${isSupplier?inv.supplier_email||settings.email:inv.customer_email||settings.email}?subject=Invoice ${inv.id}&body=${encodeURIComponent(waText)}`} style={{textDecoration:"none"}}><button className="btn btn-ghost">✉ Email</button></a>}
+          {!isSupplier&&<label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--text2)",cursor:"pointer"}}><input type="checkbox" checked={wsQr} onChange={e=>toggleWsQr(e.target.checked)}/>Workshop QR</label>}
           <button className="btn btn-ghost" style={{marginLeft:"auto"}} onClick={onClose}>✕ Close</button>
         </div>
 
@@ -6703,6 +6707,21 @@ export function PdfInvoiceModal({inv,settings,onClose}) {
 
           {/* Notes */}
           {inv.notes&&<div style={{marginTop:20,padding:"10px 14px",background:"#f9f9f9",borderRadius:6,fontSize:12,color:"#555",borderLeft:"3px solid #ff7a2e"}}><strong>Notes:</strong> {inv.notes}</div>}
+
+          {/* Workshop signup promo — scanning stamps referral_source "invoice_qr" on the new workshop */}
+          {!isSupplier&&wsQr&&(()=>{
+            const regUrl=workshopRegUrl(settings.shop_name||"VelGenius","inv");
+            return(
+              <div style={{marginTop:28,display:"flex",alignItems:"center",gap:16,padding:"12px 16px",border:"1.5px dashed #ff7a2e",borderRadius:10,background:"#fff7ed"}}>
+                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(regUrl)}&format=png&margin=1`} width={84} height={84} alt="Workshop QR" style={{flexShrink:0,background:"#fff"}}/>
+                <div style={{fontSize:12,color:"#444",lineHeight:1.6}}>
+                  <div style={{fontSize:14,fontWeight:800,color:"#ea580c"}}>Own a garage or workshop?</div>
+                  <div>Run it with our free workshop software — job cards, quotes, invoices and WhatsApp updates.</div>
+                  <div><strong>Scan to register — 30-day free trial.</strong></div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Footer */}
           <div style={{marginTop:36,paddingTop:14,borderTop:"1px solid #e5e5e5",fontSize:11,color:"#999",textAlign:"center",lineHeight:1.8}}>

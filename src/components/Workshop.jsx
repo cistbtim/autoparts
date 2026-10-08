@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, normMake, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL, nemigaVinUrl, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
+import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, REF_NEWCOMER_BONUS_DAYS, REF_REFERRER_REWARD_DAYS, normMake, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL, nemigaVinUrl, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner, RenewalDocsModal } from "../components/shared.jsx";
@@ -1739,27 +1739,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           </div>
 
           {/* ── Referral Link (main workshop account only) ── */}
-          {wsRole==="main"&&(()=>{
-            const refUrl=`${window.location.origin}${window.location.pathname}?ref=${wsId}`;
-            return(
-              <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
-                <div style={{fontWeight:700,fontSize:13,marginBottom:4,display:"flex",alignItems:"center",gap:8}}>🤝 Invite Another Workshop <HelpIcon topic="invite-workshop"/></div>
-                <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>
-                  Know another workshop owner? Share this link — when they sign up with it, we'll know it came from you.
-                </div>
-                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                  <code style={{fontSize:11,background:"var(--surface2)",padding:"6px 10px",borderRadius:6,flex:1,wordBreak:"break-all",color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{refUrl}</code>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>navigator.clipboard?.writeText(refUrl).then(()=>alert("Link copied!"))}>📋 Copy</button>
-                  {navigator.share&&(
-                    <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}}
-                      onClick={()=>navigator.share({title:"Try VelGenius for your workshop",text:"I've been using this to run my workshop — worth a look.",url:refUrl}).catch(()=>{})}>
-                      📤 Share
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
+          {wsRole==="main"&&<RefInviteCard wsId={wsId}/>}
 
           {/* ── Availability Settings ── */}
           <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
@@ -12645,5 +12625,59 @@ function WsShopRequestModal({job, items=[], wsProfile={}, existingRequests=[], p
         <ImgLightbox urls={modalPartPhotoLightbox} onClose={()=>setModalPartPhotoLightbox(null)}/>
       )}
     </Overlay>
+  );
+}
+
+
+// Invite-another-workshop card: personal ?ref= link + QR, the reward on offer, and this workshop's own referral tally.
+function RefInviteCard({wsId}){
+  const [refs,setRefs]=useState(null); // null = loading
+  const refUrl=`${window.location.origin}${window.location.pathname}?ref=${wsId}`;
+  const qrSrc=`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(refUrl)}&format=png&margin=1`;
+  useEffect(()=>{
+    let alive=true;
+    (async()=>{
+      // referral_rewarded may not exist yet (SQL not run) — fall back to the plain query
+      let r=await api.get("workshop_profiles",`referred_by_user_id=eq.${wsId}&select=id,name,subscription_status,referral_rewarded`).catch(()=>null);
+      if(!Array.isArray(r)) r=await api.get("workshop_profiles",`referred_by_user_id=eq.${wsId}&select=id,name,subscription_status`).catch(()=>[]);
+      if(alive) setRefs(Array.isArray(r)?r:[]);
+    })();
+    return()=>{alive=false;};
+  },[wsId]);
+  const rewarded=(refs||[]).filter(r=>r.referral_rewarded).length;
+  const pending=(refs||[]).filter(r=>!r.referral_rewarded).length;
+  const shareText=`I run my workshop on VelGenius — job cards, quotes and invoices on my phone. Sign up with my link and get ${30+REF_NEWCOMER_BONUS_DAYS} days free:`;
+  return(
+    <div className="card" style={{marginBottom:14,padding:"12px 16px"}}>
+      <div style={{fontWeight:700,fontSize:13,marginBottom:4,display:"flex",alignItems:"center",gap:8}}>🤝 Invite Another Workshop <HelpIcon topic="invite-workshop"/></div>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:10,lineHeight:1.6}}>
+        🎁 <strong style={{color:"var(--accent)"}}>Earn {REF_REFERRER_REWARD_DAYS} free days</strong> for every workshop you invite that goes live — and they get <strong>{30+REF_NEWCOMER_BONUS_DAYS} days free</strong> instead of 30. Share your link or let them scan the QR.
+      </div>
+      <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
+        <img src={qrSrc} width={96} height={96} alt="Invite QR" style={{borderRadius:8,background:"#fff",padding:4,border:"1px solid var(--border)",flexShrink:0}}/>
+        <div style={{flex:1,minWidth:220,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            <code style={{fontSize:11,background:"var(--surface2)",padding:"6px 10px",borderRadius:6,flex:1,wordBreak:"break-all",color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{refUrl}</code>
+            <button className="btn btn-ghost btn-sm" onClick={()=>navigator.clipboard?.writeText(refUrl).then(()=>alert("Link copied!"))}>📋 Copy</button>
+            <a href={waLink("",`${shareText}
+${refUrl}`)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+              <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}}>💬 WhatsApp</button>
+            </a>
+            {navigator.share&&(
+              <button className="btn btn-ghost btn-sm" style={{color:"#25D366"}}
+                onClick={()=>navigator.share({title:"Try VelGenius for your workshop",text:shareText,url:refUrl}).catch(()=>{})}>
+                📤 Share
+              </button>
+            )}
+          </div>
+          {refs!==null&&(
+            <div style={{fontSize:12,color:"var(--text2)"}}>
+              {refs.length===0?"No invites yet — your first one earns a free month."
+                :`${refs.length} invited · 🎁 ${rewarded} reward${rewarded!==1?"s":""} earned (${rewarded*REF_REFERRER_REWARD_DAYS} days)${pending?` · ${pending} waiting to go live`:""}`}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

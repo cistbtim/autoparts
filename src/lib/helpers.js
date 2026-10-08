@@ -551,3 +551,19 @@ export function openShelfLabelWindow({ binName, description = "" }, { widthMm = 
   win.document.write(html);
   win.document.close();
 }
+
+// ── Workshop promotion / referral rewards ──────────────────────────────────
+// A workshop that signs up through a real ?ref= invite link gets this many extra trial days.
+export const REF_NEWCOMER_BONUS_DAYS = 15;
+// The inviting workshop gets this many free days once the invited workshop goes active (paid).
+export const REF_REFERRER_REWARD_DAYS = 30;
+
+// Spare-shop registration link (same token WorkshopQRSection builds). `src` tags where the scan came
+// from (e.g. "inv" for the invoice QR) so WorkshopRegisterPage can stamp referral_source.
+export function workshopRegUrl(shopName, src = "") {
+  let token;
+  try { token = btoa(JSON.stringify({ id: 1, name: shopName })); }
+  catch { token = btoa(JSON.stringify({ id: 1 })); }
+  const base = `${window.location.origin}${window.location.pathname}`;
+  return `${base}?ws_register=${token}${src ? `&src=${src}` : ""}`;
+}

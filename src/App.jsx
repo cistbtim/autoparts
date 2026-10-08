@@ -2,7 +2,7 @@
 import { api, setDemoMode, SUPABASE_URL, SUPABASE_KEY } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
-import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag, openPartLabelsWindow, normMake } from "./lib/helpers.js";
+import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag, openPartLabelsWindow, normMake, REF_REFERRER_REWARD_DAYS } from "./lib/helpers.js";
 import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess, CITY_PROVINCE } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
 import { CSS } from "./styles.js";
@@ -222,9 +222,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [confirmRefreshLogs,setConfirmRefreshLogs]=useState(false);
   const [selectedMapCountry,setSelectedMapCountry]=useState(null);
   const [selectedMapProvince,setSelectedMapProvince]=useState(null);
+  const [provMapZoom,setProvMapZoom]=useState({prov:null,z:1}); // zoom level of the province map, remembered per province
   const [selectedMapCity,setSelectedMapCity]=useState(null);
   const [llCountryFilter,setLlCountryFilter]=useState(null);
   const [adContracts,setAdContracts]=useState([]);
+  const [wsRewardMap,setWsRewardMap]=useState({}); // workshop_profiles.id → true once its referrer got the reward (needs referral_rewarded column)
   const [wsGrowthProfiles,setWsGrowthProfiles]=useState([]); // workshop_profiles + trial/referral fields, admin-only, for Workshop Growth dashboard
   const [wsGrowthLoginLogs,setWsGrowthLoginLogs]=useState([]); // full (unlimited) login_logs, workshop role only, for the same dashboard
   const [suppliers,setSuppliers]=useState([]);
@@ -886,6 +888,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // missing referral_source/referred_by_user_id column (until the SQL below is run) can't break them.
     if(needsAdmin){
       api.get("workshop_profiles","select=id,name,city,country,trial_start,subscription_status,referral_source,referred_by_user_id&order=trial_start.asc").catch(()=>[]).then(r=>{if(Array.isArray(r))setWsGrowthProfiles(r);});
+      // Separate query: referral_rewarded only exists after the reward SQL is run — must not break the one above.
+      api.get("workshop_profiles","select=id,referral_rewarded&referral_rewarded=eq.true").catch(()=>[]).then(r=>{if(Array.isArray(r))setWsRewardMap(Object.fromEntries(r.map(x=>[x.id,true])));});
       // No &limit= — api.get paginates automatically, unlike the capped Login Logs page query.
       // All roles (not just workshop) — also powers the "Last Login" column on the Users table.
       api.get("login_logs","select=username,created_at,user_role&order=created_at.asc").catch(()=>[]).then(r=>{if(Array.isArray(r))setWsGrowthLoginLogs(r);});
@@ -7946,14 +7950,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                   <filter id="saGlow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
                 </defs>
               );
-              const MapBase=({viewBox:vb,children})=>(
+              const MapBase=({viewBox:vb,children,sw=1})=>(
                 <svg viewBox={vb||`0 0 ${MW} ${MH}`} style={{width:"100%",height:"auto",display:"block"}}>
                   {SVG_DEFS}
                   <rect width={MW} height={MH} fill="url(#oceanGrad)"/>
                   {[-60,-30,0,30,60].map(lat=>(<line key={`g${lat}`} x1={0} y1={mY(lat).toFixed(1)} x2={MW} y2={mY(lat).toFixed(1)} stroke="#1a3050" strokeWidth={lat===0?1:0.4} strokeDasharray={lat===0?"":"4,8"}/>))}
                   {[-120,-60,0,60,120].map(lon=>(<line key={`g${lon}`} x1={mX(lon).toFixed(1)} y1={0} x2={mX(lon).toFixed(1)} y2={MH} stroke="#1a3050" strokeWidth={0.4} strokeDasharray="4,8"/>))}
-                  {LAND.map((pts,i)=>(<polygon key={i} points={poly(pts)} fill="#1e4535" stroke="#2d6648" strokeWidth={0.7} strokeLinejoin="round"/>))}
-                  <polygon points={poly(SA_POLY)} fill="#1a6640" stroke="#4ade80" strokeWidth={1} filter="url(#saGlow)" strokeLinejoin="round"/>
+                  {LAND.map((pts,i)=>(<polygon key={i} points={poly(pts)} fill="#1e4535" stroke="#2d6648" strokeWidth={0.7*sw} strokeLinejoin="round"/>))}
+                  <polygon points={poly(SA_POLY)} fill="#1a6640" stroke="#4ade80" strokeWidth={1*sw} filter={sw<1?undefined:"url(#saGlow)"} strokeLinejoin="round"/>
                   {children}
                 </svg>
               );
@@ -8007,6 +8011,37 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     const cityMap=provLogs.reduce((a,l)=>{const c=l.city||"Unknown";if(!a[c])a[c]={count:0,users:[]};if(!a[c].users.includes(l.username)){a[c].count++;a[c].users.push(l.username);}return a;},{});
                     const cities=Object.entries(cityMap).sort((a,b)=>b[1].count-a[1].count);
                     const maxC=cities[0]?.[1].count||1;
+                    // City pins: centroid of each city's logged lat/lon (cities with no coordinates stay in the list only).
+                    const cityAcc={};
+                    provLogs.forEach(l=>{ if(l.lat==null||l.lon==null)return; const c=l.city||"Unknown"; const a=cityAcc[c]||(cityAcc[c]={la:0,lo:0,n:0}); a.la+=+l.lat; a.lo+=+l.lon; a.n++; });
+                    // Fallback positions for well-known cities whose log rows carry no lat/lon (e.g. IP lookup returned none).
+                    const CITY_LL={"Cape Town":[-33.92,18.42],"Johannesburg":[-26.20,28.05],"Pretoria":[-25.75,28.19],"Durban":[-29.86,31.02],"Gqeberha":[-33.96,25.60],"Port Elizabeth":[-33.96,25.60],"Bloemfontein":[-29.12,26.21],"Polokwane":[-23.90,29.45],"East London":[-33.02,27.91],"Kimberley":[-28.74,24.77],"Nelspruit":[-25.47,30.97],"Mbombela":[-25.47,30.97],"Stellenbosch":[-33.93,18.86],"Paarl":[-33.73,18.97],"George":[-33.96,22.46],"Harare":[-17.83,31.05],"Bulawayo":[-20.15,28.58],"Lusaka":[-15.39,28.32]};
+                    const cityPins=cities.map(([city,d])=>{const a=cityAcc[city]; const f=CITY_LL[city]; return a?{city,count:d.count,x:mX(a.lo/a.n),y:mY(a.la/a.n)}:(f?{city,count:d.count,x:mX(f[1]),y:mY(f[0])}:null);}).filter(Boolean);
+                    const provCenter=PROV_LL[selectedMapProvince];
+                    // (pinGroups is filled in below once pinR is known)
+                    let pinGroups=[];
+                    const provZoomNow=provMapZoom.prov===selectedMapProvince?provMapZoom.z:1;
+                    const pinPts=cityPins.length?cityPins:(provCenter?[{x:mX(provCenter[1]),y:mY(provCenter[0])}]:[]);
+                    let provVB=`0 0 ${MW} ${MH}`, pinR=1, provSw=1, vbX=0, vbW=MW;
+                    if(pinPts.length){
+                      const xs=pinPts.map(p=>p.x),ys=pinPts.map(p=>p.y);
+                      const cx=(Math.min(...xs)+Math.max(...xs))/2, cy=(Math.min(...ys)+Math.max(...ys))/2;
+                      const zoom=provMapZoom.prov===selectedMapProvince?provMapZoom.z:1;
+                      const w0=Math.max((Math.max(...xs)-Math.min(...xs))*1.7,16);
+                      const w=Math.max(w0/zoom,1.5), h=w*0.62;
+                      // Zooming in drifts the view from the middle of all cities toward the busiest one, so the cluster stays on screen.
+                      const top=[...cityPins].sort((a,b)=>b.count-a.count)[0]||pinPts[0];
+                      const t=Math.min(1,(zoom-1)/1.5);
+                      const fx=cx+(top.x-cx)*t, fy=cy+(top.y-cy)*t;
+                      provVB=`${(fx-w/2).toFixed(2)} ${(fy-h/2).toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`; vbX=fx-w/2; vbW=w;
+                      pinR=Math.max(0.04,w*0.011); provSw=Math.min(1,w/90);
+                    }
+                    // Merge pins that would overlap at this zoom into one grouped pin (centroid, summed count).
+                    [...cityPins].sort((a,b)=>b.count-a.count).forEach(p=>{
+                      const g=pinGroups.find(g=>Math.hypot(g.x-p.x,g.y-p.y)<pinR*3.2);
+                      if(g){ g.x=(g.x*g.cities.length+p.x)/(g.cities.length+1); g.y=(g.y*g.cities.length+p.y)/(g.cities.length+1); g.cities.push(p); g.count+=p.count; }
+                      else pinGroups.push({x:p.x,y:p.y,count:p.count,cities:[p]});
+                    });
                     if(selectedMapCity){
                       const cityUsers=Object.values(provLogs.filter(l=>l.city===selectedMapCity||(selectedMapCity==="Unknown"&&!l.city)).reduce((a,l)=>{if(!a[l.username]||l.created_at>a[l.username].created_at)a[l.username]=l;return a;},{})).sort((a,b)=>(b.created_at||"").localeCompare(a.created_at||""));
                       return(
@@ -8034,6 +8069,90 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     }
                     return(
                       <div style={{background:"#080f1a"}}>
+                        <div style={window.innerWidth<640?{display:"flex",flexDirection:"column"}:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+                        {/* Left: zoomed map with one pin per city */}
+                        <div style={{position:"relative"}}>
+                        <div style={{position:"absolute",top:10,right:10,zIndex:2,display:"flex",flexDirection:"column",gap:4}}>
+                          {[["+",()=>Math.min(12,provZoomNow*1.6),"Zoom in"],["−",()=>Math.max(1,provZoomNow/1.6),"Zoom out"],["⟲",()=>1,"Reset zoom"]].map(([lb,next,tt])=>(
+                            <button key={lb} title={tt} onClick={()=>setProvMapZoom({prov:selectedMapProvince,z:next()})}
+                              style={{width:30,height:30,borderRadius:6,border:"1px solid #1e3a5f",background:"rgba(8,15,26,.85)",color:"#e2e8f0",fontSize:16,fontWeight:700,cursor:"pointer",lineHeight:1}}>{lb}</button>
+                          ))}
+                        </div>
+                        <MapBase viewBox={provVB} sw={provSw}>
+                          {pinGroups.map((g,i,all)=>{
+                            if(g.cities.length===1){
+                              const c=g.cities[0];
+                              const clash=all.some(o=>{
+                                if(o.cities.length<2||o.cities.length>4)return false;
+                                const sd=(o.x-vbX)<vbW/2?1:-1, n=o.cities.length;
+                                const x0=sd===1?o.x+pinR*4.7:o.x-pinR*4.7-pinR*14, x1=x0+pinR*14;
+                                const y0=o.y-(n-1)/2*pinR*1.9-pinR, y1=o.y+(n-1)/2*pinR*1.9+pinR;
+                                const lx0=c.x-pinR*5, lx1=c.x+pinR*5, ly0=c.y+pinR*1.8, ly1=c.y+pinR*3.2;
+                                return lx0<x1&&lx1>x0&&ly0<y1&&ly1>y0;
+                              });
+                              return(
+                                <g key={i} transform={`translate(${c.x.toFixed(2)},${c.y.toFixed(2)})`} onClick={()=>setSelectedMapCity(c.city)} style={{cursor:"pointer"}}>
+                                  <circle r={pinR} fill="#d97706" stroke="#fef08a" strokeWidth={pinR*0.2}/>
+                                  <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={pinR*1.05} fontWeight="700" fontFamily="DM Mono,monospace">{c.count}</text>
+                                  <text y={clash?-pinR*1.9:pinR*2.5} textAnchor="middle" fill="#fbbf24" fontSize={pinR*1.15} fontWeight="600" stroke="#080f1a" strokeWidth={pinR*0.3} paintOrder="stroke">{c.city}</text>
+                                </g>
+                              );
+                            }
+                            // Crowded cluster: every city keeps its own true-position dot, and the names fan out to the
+                            // side with room (away from the map edge), each tied to its dot by a thin leader line.
+                            const side=(g.x-vbX)<vbW/2?1:-1, n=g.cities.length;
+                            const ordered=[...g.cities].sort((a,b)=>a.y-b.y);
+                            if(n>4){
+                              // Big cluster (e.g. Gauteng): split the names into a left and a right column, evenly spaced,
+                              // each column ordered top-to-bottom to match its dots so the leader lines barely cross.
+                              const byX=[...g.cities].sort((a,b)=>a.x-b.x);
+                              const half=Math.ceil(n/2);
+                              const cols=[{items:byX.slice(0,half),dir:-1},{items:byX.slice(half),dir:1}];
+                              const minX=byX[0].x, maxX=byX[n-1].x;
+                              const step=pinR*2.1;
+                              return(
+                                <g key={i}>
+                                  {cols.map(col=>{
+                                    const items=[...col.items].sort((a,b)=>a.y-b.y);
+                                    const colX=col.dir===-1?minX-pinR*5:maxX+pinR*5;
+                                    return items.map((c,j)=>{
+                                      const ly=g.y+(j-(items.length-1)/2)*step;
+                                      return(
+                                        <g key={c.city} onClick={()=>setSelectedMapCity(c.city)} style={{cursor:"pointer"}}>
+                                          <line x1={c.x} y1={c.y} x2={colX-col.dir*pinR*0.3} y2={ly} stroke="#fbbf24" strokeWidth={pinR*0.1} opacity={0.55}/>
+                                          <circle cx={c.x} cy={c.y} r={pinR*0.45} fill="#d97706" stroke="#fef08a" strokeWidth={pinR*0.12}/>
+                                          <text x={colX} y={ly} dominantBaseline="central" textAnchor={col.dir===-1?"end":"start"} fill="#fbbf24" fontSize={pinR*1.05} fontWeight="600" stroke="#080f1a" strokeWidth={pinR*0.28} paintOrder="stroke">{c.city} · {c.count}</text>
+                                        </g>
+                                      );
+                                    });
+                                  })}
+                                </g>
+                              );
+                            }
+                            return(
+                              <g key={i}>
+                                {ordered.map((c,j)=>{
+                                  const lx=g.x+side*pinR*5, ly=g.y+(j-(n-1)/2)*pinR*1.9;
+                                  return(
+                                    <g key={c.city} onClick={()=>setSelectedMapCity(c.city)} style={{cursor:"pointer"}}>
+                                      <line x1={c.x} y1={c.y} x2={lx-side*pinR*0.3} y2={ly} stroke="#fbbf24" strokeWidth={pinR*0.12} opacity={0.7}/>
+                                      <circle cx={c.x} cy={c.y} r={pinR*0.5} fill="#d97706" stroke="#fef08a" strokeWidth={pinR*0.14}/>
+                                      <text x={lx} y={ly} dominantBaseline="central" textAnchor={side===1?"start":"end"} fill="#fbbf24" fontSize={pinR*1.15} fontWeight="600" stroke="#080f1a" strokeWidth={pinR*0.3} paintOrder="stroke">{c.city} · {c.count}</text>
+                                    </g>
+                                  );
+                                })}
+                              </g>
+                            );
+                          })}
+                          {cityPins.length===0&&provCenter&&(
+                            <g transform={`translate(${mX(provCenter[1]).toFixed(1)},${mY(provCenter[0]).toFixed(1)})`}>
+                              <circle r={pinR} fill="#d97706" stroke="#fef08a" strokeWidth={pinR*0.2}/>
+                            </g>
+                          )}
+                        </MapBase>
+                        </div>
+                        {/* Right: city cards */}
+                        <div style={{borderLeft:window.innerWidth<640?"none":"1px solid #0f1e2e",borderTop:window.innerWidth<640?"1px solid #0f1e2e":"none"}}>
                         <div style={{padding:"12px 16px",display:"flex",flexWrap:"wrap",gap:8}}>
                           {cities.map(([city,d])=>(
                             <div key={city} onClick={()=>setSelectedMapCity(city)} style={{flex:"1 1 140px",background:"#0a1525",border:"1px solid #0f1e2e",borderRadius:8,padding:"10px 14px",cursor:"pointer"}}>
@@ -8047,6 +8166,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                               <div style={{fontSize:10,color:"#475569",marginTop:5}}>Tap to see users →</div>
                             </div>
                           ))}
+                        </div>
+                        </div>
                         </div>
                       </div>
                     );
@@ -8283,6 +8404,30 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           const activePct=eligible.length?Math.round(activeCount/eligible.length*100):null;
 
           const referrals=profiles.filter(p=>p.referral_source==="referral").sort((a,b)=>(b.trial_start||"").localeCompare(a.trial_start||""));
+          const invoiceQrCount=profiles.filter(p=>p.referral_source==="invoice_qr").length;
+          const rewardsGiven=referrals.filter(p=>wsRewardMap[p.id]).length;
+
+          // Referrer earns REF_REFERRER_REWARD_DAYS free days once the invited workshop is active (paid).
+          // Flag is set first so a double-click can't grant twice; reverted if extending the expiry fails.
+          const grantReferralReward=async(p)=>{
+            const rid=p.referred_by_user_id;
+            if(!rid||wsRewardMap[p.id]) return;
+            setWsRewardMap(m=>({...m,[p.id]:true}));
+            const fail=(msg)=>{ setWsRewardMap(m=>{const n={...m};delete n[p.id];return n;}); showToast(msg,"err"); };
+            const f1=await api.patch("workshop_profiles","id",p.id,{referral_rewarded:true});
+            if(f1?.code||f1?.message) return fail("Run the referral_rewarded SQL first — "+(f1.message||f1.code));
+            const cur=await api.get("workshop_profiles",`id=eq.${rid}&select=id,subscription_status,subscription_expires_at`).catch(()=>[]);
+            const rp=Array.isArray(cur)&&cur[0];
+            if(!rp){ await api.patch("workshop_profiles","id",p.id,{referral_rewarded:false}); return fail("Referrer workshop not found"); }
+            const now=new Date(); now.setHours(0,0,0,0);
+            const exp=rp.subscription_expires_at?new Date(rp.subscription_expires_at):null;
+            const base=exp&&exp>now?exp:now;
+            const nd=new Date(base.getTime()+REF_REFERRER_REWARD_DAYS*24*60*60*1000);
+            const patch={subscription_expires_at:nd.toISOString().slice(0,10),...(rp.subscription_status==="expired"?{subscription_status:"trial"}:{})};
+            const f2=await api.patch("workshop_profiles","id",rid,patch);
+            if(f2?.code||f2?.message){ await api.patch("workshop_profiles","id",p.id,{referral_rewarded:false}); return fail("Reward failed: "+(f2.message||f2.code)); }
+            showToast(`🎁 ${idToName[rid]||"Referrer"} +${REF_REFERRER_REWARD_DAYS} days → ${patch.subscription_expires_at}`);
+          };
 
           const maxReg=Math.max(1,...weeks.map(w=>(regByWeek[w]?.organic||0)+(regByWeek[w]?.referral||0)));
           const maxLogin=Math.max(1,...weeks.map(w=>(loginByWeek[w]?.new||0)+(loginByWeek[w]?.returning||0)));
@@ -8300,6 +8445,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:20}}>
                 <SC label="Total Workshops" value={profiles.length} icon="🔧" color="var(--accent)"/>
                 <SC label="Via Referral" value={referrals.length} icon="🤝" color="var(--blue)"/>
+                <SC label="Via Invoice QR" value={invoiceQrCount} icon="🧾" color="var(--yellow)"/>
+                <SC label="Rewards Given" value={rewardsGiven} icon="🎁" color="var(--purple)"/>
                 <SC label="Active 30d After Signup" value={activePct===null?"—":`${activePct}%`} icon="📈" color="var(--green)"/>
               </div>
 
@@ -8355,13 +8502,18 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                   ):(
                     <div className="tbl-wrap">
                       <table className="tbl">
-                        <thead><tr><th>Workshop</th><th>Referred By</th><th>Signed Up</th></tr></thead>
+                        <thead><tr><th>Workshop</th><th>Referred By</th><th>Signed Up</th><th>Status</th><th>Reward</th></tr></thead>
                         <tbody>
                           {referrals.map(p=>(
                             <tr key={p.id}>
                               <td style={{fontWeight:600}}>{p.name||p.id}</td>
                               <td>{idToName[p.referred_by_user_id]||p.referred_by_user_id||"—"}</td>
                               <td style={{fontSize:13,color:"var(--text3)"}}>{p.trial_start||"—"}</td>
+                              <td style={{fontSize:12}}>{p.subscription_status||"—"}</td>
+                              <td>{wsRewardMap[p.id]?<span style={{fontSize:12,color:"var(--green)",fontWeight:700}}>✅ Granted</span>
+                                :(p.subscription_status==="active"&&p.referred_by_user_id&&p.referred_by_user_id!=="9")
+                                  ?<button className="btn btn-primary btn-xs" onClick={()=>grantReferralReward(p)}>🎁 Grant +{REF_REFERRER_REWARD_DAYS}d</button>
+                                  :<span style={{fontSize:12,color:"var(--text3)"}}>{p.referred_by_user_id==="9"?"— (default)":"Waiting for active"}</span>}</td>
                             </tr>
                           ))}
                         </tbody>

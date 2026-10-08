@@ -4,7 +4,7 @@ import { getSettings } from "../lib/settings.js";
 import { CSS } from "../styles.js";
 import { ShopLogo, FL, VelGeniusBanner, Overlay } from "../components/shared.jsx";
 import { helpUrl } from "../lib/tutorials.js";
-import { detectGeoLocation, fetchWeather, waLink } from "../lib/helpers.js";
+import { detectGeoLocation, fetchWeather, waLink, REF_NEWCOMER_BONUS_DAYS } from "../lib/helpers.js";
 import { getSubInfo } from "../lib/constants.js";
 
 // Attach spare_shop_name + queue linked_branch_id from localStorage (set during QR registration)
@@ -342,7 +342,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     const ex=await api.fresh("users",`username=eq.${encodeURIComponent(wsRegUser)}&select=id`).catch(()=>[]);
     if(Array.isArray(ex)&&ex.length>0){setErr("Username already taken — choose another");setLoading(false);return;}
     const today=new Date().toISOString().slice(0,10);
-    const trialEnd=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
+    // Invited by another workshop (real ?ref= link) → bonus trial days for the newcomer
+    const trialEnd=new Date(Date.now()+(30+(wsReferrerId?REF_NEWCOMER_BONUS_DAYS:0))*24*60*60*1000).toISOString().slice(0,10);
     // users.id is a DB-generated bigint — don't send our own id. api.insert resolves with the
     // Postgres error JSON on failure instead of throwing, so check the result, not just .catch.
     const newUser=await api.insert("users",{username:wsRegUser,password:wsRegPass,name:wsRegName,role:"workshop",phone:wsRegPhone||"",email:wsRegEmail||"",spare_shop_name:DEFAULT_SPARE_SHOP.name}).catch(e=>({message:e.message}));

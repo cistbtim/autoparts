@@ -2192,6 +2192,8 @@ export function WorkshopRegisterPage({ token }) {
     shopName = d.name || "Spare Shop";
   } catch { /* invalid token – use defaults */ }
 
+  // ?src=inv → scanned from the QR printed on a customer invoice (tagged so Workshop Growth can count it)
+  const regSrc = new URLSearchParams(window.location.search).get("src") === "inv" ? "invoice_qr" : "";
   const [f, setF] = useState({
     workshop_name: "", username: "", password: "", password2: "",
     phone: "", email: "", city: "", country: "", address: "",
@@ -2255,6 +2257,7 @@ export function WorkshopRegisterPage({ token }) {
           whatsapp_country_code: f.whatsapp_country_code || "",
           logo_url: f.logo_url || "", logo_data: f.logo_data || "",
           trial_start: today, subscription_status: "trial", subscription_expires_at: trialEnd,
+          ...(regSrc ? { referral_source: regSrc } : {}),
         }),
       }).catch(() => {});
       // Save spare shop info to localStorage so login can apply it even if DB column isn't migrated yet

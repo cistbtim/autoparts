@@ -3059,12 +3059,19 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 // ═══════════════════════════════════════════════════════════════
 // VEHICLES MANAGEMENT PAGE  — drill-down: Makes → Models
 // ═══════════════════════════════════════════════════════════════
-export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[], onSave, onDelete, onViewInShop, onViewJobs, onAddPart, onLinkPart, onRefreshVehicles, onShiftCodes, t, jumpMake=null, jumpModel=null, jumpSearch=""}) {
+export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[], onSave, onDelete, onViewInShop, onViewJobs, onAddPart, onLinkPart, onLinkPartsBulk, onRefreshVehicles, onShiftCodes, t, jumpMake=null, jumpModel=null, jumpSearch=""}) {
   const [refreshing, setRefreshing] = useState(false);
   const [inserting, setInserting] = useState(null); // vehicle id currently being shifted for insert
   const [linkPartFor, setLinkPartFor] = useState(null); // vehicle being linked to an existing part
   const [linkSearch,  setLinkSearch]  = useState("");
   const [linkingId,   setLinkingId]   = useState(null); // part id currently being linked (spinner)
+  const [linkTargets, setLinkTargets] = useState(()=>new Set()); // vehicle ids a Link Part action applies to (current + ticked siblings)
+  const [linkPicked,  setLinkPicked]  = useState(()=>new Set()); // part ids ticked in the Link Part list
+  const [copyFor,     setCopyFor]     = useState(null);  // target vehicle of "Copy parts from…"
+  const [copySrc,     setCopySrc]     = useState(null);  // chosen source vehicle
+  const [copyPicked,  setCopyPicked]  = useState(()=>new Set());
+  const [copySearch,  setCopySearch]  = useState("");
+  const [bulkBusy,    setBulkBusy]    = useState(false);
   const [selMake, setSelMake] = useState(jumpMake);  // null = makes level
   const [search,  setSearch]  = useState(jumpSearch);
   const [searchD, setSearchD] = useState(jumpSearch);
@@ -3099,6 +3106,25 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
   },[search]);
 
   const fitCount = (vid) => partFitments.filter(f=>String(f.vehicle_id)===String(vid)).length;
+
+  // Same "family" = same make + code without its trailing letter (BM091A/B/C/D -> BM091): the variants of one
+  // generation, which share most of their parts.
+  const familyKey = (v) => { const m=/^(.*\d)[A-Za-z]$/.exec(v.code||""); return m?`${v.make}|${m[1].toUpperCase()}`:null; };
+  const siblingsOf = (v) => { const k=familyKey(v); return k?vehicles.filter(x=>String(x.id)!==String(v.id)&&familyKey(x)===k):[]; };
+  const partsById = useMemo(()=>new Map(parts.map(p=>[String(p.id),p])),[parts]);
+  const fitsByVehicle = useMemo(()=>{
+    const m=new Map();
+    partFitments.forEach(f=>{ const k=String(f.vehicle_id); if(!m.has(k)) m.set(k,new Set()); m.get(k).add(String(f.part_id)); });
+    return m;
+  },[partFitments]);
+  const linkBulk = async (pairs) => {
+    if(!pairs.length) return 0;
+    if(onLinkPartsBulk) return onLinkPartsBulk(pairs);
+    for(const pr of pairs) await onLinkPart(pr.part_id, pr.vehicle_id); // fallback: one at a time
+    return pairs.length;
+  };
+  const openLink = (v) => { setLinkPartFor(v); setLinkSearch(""); setLinkPicked(new Set()); setLinkTargets(new Set([String(v.id),...siblingsOf(v).map(x=>String(x.id))])); };
+  const openCopy = (v) => { setCopyFor(v); setCopySrc(null); setCopySearch(""); setCopyPicked(new Set()); };
 
   // ── Bulk Add from Research — the code system this catalog actually uses (learned
   // the hard way this session): code = [make's short prefix][real chassis number][letter],
@@ -3484,7 +3510,9 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
                 {onAddPart&&<button className="btn btn-ghost btn-xs" style={{color:"var(--accent)",borderColor:"var(--accent)"}}
                   onClick={()=>onAddPart(v)} title={`Add new part with SKU ${v.code}-`}>+ Part</button>}
                 {onLinkPart&&<button className="btn btn-ghost btn-xs" style={{color:"var(--blue)",borderColor:"var(--blue)"}}
-                  onClick={()=>{setLinkPartFor(v);setLinkSearch("");}} title="Link an existing part to this vehicle">🔗 Link Part</button>}
+                  onClick={()=>openLink(v)} title="Link an existing part to this vehicle (and its variants)">🔗 Link Part</button>}
+                {onLinkPart&&<button className="btn btn-ghost btn-xs" style={{color:"var(--blue)"}}
+                  onClick={()=>openCopy(v)} title="Copy the parts of another vehicle (e.g. a sibling variant) onto this one">📋 Copy</button>}
                 {onShiftCodes&&v.code&&<button className="btn btn-ghost btn-xs" disabled={inserting===v.id}
                   onClick={()=>insertBefore(v)} title={`Insert a new vehicle before this one — shifts ${v.code} and later codes up one letter`}>
                   {inserting===v.id?"⏳":"⬆️➕"} Insert</button>}
@@ -3539,49 +3567,148 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
       </ErrorBoundary>
     )}
 
-    {linkPartFor&&(
+    {linkPartFor&&(()=>{
+      const targets=[...linkTargets];
+      const sibs=siblingsOf(linkPartFor);
+      const words=linkSearch.trim().toLowerCase().split(" ").filter(Boolean);
+      const linkedTo=(pid,vid)=>fitsByVehicle.get(String(vid))?.has(String(pid));
+      const results=!words.length?[]:parts.filter(p=>{
+        if(targets.length&&targets.every(t=>linkedTo(p.id,t))) return false; // already on every selected vehicle
+        const fields=[p.name,p.chinese_desc,p.sku,p.brand,p.make,p.model,p.year_range,p.oe_number,p.category].map(x=>(x||"").toLowerCase()).join(" ");
+        return words.every(w=>fields.includes(w));
+      }).slice(0,40);
+      const doLink=async(pids)=>{
+        setBulkBusy(true);
+        try{
+          const pairs=[]; pids.forEach(pid=>targets.forEach(vid=>{ if(!linkedTo(pid,vid)) pairs.push({part_id:pid,vehicle_id:vid}); }));
+          await linkBulk(pairs);
+          setLinkPicked(new Set());
+        }catch(e){ alert(`❌ Failed to link part: ${e.message||e}`); }
+        finally{ setBulkBusy(false); setLinkingId(null); }
+      };
+      const toggleSet=(setter,id)=>setter(prev=>{ const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
+      return(
       <Overlay onClose={()=>setLinkPartFor(null)}>
         <MHead title={`🔗 Link Part — ${linkPartFor.make} ${linkPartFor.model}${linkPartFor.code?` (${linkPartFor.code})`:""}`} onClose={()=>setLinkPartFor(null)}/>
+        {sibs.length>0&&(
+          <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"8px 10px",marginBottom:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+              <span style={{fontSize:12,fontWeight:700}}>Also apply to these variants</span>
+              <button className="btn btn-ghost btn-xs" style={{marginLeft:"auto"}} onClick={()=>setLinkTargets(new Set([String(linkPartFor.id),...sibs.map(x=>String(x.id))]))}>All</button>
+              <button className="btn btn-ghost btn-xs" onClick={()=>setLinkTargets(new Set([String(linkPartFor.id)]))}>None</button>
+            </div>
+            {sibs.map(x=>(
+              <label key={x.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,padding:"2px 0",cursor:"pointer"}}>
+                <input type="checkbox" checked={linkTargets.has(String(x.id))} onChange={()=>toggleSet(setLinkTargets,String(x.id))}/>
+                <span style={{fontWeight:600}}>{x.model}</span>
+                <span style={{fontFamily:"DM Mono,monospace",color:"var(--accent)",fontSize:11}}>{x.code}</span>
+                <span style={{color:"var(--text3)"}}>{x.year_from}–{x.year_to||"present"}</span>
+              </label>
+            ))}
+          </div>
+        )}
         <input className="inp" autoFocus placeholder="Search part name or SKU… e.g. windscreen"
           value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} style={{marginBottom:12}}/>
-        <div style={{maxHeight:420,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
-          {(() => {
-            const linkedIds = new Set(partFitments.filter(f=>String(f.vehicle_id)===String(linkPartFor.id)).map(f=>String(f.part_id)));
-            const words = linkSearch.trim().toLowerCase().split(" ").filter(Boolean);
-            if(!words.length) return <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>Start typing to search parts… e.g. "vitz windscreen"</div>;
-            const results = parts.filter(p=>{
-              if(linkedIds.has(String(p.id))) return false;
-              const fields=[p.name,p.chinese_desc,p.sku,p.brand,p.make,p.model,p.year_range,p.oe_number,p.category]
-                .map(v=>(v||"").toLowerCase()).join(" ");
-              return words.every(w=>fields.includes(w));
-            }).slice(0,40);
-            if(!results.length) return <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>No matching parts</div>;
-            return results.map(p=>(
-              <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)"}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                  {p.chinese_desc&&<div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.chinese_desc}</div>}
-                  <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:2}}>
-                    <span style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{p.sku}</span>
-                    {(p.make||p.model)&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"var(--surface3)",color:"var(--text2)"}}>{[p.make,p.model].filter(Boolean).join(" ")}</span>}
-                    {p.year_range&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"var(--surface3)",color:"var(--text3)"}}>{p.year_range}</span>}
-                  </div>
-                </div>
-                <button className="btn btn-primary btn-xs" disabled={linkingId===p.id}
-                  onClick={async()=>{
-                    setLinkingId(p.id);
-                    try{ await onLinkPart(p.id, linkPartFor.id); }
-                    catch(e){ alert(`❌ Failed to link part: ${e.message||e}`); }
-                    finally{ setLinkingId(null); }
-                  }}>
-                  {linkingId===p.id?"⏳":"🔗 Link"}
-                </button>
-              </div>
-            ));
-          })()}
+        <div style={{maxHeight:360,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
+          {!words.length
+            ? <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>Start typing to search parts… e.g. "vitz windscreen"</div>
+            : !results.length
+              ? <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>No matching parts</div>
+              : results.map(p=>{
+                  const onN=targets.filter(t=>linkedTo(p.id,t)).length;
+                  return(
+                  <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"var(--surface2)",borderRadius:8,border:`1px solid ${linkPicked.has(String(p.id))?"var(--accent)":"var(--border)"}`}}>
+                    <input type="checkbox" checked={linkPicked.has(String(p.id))} onChange={()=>toggleSet(setLinkPicked,String(p.id))}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                      {p.chinese_desc&&<div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.chinese_desc}</div>}
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:2}}>
+                        <span style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{p.sku}</span>
+                        {(p.make||p.model)&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"var(--surface3)",color:"var(--text2)"}}>{[p.make,p.model].filter(Boolean).join(" ")}</span>}
+                        {p.year_range&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"var(--surface3)",color:"var(--text3)"}}>{p.year_range}</span>}
+                        {onN>0&&<span style={{fontSize:10,color:"var(--green)"}}>already on {onN} of {targets.length}</span>}
+                      </div>
+                    </div>
+                    <button className="btn btn-primary btn-xs" disabled={bulkBusy}
+                      onClick={()=>{ setLinkingId(p.id); doLink([p.id]); }}>
+                      {linkingId===p.id&&bulkBusy?"⏳":`🔗 Link${targets.length>1?` ×${targets.length}`:""}`}
+                    </button>
+                  </div>);
+                })}
         </div>
-      </Overlay>
-    )}
+        {linkPicked.size>0&&(
+          <button className="btn btn-primary" style={{width:"100%",marginTop:12,fontWeight:700}} disabled={bulkBusy} onClick={()=>doLink([...linkPicked])}>
+            {bulkBusy?"⏳ Linking…":`🔗 Link ${linkPicked.size} selected part${linkPicked.size!==1?"s":""} to ${targets.length} vehicle${targets.length!==1?"s":""}`}
+          </button>
+        )}
+      </Overlay>);
+    })()}
+
+    {copyFor&&(()=>{
+      const target=copyFor;
+      const tHave=fitsByVehicle.get(String(target.id))||new Set();
+      const sibs=siblingsOf(target);
+      const q=copySearch.trim().toLowerCase();
+      const others=vehicles.filter(x=>String(x.id)!==String(target.id)&&x.make===target.make&&!sibs.some(s2=>s2.id===x.id)
+        &&(!q||`${x.model} ${x.code||""}`.toLowerCase().includes(q))).slice(0,30);
+      const srcIds=copySrc?[...(fitsByVehicle.get(String(copySrc.id))||[])]:[];
+      const srcParts=srcIds.map(id=>partsById.get(id)).filter(Boolean).sort((a,b)=>(a.sku||"").localeCompare(b.sku||""));
+      const pickable=srcParts.filter(p=>!tHave.has(String(p.id)));
+      const pickSource=(x)=>{ setCopySrc(x); const have=fitsByVehicle.get(String(x.id))||new Set(); setCopyPicked(new Set([...have].filter(id=>!tHave.has(id)))); };
+      const toggle=(id)=>setCopyPicked(prev=>{ const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
+      const doCopy=async()=>{
+        setBulkBusy(true);
+        try{
+          await linkBulk([...copyPicked].map(pid=>({part_id:pid,vehicle_id:target.id})));
+          setCopyFor(null);
+        }catch(e){ alert(`❌ Failed to copy parts: ${e.message||e}`); }
+        finally{ setBulkBusy(false); }
+      };
+      const vRow=(x,tag)=>(
+        <button key={x.id} className="btn btn-ghost" style={{display:"flex",alignItems:"center",gap:8,justifyContent:"flex-start",textAlign:"left",padding:"8px 10px"}} onClick={()=>pickSource(x)}>
+          <span style={{fontWeight:600,fontSize:13}}>{x.model}</span>
+          <span style={{fontFamily:"DM Mono,monospace",color:"var(--accent)",fontSize:11}}>{x.code}</span>
+          <span style={{color:"var(--text3)",fontSize:11}}>{x.year_from}–{x.year_to||"present"}</span>
+          {tag&&<span style={{fontSize:10,color:"var(--green)"}}>{tag}</span>}
+          <span style={{marginLeft:"auto",fontSize:11,color:"var(--blue)"}}>🔗 {fitCount(x.id)} parts</span>
+        </button>);
+      return(
+      <Overlay onClose={()=>!bulkBusy&&setCopyFor(null)}>
+        <MHead title={`📋 Copy parts to ${target.model}${target.code?` (${target.code})`:""}`}
+          sub={copySrc?`From ${copySrc.model}${copySrc.code?` (${copySrc.code})`:""} — tick what fits`:"Pick the vehicle to copy parts from"} onClose={()=>!bulkBusy&&setCopyFor(null)}/>
+        {!copySrc?(<>
+          {sibs.length>0&&<div style={{fontSize:11,color:"var(--text3)",fontWeight:700,marginBottom:4}}>SAME FAMILY</div>}
+          <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>{sibs.map(x=>vRow(x,"variant"))}</div>
+          <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,marginBottom:4}}>OTHER {String(target.make||"").toUpperCase()} VEHICLES</div>
+          <input className="inp" placeholder="Search model or code…" value={copySearch} onChange={e=>setCopySearch(e.target.value)} style={{marginBottom:8}}/>
+          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:260,overflowY:"auto"}}>{others.map(x=>vRow(x))}</div>
+        </>):(<>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+            <button className="btn btn-ghost btn-xs" disabled={bulkBusy} onClick={()=>setCopySrc(null)}>← Other vehicle</button>
+            <span style={{fontSize:12,color:"var(--text2)"}}>Will add <b>{copyPicked.size}</b> · {srcParts.length-pickable.length} already linked</span>
+            <button className="btn btn-ghost btn-xs" style={{marginLeft:"auto"}} onClick={()=>setCopyPicked(new Set(pickable.map(p=>String(p.id))))}>All</button>
+            <button className="btn btn-ghost btn-xs" onClick={()=>setCopyPicked(new Set())}>None</button>
+          </div>
+          <div style={{maxHeight:340,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
+            {srcParts.map(p=>{
+              const has=tHave.has(String(p.id));
+              return(
+                <label key={p.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--surface2)",opacity:has?.45:1,cursor:has?"default":"pointer"}}>
+                  <input type="checkbox" disabled={has} checked={has||copyPicked.has(String(p.id))} onChange={()=>toggle(String(p.id))}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{p.sku}</div>
+                  </div>
+                  {has&&<span style={{fontSize:10,color:"var(--green)"}}>already linked</span>}
+                </label>);
+            })}
+          </div>
+          <button className="btn btn-primary" style={{width:"100%",marginTop:12,fontWeight:700}} disabled={bulkBusy||!copyPicked.size} onClick={doCopy}>
+            {bulkBusy?"⏳ Linking…":`📋 Link ${copyPicked.size} part${copyPicked.size!==1?"s":""} to ${target.model}`}
+          </button>
+        </>)}
+      </Overlay>);
+    })()}
 
     {bulkOpen&&(
       <Overlay onClose={()=>!bulkSaving&&setBulkOpen(false)} wide>

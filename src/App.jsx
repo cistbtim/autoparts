@@ -2885,6 +2885,37 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     });
     showToast("Vehicle linked");
   };
+  // Many (part, vehicle) links in one go — pairs already linked (checked against local state) are skipped.
+  // Posted in chunks; local state is updated once from whatever was saved, even if a later chunk fails.
+  const saveFitmentsBulk=async(pairs)=>{
+    const have=new Set(partFitments.map(f=>`${f.part_id}|${f.vehicle_id}`));
+    const seen=new Set();
+    const todo=[];
+    for(const pr of pairs){
+      const k=`${pr.part_id}|${pr.vehicle_id}`;
+      if(have.has(k)||seen.has(k)) continue;
+      seen.add(k); todo.push({part_id:pr.part_id,vehicle_id:pr.vehicle_id,notes:""});
+    }
+    if(!todo.length) return 0;
+    const added=[];
+    try{
+      for(let i=0;i<todo.length;i+=200){
+        const chunk=todo.slice(i,i+200);
+        const r=await api.upsert("part_fitments",chunk);
+        if(r&&!Array.isArray(r)&&(r.code||r.message)) throw new Error(r.message||r.code);
+        added.push(...(Array.isArray(r)&&r.length?r:chunk));
+      }
+    } finally {
+      if(added.length){
+        setPartFitments(prev=>{
+          const have2=new Set(prev.map(f=>`${f.part_id}|${f.vehicle_id}`));
+          return [...prev,...added.filter(f=>!have2.has(`${f.part_id}|${f.vehicle_id}`))];
+        });
+        showToast(`${added.length} link${added.length!==1?"s":""} added`);
+      }
+    }
+    return added.length;
+  };
   const deleteFitment=async(id)=>{
     await api.delete("part_fitments","id",id);
     setPartFitments(prev=>prev.filter(f=>String(f.id)!==String(id)));
@@ -8794,7 +8825,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
             onViewJobs={(label,jobIds,make,model,searchKw)=>{setWorkshopJobFilter({label,jobIds,returnMake:make,returnModel:model,returnSearch:searchKw});setTab("workshop");}}
             onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
-            onLinkPart={saveFitment}
+            onLinkPart={saveFitment} onLinkPartsBulk={saveFitmentsBulk}
             onRefreshVehicles={()=>refreshTables("vehicles")}
             onShiftCodes={shiftVehicleCodes}
             jumpMake={vehiclesJumpMake} jumpModel={vehiclesJumpModel} jumpSearch={vehiclesJumpSearch} t={t}/>

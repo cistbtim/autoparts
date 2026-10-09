@@ -15,6 +15,7 @@ import { WsDocumentsPage } from "./ws/Documents.jsx";
 import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote, CHECKLIST_ITEMS } from "./ws/Print.jsx";
 import { BookInModal } from "./ws/BookIn.jsx";
 import { WsCustomerMessageModal } from "./ws/CustomerMessage.jsx";
+import { WsVoiceMessageModal } from "./ws/VoiceMessage.jsx";
 import { WsCustomersPage, WsCustomerForm, WsVehicleForm, LicenceRenewalModal, WsLicenceRenewalsPage } from "./ws/Customers.jsx";
 import { WsSupplierInvoicesPage, WsSupInvoiceModal, WsSupInvoiceViewModal, WsSupPaymentModal, WsSupReturnModal } from "./ws/SupplierInvoices.jsx";
 import { WsCreatePoFromJobModal, WsPurchaseOrdersPage, WsPurchaseOrderModal, WsReceiveGoodsModal } from "./ws/PurchaseOrders.jsx";
@@ -69,6 +70,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [bkDeletedPeriod, setBkDeletedPeriod] = useState("week");
   const [bkAvailOpen,     setBkAvailOpen]     = useState(false);
   const [msgCtx,           setMsgCtx]          = useState(null); // customer-message draft window ({name,phone,reg,…,defaultTpl})
+  const [voiceOpen,        setVoiceOpen]       = useState(false); // voice → message draft window
   const [bkWorkDays,      setBkWorkDays]      = useState([1,2,3,4,5]);
   const [bkHolidays,      setBkHolidays]      = useState([]);
   const [bkClosedDates,   setBkClosedDates]   = useState([]);
@@ -588,6 +590,8 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               style={{opacity:jobsRefreshing?.6:1}}>
               <span style={{display:"inline-block",animation:jobsRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
             </button>
+            <button className="btn btn-ghost" title="Voice message — say who to notify and what" aria-label="Voice message" onClick={()=>setVoiceOpen(true)}
+              style={{fontSize:15,lineHeight:1}}>🎤</button>
             {kanbanView&&(
               <div className="hide-mobile" style={{display:"contents"}}>
                 <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
@@ -1614,6 +1618,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
       )}
 
       {msgCtx&&<WsCustomerMessageModal ctx={msgCtx} wsProfile={wsProfile} onClose={()=>setMsgCtx(null)}/>}
+      {voiceOpen&&<WsVoiceMessageModal jobs={jobs} bookings={wsBookings} initialLang={lang==="zh"?"zh":"en"} onDraft={setMsgCtx} onClose={()=>setVoiceOpen(false)}/>}
 
       {/* ══════════════ BOOKINGS TAB ══════════════ */}
       {wsTab==="wsbookings"&&(()=>{

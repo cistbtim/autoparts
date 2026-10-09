@@ -70,7 +70,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
     name:"", vat_number:"", tax_rate:0, phone:"", whatsapp:"", email:"",
     address:"", website:"", logo_url:"", logo_data:"", currency:"ZAR R", city:"", country:"", province:"",
     licence_renewal_agent_name:"", licence_renewal_agent_phone:"", custom_licence_agents:[],
-    whatsapp_country_code:"", hide_ads:false, default_markup_pct:0, move_pin:"",
+    whatsapp_country_code:"", hide_ads:false, wechat_tools:false, default_markup_pct:0, move_pin:"",
     label_width_mm:98, label_height_mm:45, linked_branch_id:"",
     part_label_w:98, part_label_h:45, shelf_label_w:70, shelf_label_h:45,
     bank_name:"", bank_account_holder:"", bank_account_number:"", bank_branch_code:"", bank_swift:"", bank_reference_note:"",
@@ -501,6 +501,22 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             onChange={e=>s("whatsapp_country_code",e.target.value.replace(/\D/g,""))}
             placeholder="e.g. 27 (South Africa)"/>
           <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Digits only, no + — applied to every customer/supplier number typed as a local number (e.g. 0833927725 → 27833927725) before opening WhatsApp</div>
+        </div>
+        {/* WeChat tools — off by default; most customers use WhatsApp, so only workshops that talk to customers on WeChat switch it on */}
+        <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
+          <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+            <div onClick={()=>s("wechat_tools",!f.wechat_tools)} style={{
+              width:38,height:22,borderRadius:11,background:f.wechat_tools?"#07C160":"var(--surface3)",
+              border:`1.5px solid ${f.wechat_tools?"#07C160":"var(--border)"}`,
+              position:"relative",transition:"background .18s,border-color .18s",flexShrink:0,cursor:"pointer"
+            }}>
+              <div style={{position:"absolute",top:2,left:f.wechat_tools?18:2,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left .18s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/>
+            </div>
+            <div>
+              <div style={{fontWeight:600,fontSize:13}}>💬 WeChat 微信 tools</div>
+              <div style={{fontSize:11,color:"var(--text3)"}}>Adds WeChat copy-message, Moments post and booking QR to the Send Booking Link window. Click Save below to apply.</div>
+            </div>
+          </label>
         </div>
         </>)}
 

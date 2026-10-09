@@ -12772,7 +12772,8 @@ ${bookingUrl}`;
             {navigator.share&&<button className="btn btn-ghost" onClick={()=>navigator.share({title:"Book your car service",text:bookingText,url:bookingUrl}).catch(()=>{})}>📤 Share</button>}
           </div>
 
-          {/* ── WeChat tools ── */}
+          {/* ── WeChat tools (WS Settings → Shop → WeChat tools) ── */}
+          {wsProfile?.wechat_tools&&(
           <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid var(--border)"}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
               <div style={{fontWeight:700,fontSize:13,color:"#07C160"}}>💬 WeChat 微信</div>
@@ -12796,6 +12797,7 @@ ${bookingUrl}`;
               </div>
             </div>
           </div>
+          )}
         </>)}
       </Overlay>
     )}

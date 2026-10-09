@@ -14,6 +14,7 @@ import { WsTransferPage } from "./ws/Transfer.jsx";
 import { WsDocumentsPage } from "./ws/Documents.jsx";
 import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote, CHECKLIST_ITEMS } from "./ws/Print.jsx";
 import { BookInModal } from "./ws/BookIn.jsx";
+import { WsCustomerMessageModal } from "./ws/CustomerMessage.jsx";
 import { WsCustomersPage, WsCustomerForm, WsVehicleForm, LicenceRenewalModal, WsLicenceRenewalsPage } from "./ws/Customers.jsx";
 import { WsSupplierInvoicesPage, WsSupInvoiceModal, WsSupInvoiceViewModal, WsSupPaymentModal, WsSupReturnModal } from "./ws/SupplierInvoices.jsx";
 import { WsCreatePoFromJobModal, WsPurchaseOrdersPage, WsPurchaseOrderModal, WsReceiveGoodsModal } from "./ws/PurchaseOrders.jsx";
@@ -67,6 +68,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [bkShowDeleted,   setBkShowDeleted]   = useState(false);
   const [bkDeletedPeriod, setBkDeletedPeriod] = useState("week");
   const [bkAvailOpen,     setBkAvailOpen]     = useState(false);
+  const [msgCtx,           setMsgCtx]          = useState(null); // customer-message draft window ({name,phone,reg,…,defaultTpl})
   const [bkWorkDays,      setBkWorkDays]      = useState([1,2,3,4,5]);
   const [bkHolidays,      setBkHolidays]      = useState([]);
   const [bkClosedDates,   setBkClosedDates]   = useState([]);
@@ -1611,6 +1613,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
           onClose={()=>setQInvModal(null)} t={t}/>
       )}
 
+      {msgCtx&&<WsCustomerMessageModal ctx={msgCtx} wsProfile={wsProfile} onClose={()=>setMsgCtx(null)}/>}
+
       {/* ══════════════ BOOKINGS TAB ══════════════ */}
       {wsTab==="wsbookings"&&(()=>{
         const bToken=bookingToken||wsProfile?.booking_token||"";
@@ -1636,6 +1640,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         const bookingsOnDate=(ds)=>activeBookings.filter(b=>b.preferred_date===ds);
         const holidayOnDate=(ds)=>bkHolidays.find(h=>h.date===ds);
         const closureOnDate=(ds)=>bkClosedDates.find(c=>c.date===ds);
+        const openBkMsg=(b,defaultTpl)=>setMsgCtx({name:b.customer_name,phone:b.customer_phone,reg:b.vehicle_reg,make:b.vehicle_make,model:b.vehicle_model,date:b.preferred_date||"",defaultTpl});
         const renderBookingCard=(b)=>(
           <div key={b.id} className="card" style={{marginBottom:12,padding:14}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
@@ -1675,6 +1680,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   <a href={bkWaLink(b,"received")} target="_blank" rel="noreferrer"
                     className="btn btn-ghost btn-sm" style={{color:"#25D366",textDecoration:"none"}}>📱 WhatsApp</a>
                 )}
+                <button className="btn btn-ghost btn-sm" onClick={()=>openBkMsg(b,"confirm")}>✉ Message</button>
               </div>
             )}
             {b.status==="confirmed"&&(
@@ -1685,6 +1691,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   <a href={bkWaLink(b,"confirm")} target="_blank" rel="noreferrer"
                     className="btn btn-ghost btn-sm" style={{color:"#25D366",textDecoration:"none"}}>📱 Confirm via WhatsApp</a>
                 )}
+                <button className="btn btn-ghost btn-sm" onClick={()=>openBkMsg(b,"reminder")}>✉ Message</button>
               </div>
             )}
             <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",marginLeft:"auto",display:"block",marginTop:6}}
@@ -4407,6 +4414,7 @@ export function decodeVin(vin) {
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
 function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,wsLicenceRenewals=[],onUpdateWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},onSaveWsProfile,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
+  const [msgOpen,setMsgOpen]=useState(false); // customer-message draft window
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
   const fmtAmt = v => `${_wsC}${(+v||0).toLocaleString()}`;
@@ -5670,6 +5678,11 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
                 style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(9,187,7,.12)",border:"1px solid rgba(9,187,7,.35)",borderRadius:7,cursor:"pointer",color:"#09bb07",fontSize:11,fontWeight:700}}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8.5 10.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM12 2C6.477 2 2 6.253 2 11.5c0 2.304.87 4.411 2.304 6.03L3 22l4.682-1.558A10.46 10.46 0 0 0 12 21c5.523 0 10-4.253 10-9.5S17.523 2 12 2z"/></svg>
               </button>
+              <button title="Draft a message to the customer" onClick={()=>setMsgOpen(true)}
+                style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(255,122,46,.12)",border:"1px solid rgba(255,122,46,.4)",borderRadius:7,cursor:"pointer",color:"var(--accent)",fontSize:11,fontWeight:700}}>✉</button>
+              {msgOpen&&<WsCustomerMessageModal wsProfile={wsProfile} onClose={()=>setMsgOpen(false)}
+                ctx={{name:job.customer_name,phone:job.customer_phone,reg:job.vehicle_reg,make:job.vehicle_make,model:job.vehicle_model,date:"",
+                  defaultTpl:job.status==="Ordered"?"parts":"ready"}}/>}
             </div>
           );
         })()}

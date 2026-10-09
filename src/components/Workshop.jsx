@@ -12712,6 +12712,10 @@ ${bookingUrl}`;
 ${bookingUrl}`
     :`🔧 Online booking is live at ${shopLabel||"our workshop"}! Scan and book your service — no phone call needed 👇
 ${bookingUrl}`;
+  // one language at a time — labels follow the 中文/English switch
+  const WL=wxLang==="zh"
+    ?{title:"💬 微信",copy:"📋 复制消息",copied:"✅ 已复制",open:"↗ 打开微信",moments:"🌅 朋友圈文案",save:"💾 保存二维码",qr:"二维码 · 客户扫码即可预约。保存图片后发到微信聊天、群或朋友圈。"}
+    :{title:"💬 WeChat",copy:"📋 Copy message",copied:"✅ Copied",open:"↗ Open WeChat",moments:"🌅 Moments post",save:"💾 Save QR",qr:"QR code — customers scan to book. Save the image and send it in WeChat chats, groups or Moments."};
   const wxCopy=async(key,txt)=>{ try{ await navigator.clipboard.writeText(txt); setWxCopied(key); setTimeout(()=>setWxCopied(""),1800); }catch{/* clipboard blocked */} };
   const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=12&data=${encodeURIComponent(bookingUrl)}&format=png`;
   const saveQr=async()=>{
@@ -12776,7 +12780,7 @@ ${bookingUrl}`;
           {wsProfile?.wechat_tools&&(
           <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid var(--border)"}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-              <div style={{fontWeight:700,fontSize:13,color:"#07C160"}}>💬 WeChat 微信</div>
+              <div style={{fontWeight:700,fontSize:13,color:"#07C160"}}>{WL.title}</div>
               <div style={{marginLeft:"auto",display:"flex",gap:4}}>
                 {[["zh","中文"],["en","English"]].map(([v,lb])=>(
                   <button key={v} className={`btn btn-xs ${wxLang===v?"btn-primary":"btn-ghost"}`} onClick={()=>setWxLang(v)}>{lb}</button>
@@ -12785,15 +12789,15 @@ ${bookingUrl}`;
             </div>
             <div style={{fontSize:12,background:"var(--surface2)",borderRadius:8,padding:"8px 10px",whiteSpace:"pre-wrap",wordBreak:"break-all",color:"var(--text2)",marginBottom:8}}>{wxMessage}</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
-              <button className="btn" style={{background:"#07C160",color:"#fff",border:"none",fontWeight:700}} onClick={()=>wxCopy("msg",wxMessage)}>{wxCopied==="msg"?"✅ 已复制 Copied":"📋 复制消息 Copy"}</button>
-              <a href="weixin://" style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{color:"#07C160",borderColor:"rgba(7,193,96,.5)"}}>↗ 打开微信 Open WeChat</button></a>
-              <button className="btn btn-ghost" onClick={()=>wxCopy("moments",wxMoments)}>{wxCopied==="moments"?"✅ 已复制 Copied":"🌅 朋友圈文案 Moments post"}</button>
+              <button className="btn" style={{background:"#07C160",color:"#fff",border:"none",fontWeight:700}} onClick={()=>wxCopy("msg",wxMessage)}>{wxCopied==="msg"?WL.copied:WL.copy}</button>
+              <a href="weixin://" style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{color:"#07C160",borderColor:"rgba(7,193,96,.5)"}}>{WL.open}</button></a>
+              <button className="btn btn-ghost" onClick={()=>wxCopy("moments",wxMoments)}>{wxCopied==="moments"?WL.copied:WL.moments}</button>
             </div>
             <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
               <img src={qrUrl} width={130} height={130} alt="Booking QR" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",flexShrink:0}}/>
               <div style={{flex:1,minWidth:180}}>
-                <div style={{fontSize:12,color:"var(--text3)",marginBottom:8,lineHeight:1.6}}>二维码 · 客户扫码即可预约。保存图片后发到微信聊天、群或朋友圈。<br/>QR code — customers scan to book. Save the image and send it in WeChat chats, groups or Moments.</div>
-                <button className="btn btn-ghost" onClick={saveQr}>💾 保存二维码 Save QR</button>
+                <div style={{fontSize:12,color:"var(--text3)",marginBottom:8,lineHeight:1.6}}>{WL.qr}</div>
+                <button className="btn btn-ghost" onClick={saveQr}>{WL.save}</button>
               </div>
             </div>
           </div>

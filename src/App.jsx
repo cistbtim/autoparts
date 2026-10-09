@@ -44,6 +44,26 @@ window.addEventListener("popstate",()=>{
 // again — so one field whose SQL migration hasn't been run yet doesn't block
 // every other field in the same save. `write(payload)` performs the actual
 // insert/patch/upsert; returns {res, payload: the payload that actually saved}.
+// Two-note chime for a new customer booking — Web Audio, so no asset to load. Silent if the browser blocks audio.
+function playBookingChime() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    const t0 = ctx.currentTime;
+    [[880, 0], [1175, 0.2]].forEach(([freq, d]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t0 + d);
+      g.gain.exponentialRampToValueAtTime(0.3, t0 + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.3);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t0 + d); o.stop(t0 + d + 0.35);
+    });
+    setTimeout(() => { try { ctx.close(); } catch { /* already closed */ } }, 900);
+  } catch { /* audio unavailable */ }
+}
+
 async function writeTolerant(write, payload) {
   let current = { ...payload };
   let res = await write(current).catch(e => ({ message: e.message }));
@@ -2670,32 +2690,50 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     setWsBookings(Array.isArray(bk)?bk:[]);
   };
 
-  // ── Lightweight booking-count poll ──────────────────────────────
-  // Runs continuously while inside the workshop module without re-triggering
-  // the full loadAll() sync (which stays paused there to save reads/avoid
-  // interrupting kanban work). Each tick is a HEAD request — no row data —
-  // so it's cheap enough to run every 45s. Only does a real (cached-busting)
-  // refresh + toast when the pending count actually goes up.
-  const pendingBookingCountRef = useRef(null); // null until first successful check
+  // ── Lightweight booking poll ────────────────────────────────────
+  // Runs without re-triggering the full loadAll() sync. Each tick is a HEAD request — no row
+  // data — so it's cheap enough to run every 45s. It counts ALL bookings (deleting a booking only
+  // patches its status, so the total never goes down), which means a new booking is caught even
+  // if the owner confirmed or cancelled another one in between. On a new booking: refresh the
+  // list, toast, chime, and flash the browser tab title until the owner looks at it.
+  // A workshop account is checked from every page and while the tab is in the background;
+  // admin/manager keep the old behaviour (workshop pages only, tab visible).
+  const wsBookingCountRef = useRef(null); // null until first successful check
   useEffect(()=>{
     if(!(role==="workshop"||role==="admin"||role==="manager")) return;
-    const WORKSHOP_TABS=["workshop","wscustomers","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop"];
+    const isWorkshopUser = role==="workshop";
+    const WORKSHOP_TABS=["workshop","wscustomers","wsbookings","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop"];
+    const baseTitle=document.title;
+    let flashTimer=null;
+    const stopFlash=()=>{ if(flashTimer){ clearInterval(flashTimer); flashTimer=null; document.title=baseTitle; } };
+    const startFlash=(n)=>{
+      stopFlash();
+      let on=false;
+      flashTimer=setInterval(()=>{ on=!on; document.title=on?`🔔 ${n} new booking${n>1?"s":""}!`:baseTitle; },1000);
+    };
     const check=async()=>{
-      if(document.hidden) return; // don't burn quota while backgrounded/minimized
-      if(!WORKSHOP_TABS.includes(tabRef.current)) return; // only relevant inside the workshop module
-      const n=await api.count("workshop_bookings",`status=eq.pending${wsF}`).catch(()=>null);
+      if(!isWorkshopUser){
+        if(document.hidden) return; // don't burn quota while backgrounded/minimized
+        if(!WORKSHOP_TABS.includes(tabRef.current)) return;
+      }
+      const n=await api.count("workshop_bookings",`select=id${wsF}`).catch(()=>null);
       if(n===null) return;
-      if(pendingBookingCountRef.current!==null && n>pendingBookingCountRef.current){
-        const added=n-pendingBookingCountRef.current;
+      if(wsBookingCountRef.current!==null && n>wsBookingCountRef.current){
+        const added=n-wsBookingCountRef.current;
         api.cacheInvalidate("workshop_bookings");
         await refreshWsBookings();
         showToast(`🔔 ${added} new booking${added>1?"s":""} received`);
+        playBookingChime();
+        if(document.hidden||!document.hasFocus()) startFlash(added);
       }
-      pendingBookingCountRef.current=n;
+      wsBookingCountRef.current=n;
     };
+    const onVisible=()=>{ if(!document.hidden){ stopFlash(); check(); } };
     check();
     const id=setInterval(check,45000);
-    return ()=>clearInterval(id);
+    document.addEventListener("visibilitychange",onVisible);
+    window.addEventListener("focus",stopFlash);
+    return ()=>{ clearInterval(id); stopFlash(); document.removeEventListener("visibilitychange",onVisible); window.removeEventListener("focus",stopFlash); };
   },[role,wsF]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Workshop Supplier Invoices ────────────────────────────────
@@ -4736,6 +4774,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const pendingVehicleRequests=vehicleRequests.filter(r=>r.status==="pending").length||0;
   const pendingTransferRequests=branchStockRequests.filter(r=>r.status==="pending"||r.status==="quoted"||r.status==="confirmed"||r.status==="dispatched").length||0;
   const pendingWsShopRequests=wsShopRequests.filter(r=>isBranchUser?r.status==="pending":r.status==="escalated").length||0;
+  const pendingWsBookings=wsBookings.filter(b=>b.status==="pending").length||0; // customer booking requests still awaiting a reply (nav badge)
   // Multi-word search using DEBOUNCED value — fast typing won't lag UI
   const suppNoByPart={};
   partSuppliers.forEach(ps=>{if(ps.supplier_part_no)suppNoByPart[ps.part_id]=(suppNoByPart[ps.part_id]||[]).concat(ps.supplier_part_no.toLowerCase());});
@@ -5028,7 +5067,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       children:[
         {id:"workshop",    icon:"🔧",label:t.wsJobs,                      roles:["admin","manager"]},
         {id:"wscustomers", icon:"👥",label:t.wsCustomers,                 roles:["admin","manager"]},
-        {id:"wsbookings",  icon:"🗓️",label:t.wsBookings||"Bookings",       roles:["admin","manager"]},
+        {id:"wsbookings",  icon:"🗓️",label:t.wsBookings||"Bookings",       roles:["admin","manager"], badge:pendingWsBookings},
         {id:"wsreminders", icon:"🔔",label:t.wsReminders||"Service Reminders", roles:["admin","manager"]},
         {id:"wsquotations",icon:"📝",label:t.wsQuotations,                roles:["admin","manager"]},
         {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,                  roles:["admin","manager"]},
@@ -5049,11 +5088,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // Workshop role: 4 organised sub-groups (this IS their whole app)
     ...(role==="workshop"?[
       {
-        id:"grp_ws_jobs", icon:"🔧", label:t.grpWorkshop||"Workshop — Jobs", roles:["workshop"],
+        id:"grp_ws_jobs", icon:"🔧", label:t.grpWorkshop||"Workshop — Jobs", roles:["workshop"], badge:pendingWsBookings,
         children:[
           {id:"workshop",    icon:"🔧",label:t.wsJobs,       roles:["workshop"]},
           {id:"wscustomers", icon:"👥",label:t.wsCustomers,  roles:["workshop"], wsRoles:["main","manager"]},
-          {id:"wsbookings",  icon:"🗓️",label:t.wsBookings||"Bookings", roles:["workshop"]},
+          {id:"wsbookings",  icon:"🗓️",label:t.wsBookings||"Bookings", roles:["workshop"], badge:pendingWsBookings},
           {id:"wsreminders", icon:"🔔",label:t.wsReminders||"Service Reminders", roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsquotations",icon:"📝",label:t.wsQuotations, roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsinvoices",  icon:"🧾",label:t.wsInvoices,   roles:["workshop"], wsRoles:["main","manager"]},

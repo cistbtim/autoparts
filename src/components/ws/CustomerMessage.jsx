@@ -5,7 +5,8 @@ import { waLink } from "../../lib/helpers.js";
 // "Draft → owner reviews → owner sends" customer messages. Nothing is ever sent automatically:
 // the owner picks a template, tweaks the text, then opens WhatsApp or copies it into WeChat.
 //
-// ctx = { name, phone, reg, make, model, date, time, defaultTpl }  (any field may be empty)
+// ctx = { name, phone, reg, make, model, year, date, time, defaultTpl }  (any field may be empty; model should be the
+// real model name, not the catalogue code)
 
 const TPLS = ["confirm", "reminder", "parts", "ready"];
 
@@ -30,7 +31,7 @@ const hasCJK = (s) => /[㐀-鿿]/.test(s || "");
 
 function draft(tpl, lang, c) {
   const name = (c.name || "").trim().split(" ")[0] || (lang === "zh" ? "" : "there");
-  const car = [c.make, c.model].filter(Boolean).join(" ");
+  const car = [c.year, c.make, c.model].filter(Boolean).join(" ");
   const carReg = [car, c.reg ? `(${c.reg})` : ""].filter(Boolean).join(" ") || (lang === "zh" ? "您的车" : "your vehicle");
   const when = [c.date, c.time].filter(Boolean).join(lang === "zh" ? " " : " at ");
   const shop = c.shop || "";

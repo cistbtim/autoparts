@@ -24,7 +24,7 @@ const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9㐀-鿿]/g, "");
 const cjk = (s) => /[㐀-鿿]/.test(s || "");
 
 // Rank people (from jobs + bookings) against the spoken sentence.
-function findPeople(text, jobs, bookings) {
+function findPeople(text, jobs, bookings, resolveModel = (mk, md) => md) {
   const spoken = norm(text);
   const spokenWords = (text || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
   const people = [];
@@ -36,11 +36,11 @@ function findPeople(text, jobs, bookings) {
     people.push(p);
   };
   jobs.filter(j => !j.is_cancelled).forEach(j => add({
-    name: j.customer_name, phone: j.customer_phone, reg: j.vehicle_reg, make: j.vehicle_make, model: j.vehicle_model,
+    name: j.customer_name, phone: j.customer_phone, reg: j.vehicle_reg, make: j.vehicle_make, model: resolveModel(j.vehicle_make, j.vehicle_model), year: j.vehicle_year || "",
     when: j.date_in || j.created_at || "", active: j.status !== "Paid", src: "job", status: j.status,
   }));
   bookings.filter(b => b.status !== "deleted").forEach(b => add({
-    name: b.customer_name, phone: b.customer_phone, reg: b.vehicle_reg, make: b.vehicle_make, model: b.vehicle_model,
+    name: b.customer_name, phone: b.customer_phone, reg: b.vehicle_reg, make: b.vehicle_make, model: resolveModel(b.vehicle_make, b.vehicle_model), year: b.vehicle_year || "",
     when: b.created_at || "", active: b.status !== "cancelled", src: "booking", status: b.status,
   }));
   return people.map(p => {
@@ -83,7 +83,7 @@ const L = {
   },
 };
 
-export function WsVoiceMessageModal({ jobs = [], bookings = [], onDraft, onClose, initialLang = "zh" }) {
+export function WsVoiceMessageModal({ jobs = [], bookings = [], resolveModel, onDraft, onClose, initialLang = "zh" }) {
   const SR = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
   const [lang, setLang] = useState(initialLang);
   const [text, setText] = useState("");
@@ -94,7 +94,7 @@ export function WsVoiceMessageModal({ jobs = [], bookings = [], onDraft, onClose
   const recRef = useRef(null);
   const T = L[lang];
 
-  const people = useMemo(() => findPeople(text, jobs, bookings), [text, jobs, bookings]);
+  const people = useMemo(() => findPeople(text, jobs, bookings, resolveModel), [text, jobs, bookings, resolveModel]);
   const matches = people.filter(p => p.score > 0);
   const detected = detectTpl(text);
 
@@ -162,7 +162,7 @@ export function WsVoiceMessageModal({ jobs = [], bookings = [], onDraft, onClose
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 13 }}>{p.name}</div>
               <div style={{ fontSize: 11, color: "var(--text3)" }}>
-                {[p.reg, [p.make, p.model].filter(Boolean).join(" "), p.phone].filter(Boolean).join(" · ")}
+                {[p.reg, [p.year, p.make, p.model].filter(Boolean).join(" "), p.phone].filter(Boolean).join(" · ")}
               </div>
             </div>
             {p.score > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--green)" }}>✓ {T.match}</span>}
@@ -171,7 +171,7 @@ export function WsVoiceMessageModal({ jobs = [], bookings = [], onDraft, onClose
       </div>
 
       <button className="btn btn-primary" style={{ width: "100%", fontWeight: 700 }} disabled={!chosen}
-        onClick={() => { onDraft({ name: chosen.name, phone: chosen.phone, reg: chosen.reg, make: chosen.make, model: chosen.model, date: "", defaultTpl: effTpl }); onClose(); }}>
+        onClick={() => { onDraft({ name: chosen.name, phone: chosen.phone, reg: chosen.reg, make: chosen.make, model: chosen.model, year: chosen.year, date: "", defaultTpl: effTpl }); onClose(); }}>
         {T.draft}
       </button>
       <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 8 }}>{T.privacy}</div>

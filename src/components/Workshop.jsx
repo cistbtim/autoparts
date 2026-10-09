@@ -33,6 +33,13 @@ import { JobTimeProfitCard, WsPerformanceReport } from "./ws/TimeProfit.jsx";
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP PAGE
 // ═══════════════════════════════════════════════════════════════
+// Jobs/bookings often store the catalogue CODE (e.g. BM091D) in vehicle_model; show the real model name.
+const resolveCarModel = (vehicles, make, model) => {
+  if(!model) return model||"";
+  const v = make ? (vehicles||[]).find(x=>(x.code===model||x.model===model)&&normMake(x.make)===normMake(make)) : null;
+  return v ? v.model : model;
+};
+
 export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle,headerBookInTrigger=0}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
@@ -1618,7 +1625,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
       )}
 
       {msgCtx&&<WsCustomerMessageModal ctx={msgCtx} wsProfile={wsProfile} onClose={()=>setMsgCtx(null)}/>}
-      {voiceOpen&&<WsVoiceMessageModal jobs={jobs} bookings={wsBookings} initialLang={lang==="zh"?"zh":"en"} onDraft={setMsgCtx} onClose={()=>setVoiceOpen(false)}/>}
+      {voiceOpen&&<WsVoiceMessageModal jobs={jobs} bookings={wsBookings} resolveModel={(mk,md)=>resolveCarModel(vehicles,mk,md)} initialLang={lang==="zh"?"zh":"en"} onDraft={setMsgCtx} onClose={()=>setVoiceOpen(false)}/>}
 
       {/* ══════════════ BOOKINGS TAB ══════════════ */}
       {wsTab==="wsbookings"&&(()=>{
@@ -1645,7 +1652,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         const bookingsOnDate=(ds)=>activeBookings.filter(b=>b.preferred_date===ds);
         const holidayOnDate=(ds)=>bkHolidays.find(h=>h.date===ds);
         const closureOnDate=(ds)=>bkClosedDates.find(c=>c.date===ds);
-        const openBkMsg=(b,defaultTpl)=>setMsgCtx({name:b.customer_name,phone:b.customer_phone,reg:b.vehicle_reg,make:b.vehicle_make,model:b.vehicle_model,date:b.preferred_date||"",defaultTpl});
+        const openBkMsg=(b,defaultTpl)=>setMsgCtx({name:b.customer_name,phone:b.customer_phone,reg:b.vehicle_reg,make:b.vehicle_make,model:resolveCarModel(vehicles,b.vehicle_make,b.vehicle_model),year:b.vehicle_year||"",date:b.preferred_date||"",defaultTpl});
         const renderBookingCard=(b)=>(
           <div key={b.id} className="card" style={{marginBottom:12,padding:14}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
@@ -5686,7 +5693,7 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
               <button title="Draft a message to the customer" onClick={()=>setMsgOpen(true)}
                 style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"rgba(255,122,46,.12)",border:"1px solid rgba(255,122,46,.4)",borderRadius:7,cursor:"pointer",color:"var(--accent)",fontSize:11,fontWeight:700}}>✉</button>
               {msgOpen&&<WsCustomerMessageModal wsProfile={wsProfile} onClose={()=>setMsgOpen(false)}
-                ctx={{name:job.customer_name,phone:job.customer_phone,reg:job.vehicle_reg,make:job.vehicle_make,model:job.vehicle_model,date:"",
+                ctx={{name:job.customer_name,phone:job.customer_phone,reg:job.vehicle_reg,make:job.vehicle_make,model:resolveCarModel(vehicles,job.vehicle_make,job.vehicle_model),year:job.vehicle_year||"",date:"",
                   defaultTpl:job.status==="Ordered"?"parts":"ready"}}/>}
             </div>
           );

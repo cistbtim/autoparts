@@ -12692,12 +12692,35 @@ export function WsShareButtons({wsId,wsRole="main",wsProfile,onTokenSaved,classN
   const [phone,setPhone]=useState("");
   const [busy,setBusy]=useState(false);
   const [copied,setCopied]=useState(false);
+  const [wxLang,setWxLang]=useState("zh"); // WeChat message language
+  const [wxCopied,setWxCopied]=useState("");
   useEffect(()=>{ if(wsProfile?.booking_token) setToken(wsProfile.booking_token); },[wsProfile?.booking_token]);
   if(!wsId) return null;
   const bookingUrl=token?`${window.location.origin}${window.location.pathname}?wsbooking=${token}`:"";
   const bookingText=`Hi! Book your car service with ${wsProfile?.name||"us"} online — scan your licence disc to get started:
 ${bookingUrl}`;
   const copy=async(txt)=>{ try{ await navigator.clipboard.writeText(txt); setCopied(true); setTimeout(()=>setCopied(false),1800); }catch{/* clipboard blocked */} };
+  // WeChat has no "send to this person" link and no auto-reply on personal accounts, so: copy the text, open WeChat, paste.
+  const shopLabel=wsProfile?.name||"";
+  const wxMessage=wxLang==="zh"
+    ?`您好！欢迎预约${shopLabel||"我们的修车厂"}。点击链接，扫描车辆牌照盘即可在线预约维修时间，无需电话：
+${bookingUrl}`
+    :`Hi! Book your car service with ${shopLabel||"us"} online — scan your licence disc to get started:
+${bookingUrl}`;
+  const wxMoments=wxLang==="zh"
+    ?`🔧 ${shopLabel||"修车厂"} 在线预约上线啦！保养、维修扫码即可预约，不用打电话 👇
+${bookingUrl}`
+    :`🔧 Online booking is live at ${shopLabel||"our workshop"}! Scan and book your service — no phone call needed 👇
+${bookingUrl}`;
+  const wxCopy=async(key,txt)=>{ try{ await navigator.clipboard.writeText(txt); setWxCopied(key); setTimeout(()=>setWxCopied(""),1800); }catch{/* clipboard blocked */} };
+  const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=12&data=${encodeURIComponent(bookingUrl)}&format=png`;
+  const saveQr=async()=>{
+    try{
+      const blob=await (await fetch(qrUrl)).blob();
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="booking-qr.png"; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    }catch{ window.open(qrUrl,"_blank"); } // blocked → open the image so it can be long-pressed / saved manually
+  };
   const openBooking=async()=>{
     setOpen("booking");
     if(token) return;
@@ -12747,6 +12770,31 @@ ${bookingUrl}`;
             </a>
             <button className="btn btn-ghost" onClick={()=>copy(bookingUrl)}>{copied?"✅ Copied":"📋 Copy link"}</button>
             {navigator.share&&<button className="btn btn-ghost" onClick={()=>navigator.share({title:"Book your car service",text:bookingText,url:bookingUrl}).catch(()=>{})}>📤 Share</button>}
+          </div>
+
+          {/* ── WeChat tools ── */}
+          <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid var(--border)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <div style={{fontWeight:700,fontSize:13,color:"#07C160"}}>💬 WeChat 微信</div>
+              <div style={{marginLeft:"auto",display:"flex",gap:4}}>
+                {[["zh","中文"],["en","English"]].map(([v,lb])=>(
+                  <button key={v} className={`btn btn-xs ${wxLang===v?"btn-primary":"btn-ghost"}`} onClick={()=>setWxLang(v)}>{lb}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{fontSize:12,background:"var(--surface2)",borderRadius:8,padding:"8px 10px",whiteSpace:"pre-wrap",wordBreak:"break-all",color:"var(--text2)",marginBottom:8}}>{wxMessage}</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+              <button className="btn" style={{background:"#07C160",color:"#fff",border:"none",fontWeight:700}} onClick={()=>wxCopy("msg",wxMessage)}>{wxCopied==="msg"?"✅ 已复制 Copied":"📋 复制消息 Copy"}</button>
+              <a href="weixin://" style={{textDecoration:"none"}}><button className="btn btn-ghost" style={{color:"#07C160",borderColor:"rgba(7,193,96,.5)"}}>↗ 打开微信 Open WeChat</button></a>
+              <button className="btn btn-ghost" onClick={()=>wxCopy("moments",wxMoments)}>{wxCopied==="moments"?"✅ 已复制 Copied":"🌅 朋友圈文案 Moments post"}</button>
+            </div>
+            <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
+              <img src={qrUrl} width={130} height={130} alt="Booking QR" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",flexShrink:0}}/>
+              <div style={{flex:1,minWidth:180}}>
+                <div style={{fontSize:12,color:"var(--text3)",marginBottom:8,lineHeight:1.6}}>二维码 · 客户扫码即可预约。保存图片后发到微信聊天、群或朋友圈。<br/>QR code — customers scan to book. Save the image and send it in WeChat chats, groups or Moments.</div>
+                <button className="btn btn-ghost" onClick={saveQr}>💾 保存二维码 Save QR</button>
+              </div>
+            </div>
           </div>
         </>)}
       </Overlay>

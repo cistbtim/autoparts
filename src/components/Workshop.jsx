@@ -559,11 +559,11 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                 ))}
               </select>
             )}
-            <button className="btn btn-primary hide-desktop" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 Book In Car</button>
+            <button className="btn btn-primary hide-desktop" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 {t?.bookInCar||"Book In Car"}</button>
             {wsProfile?.linked_branch_id&&onGoToSpareShopTab&&(
-              <button className="btn btn-ghost hide-desktop" style={{fontSize:14,padding:"9px 14px",border:"1px solid rgba(96,165,250,.4)",color:"var(--blue)"}} onClick={()=>onGoToSpareShopTab()}>🔍 Search Spare</button>
+              <button className="btn btn-ghost hide-desktop" style={{fontSize:14,padding:"9px 14px",border:"1px solid rgba(96,165,250,.4)",color:"var(--blue)"}} onClick={()=>onGoToSpareShopTab()}>🔍 {t?.searchSpare||"Search Spare"}</button>
             )}
-            <WsShareButtons wsId={wsId} wsRole={wsRole} wsProfile={wsProfile} onTokenSaved={setBookingToken} className="hide-desktop" compact/>
+            <WsShareButtons t={t} wsId={wsId} wsRole={wsRole} wsProfile={wsProfile} onTokenSaved={setBookingToken} className="hide-desktop" compact/>
             <HelpIcon topic="book-in-car" className="hide-desktop"/>
             {/* Moved right after Book In Car — on mobile this used to sit after the
                 Search box, which greedily takes remaining row width and pushed this
@@ -577,11 +577,11 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               <div style={{position:"relative",marginLeft:4,flex:1,minWidth:160,maxWidth:420}}>
                 <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--text3)",pointerEvents:"none"}}>🔍</span>
                 <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
-                  placeholder="Search board…" style={{width:"100%",padding:"9px 30px 9px 32px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+                  placeholder={t?.wsSearchBoard||"Search board…"} style={{width:"100%",padding:"9px 30px 9px 32px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
                 {kanbanSearch&&<button onClick={()=>setKanbanSearch("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,lineHeight:1}}>✕</button>}
               </div>
             )}
-            <button className="btn btn-ghost" title="Refresh jobs" disabled={jobsRefreshing}
+            <button className="btn btn-ghost" title={t?.wsRefreshJobs||"Refresh jobs"} disabled={jobsRefreshing}
               onClick={async()=>{if(!onRefresh)return;setJobsRefreshing(true);try{await onRefresh();}finally{setJobsRefreshing(false);}}}
               style={{opacity:jobsRefreshing?.6:1}}>
               <span style={{display:"inline-block",animation:jobsRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
@@ -589,28 +589,28 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
             {kanbanView&&(
               <div className="hide-mobile" style={{display:"contents"}}>
                 <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
-                  <button title="Zoom out" disabled={kanbanZoom<=0}
+                  <button title={t?.wsZoomOut||"Zoom out"} disabled={kanbanZoom<=0}
                     style={{padding:"7px 11px",border:"none",cursor:kanbanZoom<=0?"not-allowed":"pointer",background:"transparent",color:kanbanZoom<=0?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom<=0?.4:1}}
                     onClick={()=>{const z=Math.max(0,kanbanZoom-1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>−</button>
                   <div style={{padding:"7px 8px",fontSize:11,fontWeight:700,color:"var(--text1)",display:"flex",alignItems:"center",gap:4,borderLeft:"1px solid var(--border)",borderRight:"1px solid var(--border)"}}>
                     {["XS","S","M","L","XL"][kanbanZoom]}
                     <span style={{color:"var(--text3)",fontWeight:400}}>{kanbanColW}px</span>
                   </div>
-                  <button title="Zoom in" disabled={kanbanZoom>=4}
+                  <button title={t?.wsZoomIn||"Zoom in"} disabled={kanbanZoom>=4}
                     style={{padding:"7px 11px",border:"none",cursor:kanbanZoom>=4?"not-allowed":"pointer",background:"transparent",color:kanbanZoom>=4?"var(--text3)":"var(--text1)",fontSize:14,lineHeight:1,opacity:kanbanZoom>=4?.4:1}}
                     onClick={()=>{const z=Math.min(4,kanbanZoom+1);setKanbanZoom(z);try{localStorage.setItem("ws_kanban_zoom",z);}catch{}}}>＋</button>
                 </div>
-                <button title={showKanbanPhotos?"Hide car photos":"Show car photos"}
+                <button title={showKanbanPhotos?(t?.wsHidePhotosTip||"Hide car photos"):(t?.wsShowPhotosTip||"Show car photos")}
                   style={{display:"flex",alignItems:"center",gap:5,padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:showKanbanPhotos?"var(--surface2)":"transparent",cursor:"pointer",fontSize:12,fontWeight:600,color:"var(--text2)",lineHeight:1,marginLeft:4,whiteSpace:"nowrap"}}
                   onClick={()=>{const v=!showKanbanPhotos;setShowKanbanPhotos(v);try{localStorage.setItem("ws_kanban_photos",v?"1":"0");}catch{}}}>
                   <span style={{fontSize:14}}>{showKanbanPhotos?"🚗":"🚫"}</span>
-                  <span className="hide-mobile">Photos</span>
+                  <span className="hide-mobile">{t?.wsPhotos||"Photos"}</span>
                 </button>
-                <button title={hideFinished?"Show Payment Received & Cancelled columns":"Collapse Payment Received & Cancelled columns — focus on active work"}
+                <button title={hideFinished?(t?.wsShowFinishedTip||"Show Payment Received & Cancelled columns"):(t?.wsHideFinishedTip||"Collapse Payment Received & Cancelled columns — focus on active work")}
                   style={{display:"flex",alignItems:"center",gap:5,padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:hideFinished?"var(--surface2)":"transparent",cursor:"pointer",fontSize:12,fontWeight:600,color:"var(--text2)",lineHeight:1,marginLeft:4,whiteSpace:"nowrap"}}
                   onClick={()=>{const v=!hideFinished;setHideFinished(v);try{localStorage.setItem("ws_kanban_hidefinished",v?"1":"0");}catch{}}}>
                   <span style={{fontSize:14}}>{hideFinished?"🙈":"✅"}</span>
-                  <span className="hide-mobile">{hideFinished?"Finished Hidden":"Hide Finished"}</span>
+                  <span className="hide-mobile">{hideFinished?(t?.wsFinishedHidden||"Finished Hidden"):(t?.wsHideFinished||"Hide Finished")}</span>
                 </button>
               </div>
             )}
@@ -1076,7 +1076,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                       skipped with no visible consequence anywhere else on the board */}
                   {!job.is_cancelled&&(()=>{ const pend=checklistPendingFor(job.id); return pend>0&&(
                     <div style={{fontSize:10,fontWeight:800,color:"var(--red)",marginBottom:5,background:"rgba(248,113,113,.12)",border:"1px solid var(--red)",borderRadius:6,padding:"3px 8px",display:"flex",alignItems:"center",justifyContent:"center",gap:5,animation:pend===CHECKLIST_ITEMS.length?"pulseWarn 1.6s ease-in-out infinite":undefined}}>
-                      📋 Inspection: {CHECKLIST_ITEMS.length-pend}/{CHECKLIST_ITEMS.length}
+                      📋 {t?.wsInspection||"Inspection"}: {CHECKLIST_ITEMS.length-pend}/{CHECKLIST_ITEMS.length}
                     </div>
                   );})()}
                   {/* workshop badge — admin viewing all workshops */}
@@ -1218,7 +1218,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                     ) : (
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,fontSize:10,fontWeight:700,marginBottom:5,padding:"3px 7px",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.25)",borderRadius:5,color:"var(--blue)",cursor:"pointer"}}
                         onClick={e=>{e.stopPropagation();setKanbanBkDateEdit({jobId:job.id});}}>
-                        <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🌐 {srcBk.preferred_date?`Booked: ${srcBk.preferred_date}`:"No date selected"}</span>
+                        <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🌐 {srcBk.preferred_date?`${t?.wsBooked||"Booked"}: ${srcBk.preferred_date}`:(t?.wsNoDateSelected||"No date selected")}</span>
                         <span>✏️</span>
                       </div>
                     )
@@ -1227,7 +1227,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                   {/* invoice total — hidden in Payment Received column (PAID stamp already says it) */}
                   {inv&&wsRole!=="mechanic"&&col.id!=="paid"&&(
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,marginBottom:5,padding:"4px 8px",background:"var(--surface2)",borderRadius:6,border:"1px solid var(--border)"}}>
-                      <span style={{color:"var(--text3)",fontWeight:500}}>Invoice</span>
+                      <span style={{color:"var(--text3)",fontWeight:500}}>{t?.wsBtnInvoice||"Invoice"}</span>
                       <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,color:inv.status==="paid"?"#10b981":inv.status==="partial"?"#fbbf24":"#f87171"}}>{fmt(inv.total)}</span>
                     </div>
                   )}
@@ -1276,7 +1276,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                       )}
                       {canInvoice&&(
                         <button className="btn btn-xs btn-primary" style={{width:"100%",fontSize:10,padding:"5px 0"}}
-                          onClick={()=>{ setKanbanInvJob(job); setTimeout(()=>kanbanInvPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),80); }}>🧾 Invoice</button>
+                          onClick={()=>{ setKanbanInvJob(job); setTimeout(()=>kanbanInvPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),80); }}>🧾 {t?.wsBtnInvoice||"Invoice"}</button>
                       )}
                       {col.id==="invoiced"&&wsRole!=="mechanic"&&(
                         <button className="btn btn-xs btn-success" style={{width:"100%",fontSize:10,padding:"5px 0"}}
@@ -12686,7 +12686,7 @@ ${refUrl}`)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"n
 
 // Header/toolbar shortcuts: (1) send the customer booking link, (2) invite another workshop.
 // Self-contained so the desktop header strip (App.jsx) and the mobile jobs toolbar share one copy.
-export function WsShareButtons({wsId,wsRole="main",wsProfile,onTokenSaved,className="",style={},compact=false}){
+export function WsShareButtons({t,wsId,wsRole="main",wsProfile,onTokenSaved,className="",style={},compact=false}){
   const [open,setOpen]=useState(null); // null | "booking" | "invite"
   const [token,setToken]=useState(wsProfile?.booking_token||"");
   const [phone,setPhone]=useState("");
@@ -12743,18 +12743,18 @@ ${bookingUrl}`;
   return(<>
     {compact?(
       <div className={className} style={{display:"inline-flex",flexShrink:0,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden",background:"var(--surface2)"}}>
-        <button type="button" title="Send booking link to a customer" aria-label="Send booking link to a customer" style={{...cbtn,color:"#25D366"}} onClick={openBooking}>
+        <button type="button" title={t?.sendBookingLinkHint||"Send booking link to a customer"} aria-label={t?.sendBookingLinkHint||"Send booking link to a customer"} style={{...cbtn,color:"#25D366"}} onClick={openBooking}>
           <svg {...ico}><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>
         </button>
         {wsRole==="main"&&(
-          <button type="button" title="Invite another workshop" aria-label="Invite another workshop" style={{...cbtn,color:"var(--accent)",borderLeft:"1px solid var(--border)"}} onClick={()=>setOpen("invite")}>
+          <button type="button" title={t?.inviteWorkshopHint||"Invite another workshop"} aria-label={t?.inviteWorkshopHint||"Invite another workshop"} style={{...cbtn,color:"var(--accent)",borderLeft:"1px solid var(--border)"}} onClick={()=>setOpen("invite")}>
             <svg {...ico}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
           </button>
         )}
       </div>
     ):(<>
-      <button className={`btn btn-ghost ${className}`} style={{...btn,border:"1px solid rgba(37,211,102,.45)",color:"#25D366"}} onClick={openBooking}>📲 Send Booking Link</button>
-      {wsRole==="main"&&<button className={`btn btn-ghost ${className}`} style={{...btn,border:"1px solid rgba(255,122,46,.45)",color:"var(--accent)"}} onClick={()=>setOpen("invite")}>🤝 Invite Workshop</button>}
+      <button className={`btn btn-ghost ${className}`} style={{...btn,border:"1px solid rgba(37,211,102,.45)",color:"#25D366"}} onClick={openBooking}>📲 {t?.sendBookingLink||"Send Booking Link"}</button>
+      {wsRole==="main"&&<button className={`btn btn-ghost ${className}`} style={{...btn,border:"1px solid rgba(255,122,46,.45)",color:"var(--accent)"}} onClick={()=>setOpen("invite")}>🤝 {t?.inviteWorkshop||"Invite Workshop"}</button>}
     </>)}
     {open==="booking"&&(
       <Overlay onClose={()=>setOpen(null)}>

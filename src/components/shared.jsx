@@ -21,6 +21,45 @@ export function Flag({flag,fallback="",size=18}){
     style={{width:size,height:Math.round(size*0.75),objectFit:"cover",borderRadius:2,display:"inline-block",verticalAlign:"middle"}}/>;
 }
 
+// Compact language picker for the sidebar: one button (current flag + name) that opens a list,
+// instead of a row of flags that overflows as languages are added.
+export function LangPicker({langs,lang,setLang}){
+  const [open,setOpen]=useState(false);
+  const ref=useRef(null);
+  useEffect(()=>{
+    if(!open) return;
+    const h=(e)=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown",h);
+    return ()=>document.removeEventListener("mousedown",h);
+  },[open]);
+  const cur=langs.find(l=>l.lang===lang)||langs[0];
+  if(!cur) return null;
+  return(
+    <div ref={ref} style={{position:"relative"}}>
+      <button type="button" className="lang on" onClick={()=>setOpen(o=>!o)} aria-haspopup="listbox" aria-expanded={open}
+        style={{width:"100%",display:"flex",alignItems:"center",gap:8,justifyContent:"flex-start",padding:"6px 10px"}}>
+        <Flag flag={cur.flag} fallback={cur.lang.toUpperCase()} size={20}/>
+        <span style={{flex:1,textAlign:"left",fontWeight:600}}>{cur.name}</span>
+        <span style={{fontSize:10,opacity:.8}}>{open?"▲":"▼"}</span>
+      </button>
+      {open&&(
+        <div role="listbox" style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:200,background:"#1c2130",border:"1px solid rgba(255,255,255,.18)",borderRadius:10,boxShadow:"0 10px 28px rgba(0,0,0,.55)",padding:4,maxHeight:320,overflowY:"auto"}}>
+          {langs.map(l=>(
+            <button key={l.lang} type="button" role="option" aria-selected={lang===l.lang}
+              onClick={()=>{ setLang(l.lang); setOpen(false); }}
+              style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"8px 10px",border:"none",borderRadius:7,cursor:"pointer",textAlign:"left",fontSize:13,fontWeight:lang===l.lang?700:500,
+                background:lang===l.lang?"rgba(255,122,46,.22)":"transparent",color:lang===l.lang?"#ff9a5c":"rgba(255,255,255,.88)"}}>
+              <Flag flag={l.flag} fallback={l.lang.toUpperCase()} size={20}/>
+              <span style={{flex:1}}>{l.name}</span>
+              {lang===l.lang&&<span>✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export class ErrorBoundary extends Component {
   constructor(props){ super(props); this.state={err:null}; }
   static getDerivedStateFromError(e){ return {err:e}; }

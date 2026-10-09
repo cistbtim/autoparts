@@ -6,7 +6,7 @@ import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFul
 import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess, CITY_PROVINCE } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
 import { CSS } from "./styles.js";
-import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AdBanner, AdGridCard, Flag } from "./components/shared.jsx";
+import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AdBanner, AdGridCard, Flag, LangPicker } from "./components/shared.jsx";
 
 import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, PartPhotoCapturePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage, PartOcrScanModal, resolveMarginOptions } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
@@ -5507,15 +5507,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             <span style={{width:6,height:6,borderRadius:"50%",background:"var(--green)",display:"inline-block",flexShrink:0}}/>
             <span style={{fontSize:10,color:"var(--text3)",letterSpacing:".03em"}}>{t.connected||"Connected"}</span>
           </div>
-          {langs.length>1&&(
-            <div style={{display:"flex",gap:4}}>
-              {langs.map(l=>(
-                <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
-                  <Flag flag={l.flag} fallback={l.lang.toUpperCase()}/>
-                </button>
-              ))}
-            </div>
-          )}
+          {langs.length>1&&<LangPicker langs={langs} lang={lang} setLang={setLang}/>}
         </div>
         {role!=="admin"&&sub?.label&&<div className={sub.daysLeft!=null&&sub.daysLeft<=7?"wsFlash":undefined} style={{margin:"0 12px 8px",background:"rgba(255,122,46,.15)",borderRadius:7,padding:"3px 9px",fontSize:11,color:"var(--accent)",fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
 
@@ -5609,13 +5601,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               </div>
             </div>
           </div>
-          <div style={{display:"flex",gap:5,justifyContent:"center"}}>
-            {langs.map(l=>(
-              <button key={l.lang} className={`lang ${lang===l.lang?"on":""}`} onClick={()=>setLang(l.lang)} title={l.name}>
-                <Flag flag={l.flag} fallback={l.lang.toUpperCase()}/>
-              </button>
-            ))}
-          </div>
+          {langs.length>1&&<LangPicker langs={langs} lang={lang} setLang={setLang}/>}
           {role!=="admin"&&sub?.label&&<div className={sub.daysLeft!=null&&sub.daysLeft<=7?"wsFlash":undefined} style={{marginTop:8,background:"rgba(255,122,46,.15)",borderRadius:7,padding:"4px 10px",fontSize:12,color:"var(--accent)",fontWeight:600,textAlign:"center"}}>{sub.label}</div>}
         </div>
         {/* Drawer nav groups */}
@@ -5853,13 +5839,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               {tab==="workshop"&&(
                 <>
                   <button className="btn btn-primary hide-mobile" style={{fontSize:13,padding:"7px 14px",marginLeft:14,flexShrink:0}}
-                    onClick={()=>setHeaderBookInTrigger(c=>c+1)}>📷 Book In Car</button>
+                    onClick={()=>setHeaderBookInTrigger(c=>c+1)}>📷 {t.bookInCar||"Book In Car"}</button>
                   {workshopProfile?.linked_branch_id&&(
                     <button className="btn btn-ghost hide-mobile" style={{fontSize:13,padding:"7px 14px",marginLeft:8,flexShrink:0,border:"1px solid rgba(96,165,250,.4)",color:"var(--blue)"}}
-                      onClick={()=>setTab("wsspareshop")}>🔍 Search Spare</button>
+                      onClick={()=>setTab("wsspareshop")}>🔍 {t.searchSpare||"Search Spare"}</button>
                   )}
                   <span className="hide-mobile" style={{display:"contents"}}>
-                    <WsShareButtons wsId={wsId} wsRole={wsRole} wsProfile={workshopProfile} onTokenSaved={tok=>setWorkshopProfile(p=>({...p,booking_token:tok}))} style={{marginLeft:8}}/>
+                    <WsShareButtons t={t} wsId={wsId} wsRole={wsRole} wsProfile={workshopProfile} onTokenSaved={tok=>setWorkshopProfile(p=>({...p,booking_token:tok}))} style={{marginLeft:8}}/>
                   </span>
                   <HelpIcon topic="book-in-car" style={{marginLeft:8}}/>
                 </>

@@ -2711,7 +2711,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 // ═══════════════════════════════════════════════════════════════
 // onFilter   — fitment-based filter (shop/POS): passes a Set of part IDs
 // onVehicleChange — direct make/model filter (inventory): passes {make, model}
-export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onAddPart, t, initialMake="", initialModel="", vin="", engineNo="", reg="", user=null, currentBranch=null}) {
+export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onSelection, onAddPart, t, initialMake="", initialModel="", vin="", engineNo="", reg="", user=null, currentBranch=null}) {
   const [selMake,  setSelMake]  = useState(initialMake);
   const [selModel, setSelModel] = useState(initialModel);
   const [makeInput,  setMakeInput]  = useState(initialMake);
@@ -2758,6 +2758,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
     if (!make) {
       if(onFilter) onFilter(null);
       if(onVehicleChange) onVehicleChange(null);
+      if(onSelection) onSelection(null);
       setActive(false);
       return null;
     }
@@ -2772,6 +2773,10 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
             ? byCode
             : vehicles.filter(v => v.make === make && v.model === model);
         })();
+
+    // Tell the Shop which exact vehicle(s) are selected (only when a specific model/code is picked) — it uses
+    // this for the admin "Unlink from this vehicle" shortcut on each part card.
+    if(onSelection) onSelection(model ? { make, model, vehicles: matchVehicles } : null);
 
     // 1. Fitment-linked part IDs (part_fitments table)
     const vehicleIds = new Set(matchVehicles.map(v => String(v.id)));
@@ -2843,6 +2848,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
     setSelMake(""); setSelModel(""); setMakeInput(""); setModelInput("");
     if(onFilter) onFilter(null);
     if(onVehicleChange) onVehicleChange(null);
+    if(onSelection) onSelection(null);
     setActive(false);
     setReqOpen(false); setReqDone(false);
   };

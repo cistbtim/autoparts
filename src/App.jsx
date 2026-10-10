@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from "react";
+﻿import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, setDemoMode, SUPABASE_URL, SUPABASE_KEY } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
@@ -354,6 +354,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [shopVehicleFilter,setShopVehicleFilter]=useState({make:"",model:""});
+  const [shopFilterSel,setShopFilterSel]=useState(null); // {make,model,vehicles[]} — the exact vehicle(s) picked in the Shop's vehicle filter
+  const [unlinkArm,setUnlinkArm]=useState(null);         // part id armed for the "click again to unlink" confirmation
+  // Part ids linked (via part_fitments) to the vehicle(s) picked in the Shop filter — drives the admin Unlink shortcut.
+  const selLinkedPartIds=useMemo(()=>{
+    if(!shopFilterSel) return null;
+    const vids=new Set(shopFilterSel.vehicles.map(v=>String(v.id)));
+    const s=new Set();
+    partFitments.forEach(f=>{ if(vids.has(String(f.vehicle_id))) s.add(String(f.part_id)); });
+    return s;
+  },[shopFilterSel,partFitments]);
   const [shopReturnTo,setShopReturnTo]=useState(null); // {make,model,search} when the Shop was opened from Vehicle Management — drives the "Back to Vehicles" button
   const [workshopJobFilter,setWorkshopJobFilter]=useState(null); // {label,jobIds} — one-shot nav from Vehicle Management's job-card badge
   const [headerBookInTrigger,setHeaderBookInTrigger]=useState(0); // bumped by the header-strip "Book In Car" button (desktop) to open Workshop's modal
@@ -2917,6 +2927,30 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       }
     }
     return added.length;
+  };
+  // Admin shortcut in the Shop: remove ONE part's link to the vehicle(s) picked in the vehicle filter
+  // (the part stays in inventory and on every other vehicle).
+  const unlinkPartFromSelection=async(p)=>{
+    const sel=shopFilterSel;
+    if(!sel) return;
+    const vids=new Set(sel.vehicles.map(v=>String(v.id)));
+    setUnlinkArm(null);
+    try{
+      let rows=partFitments.filter(f=>String(f.part_id)===String(p.id)&&vids.has(String(f.vehicle_id)));
+      if(rows.some(r=>r.id==null)){ // rows fetched without their id — look them up
+        const fresh=await api.fresh("part_fitments",`part_id=eq.${p.id}&select=*`);
+        rows=(Array.isArray(fresh)?fresh:[]).filter(f=>vids.has(String(f.vehicle_id)));
+      }
+      if(!rows.length) return;
+      for(const r of rows){
+        const res=await api.delete("part_fitments","id",r.id);
+        if(res&&!Array.isArray(res)&&(res.code||res.message)) throw new Error(res.message||res.code);
+      }
+      const gone=new Set(rows.map(r=>`${r.part_id}|${r.vehicle_id}`));
+      setPartFitments(prev=>prev.filter(f=>!gone.has(`${f.part_id}|${f.vehicle_id}`)));
+      setVehicleFilterIds(prev=>{ if(!prev) return prev; const n=new Set(prev); n.delete(String(p.id)); return n.size?n:new Set(["__none__"]); });
+      showToast(`✂ Unlinked from ${sel.vehicles.map(v=>v.code||v.model).join(", ")}`);
+    }catch(e){ showToast("❌ Unlink failed: "+(e.message||e),"err"); }
   };
   const deleteFitment=async(id)=>{
     await api.delete("part_fitments","id",id);
@@ -6928,6 +6962,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               initialMake={shopVehicleFilter.make}
               initialModel={shopVehicleFilter.model}
               onFilter={(ids)=>{setVehicleFilterIds(ids);setShopPage(0);if(ids)setSearchPart("");}}
+              onSelection={setShopFilterSel}
               onAddPart={(role==="admin"||role==="manager"||role==="demo")?((vehIds)=>{
                 const v=vehicles.find(v=>vehIds.includes(v.id));
                 setNewPartInitialF({price:0,cost_price:0,sku:(v?.code||"")+(v?.code?"-":""),category:"Body"});
@@ -6974,6 +7009,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                           onClick={()=>role==="admin"&&openM("editPart",p)}>{p.image||"🔩"}</div>}
                     {/* Content — flex:1 pushes button to bottom */}
                     <div style={{flex:1}}>
+                      {role==="admin"&&vehicleFilterIds&&selLinkedPartIds?.has(String(p.id))&&(()=>{
+                        const armed=unlinkArm===p.id;
+                        const label=shopFilterSel.vehicles.length===1?(shopFilterSel.vehicles[0].code||shopFilterSel.vehicles[0].model):`${shopFilterSel.vehicles.length} vehicles`;
+                        return(
+                          <button className="btn btn-xs" style={{marginBottom:6,fontWeight:700,background:armed?"var(--red)":"rgba(239,68,68,.1)",color:armed?"#fff":"var(--red)",border:"1px solid var(--red)"}}
+                            title="Remove this part's link to the selected vehicle only — the part itself stays in inventory"
+                            onClick={()=>{ if(armed){ unlinkPartFromSelection(p); } else { setUnlinkArm(p.id); setTimeout(()=>setUnlinkArm(a=>a===p.id?null:a),3000); } }}>
+                            {armed?"✓ Click again to unlink":`✂ Doesn't fit ${label}`}
+                          </button>
+                        );
+                      })()}
                       <div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>{p.sku} · {p.brand}</div>
                       <div style={{fontSize:14,fontWeight:700,marginBottom:2,lineHeight:1.3}}>{p.name}</div>
                       {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:2}}>{p.chinese_desc}</div>}
@@ -8687,6 +8733,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             initialJobFilter={tab==="workshop"?workshopJobFilter:null}
             onConsumeInitialJobFilter={()=>setWorkshopJobFilter(null)}
             headerBookInTrigger={headerBookInTrigger}
+            onFitmentsRemoved={(rows)=>setPartFitments(prev=>{const gone=new Set(rows.map(r=>`${r.part_id}|${r.vehicle_id}`));return prev.filter(f=>!gone.has(`${f.part_id}|${f.vehicle_id}`));})}
             onReturnToVehicle={role==="admin"?(make,model,searchKw)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setVehiclesJumpSearch(searchKw||"");setTab("vehicles");}:null}
             ads={liveAds}
             userCtx={{id:String(user.id),name:user.username||user.name||"",role:user.role}}

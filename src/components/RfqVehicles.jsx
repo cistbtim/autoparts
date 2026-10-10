@@ -3572,7 +3572,13 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
       const sibs=siblingsOf(linkPartFor);
       const words=linkSearch.trim().toLowerCase().split(" ").filter(Boolean);
       const linkedTo=(pid,vid)=>fitsByVehicle.get(String(vid))?.has(String(pid));
-      const results=!words.length?[]:parts.filter(p=>{
+      // No search typed: list the parts already on THIS vehicle that are still missing on a ticked variant —
+      // tick the variants above, then link them across without searching for each part.
+      const ownMissing=!words.length
+        ?[...(fitsByVehicle.get(String(linkPartFor.id))||[])].map(id=>partsById.get(id)).filter(Boolean)
+            .filter(p=>targets.some(t=>!linkedTo(p.id,t))).sort((a,b)=>(a.sku||"").localeCompare(b.sku||"")).slice(0,300)
+        :[];
+      const results=!words.length?ownMissing:parts.filter(p=>{
         if(targets.length&&targets.every(t=>linkedTo(p.id,t))) return false; // already on every selected vehicle
         const fields=[p.name,p.chinese_desc,p.sku,p.brand,p.make,p.model,p.year_range,p.oe_number,p.category].map(x=>(x||"").toLowerCase()).join(" ");
         return words.every(w=>fields.includes(w));
@@ -3610,11 +3616,18 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
         <input className="inp" autoFocus placeholder="Search part name or SKU… e.g. windscreen"
           value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} style={{marginBottom:12}}/>
         <div style={{maxHeight:360,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
-          {!words.length
-            ? <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>Start typing to search parts… e.g. "vitz windscreen"</div>
-            : !results.length
-              ? <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>No matching parts</div>
-              : results.map(p=>{
+          {!words.length&&sibs.length>0&&results.length>0&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"var(--text2)",padding:"0 2px"}}>
+              <span style={{flex:1}}>Parts already on <b>{linkPartFor.code||linkPartFor.model}</b> that the ticked variants don't have yet ({results.length}) — or search below to add others</span>
+              <button className="btn btn-ghost btn-xs" onClick={()=>setLinkPicked(new Set(results.map(p=>String(p.id))))}>Select all</button>
+              <button className="btn btn-ghost btn-xs" onClick={()=>setLinkPicked(new Set())}>None</button>
+            </div>
+          )}
+          {!results.length
+            ? <div style={{textAlign:"center",padding:24,color:"var(--text3)",fontSize:13}}>{!words.length
+                ? (sibs.length?"Every part on this vehicle is already linked to the ticked variants. Search to link other parts… e.g. \"windscreen\"":"Start typing to search parts… e.g. \"vitz windscreen\"")
+                : "No matching parts"}</div>
+            : results.map(p=>{
                   const onN=targets.filter(t=>linkedTo(p.id,t)).length;
                   return(
                   <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"var(--surface2)",borderRadius:8,border:`1px solid ${linkPicked.has(String(p.id))?"var(--accent)":"var(--border)"}`}}>
